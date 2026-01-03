@@ -1,0 +1,193 @@
+generated_at: '2026-01-03T14:36:16.448946'
+total_categories: 10
+categories:
+  AI/ML Capabilities:
+    count: 1
+    items:
+    - id: vector-search-benchmark-support
+      file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
+      title: Vector Search Benchmark Support
+      priority: Medium-High
+      status: Not Started
+  Benchmark Development:
+    count: 1
+    items:
+    - id: geospatial-primitives-benchmark
+      file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
+      title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
+      priority: Medium
+      status: Not Started
+  Blog Revision:
+    count: 19
+    items:
+    - id: arm-graviton-generations-benchmarks
+      file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
+      title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
+      priority: Medium-High
+      status: Not Started
+    - id: arm-hyperscaler-comparison-benchmarks
+      file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml
+      title: '[ARM Series] Run hyperscaler ARM comparison (Graviton 4 vs Cobalt 100 vs Axion)'
+      priority: Medium-High
+      status: Not Started
+    - id: cicd-benchmarking-demo
+      file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
+      title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'
+      priority: Medium
+      status: Not Started
+    - id: clickhouse-optimizer-analysis-benchmarks
+      file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
+      title: '[ClickHouse Analysis] Run comparative benchmark suite'
+      priority: Medium-High
+      status: Not Started
+    - id: duckdb-architecture-verification
+      file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
+      title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
+      priority: Medium
+      status: Not Started
+    - id: duckdb-version-performance-benchmarks
+      file: TODO/blog-content/planning/duckdb-version-performance-benchmarks.yaml
+      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+      priority: Medium-High
+      status: Not Started
+    - id: oxbow-series-add-learning-moments
+      file: TODO/blog-content/planning/oxbow-series-add-learning-moments.yaml
+      title: '[Oxbow Series] Add ''learning in public'' moments'
+      priority: Medium-High
+      status: Not Started
+    - id: oxbow-series-add-citations
+      file: TODO/blog-content/planning/oxbow-series-add-citations.yaml
+      title: '[Oxbow Series] Add missing citations for claims'
+      priority: Medium-High
+      status: Not Started
+    - id: oxbow-series-reality-vs-aspiration
+      file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
+      title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'
+      priority: High
+      status: Not Started
+    - id: oxbow-series-fix-orphaned-footnotes
+      file: TODO/blog-content/planning/oxbow-series-fix-orphaned-footnotes.yaml
+      title: '[Oxbow Series] Fix orphaned footnotes across all posts'
+      priority: High
+      status: Not Started
+    - id: oxbow-tier1-benchmark-runs
+      file: TODO/blog-content/planning/oxbow-tier1-benchmark-runs.yaml
+      title: '[Oxbow Series] Run Tier 1 benchmark suite for blog content'
+      priority: High
+      status: Not Started
+    - id: oxbow-tier2-benchmark-runs
+      file: TODO/blog-content/planning/oxbow-tier2-benchmark-runs.yaml
+      title: '[Oxbow Series] Run Tier 2 benchmark suite for enhanced blog content'
+      priority: Medium-High
+      status: Not Started
+    - id: oxbow-tier3-cloud-benchmark-runs
+      file: TODO/blog-content/planning/oxbow-tier3-cloud-benchmark-runs.yaml
+      title: '[Oxbow Series] Run Tier 3 cloud benchmarks for cost comparison data'
+      priority: Medium
+      status: Not Started
+    - id: oxbow-series-strengthen-opening-hooks
+      file: TODO/blog-content/planning/oxbow-series-strengthen-opening-hooks.yaml
+      title: '[Oxbow Series] Strengthen opening hooks for Posts 1, 3, 6'
+      priority: Medium-High
+      status: Not Started
+    - id: oxbow-series-style-cleanup
+      file: TODO/blog-content/planning/oxbow-series-style-cleanup.yaml
+      title: '[Oxbow Series] Style cleanup: headings, cross-links, status lines'
+      priority: Medium
+      status: Not Started
+    - id: oxbow-update-drafts-with-data
+      file: TODO/blog-content/planning/oxbow-update-drafts-with-data.yaml
+      title: '[Oxbow Series] Update drafts with real benchmark data'
+      priority: Medium-High
+      status: Not Started
+    - id: oxbow-series-verify-benchbox-commands
+      file: TODO/blog-content/planning/oxbow-series-verify-benchbox-commands.yaml
+      title: '[Oxbow Series] Verify BenchBox install and run commands'
+      priority: Medium-High
+      status: Not Started
+    - id: snowflake-gen2-comparison-benchmarks
+      file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
+      title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
+      priority: Medium-High
+      status: Not Started
+    - id: tutorial-benchmark-verification
+      file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
+      title: '[Tutorials] Verify benchmark commands in tutorial posts'
+      priority: Medium
+      status: Not Started
+  Code Quality and Technical Debt:
+    count: 1
+    items:
+    - id: runtime-module-refactor-batch-two
+      file: TODO/runtime-ops/planning/runtime-module-refactor-batch-two.yaml
+      title: Runtime Module Refactor – Batch Two
+      priority: Low
+      status: Identified
+  Core Functionality:
+    count: 1
+    items:
+    - id: cloud-spark-dependency-groups
+      file: TODO/platform-expansion/planning/cloud-spark-dependency-groups.yaml
+      title: Cloud Spark Dependency Groups in pyproject.toml
+      priority: Medium-High
+      status: Not Started
+  Documentation:
+    count: 2
+    items:
+    - id: influxdb-blog-post-edits
+      file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
+      title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
+      priority: Medium
+      status: Not Started
+    - id: timescaledb-blog-post-edits
+      file: TODO/blog-content/planning/timescaledb-blog-post-edits.yaml
+      title: Edit TimescaleDB vs PostgreSQL blog post before publication
+      priority: Medium
+      status: Not Started
+  Platform Expansion:
+    count: 2
+    items:
+    - id: local-platform-cost-tracking
+      file: TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
+      title: Add cost tracking for local/self-hosted platforms
+      priority: Low
+      status: Not Started
+    - id: postgresql-first-class-platform
+      file: TODO/platform-expansion/planning/postgresql-first-class-platform.yaml
+      title: Promote PostgreSQL to first-class platform status
+      priority: High
+      status: Not Started
+  Specialized Benchmarks:
+    count: 3
+    items:
+    - id: geospatial-benchmark-support-postgis-integration
+      file: TODO/specialized-geospatial/planning/geospatial-benchmark-support-postgis-integration.yaml
+      title: Geospatial Benchmark Support - PostGIS Integration
+      priority: Low
+      status: Not Started
+    - id: graph-query-benchmark-support-neo4j-neptune
+      file: TODO/specialized-graph/planning/graph-query-benchmark-support-neo4j-neptune.yaml
+      title: Graph Query Benchmark Support - Neo4j, Neptune
+      priority: Low
+      status: Not Started
+    - id: streaming-benchmark-support-kafka-flink-spark-streaming
+      file: TODO/specialized-streaming/planning/streaming-benchmark-support-kafka-flink-spark-streaming.yaml
+      title: Streaming Benchmark Support - Kafka, Flink, Spark Streaming
+      priority: Low
+      status: Not Started
+  Supporting Infrastructure:
+    count: 1
+    items:
+    - id: interactive-benchmark-explorer-web-ui
+      file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
+      title: Interactive Benchmark Explorer - Web UI
+      priority: Low
+      status: Not Started
+  User Experience:
+    count: 1
+    items:
+    - id: platform-setup-numbered-list-selection
+      file: TODO/ux-improvements/planning/platform-setup-numbered-list-selection.yaml
+      title: Add numbered list selection to platform setup wizard
+      priority: Medium-High
+      status: Not Started

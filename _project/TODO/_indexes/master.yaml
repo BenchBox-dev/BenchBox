@@ -1,0 +1,362 @@
+generated_at: '2026-01-03T14:36:16.448917'
+total_items: 32
+items:
+- id: postgresql-first-class-platform
+  file: TODO/platform-expansion/planning/postgresql-first-class-platform.yaml
+  title: Promote PostgreSQL to first-class platform status
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - postgresql
+  - platform
+  - relational
+  - first-class
+  estimated_effort: Medium
+- id: oxbow-series-reality-vs-aspiration
+  file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
+  title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'
+  worktree: blog-content
+  category: Blog Revision
+  priority: High
+  status: Not Started
+  estimated_effort: 2 hours
+- id: oxbow-series-fix-orphaned-footnotes
+  file: TODO/blog-content/planning/oxbow-series-fix-orphaned-footnotes.yaml
+  title: '[Oxbow Series] Fix orphaned footnotes across all posts'
+  worktree: blog-content
+  category: Blog Revision
+  priority: High
+  status: Not Started
+  estimated_effort: 1 hour
+- id: oxbow-tier1-benchmark-runs
+  file: TODO/blog-content/planning/oxbow-tier1-benchmark-runs.yaml
+  title: '[Oxbow Series] Run Tier 1 benchmark suite for blog content'
+  worktree: blog-content
+  category: Blog Revision
+  priority: High
+  status: Not Started
+  tags:
+  - oxbow-series
+  - benchmarking
+  - blog-data
+  estimated_effort: 30-60 minutes
+- id: local-platform-cost-tracking
+  file: TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
+  title: Add cost tracking for local/self-hosted platforms
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  tags:
+  - cost-estimation
+  - local-platforms
+  - self-hosted
+  - resource-tracking
+  estimated_effort: 1-2 days
+- id: geospatial-benchmark-support-postgis-integration
+  file: TODO/specialized-geospatial/planning/geospatial-benchmark-support-postgis-integration.yaml
+  title: Geospatial Benchmark Support - PostGIS Integration
+  worktree: specialized-geospatial
+  category: Specialized Benchmarks
+  priority: Low
+  status: Not Started
+  estimated_effort: 2 weeks (0.5 FTE)
+- id: graph-query-benchmark-support-neo4j-neptune
+  file: TODO/specialized-graph/planning/graph-query-benchmark-support-neo4j-neptune.yaml
+  title: Graph Query Benchmark Support - Neo4j, Neptune
+  worktree: specialized-graph
+  category: Specialized Benchmarks
+  priority: Low
+  status: Not Started
+  estimated_effort: 4 weeks (1.0 FTE)
+- id: interactive-benchmark-explorer-web-ui
+  file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
+  title: Interactive Benchmark Explorer - Web UI
+  worktree: infrastructure-explorer
+  category: Supporting Infrastructure
+  priority: Low
+  status: Not Started
+  estimated_effort: 6 weeks (1.0 FTE frontend engineer)
+- id: runtime-module-refactor-batch-two
+  file: TODO/runtime-ops/planning/runtime-module-refactor-batch-two.yaml
+  title: Runtime Module Refactor – Batch Two
+  worktree: runtime-ops
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Identified
+- id: streaming-benchmark-support-kafka-flink-spark-streaming
+  file: TODO/specialized-streaming/planning/streaming-benchmark-support-kafka-flink-spark-streaming.yaml
+  title: Streaming Benchmark Support - Kafka, Flink, Spark Streaming
+  worktree: specialized-streaming
+  category: Specialized Benchmarks
+  priority: Low
+  status: Not Started
+  estimated_effort: 4 weeks (1.0 FTE)
+- id: influxdb-blog-post-edits
+  file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
+  title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
+  worktree: blog-content
+  category: Documentation
+  priority: Medium
+  status: Not Started
+  tags:
+  - blog
+  - influxdb
+  - fdap
+  - editing
+  - platform-deep-dives
+  estimated_effort: Low
+- id: timescaledb-blog-post-edits
+  file: TODO/blog-content/planning/timescaledb-blog-post-edits.yaml
+  title: Edit TimescaleDB vs PostgreSQL blog post before publication
+  worktree: blog-content
+  category: Documentation
+  priority: Medium
+  status: Not Started
+  tags:
+  - blog
+  - timescaledb
+  - postgresql
+  - editing
+  - platform-deep-dives
+  estimated_effort: Low
+- id: geospatial-primitives-benchmark
+  file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
+  title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - primitives
+  - benchmark
+  - geospatial
+  - geography
+  - geometry
+  - st_functions
+  - h3
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 3-4 weeks
+- id: cicd-benchmarking-demo
+  file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
+  title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - cicd
+  - business-of-analytics
+  - regression-detection
+  - demo
+  estimated_effort: 20-30 minutes
+- id: duckdb-architecture-verification
+  file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
+  title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - duckdb
+  - platform-deep-dives
+  - verification
+  - quick-task
+  estimated_effort: 10-15 minutes
+- id: oxbow-tier3-cloud-benchmark-runs
+  file: TODO/blog-content/planning/oxbow-tier3-cloud-benchmark-runs.yaml
+  title: '[Oxbow Series] Run Tier 3 cloud benchmarks for cost comparison data'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - oxbow-series
+  - benchmarking
+  - blog-data
+  - cloud-platforms
+  - cost-analysis
+  estimated_effort: 1-2 hours
+- id: oxbow-series-style-cleanup
+  file: TODO/blog-content/planning/oxbow-series-style-cleanup.yaml
+  title: '[Oxbow Series] Style cleanup: headings, cross-links, status lines'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  estimated_effort: 45 minutes
+- id: tutorial-benchmark-verification
+  file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
+  title: '[Tutorials] Verify benchmark commands in tutorial posts'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - tutorials
+  - benchmarking
+  - blog-data
+  - verification
+  estimated_effort: 30-60 minutes
+- id: platform-setup-numbered-list-selection
+  file: TODO/ux-improvements/planning/platform-setup-numbered-list-selection.yaml
+  title: Add numbered list selection to platform setup wizard
+  worktree: ux-improvements
+  category: User Experience
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - cli
+  - ux
+  - rich
+  - interactive
+  estimated_effort: Small
+- id: cloud-spark-dependency-groups
+  file: TODO/platform-expansion/planning/cloud-spark-dependency-groups.yaml
+  title: Cloud Spark Dependency Groups in pyproject.toml
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - cloud-spark
+  - dependencies
+  - pyproject
+  estimated_effort: 2 hours
+- id: vector-search-benchmark-support
+  file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
+  title: Vector Search Benchmark Support
+  worktree: ai-ml-vector-search
+  category: AI/ML Capabilities
+  priority: Medium-High
+  status: Not Started
+  estimated_effort: 4 weeks (1.0 FTE ML engineer)
+- id: arm-graviton-generations-benchmarks
+  file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
+  title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - arm-performance
+  - graviton
+  - aws
+  - cloud-benchmarking
+  - blog-data
+  estimated_effort: 2-3 hours
+- id: arm-hyperscaler-comparison-benchmarks
+  file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml
+  title: '[ARM Series] Run hyperscaler ARM comparison (Graviton 4 vs Cobalt 100 vs Axion)'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - arm-performance
+  - graviton
+  - cobalt
+  - axion
+  - cloud-benchmarking
+  - cross-cloud
+  - blog-data
+  estimated_effort: 3-4 hours
+- id: clickhouse-optimizer-analysis-benchmarks
+  file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
+  title: '[ClickHouse Analysis] Run comparative benchmark suite'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - clickhouse
+  - platform-deep-dives
+  - benchmarking
+  - blog-data
+  estimated_effort: 1-2 hours
+- id: duckdb-version-performance-benchmarks
+  file: TODO/blog-content/planning/duckdb-version-performance-benchmarks.yaml
+  title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - duckdb-performance
+  - benchmarking
+  - blog-data
+  - multi-version
+  estimated_effort: 3-5 hours
+- id: oxbow-series-add-learning-moments
+  file: TODO/blog-content/planning/oxbow-series-add-learning-moments.yaml
+  title: '[Oxbow Series] Add ''learning in public'' moments'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  estimated_effort: 30 minutes
+- id: oxbow-series-add-citations
+  file: TODO/blog-content/planning/oxbow-series-add-citations.yaml
+  title: '[Oxbow Series] Add missing citations for claims'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  estimated_effort: 1 hour
+- id: oxbow-tier2-benchmark-runs
+  file: TODO/blog-content/planning/oxbow-tier2-benchmark-runs.yaml
+  title: '[Oxbow Series] Run Tier 2 benchmark suite for enhanced blog content'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - oxbow-series
+  - benchmarking
+  - blog-data
+  - dataframe
+  estimated_effort: 30-60 minutes
+- id: oxbow-series-strengthen-opening-hooks
+  file: TODO/blog-content/planning/oxbow-series-strengthen-opening-hooks.yaml
+  title: '[Oxbow Series] Strengthen opening hooks for Posts 1, 3, 6'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  estimated_effort: 45 minutes
+- id: oxbow-update-drafts-with-data
+  file: TODO/blog-content/planning/oxbow-update-drafts-with-data.yaml
+  title: '[Oxbow Series] Update drafts with real benchmark data'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - oxbow-series
+  - blog-revision
+  - data-integration
+  estimated_effort: 1-2 hours
+- id: oxbow-series-verify-benchbox-commands
+  file: TODO/blog-content/planning/oxbow-series-verify-benchbox-commands.yaml
+  title: '[Oxbow Series] Verify BenchBox install and run commands'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  estimated_effort: 30 minutes
+- id: snowflake-gen2-comparison-benchmarks
+  file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
+  title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - snowflake
+  - cloud-benchmarking
+  - gen2-comparison
+  - blog-data
+  estimated_effort: 2-4 hours
