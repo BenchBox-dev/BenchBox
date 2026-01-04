@@ -1,4 +1,4 @@
-generated_at: '2026-01-03T14:36:17.089721'
+generated_at: '2026-01-03T19:04:27.356858'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -322,7 +322,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 47
+    count: 48
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -539,6 +539,11 @@ categories:
       title: Refactor and Simplify TPC Compilation Infrastructure ✅ COMPLETED
       priority: Medium
       status: Not Started
+    - id: refactor-core-dependencies-to-optional
+      file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
+      title: Refactor platform-specific packages from core to optional dependencies
+      priority: High
+      status: Completed
     - id: standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com
       file: DONE/unknown/planning/standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com.yaml
       title: Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED

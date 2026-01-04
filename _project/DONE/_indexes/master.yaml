@@ -1,5 +1,5 @@
-generated_at: '2026-01-03T14:36:17.089581'
-total_items: 324
+generated_at: '2026-01-03T19:04:27.356702'
+total_items: 325
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -990,6 +990,19 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 3-5 days
   completed_date: '2025-12-12'
+- id: refactor-core-dependencies-to-optional
+  file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
+  title: Refactor platform-specific packages from core to optional dependencies
+  worktree: infrastructure-publishing
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - dependencies
+  - packaging
+  - developer-experience
+  - install-size
+  estimated_effort: Medium
 - id: pyspark-sql-registry-integration
   file: DONE/dataframe-expansion/planning/pyspark-sql-registry-integration.yaml
   title: Register PySpark SQL mode in platform registry

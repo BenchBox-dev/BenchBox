@@ -1,5 +1,5 @@
-generated_at: '2026-01-03T14:36:17.089885'
-total_items: 324
+generated_at: '2026-01-03T19:04:27.357030'
+total_items: 325
 statuses:
   In Progress:
     count: 1
@@ -686,7 +686,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 148
+    count: 149
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1048,6 +1048,11 @@ statuses:
       title: Ranking & Aggregation System - Platform Leaderboards & Trends
       priority: Critical
       category: Marketing Content Enablement
+    - id: refactor-core-dependencies-to-optional
+      file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
+      title: Refactor platform-specific packages from core to optional dependencies
+      priority: High
+      category: Core Functionality
     - id: resource-management
       file: DONE/runtime-ops/completed/resource-management.yaml
       title: Resource Management
