@@ -1,0 +1,125 @@
+title: "Refactor platform-specific packages from core to optional dependencies"
+worktree: "infrastructure-publishing"
+priority: "High"
+status: "Identified"
+category: "Core Functionality"
+
+description: |
+  Platform-specific packages have accumulated in pyproject.toml core dependencies
+  that should be optional extras. This causes install bloat, dependency conflicts,
+  and cross-platform issues (e.g., PySpark requires Java).
+
+  Current core dependencies that should be optional:
+  - polars>=1.35.2 (DataFrame platform)
+  - datafusion>=50.1.0 (SQL/DataFrame platform)
+  - presto-python-client>=0.8.4 (SQL platform)
+  - clickhouse-driver>=0.2.9 (SQL platform)
+  - pyspark>=4.0.1 (DataFrame platform - requires Java!)
+  - dask[distributed]>=2024.8.0 (DataFrame platform)
+
+  Core dependencies should only include CLI essentials:
+  - click, rich (CLI framework)
+  - pyyaml (config parsing)
+  - packaging (version handling)
+  - jsonschema (validation)
+
+  DuckDB should remain as the default reference platform for ease of use.
+
+context_sections:
+  "Background and Motivation": |
+    These dependencies were gradually added between 2025-10-20 and 2026-01-03
+    as each platform feature was developed. Each addition put its dependency
+    in core instead of optional, leading to dependency creep.
+
+    Git blame shows the progression:
+    - duckdb: 2025-10-20 (37a822ab2)
+    - polars: 2025-11-28 (f04facc43)
+    - datafusion: 2025-12-07 (e76b4897f)
+    - presto-python-client: 2025-12-12 (b84c4e21a)
+    - clickhouse-driver: 2025-12-13 (f842b57d7)
+    - pyspark: 2025-12-14 (531fc1a7f)
+    - dask: 2026-01-03 (0e521d3d5)
+
+  "Technical Context": |
+    The CLI currently assumes platforms are always available. Moving to optional
+    dependencies requires:
+    1. Updating import guards throughout the codebase
+    2. Adding helpful "install with: uv sync --extra X" messages
+    3. Ensuring benchbox CLI starts even with no platforms installed
+    4. Updating documentation and getting-started guides
+
+impact:
+  business_value: |
+    - Faster installs for users who only need specific platforms
+    - Fewer dependency conflicts in user environments
+    - Professional package structure matching industry standards
+  user_impact: |
+    - `pip install benchbox` goes from ~500MB to ~10MB
+    - Users can install only the platforms they need
+    - No more Java requirement for basic usage (PySpark is optional)
+  technical_debt: |
+    - Cleans up accidental dependency creep
+    - Establishes clear pattern for future platform additions
+
+tasks:
+  phases:
+    - phase: "Phase 1: Analysis and Planning"
+      done: false
+      items:
+        - summary: "Audit all imports of platform packages in core code"
+          done: false
+        - summary: "Identify which imports are truly required vs. optional"
+          done: false
+        - summary: "Document the target dependency structure"
+          done: false
+
+    - phase: "Phase 2: Core Refactoring"
+      done: false
+      items:
+        - summary: "Move platform packages to optional-dependencies in pyproject.toml"
+          done: false
+        - summary: "Add import guards with helpful error messages"
+          done: false
+        - summary: "Update CLI to handle missing platforms gracefully"
+          done: false
+        - summary: "Create benchbox[quick-start] meta-extra with duckdb + polars"
+          done: false
+
+    - phase: "Phase 3: Testing and Documentation"
+      done: false
+      items:
+        - summary: "Test clean install with minimal dependencies"
+          done: false
+        - summary: "Test each platform extra installs correctly"
+          done: false
+        - summary: "Update installation documentation"
+          done: false
+        - summary: "Update getting-started guides"
+          done: false
+
+files_affected:
+  modified:
+    - "pyproject.toml"
+    - "benchbox/cli/commands/run.py"
+    - "benchbox/utils/dependencies.py"
+    - "benchbox/platforms/__init__.py"
+    - "docs/installation.md"
+
+success_metrics:
+  - "pip install benchbox completes in <30 seconds"
+  - "benchbox --help works with zero platform dependencies"
+  - "Each platform extra installs and works independently"
+  - "No Java required for benchbox[duckdb] or benchbox[polars]"
+
+open_questions:
+  - "Should pyarrow be core (for data format) or optional?"
+  - "What should the default behavior be when only DuckDB is available?"
+
+metadata:
+  tags:
+    - "dependencies"
+    - "packaging"
+    - "developer-experience"
+    - "install-size"
+  estimated_effort: "Medium"
+  created_date: "2026-01-03"
