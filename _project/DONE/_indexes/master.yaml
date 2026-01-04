@@ -1,5 +1,5 @@
-generated_at: '2026-01-03T21:38:50.102153'
-total_items: 325
+generated_at: '2026-01-04T14:19:31.049245'
+total_items: 337
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -216,6 +216,22 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 2 weeks
   completed_date: '2025-12-02'
+- id: pt-01-ddl-generator-protocol
+  file: DONE/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml
+  title: 'PT-01: DDL Generator Protocol and Base Implementation'
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: Critical
+  status: Completed
+  tags:
+  - tuning
+  - ddl-generation
+  - protocol
+  - foundation
+  owners:
+  - joe
+  estimated_effort: Medium
+  completed_date: '2026-01-03'
 - id: query-plan-core-infrastructure-models-storage
   file: DONE/query-plan-core/planning/query-plan-core-infrastructure-models-storage.yaml
   title: Query Plan Core Infrastructure (Models & Storage)
@@ -842,6 +858,65 @@ items:
   category: '"Technical Debt & Refactoring"'
   priority: High
   status: Completed
+- id: pt-02-tuning-config-enhancements
+  file: DONE/physical-tuning/planning/pt-02-tuning-config-enhancements.yaml
+  title: 'PT-02: Tuning Configuration Schema Enhancements'
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - tuning
+  - configuration
+  - schema
+  owners:
+  - joe
+  estimated_effort: Medium
+- id: pt-03-redshift-ddl
+  file: DONE/physical-tuning/planning/pt-03-redshift-ddl.yaml
+  title: 'PT-03: Redshift Physical Tuning DDL Generator'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - tuning
+  - redshift
+  - aws
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Medium
+- id: pt-04-duckdb-ddl
+  file: DONE/physical-tuning/planning/pt-04-duckdb-ddl.yaml
+  title: 'PT-04: DuckDB Physical Tuning DDL Generator'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - tuning
+  - duckdb
+  - local-platform
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Small
+- id: pt-05-postgresql-timescaledb-ddl
+  file: DONE/physical-tuning/planning/pt-05-postgresql-timescaledb-ddl.yaml
+  title: 'PT-05: PostgreSQL & TimescaleDB Physical Tuning DDL Generators'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - tuning
+  - postgresql
+  - timescaledb
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Medium-Large
 - id: phase-4-infrastructure
   file: DONE/platform-config-audit/completed/phase-4-infrastructure.yaml
   title: 'Platform Config Audit: Infrastructure/Cluster Changes'
@@ -2375,6 +2450,103 @@ items:
   category: Code Quality and Technical Debt
   priority: Medium
   status: Not Started
+- id: pt-07-snowflake-ddl
+  file: DONE/physical-tuning/planning/pt-07-snowflake-ddl.yaml
+  title: 'PT-07: Snowflake Physical Tuning DDL Generator Enhancement'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - snowflake
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Small
+- id: pt-08-databricks-spark-ddl
+  file: DONE/physical-tuning/planning/pt-08-databricks-spark-ddl.yaml
+  title: 'PT-08: Spark Family Physical Tuning DDL Generator (All Platforms)'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - spark
+  - databricks
+  - delta-lake
+  - iceberg
+  - aws
+  - gcp
+  - azure
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Large
+- id: pt-09-bigquery-ddl
+  file: DONE/physical-tuning/planning/pt-09-bigquery-ddl.yaml
+  title: 'PT-09: BigQuery Physical Tuning DDL Generator Enhancement'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - bigquery
+  - gcp
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Small
+- id: pt-10-dataframe-physical-tuning
+  file: DONE/physical-tuning/planning/pt-10-dataframe-physical-tuning.yaml
+  title: 'PT-10: DataFrame Platform Physical Tuning (Write-Time Layout)'
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: Medium
+  status: Done
+  tags:
+  - tuning
+  - dataframe
+  - physical-layout
+  - parquet
+  owners:
+  - joe
+  estimated_effort: Large
+- id: pt-11-integration-testing-dryrun
+  file: DONE/physical-tuning/planning/pt-11-integration-testing-dryrun.yaml
+  title: 'PT-11: Physical Tuning Integration, Testing & Dry-Run Enhancement'
+  worktree: physical-tuning
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Done
+  tags:
+  - tuning
+  - integration
+  - testing
+  - dry-run
+  - documentation
+  owners:
+  - joe
+  estimated_effort: Medium-Large
+- id: pt-12-remaining-platforms-ddl
+  file: DONE/physical-tuning/planning/pt-12-remaining-platforms-ddl.yaml
+  title: 'PT-12: Remaining Platforms Physical Tuning DDL Generator Enhancement'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: Medium
+  status: Done
+  tags:
+  - tuning
+  - clickhouse
+  - firebolt
+  - azure-synapse
+  - fabric
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Medium
 - id: performance-regression-detection-system
   file: DONE/enterprise-ops-regression/planning/performance-regression-detection-system.yaml
   title: Performance Regression Detection System
@@ -3078,6 +3250,23 @@ items:
   - saas
   estimated_effort: 2 weeks
   completed_date: '2025-12-24'
+- id: pt-06-trino-presto-athena-ddl
+  file: DONE/physical-tuning/planning/pt-06-trino-presto-athena-ddl.yaml
+  title: 'PT-06: Trino, Presto & Athena Physical Tuning DDL Generators'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - tuning
+  - trino
+  - presto
+  - athena
+  - iceberg
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Large
 - id: platform-troubleshooting-guide
   file: DONE/docs-experience/planning/platform-troubleshooting-guide.yaml
   title: Platform Troubleshooting Guide

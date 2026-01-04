@@ -5,7 +5,7 @@
 title: "PT-10: DataFrame Platform Physical Tuning (Write-Time Layout)"
 worktree: "physical-tuning"
 priority: "Medium"
-status: "Not Started"
+status: "Done"
 category: "Core Functionality"
 
 description: |

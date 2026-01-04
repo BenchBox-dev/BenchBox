@@ -1,8 +1,8 @@
-generated_at: '2026-01-03T21:38:50.102385'
-total_items: 325
+generated_at: '2026-01-04T14:19:31.049542'
+total_items: 337
 priorities:
   Critical:
-    count: 23
+    count: 24
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -79,6 +79,11 @@ priorities:
       title: Implement TPC-H Queries for Pandas Family
       category: Core Functionality
       status: Partially Complete
+    - id: pt-01-ddl-generator-protocol
+      file: DONE/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml
+      title: 'PT-01: DDL Generator Protocol and Base Implementation'
+      category: Core Functionality
+      status: Completed
     - id: query-plan-core-infrastructure-models-storage
       file: DONE/query-plan-core/planning/query-plan-core-infrastructure-models-storage.yaml
       title: Query Plan Core Infrastructure (Models & Storage)
@@ -120,7 +125,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 101
+    count: 105
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -332,6 +337,26 @@ priorities:
       title: NYC Taxi OLAP Benchmark (Core Implementation)
       category: '"Technical Debt & Refactoring"'
       status: Completed
+    - id: pt-02-tuning-config-enhancements
+      file: DONE/physical-tuning/planning/pt-02-tuning-config-enhancements.yaml
+      title: 'PT-02: Tuning Configuration Schema Enhancements'
+      category: Core Functionality
+      status: Not Started
+    - id: pt-03-redshift-ddl
+      file: DONE/physical-tuning/planning/pt-03-redshift-ddl.yaml
+      title: 'PT-03: Redshift Physical Tuning DDL Generator'
+      category: Platform Expansion
+      status: Not Started
+    - id: pt-04-duckdb-ddl
+      file: DONE/physical-tuning/planning/pt-04-duckdb-ddl.yaml
+      title: 'PT-04: DuckDB Physical Tuning DDL Generator'
+      category: Platform Expansion
+      status: Not Started
+    - id: pt-05-postgresql-timescaledb-ddl
+      file: DONE/physical-tuning/planning/pt-05-postgresql-timescaledb-ddl.yaml
+      title: 'PT-05: PostgreSQL & TimescaleDB Physical Tuning DDL Generators'
+      category: Platform Expansion
+      status: Not Started
     - id: phase-4-infrastructure
       file: DONE/platform-config-audit/completed/phase-4-infrastructure.yaml
       title: 'Platform Config Audit: Infrastructure/Cluster Changes'
@@ -628,7 +653,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 10
+    count: 11
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -670,6 +695,11 @@ priorities:
       title: Microsoft Fabric Spark Platform
       category: Platform Expansion
       status: Completed
+    - id: pt-06-trino-presto-athena-ddl
+      file: DONE/physical-tuning/planning/pt-06-trino-presto-athena-ddl.yaml
+      title: 'PT-06: Trino, Presto & Athena Physical Tuning DDL Generators'
+      category: Platform Expansion
+      status: Not Started
     - id: platform-troubleshooting-guide
       file: DONE/docs-experience/planning/platform-troubleshooting-guide.yaml
       title: Platform Troubleshooting Guide
@@ -681,7 +711,7 @@ priorities:
       category: Platform Expansion
       status: Complete
   Medium:
-    count: 178
+    count: 184
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1193,6 +1223,36 @@ priorities:
       title: Optimize Benchmark Results JSON Output Format
       category: Code Quality and Technical Debt
       status: Not Started
+    - id: pt-07-snowflake-ddl
+      file: DONE/physical-tuning/planning/pt-07-snowflake-ddl.yaml
+      title: 'PT-07: Snowflake Physical Tuning DDL Generator Enhancement'
+      category: Platform Expansion
+      status: Not Started
+    - id: pt-08-databricks-spark-ddl
+      file: DONE/physical-tuning/planning/pt-08-databricks-spark-ddl.yaml
+      title: 'PT-08: Spark Family Physical Tuning DDL Generator (All Platforms)'
+      category: Platform Expansion
+      status: Not Started
+    - id: pt-09-bigquery-ddl
+      file: DONE/physical-tuning/planning/pt-09-bigquery-ddl.yaml
+      title: 'PT-09: BigQuery Physical Tuning DDL Generator Enhancement'
+      category: Platform Expansion
+      status: Not Started
+    - id: pt-10-dataframe-physical-tuning
+      file: DONE/physical-tuning/planning/pt-10-dataframe-physical-tuning.yaml
+      title: 'PT-10: DataFrame Platform Physical Tuning (Write-Time Layout)'
+      category: Core Functionality
+      status: Done
+    - id: pt-11-integration-testing-dryrun
+      file: DONE/physical-tuning/planning/pt-11-integration-testing-dryrun.yaml
+      title: 'PT-11: Physical Tuning Integration, Testing & Dry-Run Enhancement'
+      category: Testing and Quality Assurance
+      status: Done
+    - id: pt-12-remaining-platforms-ddl
+      file: DONE/physical-tuning/planning/pt-12-remaining-platforms-ddl.yaml
+      title: 'PT-12: Remaining Platforms Physical Tuning DDL Generator Enhancement'
+      category: Platform Expansion
+      status: Done
     - id: performance-regression-detection-system
       file: DONE/enterprise-ops-regression/planning/performance-regression-detection-system.yaml
       title: Performance Regression Detection System

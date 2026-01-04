@@ -1,4 +1,4 @@
-generated_at: '2026-01-03T21:38:50.102302'
+generated_at: '2026-01-04T14:19:31.049444'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -322,7 +322,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 48
+    count: 51
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -499,6 +499,21 @@ categories:
       title: Make DuckDB text plan parsing reliable or fail fast
       priority: Medium
       status: Not Started
+    - id: pt-01-ddl-generator-protocol
+      file: DONE/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml
+      title: 'PT-01: DDL Generator Protocol and Base Implementation'
+      priority: Critical
+      status: Completed
+    - id: pt-02-tuning-config-enhancements
+      file: DONE/physical-tuning/planning/pt-02-tuning-config-enhancements.yaml
+      title: 'PT-02: Tuning Configuration Schema Enhancements'
+      priority: High
+      status: Not Started
+    - id: pt-10-dataframe-physical-tuning
+      file: DONE/physical-tuning/planning/pt-10-dataframe-physical-tuning.yaml
+      title: 'PT-10: DataFrame Platform Physical Tuning (Write-Time Layout)'
+      priority: Medium
+      status: Done
     - id: postgresql-code-quality-fixes
       file: DONE/platform-expansion/active/postgresql-code-quality-fixes.yaml
       title: PostgreSQL adapter code quality fixes from code review
@@ -979,7 +994,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 27
+    count: 35
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1091,6 +1106,46 @@ categories:
       title: Microsoft Fabric Spark Platform
       priority: Medium-High
       status: Completed
+    - id: pt-03-redshift-ddl
+      file: DONE/physical-tuning/planning/pt-03-redshift-ddl.yaml
+      title: 'PT-03: Redshift Physical Tuning DDL Generator'
+      priority: High
+      status: Not Started
+    - id: pt-04-duckdb-ddl
+      file: DONE/physical-tuning/planning/pt-04-duckdb-ddl.yaml
+      title: 'PT-04: DuckDB Physical Tuning DDL Generator'
+      priority: High
+      status: Not Started
+    - id: pt-05-postgresql-timescaledb-ddl
+      file: DONE/physical-tuning/planning/pt-05-postgresql-timescaledb-ddl.yaml
+      title: 'PT-05: PostgreSQL & TimescaleDB Physical Tuning DDL Generators'
+      priority: High
+      status: Not Started
+    - id: pt-06-trino-presto-athena-ddl
+      file: DONE/physical-tuning/planning/pt-06-trino-presto-athena-ddl.yaml
+      title: 'PT-06: Trino, Presto & Athena Physical Tuning DDL Generators'
+      priority: Medium-High
+      status: Not Started
+    - id: pt-07-snowflake-ddl
+      file: DONE/physical-tuning/planning/pt-07-snowflake-ddl.yaml
+      title: 'PT-07: Snowflake Physical Tuning DDL Generator Enhancement'
+      priority: Medium
+      status: Not Started
+    - id: pt-08-databricks-spark-ddl
+      file: DONE/physical-tuning/planning/pt-08-databricks-spark-ddl.yaml
+      title: 'PT-08: Spark Family Physical Tuning DDL Generator (All Platforms)'
+      priority: Medium
+      status: Not Started
+    - id: pt-09-bigquery-ddl
+      file: DONE/physical-tuning/planning/pt-09-bigquery-ddl.yaml
+      title: 'PT-09: BigQuery Physical Tuning DDL Generator Enhancement'
+      priority: Medium
+      status: Not Started
+    - id: pt-12-remaining-platforms-ddl
+      file: DONE/physical-tuning/planning/pt-12-remaining-platforms-ddl.yaml
+      title: 'PT-12: Remaining Platforms Physical Tuning DDL Generator Enhancement'
+      priority: Medium
+      status: Done
     - id: polars-platform-adapter
       file: DONE/platform-expansion-polars/completed/polars-platform-adapter.yaml
       title: Polars Platform Adapter
@@ -1583,7 +1638,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 10
+    count: 11
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1615,6 +1670,11 @@ categories:
       title: Open Table Format Smoke Tests
       priority: Medium
       status: Completed
+    - id: pt-11-integration-testing-dryrun
+      file: DONE/physical-tuning/planning/pt-11-integration-testing-dryrun.yaml
+      title: 'PT-11: Physical Tuning Integration, Testing & Dry-Run Enhancement'
+      priority: Medium
+      status: Done
     - id: coverage-improvement
       file: DONE/observability-quality/active/coverage-improvement.yaml
       title: Test Infrastructure & Coverage Improvement
