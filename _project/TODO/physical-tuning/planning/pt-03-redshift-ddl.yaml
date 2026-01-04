@@ -1,0 +1,212 @@
+# Physical Tuning #03: Redshift DDL Generator
+#
+# Redshift has the most complex physical tuning model with unique features.
+
+title: "PT-03: Redshift Physical Tuning DDL Generator"
+worktree: "physical-tuning"
+priority: "High"
+status: "Not Started"
+category: "Platform Expansion"
+
+description: |
+  Implement comprehensive DDL generation for Amazon Redshift with support for
+  its unique physical tuning capabilities.
+
+  ## Redshift Physical Tuning Features
+
+  ### Distribution Styles (DISTSTYLE)
+  - **ALL**: Entire table copied to every node (small dimension tables)
+  - **KEY**: Rows distributed by hash of DISTKEY column (fact tables)
+  - **EVEN**: Round-robin distribution (default, no join colocation)
+  - **AUTO**: Redshift chooses based on data size
+
+  ### Distribution Key (DISTKEY)
+  - Single column for hash distribution
+  - Critical for join performance (colocate related rows)
+  - Should match JOIN columns between fact and dimension tables
+
+  ### Sort Keys (SORTKEY)
+  - **COMPOUND**: Columns sorted in order specified (default)
+    - Best for queries with range conditions on leading column
+    - Best for ORDER BY matching the sort key
+  - **INTERLEAVED**: Equal weight to each column
+    - Best for queries filtering on any subset of columns
+    - Higher load/vacuum overhead
+  - Up to 400 columns in sort key
+
+  ### Column Encoding (ENCODE)
+  - Per-column compression algorithm
+  - Options: RAW, AZ64, BYTEDICT, DELTA, DELTA32K, LZO, MOSTLY8/16/32,
+    RUNLENGTH, TEXT255, TEXT32K, ZSTD
+  - AUTO encoding recommended for most cases
+
+  ## Current Gap
+
+  Redshift adapter (`benchbox/platforms/redshift.py`) has:
+  - `generate_tuning_clause()` method (line ~1936)
+  - Reads partitioning/sorting columns from tuning config
+  - BUT: Only logs tuning info, doesn't generate DISTSTYLE/SORTKEY DDL
+
+context_sections:
+  "DDL Syntax Examples": |
+    ```sql
+    -- Fact table with distribution and compound sort key
+    CREATE TABLE lineitem (
+        l_orderkey BIGINT NOT NULL ENCODE az64,
+        l_partkey BIGINT NOT NULL ENCODE az64,
+        l_suppkey BIGINT NOT NULL ENCODE az64,
+        l_linenumber INTEGER NOT NULL ENCODE az64,
+        l_quantity DECIMAL(15,2) ENCODE az64,
+        l_extendedprice DECIMAL(15,2) ENCODE az64,
+        l_discount DECIMAL(15,2) ENCODE az64,
+        l_tax DECIMAL(15,2) ENCODE az64,
+        l_returnflag CHAR(1) ENCODE lzo,
+        l_linestatus CHAR(1) ENCODE lzo,
+        l_shipdate DATE ENCODE az64,
+        l_commitdate DATE ENCODE az64,
+        l_receiptdate DATE ENCODE az64,
+        l_shipinstruct VARCHAR(25) ENCODE lzo,
+        l_shipmode VARCHAR(10) ENCODE lzo,
+        l_comment VARCHAR(44) ENCODE lzo
+    )
+    DISTSTYLE KEY
+    DISTKEY (l_orderkey)
+    COMPOUND SORTKEY (l_shipdate, l_orderkey);
+
+    -- Dimension table with ALL distribution
+    CREATE TABLE region (
+        r_regionkey INTEGER NOT NULL ENCODE az64,
+        r_name VARCHAR(25) ENCODE lzo,
+        r_comment VARCHAR(152) ENCODE lzo
+    )
+    DISTSTYLE ALL;
+
+    -- Interleaved sort key example
+    CREATE TABLE sales (
+        sale_id BIGINT,
+        customer_id BIGINT,
+        product_id BIGINT,
+        sale_date DATE,
+        amount DECIMAL(10,2)
+    )
+    DISTSTYLE KEY DISTKEY(customer_id)
+    INTERLEAVED SORTKEY (sale_date, customer_id, product_id);
+    ```
+
+  "Tuning Configuration Mapping": |
+    YAML tuning config → Redshift DDL mapping:
+
+    | Tuning Type | Redshift DDL |
+    |-------------|--------------|
+    | partitioning | Not directly supported (use sort key + date predicates) |
+    | clustering | Maps to SORTKEY columns |
+    | distribution | Maps to DISTSTYLE + DISTKEY |
+    | sorting | Maps to SORTKEY with style (COMPOUND/INTERLEAVED) |
+
+    Special handling needed:
+    - `distribution` with single column → DISTSTYLE KEY DISTKEY(col)
+    - `distribution` empty + small table hint → DISTSTYLE ALL
+    - `sorting.style: INTERLEAVED` → INTERLEAVED SORTKEY
+    - `compression` per column → ENCODE clause
+
+tasks:
+  phases:
+    - phase: "Phase 1: RedshiftDDLGenerator Implementation"
+      done: false
+      items:
+        - summary: "Create benchbox/core/tuning/generators/redshift.py"
+          done: false
+          subtasks:
+            - summary: "Implement generate_tuning_clauses() with DISTSTYLE/DISTKEY"
+              done: false
+            - summary: "Implement SORTKEY generation (COMPOUND and INTERLEAVED)"
+              done: false
+            - summary: "Implement column ENCODE clause generation"
+              done: false
+        - summary: "Add encoding recommendation logic"
+          done: false
+          subtasks:
+            - summary: "Recommend AZ64 for numeric/date columns"
+              done: false
+            - summary: "Recommend LZO for VARCHAR columns"
+              done: false
+            - summary: "Support AUTO encoding option"
+              done: false
+
+    - phase: "Phase 2: Integration with Redshift Adapter"
+      done: false
+      items:
+        - summary: "Inject RedshiftDDLGenerator into RedshiftAdapter"
+          done: false
+        - summary: "Replace inline CREATE TABLE with generator calls"
+          done: false
+        - summary: "Wire tuning_config to DDL generation in load_data()"
+          done: false
+
+    - phase: "Phase 3: YAML Examples and Documentation"
+      done: false
+      items:
+        - summary: "Create examples/tunings/redshift/tpch_tuned.yaml"
+          done: false
+          subtasks:
+            - summary: "Configure LINEITEM with KEY distribution on l_orderkey"
+              done: false
+            - summary: "Configure dimension tables with ALL distribution"
+              done: false
+            - summary: "Show INTERLEAVED sort key example"
+              done: false
+        - summary: "Document Redshift tuning best practices"
+          done: false
+
+    - phase: "Phase 4: Testing"
+      done: false
+      items:
+        - summary: "Unit tests for RedshiftDDLGenerator"
+          done: false
+          subtasks:
+            - summary: "Test DISTSTYLE ALL/KEY/EVEN/AUTO generation"
+              done: false
+            - summary: "Test COMPOUND vs INTERLEAVED SORTKEY"
+              done: false
+            - summary: "Test column ENCODE clauses"
+              done: false
+        - summary: "Integration test with actual Redshift (when credentials available)"
+          done: false
+
+files_affected:
+  added:
+    - "benchbox/core/tuning/generators/redshift.py"
+    - "examples/tunings/redshift/tpch_tuned.yaml"
+    - "examples/tunings/redshift/tpch_notuning.yaml"
+    - "tests/unit/core/tuning/generators/test_redshift_ddl.py"
+  modified:
+    - "benchbox/platforms/redshift.py"
+
+technical_requirements:
+  constraints:
+    - "Must support all DISTSTYLE options"
+    - "Must support both COMPOUND and INTERLEAVED sort keys"
+    - "Column encoding must be optional (default to AUTO)"
+  dependencies:
+    - "psycopg2 or redshift-connector for testing"
+
+success_metrics:
+  - "Generated DDL executes successfully on Redshift"
+  - "TPC-H tables created with appropriate distribution (KEY for facts, ALL for dims)"
+  - "Sort keys applied matching tuning configuration"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml"
+    - "_project/TODO/physical-tuning/planning/pt-02-tuning-config-enhancements.yaml"
+
+metadata:
+  owners:
+    - "joe"
+  tags:
+    - "tuning"
+    - "redshift"
+    - "aws"
+    - "ddl-generation"
+  estimated_effort: "Medium"
+  created_date: "2026-01-03"

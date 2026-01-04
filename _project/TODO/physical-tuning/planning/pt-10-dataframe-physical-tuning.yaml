@@ -1,0 +1,300 @@
+# Physical Tuning #10: DataFrame Platform Physical Tuning
+#
+# Extend DataFrame platforms to support write-time physical layout options.
+
+title: "PT-10: DataFrame Platform Physical Tuning (Write-Time Layout)"
+worktree: "physical-tuning"
+priority: "Medium"
+status: "Not Started"
+category: "Core Functionality"
+
+description: |
+  Extend the DataFrame tuning system to support physical data layout options
+  during the write phase (Parquet generation). Currently, DataFrame tuning only
+  covers runtime options (threads, memory, streaming). This TODO adds write-time
+  physical layout control.
+
+  ## Current State Analysis
+
+  ### Existing DataFrame Tuning (Runtime)
+  The current system (`benchbox/core/dataframe/tuning/`) supports:
+  - **Parallelism**: thread_count, worker_count, threads_per_worker
+  - **Memory**: memory_limit, chunk_size, spill_to_disk, rechunk
+  - **Execution**: streaming_mode, engine_affinity, lazy_evaluation
+  - **Data Types**: dtype_backend, string_cache, auto_categorize
+  - **I/O**: memory_pool, memory_map, pre_buffer, row_group_size
+  - **GPU**: device_id, spill_to_host, pool_type
+
+  ### Missing Physical Layout Options
+  When DataFrames write to Parquet (during data preparation), there's no
+  configuration for:
+  - **Partitioning**: Hive-style partition directories
+  - **Sorting**: Physical row order within files
+  - **Row Group Size**: Control compression/scan efficiency
+  - **Repartitioning**: Number of output files
+  - **Column Encoding**: Dictionary, RLE, bit-packing per column
+
+  ## Platform Capabilities
+
+  | Platform | Partitioned Write | Sorted Write | Repartition | Row Group Size |
+  |----------|-------------------|--------------|-------------|----------------|
+  | Polars   | ✗ No              | ✓ sort()     | ✗ No        | ✓ Yes          |
+  | Pandas   | ✗ No              | ✓ sort_values| ✗ No        | ✓ Yes          |
+  | Dask     | ✓ to_parquet()    | ✗ Limited    | ✓ repartition | ✓ Yes        |
+  | PySpark  | ✓ partitionBy()   | ✓ sortBy()   | ✓ repartition | ✓ Yes        |
+  | cuDF     | ✗ No              | ✓ sort_values| ✗ No        | ✓ Yes          |
+  | Modin    | ✗ No              | ✓ sort_values| ✗ No        | ✓ Via Pandas   |
+
+  ## Why This Matters
+
+  Physical layout affects:
+  1. **Query performance**: Sorted data enables skip-scanning
+  2. **Compression ratio**: Sorted columns compress better
+  3. **Partition pruning**: Hive partitions reduce scan scope
+  4. **Parallel reads**: Multiple files enable parallel loading
+
+context_sections:
+  "Current Write Flow": |
+    Data preparation uses `convert_csv_to_parquet()` in `benchbox/core/dataframe/data_loader.py`:
+
+    ```python
+    def convert_csv_to_parquet(
+        csv_path: Path,
+        parquet_path: Path,
+        schema: dict[str, str],
+        compression: str = "zstd",
+    ) -> tuple[bool, int]:
+        # Uses PyArrow directly
+        pq.write_table(
+            table,
+            parquet_path,
+            compression=compression,
+            use_dictionary=True,  # Fixed
+        )
+    ```
+
+    **Limitations**:
+    - No sorting before write
+    - No partitioning
+    - Row group size not configurable
+    - No per-column encoding control
+
+  "Proposed Architecture": |
+    ```python
+    @dataclass
+    class DataFrameWriteConfiguration:
+        """Physical layout options for DataFrame writes."""
+
+        # Partitioning (Hive-style directories)
+        partition_by: list[str] | None = None
+        partition_strategy: Literal["value", "date_year", "date_month"] = "value"
+
+        # Sorting (physical row order)
+        sort_by: list[tuple[str, Literal["asc", "desc"]]] | None = None
+
+        # File layout
+        row_group_size: int | None = None  # Default ~128MB worth
+        target_file_size_mb: int = 128
+        repartition_count: int | None = None  # Number of output files
+
+        # Compression
+        compression: str = "zstd"
+        compression_level: int | None = None
+
+        # Encoding
+        dictionary_columns: list[str] | None = None  # Explicit dict encoding
+        skip_dictionary_columns: list[str] | None = None
+
+    class DataFrameWriteTuningType(Enum):
+        """Tuning types for DataFrame write operations."""
+        PARTITION_BY = "partition_by"
+        SORT_BY = "sort_by"
+        ROW_GROUP_SIZE = "row_group_size"
+        REPARTITION = "repartition"
+        COMPRESSION = "compression"
+    ```
+
+  "YAML Configuration Example": |
+    ```yaml
+    # DataFrame write tuning (new section in tuning YAML)
+    dataframe_write:
+      # Sort data before writing (improves compression & scans)
+      sort_by:
+        - column: l_shipdate
+          order: asc
+        - column: l_orderkey
+          order: asc
+
+      # Partition into Hive-style directories (Dask/PySpark only)
+      partition_by:
+        - l_shipdate
+      partition_strategy: date_month  # Creates year=YYYY/month=MM dirs
+
+      # File layout
+      row_group_size: 1048576  # ~1M rows per group
+      target_file_size_mb: 256
+      repartition_count: 8  # 8 output files
+
+      # Compression
+      compression: zstd
+      compression_level: 3
+
+    # Existing runtime tuning (unchanged)
+    parallelism:
+      thread_count: 8
+    memory:
+      chunk_size: 1000000
+    ```
+
+tasks:
+  phases:
+    - phase: "Phase 1: DataFrameWriteConfiguration Design"
+      done: false
+      items:
+        - summary: "Create benchbox/core/dataframe/tuning/write_config.py"
+          done: false
+          subtasks:
+            - summary: "Define DataFrameWriteConfiguration dataclass"
+              done: false
+            - summary: "Define DataFrameWriteTuningType enum"
+              done: false
+            - summary: "Add platform compatibility matrix for write options"
+              done: false
+        - summary: "Extend YAML loader to parse dataframe_write section"
+          done: false
+        - summary: "Add validation for write configuration"
+          done: false
+
+    - phase: "Phase 2: Integrate with Data Preparation"
+      done: false
+      items:
+        - summary: "Modify convert_csv_to_parquet() to accept write config"
+          done: false
+          subtasks:
+            - summary: "Add sorting before write"
+              done: false
+            - summary: "Add row_group_size parameter"
+              done: false
+            - summary: "Add compression level parameter"
+              done: false
+        - summary: "Create platform-specific write handlers"
+          done: false
+          subtasks:
+            - summary: "Polars write handler with sorting"
+              done: false
+            - summary: "Dask write handler with partitioning"
+              done: false
+            - summary: "PySpark write handler with partitionBy/sortBy"
+              done: false
+
+    - phase: "Phase 3: Platform Adapter Integration"
+      done: false
+      items:
+        - summary: "Add write_config to DataFrame adapter interface"
+          done: false
+        - summary: "Implement in Polars adapter"
+          done: false
+          subtasks:
+            - summary: "Sort DataFrame before collect/write"
+              done: false
+            - summary: "Configure row_group_size in write_parquet"
+              done: false
+        - summary: "Implement in Dask adapter"
+          done: false
+          subtasks:
+            - summary: "Support partition_on in to_parquet()"
+              done: false
+            - summary: "Support repartition() before write"
+              done: false
+        - summary: "Implement in PySpark adapter"
+          done: false
+          subtasks:
+            - summary: "Support partitionBy() in write"
+              done: false
+            - summary: "Support sortBy() for bucket sorting"
+              done: false
+
+    - phase: "Phase 4: CLI Integration"
+      done: false
+      items:
+        - summary: "Add --dataframe-write-config option to run command"
+          done: false
+        - summary: "Show write config in --dry-run output"
+          done: false
+        - summary: "Update tuning wizard for DataFrame write options"
+          done: false
+
+    - phase: "Phase 5: Testing"
+      done: false
+      items:
+        - summary: "Unit tests for DataFrameWriteConfiguration"
+          done: false
+        - summary: "Integration tests verifying physical layout"
+          done: false
+          subtasks:
+            - summary: "Verify sorted Parquet files"
+              done: false
+            - summary: "Verify partitioned directory structure"
+              done: false
+            - summary: "Verify row group sizes"
+              done: false
+        - summary: "Performance tests comparing sorted vs unsorted"
+          done: false
+
+files_affected:
+  added:
+    - "benchbox/core/dataframe/tuning/write_config.py"
+    - "tests/unit/core/dataframe/tuning/test_write_config.py"
+    - "examples/tunings/dataframe/polars_write_optimized.yaml"
+    - "examples/tunings/dataframe/dask_partitioned.yaml"
+    - "examples/tunings/dataframe/pyspark_partitioned.yaml"
+  modified:
+    - "benchbox/core/dataframe/tuning/interface.py"
+    - "benchbox/core/dataframe/tuning/loader.py"
+    - "benchbox/core/dataframe/tuning/types.py"
+    - "benchbox/core/dataframe/data_loader.py"
+    - "benchbox/platforms/dataframe/polars_df.py"
+    - "benchbox/platforms/dataframe/dask_df.py"
+    - "benchbox/platforms/dataframe/pyspark_df.py"
+
+technical_requirements:
+  constraints:
+    - "Must not break existing runtime tuning configuration"
+    - "Write config section is optional (defaults preserve current behavior)"
+    - "Platform-incompatible options should warn, not error"
+  dependencies:
+    - "PyArrow for Parquet write configuration"
+    - "Dask for partitioned writes"
+    - "PySpark for bucketed/sorted writes"
+
+success_metrics:
+  - "Sorted Parquet files show better compression ratio"
+  - "Partitioned writes create correct Hive directory structure"
+  - "Row group size configuration affects actual file structure"
+  - "Query scan times improve with sorted data"
+
+open_questions:
+  - "Should write config be in same YAML as runtime config or separate file?"
+  - "How to handle platforms that don't support partitioned writes?"
+  - "Should we support Iceberg/Delta writes from DataFrame platforms?"
+
+impact:
+  business_value: |
+    Enables DataFrame platforms to produce optimally-laid-out data files,
+    improving downstream query performance regardless of which platform
+    ultimately queries the data.
+
+  user_impact: |
+    Users can configure physical data layout without switching to SQL platforms.
+    Especially valuable for Dask and PySpark users who expect partitioning.
+
+metadata:
+  owners:
+    - "joe"
+  tags:
+    - "tuning"
+    - "dataframe"
+    - "physical-layout"
+    - "parquet"
+  estimated_effort: "Large"
+  created_date: "2026-01-03"

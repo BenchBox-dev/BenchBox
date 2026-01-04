@@ -1,6 +1,95 @@
-generated_at: '2026-01-03T19:04:26.678041'
-total_items: 32
+generated_at: '2026-01-03T21:38:49.421648'
+total_items: 45
 items:
+- id: pt-01-ddl-generator-protocol
+  file: TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml
+  title: 'PT-01: DDL Generator Protocol and Base Implementation'
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: Critical
+  status: Not Started
+  tags:
+  - tuning
+  - ddl-generation
+  - protocol
+  - foundation
+  owners:
+  - joe
+  estimated_effort: Medium
+- id: physical-tuning-ddl-generation
+  file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
+  title: Implement Physical Tuning DDL Generation Across All Platforms
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - tuning
+  - ddl-generation
+  - performance
+  - platform-parity
+  owners:
+  - joe
+  estimated_effort: Large
+- id: pt-02-tuning-config-enhancements
+  file: TODO/physical-tuning/planning/pt-02-tuning-config-enhancements.yaml
+  title: 'PT-02: Tuning Configuration Schema Enhancements'
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - tuning
+  - configuration
+  - schema
+  owners:
+  - joe
+  estimated_effort: Medium
+- id: pt-03-redshift-ddl
+  file: TODO/physical-tuning/planning/pt-03-redshift-ddl.yaml
+  title: 'PT-03: Redshift Physical Tuning DDL Generator'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - tuning
+  - redshift
+  - aws
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Medium
+- id: pt-04-duckdb-ddl
+  file: TODO/physical-tuning/planning/pt-04-duckdb-ddl.yaml
+  title: 'PT-04: DuckDB Physical Tuning DDL Generator'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - tuning
+  - duckdb
+  - local-platform
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Small
+- id: pt-05-postgresql-timescaledb-ddl
+  file: TODO/physical-tuning/planning/pt-05-postgresql-timescaledb-ddl.yaml
+  title: 'PT-05: PostgreSQL & TimescaleDB Physical Tuning DDL Generators'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - tuning
+  - postgresql
+  - timescaledb
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Medium-Large
 - id: postgresql-first-class-platform
   file: TODO/platform-expansion/planning/postgresql-first-class-platform.yaml
   title: Promote PostgreSQL to first-class platform status
@@ -140,6 +229,103 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 3-4 weeks
+- id: pt-07-snowflake-ddl
+  file: TODO/physical-tuning/planning/pt-07-snowflake-ddl.yaml
+  title: 'PT-07: Snowflake Physical Tuning DDL Generator Enhancement'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - snowflake
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Small
+- id: pt-08-databricks-spark-ddl
+  file: TODO/physical-tuning/planning/pt-08-databricks-spark-ddl.yaml
+  title: 'PT-08: Spark Family Physical Tuning DDL Generator (All Platforms)'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - spark
+  - databricks
+  - delta-lake
+  - iceberg
+  - aws
+  - gcp
+  - azure
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Large
+- id: pt-09-bigquery-ddl
+  file: TODO/physical-tuning/planning/pt-09-bigquery-ddl.yaml
+  title: 'PT-09: BigQuery Physical Tuning DDL Generator Enhancement'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - bigquery
+  - gcp
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Small
+- id: pt-10-dataframe-physical-tuning
+  file: TODO/physical-tuning/planning/pt-10-dataframe-physical-tuning.yaml
+  title: 'PT-10: DataFrame Platform Physical Tuning (Write-Time Layout)'
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - dataframe
+  - physical-layout
+  - parquet
+  owners:
+  - joe
+  estimated_effort: Large
+- id: pt-11-integration-testing-dryrun
+  file: TODO/physical-tuning/planning/pt-11-integration-testing-dryrun.yaml
+  title: 'PT-11: Physical Tuning Integration, Testing & Dry-Run Enhancement'
+  worktree: physical-tuning
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - integration
+  - testing
+  - dry-run
+  - documentation
+  owners:
+  - joe
+  estimated_effort: Medium-Large
+- id: pt-12-remaining-platforms-ddl
+  file: TODO/physical-tuning/planning/pt-12-remaining-platforms-ddl.yaml
+  title: 'PT-12: Remaining Platforms Physical Tuning DDL Generator Enhancement'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - clickhouse
+  - firebolt
+  - azure-synapse
+  - fabric
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Medium
 - id: cicd-benchmarking-demo
   file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
   title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'
@@ -226,6 +412,23 @@ items:
   - dependencies
   - pyproject
   estimated_effort: 2 hours
+- id: pt-06-trino-presto-athena-ddl
+  file: TODO/physical-tuning/planning/pt-06-trino-presto-athena-ddl.yaml
+  title: 'PT-06: Trino, Presto & Athena Physical Tuning DDL Generators'
+  worktree: physical-tuning
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - tuning
+  - trino
+  - presto
+  - athena
+  - iceberg
+  - ddl-generation
+  owners:
+  - joe
+  estimated_effort: Large
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support

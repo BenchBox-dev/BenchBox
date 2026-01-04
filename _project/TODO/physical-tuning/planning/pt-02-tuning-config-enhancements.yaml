@@ -1,0 +1,222 @@
+# Physical Tuning #02: Tuning Configuration Enhancements
+#
+# Extends the existing tuning configuration schema to support advanced physical
+# tuning options needed by various platforms.
+
+title: "PT-02: Tuning Configuration Schema Enhancements"
+worktree: "physical-tuning"
+priority: "High"
+status: "Not Started"
+category: "Core Functionality"
+
+description: |
+  Extend the existing `TuningColumn` and related classes to support advanced
+  physical tuning options that different platforms require.
+
+  ## Current Limitations
+
+  The current `TuningColumn` class only captures:
+  - `name`: Column name
+  - `type`: SQL data type
+  - `order`: Position in tuning configuration
+
+  This is insufficient for:
+  - **Sort order**: ASC vs DESC per column
+  - **Nulls handling**: NULLS FIRST vs NULLS LAST
+  - **Compression**: Per-column encoding (Redshift ENCODE)
+  - **Partition granularity**: DAILY, MONTHLY, YEARLY for date columns
+  - **Sort key style**: COMPOUND vs INTERLEAVED (Redshift)
+  - **Bucket count**: Number of buckets for hash partitioning
+
+  ## Backward Compatibility
+
+  All enhancements must be backward compatible with existing YAML configs.
+  New fields should have sensible defaults that preserve current behavior.
+
+context_sections:
+  "Extended TuningColumn Design": |
+    ```python
+    @dataclass
+    class TuningColumn:
+        """Column participating in tuning configuration."""
+        name: str
+        type: str
+        order: int
+
+        # New fields (all optional with defaults)
+        sort_order: Literal["ASC", "DESC"] = "ASC"
+        nulls_position: Literal["FIRST", "LAST", "DEFAULT"] = "DEFAULT"
+        compression: str | None = None  # Platform-specific: "lzo", "zstd", "raw", etc.
+    ```
+
+  "New PartitioningConfig Design": |
+    ```python
+    @dataclass
+    class PartitioningConfig:
+        """Advanced partitioning configuration."""
+        columns: list[TuningColumn]
+        strategy: Literal["RANGE", "LIST", "HASH", "DATE"] = "RANGE"
+
+        # For DATE strategy
+        granularity: Literal["HOURLY", "DAILY", "MONTHLY", "YEARLY"] | None = None
+
+        # For HASH strategy
+        bucket_count: int | None = None
+
+        # For RANGE strategy
+        range_boundaries: list[Any] | None = None  # Platform-specific
+    ```
+
+  "New SortKeyConfig Design": |
+    ```python
+    @dataclass
+    class SortKeyConfig:
+        """Advanced sort key configuration (primarily for Redshift)."""
+        columns: list[TuningColumn]
+        style: Literal["COMPOUND", "INTERLEAVED", "AUTO"] = "COMPOUND"
+    ```
+
+  "YAML Schema Example": |
+    ```yaml
+    table_tunings:
+      LINEITEM:
+        table_name: LINEITEM
+        partitioning:
+          strategy: DATE
+          granularity: DAILY
+          columns:
+            - name: L_SHIPDATE
+              type: DATE
+              order: 1
+
+        sorting:
+          style: COMPOUND  # Redshift-specific
+          columns:
+            - name: L_ORDERKEY
+              type: INTEGER
+              order: 1
+              sort_order: ASC
+              nulls_position: LAST
+            - name: L_LINENUMBER
+              type: INTEGER
+              order: 2
+              sort_order: ASC
+
+        distribution:
+          - name: L_ORDERKEY
+            type: INTEGER
+            order: 1
+            compression: lzo  # Redshift ENCODE
+
+        clustering:
+          bucket_count: 64  # For hash-based clustering
+          columns:
+            - name: L_PARTKEY
+              type: INTEGER
+              order: 1
+    ```
+
+tasks:
+  phases:
+    - phase: "Phase 1: Extend TuningColumn"
+      done: false
+      items:
+        - summary: "Add sort_order field (ASC/DESC) with default ASC"
+          done: false
+        - summary: "Add nulls_position field (FIRST/LAST/DEFAULT)"
+          done: false
+        - summary: "Add compression field for per-column encoding"
+          done: false
+        - summary: "Update from_dict() to handle new fields with defaults"
+          done: false
+        - summary: "Update to_dict() to only include non-default values"
+          done: false
+
+    - phase: "Phase 2: Add PartitioningConfig"
+      done: false
+      items:
+        - summary: "Create PartitioningConfig dataclass"
+          done: false
+          subtasks:
+            - summary: "Support RANGE, LIST, HASH, DATE strategies"
+              done: false
+            - summary: "Add granularity for DATE partitioning"
+              done: false
+            - summary: "Add bucket_count for HASH partitioning"
+              done: false
+        - summary: "Update TableTuning to optionally use PartitioningConfig"
+          done: false
+        - summary: "Maintain backward compatibility with list[TuningColumn]"
+          done: false
+
+    - phase: "Phase 3: Add SortKeyConfig"
+      done: false
+      items:
+        - summary: "Create SortKeyConfig dataclass"
+          done: false
+          subtasks:
+            - summary: "Support COMPOUND, INTERLEAVED, AUTO styles"
+              done: false
+            - summary: "Document platform support (Redshift-specific)"
+              done: false
+        - summary: "Update TableTuning to optionally use SortKeyConfig"
+          done: false
+
+    - phase: "Phase 4: Update YAML Examples"
+      done: false
+      items:
+        - summary: "Update examples/tunings/duckdb/tpch_tuned.yaml"
+          done: false
+        - summary: "Create examples/tunings/redshift/tpch_tuned.yaml with SORTKEY styles"
+          done: false
+        - summary: "Update databricks example with partition granularity"
+          done: false
+
+    - phase: "Phase 5: Validation Updates"
+      done: false
+      items:
+        - summary: "Validate sort_order values"
+          done: false
+        - summary: "Validate nulls_position compatibility per platform"
+          done: false
+        - summary: "Validate partition strategy compatibility per platform"
+          done: false
+        - summary: "Warn on INTERLEAVED sort key for non-Redshift platforms"
+          done: false
+
+files_affected:
+  modified:
+    - "benchbox/core/tuning/interface.py"
+    - "benchbox/core/tuning/validation.py"
+    - "examples/tunings/duckdb/tpch_tuned.yaml"
+    - "examples/tunings/databricks/tpch_tuned.yaml"
+  added:
+    - "examples/tunings/redshift/tpch_tuned.yaml"
+    - "examples/tunings/redshift/tpch_notuning.yaml"
+
+technical_requirements:
+  constraints:
+    - "All new fields must have defaults for backward compatibility"
+    - "Existing YAML files must continue to work without modification"
+    - "Validation must warn (not error) on platform-incompatible options"
+
+success_metrics:
+  - "All existing tuning YAML files parse without errors"
+  - "New fields serialize/deserialize correctly"
+  - "Platform-specific validation catches incompatible combinations"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml"
+  blocks:
+    - "_project/TODO/physical-tuning/planning/pt-03-redshift-ddl.yaml"
+
+metadata:
+  owners:
+    - "joe"
+  tags:
+    - "tuning"
+    - "configuration"
+    - "schema"
+  estimated_effort: "Medium"
+  created_date: "2026-01-03"

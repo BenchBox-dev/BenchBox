@@ -1,5 +1,5 @@
-generated_at: '2026-01-03T19:04:26.678070'
-total_categories: 10
+generated_at: '2026-01-03T21:38:49.421684'
+total_categories: 11
 categories:
   AI/ML Capabilities:
     count: 1
@@ -124,12 +124,32 @@ categories:
       priority: Low
       status: Identified
   Core Functionality:
-    count: 1
+    count: 5
     items:
     - id: cloud-spark-dependency-groups
       file: TODO/platform-expansion/planning/cloud-spark-dependency-groups.yaml
       title: Cloud Spark Dependency Groups in pyproject.toml
       priority: Medium-High
+      status: Not Started
+    - id: physical-tuning-ddl-generation
+      file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
+      title: Implement Physical Tuning DDL Generation Across All Platforms
+      priority: High
+      status: Not Started
+    - id: pt-01-ddl-generator-protocol
+      file: TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml
+      title: 'PT-01: DDL Generator Protocol and Base Implementation'
+      priority: Critical
+      status: Not Started
+    - id: pt-02-tuning-config-enhancements
+      file: TODO/physical-tuning/planning/pt-02-tuning-config-enhancements.yaml
+      title: 'PT-02: Tuning Configuration Schema Enhancements'
+      priority: High
+      status: Not Started
+    - id: pt-10-dataframe-physical-tuning
+      file: TODO/physical-tuning/planning/pt-10-dataframe-physical-tuning.yaml
+      title: 'PT-10: DataFrame Platform Physical Tuning (Write-Time Layout)'
+      priority: Medium
       status: Not Started
   Documentation:
     count: 2
@@ -145,12 +165,52 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 2
+    count: 10
     items:
     - id: local-platform-cost-tracking
       file: TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
       title: Add cost tracking for local/self-hosted platforms
       priority: Low
+      status: Not Started
+    - id: pt-03-redshift-ddl
+      file: TODO/physical-tuning/planning/pt-03-redshift-ddl.yaml
+      title: 'PT-03: Redshift Physical Tuning DDL Generator'
+      priority: High
+      status: Not Started
+    - id: pt-04-duckdb-ddl
+      file: TODO/physical-tuning/planning/pt-04-duckdb-ddl.yaml
+      title: 'PT-04: DuckDB Physical Tuning DDL Generator'
+      priority: High
+      status: Not Started
+    - id: pt-05-postgresql-timescaledb-ddl
+      file: TODO/physical-tuning/planning/pt-05-postgresql-timescaledb-ddl.yaml
+      title: 'PT-05: PostgreSQL & TimescaleDB Physical Tuning DDL Generators'
+      priority: High
+      status: Not Started
+    - id: pt-06-trino-presto-athena-ddl
+      file: TODO/physical-tuning/planning/pt-06-trino-presto-athena-ddl.yaml
+      title: 'PT-06: Trino, Presto & Athena Physical Tuning DDL Generators'
+      priority: Medium-High
+      status: Not Started
+    - id: pt-07-snowflake-ddl
+      file: TODO/physical-tuning/planning/pt-07-snowflake-ddl.yaml
+      title: 'PT-07: Snowflake Physical Tuning DDL Generator Enhancement'
+      priority: Medium
+      status: Not Started
+    - id: pt-08-databricks-spark-ddl
+      file: TODO/physical-tuning/planning/pt-08-databricks-spark-ddl.yaml
+      title: 'PT-08: Spark Family Physical Tuning DDL Generator (All Platforms)'
+      priority: Medium
+      status: Not Started
+    - id: pt-09-bigquery-ddl
+      file: TODO/physical-tuning/planning/pt-09-bigquery-ddl.yaml
+      title: 'PT-09: BigQuery Physical Tuning DDL Generator Enhancement'
+      priority: Medium
+      status: Not Started
+    - id: pt-12-remaining-platforms-ddl
+      file: TODO/physical-tuning/planning/pt-12-remaining-platforms-ddl.yaml
+      title: 'PT-12: Remaining Platforms Physical Tuning DDL Generator Enhancement'
+      priority: Medium
       status: Not Started
     - id: postgresql-first-class-platform
       file: TODO/platform-expansion/planning/postgresql-first-class-platform.yaml
@@ -182,6 +242,14 @@ categories:
       file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
       title: Interactive Benchmark Explorer - Web UI
       priority: Low
+      status: Not Started
+  Testing and Quality Assurance:
+    count: 1
+    items:
+    - id: pt-11-integration-testing-dryrun
+      file: TODO/physical-tuning/planning/pt-11-integration-testing-dryrun.yaml
+      title: 'PT-11: Physical Tuning Integration, Testing & Dry-Run Enhancement'
+      priority: Medium
       status: Not Started
   User Experience:
     count: 1

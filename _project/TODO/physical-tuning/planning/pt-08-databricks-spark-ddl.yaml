@@ -1,0 +1,363 @@
+# Physical Tuning #08: Spark Family DDL Generator Enhancement
+#
+# Covers ALL Spark-based platforms including cloud-managed services.
+# Leverages shared cloud_spark infrastructure for 80%+ code reuse.
+
+title: "PT-08: Spark Family Physical Tuning DDL Generator (All Platforms)"
+worktree: "physical-tuning"
+priority: "Medium"
+status: "Not Started"
+category: "Platform Expansion"
+
+description: |
+  Enhance DDL generation for ALL Spark-based platforms with full support for
+  partitioning, clustering, Z-ordering, and Delta Lake features. This covers
+  12 Spark platforms through a shared infrastructure approach.
+
+  ## Spark Family Platforms (12 total)
+
+  ### Core Spark
+  | Platform | File | Execution |
+  |----------|------|-----------|
+  | Local Spark | `benchbox/platforms/spark.py` | local[*], YARN, K8s |
+  | PySpark SQL | `benchbox/platforms/pyspark/sql_adapter.py` | local[*], cluster |
+
+  ### AWS Spark Services
+  | Platform | File | Key Features |
+  |----------|------|--------------|
+  | EMR Serverless | `benchbox/platforms/aws/emr_serverless_adapter.py` | Auto-scaling, S3 |
+  | AWS Glue | `benchbox/platforms/aws/glue_adapter.py` | Glue Catalog, ETL |
+  | Athena Spark | `benchbox/platforms/aws/athena_spark_adapter.py` | Sub-second startup |
+
+  ### GCP Spark Services
+  | Platform | File | Key Features |
+  |----------|------|--------------|
+  | Dataproc | `benchbox/platforms/gcp/dataproc_adapter.py` | Persistent/ephemeral |
+  | Dataproc Serverless | `benchbox/platforms/gcp/dataproc_serverless_adapter.py` | Fully managed |
+
+  ### Azure Spark Services
+  | Platform | File | Key Features |
+  |----------|------|--------------|
+  | Synapse Spark | `benchbox/platforms/azure/synapse_spark_adapter.py` | Spark pools |
+  | Fabric Spark | `benchbox/platforms/azure/fabric_spark_adapter.py` | OneLake storage |
+
+  ### Databricks
+  | Platform | File | Key Features |
+  |----------|------|--------------|
+  | Databricks | `benchbox/platforms/databricks/adapter.py` | Delta, Unity Catalog |
+
+  ### DataFrame Mode
+  | Platform | File | Key Features |
+  |----------|------|--------------|
+  | PySpark DataFrame | `benchbox/platforms/dataframe/pyspark_df.py` | Expression family |
+
+  ### Snowflake (PySpark API)
+  | Platform | File | Key Features |
+  |----------|------|--------------|
+  | Snowpark Connect | `benchbox/platforms/snowpark_connect.py` | PySpark API compat |
+
+  ## Architecture Strategy: Shared Mixin
+
+  All cloud Spark platforms already inherit from shared infrastructure at
+  `benchbox/platforms/base/cloud_spark/`. The physical tuning implementation
+  will follow this pattern:
+
+  1. **Create `SparkDDLGeneratorMixin`** in `benchbox/platforms/base/cloud_spark/mixins.py`
+  2. **Implement format-specific generators** for Delta, Iceberg, Parquet, Hive
+  3. **All platforms inherit the mixin** - 80%+ code reuse
+  4. **Platform-specific overrides** where needed (e.g., Databricks Unity Catalog)
+
+  ## Physical Tuning Features by Table Format
+
+  ### Delta Lake (Databricks, EMR, Dataproc with Delta)
+  ```sql
+  CREATE TABLE t (...) USING DELTA PARTITIONED BY (col);
+  CREATE TABLE t (...) USING DELTA CLUSTER BY (col1, col2);  -- Delta 3.0+ Liquid Clustering
+  OPTIMIZE table ZORDER BY (col1, col2);  -- Post-load optimization
+  ALTER TABLE t SET TBLPROPERTIES (delta.autoOptimize.optimizeWrite = true);
+  ```
+
+  ### Apache Iceberg (AWS Glue, Athena, Dataproc, EMR)
+  ```sql
+  CREATE TABLE t (...) USING ICEBERG PARTITIONED BY (bucket(16, col));
+  CREATE TABLE t (...) PARTITIONED BY (years(ts), bucket(16, id));
+  ```
+
+  ### Apache Parquet (All platforms)
+  ```sql
+  CREATE TABLE t (...) USING PARQUET PARTITIONED BY (col);
+  CREATE TABLE t (...) CLUSTERED BY (col) INTO 32 BUCKETS;
+  ```
+
+  ### Apache Hive (Legacy, still supported)
+  ```sql
+  CREATE TABLE t (...) STORED AS PARQUET
+  PARTITIONED BY (dt STRING)
+  CLUSTERED BY (id) SORTED BY (id) INTO 32 BUCKETS;
+  ```
+
+context_sections:
+  "Shared Infrastructure": |
+    BenchBox already has shared Spark infrastructure at `benchbox/platforms/base/cloud_spark/`:
+
+    ```python
+    # mixins.py - existing tuning mixin
+    class SparkTuningMixin:
+        """Handles constraint application (PKs/FKs not enforced in Spark)."""
+        def apply_primary_keys(self, config): ...
+        def apply_foreign_keys(self, config): ...
+
+    class CloudSparkConfigMixin:
+        """Benchmark configuration via SparkConfigOptimizer."""
+        cloud_platform: ClassVar[CloudPlatform]
+        def configure_for_benchmark(self, connection, benchmark_type): ...
+
+    # NEW: SparkDDLGeneratorMixin (to be added)
+    class SparkDDLGeneratorMixin:
+        """DDL generation for Spark platforms."""
+        def generate_tuning_clauses(self, table_tuning, platform_opts) -> TuningClauses: ...
+        def get_post_load_statements(self, table_name, tuning) -> list[str]: ...
+    ```
+
+    All cloud adapters already use this pattern:
+    ```python
+    class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
+        cloud_platform = CloudPlatform.DATAPROC_SERVERLESS
+    ```
+
+  "Format Detection Strategy": |
+    Spark platforms can use multiple table formats. The DDL generator must detect
+    and handle each format appropriately:
+
+    ```python
+    class SparkDDLGeneratorMixin:
+        def detect_table_format(self) -> Literal["delta", "iceberg", "parquet", "hive"]:
+            """Detect table format from adapter configuration."""
+            # Check adapter settings, USING clause, etc.
+            ...
+
+        def generate_tuning_clauses(self, table_tuning, platform_opts) -> TuningClauses:
+            format = self.detect_table_format()
+            if format == "delta":
+                return self._generate_delta_tuning(table_tuning)
+            elif format == "iceberg":
+                return self._generate_iceberg_tuning(table_tuning)
+            # etc.
+    ```
+
+  "Platform-Specific Considerations": |
+    While most DDL is shared, some platforms have unique requirements:
+
+    | Platform | Unique Considerations |
+    |----------|----------------------|
+    | Databricks | Unity Catalog naming, Delta-only, liquid clustering |
+    | AWS Glue | Glue Data Catalog, partition pruning via Glue |
+    | Athena Spark | External tables only, S3 storage |
+    | Dataproc | Hive Metastore or BigLake Metastore |
+    | Synapse Spark | Serverless SQL pool integration |
+    | Fabric Spark | OneLake Delta Tables, Lakehouse pattern |
+    | Snowpark | NOT Spark DDL - uses Snowflake DDL (see PT-07) |
+
+    Note: Snowpark Connect uses PySpark API for compatibility but executes natively
+    on Snowflake. Its physical tuning uses Snowflake clustering, NOT Spark DDL.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Shared DDL Generator Mixin"
+      done: false
+      items:
+        - summary: "Create SparkDDLGeneratorMixin in cloud_spark/mixins.py"
+          done: false
+          subtasks:
+            - summary: "Implement generate_tuning_clauses() base method"
+              done: false
+            - summary: "Implement get_post_load_statements() base method"
+              done: false
+            - summary: "Add table format detection"
+              done: false
+        - summary: "Create format-specific DDL generators"
+          done: false
+          subtasks:
+            - summary: "Delta Lake: PARTITIONED BY, CLUSTER BY, Z-ORDER"
+              done: false
+            - summary: "Iceberg: partition transforms (bucket, years, months)"
+              done: false
+            - summary: "Parquet: PARTITIONED BY, CLUSTERED BY, SORTED BY"
+              done: false
+            - summary: "Hive: legacy STORED AS, CLUSTERED INTO BUCKETS"
+              done: false
+
+    - phase: "Phase 2: Databricks Enhancement"
+      done: false
+      items:
+        - summary: "Refactor Databricks adapter to use mixin"
+          done: false
+        - summary: "Support liquid clustering (Delta 3.0+)"
+          done: false
+        - summary: "Support Z-ORDER for older Delta versions"
+          done: false
+        - summary: "Generate auto-optimize table properties"
+          done: false
+        - summary: "Support bloom filter index creation"
+          done: false
+
+    - phase: "Phase 3: AWS Spark Platforms"
+      done: false
+      items:
+        - summary: "Add mixin to EMR Serverless adapter"
+          done: false
+        - summary: "Add mixin to AWS Glue adapter"
+          done: false
+        - summary: "Add mixin to Athena Spark adapter"
+          done: false
+        - summary: "Handle Glue Data Catalog partitioning"
+          done: false
+        - summary: "Support Iceberg partition transforms"
+          done: false
+
+    - phase: "Phase 4: GCP Spark Platforms"
+      done: false
+      items:
+        - summary: "Add mixin to Dataproc adapter"
+          done: false
+        - summary: "Add mixin to Dataproc Serverless adapter"
+          done: false
+        - summary: "Support BigLake Metastore integration"
+          done: false
+
+    - phase: "Phase 5: Azure Spark Platforms"
+      done: false
+      items:
+        - summary: "Add mixin to Synapse Spark adapter"
+          done: false
+        - summary: "Add mixin to Fabric Spark adapter"
+          done: false
+        - summary: "Handle OneLake Delta table creation"
+          done: false
+
+    - phase: "Phase 6: Local Spark & PySpark"
+      done: false
+      items:
+        - summary: "Add mixin to local Spark adapter"
+          done: false
+        - summary: "Add mixin to PySpark SQL adapter"
+          done: false
+        - summary: "Support all format options (Delta, Iceberg, Parquet)"
+          done: false
+
+    - phase: "Phase 7: PySpark DataFrame Platform"
+      done: false
+      items:
+        - summary: "Evaluate DDL generation for DataFrame mode"
+          done: false
+        - summary: "Integrate with DataFrame write configuration (see PT-10)"
+          done: false
+
+    - phase: "Phase 8: Version Detection"
+      done: false
+      items:
+        - summary: "Detect Databricks Runtime version"
+          done: false
+        - summary: "Detect Delta Lake version"
+          done: false
+        - summary: "Detect Iceberg version"
+          done: false
+        - summary: "Use appropriate features for version"
+          done: false
+          subtasks:
+            - summary: "Delta 2.0+: CLUSTER BY available"
+              done: false
+            - summary: "Delta 3.0+: Liquid clustering"
+              done: false
+            - summary: "Pre-2.0: Z-ORDER only"
+              done: false
+
+    - phase: "Phase 9: Testing"
+      done: false
+      items:
+        - summary: "Unit tests for SparkDDLGeneratorMixin"
+          done: false
+        - summary: "Unit tests for each format generator"
+          done: false
+        - summary: "Integration tests with local Spark"
+          done: false
+        - summary: "Integration tests with Databricks (credentials required)"
+          done: false
+        - summary: "Mock tests for cloud platforms"
+          done: false
+
+files_affected:
+  modified:
+    # Shared infrastructure
+    - "benchbox/platforms/base/cloud_spark/mixins.py"
+    - "benchbox/platforms/base/cloud_spark/__init__.py"
+    # Core Spark
+    - "benchbox/platforms/spark.py"
+    - "benchbox/platforms/pyspark/sql_adapter.py"
+    # AWS
+    - "benchbox/platforms/aws/emr_serverless_adapter.py"
+    - "benchbox/platforms/aws/glue_adapter.py"
+    - "benchbox/platforms/aws/athena_spark_adapter.py"
+    # GCP
+    - "benchbox/platforms/gcp/dataproc_adapter.py"
+    - "benchbox/platforms/gcp/dataproc_serverless_adapter.py"
+    # Azure
+    - "benchbox/platforms/azure/synapse_spark_adapter.py"
+    - "benchbox/platforms/azure/fabric_spark_adapter.py"
+    # Databricks
+    - "benchbox/platforms/databricks/adapter.py"
+    # DataFrame
+    - "benchbox/platforms/dataframe/pyspark_df.py"
+    # Examples
+    - "examples/tunings/databricks/tpch_tuned.yaml"
+  added:
+    - "benchbox/core/tuning/generators/spark_family.py"
+    - "tests/unit/core/tuning/generators/test_spark_family_ddl.py"
+    - "tests/unit/platforms/base/cloud_spark/test_ddl_generator_mixin.py"
+    - "examples/tunings/spark/tpch_delta_tuned.yaml"
+    - "examples/tunings/spark/tpch_iceberg_tuned.yaml"
+    - "examples/tunings/spark/tpch_parquet_tuned.yaml"
+
+technical_requirements:
+  constraints:
+    - "Must support all table formats: Delta, Iceberg, Parquet, Hive"
+    - "Must support Delta 2.0 CLUSTER BY and Delta 3.0 liquid clustering"
+    - "Must fall back to Z-ORDER for older versions"
+    - "Spark bucketing requires explicit bucket count"
+    - "Snowpark Connect uses Snowflake DDL, not Spark DDL (handled in PT-07)"
+    - "80%+ code reuse via shared mixin"
+  dependencies:
+    - "delta-spark for Delta Lake format"
+    - "iceberg-spark for Iceberg format"
+    - "Existing cloud_spark base infrastructure"
+
+success_metrics:
+  - "All 11 Spark platforms (excluding Snowpark) use shared DDL mixin"
+  - "Tables created with correct partitioning and clustering per format"
+  - "Z-ORDER applied post-load for older Delta versions"
+  - "Auto-optimize properties set correctly for Delta"
+  - "Iceberg partition transforms work correctly"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml"
+  related_to:
+    - "_project/TODO/physical-tuning/planning/pt-07-snowflake-ddl.yaml"  # Snowpark DDL
+    - "_project/TODO/physical-tuning/planning/pt-10-dataframe-physical-tuning.yaml"  # DataFrame write config
+
+metadata:
+  owners:
+    - "joe"
+  tags:
+    - "tuning"
+    - "spark"
+    - "databricks"
+    - "delta-lake"
+    - "iceberg"
+    - "aws"
+    - "gcp"
+    - "azure"
+    - "ddl-generation"
+  estimated_effort: "Large"  # Upgraded from Medium due to 12 platforms
+  created_date: "2026-01-03"
+  updated_date: "2026-01-03"
