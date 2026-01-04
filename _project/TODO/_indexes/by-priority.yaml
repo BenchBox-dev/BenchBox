@@ -1,8 +1,8 @@
-generated_at: '2026-01-04T14:19:29.955288'
-total_items: 33
+generated_at: '2026-01-04T18:14:51.681798'
+total_items: 34
 priorities:
   High:
-    count: 5
+    count: 6
     items:
     - id: physical-tuning-ddl-generation
       file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
@@ -13,6 +13,11 @@ priorities:
       file: TODO/platform-expansion/planning/postgresql-first-class-platform.yaml
       title: Promote PostgreSQL to first-class platform status
       category: Platform Expansion
+      status: Not Started
+    - id: result-schema-v2-redesign
+      file: TODO/result-object-migration/planning/result-schema-v2-redesign.yaml
+      title: Result Output Schema v2.0 Complete Redesign
+      category: Core Functionality
       status: Not Started
     - id: oxbow-series-reality-vs-aspiration
       file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml

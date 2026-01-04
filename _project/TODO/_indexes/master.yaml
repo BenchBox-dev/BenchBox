@@ -1,5 +1,5 @@
-generated_at: '2026-01-04T14:19:29.955240'
-total_items: 33
+generated_at: '2026-01-04T18:14:51.681756'
+total_items: 34
 items:
 - id: physical-tuning-ddl-generation
   file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
@@ -29,6 +29,21 @@ items:
   - relational
   - first-class
   estimated_effort: Medium
+- id: result-schema-v2-redesign
+  file: TODO/result-object-migration/planning/result-schema-v2-redesign.yaml
+  title: Result Output Schema v2.0 Complete Redesign
+  worktree: result-object-migration
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - schema
+  - breaking-change
+  - results
+  - json-export
+  owners:
+  - joe
+  estimated_effort: Large
 - id: oxbow-series-reality-vs-aspiration
   file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
   title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'

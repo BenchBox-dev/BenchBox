@@ -1,4 +1,4 @@
-generated_at: '2026-01-04T14:19:29.955273'
+generated_at: '2026-01-04T18:14:51.681786'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -124,7 +124,7 @@ categories:
       priority: Low
       status: Identified
   Core Functionality:
-    count: 2
+    count: 3
     items:
     - id: cloud-spark-dependency-groups
       file: TODO/platform-expansion/planning/cloud-spark-dependency-groups.yaml
@@ -134,6 +134,11 @@ categories:
     - id: physical-tuning-ddl-generation
       file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
       title: Implement Physical Tuning DDL Generation Across All Platforms
+      priority: High
+      status: Not Started
+    - id: result-schema-v2-redesign
+      file: TODO/result-object-migration/planning/result-schema-v2-redesign.yaml
+      title: Result Output Schema v2.0 Complete Redesign
       priority: High
       status: Not Started
   Documentation:

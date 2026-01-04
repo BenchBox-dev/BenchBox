@@ -1,8 +1,8 @@
-generated_at: '2026-01-04T14:19:29.955298'
-total_items: 33
+generated_at: '2026-01-04T18:14:51.681808'
+total_items: 34
 statuses:
   Not Started:
-    count: 32
+    count: 33
     items:
     - id: local-platform-cost-tracking
       file: TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
@@ -59,6 +59,11 @@ statuses:
       title: Promote PostgreSQL to first-class platform status
       priority: High
       category: Platform Expansion
+    - id: result-schema-v2-redesign
+      file: TODO/result-object-migration/planning/result-schema-v2-redesign.yaml
+      title: Result Output Schema v2.0 Complete Redesign
+      priority: High
+      category: Core Functionality
     - id: streaming-benchmark-support-kafka-flink-spark-streaming
       file: TODO/specialized-streaming/planning/streaming-benchmark-support-kafka-flink-spark-streaming.yaml
       title: Streaming Benchmark Support - Kafka, Flink, Spark Streaming
