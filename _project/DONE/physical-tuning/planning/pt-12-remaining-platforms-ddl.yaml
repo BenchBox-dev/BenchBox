@@ -159,86 +159,86 @@ context_sections:
 tasks:
   phases:
     - phase: "Phase 1: ClickHouse Protocol Alignment"
-      done: false
+      done: true
       items:
         - summary: "Refactor ClickHouseTuningMixin to DDL Generator protocol"
-          done: false
+          done: true
           subtasks:
             - summary: "Implement generate_tuning_clauses() returning TuningClauses"
-              done: false
+              done: true
             - summary: "Keep backward compat with existing generate_tuning_clause()"
-              done: false
+              done: true
         - summary: "Add MergeTree engine selection based on tuning config"
-          done: false
+          done: true
         - summary: "Add TTL support for time-series data"
-          done: false
+          done: true
         - summary: "Unit tests for ClickHouse DDL generator"
-          done: false
+          done: true
 
     - phase: "Phase 2: Firebolt Protocol Alignment"
-      done: false
+      done: true
       items:
         - summary: "Refactor to DDL Generator protocol"
-          done: false
+          done: true
         - summary: "Add AGGREGATING INDEX support"
-          done: false
+          done: true
         - summary: "Add JOIN INDEX support"
-          done: false
+          done: true
         - summary: "Unit tests for Firebolt DDL generator"
-          done: false
+          done: true
 
     - phase: "Phase 3: Azure Synapse Protocol Alignment"
-      done: false
+      done: true
       items:
         - summary: "Refactor to DDL Generator protocol"
-          done: false
+          done: true
         - summary: "Add CLUSTERED INDEX with specific columns"
-          done: false
+          done: true
         - summary: "Add PARTITION BY support (table partitioning)"
-          done: false
+          done: true
         - summary: "Add HEAP table support for staging"
-          done: false
+          done: true
         - summary: "Unit tests for Azure Synapse DDL generator"
-          done: false
+          done: true
 
     - phase: "Phase 4: Fabric Warehouse Evaluation"
-      done: false
+      done: true
       items:
         - summary: "Evaluate Fabric Warehouse tuning overlap with PT-08"
-          done: false
+          done: true
         - summary: "If unique features, implement DDL generator"
-          done: false
+          done: true
         - summary: "If shared with Spark/Delta, document in PT-08"
-          done: false
+          done: true
 
     - phase: "Phase 5: Minimal Tuning Platforms"
-      done: false
+      done: true
       items:
         - summary: "Implement no-op DDL generators for minimal platforms"
-          done: false
+          done: true
           subtasks:
             - summary: "SQLite: Return empty TuningClauses with log"
-              done: false
+              done: true
             - summary: "DataFusion: Return empty TuningClauses with log"
-              done: false
+              done: true
             - summary: "Polars SQL: Return empty TuningClauses with log"
-              done: false
+              done: true
             - summary: "InfluxDB: Return empty TuningClauses with log"
-              done: false
+              done: true
         - summary: "Add tuning not supported message to dry-run output"
-          done: false
+          done: true
 
     - phase: "Phase 6: Testing"
-      done: false
+      done: true
       items:
         - summary: "Unit tests for ClickHouse DDL generator"
-          done: false
+          done: true
         - summary: "Unit tests for Firebolt DDL generator"
-          done: false
+          done: true
         - summary: "Unit tests for Azure Synapse DDL generator"
-          done: false
+          done: true
         - summary: "Integration tests with ClickHouse (local/chdb)"
-          done: false
+          done: true
 
 files_affected:
   modified:
