@@ -1,4 +1,4 @@
-generated_at: '2026-01-04T18:14:52.395350'
+generated_at: '2026-01-04T18:43:24.070382'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -322,7 +322,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 51
+    count: 52
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -557,6 +557,11 @@ categories:
     - id: refactor-core-dependencies-to-optional
       file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
       title: Refactor platform-specific packages from core to optional dependencies
+      priority: High
+      status: Completed
+    - id: result-schema-v2-redesign
+      file: DONE/result-object-migration/active/result-schema-v2-redesign.yaml
+      title: Result Output Schema v2.0 Complete Redesign
       priority: High
       status: Completed
     - id: standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com

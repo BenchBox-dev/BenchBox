@@ -1,5 +1,5 @@
-generated_at: '2026-01-04T18:14:52.395510'
-total_items: 337
+generated_at: '2026-01-04T18:43:24.070548'
+total_items: 338
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 150
+    count: 151
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1108,6 +1108,11 @@ statuses:
       title: Result Object Migration (BenchmarkResult → BenchmarkResults)
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: result-schema-v2-redesign
+      file: DONE/result-object-migration/active/result-schema-v2-redesign.yaml
+      title: Result Output Schema v2.0 Complete Redesign
+      priority: High
+      category: Core Functionality
     - id: sql-cross-platform-benchmark-suite
       file: DONE/platform-comparison/planning/sql-cross-platform-benchmark-suite.yaml
       title: SQL Cross-Platform Benchmark Suite

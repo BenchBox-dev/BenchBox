@@ -1,5 +1,5 @@
-generated_at: '2026-01-04T18:14:52.395210'
-total_items: 337
+generated_at: '2026-01-04T18:43:24.070246'
+total_items: 338
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1105,6 +1105,21 @@ items:
   - cli
   owners:
   - '"@benchbox-maintainers"'
+- id: result-schema-v2-redesign
+  file: DONE/result-object-migration/active/result-schema-v2-redesign.yaml
+  title: Result Output Schema v2.0 Complete Redesign
+  worktree: result-object-migration
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - schema
+  - breaking-change
+  - results
+  - json-export
+  owners:
+  - joe
+  estimated_effort: Large
 - id: secure-credential-handling
   file: DONE/security-hardening/secure-credential-handling.yaml
   title: Secure Credential Handling

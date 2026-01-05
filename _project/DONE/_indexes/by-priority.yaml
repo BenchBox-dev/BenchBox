@@ -1,5 +1,5 @@
-generated_at: '2026-01-04T18:14:52.395438'
-total_items: 337
+generated_at: '2026-01-04T18:43:24.070476'
+total_items: 338
 priorities:
   Critical:
     count: 24
@@ -125,7 +125,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 105
+    count: 106
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -431,6 +431,11 @@ priorities:
       file: DONE/result-object-migration/completed/result-object-migration-benchmarkresult-benchmarkresults.yaml
       title: Result Object Migration (BenchmarkResult → BenchmarkResults)
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+      status: Completed
+    - id: result-schema-v2-redesign
+      file: DONE/result-object-migration/active/result-schema-v2-redesign.yaml
+      title: Result Output Schema v2.0 Complete Redesign
+      category: Core Functionality
       status: Completed
     - id: secure-credential-handling
       file: DONE/security-hardening/secure-credential-handling.yaml
