@@ -10,10 +10,11 @@ description: |
   `uv add benchbox --extra cloud-spark-<provider>`.
 
   **Current State (as of 2026-01-07):**
-  All 6 cloud Spark platform adapters are COMPLETE and registered:
+  All 7 cloud Spark platform adapters are COMPLETE and registered:
   - AWS: Glue, EMR Serverless, Athena Spark (all use boto3)
   - GCP: Dataproc, Dataproc Serverless (use google-cloud-dataproc + storage)
   - Azure: Synapse Spark, Fabric Spark (use azure-identity + datalake + requests)
+  - Snowflake: Snowpark Connect (uses snowflake-snowpark-python)
 
   **Problem:**
   The existing `cloud-spark` extra in pyproject.toml only includes Databricks
@@ -41,7 +42,7 @@ tasks:
           notes: "Covers Synapse Spark and Fabric Spark"
         - summary: "Add cloud-spark-snowflake = [\"snowflake-snowpark-python>=1.11.0\", \"pyspark>=3.5.0\"]"
           done: true
-          notes: "For future Snowpark adapter - dependency group can be added now"
+          notes: "For SnowparkConnectAdapter (already implemented)"
 
     - phase: "Phase 2: Update cloud-spark Meta-Group"
       done: true
@@ -74,7 +75,7 @@ tasks:
               done: true
             - summary: "Document cloud-spark-azure for Synapse/Fabric Spark"
               done: true
-            - summary: "Document cloud-spark-snowflake for future Snowpark support"
+            - summary: "Document cloud-spark-snowflake for Snowpark Connect"
               done: true
             - summary: "Document cloud-spark for all-in-one installation"
               done: true
