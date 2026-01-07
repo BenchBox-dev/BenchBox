@@ -1,0 +1,236 @@
+# PostgreSQL First-Class Platform Promotion
+#
+# Location: _project/TODO/platform-expansion/planning/postgresql-first-class-platform.yaml
+# Priority: High
+
+title: "Promote PostgreSQL to first-class platform status"
+worktree: platform-expansion
+priority: High
+status: Not Started
+description: |
+  PostgreSQL adapter exists but needs improvements to be a first-class platform.
+
+  **Current State (needs verification):**
+  - Adapter: benchbox/platforms/postgresql.py (exists)
+  - Registration: Listed in platform_registry.py
+  - Connectivity: psycopg2 with COPY bulk loading
+  - CLI: [VERIFY] Does it appear in wizard?
+  - Documentation: [MISSING] No dedicated docs page
+  - Examples: [MISSING] No example scripts
+  - Tuning: [VERIFY] Are tuning profiles defined?
+
+  **First-Class Platform Requirements:**
+  - [ ] Appears in interactive CLI wizard with proper options
+  - [ ] Dedicated documentation page (docs/platforms/postgresql.rst)
+  - [ ] Example scripts in examples/getting_started/sql/
+  - [ ] Platform-specific CLI options (host, port, database, etc.)
+  - [ ] Tuning profile with OLAP-optimized settings
+  - [ ] All TPC benchmarks (TPC-H, TPC-DS, SSB) verified working
+  - [ ] Integration smoke tests in CI
+
+  **Reference Platforms:**
+  Compare against DuckDB and Snowflake adapters for first-class feature parity.
+
+category: Platform Expansion
+
+tasks:
+  phases:
+    - phase: "Phase 0: Current State Audit"
+      done: false
+      items:
+        - summary: "Audit PostgreSQL adapter implementation"
+          done: false
+          subtasks:
+            - summary: "Review postgresql.py for completeness vs PlatformAdapter base"
+              done: false
+            - summary: "Compare feature coverage against DuckDB adapter (reference)"
+              done: false
+            - summary: "Check CLI platform hooks registration in __init__.py"
+              done: false
+            - summary: "Verify tuning support implementation"
+              done: false
+        - summary: "Document gaps found vs first-class platforms"
+          done: false
+        - summary: "Update this TODO with specific gaps to address"
+          done: false
+
+    - phase: "Phase 1: Verification and Testing"
+      done: false
+      items:
+        - summary: "Verify PostgreSQL appears in interactive wizard"
+          done: false
+          subtasks:
+            - summary: "Test `benchbox run` interactive mode shows PostgreSQL"
+              done: false
+            - summary: "Verify platform selection and configuration flow"
+              done: false
+            - summary: "Test CLI options (--host, --port, --database, etc.)"
+              done: false
+        - summary: "Run TPC-H benchmark end-to-end with PostgreSQL"
+          done: false
+          subtasks:
+            - summary: "Test SF=0.01 for quick validation"
+              done: false
+            - summary: "Verify all 22 queries execute successfully"
+              done: false
+            - summary: "Check row count validation passes"
+              done: false
+        - summary: "Run TPC-DS benchmark end-to-end with PostgreSQL (SF >= 1.0)"
+          done: false
+        - summary: "Run SSB benchmark end-to-end with PostgreSQL"
+          done: false
+
+    - phase: "Phase 2: Documentation"
+      done: false
+      items:
+        - summary: "Create PostgreSQL platform documentation page"
+          done: false
+          subtasks:
+            - summary: "Document connection parameters (host, port, database, user, password)"
+              done: false
+            - summary: "Document performance tuning options (work_mem, shared_buffers, etc.)"
+              done: false
+            - summary: "Document COPY-based data loading approach"
+              done: false
+            - summary: "Add troubleshooting section for common issues"
+              done: false
+        - summary: "Add PostgreSQL example scripts to examples/"
+          done: false
+          subtasks:
+            - summary: "Create postgresql_tpch.py example"
+              done: false
+            - summary: "Create postgresql_tpcds.py example"
+              done: false
+        - summary: "Update CLI reference with PostgreSQL-specific options"
+          done: false
+
+    - phase: "Phase 3: Tuning Profiles"
+      done: false
+      items:
+        - summary: "Create PostgreSQL-specific tuning profile"
+          done: false
+          subtasks:
+            - summary: "Define OLAP-optimized GUC settings (work_mem, etc.)"
+              done: false
+            - summary: "Define index recommendations per benchmark"
+              done: false
+            - summary: "Document when to use which tuning level"
+              done: false
+        - summary: "Test tuning wizard integration with PostgreSQL"
+          done: false
+        - summary: "Verify --tuning flag works with PostgreSQL"
+          done: false
+
+    - phase: "Phase 4: CI Integration"
+      done: false
+      items:
+        - summary: "Add PostgreSQL integration smoke test"
+          done: false
+          subtasks:
+            - summary: "Create test_postgresql_smoke.py"
+              done: false
+            - summary: "Use postgres:16 Docker image for CI"
+              done: false
+        - summary: "Add PostgreSQL to CI matrix (optional)"
+          done: false
+
+metadata:
+  tags:
+    - postgresql
+    - platform
+    - relational
+    - first-class
+    - oltp-capable
+  estimated_effort: "3-5 days"
+  created_date: "2025-12-21"
+  last_updated: "2025-01-07"
+
+impact:
+  business_value: |
+    PostgreSQL is one of the most popular databases worldwide. Making it a
+    first-class platform allows BenchBox to serve the large PostgreSQL user
+    base who want to benchmark their deployments against TPC standards.
+  user_impact: |
+    Users can easily benchmark PostgreSQL instances through the interactive
+    wizard and get actionable performance insights. Documentation and examples
+    reduce time-to-first-benchmark significantly.
+  technical_debt: |
+    PostgreSQL adapter exists but may have feature gaps compared to other
+    first-class platforms. This work closes those gaps and establishes
+    parity with DuckDB/Snowflake adapters.
+
+files_affected:
+  modified:
+    - benchbox/platforms/postgresql.py
+    - benchbox/core/platform_registry.py
+    - benchbox/cli/platform_hooks.py
+    - pyproject.toml
+    - docs/index.rst
+  added:
+    - docs/platforms/postgresql.rst
+    - examples/getting_started/sql/postgresql_tpch.py
+    - examples/getting_started/sql/postgresql_tpcds.py
+    - benchbox/tuning/profiles/postgresql.yaml
+    - tests/integration/platforms/test_postgresql_smoke.py
+
+context_sections:
+  "Background and Motivation": |
+    PostgreSQL is the world's most advanced open source relational database,
+    widely used in enterprise environments. BenchBox already has a PostgreSQL
+    adapter, but it hasn't been promoted to first-class status with full
+    documentation, examples, and verified benchmark compatibility.
+
+    First-class platforms in BenchBox have:
+    - Dedicated documentation page
+    - Example scripts for common benchmarks
+    - CLI integration with platform-specific options
+    - Tuning profiles for optimal performance
+    - CI integration for regression testing
+
+  "Technical Context": |
+    **Current Implementation:**
+    - File: benchbox/platforms/postgresql.py
+    - Driver: psycopg2 (DB-API 2.0 compliant)
+    - Bulk loading: COPY command for efficient data ingestion
+    - SQLGlot dialect: "postgres" (fully supported)
+
+    **PostgreSQL OLAP Tuning:**
+    Key GUC parameters for analytical workloads:
+    - work_mem: Memory for sorts/hashes (increase for OLAP)
+    - shared_buffers: Buffer pool size
+    - effective_cache_size: Planner hint for available cache
+    - random_page_cost: Lower for SSDs
+    - max_parallel_workers_per_gather: Parallel query execution
+
+technical_requirements:
+  constraints:
+    - "Must work with PostgreSQL 12+ (current LTS versions)"
+    - "psycopg2-binary or psycopg2 as driver (not psycopg3 yet)"
+    - "COPY command required for bulk loading (not row-by-row INSERT)"
+    - "Superuser not required but COPY FROM STDIN needs appropriate permissions"
+  dependencies:
+    - "psycopg2-binary>=2.9.0 (or psycopg2 with libpq)"
+  compatibility: |
+    PostgreSQL versions: 12, 13, 14, 15, 16, 17
+    Docker testing: postgres:16-alpine image
+    Cloud managed: AWS RDS, Azure Database, GCP Cloud SQL, Supabase
+
+dependencies:
+  related:
+    - "_project/TODO/platform-expansion/planning/timescaledb-promotion.yaml"
+
+open_questions:
+  - "Does PostgreSQL adapter already appear in the CLI wizard correctly?"
+  - "Are there any TPC-H or TPC-DS queries that fail on PostgreSQL?"
+  - "Should we support psycopg3 (async) in addition to psycopg2?"
+  - "What PostgreSQL version should be minimum supported (12 vs 14)?"
+  - "Should tuning profile auto-detect PostgreSQL version for optimal settings?"
+
+success_metrics:
+  - "PostgreSQL appears in interactive wizard platform selection"
+  - "TPC-H (all 22 queries) completes successfully at SF=1"
+  - "TPC-DS (all 99 queries) completes successfully at SF=1"
+  - "SSB benchmark completes successfully"
+  - "Documentation published in docs site with examples"
+  - "At least two example scripts in examples/getting_started/sql/"
+  - "Integration smoke test passes in CI"
