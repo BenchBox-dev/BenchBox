@@ -1,4 +1,4 @@
-generated_at: '2026-01-07T14:08:05.663633'
+generated_at: '2026-01-07T17:59:17.917741'
 total_items: 35
 items:
 - id: physical-tuning-ddl-generation
@@ -269,7 +269,8 @@ items:
   - cloud-spark
   - dependencies
   - pyproject
-  estimated_effort: 2 hours
+  - documentation
+  estimated_effort: Small
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support
