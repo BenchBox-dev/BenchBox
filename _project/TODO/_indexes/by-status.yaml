@@ -1,8 +1,8 @@
-generated_at: '2026-01-07T18:20:16.970378'
-total_items: 34
+generated_at: '2026-01-07T18:28:43.646707'
+total_items: 33
 statuses:
   Not Started:
-    count: 33
+    count: 32
     items:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
@@ -59,11 +59,6 @@ statuses:
       title: Interactive Benchmark Explorer - Web UI
       priority: Low
       category: Supporting Infrastructure
-    - id: postgresql-first-class-platform
-      file: TODO/platform-expansion/planning/postgresql-first-class-platform.yaml
-      title: Promote PostgreSQL to first-class platform status
-      priority: High
-      category: Platform Expansion
     - id: streaming-benchmark-support-kafka-flink-spark-streaming
       file: TODO/specialized-streaming/planning/streaming-benchmark-support-kafka-flink-spark-streaming.yaml
       title: Streaming Benchmark Support - Kafka, Flink, Spark Streaming

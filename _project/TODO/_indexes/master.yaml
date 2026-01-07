@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T18:20:16.970310'
-total_items: 34
+generated_at: '2026-01-07T18:28:43.646561'
+total_items: 33
 items:
 - id: physical-tuning-ddl-generation
   file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
@@ -16,20 +16,6 @@ items:
   owners:
   - joe
   estimated_effort: Large
-- id: postgresql-first-class-platform
-  file: TODO/platform-expansion/planning/postgresql-first-class-platform.yaml
-  title: Promote PostgreSQL to first-class platform status
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: High
-  status: Not Started
-  tags:
-  - postgresql
-  - platform
-  - relational
-  - first-class
-  - oltp-capable
-  estimated_effort: 3-5 days
 - id: oxbow-series-reality-vs-aspiration
   file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
   title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'

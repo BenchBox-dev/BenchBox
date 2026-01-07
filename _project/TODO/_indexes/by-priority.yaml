@@ -1,18 +1,13 @@
-generated_at: '2026-01-07T18:20:16.970367'
-total_items: 34
+generated_at: '2026-01-07T18:28:43.646695'
+total_items: 33
 priorities:
   High:
-    count: 5
+    count: 4
     items:
     - id: physical-tuning-ddl-generation
       file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
       title: Implement Physical Tuning DDL Generation Across All Platforms
       category: Core Functionality
-      status: Not Started
-    - id: postgresql-first-class-platform
-      file: TODO/platform-expansion/planning/postgresql-first-class-platform.yaml
-      title: Promote PostgreSQL to first-class platform status
-      category: Platform Expansion
       status: Not Started
     - id: oxbow-series-reality-vs-aspiration
       file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml

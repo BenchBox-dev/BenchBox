@@ -1,4 +1,4 @@
-generated_at: '2026-01-07T18:20:16.970351'
+generated_at: '2026-01-07T18:28:43.646665'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -145,7 +145,7 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 4
+    count: 3
     items:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
@@ -161,11 +161,6 @@ categories:
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
       priority: Low
-      status: Not Started
-    - id: postgresql-first-class-platform
-      file: TODO/platform-expansion/planning/postgresql-first-class-platform.yaml
-      title: Promote PostgreSQL to first-class platform status
-      priority: High
       status: Not Started
   Specialized Benchmarks:
     count: 3
