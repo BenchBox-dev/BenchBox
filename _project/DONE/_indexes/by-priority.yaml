@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T18:05:01.753145'
-total_items: 338
+generated_at: '2026-01-07T18:12:03.633928'
+total_items: 339
 priorities:
   Critical:
     count: 24
@@ -658,7 +658,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 11
+    count: 12
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -690,6 +690,11 @@ priorities:
       title: Cloud Spark Adapter Consolidation - Extract Common Patterns
       category: Core Functionality
       status: Complete
+    - id: cloud-spark-dependency-groups
+      file: DONE/platform-expansion/active/cloud-spark-dependency-groups.yaml
+      title: Cloud Spark Dependency Groups in pyproject.toml
+      category: Core Functionality
+      status: Completed
     - id: compare-interactive-file-selection
       file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
       title: Improve interactive file selection in compare command

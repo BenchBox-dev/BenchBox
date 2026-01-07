@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T18:05:01.752859'
-total_items: 338
+generated_at: '2026-01-07T18:12:03.633685'
+total_items: 339
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3237,6 +3237,19 @@ items:
   - code-quality
   - DRY
   estimated_effort: Medium (16-22 hours)
+- id: cloud-spark-dependency-groups
+  file: DONE/platform-expansion/active/cloud-spark-dependency-groups.yaml
+  title: Cloud Spark Dependency Groups in pyproject.toml
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - cloud-spark
+  - dependencies
+  - pyproject
+  - documentation
+  estimated_effort: Small
 - id: compare-interactive-file-selection
   file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
   title: Improve interactive file selection in compare command

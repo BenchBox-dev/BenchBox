@@ -1,8 +1,8 @@
-generated_at: '2026-01-07T18:05:00.523647'
-total_items: 35
+generated_at: '2026-01-07T18:12:02.881113'
+total_items: 34
 statuses:
   Not Started:
-    count: 34
+    count: 33
     items:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
@@ -19,11 +19,6 @@ statuses:
       title: Add numbered list selection to platform setup wizard
       priority: Medium-High
       category: User Experience
-    - id: cloud-spark-dependency-groups
-      file: TODO/platform-expansion/planning/cloud-spark-dependency-groups.yaml
-      title: Cloud Spark Dependency Groups in pyproject.toml
-      priority: Medium-High
-      category: Core Functionality
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration

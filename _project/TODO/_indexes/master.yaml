@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T18:05:00.523515'
-total_items: 35
+generated_at: '2026-01-07T18:12:02.881049'
+total_items: 34
 items:
 - id: physical-tuning-ddl-generation
   file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
@@ -257,19 +257,6 @@ items:
   - ux
   - rich
   - interactive
-  estimated_effort: Small
-- id: cloud-spark-dependency-groups
-  file: TODO/platform-expansion/planning/cloud-spark-dependency-groups.yaml
-  title: Cloud Spark Dependency Groups in pyproject.toml
-  worktree: platform-expansion
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - cloud-spark
-  - dependencies
-  - pyproject
-  - documentation
   estimated_effort: Small
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml

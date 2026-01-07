@@ -1,4 +1,4 @@
-generated_at: '2026-01-07T18:05:01.753035'
+generated_at: '2026-01-07T18:12:03.633834'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -322,7 +322,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 52
+    count: 53
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -374,6 +374,11 @@ categories:
       title: Cloud Spark Adapter Consolidation - Extract Common Patterns
       priority: Medium-High
       status: Complete
+    - id: cloud-spark-dependency-groups
+      file: DONE/platform-expansion/active/cloud-spark-dependency-groups.yaml
+      title: Cloud Spark Dependency Groups in pyproject.toml
+      priority: Medium-High
+      status: Completed
     - id: cloud-spark-shared-infrastructure
       file: DONE/platform-expansion/planning/cloud-spark-shared-infrastructure.yaml
       title: Cloud Spark Shared Infrastructure
