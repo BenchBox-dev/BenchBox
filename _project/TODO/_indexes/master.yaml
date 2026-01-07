@@ -1,4 +1,4 @@
-generated_at: '2026-01-07T18:19:00.298606'
+generated_at: '2026-01-07T18:20:16.970310'
 total_items: 34
 items:
 - id: physical-tuning-ddl-generation
@@ -28,7 +28,8 @@ items:
   - platform
   - relational
   - first-class
-  estimated_effort: Medium
+  - oltp-capable
+  estimated_effort: 3-5 days
 - id: oxbow-series-reality-vs-aspiration
   file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
   title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'
