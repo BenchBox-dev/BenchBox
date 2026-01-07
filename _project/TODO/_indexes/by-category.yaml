@@ -1,4 +1,4 @@
-generated_at: '2026-01-04T18:43:23.368251'
+generated_at: '2026-01-07T14:08:05.663663'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -150,11 +150,21 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 2
+    count: 4
     items:
+    - id: starrocks-olap-platform
+      file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
+      title: Add StarRocks MPP OLAP platform support
+      priority: Medium-High
+      status: Not Started
     - id: local-platform-cost-tracking
       file: TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
       title: Add cost tracking for local/self-hosted platforms
+      priority: Low
+      status: Not Started
+    - id: databend-cloud-olap-platform
+      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+      title: Databend Cloud-Native OLAP Platform Integration
       priority: Low
       status: Not Started
     - id: postgresql-first-class-platform

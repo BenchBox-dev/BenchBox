@@ -1,5 +1,5 @@
-generated_at: '2026-01-04T18:43:23.368220'
-total_items: 33
+generated_at: '2026-01-07T14:08:05.663633'
+total_items: 35
 items:
 - id: physical-tuning-ddl-generation
   file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
@@ -70,6 +70,20 @@ items:
   - self-hosted
   - resource-tracking
   estimated_effort: 1-2 days
+- id: databend-cloud-olap-platform
+  file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+  title: Databend Cloud-Native OLAP Platform Integration
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  tags:
+  - cloud-native
+  - olap
+  - snowflake-compatible
+  - rust
+  - object-storage
+  estimated_effort: 2-3 days
 - id: geospatial-benchmark-support-postgis-integration
   file: TODO/specialized-geospatial/planning/geospatial-benchmark-support-postgis-integration.yaml
   title: Geospatial Benchmark Support - PostGIS Integration
@@ -216,6 +230,21 @@ items:
   - blog-data
   - verification
   estimated_effort: 30-60 minutes
+- id: starrocks-olap-platform
+  file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
+  title: Add StarRocks MPP OLAP platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - starrocks
+  - olap
+  - mpp
+  - columnar
+  - platform
+  - mysql-protocol
+  estimated_effort: Medium
 - id: platform-setup-numbered-list-selection
   file: TODO/ux-improvements/planning/platform-setup-numbered-list-selection.yaml
   title: Add numbered list selection to platform setup wizard

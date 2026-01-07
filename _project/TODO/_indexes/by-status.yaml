@@ -1,9 +1,14 @@
-generated_at: '2026-01-04T18:43:23.368275'
-total_items: 33
+generated_at: '2026-01-07T14:08:05.663688'
+total_items: 35
 statuses:
   Not Started:
-    count: 32
+    count: 34
     items:
+    - id: starrocks-olap-platform
+      file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
+      title: Add StarRocks MPP OLAP platform support
+      priority: Medium-High
+      category: Platform Expansion
     - id: local-platform-cost-tracking
       file: TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
       title: Add cost tracking for local/self-hosted platforms
@@ -19,6 +24,11 @@ statuses:
       title: Cloud Spark Dependency Groups in pyproject.toml
       priority: Medium-High
       category: Core Functionality
+    - id: databend-cloud-olap-platform
+      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+      title: Databend Cloud-Native OLAP Platform Integration
+      priority: Low
+      category: Platform Expansion
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication

@@ -1,5 +1,5 @@
-generated_at: '2026-01-04T18:43:23.368265'
-total_items: 33
+generated_at: '2026-01-07T14:08:05.663678'
+total_items: 35
 priorities:
   High:
     count: 5
@@ -30,8 +30,13 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium-High:
-    count: 14
+    count: 15
     items:
+    - id: starrocks-olap-platform
+      file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
+      title: Add StarRocks MPP OLAP platform support
+      category: Platform Expansion
+      status: Not Started
     - id: platform-setup-numbered-list-selection
       file: TODO/ux-improvements/planning/platform-setup-numbered-list-selection.yaml
       title: Add numbered list selection to platform setup wizard
@@ -146,11 +151,16 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 6
+    count: 7
     items:
     - id: local-platform-cost-tracking
       file: TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
       title: Add cost tracking for local/self-hosted platforms
+      category: Platform Expansion
+      status: Not Started
+    - id: databend-cloud-olap-platform
+      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+      title: Databend Cloud-Native OLAP Platform Integration
       category: Platform Expansion
       status: Not Started
     - id: geospatial-benchmark-support-postgis-integration
