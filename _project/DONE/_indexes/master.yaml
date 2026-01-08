@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:26:39.884907'
-total_items: 341
+generated_at: '2026-01-07T19:35:25.235716'
+total_items: 342
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1524,6 +1524,14 @@ items:
   - dependencies
   owners:
   - '"@benchbox-maintainers"'
+- id: runtime-module-refactor-batch-two
+  file: DONE/runtime-ops/planning/runtime-module-refactor-batch-two.yaml
+  title: Runtime Module Refactor – Batch Two
+  worktree: runtime-ops
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Completed
+  completed_date: '2026-01-07'
 - id: sql-cross-platform-benchmark-suite
   file: DONE/platform-comparison/planning/sql-cross-platform-benchmark-suite.yaml
   title: SQL Cross-Platform Benchmark Suite

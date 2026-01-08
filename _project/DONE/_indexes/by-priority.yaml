@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:26:39.885221'
-total_items: 341
+generated_at: '2026-01-07T19:35:25.236434'
+total_items: 342
 priorities:
   Critical:
     count: 24
@@ -1654,7 +1654,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 8
+    count: 9
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -1681,6 +1681,11 @@ priorities:
       title: Fix TPC-DS Optional Dependency Example Test
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
       status: Identified
+    - id: runtime-module-refactor-batch-two
+      file: DONE/runtime-ops/planning/runtime-module-refactor-batch-two.yaml
+      title: Runtime Module Refactor – Batch Two
+      category: Code Quality and Technical Debt
+      status: Completed
     - id: sql-cross-platform-benchmark-suite
       file: DONE/platform-comparison/planning/sql-cross-platform-benchmark-suite.yaml
       title: SQL Cross-Platform Benchmark Suite

@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:26:39.134997'
-total_items: 32
+generated_at: '2026-01-07T19:35:24.125640'
+total_items: 31
 priorities:
   High:
     count: 3
@@ -28,10 +28,10 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: platform-setup-numbered-list-selection
-      file: TODO/ux-improvements/planning/platform-setup-numbered-list-selection.yaml
+      file: TODO/ux-improvements/active/platform-setup-numbered-list-selection.yaml
       title: Add numbered list selection to platform setup wizard
       category: User Experience
-      status: Not Started
+      status: In Progress
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
@@ -136,7 +136,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 7
+    count: 6
     items:
     - id: local-platform-cost-tracking
       file: TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
@@ -163,11 +163,6 @@ priorities:
       title: Interactive Benchmark Explorer - Web UI
       category: Supporting Infrastructure
       status: Not Started
-    - id: runtime-module-refactor-batch-two
-      file: TODO/runtime-ops/planning/runtime-module-refactor-batch-two.yaml
-      title: Runtime Module Refactor – Batch Two
-      category: Code Quality and Technical Debt
-      status: Identified
     - id: streaming-benchmark-support-kafka-flink-spark-streaming
       file: TODO/specialized-streaming/planning/streaming-benchmark-support-kafka-flink-spark-streaming.yaml
       title: Streaming Benchmark Support - Kafka, Flink, Spark Streaming

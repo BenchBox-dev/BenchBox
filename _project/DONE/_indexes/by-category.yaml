@@ -1,4 +1,4 @@
-generated_at: '2026-01-07T19:26:39.885087'
+generated_at: '2026-01-07T19:35:25.236175'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -171,7 +171,7 @@ categories:
       priority: Medium
       status: Not Started
   Code Quality and Technical Debt:
-    count: 25
+    count: 26
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -243,6 +243,11 @@ categories:
       title: Remove TPC-H Parallel File Merging Anti-Pattern
       priority: Medium
       status: Not Started
+    - id: runtime-module-refactor-batch-two
+      file: DONE/runtime-ops/planning/runtime-module-refactor-batch-two.yaml
+      title: Runtime Module Refactor – Batch Two
+      priority: Low
+      status: Completed
     - id: standardize-benchmark-constraint-parameter-apis
       file: DONE/unknown/planning/standardize-benchmark-constraint-parameter-apis.yaml
       title: Standardize Benchmark Constraint Parameter APIs
