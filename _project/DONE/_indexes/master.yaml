@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T18:20:18.001845'
-total_items: 339
+generated_at: '2026-01-07T19:24:27.898126'
+total_items: 340
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -990,6 +990,21 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 5-6 hours
+- id: postgresql-first-class-platform
+  file: DONE/platform-expansion/active/postgresql-first-class-platform.yaml
+  title: Promote PostgreSQL to first-class platform status
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Completed
+  tags:
+  - postgresql
+  - platform
+  - relational
+  - first-class
+  - oltp-capable
+  estimated_effort: 3-5 days
+  completed_date: '2025-01-07'
 - id: query-plan-cli-visualization
   file: DONE/query-plan-cli/planning/query-plan-cli-visualization.yaml
   title: Query Plan CLI & Visualization

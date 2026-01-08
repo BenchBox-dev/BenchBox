@@ -1,4 +1,4 @@
-generated_at: '2026-01-07T18:20:18.002043'
+generated_at: '2026-01-07T19:24:27.898436'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -1004,7 +1004,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 35
+    count: 36
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1159,6 +1159,11 @@ categories:
     - id: polars-platform-adapter
       file: DONE/platform-expansion-polars/completed/polars-platform-adapter.yaml
       title: Polars Platform Adapter
+      priority: High
+      status: Completed
+    - id: postgresql-first-class-platform
+      file: DONE/platform-expansion/active/postgresql-first-class-platform.yaml
+      title: Promote PostgreSQL to first-class platform status
       priority: High
       status: Completed
     - id: pyspark-sql-registry-integration

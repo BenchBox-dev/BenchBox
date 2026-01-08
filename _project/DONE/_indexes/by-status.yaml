@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T18:20:18.002233'
-total_items: 339
+generated_at: '2026-01-07T19:24:27.898661'
+total_items: 340
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 152
+    count: 153
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1058,6 +1058,11 @@ statuses:
       title: Prepare Project for Publication
       priority: High
       category: Project Lifecycle Management
+    - id: postgresql-first-class-platform
+      file: DONE/platform-expansion/active/postgresql-first-class-platform.yaml
+      title: Promote PostgreSQL to first-class platform status
+      priority: High
+      category: Platform Expansion
     - id: pyspark-dataframe-adapter
       file: DONE/dataframe-expansion/planning/pyspark-dataframe-adapter.yaml
       title: PySpark DataFrame Adapter Implementation

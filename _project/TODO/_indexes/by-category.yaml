@@ -1,4 +1,4 @@
-generated_at: '2026-01-07T18:28:43.646665'
+generated_at: '2026-01-07T19:24:26.991256'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -129,7 +129,7 @@ categories:
     - id: physical-tuning-ddl-generation
       file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
       title: Implement Physical Tuning DDL Generation Across All Platforms
-      priority: High
+      priority: Medium-High
       status: Not Started
   Documentation:
     count: 2

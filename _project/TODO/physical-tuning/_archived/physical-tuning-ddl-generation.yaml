@@ -1,12 +1,12 @@
 # Physical Tuning DDL Generation Implementation
 #
-# Location: _project/TODO/physical-tuning/planning/physical-tuning-ddl-generation.yaml
+# Location: _project/TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
 # Created: 2026-01-03
 # Analysis: Comprehensive review of existing tuning infrastructure
 
 title: "Implement Physical Tuning DDL Generation Across All Platforms"
 worktree: "physical-tuning"
-priority: "High"
+priority: "Medium-High"
 status: "Not Started"
 category: "Core Functionality"
 
@@ -415,4 +415,4 @@ metadata:
     - "platform-parity"
   estimated_effort: "Large"
   created_date: "2026-01-03"
-  last_updated: "2026-01-03T12:00:00"
+  last_updated: "2026-01-07T22:00:00"

@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T18:20:18.002147'
-total_items: 339
+generated_at: '2026-01-07T19:24:27.898558'
+total_items: 340
 priorities:
   Critical:
     count: 24
@@ -125,7 +125,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 106
+    count: 107
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -392,6 +392,11 @@ priorities:
       title: Presto and Trino Platform Documentation
       category: Documentation and User Experience
       status: Done
+    - id: postgresql-first-class-platform
+      file: DONE/platform-expansion/active/postgresql-first-class-platform.yaml
+      title: Promote PostgreSQL to first-class platform status
+      category: Platform Expansion
+      status: Completed
     - id: query-plan-cli-visualization
       file: DONE/query-plan-cli/planning/query-plan-cli-visualization.yaml
       title: Query Plan CLI & Visualization
