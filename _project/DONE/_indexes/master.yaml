@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:35:25.235716'
-total_items: 342
+generated_at: '2026-01-07T19:37:24.561828'
+total_items: 343
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3218,6 +3218,20 @@ items:
   - joe
   estimated_effort: Medium
   completed_date: '2025-12-26'
+- id: platform-setup-numbered-list-selection
+  file: DONE/ux-improvements/active/platform-setup-numbered-list-selection.yaml
+  title: Add numbered list selection to platform setup wizard
+  worktree: ux-improvements
+  category: User Experience
+  priority: Medium-High
+  status: Completed
+  tags:
+  - cli
+  - ux
+  - rich
+  - interactive
+  estimated_effort: Small
+  completed_date: '2026-01-07'
 - id: emr-serverless-platform
   file: DONE/platform-expansion/planning/emr-serverless-platform.yaml
   title: Amazon EMR Serverless Platform

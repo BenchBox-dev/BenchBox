@@ -1,4 +1,4 @@
-generated_at: '2026-01-07T19:35:25.236175'
+generated_at: '2026-01-07T19:37:24.561970'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -1749,7 +1749,7 @@ categories:
       priority: critical
       status: Open
   User Experience:
-    count: 15
+    count: 16
     items:
     - id: interactive-wizard-capture-plans
       file: DONE/ux-improvements/planning/interactive-wizard-capture-plans.yaml
@@ -1811,6 +1811,11 @@ categories:
       title: Add --verbose/-v option to interactive wizard
       priority: Low
       status: Not Started
+    - id: platform-setup-numbered-list-selection
+      file: DONE/ux-improvements/active/platform-setup-numbered-list-selection.yaml
+      title: Add numbered list selection to platform setup wizard
+      priority: Medium-High
+      status: Completed
     - id: interactive-mode-open-table-format-selection
       file: DONE/ux-improvements/planning/interactive-mode-open-table-format-selection.yaml
       title: Add open table format selection to CLI interactive mode

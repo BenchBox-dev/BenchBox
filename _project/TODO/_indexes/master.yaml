@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:35:24.125590'
-total_items: 31
+generated_at: '2026-01-07T19:37:23.810478'
+total_items: 30
 items:
 - id: oxbow-series-reality-vs-aspiration
   file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
@@ -210,19 +210,6 @@ items:
   - platform
   - mysql-protocol
   estimated_effort: Medium
-- id: platform-setup-numbered-list-selection
-  file: TODO/ux-improvements/active/platform-setup-numbered-list-selection.yaml
-  title: Add numbered list selection to platform setup wizard
-  worktree: ux-improvements
-  category: User Experience
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - cli
-  - ux
-  - rich
-  - interactive
-  estimated_effort: Small
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support
