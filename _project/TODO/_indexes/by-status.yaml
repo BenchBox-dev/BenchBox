@@ -1,8 +1,8 @@
-generated_at: '2026-01-07T19:39:19.221202'
-total_items: 29
+generated_at: '2026-01-07T19:42:07.614032'
+total_items: 31
 statuses:
   Not Started:
-    count: 29
+    count: 31
     items:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
@@ -39,6 +39,11 @@ statuses:
       title: Graph Query Benchmark Support - Neo4j, Neptune
       priority: Low
       category: Specialized Benchmarks
+    - id: ctas-sorted-data-loading
+      file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
+      title: Implement CTAS-based sorted data loading for DuckDB
+      priority: Medium
+      category: Core Functionality
     - id: interactive-benchmark-explorer-web-ui
       file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
       title: Interactive Benchmark Explorer - Web UI
@@ -49,6 +54,11 @@ statuses:
       title: Streaming Benchmark Support - Kafka, Flink, Spark Streaming
       priority: Low
       category: Specialized Benchmarks
+    - id: presorted-open-table-format-datasets
+      file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
+      title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+      priority: Medium-High
+      category: Core Functionality
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support

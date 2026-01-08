@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:39:19.221180'
-total_categories: 7
+generated_at: '2026-01-07T19:42:07.614011'
+total_categories: 8
 categories:
   AI/ML Capabilities:
     count: 1
@@ -114,6 +114,19 @@ categories:
       file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
+      status: Not Started
+  Core Functionality:
+    count: 2
+    items:
+    - id: ctas-sorted-data-loading
+      file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
+      title: Implement CTAS-based sorted data loading for DuckDB
+      priority: Medium
+      status: Not Started
+    - id: presorted-open-table-format-datasets
+      file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
+      title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+      priority: Medium-High
       status: Not Started
   Documentation:
     count: 2

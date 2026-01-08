@@ -1,0 +1,170 @@
+# Pre-Sorted / Pre-Clustered Dataset Generation for Open Table Formats
+#
+# Location: _project/TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
+
+title: "Support creation of pre-sorted / pre-clustered datasets in open table formats"
+worktree: physical-tuning
+priority: Medium-High
+status: Not Started
+description: |
+  Enable BenchBox to generate benchmark datasets (TPC-H, TPC-DS, etc.) that are
+  pre-sorted or pre-clustered in open table formats like Parquet, Delta Lake,
+  and Iceberg. This allows users to:
+
+  1. Test zone map / data skipping effectiveness across platforms
+  2. Compare sorted vs unsorted query performance
+  3. Evaluate Z-order and Hilbert clustering strategies
+  4. Create reproducible benchmark datasets with controlled data organization
+
+  Currently, BenchBox generates data in TBL format and loads it into platforms.
+  The data order depends on the dbgen tool output and platform loading behavior.
+  This TODO adds explicit control over data organization in the generated files.
+
+  Key use cases:
+  - Generate Parquet files sorted by date columns for time-series benchmarks
+  - Create Z-ordered Delta Lake tables for multi-dimensional filtering
+  - Produce Iceberg tables with optimized partition/sort strategies
+  - Enable A/B testing of data organization strategies
+
+category: Core Functionality
+
+tasks:
+  phases:
+    - phase: "Phase 1: Parquet Sorted Export"
+      done: false
+      items:
+        - summary: "Add sorted Parquet export to data generator"
+          done: false
+          subtasks:
+            - summary: "Support single-column sorting (e.g., by date)"
+              done: false
+            - summary: "Support multi-column sorting with order specification"
+              done: false
+            - summary: "Configure row group size for zone map granularity"
+              done: false
+        - summary: "Integrate with tuning config for sort column specification"
+          done: false
+        - summary: "Add CLI option: --data-format parquet-sorted"
+          done: false
+
+    - phase: "Phase 2: Multi-Dimensional Clustering"
+      done: false
+      items:
+        - summary: "Implement Z-order encoding for Parquet"
+          done: false
+        - summary: "Implement Hilbert curve encoding option"
+          done: false
+        - summary: "Support cluster-by columns in tuning config"
+          done: false
+
+    - phase: "Phase 3: Delta Lake and Iceberg Support"
+      done: false
+      items:
+        - summary: "Generate sorted Delta Lake tables with OPTIMIZE"
+          done: false
+        - summary: "Generate Iceberg tables with sort orders"
+          done: false
+        - summary: "Support partition-aware sorting"
+          done: false
+
+    - phase: "Phase 4: Testing and Documentation"
+      done: false
+      items:
+        - summary: "Unit tests for sorted data generation"
+          done: false
+        - summary: "Integration tests verifying sortedness metrics"
+          done: false
+        - summary: "Documentation: data organization strategies guide"
+          done: false
+
+metadata:
+  tags:
+    - data-generation
+    - parquet
+    - delta-lake
+    - iceberg
+    - zone-maps
+    - z-order
+    - performance
+  estimated_effort: "Large"
+  created_date: "2026-01-07"
+
+impact:
+  business_value: |
+    Enables systematic benchmarking of data organization strategies across
+    platforms. Users can generate reproducible datasets to test zone map
+    pruning, Z-order effectiveness, and platform-specific optimizations.
+    Critical for the "Data Order Playbook" blog series and performance research.
+  user_impact: |
+    Users can generate pre-optimized benchmark datasets without manual
+    post-processing. Enables fair comparisons of query performance across
+    different data organization strategies.
+  technical_debt: |
+    Currently, data organization is left to chance (dbgen output order) or
+    requires manual intervention. This creates a controlled, reproducible
+    approach to data organization in benchmarks.
+
+files_affected:
+  modified:
+    - "benchbox/core/tpch/generator.py"
+    - "benchbox/core/tpcds/generator.py"
+    - "benchbox/cli/run.py"
+  added:
+    - "benchbox/core/data_organization/__init__.py"
+    - "benchbox/core/data_organization/sorting.py"
+    - "benchbox/core/data_organization/clustering.py"
+    - "docs/guides/data-organization-strategies.md"
+
+context_sections:
+  "Background and Motivation": |
+    Experiments show 5-28x speedups for selective queries when data is
+    properly sorted, enabling zone map (min-max index) pruning. However,
+    generating sorted datasets requires post-processing that varies by
+    platform. BenchBox should support this natively.
+
+    The "Data Order Playbook" blog series documents:
+    - Part 1: Pre-sorted data performance benefits
+    - Part 2: Platform order preservation behavior
+    - Part 3: Multi-dimensional clustering (Z-order, Hilbert)
+
+    This TODO enables reproducible experiments for all three topics.
+
+  "Technical Context": |
+    Open table formats support various data organization features:
+    - Parquet: Row group sorting, page-level statistics
+    - Delta Lake: OPTIMIZE ZORDER, liquid clustering
+    - Iceberg: Sort orders, hidden partitioning
+
+    DuckDB's recent blog posts document Hilbert encoding outperforming
+    Z-order for mixed workloads. BenchBox should support both.
+
+    Key technical decisions:
+    - Use PyArrow for Parquet writing with sorted data
+    - Consider delta-rs for Delta Lake generation
+    - Consider pyiceberg for Iceberg generation
+
+technical_requirements:
+  dependencies:
+    - "pyarrow (Parquet writing)"
+    - "delta-rs (optional: Delta Lake)"
+    - "pyiceberg (optional: Iceberg)"
+  constraints:
+    - "Must preserve data correctness (same rows, just reordered)"
+    - "Should support all TPC benchmarks, not just TPC-H"
+    - "Row group size must be configurable for zone map experiments"
+
+success_metrics:
+  - "Can generate TPC-H Parquet files sorted by l_shipdate"
+  - "Sortedness metrics confirm expected data organization"
+  - "Z-order and Hilbert options produce correct interleaved ordering"
+  - "Generated files load correctly into target platforms"
+  - "Performance delta matches expectations from research"
+
+open_questions:
+  - "Should sorting happen during generation or as post-processing?"
+  - "How to handle very large scale factors (memory constraints)?"
+  - "Should we support platform-specific formats (DuckDB native)?"
+
+dependencies:
+  related:
+    - "_project/TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml"

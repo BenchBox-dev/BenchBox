@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:39:19.221193'
-total_items: 29
+generated_at: '2026-01-07T19:42:07.614023'
+total_items: 31
 priorities:
   High:
     count: 3
@@ -20,12 +20,17 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium-High:
-    count: 13
+    count: 14
     items:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
+      status: Not Started
+    - id: presorted-open-table-format-datasets
+      file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
+      title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+      category: Core Functionality
       status: Not Started
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
@@ -88,7 +93,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 8
+    count: 9
     items:
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
@@ -104,6 +109,11 @@ priorities:
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
       title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
       category: Benchmark Development
+      status: Not Started
+    - id: ctas-sorted-data-loading
+      file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
+      title: Implement CTAS-based sorted data loading for DuckDB
+      category: Core Functionality
       status: Not Started
     - id: cicd-benchmarking-demo
       file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
