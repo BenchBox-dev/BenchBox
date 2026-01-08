@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:24:26.991270'
-total_items: 33
+generated_at: '2026-01-07T19:26:39.134997'
+total_items: 32
 priorities:
   High:
     count: 3
@@ -20,7 +20,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium-High:
-    count: 15
+    count: 14
     items:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
@@ -31,11 +31,6 @@ priorities:
       file: TODO/ux-improvements/planning/platform-setup-numbered-list-selection.yaml
       title: Add numbered list selection to platform setup wizard
       category: User Experience
-      status: Not Started
-    - id: physical-tuning-ddl-generation
-      file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
-      title: Implement Physical Tuning DDL Generation Across All Platforms
-      category: Core Functionality
       status: Not Started
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml

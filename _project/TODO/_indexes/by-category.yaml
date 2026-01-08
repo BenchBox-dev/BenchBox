@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:24:26.991256'
-total_categories: 10
+generated_at: '2026-01-07T19:26:39.134983'
+total_categories: 9
 categories:
   AI/ML Capabilities:
     count: 1
@@ -123,14 +123,6 @@ categories:
       title: Runtime Module Refactor – Batch Two
       priority: Low
       status: Identified
-  Core Functionality:
-    count: 1
-    items:
-    - id: physical-tuning-ddl-generation
-      file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
-      title: Implement Physical Tuning DDL Generation Across All Platforms
-      priority: Medium-High
-      status: Not Started
   Documentation:
     count: 2
     items:

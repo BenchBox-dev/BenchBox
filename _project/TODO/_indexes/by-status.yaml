@@ -1,8 +1,8 @@
-generated_at: '2026-01-07T19:24:26.991280'
-total_items: 33
+generated_at: '2026-01-07T19:26:39.135007'
+total_items: 32
 statuses:
   Not Started:
-    count: 32
+    count: 31
     items:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
@@ -49,11 +49,6 @@ statuses:
       title: Graph Query Benchmark Support - Neo4j, Neptune
       priority: Low
       category: Specialized Benchmarks
-    - id: physical-tuning-ddl-generation
-      file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
-      title: Implement Physical Tuning DDL Generation Across All Platforms
-      priority: Medium-High
-      category: Core Functionality
     - id: interactive-benchmark-explorer-web-ui
       file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
       title: Interactive Benchmark Explorer - Web UI

@@ -1,4 +1,4 @@
-generated_at: '2026-01-07T19:24:27.898436'
+generated_at: '2026-01-07T19:26:39.885087'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -322,7 +322,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 53
+    count: 54
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -473,6 +473,11 @@ categories:
       file: DONE/dataframe-pandas-platforms/completed/implement-pandas-family-platform-adapters.yaml
       title: Implement Pandas Family Platform Adapters
       priority: High
+      status: Completed
+    - id: physical-tuning-ddl-generation
+      file: DONE/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
+      title: Implement Physical Tuning DDL Generation Across All Platforms
+      priority: Medium-High
       status: Completed
     - id: implement-tpc-ds-queries-for-both-families
       file: DONE/dataframe-tpcds/planning/implement-tpc-ds-queries-for-both-families.yaml

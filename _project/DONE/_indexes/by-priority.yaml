@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:24:27.898558'
-total_items: 340
+generated_at: '2026-01-07T19:26:39.885221'
+total_items: 341
 priorities:
   Critical:
     count: 24
@@ -663,7 +663,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 12
+    count: 13
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -698,6 +698,11 @@ priorities:
     - id: cloud-spark-dependency-groups
       file: DONE/platform-expansion/active/cloud-spark-dependency-groups.yaml
       title: Cloud Spark Dependency Groups in pyproject.toml
+      category: Core Functionality
+      status: Completed
+    - id: physical-tuning-ddl-generation
+      file: DONE/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
+      title: Implement Physical Tuning DDL Generation Across All Platforms
       category: Core Functionality
       status: Completed
     - id: compare-interactive-file-selection
