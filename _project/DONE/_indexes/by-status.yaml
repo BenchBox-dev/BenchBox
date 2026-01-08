@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:37:24.562150'
-total_items: 343
+generated_at: '2026-01-07T19:39:19.973013'
+total_items: 344
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 156
+    count: 157
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -812,6 +812,11 @@ statuses:
       file: DONE/platform-expansion/active/cloud-platform-cost-estimation.yaml
       title: Add cost estimation support for cloud platforms (Firebolt, Fabric, Synapse)
       priority: High
+      category: Platform Expansion
+    - id: local-platform-cost-tracking
+      file: DONE/platform-expansion/planning/local-platform-cost-tracking.yaml
+      title: Add cost tracking for local/self-hosted platforms
+      priority: Low
       category: Platform Expansion
     - id: interactive-wizard-execution-style-selection
       file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml

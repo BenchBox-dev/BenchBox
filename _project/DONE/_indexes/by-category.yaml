@@ -1,4 +1,4 @@
-generated_at: '2026-01-07T19:37:24.561970'
+generated_at: '2026-01-07T19:39:19.972836'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -1014,7 +1014,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 36
+    count: 37
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1045,6 +1045,11 @@ categories:
       file: DONE/platform-expansion/active/cloud-platform-cost-estimation.yaml
       title: Add cost estimation support for cloud platforms (Firebolt, Fabric, Synapse)
       priority: High
+      status: Completed
+    - id: local-platform-cost-tracking
+      file: DONE/platform-expansion/planning/local-platform-cost-tracking.yaml
+      title: Add cost tracking for local/self-hosted platforms
+      priority: Low
       status: Completed
     - id: athena-spark-platform
       file: DONE/platform-expansion/planning/athena-spark-platform.yaml

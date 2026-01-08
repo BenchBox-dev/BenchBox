@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:37:23.810522'
-total_items: 30
+generated_at: '2026-01-07T19:39:19.221193'
+total_items: 29
 priorities:
   High:
     count: 3
@@ -131,13 +131,8 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 6
+    count: 5
     items:
-    - id: local-platform-cost-tracking
-      file: TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
-      title: Add cost tracking for local/self-hosted platforms
-      category: Platform Expansion
-      status: Not Started
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration

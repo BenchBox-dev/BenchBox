@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:37:24.561828'
-total_items: 343
+generated_at: '2026-01-07T19:39:19.972672'
+total_items: 344
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1497,6 +1497,20 @@ items:
   - verbose
   - logging
   estimated_effort: Small
+- id: local-platform-cost-tracking
+  file: DONE/platform-expansion/planning/local-platform-cost-tracking.yaml
+  title: Add cost tracking for local/self-hosted platforms
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Completed
+  tags:
+  - cost-estimation
+  - local-platforms
+  - self-hosted
+  - resource-tracking
+  estimated_effort: 1-2 days
+  completed_date: '2026-01-07'
 - id: run-official-command-consolidation
   file: DONE/ux-improvements/active/run-official-command-consolidation.yaml
   title: Consolidate run-official into run --official flag

@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:37:24.562066'
-total_items: 343
+generated_at: '2026-01-07T19:39:19.972932'
+total_items: 344
 priorities:
   Critical:
     count: 24
@@ -1659,7 +1659,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 9
+    count: 10
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -1671,6 +1671,11 @@ priorities:
       title: Add --verbose/-v option to interactive wizard
       category: User Experience
       status: Not Started
+    - id: local-platform-cost-tracking
+      file: DONE/platform-expansion/planning/local-platform-cost-tracking.yaml
+      title: Add cost tracking for local/self-hosted platforms
+      category: Platform Expansion
+      status: Completed
     - id: run-official-command-consolidation
       file: DONE/ux-improvements/active/run-official-command-consolidation.yaml
       title: Consolidate run-official into run --official flag

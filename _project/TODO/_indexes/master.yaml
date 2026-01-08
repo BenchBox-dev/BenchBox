@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:37:23.810478'
-total_items: 30
+generated_at: '2026-01-07T19:39:19.221152'
+total_items: 29
 items:
 - id: oxbow-series-reality-vs-aspiration
   file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
@@ -29,19 +29,6 @@ items:
   - benchmarking
   - blog-data
   estimated_effort: 30-60 minutes
-- id: local-platform-cost-tracking
-  file: TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
-  title: Add cost tracking for local/self-hosted platforms
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Low
-  status: Not Started
-  tags:
-  - cost-estimation
-  - local-platforms
-  - self-hosted
-  - resource-tracking
-  estimated_effort: 1-2 days
 - id: databend-cloud-olap-platform
   file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
   title: Databend Cloud-Native OLAP Platform Integration
