@@ -1,4 +1,4 @@
-generated_at: '2026-01-04T18:14:52.395350'
+generated_at: '2026-01-08T13:59:22.049851'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -322,7 +322,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 51
+    count: 52
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -413,6 +413,11 @@ categories:
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
       title: Design and Implement Core DataFrame Abstractions
       priority: Critical
+      status: Completed
+    - id: embed-tuning-config-in-results
+      file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
+      title: Embed Full Tuning Config in Result Output
+      priority: Medium-High
       status: Completed
     - id: tpcds-obt-query-expansion
       file: DONE/benchmark-expansion/implementation/tpcds-obt-query-expansion.yaml
@@ -891,13 +896,13 @@ categories:
   Performance and Efficiency:
     count: 9
     items:
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       status: Not Started
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       status: Not Started
@@ -1202,13 +1207,13 @@ categories:
       title: DuckDB TPC-DS and TPC-H Example Updates for Enhanced Tuning ✅ COMPLETED
       priority: Medium
       status: Not Started
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Not Started
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Not Started
@@ -1255,13 +1260,13 @@ categories:
       title: ✅ Harmonize CLI Parameters with unified_runner (Eliminate Brittle test_type Logic)
       priority: High
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       status: Not Started
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       status: Not Started
