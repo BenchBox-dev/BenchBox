@@ -1,0 +1,95 @@
+title: "Embed Full Tuning Config in Result Output"
+worktree: "result-object-migration"
+priority: "Medium-High"
+status: "Not Started"
+category: "Core Functionality"
+description: |
+  Integrate the full tuning configuration directly into benchmark result output files.
+
+  Currently, benchmark results reference the tuning file path but do not capture the
+  actual tuning configuration content. This is problematic because:
+  - The tuning file could be modified by subsequent runs
+  - Results become non-reproducible without the exact tuning config used
+  - Comparing results across different tuning configs becomes unreliable
+
+  Unlike query text (which is deterministically generated from benchmark definitions),
+  tuning configurations are user-defined and can vary between runs. The actual tuning
+  content must be captured at execution time to ensure result reproducibility.
+
+  Solution: Embed the complete tuning configuration (clauses, indexes, constraints,
+  etc.) directly in the result output, either inline or as a companion file.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Design and Analysis"
+      done: false
+      items:
+        - summary: "Review current tuning file reference implementation"
+          done: false
+        - summary: "Analyze tuning config structure (TuningConfig dataclass)"
+          done: false
+        - summary: "Decide inline vs companion file approach"
+          done: false
+
+    - phase: "Phase 2: Implementation"
+      done: false
+      items:
+        - summary: "Update schema.py to include tuning config in output"
+          done: false
+          subtasks:
+            - summary: "Add tuning config serialization to result payload"
+              done: false
+            - summary: "Capture all TuningClauses fields (sorting_keys, partitioning, etc.)"
+              done: false
+            - summary: "Include platform-specific tuning extensions"
+              done: false
+        - summary: "Update exporter.py to serialize tuning config"
+          done: false
+        - summary: "Update loader.py to reconstruct tuning from results"
+          done: false
+
+    - phase: "Phase 3: Testing and Validation"
+      done: false
+      items:
+        - summary: "Add unit tests for tuning config serialization"
+          done: false
+        - summary: "Add round-trip tests (export → load → verify tuning)"
+          done: false
+        - summary: "Test with various tuning configurations"
+          done: false
+
+metadata:
+  tags:
+    - "results"
+    - "tuning"
+    - "reproducibility"
+    - "schema"
+  estimated_effort: "Medium"
+  created_date: "2026-01-08"
+
+impact:
+  business_value: |
+    Ensures benchmark results are fully reproducible by capturing the exact
+    tuning configuration used at execution time.
+  user_impact: |
+    Users can reliably compare results and understand what tuning was applied
+    without needing to track external tuning files.
+  technical_debt: |
+    Removes dependency on external tuning file state for result interpretation.
+
+files_affected:
+  modified:
+    - "benchbox/core/results/schema.py"
+    - "benchbox/core/results/exporter.py"
+    - "benchbox/core/results/loader.py"
+    - "tests/unit/core/results/test_schema.py"
+    - "tests/unit/core/results/test_exporter.py"
+
+dependencies:
+  related:
+    - "_project/TODO/result-object-migration/planning/result-schema-v2-redesign.yaml"
+
+success_metrics:
+  - "Tuning config is fully captured in result output"
+  - "Results remain valid even if original tuning file is modified"
+  - "Round-trip tests pass for all tuning config variations"

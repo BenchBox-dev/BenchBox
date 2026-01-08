@@ -1,8 +1,8 @@
-generated_at: '2026-01-04T18:14:51.681808'
-total_items: 34
+generated_at: '2026-01-08T13:25:27.728252'
+total_items: 35
 statuses:
   Not Started:
-    count: 33
+    count: 34
     items:
     - id: local-platform-cost-tracking
       file: TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
@@ -29,6 +29,11 @@ statuses:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       priority: Medium
       category: Documentation
+    - id: embed-tuning-config-in-results
+      file: TODO/result-object-migration/planning/embed-tuning-config-in-results.yaml
+      title: Embed Full Tuning Config in Result Output
+      priority: Medium-High
+      category: Core Functionality
     - id: geospatial-benchmark-support-postgis-integration
       file: TODO/specialized-geospatial/planning/geospatial-benchmark-support-postgis-integration.yaml
       title: Geospatial Benchmark Support - PostGIS Integration

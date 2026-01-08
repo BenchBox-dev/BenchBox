@@ -1,4 +1,4 @@
-generated_at: '2026-01-04T18:14:52.395438'
+generated_at: '2026-01-08T13:25:29.633317'
 total_items: 337
 priorities:
   Critical:
@@ -953,13 +953,13 @@ priorities:
       title: Compressed Data Generation Gaps (all benchmarks) ✅
       category: Data Quality and Compatibility Issues
       status: Not Started
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Not Started
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Not Started
@@ -1363,13 +1363,13 @@ priorities:
       title: Security Audit
       category: Pre-Release Medium Priority Tasks (Nice-to-Have)
       status: Completed
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       category: Platform Support and Deployment
       status: Not Started
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       category: Platform Support and Deployment
       status: Not Started
@@ -1538,13 +1538,13 @@ priorities:
       title: ✅ Implement Standalone Export Command
       category: User Experience and CLI Enhancement
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       category: Pre-Release High Priority Tasks (COMPLETED)
       status: Not Started
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       category: Pre-Release High Priority Tasks (COMPLETED)
       status: Not Started
