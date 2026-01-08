@@ -1,5 +1,5 @@
-generated_at: '2026-01-08T13:25:27.728230'
-total_items: 35
+generated_at: '2026-01-08T13:59:19.976372'
+total_items: 34
 priorities:
   High:
     count: 6
@@ -35,7 +35,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium-High:
-    count: 15
+    count: 14
     items:
     - id: platform-setup-numbered-list-selection
       file: TODO/ux-improvements/planning/platform-setup-numbered-list-selection.yaml
@@ -45,11 +45,6 @@ priorities:
     - id: cloud-spark-dependency-groups
       file: TODO/platform-expansion/planning/cloud-spark-dependency-groups.yaml
       title: Cloud Spark Dependency Groups in pyproject.toml
-      category: Core Functionality
-      status: Not Started
-    - id: embed-tuning-config-in-results
-      file: TODO/result-object-migration/planning/embed-tuning-config-in-results.yaml
-      title: Embed Full Tuning Config in Result Output
       category: Core Functionality
       status: Not Started
     - id: vector-search-benchmark-support

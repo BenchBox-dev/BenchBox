@@ -1,5 +1,5 @@
-generated_at: '2026-01-08T13:25:29.633509'
-total_items: 337
+generated_at: '2026-01-08T13:59:22.050243'
+total_items: 338
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 150
+    count: 151
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -923,6 +923,11 @@ statuses:
       title: Display equivalent CLI command before benchmark execution
       priority: Medium
       category: User Experience
+    - id: embed-tuning-config-in-results
+      file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
+      title: Embed Full Tuning Config in Result Output
+      priority: Medium-High
+      category: Core Functionality
     - id: enhanced-resource-monitoring-profiling
       file: DONE/infrastructure-monitoring/planning/enhanced-resource-monitoring-profiling.yaml
       title: Enhanced Resource Monitoring & Profiling

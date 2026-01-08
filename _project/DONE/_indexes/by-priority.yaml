@@ -1,5 +1,5 @@
-generated_at: '2026-01-08T13:25:29.633317'
-total_items: 337
+generated_at: '2026-01-08T13:59:22.050074'
+total_items: 338
 priorities:
   Critical:
     count: 24
@@ -653,7 +653,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 11
+    count: 12
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -685,6 +685,11 @@ priorities:
       title: Cloud Spark Adapter Consolidation - Extract Common Patterns
       category: Core Functionality
       status: Complete
+    - id: embed-tuning-config-in-results
+      file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
+      title: Embed Full Tuning Config in Result Output
+      category: Core Functionality
+      status: Completed
     - id: compare-interactive-file-selection
       file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
       title: Improve interactive file selection in compare command

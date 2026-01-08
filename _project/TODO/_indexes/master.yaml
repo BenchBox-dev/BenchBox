@@ -1,5 +1,5 @@
-generated_at: '2026-01-08T13:25:27.728135'
-total_items: 35
+generated_at: '2026-01-08T13:59:19.976252'
+total_items: 34
 items:
 - id: physical-tuning-ddl-generation
   file: TODO/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
@@ -256,19 +256,6 @@ items:
   - dependencies
   - pyproject
   estimated_effort: 2 hours
-- id: embed-tuning-config-in-results
-  file: TODO/result-object-migration/planning/embed-tuning-config-in-results.yaml
-  title: Embed Full Tuning Config in Result Output
-  worktree: result-object-migration
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - tuning
-  - reproducibility
-  - schema
-  estimated_effort: Medium
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support

@@ -1,4 +1,4 @@
-generated_at: '2026-01-08T13:25:29.633129'
+generated_at: '2026-01-08T13:59:22.049851'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -322,7 +322,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 51
+    count: 52
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -413,6 +413,11 @@ categories:
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
       title: Design and Implement Core DataFrame Abstractions
       priority: Critical
+      status: Completed
+    - id: embed-tuning-config-in-results
+      file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
+      title: Embed Full Tuning Config in Result Output
+      priority: Medium-High
       status: Completed
     - id: tpcds-obt-query-expansion
       file: DONE/benchmark-expansion/implementation/tpcds-obt-query-expansion.yaml

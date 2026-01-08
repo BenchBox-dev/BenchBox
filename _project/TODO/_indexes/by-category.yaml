@@ -1,4 +1,4 @@
-generated_at: '2026-01-08T13:25:27.728196'
+generated_at: '2026-01-08T13:59:19.976324'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -124,16 +124,11 @@ categories:
       priority: Low
       status: Identified
   Core Functionality:
-    count: 4
+    count: 3
     items:
     - id: cloud-spark-dependency-groups
       file: TODO/platform-expansion/planning/cloud-spark-dependency-groups.yaml
       title: Cloud Spark Dependency Groups in pyproject.toml
-      priority: Medium-High
-      status: Not Started
-    - id: embed-tuning-config-in-results
-      file: TODO/result-object-migration/planning/embed-tuning-config-in-results.yaml
-      title: Embed Full Tuning Config in Result Output
       priority: Medium-High
       status: Not Started
     - id: physical-tuning-ddl-generation

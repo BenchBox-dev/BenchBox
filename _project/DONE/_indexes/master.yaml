@@ -1,5 +1,5 @@
-generated_at: '2026-01-08T13:25:29.632781'
-total_items: 337
+generated_at: '2026-01-08T13:59:22.049365'
+total_items: 338
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3222,6 +3222,19 @@ items:
   - code-quality
   - DRY
   estimated_effort: Medium (16-22 hours)
+- id: embed-tuning-config-in-results
+  file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
+  title: Embed Full Tuning Config in Result Output
+  worktree: result-object-migration
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - results
+  - tuning
+  - reproducibility
+  - schema
+  estimated_effort: Medium
 - id: compare-interactive-file-selection
   file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
   title: Improve interactive file selection in compare command
