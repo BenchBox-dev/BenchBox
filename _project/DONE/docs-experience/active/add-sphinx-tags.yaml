@@ -1,0 +1,177 @@
+# Add sphinx-tags to BenchBox Documentation
+# Enable tag-based navigation and discovery across 201 documentation files
+
+title: "Add sphinx-tags to BenchBox Documentation"
+worktree: docs-experience
+priority: Medium
+status: Completed
+category: Documentation
+completed_date: "2025-01-09"
+
+description: |
+  Add the sphinx-tags extension to enable tag-based navigation and discovery
+  across 201 documentation files. This includes infrastructure setup, a controlled
+  vocabulary taxonomy of 40 tags, and systematic tagging of all pages.
+
+  Key decisions made during planning:
+  - Tags placed after the H1 title in all documents
+  - Index files get minimal tags only (1-2 category tags)
+  - All 38 Python API RST files will be fully tagged
+  - Badge colors coordinated with Furo theme
+
+  Reference plan: /Users/joe/.claude/plans/swift-noodling-harp.md
+
+tasks:
+  phases:
+    - phase: "Phase 1: Infrastructure Setup"
+      done: true
+      items:
+        - summary: "Add sphinx-tags and sphinx-design to pyproject.toml docs group"
+          done: true
+        - summary: "Configure sphinx-tags in docs/conf.py with badge colors"
+          done: true
+        - summary: "Add tags index to docs/index.rst toctree"
+          done: true
+        - summary: "Add docs/_tags/ to .gitignore"
+          done: true
+        - summary: "Verify setup with make html"
+          done: true
+
+    - phase: "Phase 2: Tag Documentation Files"
+      done: true
+      items:
+        - summary: "Tag usage/ directory (15 files)"
+          done: true
+        - summary: "Tag tutorials/ directory (5 files)"
+          done: true
+        - summary: "Tag concepts/ and design/ directories (8 files)"
+          done: true
+        - summary: "Tag guides/ directory (16 files)"
+          done: true
+        - summary: "Tag platforms/ directory (42 files)"
+          done: true
+        - summary: "Tag benchmarks/ directory (26 files)"
+          done: true
+        - summary: "Tag reference/cli/ directory (10 files)"
+          done: true
+        - summary: "Tag reference/python-api/ directory (38 files)"
+          done: true
+        - summary: "Tag development/ directory (16 files)"
+          done: true
+        - summary: "Tag advanced/ and remaining directories (25 files)"
+          done: true
+
+    - phase: "Phase 3: Verification and Commit"
+      done: true
+      items:
+        - summary: "Build docs and verify no warnings/errors"
+          done: true
+        - summary: "Verify tag badges render correctly with Furo theme"
+          done: true
+        - summary: "Run linkcheck to ensure no broken links"
+          done: true
+        - summary: "Quality check: 2-5 tags per page, no orphan tags"
+          done: true
+        - summary: "Commit changes in logical batches by directory"
+          done: true
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - documentation
+    - sphinx
+    - navigation
+    - discoverability
+  estimated_effort: Medium
+  created_date: "2025-01-09"
+  last_updated: "2025-01-09T23:45:00"
+
+impact:
+  business_value: |
+    Improved documentation discoverability helps users find relevant content faster,
+    reducing friction and support burden. Tag-based navigation is a standard feature
+    users expect from modern documentation.
+  user_impact: |
+    Users can browse documentation by topic, skill level, platform, or benchmark
+    instead of relying solely on hierarchical navigation. Cross-cutting concerns
+    (e.g., "all TPC-H content" or "all beginner content") become discoverable.
+  technical_debt: |
+    Minimal - sphinx-tags is a lightweight extension. Generated tag files are
+    excluded from git. Taxonomy is documented for consistent future tagging.
+
+files_affected:
+  modified:
+    - pyproject.toml
+    - docs/conf.py
+    - docs/index.rst
+    - .gitignore
+    - "docs/**/*.md (144 files)"
+    - "docs/**/*.rst (57 files)"
+  added:
+    - "docs/_tags/ (generated, gitignored)"
+
+context_sections:
+  "Tagging Taxonomy": |
+    40 controlled tags across 6 categories:
+
+    Audience (4): beginner, intermediate, advanced, contributor
+    Content Type (5): tutorial, guide, reference, concept, quickstart
+    Benchmarks (7): tpc-h, tpc-ds, tpc-di, ssb, clickbench, h2odb, custom-benchmark
+    Platform Category (4): sql-platform, dataframe-platform, cloud-platform, embedded-platform
+    Specific Platforms (7): duckdb, sqlite, snowflake, databricks, bigquery, polars, pandas
+    Features (11): cli, python-api, configuration, data-generation, validation, tuning,
+                   visualization, cloud-storage, testing, performance
+
+  "Tag Syntax": |
+    Markdown (MyST) - after H1 title:
+    ```{tags} beginner, tutorial, tpc-h
+    ```
+
+    RST - after title underline:
+    .. tags:: reference, python-api, tpc-h
+
+  "Badge Color Scheme": |
+    - Audience: success (green), info (blue), warning (orange), primary (purple)
+    - Content Type: primary, info, secondary, dark, success
+    - Benchmarks: danger (red/orange) for TPC, warning for others
+    - Platforms: info (SQL), primary (DataFrame), success (Cloud)
+    - Features: varied by function
+
+technical_requirements:
+  dependencies:
+    - "sphinx-tags>=0.4.0"
+    - "sphinx-design>=0.6.0"
+  compatibility: |
+    Requires MyST parser (already configured) for Markdown tag directive support.
+    Compatible with Furo theme. sphinx-design required for badge styling.
+
+success_metrics:
+  - "Documentation builds without sphinx-tags warnings"
+  - "All 201 documentation files have 2-5 tags"
+  - "Tag index page generates and displays correctly"
+  - "Badge colors render correctly with Furo theme"
+  - "No orphan tags (tags used only once)"
+
+sections:
+  "Implementation Summary": |
+    Successfully added sphinx-tags extension to BenchBox documentation with
+    comprehensive tag-based navigation across 200 documentation files.
+
+    Key accomplishments:
+    - Infrastructure: Added sphinx-tags and sphinx-design dependencies
+    - Configuration: 40-tag taxonomy with color-coded badges
+    - Tagging: All 200 docs files tagged with 2-5 tags each
+    - Build: Documentation builds successfully with tags
+    - Navigation: Tags index page auto-generated at docs/_tags/
+
+  "Commits": |
+    - 5f3a38a9: feat(docs): add sphinx-tags extension for tag-based navigation
+    - 0d1b96d9: docs(usage,tutorials): add sphinx-tags to getting started content
+    - 97666b23: docs(concepts,design): add sphinx-tags to foundational content
+    - 2f4d82e0: docs(guides): add sphinx-tags to how-to guides
+    - a89f6d12: docs(platforms): add sphinx-tags to platform documentation
+    - a3b5994d: docs(benchmarks): add sphinx-tags to benchmark documentation
+    - 65f770fc: docs(reference): add sphinx-tags to CLI and Python API reference
+    - 11cd3f98: docs(development): add sphinx-tags to contributor documentation
+    - b67b214b: docs(advanced,viz,testing): add sphinx-tags to remaining documentation

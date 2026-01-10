@@ -1,4 +1,4 @@
-generated_at: '2026-01-07T19:42:08.366465'
+generated_at: '2026-01-10T00:12:49.814629'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -327,7 +327,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 54
+    count: 55
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -423,6 +423,11 @@ categories:
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
       title: Design and Implement Core DataFrame Abstractions
       priority: Critical
+      status: Completed
+    - id: embed-tuning-config-in-results
+      file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
+      title: Embed Full Tuning Config in Result Output
+      priority: Medium-High
       status: Completed
     - id: tpcds-obt-query-expansion
       file: DONE/benchmark-expansion/implementation/tpcds-obt-query-expansion.yaml
@@ -706,8 +711,13 @@ categories:
       priority: Medium
       status: Completed
   Documentation:
-    count: 3
+    count: 4
     items:
+    - id: add-sphinx-tags
+      file: DONE/docs-experience/active/add-sphinx-tags.yaml
+      title: Add sphinx-tags to BenchBox Documentation
+      priority: Medium
+      status: Completed
     - id: create-comprehensive-dataframe-documentation
       file: DONE/dataframe-docs/planning/create-comprehensive-dataframe-documentation.yaml
       title: Create Comprehensive DataFrame Documentation

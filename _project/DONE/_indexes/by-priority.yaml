@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:42:08.366561'
-total_items: 344
+generated_at: '2026-01-10T00:12:49.814721'
+total_items: 346
 priorities:
   Critical:
     count: 24
@@ -663,7 +663,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 14
+    count: 15
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -705,6 +705,11 @@ priorities:
       title: Cloud Spark Dependency Groups in pyproject.toml
       category: Core Functionality
       status: Completed
+    - id: embed-tuning-config-in-results
+      file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
+      title: Embed Full Tuning Config in Result Output
+      category: Core Functionality
+      status: Completed
     - id: physical-tuning-ddl-generation
       file: DONE/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
       title: Implement Physical Tuning DDL Generation Across All Platforms
@@ -736,7 +741,7 @@ priorities:
       category: Platform Expansion
       status: Complete
   Medium:
-    count: 184
+    count: 185
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -903,6 +908,11 @@ priorities:
       title: Add open table format selection to CLI interactive mode
       category: User Experience
       status: Not Started
+    - id: add-sphinx-tags
+      file: DONE/docs-experience/active/add-sphinx-tags.yaml
+      title: Add sphinx-tags to BenchBox Documentation
+      category: Documentation
+      status: Completed
     - id: athena-spark-platform
       file: DONE/platform-expansion/planning/athena-spark-platform.yaml
       title: Amazon Athena for Apache Spark Platform

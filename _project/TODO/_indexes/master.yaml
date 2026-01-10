@@ -1,6 +1,20 @@
-generated_at: '2026-01-07T19:42:07.613979'
-total_items: 31
+generated_at: '2026-01-10T00:12:49.089595'
+total_items: 32
 items:
+- id: comprehensive-test-quality-audit
+  file: TODO/test-quality-review/active/comprehensive-test-quality-audit.yaml
+  title: 'Comprehensive Test Quality Audit: Ensure Meaningful and Distinct Test Coverage'
+  worktree: test-quality-review
+  category: Testing and Quality Assurance
+  priority: High
+  status: In Progress
+  tags:
+  - testing
+  - quality
+  - audit
+  - test-cleanup
+  - maintainability
+  estimated_effort: Large
 - id: oxbow-series-reality-vs-aspiration
   file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
   title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'

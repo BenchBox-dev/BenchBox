@@ -1,9 +1,14 @@
-generated_at: '2026-01-07T19:42:07.614023'
-total_items: 31
+generated_at: '2026-01-10T00:12:49.089638'
+total_items: 32
 priorities:
   High:
-    count: 3
+    count: 4
     items:
+    - id: comprehensive-test-quality-audit
+      file: TODO/test-quality-review/active/comprehensive-test-quality-audit.yaml
+      title: 'Comprehensive Test Quality Audit: Ensure Meaningful and Distinct Test Coverage'
+      category: Testing and Quality Assurance
+      status: In Progress
     - id: oxbow-series-reality-vs-aspiration
       file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
       title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'

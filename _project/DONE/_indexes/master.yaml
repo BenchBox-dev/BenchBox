@@ -1,5 +1,5 @@
-generated_at: '2026-01-07T19:42:08.366312'
-total_items: 344
+generated_at: '2026-01-10T00:12:49.814466'
+total_items: 346
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1868,6 +1868,22 @@ items:
   - iceberg
   - parquet
   estimated_effort: Medium
+- id: add-sphinx-tags
+  file: DONE/docs-experience/active/add-sphinx-tags.yaml
+  title: Add sphinx-tags to BenchBox Documentation
+  worktree: docs-experience
+  category: Documentation
+  priority: Medium
+  status: Completed
+  tags:
+  - documentation
+  - sphinx
+  - navigation
+  - discoverability
+  owners:
+  - joe
+  estimated_effort: Medium
+  completed_date: '2025-01-09'
 - id: athena-spark-platform
   file: DONE/platform-expansion/planning/athena-spark-platform.yaml
   title: Amazon Athena for Apache Spark Platform
@@ -3301,6 +3317,19 @@ items:
   - pyproject
   - documentation
   estimated_effort: Small
+- id: embed-tuning-config-in-results
+  file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
+  title: Embed Full Tuning Config in Result Output
+  worktree: result-object-migration
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - results
+  - tuning
+  - reproducibility
+  - schema
+  estimated_effort: Medium
 - id: physical-tuning-ddl-generation
   file: DONE/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
   title: Implement Physical Tuning DDL Generation Across All Platforms
