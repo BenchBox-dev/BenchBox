@@ -1,4 +1,4 @@
-generated_at: '2026-01-10T08:26:31.637987'
+generated_at: '2026-01-12T08:44:23.437268'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -711,8 +711,13 @@ categories:
       priority: Medium
       status: Completed
   Documentation:
-    count: 4
+    count: 5
     items:
+    - id: add-dedicated-tags-for-platforms-and-benchmarks
+      file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
+      title: Add dedicated tags for all platforms and benchmarks
+      priority: Medium
+      status: Done
     - id: add-sphinx-tags
       file: DONE/docs-experience/active/add-sphinx-tags.yaml
       title: Add sphinx-tags to BenchBox Documentation

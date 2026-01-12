@@ -1,5 +1,5 @@
-generated_at: '2026-01-10T08:26:31.637824'
-total_items: 347
+generated_at: '2026-01-12T08:44:23.437082'
+total_items: 348
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1866,6 +1866,18 @@ items:
   category: Core Functionality
   priority: Medium
   status: In Progress
+- id: add-dedicated-tags-for-platforms-and-benchmarks
+  file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
+  title: Add dedicated tags for all platforms and benchmarks
+  worktree: docs-experience
+  category: Documentation
+  priority: Medium
+  status: Done
+  tags:
+  - documentation
+  - sphinx-tags
+  - discoverability
+  estimated_effort: 2-3 hours
 - id: interactive-mode-open-table-format-selection
   file: DONE/ux-improvements/planning/interactive-mode-open-table-format-selection.yaml
   title: Add open table format selection to CLI interactive mode

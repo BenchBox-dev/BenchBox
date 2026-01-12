@@ -1,4 +1,4 @@
-generated_at: '2026-01-10T08:26:30.852857'
+generated_at: '2026-01-12T08:44:22.635086'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -129,8 +129,13 @@ categories:
       priority: Medium-High
       status: Not Started
   Documentation:
-    count: 2
+    count: 3
     items:
+    - id: comprehensive-docs-quality-audit
+      file: TODO/docs-experience/planning/comprehensive-docs-quality-audit.yaml
+      title: Comprehensive Documentation Quality Audit
+      priority: High
+      status: Not Started
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
