@@ -149,16 +149,16 @@ The 26-week rollout follows the release phases defined in RELEASE_ROADMAP_6_MONT
 
 ### Phase 1: Foundation (Weeks 1-4) — v0.1.x
 
-**Theme:** Core benchmarking for local databases; establish credibility
+**Theme:** Useful from Day 1 — DuckDB + ClickHouse, TPC-H + TPC-DS
 
 **Week 1 (v0.1.0 Launch):**
 
 | Time (EST) | Platform | Action |
 |------------|----------|--------|
 | 8:00am | Blog | Publish "Why Database Benchmarks Are Broken" |
-| 8:00am | GitHub | Release v0.1.0 (DuckDB + TPC-H) |
+| 8:00am | GitHub | Release v0.1.0 (DuckDB + ClickHouse-local, TPC-H + TPC-DS) |
 | 8:00am | PyPI | Package live |
-| 8:00am | HN | "Show HN: BenchBox – Python-native database benchmarking" |
+| 8:00am | HN | "Show HN: BenchBox – Compare DuckDB vs ClickHouse in minutes" |
 | 8:15am | Twitter | Launch thread (10-12 tweets) with demo GIF |
 | 8:30am | LinkedIn | Long-form announcement (link in comments) |
 | 10:00am | Reddit | r/Python post (if HN is going well) |
@@ -169,57 +169,57 @@ The 26-week rollout follows the release phases defined in RELEASE_ROADMAP_6_MONT
 
 | Week | Version | LinkedIn Focus | Twitter Focus | Blog Post |
 |------|---------|----------------|---------------|-----------|
-| 2 | 0.1.1 | SQLite benchmark results | Demo GIF: SQLite vs DuckDB | "Benchmarking is Good, Actually" |
-| 3 | 0.1.2 | DataFusion deep dive | Technical thread | "Introducing Oxbow" |
-| 4 | 0.1.3 | Dry-run feature demo | Tips for benchmark setup | "Open Methodology" |
+| 2 | 0.1.1 | SQLite joins the comparison | Demo GIF: 3-way comparison | "Benchmarking is Good, Actually" |
+| 3 | 0.1.2 | DataFusion + dry-run mode | Technical thread | "Introducing Oxbow" |
+| 4 | 0.1.3 | Export and reporting | Tips for benchmark setup | "Open Methodology" |
 
-### Phase 2: Benchmarks (Weeks 5-8) — v0.2.x
+### Phase 2: Academic Benchmarks (Weeks 5-8) — v0.2.x
 
-**Theme:** Industry-standard benchmarks; TPC-DS, SSB, ClickBench
+**Theme:** Complete TPC suite — TPC-DI, TPC-Havoc, TPC variants
 
 **Weekly Content Template:**
 
 | Week | Version | Key Feature | LinkedIn | Twitter |
 |------|---------|-------------|----------|---------|
-| 5 | 0.2.0 | TPC-DS | "TPC-DS: The Real Test" | Demo thread |
-| 6 | 0.2.1 | SSB, ClickBench | Benchmark comparison | ClickBench results GIF |
-| 7 | 0.2.2 | TPC-Havoc | "BenchBox experimental benchmarks" | Behind-scenes thread |
-| 8 | 0.2.3 | Primitives | Micro-benchmark deep dive | Q&A engagement |
+| 5 | 0.2.0 | TPC-DI | "ETL benchmarking arrives" | Demo thread |
+| 6 | 0.2.1 | TPC-Havoc | "220 query variants" | Optimizer stress thread |
+| 7 | 0.2.2 | TPC Variants | "Real data is skewed" | Behind-scenes thread |
+| 8 | 0.2.3 | JoinOrder + Primitives | "Find exactly what's slow" | Q&A engagement |
 
-### Phase 3: Cloud I (Weeks 9-12) — v0.3.x
+### Phase 3: Cloud I + Industry (Weeks 9-12) — v0.3.x
 
-**Theme:** Enterprise cloud platforms; Snowflake, Databricks, BigQuery, Redshift
+**Theme:** Enterprise cloud + real-world benchmarks
 
-**Major Announcement: Week 9 (Snowflake Support)**
+**Major Announcement: Week 9 (Snowflake + SSB)**
 
 | Day | LinkedIn | Twitter |
 |-----|----------|---------|
-| Mon | "BenchBox now supports Snowflake" | Launch thread with results |
-| Tue | Technical deep-dive | Quote tweet reactions |
+| Mon | "Snowflake + Star Schema Benchmark" | Launch thread with results |
+| Tue | Technical deep-dive on SSB | Quote tweet reactions |
 | Wed | Cost analysis preview | Demo GIF |
 | Thu | Community engagement | Answer questions |
 | Fri | Week summary | Building in public update |
 
 **Weeks 10-12 Content:**
 
-| Week | Version | Platform | Angle |
-|------|---------|----------|-------|
-| 10 | 0.3.1 | Databricks | "Databricks TPC-H: Our Results" |
-| 11 | 0.3.2 | BigQuery | "BigQuery True Cost Analysis" |
-| 12 | 0.3.3 | Redshift | "Redshift Performance Baseline" |
+| Week | Version | Platform + Benchmark | Angle |
+|------|---------|---------------------|-------|
+| 10 | 0.3.1 | Databricks + ClickBench | "Photon meets web analytics" |
+| 11 | 0.3.2 | BigQuery + NYC Taxi | "1 billion real trips" |
+| 12 | 0.3.3 | Redshift + AMPLab | "Berkeley's big data patterns" |
 
-### Phase 4: Cloud II (Weeks 13-16) — v0.4.x
+### Phase 4: Cloud II + Industry (Weeks 13-16) — v0.4.x
 
-**Theme:** More cloud platforms; cost tracking; tuning
+**Theme:** Complete cloud coverage + complete benchmark suite
 
 **Content Focus:**
 
 | Week | Version | Feature | Marketing Angle |
 |------|---------|---------|-----------------|
-| 13 | 0.4.0 | ClickHouse | "ClickHouse Speed Claims: Verified" |
-| 14 | 0.4.1 | Cost Tracking | "The True Cost of Cloud Analytics" |
-| 15 | 0.4.2 | PostgreSQL, TimescaleDB | "PostgreSQL: Still Relevant" |
-| 16 | 0.4.3 | Tuning, Validation | "Tuned vs Default: The Real Difference" |
+| 13 | 0.4.0 | ClickHouse Cloud + H2ODB | "Real-time meets data science" |
+| 14 | 0.4.1 | PostgreSQL + TSBS DevOps | "Time-series benchmarking" |
+| 15 | 0.4.2 | Cost Tracking + CoffeeShop | "Performance per dollar" |
+| 16 | 0.4.3 | Tuning + Validation | "18 benchmarks complete" |
 
 ### Phase 5: DataFrame (Weeks 17-20) — v0.5.x
 
@@ -234,7 +234,7 @@ The 26-week rollout follows the release phases defined in RELEASE_ROADMAP_6_MONT
 | 19 | 0.5.2 | PySpark-DF, Dask-DF | "Distributed DataFrame Performance" |
 | 20 | 0.5.3 | Modin-DF, cuDF-DF | "GPU Analytics: Worth It?" |
 
-### Phase 6: Advanced (Weeks 21-24) — v0.6.x
+### Phase 6: Query Engines + Azure (Weeks 21-24) — v0.6.x
 
 **Theme:** Query engines; Azure platforms; complete coverage
 
@@ -245,7 +245,7 @@ The 26-week rollout follows the release phases defined in RELEASE_ROADMAP_6_MONT
 | 21 | 0.6.0 | Trino, Presto, Spark | "Query Engine Showdown" |
 | 22 | 0.6.1 | Azure Synapse, Fabric | "Microsoft Analytics: Benchmarked" |
 | 23 | 0.6.2 | Athena, Firebolt | "Serverless Analytics Deep Dive" |
-| 24 | 0.6.3 | Specialized Benchmarks | "Complete Benchmark Coverage" |
+| 24 | 0.6.3 | Complete Platform Matrix | "21 platforms, 18 benchmarks" |
 
 ### Phase 7: Stable (Weeks 25-26) — v0.9.0 to v1.0.0
 
@@ -554,37 +554,37 @@ Create a list of 50-100 accounts in the data community to engage with regularly:
 
 | Week | Version | Monday Focus | Mid-Week | Friday |
 |------|---------|--------------|----------|--------|
-| 1 | 0.1.0 | **LAUNCH** - HN, Twitter thread, LinkedIn | Demo GIF, Reddit | Week 1 reflection |
-| 2 | 0.1.1 | SQLite release announcement | DuckDB vs SQLite comparison | Engagement focus |
-| 3 | 0.1.2 | DataFusion release + Oxbow intro | Dry-run feature demo | Community Q&A |
-| 4 | 0.1.3 | Compression, Export features | Behind-the-scenes | Phase 1 summary |
+| 1 | 0.1.0 | **LAUNCH** - DuckDB + ClickHouse, TPC-H + TPC-DS | Demo GIF, Reddit | Week 1 reflection |
+| 2 | 0.1.1 | SQLite joins comparison | 3-way comparison demo | Engagement focus |
+| 3 | 0.1.2 | DataFusion + dry-run mode | Dry-run feature demo | Community Q&A |
+| 4 | 0.1.3 | Export and reporting | Behind-the-scenes | Phase 1 summary |
 
-### Benchmarks Phase (Weeks 5-8)
-
-| Week | Version | Monday Focus | Mid-Week | Friday |
-|------|---------|--------------|----------|--------|
-| 5 | 0.2.0 | TPC-DS announcement (major) | Technical deep-dive | Engagement |
-| 6 | 0.2.1 | SSB + ClickBench | ClickBench results | Community discussion |
-| 7 | 0.2.2 | TPC-Havoc experimental | Behind-scenes: benchmark design | Q&A |
-| 8 | 0.2.3 | Primitives micro-benchmarks | Performance insights | Phase 2 summary |
-
-### Cloud I Phase (Weeks 9-12)
+### Academic Benchmarks Phase (Weeks 5-8)
 
 | Week | Version | Monday Focus | Mid-Week | Friday |
 |------|---------|--------------|----------|--------|
-| 9 | 0.3.0 | **SNOWFLAKE** (major announcement) | Cost analysis | Results discussion |
-| 10 | 0.3.1 | Databricks support | Databricks TPC-H results | Technical Q&A |
-| 11 | 0.3.2 | BigQuery support | True cost comparison | Engagement |
-| 12 | 0.3.3 | Redshift support | Cross-cloud comparison | Phase 3 summary |
+| 5 | 0.2.0 | **TPC-DI** (ETL benchmarking) | Technical deep-dive | Engagement |
+| 6 | 0.2.1 | TPC-Havoc (220 variants) | Optimizer stress results | Community discussion |
+| 7 | 0.2.2 | TPC Variants (Skew, OBT, Data Vault) | Behind-scenes: benchmark design | Q&A |
+| 8 | 0.2.3 | JoinOrder + Primitives | Performance isolation | Phase 2 summary |
 
-### Cloud II Phase (Weeks 13-16)
+### Cloud I + Industry Phase (Weeks 9-12)
 
 | Week | Version | Monday Focus | Mid-Week | Friday |
 |------|---------|--------------|----------|--------|
-| 13 | 0.4.0 | ClickHouse support | Speed verification | Discussion |
-| 14 | 0.4.1 | **Cost Tracking** feature | The true cost post | Results sharing |
-| 15 | 0.4.2 | PostgreSQL + TimescaleDB | Time-series benchmarks | Q&A |
-| 16 | 0.4.3 | Tuning + Validation modes | Tuned vs Default results | Phase 4 summary |
+| 9 | 0.3.0 | **Snowflake + SSB** | Star schema results | Discussion |
+| 10 | 0.3.1 | Databricks + ClickBench | Web analytics on Photon | Technical Q&A |
+| 11 | 0.3.2 | BigQuery + NYC Taxi | Real-world data results | Engagement |
+| 12 | 0.3.3 | Redshift + AMPLab | Cross-cloud comparison | Phase 3 summary |
+
+### Cloud II + Industry Phase (Weeks 13-16)
+
+| Week | Version | Monday Focus | Mid-Week | Friday |
+|------|---------|--------------|----------|--------|
+| 13 | 0.4.0 | ClickHouse Cloud + H2ODB | Data science patterns | Discussion |
+| 14 | 0.4.1 | PostgreSQL + TSBS DevOps | Time-series benchmarks | Q&A |
+| 15 | 0.4.2 | Cost Tracking + CoffeeShop | The true cost post | Results sharing |
+| 16 | 0.4.3 | **18 Benchmarks Complete** | Tuned vs Default results | Phase 4 summary |
 
 ### DataFrame Phase (Weeks 17-20)
 
@@ -595,14 +595,14 @@ Create a list of 50-100 accounts in the data community to engage with regularly:
 | 19 | 0.5.2 | PySpark-DF, Dask-DF | Distributed results | Engagement |
 | 20 | 0.5.3 | Modin-DF, cuDF-DF | GPU analytics | Phase 5 summary |
 
-### Advanced Phase (Weeks 21-24)
+### Query Engines + Azure Phase (Weeks 21-24)
 
 | Week | Version | Monday Focus | Mid-Week | Friday |
 |------|---------|--------------|----------|--------|
 | 21 | 0.6.0 | Trino, Presto, Spark | Query engine comparison | Discussion |
 | 22 | 0.6.1 | Azure Synapse, Fabric | Microsoft ecosystem | Q&A |
 | 23 | 0.6.2 | Athena, Firebolt | Serverless analytics | Engagement |
-| 24 | 0.6.3 | Specialized benchmarks | Complete coverage | Phase 6 summary |
+| 24 | 0.6.3 | **Complete Platform Matrix** | Platform selection guide | Phase 6 summary |
 
 ### Stable Phase (Weeks 25-26)
 
