@@ -1,4 +1,4 @@
-generated_at: '2026-01-12T09:10:15.806159'
+generated_at: '2026-01-12T09:21:54.188583'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -711,7 +711,7 @@ categories:
       priority: Medium
       status: Completed
   Documentation:
-    count: 5
+    count: 6
     items:
     - id: add-dedicated-tags-for-platforms-and-benchmarks
       file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
@@ -722,6 +722,11 @@ categories:
       file: DONE/docs-experience/active/add-sphinx-tags.yaml
       title: Add sphinx-tags to BenchBox Documentation
       priority: Medium
+      status: Completed
+    - id: comprehensive-docs-quality-audit
+      file: DONE/docs-experience/active/comprehensive-docs-quality-audit.yaml
+      title: Comprehensive Documentation Quality Audit
+      priority: High
       status: Completed
     - id: create-comprehensive-dataframe-documentation
       file: DONE/dataframe-docs/planning/create-comprehensive-dataframe-documentation.yaml

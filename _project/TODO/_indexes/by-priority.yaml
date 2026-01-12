@@ -1,14 +1,9 @@
-generated_at: '2026-01-12T09:10:15.033665'
-total_items: 32
+generated_at: '2026-01-12T09:21:53.210606'
+total_items: 33
 priorities:
   High:
-    count: 4
+    count: 3
     items:
-    - id: comprehensive-docs-quality-audit
-      file: TODO/docs-experience/active/comprehensive-docs-quality-audit.yaml
-      title: Comprehensive Documentation Quality Audit
-      category: Documentation
-      status: In Progress
     - id: oxbow-series-reality-vs-aspiration
       file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
       title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'
@@ -25,8 +20,13 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium-High:
-    count: 14
+    count: 15
     items:
+    - id: fabric-spark-notebooks-platform
+      file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
+      title: Add Microsoft Fabric Spark Notebooks platform support
+      category: Platform Expansion
+      status: Not Started
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
@@ -98,8 +98,13 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 9
+    count: 10
     items:
+    - id: fabric-lakehouse-sql-platform
+      file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
+      title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
+      category: Platform Expansion
+      status: Not Started
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication

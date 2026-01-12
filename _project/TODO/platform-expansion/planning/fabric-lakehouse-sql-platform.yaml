@@ -1,0 +1,302 @@
+title: "Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support"
+worktree: platform-expansion
+priority: Medium
+status: Not Started
+description: |
+  Integrate Microsoft Fabric Lakehouse SQL Analytics Endpoint as a read-only SQL
+  query platform for benchmarking pre-loaded Delta Lake tables.
+
+  **Critical Architectural Constraint**:
+  The Lakehouse SQL Analytics Endpoint is READ-ONLY. This is a fundamental Fabric
+  design choice, not a BenchBox limitation:
+  - NO DDL: Cannot CREATE TABLE, DROP TABLE, ALTER TABLE
+  - NO DML: Cannot INSERT, UPDATE, DELETE, MERGE
+  - QUERY ONLY: SELECT statements only
+
+  **Data Loading Requirement**:
+  Data MUST be loaded via Microsoft Fabric Spark Notebooks (see related TODO:
+  fabric-spark-notebooks-platform.yaml). The workflow is:
+  1. Use Fabric Spark to load data into Lakehouse Delta tables
+  2. Use this adapter to benchmark query performance via SQL endpoint
+
+  This is a valid benchmarking pattern for:
+  - Measuring query-only performance (common for BI/reporting workloads)
+  - Comparing Lakehouse SQL endpoint vs Fabric Warehouse performance
+  - Testing Delta Lake query optimization (V-Order, Z-Order effects)
+
+  The adapter will explicitly validate the read-only constraint and fail fast
+  with helpful error messages if users attempt write operations.
+
+  Technical characteristics:
+  - T-SQL dialect (subset compatible with Synapse/SQL Server)
+  - TDS protocol via pyodbc (same as Fabric Warehouse)
+  - Entra ID authentication only
+  - Automatic Delta Lake to SQL type mapping
+  - OneLake-backed storage (transparent to queries)
+
+  Reference: fabric_warehouse.py:14-30 documents this limitation explicitly:
+  "Lakehouse: SQL Analytics Endpoint is READ-ONLY (not supported)"
+  This adapter provides READ-ONLY support as a deliberate feature.
+
+category: Platform Expansion
+
+tasks:
+  phases:
+    - phase: "Phase 1: Core Adapter Implementation"
+      done: false
+      items:
+        - summary: "Create benchbox/platforms/fabric_lakehouse.py adapter"
+          done: false
+          subtasks:
+            - summary: "Implement FabricLakehouseAdapter inheriting from PlatformAdapter"
+              done: false
+            - summary: "Set _dialect = 'tsql' for SQLGlot transpilation"
+              done: false
+            - summary: "Implement Entra ID authentication (reuse from fabric_warehouse.py)"
+              done: false
+            - summary: "Build Lakehouse SQL endpoint connection string"
+              done: false
+        - summary: "Implement read-only enforcement"
+          done: false
+          subtasks:
+            - summary: "Override create_schema() to raise ReadOnlyPlatformError"
+              done: false
+            - summary: "Override load_data() to raise ReadOnlyPlatformError with guidance"
+              done: false
+            - summary: "Implement query validation to reject DDL/DML statements"
+              done: false
+            - summary: "Create helpful error messages pointing to Fabric Spark"
+              done: false
+        - summary: "Implement query execution"
+          done: false
+          subtasks:
+            - summary: "Implement execute_query() for SELECT statements"
+              done: false
+            - summary: "Handle result set parsing and row counting"
+              done: false
+            - summary: "Implement query timeout handling"
+              done: false
+
+    - phase: "Phase 2: Pre-loaded Data Validation"
+      done: false
+      items:
+        - summary: "Implement table discovery and validation"
+          done: false
+          subtasks:
+            - summary: "Query INFORMATION_SCHEMA to discover available tables"
+              done: false
+            - summary: "Validate expected benchmark tables exist before run"
+              done: false
+            - summary: "Report table row counts for verification"
+              done: false
+        - summary: "Implement skip-load workflow support"
+          done: false
+          subtasks:
+            - summary: "Add --skip-load flag handling (load phase becomes no-op)"
+              done: false
+            - summary: "Validate data exists when load is skipped"
+              done: false
+            - summary: "Document the Spark-first, SQL-query workflow"
+              done: false
+        - summary: "Implement schema compatibility checking"
+          done: false
+          subtasks:
+            - summary: "Compare discovered schema against benchmark expectations"
+              done: false
+            - summary: "Warn on schema mismatches (column types, missing columns)"
+              done: false
+
+    - phase: "Phase 3: Platform Features"
+      done: false
+      items:
+        - summary: "Implement platform info collection"
+          done: false
+          subtasks:
+            - summary: "Capture SQL endpoint version information"
+              done: false
+            - summary: "Report Delta Lake table metadata (V-Order status, etc.)"
+              done: false
+            - summary: "Document capacity/region information"
+              done: false
+        - summary: "Implement query plan capture"
+          done: false
+          subtasks:
+            - summary: "Use SET SHOWPLAN_TEXT ON for explain plans"
+              done: false
+            - summary: "Parse and format execution plans"
+              done: false
+        - summary: "Add result cache handling"
+          done: false
+          subtasks:
+            - summary: "Document cache behavior (may not be controllable)"
+              done: false
+            - summary: "Implement cache-clearing if supported"
+              done: false
+
+    - phase: "Phase 4: Testing and Documentation"
+      done: false
+      items:
+        - summary: "Create unit tests"
+          done: false
+          subtasks:
+            - summary: "Test read-only enforcement (DDL/DML rejection)"
+              done: false
+            - summary: "Test connection string building"
+              done: false
+            - summary: "Test query execution mocking"
+              done: false
+        - summary: "Create integration tests"
+          done: false
+          subtasks:
+            - summary: "Test against pre-loaded Fabric Lakehouse"
+              done: false
+            - summary: "Document test data setup via Fabric Spark"
+              done: false
+        - summary: "Create documentation"
+          done: false
+          subtasks:
+            - summary: "Create docs/platforms/fabric-lakehouse.md"
+              done: false
+            - summary: "Document the two-phase workflow (Spark load → SQL query)"
+              done: false
+            - summary: "Explain Lakehouse vs Warehouse differences clearly"
+              done: false
+            - summary: "Add troubleshooting for common read-only errors"
+              done: false
+
+metadata:
+  tags:
+    - fabric
+    - lakehouse
+    - sql-analytics
+    - read-only
+    - delta-lake
+    - azure
+    - platform
+    - cloud
+  estimated_effort: Medium
+  created_date: "2026-01-12"
+
+impact:
+  business_value: |
+    Enables benchmarking of Microsoft Fabric Lakehouse SQL workloads, which is
+    a common enterprise pattern:
+    - Data engineers load via Spark
+    - Analysts/BI tools query via SQL endpoint
+    - This matches real-world usage patterns
+
+    Combined with Fabric Spark Notebooks adapter, provides complete Fabric
+    Lakehouse coverage.
+  user_impact: |
+    Users with pre-loaded Fabric Lakehouse data can benchmark query performance
+    without needing to re-implement data loading. Workflow:
+    1. Load data once via Fabric Spark (or existing ETL pipelines)
+    2. Run repeated benchmark queries via this adapter
+    3. Compare against Fabric Warehouse or other platforms
+  technical_debt: |
+    Clean implementation. Can share authentication logic with fabric_warehouse.py.
+    The read-only constraint is explicit and enforced, not a hack.
+
+technical_requirements:
+  constraints:
+    - "READ-ONLY: No DDL or DML operations supported (Fabric limitation)"
+    - "Data must be pre-loaded via Fabric Spark Notebooks"
+    - "Requires Entra ID authentication (no SQL auth)"
+    - "Same-region connectivity required"
+  dependencies:
+    - "pyodbc (ODBC Driver 18 for SQL Server)"
+    - "azure-identity (Entra ID authentication)"
+  compatibility: |
+    - Python 3.10+
+    - Microsoft Fabric F2 capacity or higher
+    - ODBC Driver 18 for SQL Server
+    - SQLGlot 'tsql' dialect
+
+files_affected:
+  modified:
+    - benchbox/platforms/__init__.py
+    - benchbox/core/platform_registry.py
+    - docs/platforms/overview.md
+  added:
+    - benchbox/platforms/fabric_lakehouse.py
+    - benchbox/core/exceptions.py (ReadOnlyPlatformError if not exists)
+    - tests/unit/platforms/test_fabric_lakehouse_adapter.py
+    - docs/platforms/fabric-lakehouse.md
+
+dependencies:
+  blocked_by:
+    - _project/TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
+  related:
+    - _project/TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
+
+success_metrics:
+  - "Adapter correctly rejects all DDL/DML with helpful errors"
+  - "TPC-H queries execute successfully against pre-loaded data"
+  - "Documentation clearly explains the Spark→SQL workflow"
+  - "Platform appears in CLI with appropriate warnings about read-only nature"
+
+open_questions:
+  - "Should we auto-detect Lakehouse vs Warehouse and warn/switch?"
+  - "How to handle benchmark runs that expect to load data (fail fast vs skip)?"
+  - "Should --skip-load be required or just recommended for this platform?"
+  - "Can we query Delta Lake metadata (V-Order, file count) via SQL?"
+
+context_sections:
+  "Fabric Lakehouse vs Warehouse": |
+    Microsoft Fabric offers two primary data storage patterns:
+
+    **Lakehouse** (this adapter):
+    - Storage: OneLake with Delta Lake format
+    - Write access: Spark only (notebooks, jobs)
+    - Query access: SQL Analytics Endpoint (T-SQL, READ-ONLY)
+    - Best for: Data lake patterns, ML workloads, flexible schema
+
+    **Warehouse** (existing adapter: fabric_warehouse.py):
+    - Storage: OneLake with proprietary format
+    - Write access: Full T-SQL DDL/DML
+    - Query access: Full T-SQL
+    - Best for: Traditional DW patterns, full SQL control
+
+    Both use Entra ID auth and share OneLake storage layer.
+
+  "SQL Analytics Endpoint Details": |
+    The Lakehouse SQL Analytics Endpoint provides:
+    - Automatic Delta Lake to SQL table mapping
+    - T-SQL query syntax (Synapse-compatible subset)
+    - Read-only access to Delta tables
+    - Automatic schema inference from Delta metadata
+
+    Endpoint pattern: {workspace-guid}.sql.azuresynapse.net
+    (Note: different from Warehouse endpoint pattern)
+
+  "Recommended BenchBox Workflow": |
+    For complete Fabric Lakehouse benchmarking:
+
+    1. **Data Loading** (Fabric Spark adapter):
+       ```bash
+       benchbox run --platform fabric-spark --benchmark tpch \
+         --phases generate,load --scale 1
+       ```
+
+    2. **Query Benchmarking** (this adapter):
+       ```bash
+       benchbox run --platform fabric-lakehouse --benchmark tpch \
+         --phases power,throughput --skip-load --scale 1
+       ```
+
+    This separates concerns and matches real enterprise patterns.
+
+  "Error Message Design": |
+    When users attempt write operations, provide actionable guidance:
+
+    ```
+    ReadOnlyPlatformError: Fabric Lakehouse SQL endpoint is read-only.
+
+    Cannot execute: CREATE TABLE customer (...)
+
+    To load data into Fabric Lakehouse, use the Fabric Spark platform:
+      benchbox run --platform fabric-spark --benchmark tpch --phases generate,load
+
+    Then run queries with:
+      benchbox run --platform fabric-lakehouse --benchmark tpch --phases power --skip-load
+    ```

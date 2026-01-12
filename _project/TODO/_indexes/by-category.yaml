@@ -1,4 +1,4 @@
-generated_at: '2026-01-12T09:10:15.033652'
+generated_at: '2026-01-12T09:21:53.210592'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -129,13 +129,8 @@ categories:
       priority: Medium-High
       status: Not Started
   Documentation:
-    count: 3
+    count: 2
     items:
-    - id: comprehensive-docs-quality-audit
-      file: TODO/docs-experience/active/comprehensive-docs-quality-audit.yaml
-      title: Comprehensive Documentation Quality Audit
-      priority: High
-      status: In Progress
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -147,8 +142,18 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 2
+    count: 4
     items:
+    - id: fabric-lakehouse-sql-platform
+      file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
+      title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
+      priority: Medium
+      status: Not Started
+    - id: fabric-spark-notebooks-platform
+      file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
+      title: Add Microsoft Fabric Spark Notebooks platform support
+      priority: Medium-High
+      status: Not Started
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support

@@ -1,21 +1,6 @@
-generated_at: '2026-01-12T09:10:15.033619'
-total_items: 32
+generated_at: '2026-01-12T09:21:53.210563'
+total_items: 33
 items:
-- id: comprehensive-docs-quality-audit
-  file: TODO/docs-experience/active/comprehensive-docs-quality-audit.yaml
-  title: Comprehensive Documentation Quality Audit
-  worktree: docs-experience
-  category: Documentation
-  priority: High
-  status: In Progress
-  tags:
-  - documentation
-  - quality
-  - audit
-  - comprehensive
-  owners:
-  - joe
-  estimated_effort: 35-45 hours
 - id: oxbow-series-reality-vs-aspiration
   file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
   title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'
@@ -90,6 +75,23 @@ items:
   priority: Low
   status: Not Started
   estimated_effort: 4 weeks (1.0 FTE)
+- id: fabric-lakehouse-sql-platform
+  file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
+  title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - fabric
+  - lakehouse
+  - sql-analytics
+  - read-only
+  - delta-lake
+  - azure
+  - platform
+  - cloud
+  estimated_effort: Medium
 - id: influxdb-blog-post-edits
   file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
   title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -211,6 +213,24 @@ items:
   - blog-data
   - verification
   estimated_effort: 30-60 minutes
+- id: fabric-spark-notebooks-platform
+  file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
+  title: Add Microsoft Fabric Spark Notebooks platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - fabric
+  - spark
+  - livy
+  - managed-spark
+  - lakehouse
+  - delta-lake
+  - azure
+  - platform
+  - cloud
+  estimated_effort: Large
 - id: starrocks-olap-platform
   file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
   title: Add StarRocks MPP OLAP platform support
