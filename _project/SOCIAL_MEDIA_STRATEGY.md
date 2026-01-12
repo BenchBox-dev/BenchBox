@@ -173,22 +173,22 @@ The 26-week rollout follows the release phases defined in RELEASE_ROADMAP_6_MONT
 | 3 | 0.1.2 | DataFusion + dry-run mode | Technical thread | "Introducing Oxbow" |
 | 4 | 0.1.3 | Export and reporting | Tips for benchmark setup | "Open Methodology" |
 
-### Phase 2: Academic Benchmarks (Weeks 5-8) — v0.2.x
+### Phase 2: TPC + Primitives + Experimental (Weeks 5-8) — v0.2.x
 
-**Theme:** Complete TPC suite — TPC-DI, TPC-Havoc, TPC variants
+**Theme:** Complete TPC suite + micro-benchmarks + experimental variants
 
 **Weekly Content Template:**
 
-| Week | Version | Key Feature | LinkedIn | Twitter |
-|------|---------|-------------|----------|---------|
-| 5 | 0.2.0 | TPC-DI | "ETL benchmarking arrives" | Demo thread |
-| 6 | 0.2.1 | TPC-Havoc | "220 query variants" | Optimizer stress thread |
-| 7 | 0.2.2 | TPC Variants | "Real data is skewed" | Behind-scenes thread |
-| 8 | 0.2.3 | JoinOrder + Primitives | "Find exactly what's slow" | Q&A engagement |
+| Week | Version | Key Feature (Category) | LinkedIn | Twitter |
+|------|---------|----------------------|----------|---------|
+| 5 | 0.2.0 | TPC-DI (TPC) | "Complete TPC: H, DS, DI" | Demo thread |
+| 6 | 0.2.1 | Primitives | "Find exactly what's slow" | Micro-benchmark thread |
+| 7 | 0.2.2 | TPC-Havoc + TPC-H Skew (Experimental) | "Stress test your optimizer" | Behind-scenes thread |
+| 8 | 0.2.3 | TPC-DS OBT + Data Vault (Experimental) | "Schema variants" | Q&A engagement |
 
-### Phase 3: Cloud I + Industry (Weeks 9-12) — v0.3.x
+### Phase 3: Cloud I + Academic (Weeks 9-12) — v0.3.x
 
-**Theme:** Enterprise cloud + real-world benchmarks
+**Theme:** Enterprise cloud + research benchmarks from academia
 
 **Major Announcement: Week 9 (Snowflake + SSB)**
 
@@ -202,24 +202,24 @@ The 26-week rollout follows the release phases defined in RELEASE_ROADMAP_6_MONT
 
 **Weeks 10-12 Content:**
 
-| Week | Version | Platform + Benchmark | Angle |
-|------|---------|---------------------|-------|
-| 10 | 0.3.1 | Databricks + ClickBench | "Photon meets web analytics" |
-| 11 | 0.3.2 | BigQuery + NYC Taxi | "1 billion real trips" |
-| 12 | 0.3.3 | Redshift + AMPLab | "Berkeley's big data patterns" |
+| Week | Version | Platform + Benchmark (Category) | Angle |
+|------|---------|--------------------------------|-------|
+| 10 | 0.3.1 | Databricks + JoinOrder (Academic) | "113 queries for your optimizer" |
+| 11 | 0.3.2 | BigQuery + AMPLab (Academic) | "Berkeley's big data patterns" |
+| 12 | 0.3.3 | Redshift | "Distribution keys matter" |
 
-### Phase 4: Cloud II + Industry (Weeks 13-16) — v0.4.x
+### Phase 4: Cloud II + Industry/TimeSeries/RealWorld (Weeks 13-16) — v0.4.x
 
-**Theme:** Complete cloud coverage + complete benchmark suite
+**Theme:** Complete cloud + practitioner benchmarks
 
 **Content Focus:**
 
-| Week | Version | Feature | Marketing Angle |
-|------|---------|---------|-----------------|
-| 13 | 0.4.0 | ClickHouse Cloud + H2ODB | "Real-time meets data science" |
-| 14 | 0.4.1 | PostgreSQL + TSBS DevOps | "Time-series benchmarking" |
-| 15 | 0.4.2 | Cost Tracking + CoffeeShop | "Performance per dollar" |
-| 16 | 0.4.3 | Tuning + Validation | "18 benchmarks complete" |
+| Week | Version | Feature (Category) | Marketing Angle |
+|------|---------|-------------------|-----------------|
+| 13 | 0.4.0 | ClickHouse Cloud + ClickBench (Industry) | "Real-time meets real patterns" |
+| 14 | 0.4.1 | PostgreSQL + TSBS DevOps (Time Series) | "Time-series benchmarking" |
+| 15 | 0.4.2 | Cost Tracking + NYC Taxi + H2ODB | "Real data meets real costs" |
+| 16 | 0.4.3 | Tuning + CoffeeShop (Industry) | "18 benchmarks, 7 categories" |
 
 ### Phase 5: DataFrame (Weeks 17-20) — v0.5.x
 
@@ -559,32 +559,32 @@ Create a list of 50-100 accounts in the data community to engage with regularly:
 | 3 | 0.1.2 | DataFusion + dry-run mode | Dry-run feature demo | Community Q&A |
 | 4 | 0.1.3 | Export and reporting | Behind-the-scenes | Phase 1 summary |
 
-### Academic Benchmarks Phase (Weeks 5-8)
+### TPC + Primitives + Experimental Phase (Weeks 5-8)
 
 | Week | Version | Monday Focus | Mid-Week | Friday |
 |------|---------|--------------|----------|--------|
-| 5 | 0.2.0 | **TPC-DI** (ETL benchmarking) | Technical deep-dive | Engagement |
-| 6 | 0.2.1 | TPC-Havoc (220 variants) | Optimizer stress results | Community discussion |
-| 7 | 0.2.2 | TPC Variants (Skew, OBT, Data Vault) | Behind-scenes: benchmark design | Q&A |
-| 8 | 0.2.3 | JoinOrder + Primitives | Performance isolation | Phase 2 summary |
+| 5 | 0.2.0 | **TPC-DI** (Complete TPC suite) | Technical deep-dive | Engagement |
+| 6 | 0.2.1 | **Primitives** (Read/Write/Transaction) | Micro-benchmark results | Community discussion |
+| 7 | 0.2.2 | Experimental (TPC-Havoc + TPC-H Skew) | Optimizer stress testing | Q&A |
+| 8 | 0.2.3 | Experimental (TPC-DS OBT + Data Vault) | Schema variants | Phase 2 summary |
 
-### Cloud I + Industry Phase (Weeks 9-12)
-
-| Week | Version | Monday Focus | Mid-Week | Friday |
-|------|---------|--------------|----------|--------|
-| 9 | 0.3.0 | **Snowflake + SSB** | Star schema results | Discussion |
-| 10 | 0.3.1 | Databricks + ClickBench | Web analytics on Photon | Technical Q&A |
-| 11 | 0.3.2 | BigQuery + NYC Taxi | Real-world data results | Engagement |
-| 12 | 0.3.3 | Redshift + AMPLab | Cross-cloud comparison | Phase 3 summary |
-
-### Cloud II + Industry Phase (Weeks 13-16)
+### Cloud I + Academic Phase (Weeks 9-12)
 
 | Week | Version | Monday Focus | Mid-Week | Friday |
 |------|---------|--------------|----------|--------|
-| 13 | 0.4.0 | ClickHouse Cloud + H2ODB | Data science patterns | Discussion |
-| 14 | 0.4.1 | PostgreSQL + TSBS DevOps | Time-series benchmarks | Q&A |
-| 15 | 0.4.2 | Cost Tracking + CoffeeShop | The true cost post | Results sharing |
-| 16 | 0.4.3 | **18 Benchmarks Complete** | Tuned vs Default results | Phase 4 summary |
+| 9 | 0.3.0 | **Snowflake + SSB** (Academic) | Star schema results | Discussion |
+| 10 | 0.3.1 | Databricks + JoinOrder (Academic) | Optimizer testing | Technical Q&A |
+| 11 | 0.3.2 | BigQuery + AMPLab (Academic) | Big data patterns | Engagement |
+| 12 | 0.3.3 | Redshift | Cross-cloud comparison | Phase 3 summary |
+
+### Cloud II + Industry/TimeSeries/RealWorld Phase (Weeks 13-16)
+
+| Week | Version | Monday Focus | Mid-Week | Friday |
+|------|---------|--------------|----------|--------|
+| 13 | 0.4.0 | ClickHouse Cloud + ClickBench (Industry) | Web analytics patterns | Discussion |
+| 14 | 0.4.1 | PostgreSQL + TSBS DevOps (Time Series) | Time-series benchmarks | Q&A |
+| 15 | 0.4.2 | Cost Tracking + NYC Taxi + H2ODB | Real data + real costs | Results sharing |
+| 16 | 0.4.3 | **18 Benchmarks Complete** + CoffeeShop | Tuned vs Default results | Phase 4 summary |
 
 ### DataFrame Phase (Weeks 17-20)
 

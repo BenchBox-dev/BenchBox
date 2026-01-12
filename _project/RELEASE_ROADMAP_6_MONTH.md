@@ -20,14 +20,21 @@ BenchBox has **21 platform adapters**, **18+ benchmarks**, and comprehensive CLI
 | Phase | Weeks | Versions | Theme |
 |-------|-------|----------|-------|
 | Foundation | 1-4 | 0.1.0 - 0.1.3 | Core local benchmarking (DuckDB, ClickHouse, TPC-H/DS) |
-| Academic Benchmarks | 5-8 | 0.2.0 - 0.2.3 | TPC benchmark suite expansion |
-| Cloud I + Industry | 9-12 | 0.3.0 - 0.3.3 | Major cloud platforms + SSB, ClickBench |
-| Cloud II + Industry | 13-16 | 0.4.0 - 0.4.3 | Extended cloud + remaining benchmarks |
+| TPC + Primitives + Experimental | 5-8 | 0.2.0 - 0.2.3 | Complete TPC, micro-benchmarks, experimental variants |
+| Cloud I + Academic | 9-12 | 0.3.0 - 0.3.3 | Major cloud platforms + SSB, JoinOrder, AMPLab |
+| Cloud II + Industry/TimeSeries/RealWorld | 13-16 | 0.4.0 - 0.4.3 | Extended cloud + ClickBench, TSBS, NYC Taxi, H2ODB, CoffeeShop |
 | DataFrame | 17-20 | 0.5.0 - 0.5.3 | DataFrame paradigm |
-| Advanced | 21-24 | 0.6.0 - 0.6.3 | Query engines + Azure |
+| Query Engines + Azure | 21-24 | 0.6.0 - 0.6.3 | Trino, Presto, Spark, Azure |
 | Stable | 25-26 | 0.9.0, 1.0.0 | Production ready |
 
-**Key Design Principle:** All 18+ SQL-based benchmarks are revealed before DataFrame mode (Week 17) to ensure maximum utility on SQL platforms from launch.
+**Key Design Principle:** All 19 SQL-based benchmarks are revealed before DataFrame mode (Week 17) using BenchBox's native category groupings:
+- **TPC** (3): TPC-H, TPC-DS, TPC-DI
+- **Primitives** (3): Read, Write, Transaction
+- **Experimental** (4): TPC-Havoc, TPC-H Skew, TPC-DS OBT, TPC-H Data Vault
+- **Academic** (3): SSB, JoinOrder, AMPLab
+- **Industry** (3): ClickBench, H2ODB, CoffeeShop
+- **Time Series** (1): TSBS DevOps
+- **Real World** (1): NYC Taxi
 
 ---
 
@@ -111,11 +118,11 @@ benchbox run --platform clickhouse-local --benchmark tpcds --scale 1
 
 ---
 
-### Phase 2: Academic Benchmarks (Weeks 5-8)
+### Phase 2: TPC + Primitives + Experimental (Weeks 5-8)
 
-**Theme:** "The Complete TPC Suite"
+**Theme:** "Complete TPC Suite + Deep Performance Analysis"
 
-*All TPC and academic benchmarks are revealed in this phase, establishing BenchBox as a comprehensive TPC benchmarking tool.*
+*This phase completes the TPC standards, adds micro-benchmarks, and introduces experimental variants.*
 
 #### Week 5 - v0.2.0
 **Headline:** "TPC-DI: Benchmark Your ETL Pipelines"
@@ -126,62 +133,70 @@ benchbox run --platform clickhouse-local --benchmark tpcds --scale 1
 - Historical data loading patterns
 - Incremental update benchmarking
 
-**Marketing Angle:** "The benchmark for data integration workloads"
+**Marketing Angle:** "Complete TPC coverage: H, DS, and now DI"
 
 **Blog Post:** "TPC-DI: Finally, a Benchmark for ETL"
+
+**Category:** TPC (completing the official standards)
 
 ---
 
 #### Week 6 - v0.2.1
-**Headline:** "TPC-Havoc: Stress Test Your Query Optimizer"
+**Headline:** "Primitives: Micro-Benchmarks for Deep Analysis"
 
 **Features Revealed:**
-- TPC-Havoc benchmark (220 query variants)
-- 10 structural variants per TPC-H query
-- Optimizer robustness testing
-- Query plan stability analysis
+- Read Primitives (90+ queries)
+- Write Primitives (117 operations)
+- Transaction Primitives (8 ACID tests)
+- Operation-level performance isolation
 
-**Marketing Angle:** "Discover how your optimizer handles query variations"
+**Marketing Angle:** "Identify exactly which operations are slow"
 
-**Blog Post:** "TPC-Havoc: The Benchmark That Breaks Optimizers"
+**Blog Post:** "Primitives: When You Need to Know WHY It's Slow"
+
+**Category:** Primitives (fundamental database operations)
 
 ---
 
 #### Week 7 - v0.2.2
-**Headline:** "TPC Variants: Skew, OBT, and Data Vault"
+**Headline:** "Experimental: TPC-Havoc + TPC-H Skew"
 
 **Features Revealed:**
+- TPC-Havoc benchmark (220 query variants)
 - TPC-H Skew (configurable data distributions)
-- TPC-DS OBT (One Big Table denormalized)
-- TPC-H Data Vault (dimensional modeling)
-- Alternative schema patterns
+- Optimizer robustness testing
+- Query plan stability analysis
 
-**Marketing Angle:** "Test your database with realistic data distributions"
+**Marketing Angle:** "Stress test your optimizer with query variants and skewed data"
 
-**Blog Post:** "Beyond Standard TPC: Real-World Data Patterns"
+**Blog Post:** "Experimental Benchmarks: Beyond Standard TPC"
+
+**Category:** Experimental (specialized testing)
 
 ---
 
 #### Week 8 - v0.2.3
-**Headline:** "JoinOrder + Primitives: Deep Performance Analysis"
+**Headline:** "Experimental: TPC-DS OBT + Data Vault"
 
 **Features Revealed:**
-- JoinOrder benchmark (join optimization stress test)
-- Read Primitives (90+ queries)
-- Write Primitives (117 operations)
-- Transaction Primitives (8 ACID tests)
+- TPC-DS OBT (One Big Table denormalized)
+- TPC-H Data Vault (dimensional modeling)
+- Alternative schema patterns
+- Denormalization performance testing
 
-**Marketing Angle:** "Identify exactly which operations are slow"
+**Marketing Angle:** "Test your database with alternative schema designs"
 
-**Blog Post:** "Micro-Benchmarks: When You Need to Know WHY It's Slow"
+**Blog Post:** "Schema Variants: When Denormalization Wins"
+
+**Category:** Experimental (alternative schema patterns)
 
 ---
 
-### Phase 3: Cloud I + Industry Benchmarks (Weeks 9-12)
+### Phase 3: Cloud I + Academic Benchmarks (Weeks 9-12)
 
-**Theme:** "Enterprise Cloud Benchmarking + Real-World Workloads"
+**Theme:** "Enterprise Cloud + Research Benchmarks"
 
-*Each cloud platform release is paired with an industry benchmark, enabling immediate real-world testing on cloud infrastructure.*
+*Each cloud platform release is paired with an Academic benchmark (SSB, JoinOrder, AMPLab) from research institutions.*
 
 #### Week 9 - v0.3.0
 **Headline:** "Snowflake + Star Schema Benchmark"
@@ -194,14 +209,16 @@ benchbox run --platform clickhouse-local --benchmark tpcds --scale 1
 - `[snowflake]` extra installation
 - **Star Schema Benchmark (SSB)** - 13 queries
 
-**Marketing Angle:** "Benchmark Snowflake with TPC and real-world star schema workloads"
+**Marketing Angle:** "Benchmark Snowflake with the classic star schema workload"
 
-**Blog Post:** "Snowflake Benchmarking: TPC-H, TPC-DS, and SSB Compared"
+**Blog Post:** "Snowflake + SSB: Star Schema Performance"
+
+**Category:** Academic (research benchmark from academia)
 
 ---
 
 #### Week 10 - v0.3.1
-**Headline:** "Databricks + ClickBench"
+**Headline:** "Databricks + JoinOrder Benchmark"
 
 **Features Revealed:**
 - Databricks platform adapter
@@ -209,16 +226,18 @@ benchbox run --platform clickhouse-local --benchmark tpcds --scale 1
 - Photon engine support
 - AQE and Z-ordering
 - DBFS integration
-- **ClickBench** - 43 analytical queries (web analytics patterns)
+- **JoinOrder Benchmark** - 113 queries for optimizer testing
 
-**Marketing Angle:** "Databricks benchmarking with real-world web analytics queries"
+**Marketing Angle:** "Test Databricks optimizer with 113 join order challenges"
 
-**Blog Post:** "Databricks: From TPC to ClickBench"
+**Blog Post:** "Databricks: How Good Is Your Query Optimizer?"
+
+**Category:** Academic (query optimizer research)
 
 ---
 
 #### Week 11 - v0.3.2
-**Headline:** "BigQuery + NYC Taxi Benchmark"
+**Headline:** "BigQuery + AMPLab Benchmark"
 
 **Features Revealed:**
 - BigQuery platform adapter
@@ -226,16 +245,18 @@ benchbox run --platform clickhouse-local --benchmark tpcds --scale 1
 - Slot-based execution
 - GCS staging integration
 - Regional deployment
-- **NYC Taxi Benchmark** - real-world trip data analysis
+- **AMPLab Big Data Benchmark** - 8 queries (scan/aggregate/join)
 
-**Marketing Angle:** "BigQuery benchmarking with 1B+ row real-world data"
+**Marketing Angle:** "BigQuery benchmarking with Berkeley's big data patterns"
 
-**Blog Post:** "BigQuery: Synthetic vs Real-World Benchmarks"
+**Blog Post:** "BigQuery + AMPLab: Big Data Performance"
+
+**Category:** Academic (Berkeley research benchmark)
 
 ---
 
 #### Week 12 - v0.3.3
-**Headline:** "Amazon Redshift + AMPLab Benchmark"
+**Headline:** "Amazon Redshift"
 
 **Features Revealed:**
 - Redshift platform adapter
@@ -243,33 +264,36 @@ benchbox run --platform clickhouse-local --benchmark tpcds --scale 1
 - Sort keys
 - S3 COPY integration
 - Spectrum support
-- **AMPLab Big Data Benchmark** - scan/aggregate/join patterns
 
-**Marketing Angle:** "Redshift benchmarking with Berkeley's big data patterns"
+**Marketing Angle:** "Redshift benchmarking with proper distribution strategy"
 
 **Blog Post:** "Redshift: Distribution Keys Make or Break Performance"
 
+*Note: Academic benchmarks complete. Industry benchmarks begin in Phase 4.*
+
 ---
 
-### Phase 4: Cloud II + Industry Benchmarks (Weeks 13-16)
+### Phase 4: Cloud II + Industry/TimeSeries/RealWorld (Weeks 13-16)
 
-**Theme:** "Complete Cloud Coverage + Complete Benchmark Suite"
+**Theme:** "Complete Cloud + Practitioner Benchmarks"
 
-*This phase completes both cloud platform coverage and the industry benchmark suite, ensuring all 18+ benchmarks are available before DataFrame mode.*
+*This phase completes cloud coverage and adds Industry, Time Series, and Real World benchmarks.*
 
 #### Week 13 - v0.4.0
-**Headline:** "ClickHouse Cloud + H2ODB Benchmark"
+**Headline:** "ClickHouse Cloud + ClickBench"
 
 **Features Revealed:**
 - ClickHouse platform adapter (Cloud mode)
 - TLS support
 - Native protocol
 - Multi-node cluster support
-- **H2ODB Benchmark** - groupby/join patterns from H2O.ai
+- **ClickBench** - 43 analytical queries (web analytics patterns)
 
-**Marketing Angle:** "ClickHouse Cloud benchmarking with H2O's data science patterns"
+**Marketing Angle:** "ClickHouse Cloud with real-world web analytics patterns"
 
 **Blog Post:** "ClickHouse Cloud: Real-Time Analytics at Scale"
+
+**Category:** Industry (real-world benchmark from practitioners)
 
 *Note: ClickHouse-local was released in Week 1. This release adds cloud connectivity.*
 
@@ -290,38 +314,45 @@ benchbox run --platform clickhouse-local --benchmark tpcds --scale 1
 
 **Blog Post:** "PostgreSQL Family: From OLTP to Time-Series Analytics"
 
+**Category:** Time Series (temporal data workloads)
+
 ---
 
 #### Week 15 - v0.4.2
-**Headline:** "Cost Tracking + CoffeeShop Benchmark"
+**Headline:** "Cost Tracking + NYC Taxi + H2ODB"
 
 **Features Revealed:**
 - Per-query cost estimation
 - Platform cost tracking (Snowflake, Databricks, BigQuery, Redshift, Athena)
 - Cost comparison reports
-- TCO analysis support
-- **CoffeeShop Benchmark** - CRUD transaction patterns
+- **NYC Taxi Benchmark** - real-world trip data analysis
+- **H2ODB Benchmark** - data science groupby/join patterns
 
-**Marketing Angle:** "Performance AND cost: The complete picture"
+**Marketing Angle:** "Real-world data meets real cost tracking"
 
 **Blog Post:** "Cost-Aware Benchmarking: Performance Per Dollar"
+
+**Categories:** Real World (NYC Taxi), Industry (H2ODB)
 
 ---
 
 #### Week 16 - v0.4.3
-**Headline:** "Tuning + Validation: Complete Benchmark Configuration"
+**Headline:** "Tuning + Validation + CoffeeShop"
 
 **Features Revealed:**
 - Tuning modes (tuned, notuning, auto, custom YAML)
 - 5 validation modes (exact, loose, range, disabled, full)
 - PK/FK/index configuration
 - Platform-specific tuning (clustering, distribution)
+- **CoffeeShop Benchmark** - CRUD transaction patterns
 
-**Marketing Angle:** "All 18 benchmarks, fully configurable"
+**Marketing Angle:** "All 19 benchmarks, fully configurable"
 
 **Blog Post:** "The Tuning Gap: Default vs Optimized Performance"
 
-**Milestone:** *All SQL-based benchmarks now available (18 total). DataFrame mode begins next phase.*
+**Category:** Industry (order line benchmark)
+
+**Milestone:** *All SQL-based benchmarks now available (19 total). DataFrame mode begins next phase.*
 
 ---
 
@@ -521,23 +552,27 @@ benchbox run --platform clickhouse-local --benchmark tpcds --scale 1
 
 | Week | Version | Category | Benchmarks Added | Cumulative |
 |------|---------|----------|------------------|------------|
-| 1 | 0.1.0 | Academic | TPC-H, TPC-DS | 2 |
-| 5 | 0.2.0 | Academic | TPC-DI | 3 |
-| 6 | 0.2.1 | Academic | TPC-Havoc | 4 |
-| 7 | 0.2.2 | Academic | TPC-H Skew, TPC-DS OBT, TPC-H Data Vault | 7 |
-| 8 | 0.2.3 | Academic + Primitives | JoinOrder, Read/Write/Transaction Primitives | 11 |
-| 9 | 0.3.0 | Industry | SSB | 12 |
-| 10 | 0.3.1 | Industry | ClickBench | 13 |
-| 11 | 0.3.2 | Industry | NYC Taxi | 14 |
-| 12 | 0.3.3 | Industry | AMPLab | 15 |
-| 13 | 0.4.0 | Industry | H2ODB | 16 |
-| 14 | 0.4.1 | Industry | TSBS DevOps | 17 |
-| 15 | 0.4.2 | Industry | CoffeeShop | 18 |
+| 1 | 0.1.0 | TPC | TPC-H, TPC-DS | 2 |
+| 5 | 0.2.0 | TPC | TPC-DI | 3 |
+| 6 | 0.2.1 | Primitives | Read, Write, Transaction | 6 |
+| 7 | 0.2.2 | Experimental | TPC-Havoc, TPC-H Skew | 8 |
+| 8 | 0.2.3 | Experimental | TPC-DS OBT, TPC-H Data Vault | 10 |
+| 9 | 0.3.0 | Academic | SSB | 11 |
+| 10 | 0.3.1 | Academic | JoinOrder | 12 |
+| 11 | 0.3.2 | Academic | AMPLab | 13 |
+| 13 | 0.4.0 | Industry | ClickBench | 14 |
+| 14 | 0.4.1 | Time Series | TSBS DevOps | 15 |
+| 15 | 0.4.2 | Real World + Industry | NYC Taxi, H2ODB | 17 |
+| 16 | 0.4.3 | Industry | CoffeeShop | 18 |
 
-**Benchmark Categories:**
-- **Academic (TPC):** TPC-H, TPC-DS, TPC-DI, TPC-Havoc, TPC-H Skew, TPC-DS OBT, TPC-H Data Vault, JoinOrder
-- **Industry:** SSB, ClickBench, NYC Taxi, AMPLab, H2ODB, TSBS DevOps, CoffeeShop
-- **Primitives:** Read, Write, Transaction (micro-benchmarks)
+**BenchBox Benchmark Categories:**
+- **TPC** (3): TPC-H, TPC-DS, TPC-DI — Official industry standards
+- **Primitives** (3): Read, Write, Transaction — Fundamental operations
+- **Experimental** (4): TPC-Havoc, TPC-H Skew, TPC-DS OBT, TPC-H Data Vault — Specialized testing
+- **Academic** (3): SSB, JoinOrder, AMPLab — Research benchmarks from academia
+- **Industry** (3): ClickBench, H2ODB, CoffeeShop — Real-world from practitioners
+- **Time Series** (1): TSBS DevOps — Temporal data workloads
+- **Real World** (1): NYC Taxi — Real-world datasets
 
 ### CLI Features by Week
 
@@ -594,9 +629,10 @@ These weeks warrant extra marketing effort:
 | Week | Version | Event | Extra Activities |
 |------|---------|-------|------------------|
 | 1 | 0.1.0 | Initial Launch (DuckDB + ClickHouse, TPC-H + TPC-DS) | Show HN, Product Hunt, all channels |
-| 5 | 0.2.0 | TPC-DI (Complete Academic Suite) | Database/ETL community focus |
-| 9 | 0.3.0 | Snowflake + SSB (Cloud + Industry) | Enterprise/cloud audience |
-| 13 | 0.4.0 | ClickHouse Cloud + H2ODB | Real-time analytics community |
+| 5 | 0.2.0 | TPC-DI (Complete TPC Suite) | Database/ETL community focus |
+| 6 | 0.2.1 | Primitives (Micro-benchmarks) | Performance engineering audience |
+| 9 | 0.3.0 | Snowflake + SSB (Cloud + Academic) | Enterprise/cloud audience |
+| 13 | 0.4.0 | ClickHouse Cloud + ClickBench | Real-time analytics community |
 | 16 | 0.4.3 | All 18 Benchmarks Complete | "Complete benchmark suite" messaging |
 | 17 | 0.5.0 | DataFrame Mode | Python/data science community |
 | 25 | 0.9.0 | RC | Full press, call for testers |
@@ -682,24 +718,24 @@ For 0.x.0 releases:
 
 ## Appendix A: Complete Version History
 
-| Week | Version | Primary Feature | New Platforms | New Benchmarks |
-|------|---------|-----------------|---------------|----------------|
-| 1 | 0.1.0 | **Initial Launch** | DuckDB, ClickHouse-local | TPC-H, TPC-DS |
+| Week | Version | Primary Feature | New Platforms | New Benchmarks (Category) |
+|------|---------|-----------------|---------------|---------------------------|
+| 1 | 0.1.0 | **Initial Launch** | DuckDB, ClickHouse-local | TPC-H, TPC-DS (TPC) |
 | 2 | 0.1.1 | SQLite | SQLite | — |
 | 3 | 0.1.2 | DataFusion + Dry-Run | DataFusion | — |
 | 4 | 0.1.3 | Compression + Export | — | — |
-| 5 | 0.2.0 | **TPC-DI** | — | TPC-DI |
-| 6 | 0.2.1 | TPC-Havoc | — | TPC-Havoc |
-| 7 | 0.2.2 | TPC Variants | — | TPC-H Skew, TPC-DS OBT, TPC-H Data Vault |
-| 8 | 0.2.3 | JoinOrder + Primitives | — | JoinOrder, Primitives |
-| 9 | 0.3.0 | **Snowflake + SSB** | Snowflake | SSB |
-| 10 | 0.3.1 | Databricks + ClickBench | Databricks | ClickBench |
-| 11 | 0.3.2 | BigQuery + NYC Taxi | BigQuery | NYC Taxi |
-| 12 | 0.3.3 | Redshift + AMPLab | Redshift | AMPLab |
-| 13 | 0.4.0 | ClickHouse Cloud + H2ODB | ClickHouse Cloud | H2ODB |
-| 14 | 0.4.1 | PostgreSQL + TSBS | PostgreSQL, TimescaleDB | TSBS DevOps |
-| 15 | 0.4.2 | Cost Tracking + CoffeeShop | — | CoffeeShop |
-| 16 | 0.4.3 | **All 18 Benchmarks Complete** | — | — |
+| 5 | 0.2.0 | **TPC-DI** | — | TPC-DI (TPC) |
+| 6 | 0.2.1 | **Primitives** | — | Read, Write, Transaction (Primitives) |
+| 7 | 0.2.2 | Experimental | — | TPC-Havoc, TPC-H Skew (Experimental) |
+| 8 | 0.2.3 | Experimental | — | TPC-DS OBT, TPC-H Data Vault (Experimental) |
+| 9 | 0.3.0 | **Snowflake + SSB** | Snowflake | SSB (Academic) |
+| 10 | 0.3.1 | Databricks + JoinOrder | Databricks | JoinOrder (Academic) |
+| 11 | 0.3.2 | BigQuery + AMPLab | BigQuery | AMPLab (Academic) |
+| 12 | 0.3.3 | Redshift | Redshift | — |
+| 13 | 0.4.0 | ClickHouse Cloud + ClickBench | ClickHouse Cloud | ClickBench (Industry) |
+| 14 | 0.4.1 | PostgreSQL + TSBS | PostgreSQL, TimescaleDB | TSBS DevOps (Time Series) |
+| 15 | 0.4.2 | Cost Tracking + NYC Taxi + H2ODB | — | NYC Taxi (Real World), H2ODB (Industry) |
+| 16 | 0.4.3 | **All 18 Benchmarks Complete** | — | CoffeeShop (Industry) |
 | 17 | 0.5.0 | **DataFrame Mode** | Polars-DF, Pandas-DF | — |
 | 18 | 0.5.1 | DataFusion-DF + DuckDB-DF | DataFusion-DF, DuckDB-DF | — |
 | 19 | 0.5.2 | PySpark-DF + Dask-DF | PySpark-DF, Dask-DF | — |
@@ -725,35 +761,35 @@ For 0.x.0 releases:
 
 **0.1.3:** "From JSON results to shareable HTML reports. One command."
 
-### Phase 2: Academic Benchmarks (Weeks 5-8)
+### Phase 2: TPC + Primitives + Experimental (Weeks 5-8)
 
-**0.2.0:** "TPC-DI: Finally, a benchmark for ETL pipelines. Data integration workloads now testable."
+**0.2.0:** "TPC-DI: The complete TPC suite. H, DS, and now DI for ETL pipelines."
 
-**0.2.1:** "Your optimizer passed TPC-H. Can it handle 220 query variants? TPC-Havoc finds out."
+**0.2.1:** "Which exact operation is slow? Read, Write, Transaction Primitives isolate the answer."
 
-**0.2.2:** "Real data is skewed. Now your benchmarks can be too. TPC-H Skew, TPC-DS OBT, Data Vault."
+**0.2.2:** "Experimental: TPC-Havoc + TPC-H Skew. Stress test your optimizer."
 
-**0.2.3:** "Which exact operation is slow? Primitives + JoinOrder isolate the answer."
+**0.2.3:** "More experimental: TPC-DS OBT + Data Vault. Alternative schema patterns."
 
-### Phase 3: Cloud I + Industry (Weeks 9-12)
+### Phase 3: Cloud I + Academic (Weeks 9-12)
 
-**0.3.0:** "Snowflake + Star Schema Benchmark. Cloud benchmarking with real-world star schemas."
+**0.3.0:** "Snowflake + Star Schema Benchmark. Cloud meets academia's classic benchmark."
 
-**0.3.1:** "Databricks + ClickBench. Test Photon with web analytics patterns."
+**0.3.1:** "Databricks + JoinOrder. 113 queries to test your optimizer."
 
-**0.3.2:** "BigQuery + NYC Taxi. 1 billion real trips benchmarked."
+**0.3.2:** "BigQuery + AMPLab. Berkeley's big data patterns in the cloud."
 
-**0.3.3:** "Redshift + AMPLab. Berkeley's big data patterns on AWS."
+**0.3.3:** "Redshift benchmarking. Distribution keys make or break performance."
 
-### Phase 4: Cloud II + Industry (Weeks 13-16)
+### Phase 4: Cloud II + Industry/TimeSeries/RealWorld (Weeks 13-16)
 
-**0.4.0:** "ClickHouse Cloud + H2ODB. Real-time analytics with data science workloads."
+**0.4.0:** "ClickHouse Cloud + ClickBench. Real-time analytics meets real-world patterns."
 
 **0.4.1:** "PostgreSQL family + TSBS DevOps. Time-series benchmarking done right."
 
-**0.4.2:** "Performance per dollar. Cost tracking + CoffeeShop CRUD benchmark."
+**0.4.2:** "NYC Taxi + H2ODB + Cost Tracking. Real-world data meets real costs."
 
-**0.4.3:** "18 benchmarks, fully configurable. The complete suite before DataFrame mode."
+**0.4.3:** "CoffeeShop + Tuning. 18 benchmarks, all 7 categories, fully configurable."
 
 ### Phase 5: DataFrame (Weeks 17-20)
 
