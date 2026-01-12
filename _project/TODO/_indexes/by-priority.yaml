@@ -1,14 +1,14 @@
-generated_at: '2026-01-12T08:44:22.635100'
+generated_at: '2026-01-12T09:10:15.033665'
 total_items: 32
 priorities:
   High:
     count: 4
     items:
     - id: comprehensive-docs-quality-audit
-      file: TODO/docs-experience/planning/comprehensive-docs-quality-audit.yaml
+      file: TODO/docs-experience/active/comprehensive-docs-quality-audit.yaml
       title: Comprehensive Documentation Quality Audit
       category: Documentation
-      status: Not Started
+      status: In Progress
     - id: oxbow-series-reality-vs-aspiration
       file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
       title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'

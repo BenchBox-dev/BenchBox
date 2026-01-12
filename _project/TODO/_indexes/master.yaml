@@ -1,13 +1,13 @@
-generated_at: '2026-01-12T08:44:22.635055'
+generated_at: '2026-01-12T09:10:15.033619'
 total_items: 32
 items:
 - id: comprehensive-docs-quality-audit
-  file: TODO/docs-experience/planning/comprehensive-docs-quality-audit.yaml
+  file: TODO/docs-experience/active/comprehensive-docs-quality-audit.yaml
   title: Comprehensive Documentation Quality Audit
   worktree: docs-experience
   category: Documentation
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - documentation
   - quality

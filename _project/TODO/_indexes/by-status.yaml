@@ -1,19 +1,22 @@
-generated_at: '2026-01-12T08:44:22.635109'
+generated_at: '2026-01-12T09:10:15.033674'
 total_items: 32
 statuses:
+  In Progress:
+    count: 1
+    items:
+    - id: comprehensive-docs-quality-audit
+      file: TODO/docs-experience/active/comprehensive-docs-quality-audit.yaml
+      title: Comprehensive Documentation Quality Audit
+      priority: High
+      category: Documentation
   Not Started:
-    count: 32
+    count: 31
     items:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
       priority: Medium-High
       category: Platform Expansion
-    - id: comprehensive-docs-quality-audit
-      file: TODO/docs-experience/planning/comprehensive-docs-quality-audit.yaml
-      title: Comprehensive Documentation Quality Audit
-      priority: High
-      category: Documentation
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
