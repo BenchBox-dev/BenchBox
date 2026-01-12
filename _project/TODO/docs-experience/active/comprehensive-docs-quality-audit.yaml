@@ -48,13 +48,17 @@ tasks:
           done: false
           subtasks:
             - summary: "/docs-review docs/usage/getting-started.md"
-              done: false
+              done: true
+              notes: "Fixed --quick flag (non-existent)"
             - summary: "/docs-review docs/usage/installation.md"
-              done: false
+              done: true
+              notes: "Verified - no issues"
             - summary: "/docs-review docs/usage/cli-quick-start.md"
-              done: false
+              done: true
+              notes: "Fixed --help all/examples to --help-topic, deprecated create-sample-tuning"
             - summary: "/docs-review docs/usage/configuration.md"
-              done: false
+              done: true
+              notes: "Fixed --quick flag, deprecated create-sample-tuning"
             - summary: "/docs-review docs/usage/data-generation.md"
               done: false
             - summary: "/docs-review docs/usage/dry-run.md"
@@ -72,9 +76,11 @@ tasks:
             - summary: "/docs-review docs/usage/troubleshooting.md"
               done: false
             - summary: "/docs-review docs/usage/intelligent-guidance.md"
-              done: false
+              done: true
+              notes: "Fixed --quick flag"
             - summary: "/docs-review docs/usage/README.md"
-              done: false
+              done: true
+              notes: "Fixed --quick flag"
             - summary: "/docs-review docs/usage/index.md"
               done: false
         - summary: "Review tutorials/ directory (5 files)"
@@ -539,3 +545,32 @@ files_affected:
   key_files:
     - "docs/Makefile" # For running linkcheck and html builds
     - "docs/conf.py" # Sphinx configuration
+
+issues_discovered:
+  cli_flags:
+    status: "Fixed"
+    files_affected: 10
+    details: |
+      - --quick flag doesn't exist, removed from all examples
+      - --help all/examples should be --help-topic all/examples
+      - --describe-platform-options doesn't exist, replaced with benchbox platforms status
+      - create-sample-tuning deprecated, use tuning init
+  python_imports:
+    status: "Partially Fixed"
+    files_affected: 50+
+    details: |
+      Many docs use internal import paths that will break:
+      - from benchbox.benchmarks.tpch import TPCHBenchmark (INVALID - module doesn't exist)
+      - from benchbox.core.tpch.benchmark import TPCHBenchmark (works but internal)
+      - from benchbox.tpch import TPCHBenchmark (works but should use public API)
+
+      Correct public API:
+      - from benchbox import TPCH (recommended)
+      - from benchbox import TPCDS, SSB (other benchmarks)
+
+      Files need updating: platform-selection-guide.md, presto.md, datafusion.md,
+      microsoft-fabric.md, tpc-patterns-usage.md, tpc-h-official-guide.md,
+      row-count-validation.md, architecture.md, quick-reference.md
+  commits_made:
+    - "c0ccbfcf: docs: fix CLI flag inaccuracies in documentation (10 files)"
+    - "7a6234ef: docs: fix invalid TPCHBenchmark import in platform-selection-guide"
