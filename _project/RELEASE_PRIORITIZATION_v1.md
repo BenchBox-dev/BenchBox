@@ -102,52 +102,55 @@ Copy for each weekly release:
 - TPC-H and TPC-DS overview
 - CLI reference (basic)
 
-### Phase 2: TPC + Primitives + Experimental (Weeks 5-8)
+### Phase 2: Industry + Academic + Optimizer Stress (Weeks 5-8)
 
 | Version | Platforms | Benchmarks (Category) | Features Hidden |
 |---------|-----------|----------------------|-----------------|
-| 0.2.0 | — | + TPC-DI (TPC) | Cloud, DataFrame, Academic/Industry |
-| 0.2.1 | — | + Read, Write, Transaction (Primitives) | Cloud, DataFrame, Academic/Industry |
-| 0.2.2 | — | + TPC-Havoc, TPC-H Skew (Experimental) | Cloud, DataFrame, Academic/Industry |
-| 0.2.3 | — | + TPC-DS OBT, TPC-H Data Vault (Experimental) | Cloud, DataFrame, Academic/Industry |
+| 0.2.0 | — | + ClickBench, H2ODB, CoffeeShop (Industry) | Cloud, DataFrame |
+| 0.2.1 | — | + SSB, AMPLab, JoinOrder (Academic) | Cloud, DataFrame |
+| 0.2.2 | — | + TPC-Havoc (Experimental - Optimizer Stress) | Cloud, DataFrame |
+| 0.2.3 | — | + TPC-H Skew (Experimental - Optimizer Stress) | Cloud, DataFrame |
 
 **Documentation Priority:**
-- TPC-DI ETL guide
-- Primitives reference (Read, Write, Transaction)
-- Experimental benchmarks guide
+- Industry benchmark guides (ClickBench, H2ODB, CoffeeShop)
+- Academic benchmark guides (SSB, AMPLab, JoinOrder)
+- Experimental benchmarks guide (optimizer stress)
 - Benchmark category overview
 
-### Phase 3: Cloud I + Academic (Weeks 9-12)
+### Phase 3: Cloud I + Primitives + TPC-DI (Weeks 9-12)
 
 | Version | Platforms | Benchmarks (Category) | Features Hidden |
 |---------|-----------|----------------------|-----------------|
-| 0.3.0 | + Snowflake | + SSB (Academic) | DataFrame, remaining cloud |
-| 0.3.1 | + Databricks | + JoinOrder (Academic) | DataFrame, remaining cloud |
-| 0.3.2 | + BigQuery | + AMPLab (Academic) | DataFrame, remaining cloud |
+| 0.3.0 | + Snowflake | + Read, Write (Primitives Essential) | DataFrame, remaining cloud |
+| 0.3.1 | + Databricks | + Metadata, Transactions (Primitives Extra) | DataFrame, remaining cloud |
+| 0.3.2 | + BigQuery | + TPC-DI (TPC ETL) | DataFrame, remaining cloud |
 | 0.3.3 | + Redshift | — | DataFrame, remaining cloud |
 
 **Documentation Priority:**
 - Cloud platform guides (Snowflake, Databricks, BigQuery, Redshift)
-- Academic benchmark guides (SSB, JoinOrder, AMPLab)
+- Primitives reference (Read, Write, Metadata, Transactions)
+- TPC-DI ETL guide
 - Authentication setup
 - Cloud storage integration
 
-### Phase 4: Cloud II + Industry/TimeSeries/RealWorld (Weeks 13-16)
+### Phase 4: Cloud II + Data Modelling + Time Series + Real World (Weeks 13-16)
 
 | Version | Platforms | Benchmarks (Category) | Features Hidden |
 |---------|-----------|----------------------|-----------------|
-| 0.4.0 | + ClickHouse Cloud | + ClickBench (Industry) | DataFrame, query engines |
-| 0.4.1 | + PostgreSQL, TimescaleDB | + TSBS DevOps (Time Series) | DataFrame, query engines |
-| 0.4.2 | — | + NYC Taxi (Real World), H2ODB (Industry) | DataFrame, query engines |
-| 0.4.3 | — | + CoffeeShop (Industry) | DataFrame, query engines |
+| 0.4.0 | + ClickHouse Cloud | + TPC-DS OBT, TPC-H Data Vault (Experimental - Data Modelling) | DataFrame, query engines |
+| 0.4.1 | + PostgreSQL, TimescaleDB | + TSBS DevOps, TSBS IoT (Time Series) | DataFrame, query engines |
+| 0.4.2 | — | + NYC Taxi (Real World) | DataFrame, query engines |
+| 0.4.3 | — | — | DataFrame, query engines |
 
 **Documentation Priority:**
 - ClickHouse guide
 - PostgreSQL + TimescaleDB guide
 - Cost tracking guide
 - Tuning configuration reference
-- Industry/TimeSeries/RealWorld benchmark guides
-- **Milestone: All 18 benchmarks documented**
+- Data Modelling/Time Series/Real World benchmark guides
+- **Milestone: All 20 benchmarks documented**
+
+**Future Real World Datasets** (post-1.0): Stack Overflow, Flight Data, GitHub Archive, Wikipedia Pageviews
 
 ### Phase 5: DataFrame (Weeks 17-20)
 
