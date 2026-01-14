@@ -44,7 +44,7 @@ tasks:
               done: false
             - summary: "Define 'server' deployment (self-hosted, credentials)"
               done: false
-            - summary: "Set 'server' as default deployment"
+            - summary: "Set 'local' as default deployment (easiest onboarding)"
               done: false
         - summary: "Update ClickHouseAdapter to use deployment_mode"
           done: false

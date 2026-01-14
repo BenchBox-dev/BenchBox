@@ -82,7 +82,7 @@ tasks:
       items:
         - summary: "Add deployment metadata for DuckDB (local only)"
           done: false
-        - summary: "Add deployment metadata for ClickHouse (local, server, cloud)"
+        - summary: "Add deployment metadata for ClickHouse (local=default, server, cloud)"
           done: false
         - summary: "Add deployment metadata for Firebolt (core, cloud)"
           done: false
