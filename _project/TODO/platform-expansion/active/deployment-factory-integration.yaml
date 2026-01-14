@@ -1,7 +1,7 @@
 title: "Platform Deployment Factory Integration"
 worktree: platform-expansion
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Integrate deployment mode awareness into the adapter factory, enabling routing
@@ -27,60 +27,62 @@ context_sections:
 tasks:
   phases:
     - phase: "Phase 1: Name Parsing"
-      done: false
+      done: true
       items:
         - summary: "Extend _normalize_platform_name() to parse :deployment suffix"
-          done: false
+          done: true
           subtasks:
             - summary: "Update return type to tuple[str, bool, str | None]"
-              done: false
+              done: true
             - summary: "Parse colon separator for deployment mode"
-              done: false
+              done: true
             - summary: "Handle combined syntax (e.g., databricks-df:serverless)"
-              done: false
+              done: true
             - summary: "Add validation for known deployment modes"
-              done: false
+              done: true
 
     - phase: "Phase 2: Factory Integration"
-      done: false
+      done: true
       items:
         - summary: "Add deployment parameter to get_adapter()"
-          done: false
+          done: true
         - summary: "Implement deployment mode resolution priority"
-          done: false
+          done: true
           subtasks:
             - summary: "Explicit deployment parameter highest priority"
-              done: false
+              done: true
             - summary: "Implied from platform name (colon suffix) second"
-              done: false
+              done: true
             - summary: "Platform default deployment lowest priority"
-              done: false
+              done: true
         - summary: "Pass deployment_mode to adapters via config dict"
-          done: false
+          done: true
         - summary: "Add error handling for unsupported deployment modes"
-          done: false
+          done: true
 
     - phase: "Phase 3: Platform Registration"
-      done: false
+      done: true
       items:
         - summary: "Update platform registration in __init__.py to include deployment metadata"
-          done: false
+          done: true
         - summary: "Register deployment mode option specs in PlatformHookRegistry"
           done: false
+          notes: "Deferred to CLI integration TODO - this is CLI-specific"
         - summary: "Add deployment mode to platform availability checks"
-          done: false
+          done: true
+          notes: "Added get_available_deployments() and get_default_deployment()"
 
     - phase: "Phase 4: Testing"
-      done: false
+      done: true
       items:
         - summary: "Unit tests for extended _normalize_platform_name()"
-          done: false
+          done: true
         - summary: "Unit tests for deployment parameter in get_adapter()"
-          done: false
+          done: true
         - summary: "Integration tests for full routing with deployment modes"
-          done: false
+          done: true
         - summary: "Backward compatibility tests for existing platform names"
-          done: false
+          done: true
 
 metadata:
   tags:
@@ -105,12 +107,14 @@ files_affected:
   modified:
     - "benchbox/platforms/adapter_factory.py"
     - "benchbox/platforms/__init__.py"
-  added: []
+    - "benchbox/core/platform_registry.py"
+  added:
+    - "tests/unit/platforms/test_adapter_factory_deployment.py"
   removed: []
 
 dependencies:
   blocked_by:
-    - "_project/TODO/platform-expansion/planning/deployment-registry-extensions.yaml"
+    - "_project/TODO/platform-expansion/active/deployment-registry-extensions.yaml"
 
 success_metrics:
   - "_normalize_platform_name() correctly parses all deployment suffix patterns"

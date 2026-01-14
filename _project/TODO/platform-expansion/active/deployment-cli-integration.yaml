@@ -1,7 +1,7 @@
 title: "Platform Deployment CLI Integration"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Integrate deployment mode awareness into the BenchBox CLI, providing clear
@@ -23,60 +23,65 @@ context_sections:
 tasks:
   phases:
     - phase: "Phase 1: Help Text Updates"
-      done: false
+      done: true
       items:
         - summary: "Update --platform help text to show deployment syntax"
-          done: false
+          done: true
           subtasks:
             - summary: "Add colon separator documentation"
-              done: false
+              done: true
             - summary: "Show example deployment modes (clickhouse:cloud, firebolt:core)"
-              done: false
+              done: true
             - summary: "Reference `benchbox platforms` for full list"
-              done: false
+              done: true
         - summary: "Update --help examples section with deployment mode examples"
-          done: false
+          done: true
 
     - phase: "Phase 2: Platform Listing"
-      done: false
+      done: true
       items:
         - summary: "Add --show-deployments flag to `benchbox platforms` command"
-          done: false
+          done: true
         - summary: "Display deployment modes per platform in listing"
-          done: false
+          done: true
           subtasks:
             - summary: "Show available modes (local, server, cloud)"
-              done: false
+              done: true
             - summary: "Indicate default deployment mode"
-              done: false
+              done: true
             - summary: "Show requirements (credentials, cloud storage)"
-              done: false
+              done: true
         - summary: "Add filtering by deployment mode (--deployment-mode local)"
           done: false
+          notes: "Deferred - display_platform_deployments supports filtering but not exposed via CLI yet"
 
     - phase: "Phase 3: Error Messages"
-      done: false
+      done: true
       items:
         - summary: "Enhance error message for unknown deployment mode"
-          done: false
+          done: true
+          notes: "Implemented in adapter_factory.py - shows available modes"
         - summary: "Add suggestion for valid deployment modes when invalid provided"
-          done: false
+          done: true
         - summary: "Add warning when deployment requires unconfigured credentials"
           done: false
+          notes: "Deferred - requires runtime credential checking"
         - summary: "Add warning when deployment requires cloud storage not configured"
           done: false
+          notes: "Deferred - requires runtime config checking"
 
     - phase: "Phase 4: Testing"
-      done: false
+      done: true
       items:
         - summary: "Test help output includes deployment mode documentation"
-          done: false
+          done: true
         - summary: "Test platform listing with --show-deployments"
-          done: false
+          done: true
         - summary: "Test error messages for invalid deployment modes"
-          done: false
+          done: true
         - summary: "Test filtering by deployment mode"
           done: false
+          notes: "Deferred with Phase 2 filtering feature"
 
 metadata:
   tags:
@@ -97,13 +102,13 @@ impact:
 files_affected:
   modified:
     - "benchbox/cli/commands/run.py"
-    - "benchbox/cli/commands/platforms.py"
+    - "benchbox/cli/platform.py"
   added: []
   removed: []
 
 dependencies:
   blocked_by:
-    - "_project/TODO/platform-expansion/planning/deployment-factory-integration.yaml"
+    - "_project/TODO/platform-expansion/active/deployment-factory-integration.yaml"
 
 success_metrics:
   - "--help clearly documents deployment mode syntax"

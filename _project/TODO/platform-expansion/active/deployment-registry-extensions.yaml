@@ -1,7 +1,7 @@
 title: "Platform Deployment Registry Extensions"
 worktree: platform-expansion
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Extend the PlatformRegistry to support deployment mode awareness, enabling BenchBox
@@ -38,72 +38,72 @@ context_sections:
 tasks:
   phases:
     - phase: "Phase 1: Dataclass Design"
-      done: false
+      done: true
       items:
         - summary: "Create DeploymentCapability dataclass"
-          done: false
+          done: true
           subtasks:
             - summary: "Define mode field: local | self-hosted | managed"
-              done: false
+              done: true
             - summary: "Add requires_credentials, requires_cloud_storage, requires_network flags"
-              done: false
+              done: true
             - summary: "Add dependencies list for required packages"
-              done: false
+              done: true
             - summary: "Add auth_methods list for supported authentication"
-              done: false
+              done: true
         - summary: "Extend PlatformCapability dataclass"
-          done: false
+          done: true
           subtasks:
             - summary: "Add deployment_modes: dict[str, DeploymentCapability]"
-              done: false
+              done: true
             - summary: "Add default_deployment: str field"
-              done: false
+              done: true
             - summary: "Add platform_family: Optional[str] field"
-              done: false
+              done: true
             - summary: "Add inherits_from: Optional[str] field"
-              done: false
+              done: true
 
     - phase: "Phase 2: Registry Methods"
-      done: false
+      done: true
       items:
         - summary: "Implement get_deployment_capability(platform, mode) method"
-          done: false
+          done: true
         - summary: "Implement get_default_deployment(platform) method"
-          done: false
+          done: true
         - summary: "Implement get_platform_family(platform) method"
-          done: false
+          done: true
         - summary: "Implement get_inherited_platform(platform) method"
-          done: false
+          done: true
         - summary: "Implement requires_cloud_storage_for_deployment(platform, mode) method"
-          done: false
+          done: true
 
     - phase: "Phase 3: Platform Metadata"
-      done: false
+      done: true
       items:
         - summary: "Add deployment metadata for DuckDB (local only)"
-          done: false
+          done: true
         - summary: "Add deployment metadata for ClickHouse (local=default, server, cloud)"
-          done: false
+          done: true
         - summary: "Add deployment metadata for Firebolt (core, cloud)"
-          done: false
+          done: true
         - summary: "Add deployment metadata for Trino (self-hosted)"
-          done: false
+          done: true
         - summary: "Add deployment metadata for TimescaleDB (self-hosted, cloud)"
-          done: false
+          done: true
         - summary: "Add deployment metadata for PySpark (local)"
-          done: false
+          done: true
 
     - phase: "Phase 4: Testing"
-      done: false
+      done: true
       items:
         - summary: "Unit tests for DeploymentCapability dataclass"
-          done: false
+          done: true
         - summary: "Unit tests for extended PlatformCapability"
-          done: false
+          done: true
         - summary: "Unit tests for all new registry methods"
-          done: false
+          done: true
         - summary: "Integration tests for deployment resolution"
-          done: false
+          done: true
 
 metadata:
   tags:
