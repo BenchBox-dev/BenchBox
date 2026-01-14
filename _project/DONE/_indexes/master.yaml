@@ -1,5 +1,5 @@
-generated_at: '2026-01-12T09:21:54.188428'
-total_items: 349
+generated_at: '2026-01-14T09:18:20.203038'
+total_items: 350
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1138,6 +1138,21 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Small
+- id: comparison-matrix-restructure
+  file: DONE/docs-experience/active/comparison-matrix-restructure.yaml
+  title: Restructure Platform Comparison Matrix with Grouped Categories
+  worktree: docs-experience
+  category: Documentation
+  priority: High
+  status: Completed
+  tags:
+  - documentation
+  - platform-coverage
+  - user-experience
+  owners:
+  - joe
+  estimated_effort: 4-6 hours
+  completed_date: '2025-01-14'
 - id: result-object-migration-benchmarkresult-benchmarkresults
   file: DONE/result-object-migration/completed/result-object-migration-benchmarkresult-benchmarkresults.yaml
   title: Result Object Migration (BenchmarkResult → BenchmarkResults)

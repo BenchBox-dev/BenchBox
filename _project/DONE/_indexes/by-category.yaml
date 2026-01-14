@@ -1,4 +1,4 @@
-generated_at: '2026-01-12T09:21:54.188583'
+generated_at: '2026-01-14T09:18:20.203213'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -711,7 +711,7 @@ categories:
       priority: Medium
       status: Completed
   Documentation:
-    count: 6
+    count: 7
     items:
     - id: add-dedicated-tags-for-platforms-and-benchmarks
       file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
@@ -742,6 +742,11 @@ categories:
       file: DONE/query-plan-docs/planning/query-plan-documentation-testing.yaml
       title: Query Plan Documentation & Testing
       priority: Medium
+      status: Completed
+    - id: comparison-matrix-restructure
+      file: DONE/docs-experience/active/comparison-matrix-restructure.yaml
+      title: Restructure Platform Comparison Matrix with Grouped Categories
+      priority: High
       status: Completed
   Documentation and Developer Experience:
     count: 2
