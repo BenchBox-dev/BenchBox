@@ -1,5 +1,5 @@
-generated_at: '2026-01-12T09:21:53.210563'
-total_items: 33
+generated_at: '2026-01-13T19:52:14.290578'
+total_items: 38
 items:
 - id: oxbow-series-reality-vs-aspiration
   file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
@@ -120,6 +120,23 @@ items:
   - editing
   - platform-deep-dives
   estimated_effort: Low
+- id: flight-data-benchmark
+  file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
+  title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - flight-data
+  - bts
+  - time-series
+  - transportation
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 weeks
 - id: geospatial-primitives-benchmark
   file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
   title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
@@ -138,6 +155,23 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 3-4 weeks
+- id: github-archive-benchmark
+  file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
+  title: GitHub Archive Benchmark - Developer Activity Analytics Workload
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - github
+  - event-driven
+  - json
+  - semi-structured
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 3-4 weeks
 - id: ctas-sorted-data-loading
   file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
   title: Implement CTAS-based sorted data loading for DuckDB
@@ -152,6 +186,55 @@ items:
   - zone-maps
   - data-loading
   estimated_effort: Medium
+- id: nyc-taxi-benchmark-expansion
+  file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
+  title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - nyc-taxi
+  - enhancement
+  - multi-source
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 weeks
+- id: stackoverflow-benchmark
+  file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
+  title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - stackoverflow
+  - olap
+  - multi-table
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 3-4 weeks
+- id: wikipedia-pageviews-benchmark
+  file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
+  title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - wikipedia
+  - time-series
+  - high-cardinality
+  - web-traffic
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 weeks
 - id: cicd-benchmarking-demo
   file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
   title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'

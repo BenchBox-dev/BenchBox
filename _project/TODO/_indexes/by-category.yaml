@@ -1,4 +1,4 @@
-generated_at: '2026-01-12T09:21:53.210592'
+generated_at: '2026-01-13T19:52:14.290619'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -10,11 +10,36 @@ categories:
       priority: Medium-High
       status: Not Started
   Benchmark Development:
-    count: 1
+    count: 6
     items:
+    - id: flight-data-benchmark
+      file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
+      title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
+      priority: Medium
+      status: Not Started
     - id: geospatial-primitives-benchmark
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
       title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
+      priority: Medium
+      status: Not Started
+    - id: github-archive-benchmark
+      file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
+      title: GitHub Archive Benchmark - Developer Activity Analytics Workload
+      priority: Medium
+      status: Not Started
+    - id: nyc-taxi-benchmark-expansion
+      file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
+      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+      priority: Medium
+      status: Not Started
+    - id: stackoverflow-benchmark
+      file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
+      title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
+      priority: Medium
+      status: Not Started
+    - id: wikipedia-pageviews-benchmark
+      file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
+      title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Medium
       status: Not Started
   Blog Revision:

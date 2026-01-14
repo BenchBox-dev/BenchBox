@@ -1,5 +1,5 @@
-generated_at: '2026-01-12T09:21:53.210606'
-total_items: 33
+generated_at: '2026-01-13T19:52:14.290634'
+total_items: 38
 priorities:
   High:
     count: 3
@@ -98,7 +98,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 10
+    count: 15
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -115,15 +115,40 @@ priorities:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       category: Documentation
       status: Not Started
+    - id: flight-data-benchmark
+      file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
+      title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
+      category: Benchmark Development
+      status: Not Started
     - id: geospatial-primitives-benchmark
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
       title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
+      category: Benchmark Development
+      status: Not Started
+    - id: github-archive-benchmark
+      file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
+      title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
       status: Not Started
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
       category: Core Functionality
+      status: Not Started
+    - id: nyc-taxi-benchmark-expansion
+      file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
+      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+      category: Benchmark Development
+      status: Not Started
+    - id: stackoverflow-benchmark
+      file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
+      title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
+      category: Benchmark Development
+      status: Not Started
+    - id: wikipedia-pageviews-benchmark
+      file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
+      title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+      category: Benchmark Development
       status: Not Started
     - id: cicd-benchmarking-demo
       file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml

@@ -1,8 +1,8 @@
-generated_at: '2026-01-12T09:21:53.210616'
-total_items: 33
+generated_at: '2026-01-13T19:52:14.290645'
+total_items: 38
 statuses:
   Not Started:
-    count: 33
+    count: 38
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -34,6 +34,11 @@ statuses:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       priority: Medium
       category: Documentation
+    - id: flight-data-benchmark
+      file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
+      title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
+      priority: Medium
+      category: Benchmark Development
     - id: geospatial-benchmark-support-postgis-integration
       file: TODO/specialized-geospatial/planning/geospatial-benchmark-support-postgis-integration.yaml
       title: Geospatial Benchmark Support - PostGIS Integration
@@ -42,6 +47,11 @@ statuses:
     - id: geospatial-primitives-benchmark
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
       title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
+      priority: Medium
+      category: Benchmark Development
+    - id: github-archive-benchmark
+      file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
+      title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Medium
       category: Benchmark Development
     - id: graph-query-benchmark-support-neo4j-neptune
@@ -59,6 +69,16 @@ statuses:
       title: Interactive Benchmark Explorer - Web UI
       priority: Low
       category: Supporting Infrastructure
+    - id: nyc-taxi-benchmark-expansion
+      file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
+      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+      priority: Medium
+      category: Benchmark Development
+    - id: stackoverflow-benchmark
+      file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
+      title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
+      priority: Medium
+      category: Benchmark Development
     - id: streaming-benchmark-support-kafka-flink-spark-streaming
       file: TODO/specialized-streaming/planning/streaming-benchmark-support-kafka-flink-spark-streaming.yaml
       title: Streaming Benchmark Support - Kafka, Flink, Spark Streaming
@@ -74,6 +94,11 @@ statuses:
       title: Vector Search Benchmark Support
       priority: Medium-High
       category: AI/ML Capabilities
+    - id: wikipedia-pageviews-benchmark
+      file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
+      title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+      priority: Medium
+      category: Benchmark Development
     - id: arm-graviton-generations-benchmarks
       file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
       title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
