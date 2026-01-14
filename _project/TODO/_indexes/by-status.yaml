@@ -1,8 +1,8 @@
-generated_at: '2026-01-14T09:18:19.433093'
-total_items: 38
+generated_at: '2026-01-14T10:17:56.455113'
+total_items: 48
 statuses:
   Not Started:
-    count: 38
+    count: 48
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -17,6 +17,11 @@ statuses:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
+      priority: Medium-High
+      category: Platform Expansion
+    - id: clickhouse-cloud-deployment
+      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+      title: ClickHouse Cloud Deployment Mode
       priority: Medium-High
       category: Platform Expansion
     - id: databend-cloud-olap-platform
@@ -34,6 +39,11 @@ statuses:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       priority: Medium
       category: Documentation
+    - id: firebolt-cloud-deployment
+      file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
+      title: Firebolt Cloud Deployment Mode
+      priority: Medium-High
+      category: Platform Expansion
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -69,16 +79,51 @@ statuses:
       title: Interactive Benchmark Explorer - Web UI
       priority: Low
       category: Supporting Infrastructure
+    - id: migrate-clickhouse-firebolt-deployment
+      file: TODO/platform-expansion/planning/migrate-clickhouse-firebolt-deployment.yaml
+      title: Migrate ClickHouse/Firebolt to Deployment Registry
+      priority: Medium-High
+      category: Core Functionality
+    - id: motherduck-platform-adapter
+      file: TODO/platform-expansion/planning/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      priority: High
+      category: Platform Expansion
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       priority: Medium
       category: Benchmark Development
+    - id: deployment-config-inheritance
+      file: TODO/platform-expansion/planning/deployment-config-inheritance.yaml
+      title: Platform Configuration Inheritance
+      priority: Medium
+      category: Core Functionality
+    - id: deployment-cli-integration
+      file: TODO/platform-expansion/planning/deployment-cli-integration.yaml
+      title: Platform Deployment CLI Integration
+      priority: Medium-High
+      category: Core Functionality
+    - id: deployment-factory-integration
+      file: TODO/platform-expansion/planning/deployment-factory-integration.yaml
+      title: Platform Deployment Factory Integration
+      priority: High
+      category: Core Functionality
+    - id: deployment-registry-extensions
+      file: TODO/platform-expansion/planning/deployment-registry-extensions.yaml
+      title: Platform Deployment Registry Extensions
+      priority: High
+      category: Core Functionality
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       priority: Medium
       category: Benchmark Development
+    - id: starburst-platform-adapter
+      file: TODO/platform-expansion/planning/starburst-platform-adapter.yaml
+      title: Starburst Platform Adapter
+      priority: Medium
+      category: Platform Expansion
     - id: streaming-benchmark-support-kafka-flink-spark-streaming
       file: TODO/specialized-streaming/planning/streaming-benchmark-support-kafka-flink-spark-streaming.yaml
       title: Streaming Benchmark Support - Kafka, Flink, Spark Streaming
@@ -89,6 +134,11 @@ statuses:
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
       priority: Medium-High
       category: Core Functionality
+    - id: timescaledb-cloud-deployment
+      file: TODO/platform-expansion/planning/timescaledb-cloud-deployment.yaml
+      title: TimescaleDB Cloud Deployment Mode
+      priority: Medium
+      category: Platform Expansion
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support

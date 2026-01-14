@@ -1,9 +1,24 @@
-generated_at: '2026-01-14T09:18:19.433083'
-total_items: 38
+generated_at: '2026-01-14T10:17:56.455102'
+total_items: 48
 priorities:
   High:
-    count: 3
+    count: 6
     items:
+    - id: motherduck-platform-adapter
+      file: TODO/platform-expansion/planning/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: deployment-factory-integration
+      file: TODO/platform-expansion/planning/deployment-factory-integration.yaml
+      title: Platform Deployment Factory Integration
+      category: Core Functionality
+      status: Not Started
+    - id: deployment-registry-extensions
+      file: TODO/platform-expansion/planning/deployment-registry-extensions.yaml
+      title: Platform Deployment Registry Extensions
+      category: Core Functionality
+      status: Not Started
     - id: oxbow-series-reality-vs-aspiration
       file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
       title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'
@@ -20,7 +35,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium-High:
-    count: 15
+    count: 19
     items:
     - id: fabric-spark-notebooks-platform
       file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
@@ -31,6 +46,26 @@ priorities:
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
+      status: Not Started
+    - id: clickhouse-cloud-deployment
+      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+      title: ClickHouse Cloud Deployment Mode
+      category: Platform Expansion
+      status: Not Started
+    - id: firebolt-cloud-deployment
+      file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
+      title: Firebolt Cloud Deployment Mode
+      category: Platform Expansion
+      status: Not Started
+    - id: migrate-clickhouse-firebolt-deployment
+      file: TODO/platform-expansion/planning/migrate-clickhouse-firebolt-deployment.yaml
+      title: Migrate ClickHouse/Firebolt to Deployment Registry
+      category: Core Functionality
+      status: Not Started
+    - id: deployment-cli-integration
+      file: TODO/platform-expansion/planning/deployment-cli-integration.yaml
+      title: Platform Deployment CLI Integration
+      category: Core Functionality
       status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
@@ -98,7 +133,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 15
+    count: 18
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -140,10 +175,25 @@ priorities:
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
       status: Not Started
+    - id: deployment-config-inheritance
+      file: TODO/platform-expansion/planning/deployment-config-inheritance.yaml
+      title: Platform Configuration Inheritance
+      category: Core Functionality
+      status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       category: Benchmark Development
+      status: Not Started
+    - id: starburst-platform-adapter
+      file: TODO/platform-expansion/planning/starburst-platform-adapter.yaml
+      title: Starburst Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: timescaledb-cloud-deployment
+      file: TODO/platform-expansion/planning/timescaledb-cloud-deployment.yaml
+      title: TimescaleDB Cloud Deployment Mode
+      category: Platform Expansion
       status: Not Started
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
