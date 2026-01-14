@@ -1,0 +1,112 @@
+title: "Platform Deployment CLI Integration"
+worktree: platform-expansion
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+description: |
+  Integrate deployment mode awareness into the BenchBox CLI, providing clear
+  documentation, help text, platform listing with deployment modes, and
+  enhanced error messages for deployment-related issues.
+
+context_sections:
+  "Background and Motivation": |
+    With deployment modes added to the registry and factory, the CLI needs to
+    surface this capability to users through intuitive help text and commands.
+    Users should easily discover available deployment modes and understand
+    the implications of their selection.
+
+  "Technical Context": |
+    The CLI currently shows platform options in --help and via `benchbox platforms`.
+    We extend this to show deployment mode options and add a --show-deployments
+    flag for detailed deployment mode information.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Help Text Updates"
+      done: false
+      items:
+        - summary: "Update --platform help text to show deployment syntax"
+          done: false
+          subtasks:
+            - summary: "Add colon separator documentation"
+              done: false
+            - summary: "Show example deployment modes (clickhouse:cloud, firebolt:core)"
+              done: false
+            - summary: "Reference `benchbox platforms` for full list"
+              done: false
+        - summary: "Update --help examples section with deployment mode examples"
+          done: false
+
+    - phase: "Phase 2: Platform Listing"
+      done: false
+      items:
+        - summary: "Add --show-deployments flag to `benchbox platforms` command"
+          done: false
+        - summary: "Display deployment modes per platform in listing"
+          done: false
+          subtasks:
+            - summary: "Show available modes (local, server, cloud)"
+              done: false
+            - summary: "Indicate default deployment mode"
+              done: false
+            - summary: "Show requirements (credentials, cloud storage)"
+              done: false
+        - summary: "Add filtering by deployment mode (--deployment-mode local)"
+          done: false
+
+    - phase: "Phase 3: Error Messages"
+      done: false
+      items:
+        - summary: "Enhance error message for unknown deployment mode"
+          done: false
+        - summary: "Add suggestion for valid deployment modes when invalid provided"
+          done: false
+        - summary: "Add warning when deployment requires unconfigured credentials"
+          done: false
+        - summary: "Add warning when deployment requires cloud storage not configured"
+          done: false
+
+    - phase: "Phase 4: Testing"
+      done: false
+      items:
+        - summary: "Test help output includes deployment mode documentation"
+          done: false
+        - summary: "Test platform listing with --show-deployments"
+          done: false
+        - summary: "Test error messages for invalid deployment modes"
+          done: false
+        - summary: "Test filtering by deployment mode"
+          done: false
+
+metadata:
+  tags:
+    - cli
+    - user-experience
+    - deployment-modes
+  estimated_effort: "2 days"
+  created_date: "2026-01-14"
+
+impact:
+  business_value: |
+    Improves discoverability of deployment modes, reducing user confusion and
+    support requests about platform configuration.
+  user_impact: |
+    Users can easily discover and select deployment modes through intuitive
+    CLI help and platform listing commands.
+
+files_affected:
+  modified:
+    - "benchbox/cli/commands/run.py"
+    - "benchbox/cli/commands/platforms.py"
+  added: []
+  removed: []
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/platform-expansion/planning/deployment-factory-integration.yaml"
+
+success_metrics:
+  - "--help clearly documents deployment mode syntax"
+  - "`benchbox platforms --show-deployments` shows all deployment options"
+  - "Error messages suggest valid deployment modes"
+  - "User can filter platforms by deployment mode"

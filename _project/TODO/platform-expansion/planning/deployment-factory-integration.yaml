@@ -1,0 +1,124 @@
+title: "Platform Deployment Factory Integration"
+worktree: platform-expansion
+priority: High
+status: Not Started
+category: Core Functionality
+description: |
+  Integrate deployment mode awareness into the adapter factory, enabling routing
+  to appropriate adapters based on deployment mode (local, self-hosted, managed).
+
+  This extends the existing _normalize_platform_name() pattern that handles the
+  -df suffix for DataFrame mode, adding support for :deployment suffix parsing
+  (e.g., clickhouse:cloud, firebolt:core).
+
+context_sections:
+  "Background and Motivation": |
+    The adapter factory currently handles SQL/DataFrame mode selection via the
+    -df suffix pattern. This work extends that pattern to handle deployment modes
+    using a colon separator, enabling intuitive platform+deployment specification.
+
+  "Technical Context": |
+    Current _normalize_platform_name() returns tuple[str, bool] for (base_name, df_mode).
+    We extend this to tuple[str, bool, str | None] for (base_name, df_mode, deployment).
+
+    The get_adapter() function gains a deployment parameter and passes deployment_mode
+    through config to adapters.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Name Parsing"
+      done: false
+      items:
+        - summary: "Extend _normalize_platform_name() to parse :deployment suffix"
+          done: false
+          subtasks:
+            - summary: "Update return type to tuple[str, bool, str | None]"
+              done: false
+            - summary: "Parse colon separator for deployment mode"
+              done: false
+            - summary: "Handle combined syntax (e.g., databricks-df:serverless)"
+              done: false
+            - summary: "Add validation for known deployment modes"
+              done: false
+
+    - phase: "Phase 2: Factory Integration"
+      done: false
+      items:
+        - summary: "Add deployment parameter to get_adapter()"
+          done: false
+        - summary: "Implement deployment mode resolution priority"
+          done: false
+          subtasks:
+            - summary: "Explicit deployment parameter highest priority"
+              done: false
+            - summary: "Implied from platform name (colon suffix) second"
+              done: false
+            - summary: "Platform default deployment lowest priority"
+              done: false
+        - summary: "Pass deployment_mode to adapters via config dict"
+          done: false
+        - summary: "Add error handling for unsupported deployment modes"
+          done: false
+
+    - phase: "Phase 3: Platform Registration"
+      done: false
+      items:
+        - summary: "Update platform registration in __init__.py to include deployment metadata"
+          done: false
+        - summary: "Register deployment mode option specs in PlatformHookRegistry"
+          done: false
+        - summary: "Add deployment mode to platform availability checks"
+          done: false
+
+    - phase: "Phase 4: Testing"
+      done: false
+      items:
+        - summary: "Unit tests for extended _normalize_platform_name()"
+          done: false
+        - summary: "Unit tests for deployment parameter in get_adapter()"
+          done: false
+        - summary: "Integration tests for full routing with deployment modes"
+          done: false
+        - summary: "Backward compatibility tests for existing platform names"
+          done: false
+
+metadata:
+  tags:
+    - architecture
+    - adapter-factory
+    - deployment-modes
+  estimated_effort: "2-3 days"
+  created_date: "2026-01-14"
+
+impact:
+  business_value: |
+    Enables clean, intuitive platform+deployment specification in CLI and config,
+    making it easy for users to switch between local and cloud variants.
+  user_impact: |
+    Users can specify deployment modes naturally: `--platform clickhouse:cloud`
+    instead of requiring separate configuration options.
+  technical_debt: |
+    Centralizes deployment mode handling in factory, replacing ad-hoc mode
+    handling in individual adapters.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/adapter_factory.py"
+    - "benchbox/platforms/__init__.py"
+  added: []
+  removed: []
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/platform-expansion/planning/deployment-registry-extensions.yaml"
+
+success_metrics:
+  - "_normalize_platform_name() correctly parses all deployment suffix patterns"
+  - "get_adapter() routes to correct adapter based on deployment mode"
+  - "All existing platform names continue to work unchanged"
+  - "Clear error messages for invalid deployment modes"
+  - "Unit test coverage >= 90% for new code"
+
+open_questions:
+  - "Should we support --deployment CLI flag in addition to colon syntax?"
+  - "How to handle invalid deployment mode for a platform that doesn't support it?"

@@ -1,0 +1,144 @@
+title: "ClickHouse Cloud Deployment Mode"
+worktree: platform-expansion
+priority: Medium-High
+status: Not Started
+category: Platform Expansion
+description: |
+  Add ClickHouse Cloud deployment mode to the existing ClickHouse adapter,
+  enabling benchmarking of ClickHouse's managed cloud service via the
+  clickhouse:cloud syntax.
+
+  This completes the ClickHouse platform family: local (chDB), server
+  (self-hosted), and cloud (managed).
+
+context_sections:
+  "Background and Motivation": |
+    ClickHouse Cloud is ClickHouse Inc's managed offering:
+    - Fully managed ClickHouse clusters
+    - Pay-per-query pricing model
+    - Cloud-native storage and compute separation
+    - OAuth and API key authentication
+
+    Adding cloud support enables users to compare self-hosted ClickHouse
+    performance with the managed service.
+
+  "Technical Context": |
+    ClickHouse Cloud uses the same wire protocol as self-hosted ClickHouse,
+    so the adapter changes are primarily around:
+    - Authentication (OAuth, API keys vs password)
+    - Endpoint configuration (cloud hostnames)
+    - Cloud storage for data loading
+    - Result caching behavior
+
+tasks:
+  phases:
+    - phase: "Phase 1: Registry and Configuration"
+      done: false
+      items:
+        - summary: "Add 'cloud' deployment mode to ClickHouse registry metadata"
+          done: false
+          subtasks:
+            - summary: "Set requires_credentials=True"
+              done: false
+            - summary: "Set requires_cloud_storage=True"
+              done: false
+            - summary: "Define auth_methods=['api_key', 'oauth']"
+              done: false
+        - summary: "Add cloud-specific configuration options"
+          done: false
+          subtasks:
+            - summary: "Cloud endpoint URL"
+              done: false
+            - summary: "Organization/service ID"
+              done: false
+            - summary: "API key or OAuth token"
+              done: false
+
+    - phase: "Phase 2: Authentication"
+      done: false
+      items:
+        - summary: "Implement API key authentication"
+          done: false
+        - summary: "Implement OAuth token authentication"
+          done: false
+        - summary: "Add credential setup wizard for ClickHouse Cloud"
+          done: false
+        - summary: "Support environment variables"
+          done: false
+          subtasks:
+            - summary: "CLICKHOUSE_CLOUD_ENDPOINT"
+              done: false
+            - summary: "CLICKHOUSE_CLOUD_API_KEY"
+              done: false
+
+    - phase: "Phase 3: Connection and Data Loading"
+      done: false
+      items:
+        - summary: "Implement cloud endpoint connection"
+          done: false
+        - summary: "Implement cloud storage upload for data loading"
+          done: false
+          subtasks:
+            - summary: "Support S3 staging"
+              done: false
+            - summary: "Support GCS staging"
+              done: false
+            - summary: "Implement COPY FROM for cloud data"
+              done: false
+        - summary: "Configure result caching behavior"
+          done: false
+
+    - phase: "Phase 4: Testing"
+      done: false
+      items:
+        - summary: "Unit tests for cloud authentication"
+          done: false
+        - summary: "Integration tests with ClickHouse Cloud (requires account)"
+          done: false
+        - summary: "Test TPC-H benchmark at scale 0.1"
+          done: false
+        - summary: "Compare results with self-hosted ClickHouse"
+          done: false
+
+metadata:
+  tags:
+    - platform-adapter
+    - clickhouse
+    - cloud
+    - deployment-modes
+  estimated_effort: "2-3 days"
+  created_date: "2026-01-14"
+
+impact:
+  business_value: |
+    Enables comparison of self-hosted vs managed ClickHouse, helping users
+    make informed decisions about deployment options and cost tradeoffs.
+  user_impact: |
+    Users can benchmark ClickHouse Cloud alongside self-hosted ClickHouse
+    using the same benchmark suite and methodology.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/clickhouse/adapter.py"
+    - "benchbox/core/platform_registry.py"
+  added:
+    - "benchbox/platforms/credentials/clickhouse_cloud.py"
+  removed: []
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/platform-expansion/planning/migrate-clickhouse-firebolt-deployment.yaml"
+
+technical_requirements:
+  dependencies:
+    - "clickhouse-driver (existing)"
+  constraints:
+    - "Requires ClickHouse Cloud account for testing"
+    - "Cloud storage (S3/GCS) required for data loading"
+
+success_metrics:
+  - "clickhouse:cloud connects successfully"
+  - "Data loading via cloud storage works"
+  - "TPC-H benchmark runs at scale 0.1"
+  - "Results comparable with self-hosted ClickHouse"
+  - "Authentication works via API key and OAuth"

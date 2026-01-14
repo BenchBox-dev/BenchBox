@@ -1,0 +1,157 @@
+title: "Starburst Platform Adapter"
+worktree: platform-expansion
+priority: Medium
+status: Not Started
+category: Platform Expansion
+description: |
+  Implement Starburst platform adapter as a distinct managed Trino service.
+  Starburst is the commercial enterprise distribution of Trino with enhanced
+  features and managed cloud offerings.
+
+  This adapter inherits Trino's SQL dialect and benchmark compatibility while
+  implementing Starburst-specific authentication and catalog handling.
+
+context_sections:
+  "Background and Motivation": |
+    Starburst offers:
+    - Starburst Galaxy (fully managed Trino)
+    - Starburst Enterprise (self-hosted with enterprise features)
+    - Enhanced connectors and security features
+    - Commercial support and SLAs
+
+    As a distinct commercial service built on Trino, Starburst gets its own
+    platform name rather than a deployment mode suffix (trino:starburst).
+
+  "Technical Context": |
+    Starburst uses Trino's wire protocol and SQL dialect with extensions:
+    - Same JDBC/REST protocol
+    - Enhanced catalog connectors
+    - Additional security features (RBAC, data masking)
+    - Galaxy-specific authentication (OAuth, SAML)
+
+    Key differences from vanilla Trino:
+    - Authentication methods (OAuth for Galaxy)
+    - Catalog management (managed catalogs in Galaxy)
+    - Connection endpoints (cloud hostnames)
+
+tasks:
+  phases:
+    - phase: "Phase 1: Adapter Structure"
+      done: false
+      items:
+        - summary: "Create benchbox/platforms/starburst.py"
+          done: false
+        - summary: "Implement StarburstAdapter class extending PlatformAdapter"
+          done: false
+        - summary: "Set up inheritance from Trino (dialect, capabilities)"
+          done: false
+        - summary: "Register platform in registry with deployment metadata"
+          done: false
+
+    - phase: "Phase 2: Authentication"
+      done: false
+      items:
+        - summary: "Implement OAuth authentication for Galaxy"
+          done: false
+        - summary: "Implement basic auth for Enterprise"
+          done: false
+        - summary: "Add credential setup wizard for Starburst"
+          done: false
+        - summary: "Support environment variables"
+          done: false
+          subtasks:
+            - summary: "STARBURST_HOST"
+              done: false
+            - summary: "STARBURST_TOKEN or STARBURST_PASSWORD"
+              done: false
+
+    - phase: "Phase 3: Connection and Catalog"
+      done: false
+      items:
+        - summary: "Implement Galaxy connection handling"
+          done: false
+        - summary: "Implement catalog selection/creation"
+          done: false
+        - summary: "Handle data loading via connectors"
+          done: false
+          subtasks:
+            - summary: "S3 connector for data files"
+              done: false
+            - summary: "Hive metastore integration"
+              done: false
+        - summary: "Configure query execution settings"
+          done: false
+
+    - phase: "Phase 4: Query Execution"
+      done: false
+      items:
+        - summary: "Inherit query execution from Trino adapter"
+          done: false
+        - summary: "Handle Starburst-specific query features"
+          done: false
+        - summary: "Implement performance metrics collection"
+          done: false
+        - summary: "Handle cloud-specific error scenarios"
+          done: false
+
+    - phase: "Phase 5: Testing"
+      done: false
+      items:
+        - summary: "Unit tests for adapter (mocked connection)"
+          done: false
+        - summary: "Integration tests with Starburst Galaxy (requires account)"
+          done: false
+        - summary: "Test TPC-H benchmark at scale 1"
+          done: false
+        - summary: "Compare results with vanilla Trino"
+          done: false
+
+metadata:
+  tags:
+    - platform-adapter
+    - starburst
+    - trino
+    - cloud
+  estimated_effort: "3-4 days"
+  created_date: "2026-01-14"
+
+impact:
+  business_value: |
+    Enables benchmarking of commercial Trino offerings, important for
+    enterprise users evaluating managed query engine options.
+  user_impact: |
+    Users can benchmark Starburst Galaxy alongside vanilla Trino with
+    consistent methodology.
+
+files_affected:
+  modified:
+    - "benchbox/core/platform_registry.py"
+    - "benchbox/platforms/__init__.py"
+  added:
+    - "benchbox/platforms/starburst.py"
+    - "benchbox/platforms/credentials/starburst.py"
+  removed: []
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/platform-expansion/planning/deployment-factory-integration.yaml"
+    - "_project/TODO/platform-expansion/planning/deployment-config-inheritance.yaml"
+
+technical_requirements:
+  dependencies:
+    - "trino-python-client (existing)"
+  constraints:
+    - "Requires Starburst Galaxy account for testing"
+    - "OAuth authentication for Galaxy"
+
+success_metrics:
+  - "Starburst adapter passes connection test"
+  - "TPC-H benchmark runs successfully at scale 1"
+  - "Results are comparable with vanilla Trino"
+  - "OAuth authentication works for Galaxy"
+  - "Error messages are actionable"
+
+open_questions:
+  - "Should we support both Galaxy (managed) and Enterprise (self-hosted)?"
+  - "How to handle Starburst-specific catalog features?"
+  - "What's the default data loading strategy?"

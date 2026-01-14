@@ -1,0 +1,158 @@
+title: "Firebolt Cloud Deployment Mode"
+worktree: platform-expansion
+priority: Medium-High
+status: Not Started
+category: Platform Expansion
+description: |
+  Ensure full support for Firebolt Cloud deployment mode via the firebolt:cloud
+  syntax, completing the Firebolt platform family alongside the existing
+  firebolt:core (local Docker container) mode.
+
+  While the Firebolt adapter already has mode awareness, this TODO ensures
+  cloud mode is fully integrated with the new deployment registry architecture
+  and has comprehensive credential/connection handling.
+
+context_sections:
+  "Background and Motivation": |
+    Firebolt offers two deployment options:
+    - Firebolt Core: Free local Docker container for development/testing
+    - Firebolt Cloud: Fully managed cloud data warehouse service
+
+    The existing Firebolt adapter has basic mode support via `firebolt_mode` config,
+    but needs alignment with the deployment registry pattern and enhanced cloud
+    support (OAuth, cloud storage staging, proper credential management).
+
+  "Technical Context": |
+    Current Firebolt implementation (firebolt.py):
+    - mode="core" uses local Docker container
+    - mode="cloud" connects to Firebolt Cloud service
+    - Uses firebolt-sdk for both modes
+
+    Cloud mode requires:
+    - OAuth or service account authentication
+    - Engine selection/management
+    - Cloud storage for data loading (S3)
+    - Proper error handling for cloud-specific failures
+
+tasks:
+  phases:
+    - phase: "Phase 1: Registry Alignment"
+      done: false
+      items:
+        - summary: "Add Firebolt deployment metadata to registry"
+          done: false
+          subtasks:
+            - summary: "Define 'core' deployment (Docker, no credentials)"
+              done: false
+            - summary: "Define 'cloud' deployment (managed, credentials required)"
+              done: false
+            - summary: "Set 'core' as default deployment"
+              done: false
+            - summary: "Define auth_methods=['oauth', 'service_account']"
+              done: false
+        - summary: "Migrate firebolt_mode to deployment_mode config key"
+          done: false
+
+    - phase: "Phase 2: Cloud Authentication"
+      done: false
+      items:
+        - summary: "Implement OAuth authentication for Firebolt Cloud"
+          done: false
+        - summary: "Implement service account authentication"
+          done: false
+        - summary: "Add credential setup wizard for Firebolt Cloud"
+          done: false
+        - summary: "Support environment variables"
+          done: false
+          subtasks:
+            - summary: "FIREBOLT_CLIENT_ID"
+              done: false
+            - summary: "FIREBOLT_CLIENT_SECRET"
+              done: false
+            - summary: "FIREBOLT_ACCOUNT"
+              done: false
+
+    - phase: "Phase 3: Cloud Connection and Engine Management"
+      done: false
+      items:
+        - summary: "Implement engine selection/auto-detection"
+          done: false
+        - summary: "Handle engine start/stop lifecycle"
+          done: false
+        - summary: "Implement cloud storage staging for data loading"
+          done: false
+          subtasks:
+            - summary: "Support S3 staging location"
+              done: false
+            - summary: "Implement COPY FROM S3 pattern"
+              done: false
+        - summary: "Configure result caching behavior"
+          done: false
+
+    - phase: "Phase 4: Testing"
+      done: false
+      items:
+        - summary: "Unit tests for cloud authentication"
+          done: false
+        - summary: "Integration tests with Firebolt Cloud (requires account)"
+          done: false
+        - summary: "Test TPC-H benchmark at scale 0.1"
+          done: false
+        - summary: "Compare results with Firebolt Core"
+          done: false
+        - summary: "Test firebolt:core and firebolt:cloud syntax"
+          done: false
+
+metadata:
+  tags:
+    - platform-adapter
+    - firebolt
+    - cloud
+    - deployment-modes
+  estimated_effort: "2-3 days"
+  created_date: "2026-01-14"
+
+impact:
+  business_value: |
+    Enables comparison of Firebolt Core (free local) vs Firebolt Cloud (managed),
+    helping users evaluate Firebolt's cloud offering and understand the
+    performance differences between local development and production deployment.
+  user_impact: |
+    Users can benchmark Firebolt Cloud alongside the free Core version using
+    the same benchmark suite and methodology, with intuitive firebolt:cloud syntax.
+  technical_debt: |
+    Aligns Firebolt with the deployment registry pattern, replacing ad-hoc
+    firebolt_mode handling with standardized deployment_mode configuration.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/firebolt.py"
+    - "benchbox/core/platform_registry.py"
+  added:
+    - "benchbox/platforms/credentials/firebolt_cloud.py"
+  removed: []
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/platform-expansion/planning/migrate-clickhouse-firebolt-deployment.yaml"
+
+technical_requirements:
+  dependencies:
+    - "firebolt-sdk (existing)"
+  constraints:
+    - "Requires Firebolt Cloud account for testing"
+    - "S3 access required for cloud data loading"
+    - "Engine must be running for queries"
+
+success_metrics:
+  - "firebolt:cloud connects successfully with OAuth"
+  - "Engine auto-selection works correctly"
+  - "Data loading via S3 staging works"
+  - "TPC-H benchmark runs at scale 0.1"
+  - "Results comparable with Firebolt Core"
+  - "firebolt:core backward compatibility maintained"
+
+open_questions:
+  - "Should we auto-start engines or require pre-started engines?"
+  - "How to handle engine sizing for different scale factors?"
+  - "What's the default engine selection strategy?"
