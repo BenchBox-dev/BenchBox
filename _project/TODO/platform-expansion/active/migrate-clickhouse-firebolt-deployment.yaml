@@ -1,7 +1,7 @@
 title: "Migrate ClickHouse/Firebolt to Deployment Registry"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Align existing ClickHouse and Firebolt adapters with the new deployment registry
@@ -35,74 +35,76 @@ context_sections:
 tasks:
   phases:
     - phase: "Phase 1: ClickHouse Migration"
-      done: false
+      done: true
       items:
         - summary: "Add ClickHouse deployment metadata to registry"
-          done: false
+          done: true
           subtasks:
             - summary: "Define 'local' deployment (chDB, no credentials)"
-              done: false
+              done: true
             - summary: "Define 'server' deployment (self-hosted, credentials)"
-              done: false
+              done: true
             - summary: "Set 'local' as default deployment (easiest onboarding)"
-              done: false
+              done: true
         - summary: "Update ClickHouseAdapter to use deployment_mode"
-          done: false
+          done: true
           subtasks:
             - summary: "Replace self.mode with self.deployment_mode"
-              done: false
+              done: true
             - summary: "Update connection logic for deployment_mode"
-              done: false
+              done: true
             - summary: "Preserve backward compatibility for 'mode' config key"
-              done: false
+              done: true
         - summary: "Test clickhouse:local and clickhouse:server syntax"
-          done: false
+          done: true
 
     - phase: "Phase 2: Firebolt Migration"
-      done: false
+      done: true
       items:
         - summary: "Add Firebolt deployment metadata to registry"
-          done: false
+          done: true
           subtasks:
             - summary: "Define 'core' deployment (Docker, no credentials)"
-              done: false
+              done: true
             - summary: "Define 'cloud' deployment (managed, credentials required)"
-              done: false
+              done: true
             - summary: "Set 'core' as default deployment"
-              done: false
+              done: true
         - summary: "Update FireboltAdapter to use deployment_mode"
-          done: false
+          done: true
           subtasks:
             - summary: "Replace firebolt_mode with deployment_mode"
-              done: false
+              done: true
             - summary: "Update connection logic for deployment_mode"
-              done: false
+              done: true
             - summary: "Preserve backward compatibility for 'firebolt_mode' config key"
-              done: false
+              done: true
         - summary: "Test firebolt:core and firebolt:cloud syntax"
-          done: false
+          done: true
 
     - phase: "Phase 3: Documentation and Cleanup"
-      done: false
+      done: true
       items:
         - summary: "Update platform documentation for new syntax"
-          done: false
+          done: true
+          notes: "Updated CLI help and run.py docstring"
         - summary: "Add deprecation warnings for legacy mode config keys"
-          done: false
+          done: true
         - summary: "Update CLI help examples"
-          done: false
+          done: true
 
     - phase: "Phase 4: Testing"
-      done: false
+      done: true
       items:
         - summary: "Test ClickHouse with new deployment syntax"
-          done: false
+          done: true
         - summary: "Test Firebolt with new deployment syntax"
-          done: false
+          done: true
         - summary: "Test backward compatibility with legacy mode keys"
-          done: false
+          done: true
         - summary: "Integration tests for full benchmark runs"
           done: false
+          notes: "Deferred - requires actual ClickHouse/Firebolt services running"
 
 metadata:
   tags:
@@ -128,13 +130,14 @@ files_affected:
   modified:
     - "benchbox/platforms/clickhouse/adapter.py"
     - "benchbox/platforms/firebolt.py"
-    - "benchbox/core/platform_registry.py"
+    - "tests/unit/platforms/test_clickhouse_adapter.py"
+    - "tests/unit/platforms/test_clickhouse_local.py"
   added: []
   removed: []
 
 dependencies:
   blocked_by:
-    - "_project/TODO/platform-expansion/planning/deployment-factory-integration.yaml"
+    - "_project/TODO/platform-expansion/active/deployment-factory-integration.yaml"
   blocks:
     - "_project/TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml"
     - "_project/TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml"
