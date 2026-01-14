@@ -1,7 +1,7 @@
 title: "MotherDuck Platform Adapter"
 worktree: platform-expansion
 priority: High
-status: Not Started
+status: In Progress
 category: Platform Expansion
 description: |
   Implement MotherDuck platform adapter as the first "distinct service name"
@@ -34,77 +34,89 @@ context_sections:
 tasks:
   phases:
     - phase: "Phase 1: Adapter Structure"
-      done: false
+      done: true
       items:
         - summary: "Create benchbox/platforms/motherduck.py"
-          done: false
+          done: true
         - summary: "Implement MotherDuckAdapter class extending PlatformAdapter"
-          done: false
+          done: true
         - summary: "Set up inheritance from DuckDB (dialect, capabilities)"
-          done: false
+          done: true
         - summary: "Register platform in registry with deployment metadata"
-          done: false
+          done: true
 
     - phase: "Phase 2: Authentication"
-      done: false
+      done: true
       items:
         - summary: "Implement token-based authentication"
-          done: false
+          done: true
           subtasks:
             - summary: "Support MOTHERDUCK_TOKEN environment variable"
-              done: false
+              done: true
             - summary: "Support token in config/credentials file"
-              done: false
+              done: true
             - summary: "Implement token validation on connect"
-              done: false
+              done: true
         - summary: "Add credential setup wizard for MotherDuck"
           done: false
+          notes: "Deferred - requires interactive credential setup"
 
     - phase: "Phase 3: Connection and Data Loading"
-      done: false
+      done: true
       items:
         - summary: "Implement MotherDuck connection string handling"
-          done: false
+          done: true
           subtasks:
             - summary: "Support md:database_name syntax"
-              done: false
+              done: true
             - summary: "Handle database creation if not exists"
               done: false
+              notes: "MotherDuck handles this automatically"
         - summary: "Implement data loading strategy"
-          done: false
+          done: true
           subtasks:
             - summary: "Option 1: Upload via MotherDuck cloud storage"
               done: false
+              notes: "Deferred - requires cloud storage setup"
             - summary: "Option 2: Hybrid query from local files"
-              done: false
+              done: true
+              notes: "Default strategy - load from local parquet files"
             - summary: "Determine default strategy"
-              done: false
+              done: true
         - summary: "Implement result cache control"
           done: false
+          notes: "Deferred - requires understanding of MotherDuck cache APIs"
 
     - phase: "Phase 4: Query Execution"
-      done: false
+      done: true
       items:
         - summary: "Inherit query execution from DuckDB adapter"
-          done: false
+          done: true
+          notes: "Uses DuckDB connection with MotherDuck backend"
         - summary: "Handle MotherDuck-specific query features"
           done: false
+          notes: "Deferred - basic execution works"
         - summary: "Implement performance metrics collection"
-          done: false
+          done: true
+          notes: "Basic timing via execute_query"
         - summary: "Handle cloud-specific error scenarios"
-          done: false
+          done: true
+          notes: "Connection errors handled with helpful messages"
 
     - phase: "Phase 5: Testing"
-      done: false
+      done: true
       items:
         - summary: "Unit tests for adapter (mocked connection)"
-          done: false
+          done: true
         - summary: "Integration tests with MotherDuck (requires account)"
           done: false
+          notes: "Requires MotherDuck account - manual testing"
         - summary: "Test TPC-H benchmark at scale 0.01"
           done: false
+          notes: "Requires MotherDuck account"
         - summary: "Compare results with local DuckDB"
           done: false
+          notes: "Requires MotherDuck account"
 
 metadata:
   tags:
@@ -130,13 +142,13 @@ files_affected:
     - "benchbox/platforms/__init__.py"
   added:
     - "benchbox/platforms/motherduck.py"
-    - "benchbox/platforms/credentials/motherduck.py"
+    - "tests/unit/platforms/test_motherduck.py"
   removed: []
 
 dependencies:
   blocked_by:
-    - "_project/TODO/platform-expansion/planning/deployment-factory-integration.yaml"
-    - "_project/TODO/platform-expansion/planning/deployment-config-inheritance.yaml"
+    - "_project/TODO/platform-expansion/active/deployment-factory-integration.yaml"
+    - "_project/TODO/platform-expansion/active/deployment-config-inheritance.yaml"
 
 technical_requirements:
   dependencies:
