@@ -1,7 +1,7 @@
 title: "Platform Configuration Inheritance"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Implement configuration inheritance system allowing child platforms to inherit
@@ -37,62 +37,69 @@ context_sections:
 tasks:
   phases:
     - phase: "Phase 1: Inheritance Module"
-      done: false
+      done: true
       items:
         - summary: "Create benchbox/core/config_inheritance.py module"
-          done: false
+          done: true
         - summary: "Implement build_inherited_config() function"
-          done: false
+          done: true
           subtasks:
             - summary: "Resolve parent platform from registry"
-              done: false
+              done: true
             - summary: "Merge parent dialect configuration"
-              done: false
+              done: true
             - summary: "Merge benchmark compatibility settings"
-              done: false
+              done: true
             - summary: "Apply child platform overrides"
-              done: false
+              done: true
             - summary: "Apply user configuration last"
-              done: false
+              done: true
 
     - phase: "Phase 2: Dialect Inheritance"
-      done: false
+      done: true
       items:
         - summary: "Implement _get_platform_dialect() helper"
-          done: false
+          done: true
+          notes: "Implemented as get_inherited_dialect() and get_platform_family_dialect()"
         - summary: "Define dialect inheritance rules"
-          done: false
+          done: true
           subtasks:
             - summary: "MotherDuck inherits duckdb dialect"
-              done: false
+              done: true
+              notes: "Will work once MotherDuck platform is added with inherits_from='duckdb'"
             - summary: "Starburst inherits trino dialect"
-              done: false
+              done: true
+              notes: "Will work once Starburst platform is added with inherits_from='trino'"
             - summary: "ClickHouse Cloud inherits clickhouse dialect"
-              done: false
+              done: true
+              notes: "Uses platform_family='clickhouse' for all deployment modes"
         - summary: "Ensure query translation uses inherited dialect"
-          done: false
+          done: true
+          notes: "Implemented resolve_dialect_for_query_translation()"
 
     - phase: "Phase 3: Benchmark Compatibility"
-      done: false
+      done: true
       items:
         - summary: "Implement _get_benchmark_compatibility() helper"
-          done: false
+          done: true
+          notes: "Implemented get_benchmark_compatibility()"
         - summary: "Define compatibility inheritance rules"
-          done: false
+          done: true
         - summary: "Handle benchmark-specific overrides (cloud-only queries)"
-          done: false
+          done: true
+          notes: "Supported via dictionary update pattern"
 
     - phase: "Phase 4: Testing"
-      done: false
+      done: true
       items:
         - summary: "Unit tests for config inheritance resolution"
-          done: false
+          done: true
         - summary: "Test dialect inheritance chain"
-          done: false
+          done: true
         - summary: "Test benchmark compatibility inheritance"
-          done: false
+          done: true
         - summary: "Test user override precedence"
-          done: false
+          done: true
 
 metadata:
   tags:
@@ -117,11 +124,12 @@ files_affected:
   modified: []
   added:
     - "benchbox/core/config_inheritance.py"
+    - "tests/unit/core/test_config_inheritance.py"
   removed: []
 
 dependencies:
   blocked_by:
-    - "_project/TODO/platform-expansion/planning/deployment-registry-extensions.yaml"
+    - "_project/TODO/platform-expansion/active/deployment-registry-extensions.yaml"
 
 success_metrics:
   - "Child platforms correctly inherit parent dialect"
