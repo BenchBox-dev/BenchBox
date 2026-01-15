@@ -1,5 +1,5 @@
-generated_at: '2026-01-14T09:18:20.203038'
-total_items: 350
+generated_at: '2026-01-14T15:45:00.166955'
+total_items: 351
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3462,6 +3462,20 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 days
+- id: remove-polars-sql-mode
+  file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml
+  title: Remove Polars SQL mode support - DataFrame only
+  worktree: dataframe-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - polars
+  - platform-adapter
+  - sql-removal
+  - dataframe
+  - breaking-change
+  estimated_effort: 1-2 days
 - id: snowpark-connect-platform
   file: DONE/platform-expansion/planning/snowpark-connect-platform.yaml
   title: Snowpark Connect for Spark Platform

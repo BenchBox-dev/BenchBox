@@ -1,24 +1,24 @@
-generated_at: '2026-01-14T10:17:56.455102'
+generated_at: '2026-01-14T15:44:59.359543'
 total_items: 48
 priorities:
   High:
     count: 6
     items:
     - id: motherduck-platform-adapter
-      file: TODO/platform-expansion/planning/motherduck-platform-adapter.yaml
+      file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
       category: Platform Expansion
-      status: Not Started
+      status: In Progress
     - id: deployment-factory-integration
-      file: TODO/platform-expansion/planning/deployment-factory-integration.yaml
+      file: TODO/platform-expansion/active/deployment-factory-integration.yaml
       title: Platform Deployment Factory Integration
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: deployment-registry-extensions
-      file: TODO/platform-expansion/planning/deployment-registry-extensions.yaml
+      file: TODO/platform-expansion/active/deployment-registry-extensions.yaml
       title: Platform Deployment Registry Extensions
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: oxbow-series-reality-vs-aspiration
       file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
       title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'
@@ -58,15 +58,15 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: migrate-clickhouse-firebolt-deployment
-      file: TODO/platform-expansion/planning/migrate-clickhouse-firebolt-deployment.yaml
+      file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
       title: Migrate ClickHouse/Firebolt to Deployment Registry
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: deployment-cli-integration
-      file: TODO/platform-expansion/planning/deployment-cli-integration.yaml
+      file: TODO/platform-expansion/active/deployment-cli-integration.yaml
       title: Platform Deployment CLI Integration
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -176,10 +176,10 @@ priorities:
       category: Benchmark Development
       status: Not Started
     - id: deployment-config-inheritance
-      file: TODO/platform-expansion/planning/deployment-config-inheritance.yaml
+      file: TODO/platform-expansion/active/deployment-config-inheritance.yaml
       title: Platform Configuration Inheritance
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

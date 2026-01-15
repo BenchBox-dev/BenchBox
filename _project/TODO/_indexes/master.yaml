@@ -1,13 +1,13 @@
-generated_at: '2026-01-14T10:17:56.455056'
+generated_at: '2026-01-14T15:44:59.359492'
 total_items: 48
 items:
 - id: motherduck-platform-adapter
-  file: TODO/platform-expansion/planning/motherduck-platform-adapter.yaml
+  file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
   title: MotherDuck Platform Adapter
   worktree: platform-expansion
   category: Platform Expansion
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - platform-adapter
   - motherduck
@@ -15,24 +15,24 @@ items:
   - cloud
   estimated_effort: 3-4 days
 - id: deployment-factory-integration
-  file: TODO/platform-expansion/planning/deployment-factory-integration.yaml
+  file: TODO/platform-expansion/active/deployment-factory-integration.yaml
   title: Platform Deployment Factory Integration
   worktree: platform-expansion
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - architecture
   - adapter-factory
   - deployment-modes
   estimated_effort: 2-3 days
 - id: deployment-registry-extensions
-  file: TODO/platform-expansion/planning/deployment-registry-extensions.yaml
+  file: TODO/platform-expansion/active/deployment-registry-extensions.yaml
   title: Platform Deployment Registry Extensions
   worktree: platform-expansion
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - architecture
   - platform-registry
@@ -240,12 +240,12 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks
 - id: deployment-config-inheritance
-  file: TODO/platform-expansion/planning/deployment-config-inheritance.yaml
+  file: TODO/platform-expansion/active/deployment-config-inheritance.yaml
   title: Platform Configuration Inheritance
   worktree: platform-expansion
   category: Core Functionality
   priority: Medium
-  status: Not Started
+  status: In Progress
   tags:
   - architecture
   - configuration
@@ -431,12 +431,12 @@ items:
   - deployment-modes
   estimated_effort: 2-3 days
 - id: migrate-clickhouse-firebolt-deployment
-  file: TODO/platform-expansion/planning/migrate-clickhouse-firebolt-deployment.yaml
+  file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
   title: Migrate ClickHouse/Firebolt to Deployment Registry
   worktree: platform-expansion
   category: Core Functionality
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - migration
   - clickhouse
@@ -444,12 +444,12 @@ items:
   - deployment-modes
   estimated_effort: 2-3 days
 - id: deployment-cli-integration
-  file: TODO/platform-expansion/planning/deployment-cli-integration.yaml
+  file: TODO/platform-expansion/active/deployment-cli-integration.yaml
   title: Platform Deployment CLI Integration
   worktree: platform-expansion
   category: Core Functionality
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - cli
   - user-experience

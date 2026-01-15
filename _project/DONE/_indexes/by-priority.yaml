@@ -1,5 +1,5 @@
-generated_at: '2026-01-14T09:18:20.203320'
-total_items: 350
+generated_at: '2026-01-14T15:45:00.167296'
+total_items: 351
 priorities:
   Critical:
     count: 24
@@ -678,7 +678,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 15
+    count: 16
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -750,6 +750,11 @@ priorities:
       title: Platform Troubleshooting Guide
       category: Documentation and User Experience
       status: Done
+    - id: remove-polars-sql-mode
+      file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml
+      title: Remove Polars SQL mode support - DataFrame only
+      category: Platform Expansion
+      status: Completed
     - id: snowpark-connect-platform
       file: DONE/platform-expansion/planning/snowpark-connect-platform.yaml
       title: Snowpark Connect for Spark Platform

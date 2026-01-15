@@ -1,0 +1,135 @@
+title: "Remove Polars SQL mode support - DataFrame only"
+worktree: dataframe-expansion
+priority: Medium-High
+status: Completed
+description: |
+  Remove SQL mode support from the Polars platform adapter since Polars SQL is
+  fundamentally incompatible with most BenchBox benchmarks. DataFrame execution
+  will be the only supported mode.
+
+  Analysis revealed that Polars SQL has critical limitations that prevent
+  TPC-H, TPC-DS, and SSB benchmarks from running:
+
+  1. **Implicit Joins Not Supported** - Polars requires explicit JOIN syntax;
+     comma-separated tables in FROM clause fail (affects 17/22 TPC-H queries)
+  2. **EXISTS/NOT EXISTS Not Supported** - Correlated subqueries fail (Q4, Q21)
+  3. **Scalar Subquery Comparisons** - Only `=` supported, not `>`, `<` (Q22)
+  4. **Non-Equi Joins Not Supported** - LIKE in join conditions fails (Q13)
+  5. **Date/String Comparison Issues** - Type coercion problems
+
+  Only ClickBench (single-table, no joins) could potentially work in SQL mode,
+  but maintaining a separate SQL code path for one benchmark is not justified.
+
+  Polars is designed as a DataFrame library with SQL as a convenience layer.
+  BenchBox should embrace this by using Polars's native DataFrame API, which
+  has no such limitations and provides better performance.
+
+category: Platform Expansion
+
+tasks:
+  phases:
+    - phase: "Phase 1: Remove SQL Mode Configuration"
+      done: true
+      items:
+        - summary: "Remove --mode sql option from Polars platform CLI arguments"
+          done: true
+        - summary: "Update PlatformCapability to set supports_sql=False for Polars"
+          done: true
+        - summary: "Remove SQLContext initialization and SQL execution code"
+          done: true
+
+    - phase: "Phase 2: Clean Up Platform Adapter"
+      done: true
+      items:
+        - summary: "Remove PolarsConnection class (SQL wrapper)"
+          done: true
+        - summary: "Remove execute_query SQL path in PolarsAdapter"
+          done: true
+        - summary: "Remove SQL-specific error handling and validation"
+          done: true
+        - summary: "Simplify platform to DataFrame-only execution"
+          done: true
+
+    - phase: "Phase 3: Update Documentation and Tests"
+      done: true
+      items:
+        - summary: "Update platform comparison matrix documentation"
+          done: true
+        - summary: "Update Polars platform docstrings"
+          done: true
+        - summary: "Remove/update any SQL-specific tests for Polars"
+          done: true
+        - summary: "Add documentation explaining why DataFrame-only"
+          done: true
+
+    - phase: "Phase 4: Validation"
+      done: true
+      items:
+        - summary: "Run TPC-H DataFrame mode to verify functionality"
+          done: true
+        - summary: "Verify platform registry reflects changes"
+          done: true
+        - summary: "Test CLI help shows correct options"
+          done: true
+
+metadata:
+  tags:
+    - polars
+    - platform-adapter
+    - sql-removal
+    - dataframe
+    - breaking-change
+  estimated_effort: "1-2 days"
+  created_date: "2026-01-14"
+
+impact:
+  business_value: |
+    Simplifies codebase by removing non-functional code path. Reduces user
+    confusion by not offering a mode that fails on most benchmarks. Aligns
+    BenchBox Polars support with Polars's actual design philosophy.
+  user_impact: |
+    Users can no longer attempt --mode sql with Polars. This is a positive
+    change as the SQL mode was essentially broken for all multi-table benchmarks.
+    DataFrame mode provides full functionality.
+  technical_debt: |
+    Removes ~200 lines of SQL-specific code that was effectively dead code
+    for most use cases. Simplifies testing and maintenance.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/polars_platform.py"
+    - "benchbox/core/platform_registry.py"
+    - "docs/platforms/comparison-matrix.md"
+  removed:
+    - "benchbox/platforms/polars_platform.py (PolarsConnection class)"
+
+context_sections:
+  "Research Findings": |
+    Analysis of TPC-H errors on Polars SQL mode identified 5 fundamental
+    limitations in Polars's SQL implementation:
+
+    | Limitation | Affected Queries | Fixable? |
+    |------------|------------------|----------|
+    | Implicit joins | 17/22 | Requires SQL rewrite |
+    | EXISTS subquery | Q4, Q21 | No - missing feature |
+    | Scalar subquery > | Q22 | No - missing feature |
+    | Non-equi join | Q13 | No - missing feature |
+    | Date comparison | Q1, Q6, Q15 | Partial |
+
+    Even with a SQL transformer for implicit joins, at least 4 TPC-H queries
+    would remain broken due to fundamental missing features in Polars SQL.
+
+    References:
+    - https://github.com/pola-rs/polars/issues/14217 (chained joins)
+    - https://github.com/pola-rs/polars/issues/16907 (multiple tables)
+    - https://github.com/pola-rs/polars/issues/3935 (arbitrary expressions)
+
+success_metrics:
+  - "Polars platform only accepts DataFrame mode"
+  - "TPC-H runs successfully in DataFrame mode"
+  - "Platform registry shows supports_sql=False for Polars"
+  - "Documentation accurately describes Polars capabilities"
+
+open_questions:
+  - "Should we provide a migration guide for users who were attempting SQL mode?"
+  - "Should we emit a deprecation warning before full removal?"

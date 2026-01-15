@@ -1,4 +1,4 @@
-generated_at: '2026-01-14T09:18:20.203213'
+generated_at: '2026-01-14T15:45:00.167186'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -1039,7 +1039,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 37
+    count: 38
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1211,6 +1211,11 @@ categories:
       title: Register PySpark SQL mode in platform registry
       priority: High
       status: Not Started
+    - id: remove-polars-sql-mode
+      file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml
+      title: Remove Polars SQL mode support - DataFrame only
+      priority: Medium-High
+      status: Completed
     - id: snowpark-connect-platform
       file: DONE/platform-expansion/planning/snowpark-connect-platform.yaml
       title: Snowpark Connect for Spark Platform
