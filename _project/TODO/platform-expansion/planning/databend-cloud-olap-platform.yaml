@@ -144,7 +144,7 @@ context_sections:
     object storage (S3, Azure Blob, GCS) and claims near-100% Snowflake SQL
     compatibility.
 
-    The platform was evaluated in January 2025 and deferred due to:
+    The platform was evaluated in January 2026 and deferred due to:
     - No native SQLGlot dialect support (critical for BenchBox's SQL translation)
     - Overlap with existing platforms (ClickHouse, Snowflake, Firebolt)
     - Lower enterprise adoption

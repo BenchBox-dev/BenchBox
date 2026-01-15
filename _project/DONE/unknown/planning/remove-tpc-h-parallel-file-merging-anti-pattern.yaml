@@ -1,0 +1,87 @@
+title: Remove TPC-H Parallel File Merging Anti-Pattern
+category: Code Quality and Technical Debt
+sections:
+- name: Notes
+  items:
+  - text: '"**Priority**: High"'
+  - text: '"**Status**: ✅ **COMPLETED**"'
+  - text: '"**Description**: TPC-H data generator incorrectly merges parallel-generated chunk files, defeating the purpose
+      of parallel generation and violating TPC-H design principles"'
+  - text: '"**Root Cause**: The `_merge_parallel_files()` function was introduced in commit `8025a44` (August 13, 2025) as
+      part of adding CLI parallel data generation support. This was a design mistake that goes against TPC-H specification."'
+  - text: '"**Problems with Current Implementation**:"'
+    children:
+    - text: '"**Violates TPC-H Design**: TPC-H''s `dbgen` with parallel generation (`-C` and `-S` flags) is designed to create
+        separate chunk files for parallel loading"'
+    - text: '"**Performance Loss**: Merging defeats the purpose of parallel generation and adds unnecessary I/O overhead (read
+        all chunks + write merged file)"'
+    - text: '"**Storage Waste**: Creates both chunk files AND merged files, temporarily doubling disk usage"'
+    - text: '"**Loading Performance**: Prevents databases from loading multiple files in parallel"'
+    - text: '"**Against Specification**: TPC-H specification and documentation expect chunk files to remain separate"'
+  - text: '"**Current Platform Support Analysis**:"'
+    children:
+    - text: '"**DuckDB Adapter**: Has robust parallel file loading but uses `table_N_M` patterns, missing TPC-H chunk patterns
+        (`table.tbl.1`, `table.tbl.2`, etc.)"'
+    - text: '"**Other Adapters**: Need analysis for chunk file support"'
+  - text: '"**Tasks**:"'
+    children:
+    - text: '"[ ] **Add TPC-H chunk pattern support to platform adapters**:"'
+      children:
+      - text: '"Add glob patterns for `customer.tbl.*`, `lineitem.tbl.*`, etc. to DuckDB adapter"'
+      - text: Update other platform adapters (ClickHouse, SQLite, etc.) to support chunk patterns
+      - text: Test parallel loading performance vs merged file loading
+      - text: Ensure proper ordering of chunk files during loading (1, 2, 3, ..., not 1, 10, 2, 3)
+    - text: '"[ ] **Remove merging logic from TPC-H generator**:"'
+      children:
+      - text: '"Remove `_merge_parallel_files()` method entirely from `benchbox/core/tpch/generator.py`"'
+      - text: '"Remove call to `_merge_parallel_files()` in `_run_parallel_dbgen()`"'
+      - text: Keep chunk files separate as intended by TPC-H specification
+      - text: Update file path mapping to return chunk files instead of merged files
+    - text: '"[ ] **Update compression handling for chunk files**:"'
+      children:
+      - text: '"Compress each chunk file individually without merging first (`.tbl.1.zst`, `.tbl.2.zst`, etc.)"'
+      - text: Ensure compression works directly on parallel-generated chunks, preserving parallelism benefits
+      - text: Remove chunk cleanup logic that was added for merging workflow
+      - text: Update compression mixin to handle multiple chunk files for the same table
+      - text: '"Let platforms load compressed chunk files directly with glob patterns (`customer.tbl.*.zst`)"'
+      - text: Maintain compression reporting and statistics for individual chunk files
+    - text: '"[ ] **Testing and validation**:"'
+      children:
+      - text: Test data generation without merging produces correct chunk files
+      - text: Test platform adapters can load chunk files correctly
+      - text: Validate parallel loading performance improvement
+      - text: Ensure query results are identical with chunk vs merged files
+      - text: Test compression works correctly on individual chunk files without merging
+      - text: Verify compressed chunk files load properly with glob patterns
+      - text: Test compression reporting aggregates statistics across all chunk files
+      - text: Validate no temporary uncompressed files remain after chunk compression
+    - text: '"[ ] **Performance measurement**:"'
+      children:
+      - text: Benchmark data generation time without merging overhead
+      - text: Benchmark parallel data loading vs single-file loading
+      - text: Measure disk space savings (no temporary merged files)
+      - text: Document performance improvements
+  - text: '"**Expected Benefits**:"'
+    children:
+    - text: '"✅ **Restore TPC-H specification compliance**: Keep chunk files separate as intended"'
+    - text: '"✅ **Improve data generation performance**: Eliminate unnecessary merging I/O"'
+    - text: '"✅ **Improve data loading performance**: Enable parallel loading by databases"'
+    - text: '"✅ **Reduce disk space usage**: No temporary merged files, direct chunk compression"'
+    - text: '"✅ **Follow database best practices**: Let databases handle multiple files natively"'
+    - text: '"✅ **Preserve compression benefits**: Compress chunks individually without merging overhead"'
+  - text: '"**Files Affected**:"'
+    children:
+    - text: '"**Modified**: `benchbox/core/tpch/generator.py` (remove `_merge_parallel_files()` and calls)"'
+    - text: '"**Modified**: `benchbox/platforms/duckdb.py` (add TPC-H chunk file pattern support)"'
+    - text: '"**Modified**: Other platform adapters for chunk pattern support"'
+    - text: '"**New**: Tests for chunk file loading and performance validation"'
+  - text: '"**Impact**: Critical fix for TPC-H benchmark correctness and performance. Restores intended TPC-H behavior, improves
+      both generation and loading performance, and aligns with database optimization best practices."'
+  - text: '"**✅ COMPLETED**: January 2026, commit `8d9cf33` - Successfully removed parallel file merging anti-pattern"'
+    children:
+    - text: '"✅ Removed `_merge_parallel_files()` function and its calls"'
+    - text: ✅ Updated TPC-H generator to return chunk files directly (first chunk as reference)
+    - text: '"✅ Added TPC-H chunk pattern support to DuckDB platform adapter (`table.tbl.N`)"'
+    - text: ✅ Enhanced compression handling for parallel chunk files
+    - text: ✅ Added comprehensive test coverage for chunk file behavior
+    - text: ✅ All tests pass with improved architecture that preserves parallel loading capabilities
