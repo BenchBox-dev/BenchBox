@@ -1,5 +1,5 @@
-generated_at: '2026-01-14T15:45:00.167380'
-total_items: 351
+generated_at: '2026-01-14T20:29:12.873586'
+total_items: 352
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 162
+    count: 163
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -973,6 +973,11 @@ statuses:
       title: Fix SQL injection vulnerabilities in TimescaleDB adapter
       priority: Critical
       category: Security and Compliance
+    - id: fix-result-filename-redundancy
+      file: DONE/core-functionality/completed/fix-result-filename-redundancy.yaml
+      title: Fix inconsistent result filename generation - remove redundant elements
+      priority: Medium
+      category: Core Functionality
     - id: gcp-dataproc-platform
       file: DONE/platform-expansion/planning/gcp-dataproc-platform.yaml
       title: GCP Dataproc Managed Spark Platform

@@ -1,5 +1,5 @@
-generated_at: '2026-01-14T15:45:00.166955'
-total_items: 351
+generated_at: '2026-01-14T20:29:12.873282'
+total_items: 352
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2435,6 +2435,19 @@ items:
   category: Core Functionality
   priority: Medium
   status: Not Started
+- id: fix-result-filename-redundancy
+  file: DONE/core-functionality/completed/fix-result-filename-redundancy.yaml
+  title: Fix inconsistent result filename generation - remove redundant elements
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - results
+  - filenames
+  - cleanup
+  - ux
+  estimated_effort: 1-2 hours
 - id: dataproc-serverless-platform
   file: DONE/platform-expansion/planning/dataproc-serverless-platform.yaml
   title: GCP Dataproc Serverless Platform

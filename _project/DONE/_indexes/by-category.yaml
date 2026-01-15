@@ -1,4 +1,4 @@
-generated_at: '2026-01-14T15:45:00.167186'
+generated_at: '2026-01-14T20:29:12.873424'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -327,7 +327,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 55
+    count: 56
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -464,6 +464,11 @@ categories:
       title: Fix TPC-DS Test Mode CLI Dry Run Output to Show Actual Execution Plans ✅
       priority: Medium
       status: Not Started
+    - id: fix-result-filename-redundancy
+      file: DONE/core-functionality/completed/fix-result-filename-redundancy.yaml
+      title: Fix inconsistent result filename generation - remove redundant elements
+      priority: Medium
+      status: Completed
     - id: harden-operator-type-handling
       file: DONE/query-plan-remediation/planning/harden-operator-type-handling.yaml
       title: Harden plan comparison and visualization for unknown operator types

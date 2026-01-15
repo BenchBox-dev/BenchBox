@@ -1,5 +1,5 @@
-generated_at: '2026-01-14T15:45:00.167296'
-total_items: 351
+generated_at: '2026-01-14T20:29:12.873511'
+total_items: 352
 priorities:
   Critical:
     count: 24
@@ -761,7 +761,7 @@ priorities:
       category: Platform Expansion
       status: Complete
   Medium:
-    count: 186
+    count: 187
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1208,6 +1208,11 @@ priorities:
       title: Fix TPC-DS Test Mode CLI Dry Run Output to Show Actual Execution Plans ✅
       category: Core Functionality
       status: Not Started
+    - id: fix-result-filename-redundancy
+      file: DONE/core-functionality/completed/fix-result-filename-redundancy.yaml
+      title: Fix inconsistent result filename generation - remove redundant elements
+      category: Core Functionality
+      status: Completed
     - id: dataproc-serverless-platform
       file: DONE/platform-expansion/planning/dataproc-serverless-platform.yaml
       title: GCP Dataproc Serverless Platform
