@@ -1,9 +1,14 @@
-generated_at: '2026-01-15T22:44:57.574819'
-total_items: 49
+generated_at: '2026-01-16T12:41:13.866440'
+total_items: 50
 priorities:
   High:
-    count: 7
+    count: 8
     items:
+    - id: e2e-cli-test-suite
+      file: TODO/e2e-cli-tests/planning/e2e-cli-test-suite.yaml
+      title: 'E2E CLI Test Suite: Complete Platform Coverage'
+      category: Testing and Quality Assurance
+      status: Not Started
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter

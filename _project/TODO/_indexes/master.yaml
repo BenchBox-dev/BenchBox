@@ -1,6 +1,22 @@
-generated_at: '2026-01-15T22:44:57.574765'
-total_items: 49
+generated_at: '2026-01-16T12:41:13.866342'
+total_items: 50
 items:
+- id: e2e-cli-test-suite
+  file: TODO/e2e-cli-tests/planning/e2e-cli-test-suite.yaml
+  title: 'E2E CLI Test Suite: Complete Platform Coverage'
+  worktree: e2e-cli-tests
+  category: Testing and Quality Assurance
+  priority: High
+  status: Not Started
+  tags:
+  - e2e-testing
+  - cli
+  - quality-assurance
+  - platforms
+  - pre-release
+  owners:
+  - benchbox-team
+  estimated_effort: Large
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
   title: MotherDuck Platform Adapter
