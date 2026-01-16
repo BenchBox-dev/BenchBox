@@ -1,7 +1,7 @@
 title: "Rebuild TPC-H binaries with stdout fix for all platforms"
 worktree: "tpch-stdout-fix"
 priority: "High"
-status: "Not Started"
+status: "In Progress"
 category: "Core Functionality"
 description: |
   After applying stdout patches to TPC-H source, rebuild dbgen binaries
@@ -33,14 +33,14 @@ context_sections:
 tasks:
   phases:
     - phase: "Phase 1: macOS Builds"
-      done: false
+      done: true
       items:
         - summary: "Build darwin-arm64 binary on Apple Silicon Mac"
-          done: false
+          done: true
         - summary: "Build darwin-x86_64 binary (cross-compile or Rosetta)"
-          done: false
+          done: true
         - summary: "Verify both macOS binaries work with -z flag"
-          done: false
+          done: true
 
     - phase: "Phase 2: Linux Builds"
       done: false

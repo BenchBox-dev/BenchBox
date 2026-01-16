@@ -1,4 +1,4 @@
-generated_at: '2026-01-15T21:42:21.065834'
+generated_at: '2026-01-15T22:39:42.929200'
 total_items: 52
 priorities:
   High:
@@ -8,12 +8,12 @@ priorities:
       file: TODO/tpch-stdout-fix/planning/test-stdout-datagen.yaml
       title: Add regression tests for TPC-H stdout data generation
       category: Testing and Quality Assurance
-      status: Not Started
+      status: Completed
     - id: integrate-stdout-datagen
       file: TODO/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
       title: Integrate TPC-H stdout datagen with compression and format pipelines
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter

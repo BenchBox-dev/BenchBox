@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T21:39:24.423765'
-total_items: 356
+generated_at: '2026-01-15T22:39:43.691252'
+total_items: 357
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 167
+    count: 168
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -953,6 +953,11 @@ statuses:
       title: Display equivalent CLI command before benchmark execution
       priority: Medium
       category: User Experience
+    - id: document-stdout-patches
+      file: DONE/tpcds-docs/document-stdout-patches.yaml
+      title: Document TPC-DS stdout patches and credit tpcds-kit origin
+      priority: High
+      category: Documentation
     - id: embed-tuning-config-in-results
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output

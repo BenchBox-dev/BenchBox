@@ -1,4 +1,4 @@
-generated_at: '2026-01-15T21:42:21.065816'
+generated_at: '2026-01-15T22:39:42.929168'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -152,7 +152,7 @@ categories:
       file: TODO/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
       title: Integrate TPC-H stdout datagen with compression and format pipelines
       priority: High
-      status: Not Started
+      status: Completed
     - id: migrate-clickhouse-firebolt-deployment
       file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
       title: Migrate ClickHouse/Firebolt to Deployment Registry
@@ -287,4 +287,4 @@ categories:
       file: TODO/tpch-stdout-fix/planning/test-stdout-datagen.yaml
       title: Add regression tests for TPC-H stdout data generation
       priority: High
-      status: Not Started
+      status: Completed

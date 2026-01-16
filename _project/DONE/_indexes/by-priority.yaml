@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T21:39:24.423687'
-total_items: 356
+generated_at: '2026-01-15T22:39:43.691159'
+total_items: 357
 priorities:
   Critical:
     count: 24
@@ -125,7 +125,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 114
+    count: 115
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -252,6 +252,11 @@ priorities:
       title: DataFrame Tuning Configuration Support
       category: Platform Enhancement
       status: Not Started
+    - id: document-stdout-patches
+      file: DONE/tpcds-docs/document-stdout-patches.yaml
+      title: Document TPC-DS stdout patches and credit tpcds-kit origin
+      category: Documentation
+      status: Completed
     - id: error-message-polish
       file: DONE/release-readiness/planning/error-message-polish.yaml
       title: Error Message Polish

@@ -1,7 +1,7 @@
 title: "Add regression tests for TPC-H stdout data generation"
 worktree: "tpch-stdout-fix"
 priority: "High"
-status: "Not Started"
+status: "Completed"
 category: "Testing and Quality Assurance"
 description: |
   Create comprehensive regression tests for TPC-H stdout data generation

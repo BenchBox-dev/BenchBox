@@ -1,7 +1,7 @@
 title: "Patch TPC-H source to fix stdout data generation"
 worktree: "tpch-stdout-fix"
 priority: "High"
-status: "Not Started"
+status: "Completed"
 category: "Core Functionality"
 description: |
   Apply patches to TPC-H dbgen source code to enable reliable stdout data generation

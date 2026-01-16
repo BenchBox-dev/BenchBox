@@ -1,4 +1,4 @@
-generated_at: '2026-01-15T21:39:24.423597'
+generated_at: '2026-01-15T22:39:43.691053'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -731,7 +731,7 @@ categories:
       priority: Medium
       status: Completed
   Documentation:
-    count: 7
+    count: 8
     items:
     - id: add-dedicated-tags-for-platforms-and-benchmarks
       file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
@@ -758,6 +758,11 @@ categories:
       title: Document PySpark SQL mode usage
       priority: Medium
       status: Not Started
+    - id: document-stdout-patches
+      file: DONE/tpcds-docs/document-stdout-patches.yaml
+      title: Document TPC-DS stdout patches and credit tpcds-kit origin
+      priority: High
+      status: Completed
     - id: query-plan-documentation-testing
       file: DONE/query-plan-docs/planning/query-plan-documentation-testing.yaml
       title: Query Plan Documentation & Testing

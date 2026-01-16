@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T21:39:24.423430'
-total_items: 356
+generated_at: '2026-01-15T22:39:43.690868'
+total_items: 357
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -633,6 +633,20 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks
+- id: document-stdout-patches
+  file: DONE/tpcds-docs/document-stdout-patches.yaml
+  title: Document TPC-DS stdout patches and credit tpcds-kit origin
+  worktree: tpcds-docs
+  category: Documentation
+  priority: High
+  status: Completed
+  tags:
+  - tpc-ds
+  - documentation
+  - attribution
+  - streaming
+  estimated_effort: 2-3 hours
+  completed_date: '2026-01-15'
 - id: error-message-polish
   file: DONE/release-readiness/planning/error-message-polish.yaml
   title: Error Message Polish
