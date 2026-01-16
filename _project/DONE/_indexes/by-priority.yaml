@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T12:41:15.935900'
-total_items: 360
+generated_at: '2026-01-16T13:35:23.596727'
+total_items: 361
 priorities:
   Critical:
     count: 24
@@ -125,7 +125,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 118
+    count: 119
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -261,6 +261,11 @@ priorities:
       file: DONE/tpcds-docs/document-stdout-patches.yaml
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
       category: Documentation
+      status: Completed
+    - id: e2e-cli-test-suite
+      file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
+      title: 'E2E CLI Test Suite: Complete Platform Coverage'
+      category: Testing and Quality Assurance
       status: Completed
     - id: error-message-polish
       file: DONE/release-readiness/planning/error-message-polish.yaml
@@ -863,13 +868,13 @@ priorities:
       title: '"✅ CLI: Detect and Skip Unneeded Data Generation"'
       category: Data Quality and Compatibility Issues
       status: Completed
-    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
-      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
+    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
+      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
       title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
       category: Project Lifecycle Management
       status: Completed
-    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
-      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
+    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
+      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
       title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
       category: Project Lifecycle Management
       status: Completed
@@ -1053,13 +1058,13 @@ priorities:
       title: Compressed Data Generation Gaps (all benchmarks) ✅
       category: Data Quality and Compatibility Issues
       status: Not Started
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Not Started
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Not Started
@@ -1468,13 +1473,13 @@ priorities:
       title: Security Audit
       category: Pre-Release Medium Priority Tasks (Nice-to-Have)
       status: Completed
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       category: Platform Support and Deployment
       status: Not Started
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       category: Platform Support and Deployment
       status: Not Started

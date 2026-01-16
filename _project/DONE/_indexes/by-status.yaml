@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T12:41:15.936077'
-total_items: 360
+generated_at: '2026-01-16T13:35:23.596905'
+total_items: 361
 statuses:
   In Progress:
     count: 1
@@ -197,13 +197,13 @@ statuses:
       title: Compressed Data Generation Gaps (all benchmarks) ✅
       priority: Medium
       category: Data Quality and Compatibility Issues
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       category: Performance and Efficiency
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       category: Performance and Efficiency
@@ -552,13 +552,13 @@ statuses:
       title: Restrict Primary/Foreign Key Configuration to tuning.yaml Only
       priority: Medium
       category: Project Lifecycle Management
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
@@ -726,20 +726,20 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 171
+    count: 172
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
       title: '"✅ CLI: Detect and Skip Unneeded Data Generation"'
       priority: Medium
       category: Data Quality and Compatibility Issues
-    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
-      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
+    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
+      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
       title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
       priority: Medium
       category: Project Lifecycle Management
-    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
-      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
+    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
+      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
       title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
       priority: Medium
       category: Project Lifecycle Management
@@ -963,6 +963,11 @@ statuses:
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
       priority: High
       category: Documentation
+    - id: e2e-cli-test-suite
+      file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
+      title: 'E2E CLI Test Suite: Complete Platform Coverage'
+      priority: High
+      category: Testing and Quality Assurance
     - id: embed-tuning-config-in-results
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output

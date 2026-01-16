@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T12:41:15.935314'
-total_items: 360
+generated_at: '2026-01-16T13:35:23.596027'
+total_items: 361
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -660,6 +660,23 @@ items:
   - streaming
   estimated_effort: 2-3 hours
   completed_date: '2026-01-15'
+- id: e2e-cli-test-suite
+  file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
+  title: 'E2E CLI Test Suite: Complete Platform Coverage'
+  worktree: e2e-cli-tests
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - e2e-testing
+  - cli
+  - quality-assurance
+  - platforms
+  - pre-release
+  owners:
+  - benchbox-team
+  estimated_effort: Large
+  completed_date: '2026-01-16'
 - id: error-message-polish
   file: DONE/release-readiness/planning/error-message-polish.yaml
   title: Error Message Polish
@@ -1815,15 +1832,15 @@ items:
   category: Data Quality and Compatibility Issues
   priority: Medium
   status: Completed
-- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
-  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
+- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
+  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
   title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
   worktree: unknown
   category: Project Lifecycle Management
   priority: Medium
   status: Completed
-- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
-  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
+- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
+  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
   title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
   worktree: unknown
   category: Project Lifecycle Management
@@ -2215,15 +2232,15 @@ items:
   category: Data Quality and Compatibility Issues
   priority: Medium
   status: Not Started
-- id: compressed-data-generation-completed
-  file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+- id: compressed-data-generation-completed-2
+  file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
   title: Compressed Data Generation ✅ COMPLETED
   worktree: unknown
   category: Performance and Efficiency
   priority: Medium
   status: Not Started
-- id: compressed-data-generation-completed-2
-  file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+- id: compressed-data-generation-completed
+  file: DONE/unknown/planning/compressed-data-generation-completed.yaml
   title: Compressed Data Generation ✅ COMPLETED
   worktree: unknown
   category: Performance and Efficiency
@@ -2988,15 +3005,15 @@ items:
   priority: Medium
   status: Completed
   completed_date: 2025-11-27
-- id: simple-cloud-storage-path-support-completed
-  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+- id: simple-cloud-storage-path-support-completed-2
+  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
   title: Simple Cloud Storage Path Support ✅ COMPLETED
   worktree: unknown
   category: Platform Support and Deployment
   priority: Medium
   status: Not Started
-- id: simple-cloud-storage-path-support-completed-2
-  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+- id: simple-cloud-storage-path-support-completed
+  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
   title: Simple Cloud Storage Path Support ✅ COMPLETED
   worktree: unknown
   category: Platform Support and Deployment

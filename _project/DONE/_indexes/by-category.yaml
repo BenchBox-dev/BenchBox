@@ -1,4 +1,4 @@
-generated_at: '2026-01-16T12:41:15.935683'
+generated_at: '2026-01-16T13:35:23.596510'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -971,13 +971,13 @@ categories:
   Performance and Efficiency:
     count: 9
     items:
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       status: Not Started
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       status: Not Started
@@ -1297,13 +1297,13 @@ categories:
       title: DuckDB TPC-DS and TPC-H Example Updates for Enhanced Tuning ✅ COMPLETED
       priority: Medium
       status: Not Started
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Not Started
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Not Started
@@ -1522,13 +1522,13 @@ categories:
       title: '"✅ Add Global Quiet Mode (`--quiet`/`-q`) to Suppress All Output"'
       priority: Medium
       status: Not Started
-    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
-      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
+    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
+      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
       title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
       priority: Medium
       status: Completed
-    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
-      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
+    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
+      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
       title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
       priority: Medium
       status: Completed
@@ -1733,7 +1733,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 14
+    count: 15
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1765,6 +1765,11 @@ categories:
       title: 'Comprehensive Test Quality Audit: Ensure Meaningful and Distinct Test Coverage'
       priority: High
       status: Complete
+    - id: e2e-cli-test-suite
+      file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
+      title: 'E2E CLI Test Suite: Complete Platform Coverage'
+      priority: High
+      status: Completed
     - id: implement-dataframe-result-validation-framework
       file: DONE/dataframe-validation/completed/implement-dataframe-result-validation-framework.yaml
       title: Implement DataFrame Result Validation Framework
