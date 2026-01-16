@@ -1,4 +1,4 @@
-generated_at: '2026-01-16T08:28:47.946891'
+generated_at: '2026-01-16T08:35:39.626370'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -141,7 +141,7 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 8
+    count: 7
     items:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
@@ -171,11 +171,6 @@ categories:
     - id: deployment-registry-extensions
       file: TODO/platform-expansion/active/deployment-registry-extensions.yaml
       title: Platform Deployment Registry Extensions
-      priority: High
-      status: In Progress
-    - id: rebuild-tpch-binaries
-      file: TODO/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
-      title: Rebuild TPC-H binaries with stdout fix for all platforms
       priority: High
       status: In Progress
     - id: presorted-open-table-format-datasets

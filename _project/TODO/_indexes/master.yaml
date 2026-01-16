@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T08:28:47.946842'
-total_items: 49
+generated_at: '2026-01-16T08:35:39.626315'
+total_items: 48
 items:
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
@@ -38,19 +38,6 @@ items:
   - platform-registry
   - deployment-modes
   estimated_effort: 3-4 days
-- id: rebuild-tpch-binaries
-  file: TODO/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
-  title: Rebuild TPC-H binaries with stdout fix for all platforms
-  worktree: tpch-stdout-fix
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - tpc-h
-  - compilation
-  - binaries
-  - cross-platform
-  estimated_effort: 2-4 hours
 - id: oxbow-series-reality-vs-aspiration
   file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
   title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'

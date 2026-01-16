@@ -1,8 +1,8 @@
-generated_at: '2026-01-16T08:28:47.946921'
-total_items: 49
+generated_at: '2026-01-16T08:35:39.626400'
+total_items: 48
 statuses:
   In Progress:
-    count: 7
+    count: 6
     items:
     - id: migrate-clickhouse-firebolt-deployment
       file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
@@ -32,11 +32,6 @@ statuses:
     - id: deployment-registry-extensions
       file: TODO/platform-expansion/active/deployment-registry-extensions.yaml
       title: Platform Deployment Registry Extensions
-      priority: High
-      category: Core Functionality
-    - id: rebuild-tpch-binaries
-      file: TODO/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
-      title: Rebuild TPC-H binaries with stdout fix for all platforms
       priority: High
       category: Core Functionality
   Not Started:

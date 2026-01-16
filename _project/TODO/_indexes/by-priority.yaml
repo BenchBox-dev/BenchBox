@@ -1,8 +1,8 @@
-generated_at: '2026-01-16T08:28:47.946908'
-total_items: 49
+generated_at: '2026-01-16T08:35:39.626387'
+total_items: 48
 priorities:
   High:
-    count: 7
+    count: 6
     items:
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
@@ -17,11 +17,6 @@ priorities:
     - id: deployment-registry-extensions
       file: TODO/platform-expansion/active/deployment-registry-extensions.yaml
       title: Platform Deployment Registry Extensions
-      category: Core Functionality
-      status: In Progress
-    - id: rebuild-tpch-binaries
-      file: TODO/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
-      title: Rebuild TPC-H binaries with stdout fix for all platforms
       category: Core Functionality
       status: In Progress
     - id: oxbow-series-reality-vs-aspiration
