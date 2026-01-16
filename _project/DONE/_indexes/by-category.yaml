@@ -1,4 +1,4 @@
-generated_at: '2026-01-16T08:28:48.776701'
+generated_at: '2026-01-16T14:01:20.070419'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -335,7 +335,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 61
+    count: 63
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -542,6 +542,11 @@ categories:
       title: Make DuckDB text plan parsing reliable or fail fast
       priority: Medium
       status: Not Started
+    - id: explicit-tuning-file-resolution
+      file: DONE/ux-improvements/active/explicit-tuning-file-resolution.yaml
+      title: Make tuning file resolution explicit and transparent in CLI
+      priority: Medium-High
+      status: Completed
     - id: pt-01-ddl-generator-protocol
       file: DONE/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml
       title: 'PT-01: DDL Generator Protocol and Base Implementation'
@@ -605,6 +610,11 @@ categories:
     - id: rebuild-tpcds-binaries
       file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
       title: Rebuild TPC-DS binaries with stdout fix for all platforms
+      priority: High
+      status: Completed
+    - id: rebuild-tpch-binaries
+      file: DONE/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
+      title: Rebuild TPC-H binaries with stdout fix for all platforms
       priority: High
       status: Completed
     - id: refactor-and-simplify-tpc-compilation-infrastructure-completed
@@ -1741,7 +1751,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 14
+    count: 15
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1773,6 +1783,11 @@ categories:
       title: 'Comprehensive Test Quality Audit: Ensure Meaningful and Distinct Test Coverage'
       priority: High
       status: Complete
+    - id: e2e-cli-test-suite
+      file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
+      title: 'E2E CLI Test Suite: Complete Platform Coverage'
+      priority: High
+      status: Completed
     - id: implement-dataframe-result-validation-framework
       file: DONE/dataframe-validation/completed/implement-dataframe-result-validation-framework.yaml
       title: Implement DataFrame Result Validation Framework

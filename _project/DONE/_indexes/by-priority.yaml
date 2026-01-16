@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T08:28:48.776801'
-total_items: 361
+generated_at: '2026-01-16T14:01:20.070525'
+total_items: 364
 priorities:
   Critical:
     count: 24
@@ -125,7 +125,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 119
+    count: 121
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -261,6 +261,11 @@ priorities:
       file: DONE/tpcds-docs/document-stdout-patches.yaml
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
       category: Documentation
+      status: Completed
+    - id: e2e-cli-test-suite
+      file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
+      title: 'E2E CLI Test Suite: Complete Platform Coverage'
+      category: Testing and Quality Assurance
       status: Completed
     - id: error-message-polish
       file: DONE/release-readiness/planning/error-message-polish.yaml
@@ -475,6 +480,11 @@ priorities:
     - id: rebuild-tpcds-binaries
       file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
       title: Rebuild TPC-DS binaries with stdout fix for all platforms
+      category: Core Functionality
+      status: Completed
+    - id: rebuild-tpch-binaries
+      file: DONE/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
+      title: Rebuild TPC-H binaries with stdout fix for all platforms
       category: Core Functionality
       status: Completed
     - id: refactor-core-dependencies-to-optional
@@ -723,7 +733,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 16
+    count: 17
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -778,6 +788,11 @@ priorities:
     - id: compare-interactive-file-selection
       file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
       title: Improve interactive file selection in compare command
+      category: Core Functionality
+      status: Completed
+    - id: explicit-tuning-file-resolution
+      file: DONE/ux-improvements/active/explicit-tuning-file-resolution.yaml
+      title: Make tuning file resolution explicit and transparent in CLI
       category: Core Functionality
       status: Completed
     - id: fabric-spark-platform

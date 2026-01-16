@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T08:28:48.776529'
-total_items: 361
+generated_at: '2026-01-16T14:01:20.070234'
+total_items: 364
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -660,6 +660,23 @@ items:
   - streaming
   estimated_effort: 2-3 hours
   completed_date: '2026-01-15'
+- id: e2e-cli-test-suite
+  file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
+  title: 'E2E CLI Test Suite: Complete Platform Coverage'
+  worktree: e2e-cli-tests
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - e2e-testing
+  - cli
+  - quality-assurance
+  - platforms
+  - pre-release
+  owners:
+  - benchbox-team
+  estimated_effort: Large
+  completed_date: '2026-01-16'
 - id: error-message-polish
   file: DONE/release-readiness/planning/error-message-polish.yaml
   title: Error Message Polish
@@ -1235,6 +1252,19 @@ items:
   - build
   estimated_effort: 4-6 hours
   completed_date: '2026-01-15'
+- id: rebuild-tpch-binaries
+  file: DONE/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
+  title: Rebuild TPC-H binaries with stdout fix for all platforms
+  worktree: tpch-stdout-fix
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tpc-h
+  - compilation
+  - binaries
+  - cross-platform
+  estimated_effort: 2-4 hours
 - id: refactor-core-dependencies-to-optional
   file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
   title: Refactor platform-specific packages from core to optional dependencies
@@ -3555,6 +3585,21 @@ items:
   - interactive
   estimated_effort: 1-2 days
   completed_date: '2025-12-15'
+- id: explicit-tuning-file-resolution
+  file: DONE/ux-improvements/active/explicit-tuning-file-resolution.yaml
+  title: Make tuning file resolution explicit and transparent in CLI
+  worktree: ux-improvements
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - cli
+  - ux
+  - tuning
+  - transparency
+  - configuration
+  estimated_effort: 3-5 days
+  completed_date: '2026-01-16'
 - id: fabric-spark-platform
   file: DONE/platform-expansion/planning/fabric-spark-platform.yaml
   title: Microsoft Fabric Spark Platform

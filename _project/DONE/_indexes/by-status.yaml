@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T08:28:48.776887'
-total_items: 361
+generated_at: '2026-01-16T14:01:20.070616'
+total_items: 364
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 172
+    count: 175
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -963,6 +963,11 @@ statuses:
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
       priority: High
       category: Documentation
+    - id: e2e-cli-test-suite
+      file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
+      title: 'E2E CLI Test Suite: Complete Platform Coverage'
+      priority: High
+      category: Testing and Quality Assurance
     - id: embed-tuning-config-in-results
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output
@@ -1048,6 +1053,11 @@ statuses:
       title: MCP Server Comprehensive Improvements
       priority: High
       category: AI Integration
+    - id: explicit-tuning-file-resolution
+      file: DONE/ux-improvements/active/explicit-tuning-file-resolution.yaml
+      title: Make tuning file resolution explicit and transparent in CLI
+      priority: Medium-High
+      category: Core Functionality
     - id: fabric-spark-platform
       file: DONE/platform-expansion/planning/fabric-spark-platform.yaml
       title: Microsoft Fabric Spark Platform
@@ -1181,6 +1191,11 @@ statuses:
     - id: rebuild-tpcds-binaries
       file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
       title: Rebuild TPC-DS binaries with stdout fix for all platforms
+      priority: High
+      category: Core Functionality
+    - id: rebuild-tpch-binaries
+      file: DONE/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
+      title: Rebuild TPC-H binaries with stdout fix for all platforms
       priority: High
       category: Core Functionality
     - id: refactor-core-dependencies-to-optional
