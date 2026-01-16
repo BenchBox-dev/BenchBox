@@ -1,4 +1,4 @@
-generated_at: '2026-01-15T21:27:25.895393'
+generated_at: '2026-01-15T21:42:21.065816'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -162,7 +162,7 @@ categories:
       file: TODO/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
       title: Patch TPC-H source to fix stdout data generation
       priority: High
-      status: Not Started
+      status: Completed
     - id: deployment-config-inheritance
       file: TODO/platform-expansion/active/deployment-config-inheritance.yaml
       title: Platform Configuration Inheritance
@@ -187,7 +187,7 @@ categories:
       file: TODO/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
       title: Rebuild TPC-H binaries with stdout fix for all platforms
       priority: High
-      status: Not Started
+      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

@@ -1,4 +1,4 @@
-generated_at: '2026-01-15T21:27:25.895409'
+generated_at: '2026-01-15T21:42:21.065834'
 total_items: 52
 priorities:
   High:
@@ -23,7 +23,7 @@ priorities:
       file: TODO/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
       title: Patch TPC-H source to fix stdout data generation
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: deployment-factory-integration
       file: TODO/platform-expansion/active/deployment-factory-integration.yaml
       title: Platform Deployment Factory Integration
@@ -38,7 +38,7 @@ priorities:
       file: TODO/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
       title: Rebuild TPC-H binaries with stdout fix for all platforms
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: oxbow-series-reality-vs-aspiration
       file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
       title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'

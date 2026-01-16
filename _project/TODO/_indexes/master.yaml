@@ -1,4 +1,4 @@
-generated_at: '2026-01-15T21:27:25.895352'
+generated_at: '2026-01-15T21:42:21.065776'
 total_items: 52
 items:
 - id: test-stdout-datagen
@@ -46,7 +46,7 @@ items:
   worktree: tpch-stdout-fix
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: Completed
   tags:
   - tpc-h
   - datagen
@@ -83,7 +83,7 @@ items:
   worktree: tpch-stdout-fix
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - tpc-h
   - compilation
