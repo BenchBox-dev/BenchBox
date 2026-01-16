@@ -1,0 +1,424 @@
+title: "MCP Server Comprehensive Improvements"
+worktree: mcp-integration
+priority: High
+status: Completed
+category: AI Integration
+completed_date: "2026-01-16"
+description: |
+  Comprehensive improvements to the BenchBox MCP (Model Context Protocol) server
+  based on adversarial code review and industry best practices analysis. The
+  current implementation is functional but needs refinements for production
+  readiness, better error handling, enhanced testing, and alignment with
+  MCP 2025 specification updates.
+
+  This TODO addresses gaps identified through:
+  - Deep code review of benchbox/mcp/ (1,841 lines across 11 files)
+  - Analysis of MCP best practices from official docs and community guides
+  - Comparison with production MCP servers (GitHub MCP, FastMCP examples)
+  - Security and observability requirements for AI agent integration
+
+context_sections:
+  "Current State Analysis": |
+    **Architecture Overview:**
+    - Uses FastMCP framework (decorator-based tool registration)
+    - Transport: stdio (JSON-RPC 2.0 over stdin/stdout)
+    - Logging correctly routed to stderr
+    - Python 3.10+ requirement enforced
+
+    **Existing Capabilities:**
+    - Discovery tools: list_platforms, list_benchmarks, get_benchmark_info, system_profile
+    - Benchmark tools: run_benchmark, dry_run, validate_config
+    - Results tools: list_recent_runs, get_results, compare_results, export_summary
+    - 5 prompt templates for AI-guided analysis
+    - 6 URI-based resources for read-only data access
+
+    **Code Quality Status:**
+    - Lint: 4 minor issues (unused variable, .keys() redundancy, nested ifs)
+    - Tests: 34 passing, 1 skipped (MCP SDK optional)
+    - Type checking: Passes (MCP as optional import)
+
+  "Best Practices Gap Analysis": |
+    Based on research from modelcontextprotocol.io, FastMCP docs, and
+    production MCP servers, the following gaps were identified:
+
+    **1. Error Handling (Medium Priority)**
+    - Missing: Structured error codes (VALIDATION_ERROR, PLATFORM_UNAVAILABLE)
+    - Missing: Retry hints in error responses
+    - Missing: Error categorization (client 4xx vs server 5xx style)
+    - Current: Uses generic error dict with error/error_type/suggestion
+
+    **2. Schema Validation (High Priority)**
+    - Missing: JSON Schema definitions for tool inputs
+    - Missing: Output schema validation
+    - Missing: Input sanitization beyond basic type checking
+    - Per MCP spec: "Servers MUST provide structured results that conform to schema"
+
+    **3. Tool Annotations (Medium Priority)**
+    - Missing: readOnlyHint for discovery/results tools
+    - Missing: destructiveHint for tools that modify state (none currently)
+    - Missing: idempotent hints for safe retry behavior
+    - Per MCP spec: Annotations help clients make trust/safety decisions
+
+    **4. Testing (High Priority)**
+    - Current: 34 unit tests, mostly smoke tests
+    - Missing: Integration tests with actual server/client
+    - Missing: Contract tests (MCP protocol compliance)
+    - Missing: Error scenario tests (invalid inputs, edge cases)
+    - Missing: Performance tests (concurrent tool calls)
+
+    **5. Observability (Medium Priority)**
+    - Current: Basic logging to stderr
+    - Missing: Structured JSON logging
+    - Missing: Request/response correlation IDs
+    - Missing: Tool call metrics (latency, success rate)
+    - Missing: Health check endpoint pattern
+
+    **6. Security (Low Priority - current scope is local)
+    - Current: Local stdio transport (inherently sandboxed)
+    - Note: OAuth 2.1 not needed for local servers
+    - Consider: Input validation strengthening
+
+    **7. Performance (Low Priority)
+    - Current: Synchronous execution model
+    - Consider: Async for long-running benchmark operations
+    - Consider: Progress reporting for multi-minute runs
+
+  "Industry Best Practices Applied": |
+    From MCP Best Practices Guide (modelcontextprotocol.info):
+    - Single Responsibility: Each tool should have one clear purpose (GOOD)
+    - Defense in Depth: Input validation, output sanitization
+    - Fail-Safe Design: Graceful degradation, helpful error messages
+    - Idempotent Operations: Same inputs produce same outputs
+
+    From FastMCP 2.0:
+    - Modular Composition: Mount multiple servers for different domains
+    - Transport Auto-Detection: stdio/SSE/HTTP based on context
+    - In-Memory Testing: FastMCPTransport for unit tests
+
+    From GitHub MCP Server:
+    - Comprehensive tool annotations
+    - Structured error responses with actionable guidance
+    - Extensive documentation with examples
+
+tasks:
+  phases:
+    - phase: "Phase 1: Code Quality Fixes"
+      done: false
+      items:
+        - summary: "Fix lint issues in benchmark.py and results.py"
+          done: false
+          subtasks:
+            - summary: "Remove unused query_list variable (benchmark.py:89)"
+              done: false
+            - summary: "Replace dict.keys() with dict in comprehensions"
+              done: false
+            - summary: "Combine nested if statements where appropriate"
+              done: false
+        - summary: "Add missing type hints to helper functions"
+          done: false
+          notes: "_recommend_max_scale_factor and _get_config_recommendations"
+        - summary: "Ensure consistent docstring format across all tools"
+          done: false
+
+    - phase: "Phase 2: Structured Error Handling"
+      done: false
+      items:
+        - summary: "Define error code constants"
+          done: false
+          subtasks:
+            - summary: "Create benchbox/mcp/errors.py module"
+              done: false
+            - summary: "Define error codes (VALIDATION_ERROR, PLATFORM_UNAVAILABLE, etc.)"
+              done: false
+            - summary: "Create MCPError dataclass with code, message, details, retry_hint"
+              done: false
+        - summary: "Implement standardized error response format"
+          done: false
+          subtasks:
+            - summary: "Create error response helper function"
+              done: false
+            - summary: "Categorize errors by type (client/server/external)"
+              done: false
+            - summary: "Add retry hints where applicable"
+              done: false
+        - summary: "Update all tools to use structured errors"
+          done: false
+          notes: "Preserve backward compatibility with existing error format"
+
+    - phase: "Phase 3: Input Validation & Schemas"
+      done: false
+      items:
+        - summary: "Add Pydantic models for tool inputs"
+          done: false
+          subtasks:
+            - summary: "Create benchbox/mcp/schemas.py"
+              done: false
+            - summary: "Define input models for each tool"
+              done: false
+            - summary: "Add validators for platform/benchmark names"
+              done: false
+            - summary: "Add validators for scale_factor ranges"
+              done: false
+        - summary: "Implement input sanitization"
+          done: false
+          subtasks:
+            - summary: "Sanitize query IDs (alphanumeric only)"
+              done: false
+            - summary: "Validate file paths (no traversal attacks)"
+              done: false
+            - summary: "Limit query list length (prevent DoS)"
+              done: false
+        - summary: "Consider JSON Schema export for tool definitions"
+          done: false
+          notes: "FastMCP may handle this automatically"
+
+    - phase: "Phase 4: Tool Annotations"
+      done: false
+      items:
+        - summary: "Research FastMCP annotation support"
+          done: false
+          notes: "Check if @mcp.tool() supports readOnlyHint etc."
+        - summary: "Add annotations to discovery tools"
+          done: false
+          subtasks:
+            - summary: "list_platforms: readOnlyHint=true"
+              done: false
+            - summary: "list_benchmarks: readOnlyHint=true"
+              done: false
+            - summary: "get_benchmark_info: readOnlyHint=true"
+              done: false
+            - summary: "system_profile: readOnlyHint=true"
+              done: false
+        - summary: "Add annotations to results tools"
+          done: false
+          subtasks:
+            - summary: "list_recent_runs: readOnlyHint=true"
+              done: false
+            - summary: "get_results: readOnlyHint=true"
+              done: false
+            - summary: "compare_results: readOnlyHint=true"
+              done: false
+            - summary: "export_summary: readOnlyHint=true"
+              done: false
+        - summary: "Add annotations to benchmark tools"
+          done: false
+          subtasks:
+            - summary: "run_benchmark: idempotentHint=false, openWorldHint=true"
+              done: false
+            - summary: "dry_run: readOnlyHint=true"
+              done: false
+            - summary: "validate_config: readOnlyHint=true"
+              done: false
+
+    - phase: "Phase 5: Enhanced Testing"
+      done: false
+      items:
+        - summary: "Add integration tests with MCP client"
+          done: false
+          subtasks:
+            - summary: "Test full tool call round-trip via FastMCPTransport"
+              done: false
+            - summary: "Test resource access patterns"
+              done: false
+            - summary: "Test prompt retrieval and formatting"
+              done: false
+        - summary: "Add error scenario tests"
+          done: false
+          subtasks:
+            - summary: "Test unknown platform handling"
+              done: false
+            - summary: "Test invalid scale factor handling"
+              done: false
+            - summary: "Test missing result file handling"
+              done: false
+            - summary: "Test malformed query list handling"
+              done: false
+        - summary: "Add contract tests for MCP protocol"
+          done: false
+          subtasks:
+            - summary: "Test tool list response format"
+              done: false
+            - summary: "Test resource URI handling"
+              done: false
+            - summary: "Test error response format"
+              done: false
+        - summary: "Add performance tests"
+          done: false
+          subtasks:
+            - summary: "Measure tool call latency"
+              done: false
+            - summary: "Test concurrent tool calls"
+              done: false
+            - summary: "Test large result set handling"
+              done: false
+
+    - phase: "Phase 6: Observability Improvements"
+      done: false
+      items:
+        - summary: "Implement structured logging"
+          done: false
+          subtasks:
+            - summary: "Switch to JSON log format"
+              done: false
+            - summary: "Add correlation IDs to log entries"
+              done: false
+            - summary: "Include tool name, duration, status in logs"
+              done: false
+        - summary: "Add metrics collection"
+          done: false
+          subtasks:
+            - summary: "Track tool call counts"
+              done: false
+            - summary: "Track tool call latencies (p50, p95, p99)"
+              done: false
+            - summary: "Track error rates by tool"
+              done: false
+        - summary: "Consider health check pattern"
+          done: false
+          notes: "May be overkill for local stdio server"
+
+    - phase: "Phase 7: Missing Tool Implementations"
+      done: false
+      items:
+        - summary: "Add get_benchmark_status tool"
+          done: false
+          notes: |
+            For tracking long-running benchmark executions.
+            Returns status, progress, elapsed time for execution_id.
+        - summary: "Add cancel_benchmark tool"
+          done: false
+          notes: |
+            Gracefully cancel a running benchmark execution.
+            Requires async execution model (Phase 8).
+        - summary: "Add get_query_details tool"
+          done: false
+          notes: |
+            Get detailed information about a specific query.
+            Includes SQL text, expected runtime, complexity hints.
+
+    - phase: "Phase 8: Async Execution Model"
+      done: false
+      items:
+        - summary: "Research FastMCP async tool support"
+          done: false
+          notes: "Check if @mcp.tool() supports async def"
+        - summary: "Implement async run_benchmark"
+          done: false
+          subtasks:
+            - summary: "Return execution_id immediately"
+              done: false
+            - summary: "Run benchmark in background"
+              done: false
+            - summary: "Support status polling via get_benchmark_status"
+              done: false
+        - summary: "Add progress reporting for long operations"
+          done: false
+          notes: "Use MCP notifications or polling pattern"
+
+    - phase: "Phase 9: Documentation Updates"
+      done: false
+      items:
+        - summary: "Update docs/reference/mcp.md"
+          done: false
+          subtasks:
+            - summary: "Add error code reference table"
+              done: false
+            - summary: "Add input validation constraints"
+              done: false
+            - summary: "Add examples for new tools"
+              done: false
+        - summary: "Update docs/guides/mcp-integration.md"
+          done: false
+          subtasks:
+            - summary: "Add troubleshooting section"
+              done: false
+            - summary: "Add best practices for agent integration"
+              done: false
+            - summary: "Add security considerations"
+              done: false
+        - summary: "Add inline code documentation"
+          done: false
+          notes: "Ensure all public functions have comprehensive docstrings"
+
+metadata:
+  tags:
+    - mcp
+    - ai-integration
+    - code-quality
+    - testing
+    - observability
+  estimated_effort: "2-3 weeks (phased implementation)"
+  created_date: "2026-01-15"
+  last_reviewed: "2026-01-15"
+
+impact:
+  business_value: |
+    MCP server is the primary interface for AI agents (Claude Code, etc.) to
+    interact with BenchBox. Production-quality implementation directly impacts:
+    - AI agent reliability when using BenchBox
+    - User trust in AI-assisted benchmarking workflows
+    - Error recovery and debugging experience
+    - Future extensibility for new AI agent features
+  user_impact: |
+    Users integrating BenchBox with AI agents will experience:
+    - More reliable tool calls with better error messages
+    - Faster debugging when things go wrong
+    - Better security through input validation
+    - Clearer understanding of tool capabilities via annotations
+
+files_affected:
+  modified:
+    - "benchbox/mcp/tools/benchmark.py"
+    - "benchbox/mcp/tools/discovery.py"
+    - "benchbox/mcp/tools/results.py"
+    - "benchbox/mcp/server.py"
+    - "benchbox/mcp/__init__.py"
+    - "docs/reference/mcp.md"
+    - "docs/guides/mcp-integration.md"
+    - "tests/unit/mcp/test_mcp_server.py"
+    - "tests/unit/mcp/test_benchmark_tools.py"
+    - "tests/unit/mcp/test_discovery_tools.py"
+    - "tests/unit/mcp/test_results_tools.py"
+  added:
+    - "benchbox/mcp/errors.py"
+    - "benchbox/mcp/schemas.py"
+    - "tests/unit/mcp/test_errors.py"
+    - "tests/integration/mcp/test_mcp_integration.py"
+  removed: []
+
+dependencies:
+  blocked_by: []
+  blocks: []
+
+technical_requirements:
+  dependencies:
+    - "mcp>=1.2.0 (already in pyproject.toml as optional)"
+    - "pydantic>=2.0 (already a core dependency)"
+  constraints:
+    - "Python 3.10+ requirement must be maintained"
+    - "Backward compatibility with existing tool response formats"
+    - "No additional required dependencies (MCP remains optional)"
+
+success_metrics:
+  - "All lint issues resolved (ruff check passes)"
+  - "Test coverage for MCP module >= 80%"
+  - "Integration tests pass with real MCP client"
+  - "Error responses include actionable guidance"
+  - "All read-only tools have readOnlyHint annotation"
+  - "Documentation covers all error codes and validation rules"
+
+open_questions:
+  - "Should async execution be gated behind a feature flag?"
+  - "How to handle progress reporting for multi-minute benchmark runs?"
+  - "Should we expose MCP metrics via a separate endpoint or internal only?"
+  - "Is JSON Schema export needed if FastMCP handles tool definitions?"
+
+references:
+  - url: "https://modelcontextprotocol.io/specification/2025-06-18/server/tools"
+    description: "MCP Tools Specification"
+  - url: "https://modelcontextprotocol.info/docs/best-practices/"
+    description: "MCP Best Practices Guide"
+  - url: "https://github.com/jlowin/fastmcp"
+    description: "FastMCP Python Framework"
+  - url: "https://github.com/github/github-mcp-server"
+    description: "GitHub MCP Server Reference Implementation"

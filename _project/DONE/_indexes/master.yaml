@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T22:44:58.346704'
-total_items: 360
+generated_at: '2026-01-16T08:28:48.776529'
+total_items: 361
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -931,6 +931,21 @@ items:
   category: Testing and Quality Assurance
   priority: High
   status: Not Started
+- id: mcp-server-comprehensive-improvements
+  file: DONE/mcp-integration/active/mcp-server-comprehensive-improvements.yaml
+  title: MCP Server Comprehensive Improvements
+  worktree: mcp-integration
+  category: AI Integration
+  priority: High
+  status: Completed
+  tags:
+  - mcp
+  - ai-integration
+  - code-quality
+  - testing
+  - observability
+  estimated_effort: 2-3 weeks (phased implementation)
+  completed_date: '2026-01-16'
 - id: metadata-primitives-complexity-enhancements
   file: DONE/benchmark-expansion/planning/metadata-primitives-complexity-enhancements.yaml
   title: Metadata Primitives Complexity Enhancements

@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T22:44:58.347026'
-total_items: 360
+generated_at: '2026-01-16T08:28:48.776887'
+total_items: 361
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 171
+    count: 172
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1043,6 +1043,11 @@ statuses:
       title: Logging Standardization
       priority: Medium
       category: Monitoring and Operations
+    - id: mcp-server-comprehensive-improvements
+      file: DONE/mcp-integration/active/mcp-server-comprehensive-improvements.yaml
+      title: MCP Server Comprehensive Improvements
+      priority: High
+      category: AI Integration
     - id: fabric-spark-platform
       file: DONE/platform-expansion/planning/fabric-spark-platform.yaml
       title: Microsoft Fabric Spark Platform

@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T22:44:58.346946'
-total_items: 360
+generated_at: '2026-01-16T08:28:48.776801'
+total_items: 361
 priorities:
   Critical:
     count: 24
@@ -125,7 +125,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 118
+    count: 119
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -362,6 +362,11 @@ priorities:
       title: Integration Test Suite Cleanup - Remove Placeholder and Failing Tests
       category: Testing and Quality Assurance
       status: Not Started
+    - id: mcp-server-comprehensive-improvements
+      file: DONE/mcp-integration/active/mcp-server-comprehensive-improvements.yaml
+      title: MCP Server Comprehensive Improvements
+      category: AI Integration
+      status: Completed
     - id: metadata-primitives-complexity-enhancements
       file: DONE/benchmark-expansion/planning/metadata-primitives-complexity-enhancements.yaml
       title: Metadata Primitives Complexity Enhancements

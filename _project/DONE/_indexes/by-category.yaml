@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T22:44:58.346857'
-total_categories: 53
+generated_at: '2026-01-16T08:28:48.776701'
+total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -85,6 +85,14 @@ categories:
     - id: migrate-unified-runner-py-to-use-run-benchmark-lifecycle
       file: DONE/unknown/completed/migrate-unified-runner-py-to-use-run-benchmark-lifecycle.yaml
       title: ✅ Migrate unified_runner.py to Use run_benchmark_lifecycle
+      priority: High
+      status: Completed
+  AI Integration:
+    count: 1
+    items:
+    - id: mcp-server-comprehensive-improvements
+      file: DONE/mcp-integration/active/mcp-server-comprehensive-improvements.yaml
+      title: MCP Server Comprehensive Improvements
       priority: High
       status: Completed
   AI/ML Capabilities:
