@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T21:21:57.462322'
-total_items: 354
+generated_at: '2026-01-15T21:27:26.642642'
+total_items: 356
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -451,6 +451,20 @@ items:
   - azure-fabric
   - azure-synapse
   estimated_effort: 3-5 days
+- id: test-stdout-datagen
+  file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
+  title: Add regression tests for TPC-DS stdout data generation
+  worktree: tpcds-stdout-fix
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - tpc-ds
+  - testing
+  - regression
+  - ci
+  estimated_effort: 3-4 hours
+  completed_date: '2026-01-15'
 - id: advanced-cost-analysis-framework-multi-region-pricing-models
   file: DONE/cost-intelligence-advanced/planning/advanced-cost-analysis-framework-multi-region-pricing-models.yaml
   title: Advanced Cost Analysis Framework - Multi-Region & Pricing Models
@@ -855,6 +869,21 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 3 days
   completed_date: '2025-12-02'
+- id: integrate-stdout-datagen
+  file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
+  title: Integrate stdout datagen with compression and format pipelines
+  worktree: tpcds-stdout-fix
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tpc-ds
+  - streaming
+  - compression
+  - parquet
+  - performance
+  estimated_effort: 2-3 days
+  completed_date: '2026-01-15'
 - id: integration-test-suite-cleanup-remove-placeholder-and-failing-tests
   file: DONE/unknown/planning/integration-test-suite-cleanup-remove-placeholder-and-failing-tests.yaml
   title: Integration Test Suite Cleanup - Remove Placeholder and Failing Tests

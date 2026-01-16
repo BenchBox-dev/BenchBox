@@ -1,19 +1,6 @@
-generated_at: '2026-01-15T21:21:56.701608'
-total_items: 54
+generated_at: '2026-01-15T21:27:25.895352'
+total_items: 52
 items:
-- id: test-stdout-datagen
-  file: TODO/tpcds-stdout-fix/planning/test-stdout-datagen.yaml
-  title: Add regression tests for TPC-DS stdout data generation
-  worktree: tpcds-stdout-fix
-  category: Testing and Quality Assurance
-  priority: High
-  status: Not Started
-  tags:
-  - tpc-ds
-  - testing
-  - regression
-  - ci
-  estimated_effort: 3-4 hours
 - id: test-stdout-datagen
   file: TODO/tpch-stdout-fix/planning/test-stdout-datagen.yaml
   title: Add regression tests for TPC-H stdout data generation
@@ -40,20 +27,6 @@ items:
   - compression
   - integration
   estimated_effort: 3-4 hours
-- id: integrate-stdout-datagen
-  file: TODO/tpcds-stdout-fix/active/integrate-stdout-datagen.yaml
-  title: Integrate stdout datagen with compression and format pipelines
-  worktree: tpcds-stdout-fix
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - tpc-ds
-  - streaming
-  - compression
-  - parquet
-  - performance
-  estimated_effort: 2-3 days
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
   title: MotherDuck Platform Adapter

@@ -1,4 +1,4 @@
-generated_at: '2026-01-15T21:21:57.462540'
+generated_at: '2026-01-15T21:27:26.642783'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -327,7 +327,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 58
+    count: 59
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -519,6 +519,11 @@ categories:
       title: Integrate DataFrame Mode into CLI
       priority: High
       status: Partially Complete
+    - id: integrate-stdout-datagen
+      file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
+      title: Integrate stdout datagen with compression and format pipelines
+      priority: High
+      status: Completed
     - id: duckdb-text-plan-reliability
       file: DONE/query-plan-remediation/planning/duckdb-text-plan-reliability.yaml
       title: Make DuckDB text plan parsing reliable or fail fast
@@ -1713,7 +1718,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 12
+    count: 13
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1725,6 +1730,11 @@ categories:
       title: Add comprehensive tests for PySpark SQL adapter
       priority: High
       status: Not Started
+    - id: test-stdout-datagen
+      file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
+      title: Add regression tests for TPC-DS stdout data generation
+      priority: High
+      status: Completed
     - id: comprehensive-platform-adapter-testing-completed
       file: DONE/unknown/planning/comprehensive-platform-adapter-testing-completed.yaml
       title: Comprehensive Platform Adapter Testing ✅ COMPLETED

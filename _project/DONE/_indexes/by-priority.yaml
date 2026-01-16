@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T21:21:57.462676'
-total_items: 354
+generated_at: '2026-01-15T21:27:26.642868'
+total_items: 356
 priorities:
   Critical:
     count: 24
@@ -125,7 +125,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 112
+    count: 114
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -186,6 +186,11 @@ priorities:
       file: DONE/platform-expansion/active/cloud-platform-cost-estimation.yaml
       title: Add cost estimation support for cloud platforms (Firebolt, Fabric, Synapse)
       category: Platform Expansion
+      status: Completed
+    - id: test-stdout-datagen
+      file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
+      title: Add regression tests for TPC-DS stdout data generation
+      category: Testing and Quality Assurance
       status: Completed
     - id: advanced-cost-analysis-framework-multi-region-pricing-models
       file: DONE/cost-intelligence-advanced/planning/advanced-cost-analysis-framework-multi-region-pricing-models.yaml
@@ -332,6 +337,11 @@ priorities:
       title: Integrate DataFrame Mode into CLI
       category: Core Functionality
       status: Partially Complete
+    - id: integrate-stdout-datagen
+      file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
+      title: Integrate stdout datagen with compression and format pipelines
+      category: Core Functionality
+      status: Completed
     - id: integration-test-suite-cleanup-remove-placeholder-and-failing-tests
       file: DONE/unknown/planning/integration-test-suite-cleanup-remove-placeholder-and-failing-tests.yaml
       title: Integration Test Suite Cleanup - Remove Placeholder and Failing Tests

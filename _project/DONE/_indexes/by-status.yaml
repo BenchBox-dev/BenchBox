@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T21:21:57.462766'
-total_items: 354
+generated_at: '2026-01-15T21:27:26.642943'
+total_items: 356
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 165
+    count: 167
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -828,6 +828,11 @@ statuses:
       title: Add numbered list selection to platform setup wizard
       priority: Medium-High
       category: User Experience
+    - id: test-stdout-datagen
+      file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
+      title: Add regression tests for TPC-DS stdout data generation
+      priority: High
+      category: Testing and Quality Assurance
     - id: add-sphinx-tags
       file: DONE/docs-experience/active/add-sphinx-tags.yaml
       title: Add sphinx-tags to BenchBox Documentation
@@ -1013,6 +1018,11 @@ statuses:
       title: Input Validation and SQL Safety
       priority: Medium
       category: Security and Reliability
+    - id: integrate-stdout-datagen
+      file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
+      title: Integrate stdout datagen with compression and format pipelines
+      priority: High
+      category: Core Functionality
     - id: logging-standardization
       file: DONE/observability-quality/active/logging-standardization.yaml
       title: Logging Standardization
