@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T12:41:13.866467'
-total_items: 50
+generated_at: '2026-01-16T13:35:21.300732'
+total_items: 49
 statuses:
   In Progress:
     count: 7
@@ -40,7 +40,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 43
+    count: 42
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -67,11 +67,6 @@ statuses:
       title: Databend Cloud-Native OLAP Platform Integration
       priority: Low
       category: Platform Expansion
-    - id: e2e-cli-test-suite
-      file: TODO/e2e-cli-tests/planning/e2e-cli-test-suite.yaml
-      title: 'E2E CLI Test Suite: Complete Platform Coverage'
-      priority: High
-      category: Testing and Quality Assurance
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication

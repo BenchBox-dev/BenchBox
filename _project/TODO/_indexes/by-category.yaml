@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T12:41:13.866404'
-total_categories: 9
+generated_at: '2026-01-16T13:35:21.300639'
+total_categories: 8
 categories:
   AI/ML Capabilities:
     count: 1
@@ -269,12 +269,4 @@ categories:
       file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
       title: Interactive Benchmark Explorer - Web UI
       priority: Low
-      status: Not Started
-  Testing and Quality Assurance:
-    count: 1
-    items:
-    - id: e2e-cli-test-suite
-      file: TODO/e2e-cli-tests/planning/e2e-cli-test-suite.yaml
-      title: 'E2E CLI Test Suite: Complete Platform Coverage'
-      priority: High
       status: Not Started
