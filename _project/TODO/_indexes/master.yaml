@@ -1,6 +1,59 @@
-generated_at: '2026-01-14T20:29:12.112581'
-total_items: 48
+generated_at: '2026-01-15T21:21:56.701608'
+total_items: 54
 items:
+- id: test-stdout-datagen
+  file: TODO/tpcds-stdout-fix/planning/test-stdout-datagen.yaml
+  title: Add regression tests for TPC-DS stdout data generation
+  worktree: tpcds-stdout-fix
+  category: Testing and Quality Assurance
+  priority: High
+  status: Not Started
+  tags:
+  - tpc-ds
+  - testing
+  - regression
+  - ci
+  estimated_effort: 3-4 hours
+- id: test-stdout-datagen
+  file: TODO/tpch-stdout-fix/planning/test-stdout-datagen.yaml
+  title: Add regression tests for TPC-H stdout data generation
+  worktree: tpch-stdout-fix
+  category: Testing and Quality Assurance
+  priority: High
+  status: Not Started
+  tags:
+  - tpc-h
+  - testing
+  - regression
+  - stdout
+  estimated_effort: 2-3 hours
+- id: integrate-stdout-datagen
+  file: TODO/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
+  title: Integrate TPC-H stdout datagen with compression and format pipelines
+  worktree: tpch-stdout-fix
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - tpc-h
+  - streaming
+  - compression
+  - integration
+  estimated_effort: 3-4 hours
+- id: integrate-stdout-datagen
+  file: TODO/tpcds-stdout-fix/active/integrate-stdout-datagen.yaml
+  title: Integrate stdout datagen with compression and format pipelines
+  worktree: tpcds-stdout-fix
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - tpc-ds
+  - streaming
+  - compression
+  - parquet
+  - performance
+  estimated_effort: 2-3 days
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
   title: MotherDuck Platform Adapter
@@ -14,6 +67,19 @@ items:
   - duckdb
   - cloud
   estimated_effort: 3-4 days
+- id: patch-tpch-source-stdout
+  file: TODO/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
+  title: Patch TPC-H source to fix stdout data generation
+  worktree: tpch-stdout-fix
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - tpc-h
+  - datagen
+  - stdout
+  - patch
+  estimated_effort: 1-2 hours
 - id: deployment-factory-integration
   file: TODO/platform-expansion/active/deployment-factory-integration.yaml
   title: Platform Deployment Factory Integration
@@ -38,6 +104,19 @@ items:
   - platform-registry
   - deployment-modes
   estimated_effort: 3-4 days
+- id: rebuild-tpch-binaries
+  file: TODO/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
+  title: Rebuild TPC-H binaries with stdout fix for all platforms
+  worktree: tpch-stdout-fix
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - tpc-h
+  - compilation
+  - binaries
+  - cross-platform
+  estimated_effort: 2-4 hours
 - id: oxbow-series-reality-vs-aspiration
   file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
   title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'

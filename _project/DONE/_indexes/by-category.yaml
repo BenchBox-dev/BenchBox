@@ -1,4 +1,4 @@
-generated_at: '2026-01-14T20:29:12.873424'
+generated_at: '2026-01-15T21:21:57.462540'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -327,7 +327,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 56
+    count: 58
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -539,6 +539,11 @@ categories:
       title: 'PT-10: DataFrame Platform Physical Tuning (Write-Time Layout)'
       priority: Medium
       status: Done
+    - id: patch-tpcds-source-stdout
+      file: DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml
+      title: Patch TPC-DS source to fix stdout data generation
+      priority: High
+      status: Completed
     - id: postgresql-code-quality-fixes
       file: DONE/platform-expansion/active/postgresql-code-quality-fixes.yaml
       title: PostgreSQL adapter code quality fixes from code review
@@ -572,6 +577,11 @@ categories:
     - id: query-plan-platform-adapter-integration
       file: DONE/query-plan-adapters/planning/query-plan-platform-adapter-integration.yaml
       title: Query Plan Platform Adapter Integration
+      priority: High
+      status: Completed
+    - id: rebuild-tpcds-binaries
+      file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
+      title: Rebuild TPC-DS binaries with stdout fix for all platforms
       priority: High
       status: Completed
     - id: refactor-and-simplify-tpc-compilation-infrastructure-completed

@@ -1,5 +1,5 @@
-generated_at: '2026-01-14T20:29:12.873282'
-total_items: 352
+generated_at: '2026-01-15T21:21:57.462322'
+total_items: 354
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -947,6 +947,20 @@ items:
   owners:
   - joe
   estimated_effort: Medium-Large
+- id: patch-tpcds-source-stdout
+  file: DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml
+  title: Patch TPC-DS source to fix stdout data generation
+  worktree: tpcds-stdout-fix
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tpc-ds
+  - dsdgen
+  - stdout
+  - bugfix
+  estimated_effort: 1-2 hours
+  completed_date: '2026-01-15'
 - id: phase-4-infrastructure
   file: DONE/platform-config-audit/completed/phase-4-infrastructure.yaml
   title: 'Platform Config Audit: Infrastructure/Cluster Changes'
@@ -1110,6 +1124,20 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 3-5 days
   completed_date: '2025-12-12'
+- id: rebuild-tpcds-binaries
+  file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
+  title: Rebuild TPC-DS binaries with stdout fix for all platforms
+  worktree: tpcds-stdout-fix
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tpc-ds
+  - binaries
+  - cross-platform
+  - build
+  estimated_effort: 4-6 hours
+  completed_date: '2026-01-15'
 - id: refactor-core-dependencies-to-optional
   file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
   title: Refactor platform-specific packages from core to optional dependencies

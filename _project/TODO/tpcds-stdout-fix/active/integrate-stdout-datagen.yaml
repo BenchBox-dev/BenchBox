@@ -1,0 +1,149 @@
+# TPC-DS stdout data generation fix - BenchBox integration
+# Location: _project/TODO/tpcds-stdout-fix/planning/integrate-stdout-datagen.yaml
+
+title: "Integrate stdout datagen with compression and format pipelines"
+worktree: tpcds-stdout-fix
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  With the fixed TPC-DS binaries supporting stdout output via -FILTER Y,
+  update BenchBox data generation modules to leverage streaming output
+  for direct compression and open table format writing.
+
+  Benefits:
+  - Eliminate intermediate .dat files for large scale factors
+  - Stream directly to compressed formats (zstd, gzip, lz4)
+  - Stream directly to Parquet/ORC/Iceberg without disk staging
+  - Reduce disk I/O and storage requirements
+  - Enable parallel table generation with better resource utilization
+
+context_sections:
+  "Current Data Generation Flow": |
+    1. dsdgen writes .dat files to disk
+    2. BenchBox reads .dat files
+    3. Converts/loads to target platform
+    4. Cleanup .dat files
+
+  "New Streaming Flow": |
+    1. dsdgen -FILTER Y streams to stdout
+    2. BenchBox pipes directly to:
+       a) Compression (zstd/gzip) → file
+       b) Parquet writer → file or cloud storage
+       c) Platform loader (direct ingest)
+    3. No intermediate files needed
+
+  "Implementation Considerations": |
+    - Need to handle sales/returns table pairs (returns skipped in FILTER mode)
+    - Consider adding returns support to dsdgen later
+    - Parallel table generation possible since each table is independent
+    - Must preserve existing file-based flow as fallback
+
+tasks:
+  phases:
+    - phase: "Phase 1: Update binary wrapper module"
+      done: false
+      items:
+        - summary: "Add -FILTER Y support to dsdgen wrapper"
+          done: false
+          subtasks:
+            - summary: "Update subprocess call to capture stdout"
+              done: false
+            - summary: "Add streaming mode parameter"
+              done: false
+            - summary: "Handle stderr separately for progress/errors"
+              done: false
+        - summary: "Create streaming data reader for stdout pipe"
+          done: false
+          subtasks:
+            - summary: "Line-by-line CSV parsing from pipe"
+              done: false
+            - summary: "Batch accumulation for efficient writes"
+              done: false
+
+    - phase: "Phase 2: Add compression pipeline"
+      done: false
+      items:
+        - summary: "Create stdout → zstd compression pipeline"
+          done: false
+        - summary: "Create stdout → gzip compression pipeline"
+          done: false
+        - summary: "Support streaming to cloud storage (S3, GCS, Azure)"
+          done: false
+        - summary: "Add CLI option: --datagen-stream"
+          done: false
+
+    - phase: "Phase 3: Add format conversion pipelines"
+      done: false
+      items:
+        - summary: "Create stdout → Parquet writer pipeline"
+          done: false
+          subtasks:
+            - summary: "Use PyArrow for streaming Parquet writes"
+              done: false
+            - summary: "Support row group sizing configuration"
+              done: false
+        - summary: "Create stdout → ORC writer pipeline (if needed)"
+          done: false
+        - summary: "Create stdout → Iceberg table writer"
+          done: false
+
+    - phase: "Phase 4: Handle special cases"
+      done: false
+      items:
+        - summary: "Document sales/returns limitation (returns skipped)"
+          done: false
+        - summary: "Add fallback to file-based generation when needed"
+          done: false
+        - summary: "Support parallel table generation"
+          done: false
+
+files_affected:
+  modified:
+    - "benchbox/core/tpcds/generator.py"
+    - "benchbox/core/runner/runner.py"
+    - "benchbox/cli/commands/run.py"
+  added:
+    - "benchbox/core/tpcds/streaming.py"
+    - "benchbox/utils/compression_pipeline.py"
+
+impact:
+  business_value: |
+    Enables streaming data generation for large scale factors without disk staging,
+    reducing storage requirements and total benchmark execution time significantly.
+  user_impact: |
+    Users running SF10+ benchmarks will see 10-30% faster data generation and
+    significantly reduced disk space requirements (no intermediate .dat files).
+  technical_debt: |
+    Reduces complexity of data cleanup logic since intermediate files are eliminated.
+    Simplifies cloud deployments where disk space may be limited.
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/tpcds-stdout-fix/planning/rebuild-tpcds-binaries.yaml"
+  blocks:
+    - "_project/TODO/tpcds-stdout-fix/planning/test-stdout-datagen.yaml"
+
+open_questions:
+  - "Should we support returns tables via separate dsdgen calls for sales/returns pairs?"
+  - "What's the minimum row batch size for efficient Parquet writes (1K, 10K, 100K)?"
+  - "Should streaming be opt-in (--datagen-stream) or default for large scale factors?"
+  - "How should we handle streaming failures mid-generation (retry vs fallback to file)?"
+
+success_metrics:
+  - "dsdgen stdout output can be piped directly to zstd compression"
+  - "dsdgen stdout output can be written directly to Parquet format"
+  - "Large scale factors (SF10+) work without intermediate .dat files"
+  - "Existing file-based workflow continues to work as fallback"
+  - "10-30% reduction in total data generation time for large SFs"
+
+metadata:
+  tags:
+    - tpc-ds
+    - streaming
+    - compression
+    - parquet
+    - performance
+  estimated_effort: "2-3 days"
+  created_date: "2026-01-15"

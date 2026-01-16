@@ -1,0 +1,122 @@
+title: "Rebuild TPC-H binaries with stdout fix for all platforms"
+worktree: "tpch-stdout-fix"
+priority: "High"
+status: "Not Started"
+category: "Core Functionality"
+description: |
+  After applying stdout patches to TPC-H source, rebuild dbgen binaries
+  for all supported platforms to enable streaming data generation.
+
+  Target platforms (6 total):
+  - darwin-arm64 (macOS Apple Silicon)
+  - darwin-x86_64 (macOS Intel)
+  - linux-arm64 (Linux ARM64)
+  - linux-x86_64 (Linux x86_64)
+  - windows-arm64 (Windows ARM64)
+  - windows-x86_64 (Windows x86_64)
+
+context_sections:
+  "Technical Context": |
+    Binary locations: _binaries/tpc-h/{platform}/dbgen
+
+    Build requirements:
+    - Native compilation for each platform
+    - Cross-compilation infrastructure for non-macOS platforms
+    - Docker containers for Linux builds
+    - MinGW or similar for Windows builds
+
+    Key compilation flags:
+    - Ensure LINUX or MAC defined appropriately in config.h
+    - Static linking preferred for portability
+    - Optimize for size and performance
+
+tasks:
+  phases:
+    - phase: "Phase 1: macOS Builds"
+      done: false
+      items:
+        - summary: "Build darwin-arm64 binary on Apple Silicon Mac"
+          done: false
+        - summary: "Build darwin-x86_64 binary (cross-compile or Rosetta)"
+          done: false
+        - summary: "Verify both macOS binaries work with -z flag"
+          done: false
+
+    - phase: "Phase 2: Linux Builds"
+      done: false
+      items:
+        - summary: "Build linux-x86_64 binary (Docker or VM)"
+          done: false
+        - summary: "Build linux-arm64 binary (Docker or cross-compile)"
+          done: false
+        - summary: "Verify both Linux binaries work with -z flag"
+          done: false
+
+    - phase: "Phase 3: Windows Builds"
+      done: false
+      items:
+        - summary: "Build windows-x86_64 binary (MinGW)"
+          done: false
+        - summary: "Build windows-arm64 binary (if toolchain available)"
+          done: false
+        - summary: "Verify Windows binaries work with -z flag"
+          done: false
+
+    - phase: "Phase 4: Verification"
+      done: false
+      items:
+        - summary: "Run regression tests on all 6 binaries"
+          done: false
+          subtasks:
+            - summary: "Test backward compatibility: file-mode generation still works"
+              done: false
+            - summary: "Test new functionality: -z stdout mode works"
+              done: false
+        - summary: "Verify output format matches between -z and file modes"
+          done: false
+          subtasks:
+            - summary: "For each platform: diff stdout output vs file output"
+              done: false
+            - summary: "Verify row counts match expected for SF 0.01"
+              done: false
+        - summary: "Run existing BenchBox TPC-H tests with new binaries"
+          done: false
+          subtasks:
+            - summary: "uv run pytest tests/unit/core/tpch -v"
+              done: false
+            - summary: "uv run pytest tests/integration -k tpch -v"
+              done: false
+        - summary: "Update binary version metadata"
+          done: false
+
+files_affected:
+  modified:
+    - "_binaries/tpc-h/darwin-arm64/dbgen"
+    - "_binaries/tpc-h/darwin-x86_64/dbgen"
+    - "_binaries/tpc-h/linux-arm64/dbgen"
+    - "_binaries/tpc-h/linux-x86_64/dbgen"
+    - "_binaries/tpc-h/windows-arm64/dbgen.exe"
+    - "_binaries/tpc-h/windows-x86_64/dbgen.exe"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml"
+  blocks:
+    - "_project/TODO/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml"
+  related:
+    - "_project/TODO/tpcds-stdout-fix/planning/rebuild-tpcds-binaries.yaml"
+
+success_metrics:
+  - "All 6 platform binaries compile successfully"
+  - "All binaries pass -z stdout output verification"
+  - "Output from -z matches output from file mode exactly"
+  - "Binary sizes are reasonable (no bloat)"
+
+metadata:
+  created_date: "2026-01-15"
+  estimated_effort: "2-4 hours"
+  tags:
+    - "tpc-h"
+    - "compilation"
+    - "binaries"
+    - "cross-platform"

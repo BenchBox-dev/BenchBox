@@ -1,0 +1,153 @@
+# TPC-DS stdout data generation fix - Testing
+# Location: _project/TODO/tpcds-stdout-fix/planning/test-stdout-datagen.yaml
+
+title: "Add regression tests for TPC-DS stdout data generation"
+worktree: tpcds-stdout-fix
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Create comprehensive tests to validate the TPC-DS stdout fix and prevent
+  future regressions. Tests must cover:
+
+  1. Binary-level tests (dsdgen accepts -FILTER Y and outputs to stdout)
+  2. Integration tests (BenchBox can use streaming datagen)
+  3. Backward compatibility (file-based generation still works)
+  4. Data validation (stdout output matches file output)
+
+  These tests should run in CI to catch any regressions if the TPC source
+  is updated in the future.
+
+context_sections:
+  "Test Categories": |
+    Unit Tests:
+    - Binary wrapper correctly passes -FILTER Y flag
+    - Streaming parser handles pipe input correctly
+    - Compression pipeline produces valid output
+
+    Integration Tests:
+    - End-to-end stdout datagen for small table
+    - Stdout vs file output data equivalence
+    - Streaming to compressed file works
+    - Streaming to Parquet works
+
+    Regression Tests:
+    - Binary accepts FILTER (not _FILTER) parameter
+    - Stdout produces data (not empty or error)
+    - File-based generation unaffected
+
+  "Test Data": |
+    Use small tables for fast tests:
+    - date_dim (73,049 rows at SF1) - deterministic, good for validation
+    - time_dim (86,400 rows at SF1) - small and fast
+    - ship_mode (20 rows at SF1) - tiny, fastest
+
+    Use SCALE 1 minimum (fractional causes segfault)
+    Use fixed RNGSEED for reproducibility
+
+tasks:
+  phases:
+    - phase: "Phase 1: Binary acceptance tests"
+      done: false
+      items:
+        - summary: "Test: dsdgen -help shows FILTER (not _FILTER)"
+          done: false
+        - summary: "Test: dsdgen -FILTER Y is accepted (no error)"
+          done: false
+        - summary: "Test: dsdgen -FILTER Y produces stdout output"
+          done: false
+        - summary: "Test: dsdgen without FILTER creates file"
+          done: false
+
+    - phase: "Phase 2: Data validation tests"
+      done: false
+      items:
+        - summary: "Test: stdout output row count matches file output"
+          done: false
+        - summary: "Test: stdout output content matches file output"
+          done: false
+          subtasks:
+            - summary: "Generate date_dim via file, capture content"
+              done: false
+            - summary: "Generate date_dim via stdout, capture content"
+              done: false
+            - summary: "Compare byte-for-byte or parsed rows"
+              done: false
+        - summary: "Test: Multiple tables can be generated in sequence"
+          done: false
+
+    - phase: "Phase 3: Streaming integration tests"
+      done: false
+      note: "Requires integrate-stdout-datagen.yaml completion before these tests can be written"
+      items:
+        - summary: "Test: Pipe stdout to gzip produces valid gzip file"
+          done: false
+        - summary: "Test: Pipe stdout to zstd produces valid zstd file"
+          done: false
+        - summary: "Test: Stream to Parquet produces valid Parquet"
+          done: false
+        - summary: "Test: BenchBox streaming mode completes successfully"
+          done: false
+
+    - phase: "Phase 4: Run existing test suite"
+      done: false
+      items:
+        - summary: "Run full pytest suite to catch regressions"
+          done: false
+        - summary: "Run TPC-DS specific tests"
+          done: false
+        - summary: "Run integration tests with DuckDB"
+          done: false
+        - summary: "Verify no test failures introduced"
+          done: false
+
+    - phase: "Phase 5: CI integration"
+      done: false
+      items:
+        - summary: "Add stdout tests to CI workflow"
+          done: false
+        - summary: "Mark tests with appropriate pytest markers"
+          done: false
+        - summary: "Document test requirements (binary availability)"
+          done: false
+
+files_affected:
+  added:
+    - "tests/unit/core/tpcds/test_stdout_datagen.py"
+    - "tests/integration/test_tpcds_stdout_streaming.py"
+  modified:
+    - "tests/conftest.py"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/tpcds-stdout-fix/planning/patch-tpcds-source-stdout.yaml"
+    - "_project/TODO/tpcds-stdout-fix/planning/integrate-stdout-datagen.yaml"
+  notes: |
+    Phase 1-2 (binary acceptance + data validation) can run after patch-tpcds-source-stdout.
+    Phase 3-5 (streaming integration + CI) requires integrate-stdout-datagen completion.
+
+success_metrics:
+  - "All new tests pass with fixed binaries"
+  - "Tests fail with unfixed binaries (validates test effectiveness)"
+  - "No regressions in existing test suite"
+  - "Tests run in < 60 seconds total"
+  - "Tests integrated into CI pipeline"
+
+technical_requirements:
+  constraints:
+    - "Must use SCALE 1 minimum (fractional causes dsdgen segfault)"
+    - "Must use fixed RNGSEED for reproducibility"
+    - "Tests must be platform-independent where possible"
+  dependencies:
+    - "pytest"
+    - "dsdgen binary for target platform"
+
+metadata:
+  tags:
+    - tpc-ds
+    - testing
+    - regression
+    - ci
+  estimated_effort: "3-4 hours"
+  created_date: "2026-01-15"

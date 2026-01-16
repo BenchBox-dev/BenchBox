@@ -1,0 +1,110 @@
+title: "Add regression tests for TPC-H stdout data generation"
+worktree: "tpch-stdout-fix"
+priority: "High"
+status: "Not Started"
+category: "Testing and Quality Assurance"
+description: |
+  Create comprehensive regression tests for TPC-H stdout data generation
+  to ensure the -z flag works correctly and produces identical output
+  to file-based generation.
+
+  Test coverage should include:
+  - All 8 TPC-H tables
+  - Multiple scale factors (0.01, 0.1, 1.0)
+  - Streaming with various compression codecs
+  - Parallel generation scenarios
+  - Error handling edge cases
+
+context_sections:
+  "Technical Context": |
+    Key test scenarios:
+
+    1. Output Equivalence Tests:
+       - dbgen -z -s 0.01 -T c > stdout.tbl
+       - dbgen -s 0.01 -T c (creates customer.tbl)
+       - diff stdout.tbl customer.tbl (must be identical)
+
+    2. All Tables Test:
+       - Generate all 8 tables via stdout
+       - Verify row counts match expected for scale factor
+       - Verify data format (pipe-delimited, correct columns)
+
+    3. Compression Integration:
+       - Stream to zstd compression
+       - Stream to gzip compression
+       - Verify decompressed output matches uncompressed
+
+    4. Error Handling:
+       - Broken pipe handling
+       - Process interruption
+       - Invalid flag combinations (-z with -U)
+
+tasks:
+  phases:
+    - phase: "Phase 1: Binary Tests"
+      done: false
+      items:
+        - summary: "Test dbgen -z flag produces stdout output"
+          done: false
+        - summary: "Verify output matches file-based generation exactly"
+          done: false
+        - summary: "Test all 8 tables with -z flag"
+          done: false
+        - summary: "Test money formatting correctness (bug fix verification)"
+          done: false
+        - summary: "BACKWARD COMPATIBILITY: Verify file-mode generation still works"
+          done: false
+          subtasks:
+            - summary: "Test dbgen WITHOUT -z flag still creates .tbl files"
+              done: false
+            - summary: "Verify output format unchanged from previous behavior"
+              done: false
+
+    - phase: "Phase 2: Integration Tests"
+      done: false
+      items:
+        - summary: "Test streaming to zstd compression"
+          done: false
+        - summary: "Test streaming to gzip compression"
+          done: false
+        - summary: "Test parallel table generation with streaming"
+          done: false
+        - summary: "Test manifest tracking for streamed files"
+          done: false
+
+    - phase: "Phase 3: Error Handling Tests"
+      done: false
+      items:
+        - summary: "Test broken pipe handling"
+          done: false
+        - summary: "Test process interruption cleanup"
+          done: false
+        - summary: "Test invalid flag combination rejection"
+          done: false
+
+files_affected:
+  added:
+    - "tests/unit/core/tpch/test_stdout_datagen.py"
+    - "tests/integration/test_tpch_streaming_generation.py"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml"
+  related:
+    - "_project/TODO/tpcds-stdout-fix/planning/test-stdout-datagen.yaml"
+
+success_metrics:
+  - "All regression tests pass"
+  - "100% output equivalence between -z and file modes"
+  - "Money formatting produces correct decimal values"
+  - "Streaming compression produces valid compressed files"
+  - "Error scenarios handled gracefully"
+
+metadata:
+  created_date: "2026-01-15"
+  estimated_effort: "2-3 hours"
+  tags:
+    - "tpc-h"
+    - "testing"
+    - "regression"
+    - "stdout"

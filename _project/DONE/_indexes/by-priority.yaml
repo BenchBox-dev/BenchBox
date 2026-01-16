@@ -1,5 +1,5 @@
-generated_at: '2026-01-14T20:29:12.873511'
-total_items: 352
+generated_at: '2026-01-15T21:21:57.462676'
+total_items: 354
 priorities:
   Critical:
     count: 24
@@ -125,7 +125,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 110
+    count: 112
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -367,6 +367,11 @@ priorities:
       title: 'PT-05: PostgreSQL & TimescaleDB Physical Tuning DDL Generators'
       category: Platform Expansion
       status: Not Started
+    - id: patch-tpcds-source-stdout
+      file: DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml
+      title: Patch TPC-DS source to fix stdout data generation
+      category: Core Functionality
+      status: Completed
     - id: phase-4-infrastructure
       file: DONE/platform-config-audit/completed/phase-4-infrastructure.yaml
       title: 'Platform Config Audit: Infrastructure/Cluster Changes'
@@ -431,6 +436,11 @@ priorities:
       file: DONE/docs-experience/completed/quick-start-tutorials.yaml
       title: Quick-Start Tutorials
       category: Documentation and User Experience
+      status: Completed
+    - id: rebuild-tpcds-binaries
+      file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
+      title: Rebuild TPC-DS binaries with stdout fix for all platforms
+      category: Core Functionality
       status: Completed
     - id: refactor-core-dependencies-to-optional
       file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml

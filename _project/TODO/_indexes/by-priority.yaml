@@ -1,14 +1,39 @@
-generated_at: '2026-01-14T20:29:12.112648'
-total_items: 48
+generated_at: '2026-01-15T21:21:56.701662'
+total_items: 54
 priorities:
   High:
-    count: 6
+    count: 12
     items:
+    - id: test-stdout-datagen
+      file: TODO/tpcds-stdout-fix/planning/test-stdout-datagen.yaml
+      title: Add regression tests for TPC-DS stdout data generation
+      category: Testing and Quality Assurance
+      status: Not Started
+    - id: test-stdout-datagen
+      file: TODO/tpch-stdout-fix/planning/test-stdout-datagen.yaml
+      title: Add regression tests for TPC-H stdout data generation
+      category: Testing and Quality Assurance
+      status: Not Started
+    - id: integrate-stdout-datagen
+      file: TODO/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
+      title: Integrate TPC-H stdout datagen with compression and format pipelines
+      category: Core Functionality
+      status: Not Started
+    - id: integrate-stdout-datagen
+      file: TODO/tpcds-stdout-fix/active/integrate-stdout-datagen.yaml
+      title: Integrate stdout datagen with compression and format pipelines
+      category: Core Functionality
+      status: Not Started
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
       category: Platform Expansion
       status: In Progress
+    - id: patch-tpch-source-stdout
+      file: TODO/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
+      title: Patch TPC-H source to fix stdout data generation
+      category: Core Functionality
+      status: Not Started
     - id: deployment-factory-integration
       file: TODO/platform-expansion/active/deployment-factory-integration.yaml
       title: Platform Deployment Factory Integration
@@ -19,6 +44,11 @@ priorities:
       title: Platform Deployment Registry Extensions
       category: Core Functionality
       status: In Progress
+    - id: rebuild-tpch-binaries
+      file: TODO/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
+      title: Rebuild TPC-H binaries with stdout fix for all platforms
+      category: Core Functionality
+      status: Not Started
     - id: oxbow-series-reality-vs-aspiration
       file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
       title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'

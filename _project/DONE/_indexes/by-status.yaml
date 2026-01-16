@@ -1,5 +1,5 @@
-generated_at: '2026-01-14T20:29:12.873586'
-total_items: 352
+generated_at: '2026-01-15T21:21:57.462766'
+total_items: 354
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 163
+    count: 165
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1053,6 +1053,11 @@ statuses:
       title: 'PT-01: DDL Generator Protocol and Base Implementation'
       priority: Critical
       category: Core Functionality
+    - id: patch-tpcds-source-stdout
+      file: DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml
+      title: Patch TPC-DS source to fix stdout data generation
+      priority: High
+      category: Core Functionality
     - id: performance-regression-detection-system
       file: DONE/enterprise-ops-regression/planning/performance-regression-detection-system.yaml
       title: Performance Regression Detection System
@@ -1138,6 +1143,11 @@ statuses:
       title: Ranking & Aggregation System - Platform Leaderboards & Trends
       priority: Critical
       category: Marketing Content Enablement
+    - id: rebuild-tpcds-binaries
+      file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
+      title: Rebuild TPC-DS binaries with stdout fix for all platforms
+      priority: High
+      category: Core Functionality
     - id: refactor-core-dependencies-to-optional
       file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
       title: Refactor platform-specific packages from core to optional dependencies

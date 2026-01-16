@@ -1,5 +1,5 @@
-generated_at: '2026-01-14T20:29:12.112628'
-total_categories: 8
+generated_at: '2026-01-15T21:21:56.701644'
+total_categories: 9
 categories:
   AI/ML Capabilities:
     count: 1
@@ -141,18 +141,33 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 7
+    count: 11
     items:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
       priority: Medium
       status: Not Started
+    - id: integrate-stdout-datagen
+      file: TODO/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
+      title: Integrate TPC-H stdout datagen with compression and format pipelines
+      priority: High
+      status: Not Started
+    - id: integrate-stdout-datagen
+      file: TODO/tpcds-stdout-fix/active/integrate-stdout-datagen.yaml
+      title: Integrate stdout datagen with compression and format pipelines
+      priority: High
+      status: Not Started
     - id: migrate-clickhouse-firebolt-deployment
       file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
       title: Migrate ClickHouse/Firebolt to Deployment Registry
       priority: Medium-High
       status: In Progress
+    - id: patch-tpch-source-stdout
+      file: TODO/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
+      title: Patch TPC-H source to fix stdout data generation
+      priority: High
+      status: Not Started
     - id: deployment-config-inheritance
       file: TODO/platform-expansion/active/deployment-config-inheritance.yaml
       title: Platform Configuration Inheritance
@@ -173,6 +188,11 @@ categories:
       title: Platform Deployment Registry Extensions
       priority: High
       status: In Progress
+    - id: rebuild-tpch-binaries
+      file: TODO/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
+      title: Rebuild TPC-H binaries with stdout fix for all platforms
+      priority: High
+      status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -264,4 +284,17 @@ categories:
       file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
       title: Interactive Benchmark Explorer - Web UI
       priority: Low
+      status: Not Started
+  Testing and Quality Assurance:
+    count: 2
+    items:
+    - id: test-stdout-datagen
+      file: TODO/tpcds-stdout-fix/planning/test-stdout-datagen.yaml
+      title: Add regression tests for TPC-DS stdout data generation
+      priority: High
+      status: Not Started
+    - id: test-stdout-datagen
+      file: TODO/tpch-stdout-fix/planning/test-stdout-datagen.yaml
+      title: Add regression tests for TPC-H stdout data generation
+      priority: High
       status: Not Started
