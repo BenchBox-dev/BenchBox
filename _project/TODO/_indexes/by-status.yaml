@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T22:39:42.929221'
-total_items: 52
+generated_at: '2026-01-15T22:44:57.574831'
+total_items: 49
 statuses:
   In Progress:
     count: 7
@@ -252,21 +252,3 @@ statuses:
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
       category: Blog Revision
-  Completed:
-    count: 3
-    items:
-    - id: test-stdout-datagen
-      file: TODO/tpch-stdout-fix/planning/test-stdout-datagen.yaml
-      title: Add regression tests for TPC-H stdout data generation
-      priority: High
-      category: Testing and Quality Assurance
-    - id: integrate-stdout-datagen
-      file: TODO/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
-      title: Integrate TPC-H stdout datagen with compression and format pipelines
-      priority: High
-      category: Core Functionality
-    - id: patch-tpch-source-stdout
-      file: TODO/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
-      title: Patch TPC-H source to fix stdout data generation
-      priority: High
-      category: Core Functionality

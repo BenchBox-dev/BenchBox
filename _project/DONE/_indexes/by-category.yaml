@@ -1,4 +1,4 @@
-generated_at: '2026-01-15T22:39:43.691053'
+generated_at: '2026-01-15T22:44:58.346857'
 total_categories: 53
 categories:
   '"Bug Fixes & Reliability"':
@@ -327,7 +327,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 59
+    count: 61
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -520,6 +520,11 @@ categories:
       priority: High
       status: Partially Complete
     - id: integrate-stdout-datagen
+      file: DONE/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
+      title: Integrate TPC-H stdout datagen with compression and format pipelines
+      priority: High
+      status: Completed
+    - id: integrate-stdout-datagen
       file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
       title: Integrate stdout datagen with compression and format pipelines
       priority: High
@@ -547,6 +552,11 @@ categories:
     - id: patch-tpcds-source-stdout
       file: DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml
       title: Patch TPC-DS source to fix stdout data generation
+      priority: High
+      status: Completed
+    - id: patch-tpch-source-stdout
+      file: DONE/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
+      title: Patch TPC-H source to fix stdout data generation
       priority: High
       status: Completed
     - id: postgresql-code-quality-fixes
@@ -1723,7 +1733,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 13
+    count: 14
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1738,6 +1748,11 @@ categories:
     - id: test-stdout-datagen
       file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
       title: Add regression tests for TPC-DS stdout data generation
+      priority: High
+      status: Completed
+    - id: test-stdout-datagen
+      file: DONE/tpch-stdout-fix/planning/test-stdout-datagen.yaml
+      title: Add regression tests for TPC-H stdout data generation
       priority: High
       status: Completed
     - id: comprehensive-platform-adapter-testing-completed

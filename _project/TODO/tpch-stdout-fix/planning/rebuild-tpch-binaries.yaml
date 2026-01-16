@@ -100,11 +100,9 @@ files_affected:
 
 dependencies:
   blocked_by:
-    - "_project/TODO/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml"
-  blocks:
-    - "_project/TODO/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml"
+    - "_project/DONE/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml"
   related:
-    - "_project/TODO/tpcds-stdout-fix/planning/rebuild-tpcds-binaries.yaml"
+    - "_project/DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml"
 
 success_metrics:
   - "All 6 platform binaries compile successfully"

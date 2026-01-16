@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T22:39:43.691159'
-total_items: 357
+generated_at: '2026-01-15T22:44:58.346946'
+total_items: 360
 priorities:
   Critical:
     count: 24
@@ -125,7 +125,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 115
+    count: 118
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -190,6 +190,11 @@ priorities:
     - id: test-stdout-datagen
       file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
       title: Add regression tests for TPC-DS stdout data generation
+      category: Testing and Quality Assurance
+      status: Completed
+    - id: test-stdout-datagen
+      file: DONE/tpch-stdout-fix/planning/test-stdout-datagen.yaml
+      title: Add regression tests for TPC-H stdout data generation
       category: Testing and Quality Assurance
       status: Completed
     - id: advanced-cost-analysis-framework-multi-region-pricing-models
@@ -343,6 +348,11 @@ priorities:
       category: Core Functionality
       status: Partially Complete
     - id: integrate-stdout-datagen
+      file: DONE/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
+      title: Integrate TPC-H stdout datagen with compression and format pipelines
+      category: Core Functionality
+      status: Completed
+    - id: integrate-stdout-datagen
       file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
       title: Integrate stdout datagen with compression and format pipelines
       category: Core Functionality
@@ -385,6 +395,11 @@ priorities:
     - id: patch-tpcds-source-stdout
       file: DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml
       title: Patch TPC-DS source to fix stdout data generation
+      category: Core Functionality
+      status: Completed
+    - id: patch-tpch-source-stdout
+      file: DONE/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
+      title: Patch TPC-H source to fix stdout data generation
       category: Core Functionality
       status: Completed
     - id: phase-4-infrastructure

@@ -49,49 +49,49 @@ context_sections:
 tasks:
   phases:
     - phase: "Phase 1: Prepare Patches"
-      done: false
+      done: true
       items:
         - summary: "Create unified diff patches for each file"
-          done: false
+          done: true
           subtasks:
             - summary: "Patch dss.h - add zstdout declaration"
-              done: false
+              done: true
             - summary: "Patch print.c - add stdout conditional + fix money format"
-              done: false
+              done: true
             - summary: "Patch driver.c - add -z flag handling"
-              done: false
+              done: true
         - summary: "Optionally patch config.h for macOS platform support"
-          done: false
+          done: true
 
     - phase: "Phase 2: Apply and Verify"
-      done: false
+      done: true
       items:
         - summary: "Apply patches to _sources/tpc-h/dbgen/"
-          done: false
+          done: true
         - summary: "Verify patches apply cleanly"
-          done: false
+          done: true
         - summary: "Document patches in _sources/tpc-h/PATCHES.md"
-          done: false
+          done: true
 
     - phase: "Phase 3: Run Existing Tests (No Regression)"
-      done: false
+      done: true
       items:
         - summary: "Run existing TPC-H unit tests before patching (baseline)"
-          done: false
+          done: true
         - summary: "Run existing TPC-H unit tests after patching (must pass)"
-          done: false
+          done: true
           subtasks:
             - summary: "uv run pytest tests/unit/core/tpch -v"
-              done: false
+              done: true
             - summary: "uv run pytest tests/integration -k tpch -v"
-              done: false
+              done: true
         - summary: "Verify file-mode generation still works (backward compatibility)"
-          done: false
+          done: true
           subtasks:
             - summary: "dbgen -s 0.01 -T c creates customer.tbl correctly"
-              done: false
+              done: true
             - summary: "Existing BenchBox TPC-H generator works unchanged"
-              done: false
+              done: true
 
 files_affected:
   modified:
@@ -105,7 +105,7 @@ dependencies:
   blocks:
     - "_project/TODO/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml"
   related:
-    - "_project/TODO/tpcds-stdout-fix/planning/patch-tpcds-source-stdout.yaml"
+    - "_project/DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml"
 
 success_metrics:
   - "Patches apply cleanly to BenchBox TPC-H source"
@@ -115,7 +115,10 @@ success_metrics:
 
 metadata:
   created_date: "2026-01-15"
+  completed_date: "2026-01-15"
   estimated_effort: "1-2 hours"
+  commits:
+    - "6422d8b4"
   tags:
     - "tpc-h"
     - "datagen"

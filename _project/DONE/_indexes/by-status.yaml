@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T22:39:43.691252'
-total_items: 357
+generated_at: '2026-01-15T22:44:58.347026'
+total_items: 360
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 168
+    count: 171
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -831,6 +831,11 @@ statuses:
     - id: test-stdout-datagen
       file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
       title: Add regression tests for TPC-DS stdout data generation
+      priority: High
+      category: Testing and Quality Assurance
+    - id: test-stdout-datagen
+      file: DONE/tpch-stdout-fix/planning/test-stdout-datagen.yaml
+      title: Add regression tests for TPC-H stdout data generation
       priority: High
       category: Testing and Quality Assurance
     - id: add-sphinx-tags
@@ -1024,6 +1029,11 @@ statuses:
       priority: Medium
       category: Security and Reliability
     - id: integrate-stdout-datagen
+      file: DONE/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
+      title: Integrate TPC-H stdout datagen with compression and format pipelines
+      priority: High
+      category: Core Functionality
+    - id: integrate-stdout-datagen
       file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
       title: Integrate stdout datagen with compression and format pipelines
       priority: High
@@ -1071,6 +1081,11 @@ statuses:
     - id: patch-tpcds-source-stdout
       file: DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml
       title: Patch TPC-DS source to fix stdout data generation
+      priority: High
+      category: Core Functionality
+    - id: patch-tpch-source-stdout
+      file: DONE/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
+      title: Patch TPC-H source to fix stdout data generation
       priority: High
       category: Core Functionality
     - id: performance-regression-detection-system

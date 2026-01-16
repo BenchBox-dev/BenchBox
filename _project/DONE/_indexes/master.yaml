@@ -1,5 +1,5 @@
-generated_at: '2026-01-15T22:39:43.690868'
-total_items: 357
+generated_at: '2026-01-15T22:44:58.346704'
+total_items: 360
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -465,6 +465,19 @@ items:
   - ci
   estimated_effort: 3-4 hours
   completed_date: '2026-01-15'
+- id: test-stdout-datagen
+  file: DONE/tpch-stdout-fix/planning/test-stdout-datagen.yaml
+  title: Add regression tests for TPC-H stdout data generation
+  worktree: tpch-stdout-fix
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - tpc-h
+  - testing
+  - regression
+  - stdout
+  estimated_effort: 2-3 hours
 - id: advanced-cost-analysis-framework-multi-region-pricing-models
   file: DONE/cost-intelligence-advanced/planning/advanced-cost-analysis-framework-multi-region-pricing-models.yaml
   title: Advanced Cost Analysis Framework - Multi-Region & Pricing Models
@@ -884,6 +897,19 @@ items:
   estimated_effort: 3 days
   completed_date: '2025-12-02'
 - id: integrate-stdout-datagen
+  file: DONE/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
+  title: Integrate TPC-H stdout datagen with compression and format pipelines
+  worktree: tpch-stdout-fix
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tpc-h
+  - streaming
+  - compression
+  - integration
+  estimated_effort: 3-4 hours
+- id: integrate-stdout-datagen
   file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
   title: Integrate stdout datagen with compression and format pipelines
   worktree: tpcds-stdout-fix
@@ -1004,6 +1030,19 @@ items:
   - bugfix
   estimated_effort: 1-2 hours
   completed_date: '2026-01-15'
+- id: patch-tpch-source-stdout
+  file: DONE/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
+  title: Patch TPC-H source to fix stdout data generation
+  worktree: tpch-stdout-fix
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tpc-h
+  - datagen
+  - stdout
+  - patch
+  estimated_effort: 1-2 hours
 - id: phase-4-infrastructure
   file: DONE/platform-config-audit/completed/phase-4-infrastructure.yaml
   title: 'Platform Config Audit: Infrastructure/Cluster Changes'

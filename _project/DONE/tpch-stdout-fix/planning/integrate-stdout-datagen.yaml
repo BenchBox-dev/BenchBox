@@ -53,72 +53,71 @@ context_sections:
 tasks:
   phases:
     - phase: "Phase 1: Core Streaming Integration"
-      done: false
+      done: true
       items:
         - summary: "Add -z flag support to dbgen invocation"
-          done: false
+          done: true
         - summary: "Implement streaming compression pipeline"
-          done: false
+          done: true
         - summary: "Handle stdout buffering and chunk sizes"
-          done: false
+          done: true
 
     - phase: "Phase 2: Parallel Generation Support"
-      done: false
+      done: true
       items:
         - summary: "Implement parallel table generation with streaming"
-          done: false
+          done: true
         - summary: "Handle manifest tracking for streamed files"
-          done: false
+          done: true
         - summary: "Add progress reporting for streaming generation"
-          done: false
+          done: true
 
     - phase: "Phase 3: Error Handling"
-      done: false
+      done: true
       items:
         - summary: "Handle dbgen process failures"
-          done: false
+          done: true
         - summary: "Handle compression stream errors"
-          done: false
+          done: true
         - summary: "Implement graceful cleanup on interruption"
-          done: false
+          done: true
 
     - phase: "Phase 4: Fallback and Compatibility"
-      done: false
+      done: true
       items:
         - summary: "Implement runtime detection of -z flag support"
-          done: false
+          done: true
           subtasks:
             - summary: "Check dbgen -help output for -z flag presence"
-              done: false
+              done: true
             - summary: "Cache capability detection result"
-              done: false
+              done: true
         - summary: "Implement fallback to file-then-compress mode"
-          done: false
+          done: true
           subtasks:
             - summary: "Use existing file-based generation when -z unavailable"
-              done: false
+              done: true
             - summary: "Log warning when using fallback mode"
-              done: false
+              done: true
         - summary: "Verify identical output in both modes"
-          done: false
+          done: true
         - summary: "Run existing TPC-H tests to ensure no regression"
-          done: false
+          done: true
           subtasks:
             - summary: "uv run pytest tests/unit/core/tpch -v"
-              done: false
+              done: true
             - summary: "uv run pytest tests/integration -k tpch -v"
-              done: false
+              done: true
 
 files_affected:
   modified:
     - "benchbox/core/tpch/generator.py"
-    - "benchbox/utils/compression_mixin.py"
 
 dependencies:
   blocked_by:
-    - "_project/TODO/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml"
+    - "_project/DONE/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml"
   related:
-    - "_project/TODO/tpcds-stdout-fix/planning/integrate-stdout-datagen.yaml"
+    - "_project/DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml"
 
 success_metrics:
   - "TPC-H data generation uses streaming by default when -z available"
@@ -130,7 +129,10 @@ success_metrics:
 
 metadata:
   created_date: "2026-01-15"
+  completed_date: "2026-01-15"
   estimated_effort: "3-4 hours"
+  commits:
+    - "39c96fd7"
   tags:
     - "tpc-h"
     - "streaming"
