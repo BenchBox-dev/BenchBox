@@ -8,9 +8,9 @@ description: |
   ignored in the ty configuration. These represent technical debt that reduces
   the value of type checking and should be addressed incrementally.
 
-  UPDATE (2026-01-16): Quick wins completed - 4 rules enabled as errors. See
-  _project/DONE/main/active/fix-type-checking-quick-wins.yaml for details.
-  Remaining: 8 rules with ~2665 errors total.
+  UPDATE (2026-01-16): Quick wins completed - 5 rules enabled as errors.
+  Latest: not-iterable (19 errors) fixed and enabled.
+  Remaining: 7 rules with ~2646 errors total.
 
 tasks:
   phases:
@@ -111,7 +111,7 @@ context_sections:
        Root cause: Need proper type: ignore comments or stubs
 
   "Current Ignored Rules": |
-    **UPDATED 2026-01-16**: 4 rules enabled as errors (quick wins completed).
+    **UPDATED 2026-01-16**: 5 rules enabled as errors.
 
     Rules now set to "error" (FIXED):
     | Rule | Hits | Status |
@@ -120,6 +120,7 @@ context_sections:
     | conflicting-declarations | 3 | FIXED - enabled as error |
     | invalid-parameter-default | 11 | FIXED - enabled as error |
     | unresolved-reference | 21 | FIXED - enabled as error |
+    | not-iterable | 19 | FIXED - enabled as error |
 
     Rules still set to "ignore" (REMAINING):
     | Rule | Hits | Root Cause |
@@ -131,7 +132,6 @@ context_sections:
     | invalid-method-override | 144 | Inheritance issues |
     | non-subscriptable | 132 | Dynamic container access |
     | call-non-callable | 104 | Mock objects in tests |
-    | not-iterable | 19 | Dynamic iteration |
 
   "Recommended Approach": |
     1. **Start with public API** - Add type annotations to all public functions
