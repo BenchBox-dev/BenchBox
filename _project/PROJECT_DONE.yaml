@@ -5418,7 +5418,7 @@ entries:
     - text: '"**Description**: Update copyright and license declarations throughout the project to ensure proper attribution and TPC compliance"'
     - text: '"**Tasks**:"'
       children:
-      - text: '"[x] Add standard copyright header to all Python source files (.py) with \"Copyright 2025 Joe Harris / BenchBox Project\""'
+      - text: '"[x] Add standard copyright header to all Python source files (.py) with \"Copyright 2026 Joe Harris / BenchBox Project\""'
       - text: '"[x] Add license declaration header to all source files referencing the project license"'
       - text: '"[x] Update all TPC-related files (TPC-H, TPC-DS, TPC-DI, SSB) to include TPC copyright acknowledgment"'
       - text: '"[x] Add TPC trademark and specification compliance notices to TPC benchmark implementations"'
