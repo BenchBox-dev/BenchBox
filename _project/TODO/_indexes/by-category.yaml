@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T14:01:19.187083'
-total_categories: 8
+generated_at: '2026-01-16T20:01:25.090420'
+total_categories: 9
 categories:
   AI/ML Capabilities:
     count: 1
@@ -265,3 +265,11 @@ categories:
       title: Interactive Benchmark Explorer - Web UI
       priority: Low
       status: Not Started
+  Testing and Quality Assurance:
+    count: 1
+    items:
+    - id: fix-type-checking-errors
+      file: TODO/main/active/fix-type-checking-errors.yaml
+      title: Fix type checking errors ignored in ty config
+      priority: Medium
+      status: In Progress

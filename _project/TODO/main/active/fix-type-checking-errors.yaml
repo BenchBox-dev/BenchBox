@@ -1,0 +1,185 @@
+title: "Fix type checking errors ignored in ty config"
+worktree: main
+priority: Medium
+status: In Progress
+category: Testing and Quality Assurance
+description: |
+  The codebase has accumulated significant type checking errors that are currently
+  ignored in the ty configuration. These represent technical debt that reduces
+  the value of type checking and should be addressed incrementally.
+
+  UPDATE (2026-01-16): Quick wins completed - 4 rules enabled as errors. See
+  _project/DONE/main/active/fix-type-checking-quick-wins.yaml for details.
+  Remaining: 8 rules with ~2665 errors total.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Audit and Categorize Errors"
+      done: true
+      items:
+        - summary: "Run ty check with each rule enabled individually to get accurate counts"
+          done: true
+        - summary: "Categorize errors by root cause (see analysis below)"
+          done: true
+        - summary: "Identify quick wins vs major refactoring"
+          done: true
+
+    - phase: "Phase 2: Fix Missing Type Annotations"
+      done: false
+      items:
+        - summary: "Add return type annotations to public API functions"
+          done: false
+          subtasks:
+            - summary: "benchbox/core/*.py public functions"
+              done: false
+            - summary: "benchbox/cli/*.py public functions"
+              done: false
+            - summary: "benchbox/platforms/*.py public functions"
+              done: false
+        - summary: "Add parameter type annotations where missing"
+          done: false
+        - summary: "Add class attribute type annotations"
+          done: false
+
+    - phase: "Phase 3: Fix Dynamic Typing Patterns"
+      done: false
+      items:
+        - summary: "Replace `Any` with proper union types where possible"
+          done: false
+        - summary: "Add type guards for runtime type checks"
+          done: false
+        - summary: "Use Protocol classes for duck typing patterns"
+          done: false
+
+    - phase: "Phase 4: Fix Inheritance Issues"
+      done: false
+      items:
+        - summary: "Align method signatures with base class contracts"
+          done: false
+        - summary: "Use @override decorator (Python 3.12+) or typing_extensions"
+          done: false
+        - summary: "Document intentional signature variations"
+          done: false
+
+    - phase: "Phase 5: Tighten ty Configuration"
+      done: false
+      items:
+        - summary: "Enable unresolved-attribute as error"
+          done: false
+        - summary: "Enable invalid-argument-type as error"
+          done: false
+        - summary: "Enable invalid-assignment as error"
+          done: false
+        - summary: "Enable remaining rules incrementally"
+          done: false
+
+metadata:
+  tags:
+    - type-checking
+    - technical-debt
+    - code-quality
+    - ty
+  estimated_effort: Large
+  created_date: "2026-01-17"
+
+context_sections:
+  "Root Cause Analysis": |
+    The type errors fall into these root cause categories:
+
+    1. **Missing Type Annotations** (~60% of errors)
+       - Functions without return type hints
+       - Parameters typed as implicit `Any`
+       - Class attributes without type declarations
+       Root cause: Code written before type checking was enforced
+
+    2. **Dynamic Typing Patterns** (~20% of errors)
+       - Dict/list access on unknown types (unresolved-attribute)
+       - Optional values used without None checks
+       - Generic containers without type parameters
+       Root cause: Python's dynamic nature; need type guards
+
+    3. **Inheritance Issues** (~10% of errors)
+       - Subclass methods with different signatures
+       - Abstract methods not properly decorated
+       - Covariant/contravariant type issues
+       Root cause: Organic codebase growth without LSP enforcement
+
+    4. **External Dependencies** (~10% of errors)
+       - Optional dependencies not installed (matplotlib, pynvml, mcp)
+       - Missing type stubs for third-party packages
+       - Conditional imports not understood by type checker
+       Root cause: Need proper type: ignore comments or stubs
+
+  "Current Ignored Rules": |
+    **UPDATED 2026-01-16**: 4 rules enabled as errors (quick wins completed).
+
+    Rules now set to "error" (FIXED):
+    | Rule | Hits | Status |
+    |------|------|--------|
+    | too-many-positional-arguments | 2 | FIXED - enabled as error |
+    | conflicting-declarations | 3 | FIXED - enabled as error |
+    | invalid-parameter-default | 11 | FIXED - enabled as error |
+    | unresolved-reference | 21 | FIXED - enabled as error |
+
+    Rules still set to "ignore" (REMAINING):
+    | Rule | Hits | Root Cause |
+    |------|------|------------|
+    | unresolved-attribute | 954 | Missing annotations, dynamic access |
+    | invalid-argument-type | 763 | Missing param annotations |
+    | invalid-assignment | 465 | Missing attribute annotations |
+    | unsupported-operator | 184 | Dynamic typing patterns |
+    | invalid-method-override | 144 | Inheritance issues |
+    | non-subscriptable | 132 | Dynamic container access |
+    | call-non-callable | 104 | Mock objects in tests |
+    | not-iterable | 19 | Dynamic iteration |
+
+  "Recommended Approach": |
+    1. **Start with public API** - Add type annotations to all public functions
+       in benchbox/__init__.py and benchbox/base.py first
+
+    2. **Fix by module** - Work through one module at a time:
+       - benchbox/core/config.py (foundational types)
+       - benchbox/cli/ (user-facing code)
+       - benchbox/platforms/ (adapter implementations)
+
+    3. **Use pyright/mypy comments** - For intentional dynamic patterns:
+       ```python
+       result = dynamic_call()  # type: ignore[return-value]
+       ```
+
+    4. **Add Protocol classes** - For duck typing patterns:
+       ```python
+       class SupportsQuery(Protocol):
+           def execute(self, sql: str) -> Any: ...
+       ```
+
+impact:
+  technical_debt: |
+    Current state: 12 ty rules ignored, ~2500 errors suppressed
+    Target state: 0 rules ignored, all errors fixed or explicitly ignored with comments
+
+    This is reducing the value of type checking to near zero - we're only
+    catching syntax errors, not type errors.
+
+  user_impact: |
+    Better types will improve:
+    - IDE autocomplete accuracy
+    - Refactoring safety
+    - API documentation (type hints as docs)
+    - Bug detection before runtime
+
+files_affected:
+  modified:
+    - pyproject.toml  # ty configuration
+    - benchbox/**/*.py  # Add type annotations throughout
+
+success_metrics:
+  - "Zero ignored ty rules in pyproject.toml"
+  - "All new code passes full ty checking"
+  - "Public API has complete type annotations"
+  - "Type coverage > 80% (measured by ty)"
+
+open_questions:
+  - "Should we use mypy in addition to ty for broader ecosystem compatibility?"
+  - "Should we add py.typed marker for PEP 561 compliance?"
+  - "What's the target Python version for type annotations (3.9+ or 3.10+)?"

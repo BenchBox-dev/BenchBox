@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T14:01:19.187040'
-total_items: 48
+generated_at: '2026-01-16T20:01:25.090380'
+total_items: 49
 items:
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
@@ -157,6 +157,19 @@ items:
   - editing
   - platform-deep-dives
   estimated_effort: Low
+- id: fix-type-checking-errors
+  file: TODO/main/active/fix-type-checking-errors.yaml
+  title: Fix type checking errors ignored in ty config
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: In Progress
+  tags:
+  - type-checking
+  - technical-debt
+  - code-quality
+  - ty
+  estimated_effort: Large
 - id: flight-data-benchmark
   file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
   title: Flight Data Benchmark - US Aviation On-Time Performance Analytics

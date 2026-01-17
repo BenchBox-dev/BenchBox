@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T14:01:20.070234'
-total_items: 364
+generated_at: '2026-01-16T20:01:25.926720'
+total_items: 365
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2603,6 +2603,20 @@ items:
   - cleanup
   - ux
   estimated_effort: 1-2 hours
+- id: fix-type-checking-quick-wins
+  file: DONE/main/active/fix-type-checking-quick-wins.yaml
+  title: Fix type checking errors - Quick Wins (4 rules enabled)
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Completed
+  tags:
+  - type-checking
+  - technical-debt
+  - code-quality
+  - ty
+  estimated_effort: Small
+  completed_date: '2026-01-16'
 - id: dataproc-serverless-platform
   file: DONE/platform-expansion/planning/dataproc-serverless-platform.yaml
   title: GCP Dataproc Serverless Platform

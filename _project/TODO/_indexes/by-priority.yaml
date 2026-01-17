@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T14:01:19.187100'
-total_items: 48
+generated_at: '2026-01-16T20:01:25.090439'
+total_items: 49
 priorities:
   High:
     count: 6
@@ -133,7 +133,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 18
+    count: 19
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -150,6 +150,11 @@ priorities:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       category: Documentation
       status: Not Started
+    - id: fix-type-checking-errors
+      file: TODO/main/active/fix-type-checking-errors.yaml
+      title: Fix type checking errors ignored in ty config
+      category: Testing and Quality Assurance
+      status: In Progress
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics

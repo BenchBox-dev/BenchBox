@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T14:01:20.070616'
-total_items: 364
+generated_at: '2026-01-16T20:01:25.927103'
+total_items: 365
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 175
+    count: 176
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -998,6 +998,11 @@ statuses:
       title: Fix inconsistent result filename generation - remove redundant elements
       priority: Medium
       category: Core Functionality
+    - id: fix-type-checking-quick-wins
+      file: DONE/main/active/fix-type-checking-quick-wins.yaml
+      title: Fix type checking errors - Quick Wins (4 rules enabled)
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: gcp-dataproc-platform
       file: DONE/platform-expansion/planning/gcp-dataproc-platform.yaml
       title: GCP Dataproc Managed Spark Platform

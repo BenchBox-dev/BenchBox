@@ -1,5 +1,5 @@
-generated_at: '2026-01-16T14:01:20.070525'
-total_items: 364
+generated_at: '2026-01-16T20:01:25.927015'
+total_items: 365
 priorities:
   Critical:
     count: 24
@@ -821,7 +821,7 @@ priorities:
       category: Platform Expansion
       status: Complete
   Medium:
-    count: 187
+    count: 188
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1272,6 +1272,11 @@ priorities:
       file: DONE/core-functionality/completed/fix-result-filename-redundancy.yaml
       title: Fix inconsistent result filename generation - remove redundant elements
       category: Core Functionality
+      status: Completed
+    - id: fix-type-checking-quick-wins
+      file: DONE/main/active/fix-type-checking-quick-wins.yaml
+      title: Fix type checking errors - Quick Wins (4 rules enabled)
+      category: Testing and Quality Assurance
       status: Completed
     - id: dataproc-serverless-platform
       file: DONE/platform-expansion/planning/dataproc-serverless-platform.yaml

@@ -1,4 +1,4 @@
-generated_at: '2026-01-16T14:01:20.070419'
+generated_at: '2026-01-16T20:01:25.926915'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -1751,7 +1751,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 15
+    count: 16
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1787,6 +1787,11 @@ categories:
       file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
       title: 'E2E CLI Test Suite: Complete Platform Coverage'
       priority: High
+      status: Completed
+    - id: fix-type-checking-quick-wins
+      file: DONE/main/active/fix-type-checking-quick-wins.yaml
+      title: Fix type checking errors - Quick Wins (4 rules enabled)
+      priority: Medium
       status: Completed
     - id: implement-dataframe-result-validation-framework
       file: DONE/dataframe-validation/completed/implement-dataframe-result-validation-framework.yaml
