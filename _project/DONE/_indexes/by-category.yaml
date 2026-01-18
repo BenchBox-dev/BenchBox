@@ -1,4 +1,4 @@
-generated_at: '2026-01-18T13:34:52.626143'
+generated_at: '2026-01-18T14:38:34.200415'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -769,7 +769,7 @@ categories:
       priority: Medium
       status: Completed
   Documentation:
-    count: 8
+    count: 9
     items:
     - id: add-dedicated-tags-for-platforms-and-benchmarks
       file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
@@ -799,6 +799,11 @@ categories:
     - id: document-stdout-patches
       file: DONE/tpcds-docs/document-stdout-patches.yaml
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
+      priority: High
+      status: Completed
+    - id: mcp-landing-page-elevation
+      file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
+      title: Elevate MCP Feature on Landing Page and Documentation
       priority: High
       status: Completed
     - id: query-plan-documentation-testing
@@ -1761,7 +1766,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 16
+    count: 17
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1797,6 +1802,11 @@ categories:
       file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
       title: 'E2E CLI Test Suite: Complete Platform Coverage'
       priority: High
+      status: Completed
+    - id: fix-ci-critical-issues
+      file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml
+      title: Fix critical CI issues for green builds
+      priority: Critical
       status: Completed
     - id: fix-type-checking-quick-wins
       file: DONE/main/active/fix-type-checking-quick-wins.yaml

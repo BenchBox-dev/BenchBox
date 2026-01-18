@@ -1,8 +1,8 @@
-generated_at: '2026-01-18T13:34:52.626233'
-total_items: 367
+generated_at: '2026-01-18T14:38:34.200503'
+total_items: 369
 priorities:
   Critical:
-    count: 24
+    count: 25
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -58,6 +58,11 @@ priorities:
       file: DONE/security-hardening/active/timescaledb-sql-injection-remediation.yaml
       title: Fix SQL injection vulnerabilities in TimescaleDB adapter
       category: Security and Compliance
+      status: Completed
+    - id: fix-ci-critical-issues
+      file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml
+      title: Fix critical CI issues for green builds
+      category: Testing and Quality Assurance
       status: Completed
     - id: implement-expression-family-base-adapter-and-dialects
       file: DONE/dataframe-expression-family/completed/implement-expression-family-base-adapter-and-dialects.yaml
@@ -125,7 +130,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 122
+    count: 123
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -271,6 +276,11 @@ priorities:
       file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
       title: 'E2E CLI Test Suite: Complete Platform Coverage'
       category: Testing and Quality Assurance
+      status: Completed
+    - id: mcp-landing-page-elevation
+      file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
+      title: Elevate MCP Feature on Landing Page and Documentation
+      category: Documentation
       status: Completed
     - id: error-message-polish
       file: DONE/release-readiness/planning/error-message-polish.yaml

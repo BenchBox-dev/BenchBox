@@ -1,9 +1,14 @@
-generated_at: '2026-01-18T13:43:41.378441'
-total_items: 49
+generated_at: '2026-01-18T14:38:33.408521'
+total_items: 51
 priorities:
   High:
-    count: 6
+    count: 7
     items:
+    - id: local-ci-equivalents
+      file: TODO/ci-infrastructure/planning/local-ci-equivalents.yaml
+      title: Ensure local equivalents exist for all CI workflow steps
+      category: Testing and Quality Assurance
+      status: Not Started
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
@@ -133,7 +138,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 19
+    count: 20
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -185,6 +190,11 @@ priorities:
       title: Platform Configuration Inheritance
       category: Core Functionality
       status: In Progress
+    - id: reenable-comprehensive-ci
+      file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
+      title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
+      category: Testing and Quality Assurance
+      status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

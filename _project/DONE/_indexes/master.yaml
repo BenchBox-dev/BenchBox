@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T13:34:52.625987'
-total_items: 367
+generated_at: '2026-01-18T14:38:34.200267'
+total_items: 369
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -153,6 +153,21 @@ items:
   - joeharris76
   estimated_effort: 2-3 hours
   completed_date: '2025-12-24'
+- id: fix-ci-critical-issues
+  file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml
+  title: Fix critical CI issues for green builds
+  worktree: ci-infrastructure
+  category: Testing and Quality Assurance
+  priority: Critical
+  status: Completed
+  tags:
+  - ci
+  - critical
+  - release-blocker
+  owners:
+  - joe
+  estimated_effort: 2-4 hours
+  completed_date: '2026-01-18'
 - id: implement-expression-family-base-adapter-and-dialects
   file: DONE/dataframe-expression-family/completed/implement-expression-family-base-adapter-and-dialects.yaml
   title: Implement Expression Family Base Adapter and Dialects
@@ -692,6 +707,20 @@ items:
   - benchbox-team
   estimated_effort: Large
   completed_date: '2026-01-16'
+- id: mcp-landing-page-elevation
+  file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
+  title: Elevate MCP Feature on Landing Page and Documentation
+  worktree: docs-experience
+  category: Documentation
+  priority: High
+  status: Completed
+  tags:
+  - mcp
+  - landing-page
+  - documentation
+  - marketing
+  - visibility
+  estimated_effort: Medium
 - id: error-message-polish
   file: DONE/release-readiness/planning/error-message-polish.yaml
   title: Error Message Polish

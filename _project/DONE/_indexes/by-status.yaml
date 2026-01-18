@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T13:34:52.626312'
-total_items: 367
+generated_at: '2026-01-18T14:38:34.200580'
+total_items: 369
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 178
+    count: 180
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -978,6 +978,11 @@ statuses:
       title: 'E2E CLI Test Suite: Complete Platform Coverage'
       priority: High
       category: Testing and Quality Assurance
+    - id: mcp-landing-page-elevation
+      file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
+      title: Elevate MCP Feature on Landing Page and Documentation
+      priority: High
+      category: Documentation
     - id: embed-tuning-config-in-results
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output
@@ -1003,6 +1008,11 @@ statuses:
       title: Fix SQL injection vulnerabilities in TimescaleDB adapter
       priority: Critical
       category: Security and Compliance
+    - id: fix-ci-critical-issues
+      file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml
+      title: Fix critical CI issues for green builds
+      priority: Critical
+      category: Testing and Quality Assurance
     - id: fix-result-filename-redundancy
       file: DONE/core-functionality/completed/fix-result-filename-redundancy.yaml
       title: Fix inconsistent result filename generation - remove redundant elements

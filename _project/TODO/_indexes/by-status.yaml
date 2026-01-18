@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T13:43:41.378453'
-total_items: 49
+generated_at: '2026-01-18T14:38:33.408533'
+total_items: 51
 statuses:
   In Progress:
     count: 7
@@ -40,7 +40,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 42
+    count: 44
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -77,6 +77,11 @@ statuses:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       priority: Medium
       category: Documentation
+    - id: local-ci-equivalents
+      file: TODO/ci-infrastructure/planning/local-ci-equivalents.yaml
+      title: Ensure local equivalents exist for all CI workflow steps
+      priority: High
+      category: Testing and Quality Assurance
     - id: firebolt-cloud-deployment
       file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode
@@ -122,6 +127,11 @@ statuses:
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       priority: Medium
       category: Benchmark Development
+    - id: reenable-comprehensive-ci
+      file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
+      title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
