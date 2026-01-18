@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T14:48:14.986033'
-total_items: 50
+generated_at: '2026-01-18T15:05:52.602661'
+total_items: 51
 items:
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
@@ -38,6 +38,20 @@ items:
   - platform-registry
   - deployment-modes
   estimated_effort: 3-4 days
+- id: refactor-mcp-use-public-api
+  file: TODO/mcp-integration/planning/refactor-mcp-use-public-api.yaml
+  title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
+  worktree: mcp-integration
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - mcp
+  - architecture
+  - refactoring
+  - api-design
+  - technical-debt
+  estimated_effort: Medium
 - id: oxbow-series-reality-vs-aspiration
   file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
   title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'

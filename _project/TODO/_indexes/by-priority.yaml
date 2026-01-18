@@ -1,8 +1,8 @@
-generated_at: '2026-01-18T14:48:14.986259'
-total_items: 50
+generated_at: '2026-01-18T15:05:52.602712'
+total_items: 51
 priorities:
   High:
-    count: 6
+    count: 7
     items:
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
@@ -19,6 +19,11 @@ priorities:
       title: Platform Deployment Registry Extensions
       category: Core Functionality
       status: In Progress
+    - id: refactor-mcp-use-public-api
+      file: TODO/mcp-integration/planning/refactor-mcp-use-public-api.yaml
+      title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
+      category: Core Functionality
+      status: Not Started
     - id: oxbow-series-reality-vs-aspiration
       file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
       title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'

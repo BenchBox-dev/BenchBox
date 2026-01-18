@@ -1,4 +1,4 @@
-generated_at: '2026-01-18T14:48:14.986244'
+generated_at: '2026-01-18T15:05:52.602696'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -141,7 +141,7 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 7
+    count: 8
     items:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
@@ -173,6 +173,11 @@ categories:
       title: Platform Deployment Registry Extensions
       priority: High
       status: In Progress
+    - id: refactor-mcp-use-public-api
+      file: TODO/mcp-integration/planning/refactor-mcp-use-public-api.yaml
+      title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
+      priority: High
+      status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
