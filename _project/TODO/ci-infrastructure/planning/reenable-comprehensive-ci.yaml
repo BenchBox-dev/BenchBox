@@ -1,0 +1,127 @@
+title: "Re-enable comprehensive CI checks (linkcheck, security, coverage)"
+worktree: ci-infrastructure
+priority: Medium
+status: Not Started
+description: |
+  After fixing critical CI issues and achieving green builds, re-enable the
+  comprehensive quality checks that were temporarily disabled or made non-blocking.
+
+  These checks provide value but should not block initial release:
+  - linkcheck: Validates external links in documentation
+  - security audit: Checks dependencies for known vulnerabilities
+  - docstring coverage: Ensures public APIs are documented
+  - spellcheck: Catches typos in documentation
+  - example validation: Ensures documented examples work
+
+  This task properly configures these checks so they provide value without
+  causing spurious failures.
+
+category: Testing and Quality Assurance
+
+tasks:
+  phases:
+    - phase: "Phase 1: Fix Linkcheck"
+      done: false
+      items:
+        - summary: "Create linkcheck ignore list for known-flaky URLs"
+          done: false
+          subtasks:
+            - summary: "Add docs/linkcheck_ignore.txt with external URLs to skip"
+              done: false
+            - summary: "Configure sphinx linkcheck_ignore in conf.py"
+              done: false
+        - summary: "Fix or remove genuinely broken links"
+          done: false
+        - summary: "Re-enable linkcheck as blocking (or keep as warning)"
+          done: false
+        - summary: "Add `make docs-linkcheck` for local testing"
+          done: false
+
+    - phase: "Phase 2: Fix Security Audit"
+      done: false
+      items:
+        - summary: "Evaluate security scanning options"
+          done: false
+          subtasks:
+            - summary: "safety vs pip-audit vs GitHub Dependabot"
+              done: false
+            - summary: "Choose tool that minimizes false positives"
+              done: false
+        - summary: "Create security ignore list for false positives"
+          done: false
+        - summary: "Re-enable security job as blocking"
+          done: false
+        - summary: "Add `make security-audit` for local testing"
+          done: false
+
+    - phase: "Phase 3: Fix Docstring Coverage"
+      done: false
+      items:
+        - summary: "Review current coverage threshold (64%)"
+          done: false
+        - summary: "Add docstrings to undocumented public APIs"
+          done: false
+        - summary: "Update threshold to achievable level"
+          done: false
+        - summary: "Configure interrogate ignore patterns for internal modules"
+          done: false
+        - summary: "Re-enable docstring-coverage as blocking"
+          done: false
+
+    - phase: "Phase 4: Fix Example Validation"
+      done: false
+      items:
+        - summary: "Test validate_example_references.py locally"
+          done: false
+        - summary: "Fix any broken example references"
+          done: false
+        - summary: "Test check_example_syntax.py locally"
+          done: false
+        - summary: "Fix any syntax errors in examples"
+          done: false
+        - summary: "Re-enable example-validation as blocking"
+          done: false
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - ci
+    - quality
+    - documentation
+  estimated_effort: "1-2 days"
+  created_date: "2026-01-18"
+
+impact:
+  business_value: |
+    Comprehensive quality checks catch issues before they reach users.
+    Security scanning protects users from vulnerable dependencies.
+  user_impact: |
+    Better documentation quality through linkcheck and spellcheck.
+    More reliable examples through validation.
+  technical_debt: |
+    Proper CI configuration reduces maintenance burden and false alarms.
+
+files_affected:
+  modified:
+    - ".github/workflows/docs.yml"
+    - ".github/workflows/test.yml"
+    - "docs/conf.py"
+    - "pyproject.toml"
+    - "Makefile"
+  added:
+    - "docs/linkcheck_ignore.txt"
+    - ".safety-policy.yml"  # Or equivalent ignore file
+
+open_questions:
+  - "Should TPC-H C-compatible tests be implemented? (Currently broken workflow was removed - separate TODO needed if desired)"
+
+success_metrics:
+  - "All comprehensive checks pass consistently"
+  - "No false positive failures in CI"
+  - "Linkcheck catches real broken links"
+  - "Security audit catches real vulnerabilities"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/ci-infrastructure/planning/fix-ci-critical-issues.yaml"

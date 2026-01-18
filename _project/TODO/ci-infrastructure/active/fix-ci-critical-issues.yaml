@@ -1,0 +1,143 @@
+title: "Fix critical CI issues for green builds"
+worktree: ci-infrastructure
+priority: Critical
+status: In Progress
+description: |
+  Multiple CI workflows are failing due to broken configurations, missing files,
+  and duplicate workflows. This task addresses all critical issues to achieve
+  green CI builds on GitHub.
+
+  Issues identified in code review:
+  1. tpch-c-compatible-tests.yml references non-existent scripts
+  2. python-publish.yml duplicates release.yml functionality
+  3. docs.yml has failing linkcheck job
+  4. test.yml has duplicate docs job
+  5. Test matrix is overly broad (13 configurations)
+
+category: Testing and Quality Assurance
+
+tasks:
+  phases:
+    - phase: "Phase 1: Remove Broken/Duplicate Workflows"
+      done: false
+      items:
+        - summary: "Delete tpch-c-compatible-tests.yml"
+          done: false
+          subtasks:
+            - summary: "Verify no external dependencies on this workflow"
+              done: false
+            - summary: "Remove workflow file"
+              done: false
+            - summary: "Remove related Makefile targets if orphaned"
+              done: false
+        - summary: "Delete python-publish.yml (duplicate of release.yml)"
+          done: false
+          subtasks:
+            - summary: "Verify release.yml covers all publish functionality"
+              done: false
+            - summary: "Remove python-publish.yml"
+              done: false
+
+    - phase: "Phase 2: Fix docs.yml Failures"
+      done: false
+      items:
+        - summary: "Make linkcheck job non-blocking"
+          done: false
+          subtasks:
+            - summary: "Add `continue-on-error: true` to linkcheck job"
+              done: false
+            - summary: "Or move linkcheck to separate optional workflow"
+              done: false
+        - summary: "Make example-validation job non-blocking or fix scripts"
+          done: false
+          subtasks:
+            - summary: "Test scripts/validate_example_references.py locally"
+              done: false
+            - summary: "Test scripts/check_example_syntax.py locally"
+              done: false
+            - summary: "Fix or add `continue-on-error: true`"
+              done: false
+        - summary: "Make spellcheck job non-blocking"
+          done: false
+        - summary: "Make docstring-coverage job non-blocking"
+          done: false
+
+    - phase: "Phase 3: Fix test.yml Issues"
+      done: false
+      items:
+        - summary: "Remove duplicate docs job from test.yml"
+          done: false
+        - summary: "Simplify test matrix"
+          done: false
+          subtasks:
+            - summary: "Reduce from 13 to ~6 configurations"
+              done: false
+            - summary: "Keep: ubuntu (3.9, 3.11, 3.13), macos-latest (3.11), windows-latest (3.11)"
+              done: false
+        - summary: "Fix security job (safety check often has issues)"
+          done: false
+          subtasks:
+            - summary: "Add `continue-on-error: true` or remove"
+              done: false
+        - summary: "Review pyspark-tests job requirements"
+          done: false
+
+    - phase: "Phase 4: Validate and Test"
+      done: false
+      items:
+        - summary: "Run all workflows locally where possible"
+          done: false
+          subtasks:
+            - summary: "Run `make lint && make typecheck && make test-fast`"
+              done: false
+            - summary: "Run `make docs` to verify docs build"
+              done: false
+            - summary: "Verify no import errors with `python -c 'import benchbox'`"
+              done: false
+        - summary: "Push to feature branch and verify CI passes"
+          done: false
+          subtasks:
+            - summary: "Create branch: `git checkout -b fix/ci-cleanup`"
+              done: false
+            - summary: "Push and monitor all workflow runs"
+              done: false
+            - summary: "Fix any remaining failures"
+              done: false
+        - summary: "Merge to main when green"
+          done: false
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - ci
+    - critical
+    - release-blocker
+  estimated_effort: "2-4 hours"
+  created_date: "2026-01-18"
+
+impact:
+  business_value: |
+    Unblocks initial release by ensuring CI passes.
+    Prevents embarrassment of releasing with red CI.
+  user_impact: |
+    Contributors see green CI, building confidence in project quality.
+  technical_debt: |
+    Removes dead code (broken workflows) and reduces CI complexity.
+
+files_affected:
+  modified:
+    - ".github/workflows/docs.yml"
+    - ".github/workflows/test.yml"
+  removed:
+    - ".github/workflows/tpch-c-compatible-tests.yml"
+    - ".github/workflows/python-publish.yml"
+
+success_metrics:
+  - "All CI workflows pass on main branch"
+  - "No duplicate workflow functionality"
+  - "CI completes in < 15 minutes for PRs"
+
+dependencies:
+  blocks:
+    - "_project/TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml"
