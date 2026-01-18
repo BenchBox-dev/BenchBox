@@ -1,0 +1,40 @@
+title: Copyright and License Declaration Updates ✅ COMPLETED
+category: Legal and Licensing
+sections:
+- name: Notes
+  items:
+  - text: '"**Priority**: High"'
+  - text: '"**Status**: ✅ Completed"'
+  - text: '"**Description**: Update copyright and license declarations throughout the project to ensure proper attribution
+      and TPC compliance"'
+  - text: '"**Tasks**:"'
+    children:
+    - text: '"[x] Add standard copyright header to all Python source files (.py) with \"Copyright 2026 Joe Harris / BenchBox
+        Project\""'
+    - text: '"[x] Add license declaration header to all source files referencing the project license"'
+    - text: '"[x] Update all TPC-related files (TPC-H, TPC-DS, TPC-DI, SSB) to include TPC copyright acknowledgment"'
+    - text: '"[x] Add TPC trademark and specification compliance notices to TPC benchmark implementations"'
+    - text: '"[x] Update documentation files to include proper copyright and attribution notices"'
+    - text: '"[x] Add copyright headers to configuration files, examples, and test files"'
+    - text: '"[x] Update README.md and main documentation to include copyright and license information"'
+    - text: '"[x] Add TPC copyright notices to query files and benchmark-specific documentation"'
+    - text: '"[x] Review and update any third-party attribution requirements in dependencies"'
+    - text: '"[x] Ensure compliance with TPC Fair Use Policy for benchmark implementations"'
+    - text: '"[x] Add copyright notice template for new files created in the future"'
+    - text: '"[x] Update pyproject.toml and package metadata with proper copyright information"'
+  - text: '"**Specific TPC Copyright Requirements**:"'
+    children:
+    - text: TPC-H implementations must acknowledge "TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance
+        Council"
+    - text: TPC-DS implementations must acknowledge "TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance
+        Council"
+    - text: TPC-DI implementations must acknowledge "TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance
+        Council"
+    - text: SSB implementations must acknowledge derivation from TPC-H benchmark
+    - text: TPC-Havoc implementations must acknowledge derivation from TPC-H benchmark
+    - text: Primitives implementations must acknowledge derivation from TPC-H benchmark (uses TPC-H schema and data generation)
+  - text: '"**Files Affected**: All source files (.py), documentation (.md), configuration files, examples, tests, package
+      metadata"'
+  - text: '"**Impact**: ✅ Ensures legal compliance, proper attribution, protects project intellectual property, and maintains
+      TPC benchmark trademark compliance. Successfully added copyright headers to 323+ Python files, 108+ documentation files,
+      and comprehensive legal documentation including COPYRIGHT.md with TPC Fair Use Policy compliance."'
