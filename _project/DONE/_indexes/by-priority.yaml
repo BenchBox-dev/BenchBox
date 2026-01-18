@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T08:20:18.507414'
-total_items: 365
+generated_at: '2026-01-18T09:21:45.000300'
+total_items: 367
 priorities:
   Critical:
     count: 24
@@ -125,7 +125,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 121
+    count: 122
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -212,6 +212,11 @@ priorities:
       title: BenchBox MCP Server for AI Agent Integration
       category: Supporting Infrastructure
       status: Not Started
+    - id: bidirectional-repo-sync-v2
+      file: DONE/release-sync/active/bidirectional-repo-sync-v2.yaml
+      title: Bidirectional Repository Sync (Redesigned)
+      category: Core Functionality
+      status: Completed
     - id: cli-help-examples-missing-platforms
       file: DONE/docs-experience/planning/cli-help-examples-missing-platforms.yaml
       title: CLI Help Examples for Missing Platforms
@@ -733,7 +738,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 17
+    count: 18
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -764,6 +769,11 @@ priorities:
       file: DONE/platform-expansion/active/athena-parquet-optimization.yaml
       title: 'Athena: Convert text tables to Parquet using CTAS for query performance'
       category: Platform Expansion
+      status: Completed
+    - id: bidirectional-sync-and-true-up-releases
+      file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
+      title: Bidirectional Sync and True-Up Releases for Public/Private Repos
+      category: Core Functionality
       status: Completed
     - id: cloud-spark-adapter-consolidation
       file: DONE/platform-expansion/active/cloud-spark-adapter-consolidation.yaml

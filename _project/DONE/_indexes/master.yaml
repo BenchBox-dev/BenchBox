@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T08:20:18.507094'
-total_items: 365
+generated_at: '2026-01-18T09:21:45.000045'
+total_items: 367
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -524,6 +524,21 @@ items:
   owners:
   - joe
   estimated_effort: 2-3 weeks (1.0 FTE)
+- id: bidirectional-repo-sync-v2
+  file: DONE/release-sync/active/bidirectional-repo-sync-v2.yaml
+  title: Bidirectional Repository Sync (Redesigned)
+  worktree: release-sync
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - release-automation
+  - sync
+  - infrastructure
+  owners:
+  - joeharris76
+  estimated_effort: 2-3 days
+  completed_date: '2026-01-18'
 - id: cli-help-examples-missing-platforms
   file: DONE/docs-experience/planning/cli-help-examples-missing-platforms.yaml
   title: CLI Help Examples for Missing Platforms
@@ -3530,6 +3545,20 @@ items:
   - optimization
   estimated_effort: Medium
   completed_date: '2025-12-21'
+- id: bidirectional-sync-and-true-up-releases
+  file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
+  title: Bidirectional Sync and True-Up Releases for Public/Private Repos
+  worktree: release-sync
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - release-automation
+  - sync
+  - infrastructure
+  - github
+  estimated_effort: Large
+  completed_date: '2026-01-18'
 - id: cloud-spark-adapter-consolidation
   file: DONE/platform-expansion/active/cloud-spark-adapter-consolidation.yaml
   title: Cloud Spark Adapter Consolidation - Extract Common Patterns

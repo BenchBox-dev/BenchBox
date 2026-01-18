@@ -1,4 +1,4 @@
-generated_at: '2026-01-18T08:20:18.507302'
+generated_at: '2026-01-18T09:21:45.000208'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -335,7 +335,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 63
+    count: 65
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -382,6 +382,16 @@ categories:
       title: Auto-Compile TPC Binary Tools ✅ COMPLETED
       priority: Medium
       status: Not Started
+    - id: bidirectional-repo-sync-v2
+      file: DONE/release-sync/active/bidirectional-repo-sync-v2.yaml
+      title: Bidirectional Repository Sync (Redesigned)
+      priority: High
+      status: Completed
+    - id: bidirectional-sync-and-true-up-releases
+      file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
+      title: Bidirectional Sync and True-Up Releases for Public/Private Repos
+      priority: Medium-High
+      status: Completed
     - id: cloud-spark-adapter-consolidation
       file: DONE/platform-expansion/active/cloud-spark-adapter-consolidation.yaml
       title: Cloud Spark Adapter Consolidation - Extract Common Patterns

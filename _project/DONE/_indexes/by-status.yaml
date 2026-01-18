@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T08:20:18.507504'
-total_items: 365
+generated_at: '2026-01-18T09:21:45.000389'
+total_items: 367
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 176
+    count: 178
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -863,6 +863,16 @@ statuses:
       title: 'Athena: Convert text tables to Parquet using CTAS for query performance'
       priority: Medium-High
       category: Platform Expansion
+    - id: bidirectional-repo-sync-v2
+      file: DONE/release-sync/active/bidirectional-repo-sync-v2.yaml
+      title: Bidirectional Repository Sync (Redesigned)
+      priority: High
+      category: Core Functionality
+    - id: bidirectional-sync-and-true-up-releases
+      file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
+      title: Bidirectional Sync and True-Up Releases for Public/Private Repos
+      priority: Medium-High
+      category: Core Functionality
     - id: cli-help-examples-expansion
       file: DONE/docs-experience/planning/cli-help-examples-expansion.yaml
       title: CLI Help Examples Expansion
