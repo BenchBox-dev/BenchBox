@@ -1,4 +1,4 @@
-generated_at: '2026-01-18T14:38:34.200415'
+generated_at: '2026-01-18T14:48:15.776888'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -1766,7 +1766,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 17
+    count: 18
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1801,6 +1801,11 @@ categories:
     - id: e2e-cli-test-suite
       file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
       title: 'E2E CLI Test Suite: Complete Platform Coverage'
+      priority: High
+      status: Completed
+    - id: local-ci-equivalents
+      file: DONE/ci-infrastructure/active/local-ci-equivalents.yaml
+      title: Ensure local equivalents exist for all CI workflow steps
       priority: High
       status: Completed
     - id: fix-ci-critical-issues

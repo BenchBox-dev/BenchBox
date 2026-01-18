@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T14:38:34.200580'
-total_items: 369
+generated_at: '2026-01-18T14:48:15.777059'
+total_items: 370
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 180
+    count: 181
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -993,6 +993,11 @@ statuses:
       title: Enhanced Resource Monitoring & Profiling
       priority: Medium
       category: Supporting Infrastructure
+    - id: local-ci-equivalents
+      file: DONE/ci-infrastructure/active/local-ci-equivalents.yaml
+      title: Ensure local equivalents exist for all CI workflow steps
+      priority: High
+      category: Testing and Quality Assurance
     - id: finalize-monitoring-module-scope
       file: DONE/observability-quality/completed/finalize-monitoring-module-scope.yaml
       title: Finalize Monitoring Module Scope

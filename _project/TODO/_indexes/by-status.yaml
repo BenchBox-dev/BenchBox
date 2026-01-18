@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T14:38:33.408533'
-total_items: 51
+generated_at: '2026-01-18T14:48:14.986275'
+total_items: 50
 statuses:
   In Progress:
     count: 7
@@ -40,7 +40,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 44
+    count: 43
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -77,11 +77,6 @@ statuses:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       priority: Medium
       category: Documentation
-    - id: local-ci-equivalents
-      file: TODO/ci-infrastructure/planning/local-ci-equivalents.yaml
-      title: Ensure local equivalents exist for all CI workflow steps
-      priority: High
-      category: Testing and Quality Assurance
     - id: firebolt-cloud-deployment
       file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode

@@ -1,14 +1,9 @@
-generated_at: '2026-01-18T14:38:33.408521'
-total_items: 51
+generated_at: '2026-01-18T14:48:14.986259'
+total_items: 50
 priorities:
   High:
-    count: 7
+    count: 6
     items:
-    - id: local-ci-equivalents
-      file: TODO/ci-infrastructure/planning/local-ci-equivalents.yaml
-      title: Ensure local equivalents exist for all CI workflow steps
-      category: Testing and Quality Assurance
-      status: Not Started
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter

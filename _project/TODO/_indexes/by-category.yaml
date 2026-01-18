@@ -1,4 +1,4 @@
-generated_at: '2026-01-18T14:38:33.408505'
+generated_at: '2026-01-18T14:48:14.986244'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -266,13 +266,8 @@ categories:
       priority: Low
       status: Not Started
   Testing and Quality Assurance:
-    count: 3
+    count: 2
     items:
-    - id: local-ci-equivalents
-      file: TODO/ci-infrastructure/planning/local-ci-equivalents.yaml
-      title: Ensure local equivalents exist for all CI workflow steps
-      priority: High
-      status: Not Started
     - id: fix-type-checking-errors
       file: TODO/main/active/fix-type-checking-errors.yaml
       title: Fix type checking errors ignored in ty config

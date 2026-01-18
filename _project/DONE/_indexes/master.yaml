@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T14:38:34.200267'
-total_items: 369
+generated_at: '2026-01-18T14:48:15.776743'
+total_items: 370
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -721,6 +721,20 @@ items:
   - marketing
   - visibility
   estimated_effort: Medium
+- id: local-ci-equivalents
+  file: DONE/ci-infrastructure/active/local-ci-equivalents.yaml
+  title: Ensure local equivalents exist for all CI workflow steps
+  worktree: ci-infrastructure
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - ci
+  - developer-experience
+  - quality
+  owners:
+  - joe
+  estimated_effort: 1-2 days
 - id: error-message-polish
   file: DONE/release-readiness/planning/error-message-polish.yaml
   title: Error Message Polish

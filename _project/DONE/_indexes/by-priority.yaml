@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T14:38:34.200503'
-total_items: 369
+generated_at: '2026-01-18T14:48:15.776980'
+total_items: 370
 priorities:
   Critical:
     count: 25
@@ -130,7 +130,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 123
+    count: 124
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -281,6 +281,11 @@ priorities:
       file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
       title: Elevate MCP Feature on Landing Page and Documentation
       category: Documentation
+      status: Completed
+    - id: local-ci-equivalents
+      file: DONE/ci-infrastructure/active/local-ci-equivalents.yaml
+      title: Ensure local equivalents exist for all CI workflow steps
+      category: Testing and Quality Assurance
       status: Completed
     - id: error-message-polish
       file: DONE/release-readiness/planning/error-message-polish.yaml
