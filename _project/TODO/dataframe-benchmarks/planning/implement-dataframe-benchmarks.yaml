@@ -1,0 +1,396 @@
+title: "Implement DataFrame Support for All SQL-Only Benchmarks"
+worktree: dataframe-benchmarks
+priority: Medium-High
+status: Not Started
+description: |
+  Extend BenchBox's DataFrame execution capability to all SQL-only benchmarks.
+
+  Currently, only TPC-H (22 queries) and TPC-DS (99 queries) have DataFrame support.
+  This initiative will add DataFrame implementations for the remaining 16 benchmarks
+  (excluding only Transaction Primitives which require ACID guarantees), totaling
+  approximately 700+ query/operation implementations across two execution families
+  (expression-based and pandas-based).
+
+  Key insight: DataFrames are NOT read-only. All major DataFrame libraries support
+  write operations (to_parquet, write_csv, sink operations) and transformation
+  patterns that map directly to SQL INSERT/UPDATE/DELETE/MERGE semantics. TPC-DI
+  ETL operations and Write Primitives are actually IDEAL DataFrame workloads since
+  Pandas/Polars/PySpark are the de facto ETL tools in the Python ecosystem.
+
+  This enables users to benchmark DataFrame libraries (Polars, Pandas, PySpark,
+  DataFusion, Modin, cuDF, Dask) against SQL databases using a broader range of
+  workloads beyond the current TPC benchmarks.
+
+category: Core Functionality
+
+context_sections:
+  "Current State": |
+    DataFrame-Supported Benchmarks (2):
+    - TPC-H: 22 queries, full dual-family implementation (2,376 lines)
+    - TPC-DS: 99 queries, full dual-family implementation (579KB+)
+
+    SQL-Only Benchmarks Requiring DataFrame Implementation (17):
+    - SSB: 13 star-schema queries
+    - ClickBench: 43 analytics queries
+    - JoinOrder: 113 optimizer-testing queries
+    - NYC Taxi: 25 real-world OLAP queries
+    - TSBS DevOps: 18 time-series queries
+    - H2ODB: 10 data science queries
+    - AMPLab: 8 big data queries
+    - CoffeeShop: 11 order analytics queries
+    - TPC-DI: 38 ETL/transformation operations (Tier 2 - strong DataFrame fit)
+    - TPC-DS-OBT: 17 single-table queries
+    - TPC-Havoc: 220 query variants
+    - TPC-H Skew: 22 skewed-data queries
+    - DataVault: 22 Data Vault 2.0 queries
+    - Read Primitives: 136 read operations
+    - Write Primitives: 109 write operations (Tier 2 - strong DataFrame fit)
+    - Metadata Primitives: 28 introspection queries (limited DataFrame applicability)
+    - Transaction Primitives: 8 ACID operations (unsuitable - requires DB guarantees)
+
+  "Architecture Pattern": |
+    Each DataFrame-enabled benchmark requires:
+
+    1. Directory structure:
+       benchbox/core/{benchmark}/dataframe_queries/
+       ├── __init__.py           # Public API exports
+       ├── queries.py            # Dual-family implementations
+       ├── registry.py           # QueryRegistry for discovery
+       └── helpers.py            # Optional shared utilities
+
+    2. Dual-family implementations for each query:
+       - Expression family: Polars/PySpark/DataFusion (lazy evaluation)
+       - Pandas family: Pandas/Modin/cuDF/Dask (eager evaluation)
+
+    3. DataFrameQuery registration with:
+       - query_id, query_name, description
+       - categories (QueryCategory enum)
+       - pandas_impl and expression_impl callables
+       - sql_equivalent reference
+       - skip_platforms list
+
+    4. Registry update: supports_dataframe: True in benchmark_registry.py
+
+  "Implementation Priorities": |
+    Priority is based on query count, complexity, and user value:
+
+    Tier 1 - High Value (recommended first):
+    - SSB (13q): Simple star-schema, good starter benchmark
+    - ClickBench (43q): Popular industry benchmark
+    - NYC Taxi (25q): Real-world data, high user interest
+
+    Tier 2 - Strong DataFrame Fit:
+    - TPC-DI (38q): ETL transformations - DataFrames excel at this (SCD Type 2,
+      dimension processing, fact aggregation). Pandas/Polars/Spark are ETL tools.
+    - Write Primitives (109 ops): INSERT→concat/vstack, UPDATE→with_columns/assign,
+      DELETE→filter, BULK_LOAD→read/write_parquet, MERGE→join+conditional columns.
+      All major DataFrames support to_parquet/write_parquet output.
+    - TSBS DevOps (18q): Time-series workloads
+    - H2ODB (10q): Data science focus
+    - AMPLab (8q): Established benchmark
+    - CoffeeShop (11q): Simple analytics
+
+    Tier 3 - Experimental/Variants:
+    - TPC-H Skew (22q): Reuse TPC-H impls with skewed data
+    - TPC-DS-OBT (17q): Simplified single-table variant
+    - TPC-Havoc (220q): Query variants (may auto-generate)
+    - DataVault (22q): Specialized modeling
+
+    Tier 4 - Complex/Specialized:
+    - JoinOrder (113q): High complexity, many joins
+    - Read Primitives (136q): Foundation testing
+    - Metadata Primitives (28q): Partial applicability - schema introspection
+      (df.dtypes, df.schema) but not DB-specific INFORMATION_SCHEMA queries
+
+    Unsuitable for DataFrames:
+    - Transaction Primitives: Requires ACID guarantees that DataFrames don't provide
+
+tasks:
+  phases:
+    - phase: "Phase 1: Foundation and Pattern Extraction"
+      done: false
+      items:
+        - summary: "Extract common patterns from TPC-H/TPC-DS DataFrame implementations"
+          done: false
+          subtasks:
+            - summary: "Document reusable helper functions and utilities"
+              done: false
+            - summary: "Create shared base module for common operations"
+              done: false
+            - summary: "Define standard testing approach for DataFrame queries"
+              done: false
+        - summary: "Create DataFrame query implementation template/generator"
+          done: false
+          subtasks:
+            - summary: "Template for expression family implementation"
+              done: false
+            - summary: "Template for pandas family implementation"
+              done: false
+            - summary: "Template for registry and __init__ files"
+              done: false
+        - summary: "Establish validation framework for DataFrame query correctness"
+          done: false
+          subtasks:
+            - summary: "SQL vs DataFrame result comparison tooling"
+              done: false
+            - summary: "Automated correctness testing per query"
+              done: false
+
+    - phase: "Phase 2: Tier 1 Implementations (High Value)"
+      done: false
+      items:
+        - summary: "SSB DataFrame implementation (13 queries)"
+          done: false
+          subtasks:
+            - summary: "Analyze SSB SQL queries for DataFrame translation"
+              done: false
+            - summary: "Implement expression family (13 queries)"
+              done: false
+            - summary: "Implement pandas family (13 queries)"
+              done: false
+            - summary: "Add tests and validate against SQL results"
+              done: false
+        - summary: "ClickBench DataFrame implementation (43 queries)"
+          done: false
+          subtasks:
+            - summary: "Analyze ClickBench SQL queries for DataFrame translation"
+              done: false
+            - summary: "Implement expression family (43 queries)"
+              done: false
+            - summary: "Implement pandas family (43 queries)"
+              done: false
+            - summary: "Add tests and validate against SQL results"
+              done: false
+        - summary: "NYC Taxi DataFrame implementation (25 queries)"
+          done: false
+          subtasks:
+            - summary: "Analyze NYC Taxi SQL queries for DataFrame translation"
+              done: false
+            - summary: "Implement expression family (25 queries)"
+              done: false
+            - summary: "Implement pandas family (25 queries)"
+              done: false
+            - summary: "Add tests and validate against SQL results"
+              done: false
+
+    - phase: "Phase 3: Tier 2 Implementations (Strong DataFrame Fit)"
+      done: false
+      items:
+        - summary: "TPC-DI DataFrame implementation (38 operations)"
+          done: false
+          subtasks:
+            - summary: "Analyze TPC-DI ETL operations for DataFrame translation"
+              done: false
+            - summary: "Implement SCD Type 2 dimension processing helpers"
+              done: false
+            - summary: "Implement fact aggregation patterns"
+              done: false
+            - summary: "Implement data type transformations"
+              done: false
+            - summary: "Implement expression family (38 ops)"
+              done: false
+            - summary: "Implement pandas family (38 ops)"
+              done: false
+            - summary: "Add tests and validate against SQL results"
+              done: false
+        - summary: "Write Primitives DataFrame implementation (109 operations)"
+          done: false
+          subtasks:
+            - summary: "Analyze Write Primitives operations by category"
+              done: false
+            - summary: "Implement INSERT ops (concat/vstack patterns)"
+              done: false
+            - summary: "Implement UPDATE ops (with_columns/assign patterns)"
+              done: false
+            - summary: "Implement DELETE ops (filter negation patterns)"
+              done: false
+            - summary: "Implement BULK_LOAD ops (read/write_parquet patterns)"
+              done: false
+            - summary: "Implement MERGE ops (join + conditional column patterns)"
+              done: false
+            - summary: "Implement DDL ops (schema manipulation patterns)"
+              done: false
+            - summary: "Add tests and validate against SQL results"
+              done: false
+        - summary: "TSBS DevOps DataFrame implementation (18 queries)"
+          done: false
+          subtasks:
+            - summary: "Implement time-series specific helpers"
+              done: false
+            - summary: "Implement dual-family queries"
+              done: false
+            - summary: "Add tests and validation"
+              done: false
+        - summary: "H2ODB DataFrame implementation (10 queries)"
+          done: false
+          subtasks:
+            - summary: "Implement data science focused helpers"
+              done: false
+            - summary: "Implement dual-family queries"
+              done: false
+            - summary: "Add tests and validation"
+              done: false
+        - summary: "AMPLab DataFrame implementation (8 queries)"
+          done: false
+          subtasks:
+            - summary: "Implement dual-family queries"
+              done: false
+            - summary: "Add tests and validation"
+              done: false
+        - summary: "CoffeeShop DataFrame implementation (11 queries)"
+          done: false
+          subtasks:
+            - summary: "Implement dual-family queries"
+              done: false
+            - summary: "Add tests and validation"
+              done: false
+
+    - phase: "Phase 4: Tier 3 Implementations (Variants/Experimental)"
+      done: false
+      items:
+        - summary: "TPC-H Skew DataFrame implementation (22 queries)"
+          done: false
+          subtasks:
+            - summary: "Evaluate reuse of TPC-H implementations"
+              done: false
+            - summary: "Adapt for skewed data characteristics"
+              done: false
+            - summary: "Add tests and validation"
+              done: false
+        - summary: "TPC-DS-OBT DataFrame implementation (17 queries)"
+          done: false
+          subtasks:
+            - summary: "Implement simplified single-table queries"
+              done: false
+            - summary: "Add tests and validation"
+              done: false
+        - summary: "TPC-Havoc DataFrame implementation (220 queries)"
+          done: false
+          subtasks:
+            - summary: "Evaluate auto-generation from TPC-H base"
+              done: false
+            - summary: "Implement variant generation if feasible"
+              done: false
+            - summary: "Add tests and validation"
+              done: false
+        - summary: "DataVault DataFrame implementation (22 queries)"
+          done: false
+          subtasks:
+            - summary: "Implement Hub-Link-Satellite query patterns"
+              done: false
+            - summary: "Add tests and validation"
+              done: false
+
+    - phase: "Phase 5: Tier 4 Implementations (Complex)"
+      done: false
+      items:
+        - summary: "JoinOrder DataFrame implementation (113 queries)"
+          done: false
+          subtasks:
+            - summary: "Analyze complex join patterns"
+              done: false
+            - summary: "Implement in batches (complex joins)"
+              done: false
+            - summary: "Add tests and validation"
+              done: false
+        - summary: "Read Primitives DataFrame implementation (136 queries)"
+          done: false
+          subtasks:
+            - summary: "Categorize primitives by DataFrame applicability"
+              done: false
+            - summary: "Implement applicable primitives"
+              done: false
+            - summary: "Document skipped primitives with rationale"
+              done: false
+
+    - phase: "Phase 6: Documentation and Finalization"
+      done: false
+      items:
+        - summary: "Update benchmark documentation with DataFrame support status"
+          done: false
+        - summary: "Create DataFrame benchmark usage guide"
+          done: false
+        - summary: "Add performance comparison examples (SQL vs DataFrame)"
+          done: false
+        - summary: "Update MCP tools to reflect new DataFrame capabilities"
+          done: false
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - dataframe
+    - benchmarks
+    - polars
+    - pandas
+    - pyspark
+    - datafusion
+  estimated_effort: "Large (4-6 weeks total)"
+  created_date: "2026-01-19"
+
+impact:
+  business_value: |
+    Significantly expands BenchBox's DataFrame benchmarking capability from 2 to 15+
+    benchmarks. This enables comprehensive performance comparison between SQL databases
+    and DataFrame libraries across diverse workloads including star-schema (SSB),
+    real-world data (NYC Taxi, ClickBench), time-series (TSBS), and specialized
+    patterns (DataVault, JoinOrder).
+  user_impact: |
+    Users can benchmark DataFrame libraries (Polars, Pandas, PySpark, etc.) against
+    a much broader range of workloads. This is particularly valuable for:
+    - Data engineers comparing SQL vs DataFrame approaches
+    - Library maintainers benchmarking performance improvements
+    - Organizations evaluating DataFrame library choices
+  technical_debt: |
+    Establishes patterns and templates that will make future DataFrame benchmark
+    additions significantly easier. The shared infrastructure reduces per-benchmark
+    implementation effort.
+
+files_affected:
+  added:
+    - "benchbox/core/ssb/dataframe_queries/"
+    - "benchbox/core/clickbench/dataframe_queries/"
+    - "benchbox/core/nyctaxi/dataframe_queries/"
+    - "benchbox/core/tpcdi/dataframe_queries/"
+    - "benchbox/core/write_primitives/dataframe_queries/"
+    - "benchbox/core/tsbs_devops/dataframe_queries/"
+    - "benchbox/core/h2odb/dataframe_queries/"
+    - "benchbox/core/amplab/dataframe_queries/"
+    - "benchbox/core/coffeeshop/dataframe_queries/"
+    - "benchbox/core/tpch_skew/dataframe_queries/"
+    - "benchbox/core/tpcds_obt/dataframe_queries/"
+    - "benchbox/core/tpchavoc/dataframe_queries/"
+    - "benchbox/core/datavault/dataframe_queries/"
+    - "benchbox/core/joinorder/dataframe_queries/"
+    - "benchbox/core/read_primitives/dataframe_queries/"
+    - "benchbox/core/metadata_primitives/dataframe_queries/"
+  modified:
+    - "benchbox/core/benchmark_registry.py"
+    - "benchbox/core/dataframe/data_loader.py"
+
+success_metrics:
+  - "All Tier 1 benchmarks (SSB, ClickBench, NYC Taxi) have 100% DataFrame query coverage"
+  - "All DataFrame queries pass validation against SQL equivalents"
+  - "Both expression and pandas families implemented for all queries"
+  - "Test coverage >= 80% for new DataFrame query implementations"
+  - "Documentation updated with DataFrame support matrix"
+
+open_questions:
+  - "Can TPC-Havoc queries be auto-generated from TPC-H implementations?"
+  - "What subset of Read Primitives are meaningful for DataFrame execution?"
+  - "What subset of Metadata Primitives can map to DataFrame schema introspection?"
+  - "Should we prioritize specific DataFrame platforms for testing?"
+  - "Should Write Primitives OUTPUT operations test all formats (parquet, csv, json)?"
+
+technical_requirements:
+  constraints:
+    - "Must maintain dual-family (expression + pandas) implementation pattern"
+    - "Query results must match SQL results within validation tolerance"
+    - "No performance regression for existing TPC-H/TPC-DS DataFrame queries"
+  dependencies:
+    - "Existing DataFrameQuery and DataFrameContext infrastructure"
+    - "Platform adapters for Polars, Pandas, PySpark, DataFusion"
+  compatibility: |
+    Must work with all 8 supported DataFrame platforms:
+    - Expression family: Polars, PySpark, DataFusion
+    - Pandas family: Pandas, Modin, cuDF, Dask
