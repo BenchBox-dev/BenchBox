@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T21:04:01.860190'
-total_items: 371
+generated_at: '2026-01-19T09:18:46.994431'
+total_items: 372
 priorities:
   Critical:
     count: 25
@@ -130,7 +130,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 125
+    count: 126
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -292,6 +292,11 @@ priorities:
       title: Error Message Polish
       category: User Experience
       status: Done
+    - id: expand-mcp-tool-surface
+      file: DONE/mcp-integration/active/expand-mcp-tool-surface.yaml
+      title: Expand MCP tool surface area to match CLI capabilities
+      category: Core Functionality
+      status: Complete
     - id: tpcds-obt-query-expansion
       file: DONE/benchmark-expansion/implementation/tpcds-obt-query-expansion.yaml
       title: Expand TPC-DS OBT Query Coverage to 93 Queries

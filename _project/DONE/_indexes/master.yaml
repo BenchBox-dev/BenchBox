@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T21:04:01.859950'
-total_items: 371
+generated_at: '2026-01-19T09:18:46.994187'
+total_items: 372
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -749,6 +749,19 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 days
+- id: expand-mcp-tool-surface
+  file: DONE/mcp-integration/active/expand-mcp-tool-surface.yaml
+  title: Expand MCP tool surface area to match CLI capabilities
+  worktree: mcp-integration
+  category: Core Functionality
+  priority: High
+  status: Complete
+  tags:
+  - mcp
+  - api-surface
+  - cli-parity
+  - ai-integration
+  estimated_effort: Large
 - id: tpcds-obt-query-expansion
   file: DONE/benchmark-expansion/implementation/tpcds-obt-query-expansion.yaml
   title: Expand TPC-DS OBT Query Coverage to 93 Queries

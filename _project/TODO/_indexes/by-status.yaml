@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T21:04:01.041828'
-total_items: 50
+generated_at: '2026-01-19T09:18:46.210234'
+total_items: 51
 statuses:
   In Progress:
     count: 7
@@ -40,7 +40,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 43
+    count: 44
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -111,6 +111,11 @@ statuses:
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
       priority: Medium
+      category: Core Functionality
+    - id: implement-dataframe-benchmarks
+      file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
+      title: Implement DataFrame Support for All SQL-Only Benchmarks
+      priority: Medium-High
       category: Core Functionality
     - id: interactive-benchmark-explorer-web-ui
       file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml

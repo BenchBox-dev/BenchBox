@@ -1,4 +1,4 @@
-generated_at: '2026-01-18T21:04:01.860099'
+generated_at: '2026-01-19T09:18:46.994339'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -335,7 +335,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 66
+    count: 67
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -447,6 +447,11 @@ categories:
       title: Embed Full Tuning Config in Result Output
       priority: Medium-High
       status: Completed
+    - id: expand-mcp-tool-surface
+      file: DONE/mcp-integration/active/expand-mcp-tool-surface.yaml
+      title: Expand MCP tool surface area to match CLI capabilities
+      priority: High
+      status: Complete
     - id: tpcds-obt-query-expansion
       file: DONE/benchmark-expansion/implementation/tpcds-obt-query-expansion.yaml
       title: Expand TPC-DS OBT Query Coverage to 93 Queries

@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T21:04:01.041815'
-total_items: 50
+generated_at: '2026-01-19T09:18:46.210222'
+total_items: 51
 priorities:
   High:
     count: 6
@@ -35,7 +35,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium-High:
-    count: 19
+    count: 20
     items:
     - id: fabric-spark-notebooks-platform
       file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
@@ -56,6 +56,11 @@ priorities:
       file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode
       category: Platform Expansion
+      status: Not Started
+    - id: implement-dataframe-benchmarks
+      file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
+      title: Implement DataFrame Support for All SQL-Only Benchmarks
+      category: Core Functionality
       status: Not Started
     - id: migrate-clickhouse-firebolt-deployment
       file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml

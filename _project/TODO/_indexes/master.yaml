@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T21:04:01.041758'
-total_items: 50
+generated_at: '2026-01-19T09:18:46.210170'
+total_items: 51
 items:
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
@@ -457,6 +457,23 @@ items:
   - cloud
   - deployment-modes
   estimated_effort: 2-3 days
+- id: implement-dataframe-benchmarks
+  file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
+  title: Implement DataFrame Support for All SQL-Only Benchmarks
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - dataframe
+  - benchmarks
+  - polars
+  - pandas
+  - pyspark
+  - datafusion
+  owners:
+  - joe
+  estimated_effort: Large (4-6 weeks total)
 - id: migrate-clickhouse-firebolt-deployment
   file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
   title: Migrate ClickHouse/Firebolt to Deployment Registry
