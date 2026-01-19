@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T15:05:53.403194'
-total_items: 370
+generated_at: '2026-01-18T21:04:01.859950'
+total_items: 371
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1323,6 +1323,21 @@ items:
   - binaries
   - cross-platform
   estimated_effort: 2-4 hours
+- id: refactor-mcp-use-public-api
+  file: DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml
+  title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
+  worktree: mcp-integration
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - mcp
+  - architecture
+  - refactoring
+  - api-design
+  - technical-debt
+  estimated_effort: Medium
+  completed_date: '2026-01-18'
 - id: refactor-core-dependencies-to-optional
   file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
   title: Refactor platform-specific packages from core to optional dependencies

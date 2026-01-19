@@ -1,4 +1,4 @@
-generated_at: '2026-01-18T15:05:53.403351'
+generated_at: '2026-01-18T21:04:01.860099'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -335,7 +335,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 65
+    count: 66
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -625,6 +625,11 @@ categories:
     - id: rebuild-tpch-binaries
       file: DONE/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
       title: Rebuild TPC-H binaries with stdout fix for all platforms
+      priority: High
+      status: Completed
+    - id: refactor-mcp-use-public-api
+      file: DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml
+      title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
       priority: High
       status: Completed
     - id: refactor-and-simplify-tpc-compilation-infrastructure-completed

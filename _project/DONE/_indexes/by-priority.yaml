@@ -1,5 +1,5 @@
-generated_at: '2026-01-18T15:05:53.403446'
-total_items: 370
+generated_at: '2026-01-18T21:04:01.860190'
+total_items: 371
 priorities:
   Critical:
     count: 25
@@ -130,7 +130,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 124
+    count: 125
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -505,6 +505,11 @@ priorities:
     - id: rebuild-tpch-binaries
       file: DONE/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
       title: Rebuild TPC-H binaries with stdout fix for all platforms
+      category: Core Functionality
+      status: Completed
+    - id: refactor-mcp-use-public-api
+      file: DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml
+      title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
       category: Core Functionality
       status: Completed
     - id: refactor-core-dependencies-to-optional
