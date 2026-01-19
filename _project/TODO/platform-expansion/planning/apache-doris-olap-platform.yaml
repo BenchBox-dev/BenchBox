@@ -1,0 +1,239 @@
+title: "Add Apache Doris MPP OLAP platform support"
+worktree: platform-expansion
+priority: Medium-High
+status: Not Started
+description: |
+  Integrate Apache Doris as a supported BenchBox platform. Apache Doris is an
+  Apache Top-Level Project providing a high-performance real-time analytical
+  database. It's the upstream project from which StarRocks was forked, with
+  continued active development and strong adoption (12K+ GitHub stars, used by
+  Xiaomi, ByteDance, Baidu, JD.com, and 4000+ enterprises globally).
+
+  Technical fit analysis:
+  - SQLGlot has official 'doris' dialect support (verified)
+  - MySQL protocol connectivity via PyMySQL (port 9030)
+  - Full TPC-H (22 queries) and TPC-DS (99 queries) compatibility
+  - Competitive performance in OLAP workloads
+  - Multiple data loading options (Stream Load, Broker Load, INSERT)
+  - Vectorized execution engine and columnar storage
+
+  Strategic value:
+  - Major Apache project with strong community and enterprise adoption
+  - Enables side-by-side comparison with StarRocks (shared heritage)
+  - Real-time analytics focus complements batch OLAP platforms
+  - SelectDB Cloud offers managed deployment option
+
+  Note: Apache Doris and StarRocks share common ancestry but have diverged
+  significantly. Both are valuable benchmarking targets for different user bases.
+
+category: Platform Expansion
+
+tasks:
+  phases:
+    - phase: "Phase 1: Core Integration"
+      done: false
+      items:
+        - summary: "Create benchbox/platforms/doris.py adapter"
+          done: false
+          subtasks:
+            - summary: "Implement DorisAdapter class inheriting from PlatformAdapter"
+              done: false
+            - summary: "Set _dialect = 'doris' for SQLGlot transpilation"
+              done: false
+            - summary: "Implement create_connection() using PyMySQL"
+              done: false
+            - summary: "Implement execute_query() with timing and row count validation"
+              done: false
+        - summary: "Implement data loading via Stream Load HTTP API"
+          done: false
+          subtasks:
+            - summary: "Create HTTP PUT to FE/BE node for CSV data loading"
+              done: false
+            - summary: "Handle chunked loading for large files"
+              done: false
+            - summary: "Implement load status checking and error handling"
+              done: false
+        - summary: "Implement schema creation with Doris-specific DDL"
+          done: false
+          subtasks:
+            - summary: "Support Duplicate/Aggregate/Unique Key table models"
+              done: false
+            - summary: "Implement DISTRIBUTED BY HASH clause generation"
+              done: false
+            - summary: "Support PARTITION BY RANGE for large tables"
+              done: false
+        - summary: "Register platform in platform_registry.py"
+          done: false
+        - summary: "Add pymysql to optional dependencies in pyproject.toml"
+          done: false
+
+    - phase: "Phase 2: Optimization and Tuning"
+      done: false
+      items:
+        - summary: "Implement query cache control"
+          done: false
+          subtasks:
+            - summary: "Disable query cache via SET enable_query_cache = false"
+              done: false
+            - summary: "Add validation that cache is disabled"
+              done: false
+        - summary: "Implement platform optimizations"
+          done: false
+          subtasks:
+            - summary: "Add Bloom filter index support for high-cardinality columns"
+              done: false
+            - summary: "Add Bitmap index support for low-cardinality columns"
+              done: false
+            - summary: "Implement ANALYZE for statistics collection"
+              done: false
+        - summary: "Create tuning profile for Doris"
+          done: false
+          subtasks:
+            - summary: "Define TPC-H specific tuning (distribution keys, indexes)"
+              done: false
+            - summary: "Define TPC-DS specific tuning"
+              done: false
+            - summary: "Document colocate join configuration for multi-table joins"
+              done: false
+
+    - phase: "Phase 3: Testing and Documentation"
+      done: false
+      items:
+        - summary: "Create unit tests for Doris adapter"
+          done: false
+          subtasks:
+            - summary: "Test connection handling and configuration"
+              done: false
+            - summary: "Test SQL generation and dialect handling"
+              done: false
+            - summary: "Test Stream Load request formatting"
+              done: false
+        - summary: "Create integration tests"
+          done: false
+          subtasks:
+            - summary: "Add Docker Compose for local Doris cluster"
+              done: false
+            - summary: "Test TPC-H SF=0.01 end-to-end"
+              done: false
+            - summary: "Test TPC-DS SF=1 end-to-end"
+              done: false
+        - summary: "Create documentation"
+          done: false
+          subtasks:
+            - summary: "Create docs/platforms/doris.md with connection guide"
+              done: false
+            - summary: "Document Stream Load data loading process"
+              done: false
+            - summary: "Add deployment options (self-hosted, SelectDB Cloud)"
+              done: false
+        - summary: "Create example script"
+          done: false
+          subtasks:
+            - summary: "Create examples/getting_started/sql/doris_tpch.py"
+              done: false
+
+metadata:
+  tags:
+    - doris
+    - apache
+    - olap
+    - mpp
+    - columnar
+    - platform
+    - mysql-protocol
+    - real-time-analytics
+  estimated_effort: Medium
+  created_date: "2026-01-18"
+
+impact:
+  business_value: |
+    Apache Doris is a top-level Apache project with massive adoption in China
+    and growing international presence. Supporting it expands BenchBox's
+    relevance to a large user base and enables comparative analysis with
+    StarRocks (shared heritage, different evolution paths).
+  user_impact: |
+    Users running Apache Doris deployments can benchmark their systems with
+    industry-standard TPC-H/TPC-DS workloads. Comparative analysis against
+    StarRocks, ClickHouse, and other platforms becomes straightforward.
+  technical_debt: |
+    Clean implementation following established patterns (very similar to
+    StarRocks adapter due to shared heritage). No technical debt expected.
+
+technical_requirements:
+  constraints:
+    - "Requires Doris FE node accessible on port 9030 (MySQL protocol)"
+    - "Stream Load requires access to FE/BE nodes (HTTP port 8030)"
+    - "No embedded/local mode available (Docker recommended for testing)"
+  dependencies:
+    - "pymysql (Python MySQL client)"
+    - "requests (for Stream Load HTTP API)"
+  compatibility: |
+    - Python 3.10+
+    - Apache Doris 2.0+ (vectorized execution engine)
+    - SQLGlot 23+ (official doris dialect)
+
+files_affected:
+  modified:
+    - benchbox/platforms/__init__.py
+    - benchbox/core/platform_registry.py
+    - pyproject.toml
+  added:
+    - benchbox/platforms/doris.py
+    - tests/unit/platforms/test_doris_adapter.py
+    - tests/integration/platforms/test_doris_smoke.py
+    - docs/platforms/doris.md
+    - examples/getting_started/sql/doris_tpch.py
+
+dependencies:
+  related:
+    - _project/TODO/platform-expansion/planning/starrocks-olap-platform.yaml
+
+success_metrics:
+  - "Doris adapter passes all unit tests"
+  - "TPC-H SF=0.01 completes successfully with correct row counts"
+  - "TPC-DS SF=1 completes all 99 queries"
+  - "Platform appears in CLI wizard and --help output"
+  - "Documentation published on docs site"
+
+open_questions:
+  - "Should we support SelectDB Cloud API for managed deployments?"
+  - "Should we implement materialized view benchmarking as an advanced feature?"
+  - "What's the optimal colocate group configuration for TPC joins?"
+  - "Should we share code between Doris and StarRocks adapters given common heritage?"
+
+context_sections:
+  "Doris vs StarRocks": |
+    Apache Doris and StarRocks share common ancestry (Doris was the original,
+    StarRocks forked in 2020). Key differences today:
+    - Doris: Apache governance, larger community, more enterprise features
+    - StarRocks: Faster release cycle, more aggressive optimization focus
+    - Both: MySQL protocol, similar DDL, Stream Load API
+
+    BenchBox supporting both enables meaningful comparison.
+
+  "Performance Positioning": |
+    Apache Doris claims strong performance in OLAP workloads:
+    - Vectorized execution engine (Doris 2.0+)
+    - Columnar storage with efficient compression
+    - Cost-based query optimizer
+    - Real-time data ingestion support
+
+    Independent BenchBox verification provides objective comparison.
+
+  "Data Loading Strategy": |
+    Recommended approach for BenchBox:
+    1. Stream Load (HTTP PUT) for CSV files - primary method
+    2. Broker Load for cloud storage (S3, HDFS) scenarios
+    3. INSERT INTO SELECT for transformations
+    4. Standard INSERT for small datasets/testing
+
+    Stream Load endpoint: http://{fe_host}:8030/api/{database}/{table}/_stream_load
+
+  "Table Model Selection": |
+    Doris supports multiple table models:
+    - Duplicate: All rows stored, best for append-only logs
+    - Aggregate: Pre-aggregated on key columns, good for metrics
+    - Unique: Deduplication on key columns, good for updates
+    - Primary: Merge-on-read with updates, good for CDC
+
+    For TPC-H: Duplicate model recommended for most tables.
