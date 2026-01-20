@@ -21,7 +21,7 @@ description: |
   - Major Apache project with strong community and enterprise adoption
   - Enables side-by-side comparison with StarRocks (shared heritage)
   - Real-time analytics focus complements batch OLAP platforms
-  - SelectDB Cloud offers managed deployment option
+  - Multiple managed cloud options: VeloDB Cloud, SelectDB Cloud, ApsaraDB for SelectDB
 
   Note: Apache Doris and StarRocks share common ancestry but have diverged
   significantly. Both are valuable benchmarking targets for different user bases.
@@ -124,7 +124,7 @@ tasks:
               done: false
             - summary: "Document Stream Load data loading process"
               done: false
-            - summary: "Add deployment options (self-hosted, SelectDB Cloud)"
+            - summary: "Add deployment options (self-hosted, VeloDB Cloud, SelectDB Cloud, ApsaraDB)"
               done: false
         - summary: "Create example script"
           done: false
@@ -142,6 +142,9 @@ metadata:
     - platform
     - mysql-protocol
     - real-time-analytics
+    - velodb
+    - selectdb
+    - cloud
   estimated_effort: Medium
   created_date: "2026-01-18"
 
@@ -196,12 +199,33 @@ success_metrics:
   - "Documentation published on docs site"
 
 open_questions:
-  - "Should we support SelectDB Cloud API for managed deployments?"
+  - "Should we support VeloDB Cloud and/or SelectDB Cloud APIs for managed deployments?"
   - "Should we implement materialized view benchmarking as an advanced feature?"
   - "What's the optimal colocate group configuration for TPC joins?"
   - "Should we share code between Doris and StarRocks adapters given common heritage?"
+  - "Which cloud provider(s) should be prioritized for managed Doris testing (VeloDB on AWS, SelectDB, ApsaraDB)?"
 
 context_sections:
+  "Managed Doris Ecosystem": |
+    Multiple commercial offerings built on Apache Doris by core contributors:
+
+    **VeloDB** (velodb.io) - Founded May 2023 by original Doris contributors
+    - 50% of Doris PMC and committers onboard
+    - Products: VeloDB Cloud (fully managed), VeloDB Enterprise (on-premise)
+    - Available on AWS, GCP, Azure
+    - Decoupled storage-compute architecture with elastic scaling
+    - Hosts Apache Doris Summit
+
+    **SelectDB** (selectdb.com) - Built by core Doris developers
+    - Cloud-native real-time data warehouse service
+    - Available on multiple cloud providers
+    - ApsaraDB for SelectDB on Alibaba Cloud (ranks top in ClickBench)
+    - 50% lower TCO claimed vs self-managed
+
+    Both vendors remain major contributors to the open-source Apache Doris
+    project. For BenchBox, self-hosted Doris should work with any managed
+    service using standard MySQL protocol (port 9030).
+
   "Doris vs StarRocks": |
     Apache Doris and StarRocks share common ancestry (Doris was the original,
     StarRocks forked in 2020). Key differences today:

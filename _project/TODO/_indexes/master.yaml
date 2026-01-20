@@ -1,5 +1,5 @@
-generated_at: '2026-01-19T09:30:41.543810'
-total_items: 51
+generated_at: '2026-01-19T19:36:40.564782'
+total_items: 53
 items:
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
@@ -128,6 +128,21 @@ items:
   - azure
   - platform
   - cloud
+  estimated_effort: Medium
+- id: questdb-timeseries-platform
+  file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
+  title: Add QuestDB time-series database platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - questdb
+  - timeseries
+  - columnar
+  - platform
+  - postgres-protocol
+  - ilp
   estimated_effort: Medium
 - id: influxdb-blog-post-edits
   file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
@@ -398,6 +413,26 @@ items:
   - blog-data
   - verification
   estimated_effort: 30-60 minutes
+- id: apache-doris-olap-platform
+  file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
+  title: Add Apache Doris MPP OLAP platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - doris
+  - apache
+  - olap
+  - mpp
+  - columnar
+  - platform
+  - mysql-protocol
+  - real-time-analytics
+  - velodb
+  - selectdb
+  - cloud
+  estimated_effort: Medium
 - id: fabric-spark-notebooks-platform
   file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
   title: Add Microsoft Fabric Spark Notebooks platform support

@@ -1,5 +1,5 @@
-generated_at: '2026-01-19T09:30:41.543868'
-total_items: 51
+generated_at: '2026-01-19T19:36:40.564852'
+total_items: 53
 priorities:
   High:
     count: 6
@@ -35,8 +35,13 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium-High:
-    count: 20
+    count: 21
     items:
+    - id: apache-doris-olap-platform
+      file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
+      title: Add Apache Doris MPP OLAP platform support
+      category: Platform Expansion
+      status: Not Started
     - id: fabric-spark-notebooks-platform
       file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
       title: Add Microsoft Fabric Spark Notebooks platform support
@@ -138,11 +143,16 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 20
+    count: 21
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
       title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
+      category: Platform Expansion
+      status: Not Started
+    - id: questdb-timeseries-platform
+      file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
+      title: Add QuestDB time-series database platform support
       category: Platform Expansion
       status: Not Started
     - id: influxdb-blog-post-edits
