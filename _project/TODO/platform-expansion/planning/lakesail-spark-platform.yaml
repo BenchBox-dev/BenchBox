@@ -1,0 +1,424 @@
+title: "Add LakeSail Sail platform support for SQL and DataFrame benchmarking"
+worktree: platform-expansion
+priority: High
+status: Not Started
+description: |
+  Integrate LakeSail Sail as a supported BenchBox platform for high-performance
+  Spark-compatible SQL and DataFrame benchmarking.
+
+  LakeSail Sail is a Rust-based, drop-in replacement for Apache Spark that delivers
+  significant performance improvements while maintaining full Spark SQL and DataFrame
+  API compatibility. Key characteristics:
+
+  - **4x faster execution** with 94% lower hardware costs vs Apache Spark (TPC-H SF100)
+  - **Zero rewrite migration**: Uses standard PySpark client via Spark Connect protocol
+  - **Dual execution modes**: Multi-threaded single-host or distributed cluster
+  - **Modern architecture**: Built on DataFusion with Rust workers
+  - **Active development**: Supports Spark 3.5 and 4.0, with roadmap for streaming
+
+  This is a strategic platform addition because:
+  1. Growing interest in Spark alternatives with better performance/cost ratios
+  2. Direct comparison with existing Spark adapter validates performance claims
+  3. DataFrame API support enables benchbox dataframe mode (-df suffix)
+  4. Open-source with commercial support model fits enterprise evaluation needs
+
+  Technical approach:
+  - Leverage existing PySpark client (Sail implements Spark Connect server)
+  - Can potentially reuse significant code from spark.py/pyspark adapters
+  - SQLGlot 'spark' dialect for query translation
+  - Support both local (single-node) and distributed deployment modes
+
+  Reference implementations:
+  - benchbox/platforms/spark.py (SQL-based Spark)
+  - benchbox/platforms/pyspark/sql_adapter.py (PySpark SQL)
+  - benchbox/platforms/dataframe/pyspark_df.py (PySpark DataFrame)
+
+category: Platform Expansion
+
+tasks:
+  phases:
+    - phase: "Phase 1: Core SQL Adapter Implementation"
+      done: false
+      items:
+        - summary: "Create benchbox/platforms/lakesail.py SQL adapter"
+          done: false
+          subtasks:
+            - summary: "Implement LakeSailAdapter class inheriting from PlatformAdapter"
+              done: false
+            - summary: "Set _dialect = 'spark' for SQLGlot transpilation"
+              done: false
+            - summary: "Implement Spark Connect client configuration for Sail server"
+              done: false
+            - summary: "Configure connection to Sail server endpoint (local or cluster)"
+              done: false
+        - summary: "Implement connection management"
+          done: false
+          subtasks:
+            - summary: "Create SparkSession via Spark Connect to Sail server"
+              done: false
+            - summary: "Handle Sail-specific connection parameters (endpoint, auth)"
+              done: false
+            - summary: "Implement test_connection() for Sail server health check"
+              done: false
+            - summary: "Implement proper session cleanup in close_connection()"
+              done: false
+        - summary: "Implement schema and data operations"
+          done: false
+          subtasks:
+            - summary: "Implement create_schema() for database/table DDL"
+              done: false
+            - summary: "Implement load_data() for Parquet/CSV ingestion"
+              done: false
+            - summary: "Support Sail's native Parquet handling (DataFusion-based)"
+              done: false
+            - summary: "Handle TPC trailing delimiter edge cases"
+              done: false
+        - summary: "Implement query execution"
+          done: false
+          subtasks:
+            - summary: "Implement execute_query() with timing measurement"
+              done: false
+            - summary: "Handle result collection and row count validation"
+              done: false
+            - summary: "Implement proper error handling for Sail-specific errors"
+              done: false
+            - summary: "Add query plan capture support if available"
+              done: false
+
+    - phase: "Phase 2: DataFrame Adapter Implementation"
+      done: false
+      items:
+        - summary: "Create benchbox/platforms/dataframe/lakesail_df.py adapter"
+          done: false
+          subtasks:
+            - summary: "Implement LakeSailDataFrameAdapter inheriting from ExpressionFamilyAdapter"
+              done: false
+            - summary: "Define type aliases (LakeSailDF, LakeSailLazyDF, LakeSailExpr)"
+              done: false
+            - summary: "Implement PySpark DataFrame/Column expression mappings"
+              done: false
+            - summary: "Configure Spark Connect client for DataFrame operations"
+              done: false
+        - summary: "Implement DataFrame context management"
+          done: false
+          subtasks:
+            - summary: "Create context initialization connecting to Sail server"
+              done: false
+            - summary: "Implement lazy vs materialized evaluation semantics"
+              done: false
+            - summary: "Handle SparkSession lifecycle for DataFrame mode"
+              done: false
+        - summary: "Implement DataFrame query operations"
+          done: false
+          subtasks:
+            - summary: "Map TPC-H queries to DataFrame expression chains"
+              done: false
+            - summary: "Implement window functions via PySpark Column API"
+              done: false
+            - summary: "Handle aggregation and grouping operations"
+              done: false
+            - summary: "Implement result materialization timing"
+              done: false
+
+    - phase: "Phase 3: Platform Registry and CLI Integration"
+      done: false
+      items:
+        - summary: "Add platform metadata to registry"
+          done: false
+          subtasks:
+            - summary: "Add 'lakesail' entry to _build_platform_metadata() in platform_registry.py"
+              done: false
+            - summary: "Define capabilities (supports_sql, supports_dataframe)"
+              done: false
+            - summary: "Configure deployment modes (local, distributed)"
+              done: false
+            - summary: "Add 'lakesail-df' alias for DataFrame mode"
+              done: false
+        - summary: "Register adapter imports"
+          done: false
+          subtasks:
+            - summary: "Add LakeSailAdapter import with try/except in platforms/__init__.py"
+              done: false
+            - summary: "Add LakeSailDataFrameAdapter import for -df mode"
+              done: false
+            - summary: "Register config builder if needed for dynamic configuration"
+              done: false
+        - summary: "Implement CLI options"
+          done: false
+          subtasks:
+            - summary: "Add --lakesail-endpoint option for server address"
+              done: false
+            - summary: "Add --lakesail-mode option for local vs distributed"
+              done: false
+            - summary: "Add --lakesail-workers option for distributed mode"
+              done: false
+
+    - phase: "Phase 4: Optimization and Platform Features"
+      done: false
+      items:
+        - summary: "Implement Sail-specific optimizations"
+          done: false
+          subtasks:
+            - summary: "Configure DataFusion optimizer settings if exposed"
+              done: false
+            - summary: "Enable/disable result caching for benchmark accuracy"
+              done: false
+            - summary: "Configure memory and parallelism settings"
+              done: false
+        - summary: "Implement platform info collection"
+          done: false
+          subtasks:
+            - summary: "Capture Sail version from server"
+              done: false
+            - summary: "Capture DataFusion version if available"
+              done: false
+            - summary: "Record deployment mode (local/distributed) and worker count"
+              done: false
+            - summary: "Record Spark Connect protocol version"
+              done: false
+        - summary: "Implement tuning interface"
+          done: false
+          subtasks:
+            - summary: "Implement supports_tuning_type() for applicable tunings"
+              done: false
+            - summary: "Support partition tuning if applicable"
+              done: false
+            - summary: "Document Sail-specific configuration options"
+              done: false
+
+    - phase: "Phase 5: Testing"
+      done: false
+      items:
+        - summary: "Create unit tests for SQL adapter"
+          done: false
+          subtasks:
+            - summary: "Create tests/unit/platforms/test_lakesail_adapter.py"
+              done: false
+            - summary: "Mock PySpark/Spark Connect dependencies"
+              done: false
+            - summary: "Test initialization and configuration handling"
+              done: false
+            - summary: "Test connection string generation"
+              done: false
+            - summary: "Test query execution flow"
+              done: false
+        - summary: "Create unit tests for DataFrame adapter"
+          done: false
+          subtasks:
+            - summary: "Create tests/unit/platforms/dataframe/test_lakesail_df.py"
+              done: false
+            - summary: "Test expression API mapping"
+              done: false
+            - summary: "Test context lifecycle management"
+              done: false
+            - summary: "Test schema inference"
+              done: false
+        - summary: "Create integration tests"
+          done: false
+          subtasks:
+            - summary: "Create tests/integration/platforms/test_lakesail_smoke.py"
+              done: false
+            - summary: "Test TPC-H SF=0.01 end-to-end (requires running Sail server)"
+              done: false
+            - summary: "Test DataFrame mode execution"
+              done: false
+            - summary: "Add skip markers for CI without Sail server"
+              done: false
+
+    - phase: "Phase 6: Documentation and Examples"
+      done: false
+      items:
+        - summary: "Create platform documentation"
+          done: false
+          subtasks:
+            - summary: "Create docs/platforms/lakesail.md with full user guide"
+              done: false
+            - summary: "Document installation (pip install pysail or pyspark)"
+              done: false
+            - summary: "Document Sail server setup and configuration"
+              done: false
+            - summary: "Document deployment modes (local vs distributed)"
+              done: false
+            - summary: "Add CLI usage examples"
+              done: false
+            - summary: "Add Python API usage examples"
+              done: false
+        - summary: "Create example scripts"
+          done: false
+          subtasks:
+            - summary: "Create examples/getting_started/sql/lakesail_tpch.py"
+              done: false
+            - summary: "Create examples/getting_started/dataframe/lakesail_df_tpch.py"
+              done: false
+            - summary: "Create examples/platforms/lakesail_vs_spark_comparison.py"
+              done: false
+        - summary: "Update platform overview documentation"
+          done: false
+          subtasks:
+            - summary: "Add LakeSail to docs/platforms/overview.md"
+              done: false
+            - summary: "Add to platform comparison tables"
+              done: false
+            - summary: "Document Spark vs LakeSail benchmark comparison guidance"
+              done: false
+
+metadata:
+  tags:
+    - lakesail
+    - sail
+    - spark
+    - spark-connect
+    - datafusion
+    - rust
+    - high-performance
+    - dataframe
+    - sql
+    - platform
+    - open-source
+  estimated_effort: Large
+  created_date: "2026-01-20"
+
+impact:
+  business_value: |
+    LakeSail represents the emerging category of Spark-compatible alternatives that
+    promise significant performance improvements. Supporting LakeSail enables:
+    - Benchmarking claims of 4x speedup and 94% cost reduction vs Spark
+    - Direct comparison using identical TPC-H/TPC-DS queries
+    - Evaluation path for enterprises considering Spark migration
+    - Coverage of Rust-based analytical engines (growing ecosystem segment)
+  user_impact: |
+    Users can benchmark LakeSail Sail against Apache Spark and other platforms:
+    - Zero-friction evaluation (same PySpark code works on both)
+    - Side-by-side performance comparison with identical queries
+    - DataFrame mode testing for programmatic workloads
+    - Informed decision-making for Spark replacement/migration projects
+  technical_debt: |
+    Clean implementation leveraging existing Spark patterns. Potential for code
+    sharing with spark.py and pyspark adapters since Sail uses Spark Connect
+    protocol. May enable future refactoring to share common Spark Connect logic.
+
+technical_requirements:
+  constraints:
+    - "Requires running LakeSail Sail server (local or distributed)"
+    - "Uses Spark Connect protocol (PySpark 3.4+ client)"
+    - "Local mode requires Rust runtime; distributed requires cluster setup"
+    - "Python 3.10+ required"
+  dependencies:
+    - "pyspark>=3.4.0 (Spark Connect client)"
+    - "pysail (optional, LakeSail Python package if available)"
+  compatibility: |
+    - Python 3.10+
+    - PySpark 3.4+ or 3.5+ (Spark Connect support)
+    - Sail server compatible with Spark 3.5 or 4.0
+    - SQLGlot 'spark' dialect for query translation
+
+files_affected:
+  modified:
+    - benchbox/platforms/__init__.py
+    - benchbox/core/platform_registry.py
+    - docs/platforms/overview.md
+  added:
+    - benchbox/platforms/lakesail.py
+    - benchbox/platforms/dataframe/lakesail_df.py
+    - tests/unit/platforms/test_lakesail_adapter.py
+    - tests/unit/platforms/dataframe/test_lakesail_df.py
+    - tests/integration/platforms/test_lakesail_smoke.py
+    - docs/platforms/lakesail.md
+    - examples/getting_started/sql/lakesail_tpch.py
+    - examples/getting_started/dataframe/lakesail_df_tpch.py
+
+dependencies:
+  related:
+    - _project/TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
+    - _project/TODO/platform-expansion/planning/starburst-platform-adapter.yaml
+  blocks: []
+  blocked_by: []
+
+success_metrics:
+  - "LakeSail SQL adapter passes all unit tests with mocked dependencies"
+  - "LakeSail DataFrame adapter passes all unit tests"
+  - "TPC-H SF=0.01 completes successfully in SQL mode"
+  - "TPC-H SF=0.01 completes successfully in DataFrame mode"
+  - "Platform appears in `benchbox platforms list` output"
+  - "CLI options documented in `benchbox run --help`"
+  - "Documentation covers full setup and usage workflow"
+  - "Comparison example demonstrates Spark vs LakeSail benchmarking"
+
+open_questions:
+  - "What is the recommended Python package for LakeSail client? Is 'pysail' published or just use standard pyspark?"
+  - "Does Sail expose DataFusion configuration for tuning, or is it opaque?"
+  - "What authentication methods does Sail support for distributed mode?"
+  - "Should we implement a 'sail' CLI command wrapper for starting local server?"
+  - "How to handle version compatibility between PySpark client and Sail server versions?"
+  - "Does Sail support query plan capture via EXPLAIN for debugging/optimization?"
+
+context_sections:
+  "LakeSail Sail Architecture": |
+    LakeSail Sail is a Rust-based Spark replacement built on DataFusion:
+
+    Client Side:
+    - Standard PySpark client connects via Spark Connect protocol
+    - No client-side code changes required from existing Spark applications
+
+    Server Side:
+    - Sail server implements Spark Connect protocol
+    - Translates DataFrame/SQL operations to DataFusion logical plans
+    - DataFusion optimizer produces optimized physical plans
+    - Execution on Rust workers (single-host or distributed)
+
+    Execution Modes:
+    - Local: Multi-threaded runtime on single host
+    - Distributed: Cluster of Rust workers for scale-out
+
+  "Performance Claims (TPC-H SF100)": |
+    LakeSail published TPC-H SF100 benchmarks showing:
+    - ~4x faster execution across 22 queries vs Apache Spark
+    - 94% lower hardware costs (AWS r8g.4xlarge instances)
+    - Significantly lower peak memory usage
+    - Zero shuffle spill during execution
+
+    These claims should be validated with BenchBox benchmarking at various
+    scale factors to provide independent verification.
+
+  "Spark Connect Protocol": |
+    Spark Connect (introduced in Spark 3.4) decouples client from server:
+    - Client sends logical plans to server via gRPC
+    - Server executes and returns results
+    - Enables language-agnostic clients and pluggable servers
+
+    Sail implements the server side, accepting standard PySpark client
+    connections. This means:
+    - No special client library needed
+    - Existing PySpark code works unchanged
+    - Can compare same code on Spark vs Sail
+
+  "Implementation Strategy": |
+    Recommended approach leverages existing patterns:
+
+    1. Start with spark.py as reference (SQL mode)
+    2. Modify connection to target Sail server endpoint
+    3. Reuse most query execution logic (Spark Connect handles details)
+    4. Add Sail-specific configuration options
+
+    For DataFrame mode:
+    1. Start with pyspark_df.py as reference
+    2. Same expression API works (PySpark Column/DataFrame)
+    3. Add Sail server connection configuration
+
+    Key difference from standard Spark adapters:
+    - Connection goes to Sail server, not SparkSession.builder
+    - May need specific Spark Connect configuration for Sail endpoint
+
+  "Comparison with Existing Spark Platforms": |
+    BenchBox already supports several Spark-based platforms:
+
+    | Platform | Type | Connection |
+    |----------|------|------------|
+    | spark.py | SQL | Direct SparkSession |
+    | pyspark/ | SQL | SparkSessionManager |
+    | pyspark_df.py | DataFrame | SparkSessionManager |
+    | databricks | SQL | Databricks Connect |
+    | **lakesail** | SQL + DataFrame | Spark Connect to Sail |
+
+    LakeSail uses Spark Connect like Databricks Connect, but targets
+    the Sail server instead of Databricks runtime.

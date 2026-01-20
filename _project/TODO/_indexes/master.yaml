@@ -1,6 +1,26 @@
-generated_at: '2026-01-19T19:36:40.564782'
-total_items: 53
+generated_at: '2026-01-20T12:36:43.856362'
+total_items: 54
 items:
+- id: lakesail-spark-platform
+  file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
+  title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - lakesail
+  - sail
+  - spark
+  - spark-connect
+  - datafusion
+  - rust
+  - high-performance
+  - dataframe
+  - sql
+  - platform
+  - open-source
+  estimated_effort: Large
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
   title: MotherDuck Platform Adapter

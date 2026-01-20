@@ -1,9 +1,14 @@
-generated_at: '2026-01-19T19:36:40.564852'
-total_items: 53
+generated_at: '2026-01-20T12:36:43.856421'
+total_items: 54
 priorities:
   High:
-    count: 6
+    count: 7
     items:
+    - id: lakesail-spark-platform
+      file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
+      title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+      category: Platform Expansion
+      status: Not Started
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter

@@ -1,5 +1,5 @@
-generated_at: '2026-01-19T19:36:40.564867'
-total_items: 53
+generated_at: '2026-01-20T12:36:43.856433'
+total_items: 54
 statuses:
   In Progress:
     count: 7
@@ -40,12 +40,17 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 46
+    count: 47
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
       priority: Medium-High
+      category: Platform Expansion
+    - id: lakesail-spark-platform
+      file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
+      title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+      priority: High
       category: Platform Expansion
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
