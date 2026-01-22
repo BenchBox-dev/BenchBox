@@ -1,5 +1,5 @@
-generated_at: '2026-01-20T13:33:30.470687'
-total_items: 54
+generated_at: '2026-01-22T11:11:47.156183'
+total_items: 43
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -58,34 +58,6 @@ items:
   - platform-registry
   - deployment-modes
   estimated_effort: 3-4 days
-- id: oxbow-series-reality-vs-aspiration
-  file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
-  title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'
-  worktree: blog-content
-  category: Blog Revision
-  priority: High
-  status: Not Started
-  estimated_effort: 2 hours
-- id: oxbow-series-fix-orphaned-footnotes
-  file: TODO/blog-content/planning/oxbow-series-fix-orphaned-footnotes.yaml
-  title: '[Oxbow Series] Fix orphaned footnotes across all posts'
-  worktree: blog-content
-  category: Blog Revision
-  priority: High
-  status: Not Started
-  estimated_effort: 1 hour
-- id: oxbow-tier1-benchmark-runs
-  file: TODO/blog-content/planning/oxbow-tier1-benchmark-runs.yaml
-  title: '[Oxbow Series] Run Tier 1 benchmark suite for blog content'
-  worktree: blog-content
-  category: Blog Revision
-  priority: High
-  status: Not Started
-  tags:
-  - oxbow-series
-  - benchmarking
-  - blog-data
-  estimated_effort: 30-60 minutes
 - id: databend-cloud-olap-platform
   file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
   title: Databend Cloud-Native OLAP Platform Integration
@@ -398,28 +370,6 @@ items:
   - verification
   - quick-task
   estimated_effort: 10-15 minutes
-- id: oxbow-tier3-cloud-benchmark-runs
-  file: TODO/blog-content/planning/oxbow-tier3-cloud-benchmark-runs.yaml
-  title: '[Oxbow Series] Run Tier 3 cloud benchmarks for cost comparison data'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium
-  status: Not Started
-  tags:
-  - oxbow-series
-  - benchmarking
-  - blog-data
-  - cloud-platforms
-  - cost-analysis
-  estimated_effort: 1-2 hours
-- id: oxbow-series-style-cleanup
-  file: TODO/blog-content/planning/oxbow-series-style-cleanup.yaml
-  title: '[Oxbow Series] Style cleanup: headings, cross-links, status lines'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium
-  status: Not Started
-  estimated_effort: 45 minutes
 - id: tutorial-benchmark-verification
   file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
   title: '[Tutorials] Verify benchmark commands in tutorial posts'
@@ -634,63 +584,6 @@ items:
   - blog-data
   - multi-version
   estimated_effort: 3-5 hours
-- id: oxbow-series-add-learning-moments
-  file: TODO/blog-content/planning/oxbow-series-add-learning-moments.yaml
-  title: '[Oxbow Series] Add ''learning in public'' moments'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium-High
-  status: Not Started
-  estimated_effort: 30 minutes
-- id: oxbow-series-add-citations
-  file: TODO/blog-content/planning/oxbow-series-add-citations.yaml
-  title: '[Oxbow Series] Add missing citations for claims'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium-High
-  status: Not Started
-  estimated_effort: 1 hour
-- id: oxbow-tier2-benchmark-runs
-  file: TODO/blog-content/planning/oxbow-tier2-benchmark-runs.yaml
-  title: '[Oxbow Series] Run Tier 2 benchmark suite for enhanced blog content'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - oxbow-series
-  - benchmarking
-  - blog-data
-  - dataframe
-  estimated_effort: 30-60 minutes
-- id: oxbow-series-strengthen-opening-hooks
-  file: TODO/blog-content/planning/oxbow-series-strengthen-opening-hooks.yaml
-  title: '[Oxbow Series] Strengthen opening hooks for Posts 1, 3, 6'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium-High
-  status: Not Started
-  estimated_effort: 45 minutes
-- id: oxbow-update-drafts-with-data
-  file: TODO/blog-content/planning/oxbow-update-drafts-with-data.yaml
-  title: '[Oxbow Series] Update drafts with real benchmark data'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - oxbow-series
-  - blog-revision
-  - data-integration
-  estimated_effort: 1-2 hours
-- id: oxbow-series-verify-benchbox-commands
-  file: TODO/blog-content/planning/oxbow-series-verify-benchbox-commands.yaml
-  title: '[Oxbow Series] Verify BenchBox install and run commands'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium-High
-  status: Not Started
-  estimated_effort: 30 minutes
 - id: snowflake-gen2-comparison-benchmarks
   file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
   title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'

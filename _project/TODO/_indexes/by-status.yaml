@@ -1,5 +1,5 @@
-generated_at: '2026-01-20T13:33:30.470757'
-total_items: 54
+generated_at: '2026-01-22T11:11:47.156249'
+total_items: 43
 statuses:
   In Progress:
     count: 7
@@ -40,7 +40,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 47
+    count: 36
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -210,61 +210,6 @@ statuses:
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/planning/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'
-      priority: Medium-High
-      category: Blog Revision
-    - id: oxbow-series-add-learning-moments
-      file: TODO/blog-content/planning/oxbow-series-add-learning-moments.yaml
-      title: '[Oxbow Series] Add ''learning in public'' moments'
-      priority: Medium-High
-      category: Blog Revision
-    - id: oxbow-series-add-citations
-      file: TODO/blog-content/planning/oxbow-series-add-citations.yaml
-      title: '[Oxbow Series] Add missing citations for claims'
-      priority: Medium-High
-      category: Blog Revision
-    - id: oxbow-series-reality-vs-aspiration
-      file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
-      title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'
-      priority: High
-      category: Blog Revision
-    - id: oxbow-series-fix-orphaned-footnotes
-      file: TODO/blog-content/planning/oxbow-series-fix-orphaned-footnotes.yaml
-      title: '[Oxbow Series] Fix orphaned footnotes across all posts'
-      priority: High
-      category: Blog Revision
-    - id: oxbow-tier1-benchmark-runs
-      file: TODO/blog-content/planning/oxbow-tier1-benchmark-runs.yaml
-      title: '[Oxbow Series] Run Tier 1 benchmark suite for blog content'
-      priority: High
-      category: Blog Revision
-    - id: oxbow-tier2-benchmark-runs
-      file: TODO/blog-content/planning/oxbow-tier2-benchmark-runs.yaml
-      title: '[Oxbow Series] Run Tier 2 benchmark suite for enhanced blog content'
-      priority: Medium-High
-      category: Blog Revision
-    - id: oxbow-tier3-cloud-benchmark-runs
-      file: TODO/blog-content/planning/oxbow-tier3-cloud-benchmark-runs.yaml
-      title: '[Oxbow Series] Run Tier 3 cloud benchmarks for cost comparison data'
-      priority: Medium
-      category: Blog Revision
-    - id: oxbow-series-strengthen-opening-hooks
-      file: TODO/blog-content/planning/oxbow-series-strengthen-opening-hooks.yaml
-      title: '[Oxbow Series] Strengthen opening hooks for Posts 1, 3, 6'
-      priority: Medium-High
-      category: Blog Revision
-    - id: oxbow-series-style-cleanup
-      file: TODO/blog-content/planning/oxbow-series-style-cleanup.yaml
-      title: '[Oxbow Series] Style cleanup: headings, cross-links, status lines'
-      priority: Medium
-      category: Blog Revision
-    - id: oxbow-update-drafts-with-data
-      file: TODO/blog-content/planning/oxbow-update-drafts-with-data.yaml
-      title: '[Oxbow Series] Update drafts with real benchmark data'
-      priority: Medium-High
-      category: Blog Revision
-    - id: oxbow-series-verify-benchbox-commands
-      file: TODO/blog-content/planning/oxbow-series-verify-benchbox-commands.yaml
-      title: '[Oxbow Series] Verify BenchBox install and run commands'
       priority: Medium-High
       category: Blog Revision
     - id: snowflake-gen2-comparison-benchmarks

@@ -1,5 +1,5 @@
-generated_at: '2026-01-20T13:33:31.316193'
-total_items: 372
+generated_at: '2026-01-22T11:11:47.991826'
+total_items: 373
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2138,6 +2138,20 @@ items:
   category: Core Functionality
   priority: Medium
   status: In Progress
+- id: add-blog-with-ablog
+  file: DONE/docs-experience/active/add-blog-with-ablog.yaml
+  title: Add blog to BenchBox site using ABlog Sphinx extension
+  worktree: docs-experience
+  category: Documentation
+  priority: Medium
+  status: Completed
+  tags:
+  - documentation
+  - website
+  - blog
+  - sphinx
+  - ablog
+  estimated_effort: 2-3 hours
 - id: add-dedicated-tags-for-platforms-and-benchmarks
   file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
   title: Add dedicated tags for all platforms and benchmarks

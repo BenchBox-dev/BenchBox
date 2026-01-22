@@ -1,0 +1,132 @@
+title: "Add blog to BenchBox site using ABlog Sphinx extension"
+worktree: docs-experience
+priority: Medium
+status: Completed
+category: Documentation
+description: |
+  Add a blog to the BenchBox website at https://benchbox.dev/blog/ using ABlog,
+  a Sphinx extension for blogging. This integrates seamlessly with the existing
+  Sphinx/Furo/MyST documentation setup, requiring minimal changes.
+
+  ABlog was chosen over alternatives (Hugo, Pelican, Jekyll) because:
+  - Uses existing Sphinx toolchain (no new build system)
+  - Inherits Furo theme for visual consistency with docs
+  - Supports Markdown via MyST (already configured)
+  - Integrates into existing GitHub Actions deployment
+  - Provides full blog features: RSS, archives, tags, categories
+
+tasks:
+  phases:
+    - phase: "Phase 1: Setup"
+      done: true
+      items:
+        - summary: "Add ablog dependency to pyproject.toml"
+          done: true
+        - summary: "Configure ABlog in docs/conf.py"
+          done: true
+          subtasks:
+            - summary: "Add 'ablog' to extensions list"
+              done: true
+            - summary: "Set blog_baseurl, blog_path, blog_title"
+              done: true
+            - summary: "Configure blog_authors and blog_default_author"
+              done: true
+
+    - phase: "Phase 2: Content Structure"
+      done: true
+      items:
+        - summary: "Create docs/blog/ directory structure"
+          done: true
+        - summary: "Create blog index page (docs/blog/index.rst)"
+          done: true
+        - summary: "Add sample post to verify setup"
+          done: true
+
+    - phase: "Phase 3: Deployment Integration"
+      done: true
+      items:
+        - summary: "Update .github/workflows/docs.yml site assembly"
+          done: true
+          subtasks:
+            - summary: "Ensure blog/ is included in site output"
+              done: true
+            - summary: "Verify atom.xml feed is generated"
+              done: true
+        - summary: "Add blog link to landing page navigation"
+          done: true
+
+    - phase: "Phase 4: Verification"
+      done: true
+      items:
+        - summary: "Local build test: sphinx-build and verify blog output"
+          done: true
+        - summary: "Verify Furo theme applies correctly to blog pages"
+          done: true
+        - summary: "Test RSS feed generation"
+          done: true
+        - summary: "Push to branch and verify GitHub Actions build"
+          done: true
+
+metadata:
+  tags:
+    - documentation
+    - website
+    - blog
+    - sphinx
+    - ablog
+  estimated_effort: "2-3 hours"
+  created_date: "2025-01-22"
+  completed_date: "2025-01-22"
+
+files_affected:
+  modified:
+    - "pyproject.toml"
+    - "docs/conf.py"
+    - ".github/workflows/docs.yml"
+    - "landing/index.html"
+    - "docs/_static/custom.css"
+  added:
+    - "docs/blog/index.rst"
+    - "docs/blog/2025-01-22-welcome.md"
+    - "docs/_templates/page.html"
+    - "docs/_templates/ablog/collection.html"
+    - "docs/_templates/ablog/catalog.html"
+    - "docs/_templates/ablog/redirect.html"
+
+success_metrics:
+  - "Blog accessible at benchbox.dev/blog/"
+  - "Blog uses Furo theme matching docs"
+  - "RSS feed available at benchbox.dev/blog/atom.xml"
+  - "GitHub Actions builds and deploys blog successfully"
+
+context_sections:
+  "Current Site Architecture": |
+    - Landing page: Pure HTML/CSS/JS at root (landing/)
+    - Docs: Sphinx + Furo + MyST at /docs/
+    - Deployment: GitHub Actions → GitHub Pages
+    - Domain: benchbox.dev with custom CNAME
+
+  "Why ABlog": |
+    ABlog is a Sphinx extension that adds blogging capabilities. Key benefits:
+    - Same toolchain as existing docs (Sphinx)
+    - Same theme (Furo) for visual consistency
+    - Same content format (Markdown via MyST)
+    - Same deployment pipeline (GitHub Actions)
+    - Single new dependency: `uv add ablog`
+
+    Alternatives considered and rejected:
+    - Hugo/Pelican: Require separate toolchain and theme
+    - Plain Markdown: Lacks blog features (RSS, archives, tags)
+    - Jekyll: Ruby dependency, different ecosystem
+
+  "Implementation Notes": |
+    ABlog 0.11.12 has a compatibility issue with Sphinx 9.x that requires
+    ABlog 0.11.13+ (from GitHub main branch). Custom templates were created
+    in docs/_templates/ to bridge ABlog with Furo theme since Furo doesn't
+    support extensions that extend layout.html.
+
+    Key templates created:
+    - page.html: Extends Furo's page.html, adds RSS link and blog post navigation
+    - ablog/collection.html: Archive pages (by date, tag, author)
+    - ablog/catalog.html: Catalog listing pages
+    - ablog/redirect.html: Post redirect pages

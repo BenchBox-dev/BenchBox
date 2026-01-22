@@ -1,5 +1,5 @@
-generated_at: '2026-01-20T13:33:31.316469'
-total_items: 372
+generated_at: '2026-01-22T11:11:47.992089'
+total_items: 373
 priorities:
   Critical:
     count: 25
@@ -856,7 +856,7 @@ priorities:
       category: Platform Expansion
       status: Complete
   Medium:
-    count: 188
+    count: 189
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1018,6 +1018,11 @@ priorities:
       title: Add Time Series Benchmark Suite (TSBS) Implementation
       category: Core Functionality
       status: In Progress
+    - id: add-blog-with-ablog
+      file: DONE/docs-experience/active/add-blog-with-ablog.yaml
+      title: Add blog to BenchBox site using ABlog Sphinx extension
+      category: Documentation
+      status: Completed
     - id: add-dedicated-tags-for-platforms-and-benchmarks
       file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
       title: Add dedicated tags for all platforms and benchmarks

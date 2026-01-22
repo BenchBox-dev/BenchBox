@@ -1,4 +1,4 @@
-generated_at: '2026-01-20T13:33:31.316367'
+generated_at: '2026-01-22T11:11:47.991991'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -779,8 +779,13 @@ categories:
       priority: Medium
       status: Completed
   Documentation:
-    count: 9
+    count: 10
     items:
+    - id: add-blog-with-ablog
+      file: DONE/docs-experience/active/add-blog-with-ablog.yaml
+      title: Add blog to BenchBox site using ABlog Sphinx extension
+      priority: Medium
+      status: Completed
     - id: add-dedicated-tags-for-platforms-and-benchmarks
       file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
       title: Add dedicated tags for all platforms and benchmarks

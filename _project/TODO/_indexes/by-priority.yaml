@@ -1,8 +1,8 @@
-generated_at: '2026-01-20T13:33:30.470744'
-total_items: 54
+generated_at: '2026-01-22T11:11:47.156237'
+total_items: 43
 priorities:
   High:
-    count: 7
+    count: 4
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -24,23 +24,8 @@ priorities:
       title: Platform Deployment Registry Extensions
       category: Core Functionality
       status: In Progress
-    - id: oxbow-series-reality-vs-aspiration
-      file: TODO/blog-content/planning/oxbow-series-reality-vs-aspiration.yaml
-      title: '[Oxbow Series] Clarify reality vs. aspiration throughout series'
-      category: Blog Revision
-      status: Not Started
-    - id: oxbow-series-fix-orphaned-footnotes
-      file: TODO/blog-content/planning/oxbow-series-fix-orphaned-footnotes.yaml
-      title: '[Oxbow Series] Fix orphaned footnotes across all posts'
-      category: Blog Revision
-      status: Not Started
-    - id: oxbow-tier1-benchmark-runs
-      file: TODO/blog-content/planning/oxbow-tier1-benchmark-runs.yaml
-      title: '[Oxbow Series] Run Tier 1 benchmark suite for blog content'
-      category: Blog Revision
-      status: Not Started
   Medium-High:
-    count: 21
+    count: 15
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -112,43 +97,13 @@ priorities:
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'
       category: Blog Revision
       status: Not Started
-    - id: oxbow-series-add-learning-moments
-      file: TODO/blog-content/planning/oxbow-series-add-learning-moments.yaml
-      title: '[Oxbow Series] Add ''learning in public'' moments'
-      category: Blog Revision
-      status: Not Started
-    - id: oxbow-series-add-citations
-      file: TODO/blog-content/planning/oxbow-series-add-citations.yaml
-      title: '[Oxbow Series] Add missing citations for claims'
-      category: Blog Revision
-      status: Not Started
-    - id: oxbow-tier2-benchmark-runs
-      file: TODO/blog-content/planning/oxbow-tier2-benchmark-runs.yaml
-      title: '[Oxbow Series] Run Tier 2 benchmark suite for enhanced blog content'
-      category: Blog Revision
-      status: Not Started
-    - id: oxbow-series-strengthen-opening-hooks
-      file: TODO/blog-content/planning/oxbow-series-strengthen-opening-hooks.yaml
-      title: '[Oxbow Series] Strengthen opening hooks for Posts 1, 3, 6'
-      category: Blog Revision
-      status: Not Started
-    - id: oxbow-update-drafts-with-data
-      file: TODO/blog-content/planning/oxbow-update-drafts-with-data.yaml
-      title: '[Oxbow Series] Update drafts with real benchmark data'
-      category: Blog Revision
-      status: Not Started
-    - id: oxbow-series-verify-benchbox-commands
-      file: TODO/blog-content/planning/oxbow-series-verify-benchbox-commands.yaml
-      title: '[Oxbow Series] Verify BenchBox install and run commands'
-      category: Blog Revision
-      status: Not Started
     - id: snowflake-gen2-comparison-benchmarks
       file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 21
+    count: 19
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -238,16 +193,6 @@ priorities:
     - id: duckdb-architecture-verification
       file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
       title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
-      category: Blog Revision
-      status: Not Started
-    - id: oxbow-tier3-cloud-benchmark-runs
-      file: TODO/blog-content/planning/oxbow-tier3-cloud-benchmark-runs.yaml
-      title: '[Oxbow Series] Run Tier 3 cloud benchmarks for cost comparison data'
-      category: Blog Revision
-      status: Not Started
-    - id: oxbow-series-style-cleanup
-      file: TODO/blog-content/planning/oxbow-series-style-cleanup.yaml
-      title: '[Oxbow Series] Style cleanup: headings, cross-links, status lines'
       category: Blog Revision
       status: Not Started
     - id: tutorial-benchmark-verification
