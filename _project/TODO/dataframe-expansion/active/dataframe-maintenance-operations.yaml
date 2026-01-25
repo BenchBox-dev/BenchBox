@@ -64,24 +64,24 @@ tasks:
           done: true
 
     - phase: "Phase 2: Design Unified Maintenance Abstraction"
-      done: false
+      done: true
       items:
         - summary: "Design MaintenanceOperationsInterface that works for SQL and DataFrame"
-          done: false
+          done: true
           subtasks:
             - summary: "Define abstract operations: insert_rows, update_rows, delete_rows"
-              done: false
+              done: true
             - summary: "Define platform capability flags (supports_transactions, supports_merge, etc.)"
-              done: false
+              done: true
         - summary: "Document which DataFrame platforms support which operations"
-          done: false
+          done: true
           subtasks:
             - summary: "Delta Lake capabilities (full ACID)"
-              done: false
+              done: true
             - summary: "Iceberg capabilities (row-level operations)"
-              done: false
+              done: true
             - summary: "Polars/Parquet capabilities (file-level operations)"
-              done: false
+              done: true
 
     - phase: "Phase 3: Implementation"
       done: false
@@ -119,12 +119,14 @@ files_affected:
   modified:
     - "benchbox/core/dryrun.py"
     - "benchbox/core/runner/dataframe_runner.py"
-    - "benchbox/core/tpch/maintenance_test.py"
-    - "benchbox/core/tpcds/maintenance_test.py"
+    - "benchbox/core/dataframe/__init__.py"
   added:
-    - "benchbox/core/dataframe/maintenance_operations.py"
+    - "benchbox/core/dataframe/maintenance_interface.py"
+    - "tests/unit/core/dataframe/test_maintenance_interface.py"
+  planned:
     - "benchbox/platforms/dataframe/delta_lake_maintenance.py"
     - "benchbox/platforms/dataframe/iceberg_maintenance.py"
+    - "benchbox/platforms/dataframe/polars_maintenance.py"
 
 impact:
   business_value: |
