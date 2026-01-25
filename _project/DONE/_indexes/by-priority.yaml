@@ -1,5 +1,5 @@
-generated_at: '2026-01-24T19:21:50.766616'
-total_items: 374
+generated_at: '2026-01-25T08:02:11.496314'
+total_items: 375
 priorities:
   Critical:
     count: 26
@@ -768,7 +768,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 18
+    count: 19
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -803,6 +803,11 @@ priorities:
     - id: bidirectional-sync-and-true-up-releases
       file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
       title: Bidirectional Sync and True-Up Releases for Public/Private Repos
+      category: Core Functionality
+      status: Completed
+    - id: centralize-file-format-detection
+      file: DONE/core-functionality/centralize-file-format-detection.yaml
+      title: Centralize File Format and Compression Extension Detection
       category: Core Functionality
       status: Completed
     - id: cloud-spark-adapter-consolidation

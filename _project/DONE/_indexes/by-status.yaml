@@ -1,5 +1,5 @@
-generated_at: '2026-01-24T19:21:50.766710'
-total_items: 374
+generated_at: '2026-01-25T08:02:11.496392'
+total_items: 375
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 184
+    count: 185
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -893,6 +893,11 @@ statuses:
       title: Canonicalize Result Schema
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: centralize-file-format-detection
+      file: DONE/core-functionality/centralize-file-format-detection.yaml
+      title: Centralize File Format and Compression Extension Detection
+      priority: Medium-High
+      category: Core Functionality
     - id: cloud-spark-dependency-groups
       file: DONE/platform-expansion/active/cloud-spark-dependency-groups.yaml
       title: Cloud Spark Dependency Groups in pyproject.toml

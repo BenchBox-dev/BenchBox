@@ -1,5 +1,5 @@
-generated_at: '2026-01-24T19:21:50.766317'
-total_items: 374
+generated_at: '2026-01-25T08:02:11.496074'
+total_items: 375
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3661,6 +3661,20 @@ items:
   - github
   estimated_effort: Large
   completed_date: '2026-01-18'
+- id: centralize-file-format-detection
+  file: DONE/core-functionality/centralize-file-format-detection.yaml
+  title: Centralize File Format and Compression Extension Detection
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - refactoring
+  - code-quality
+  - DRY
+  - utilities
+  estimated_effort: 2-3 days
+  completed_date: '2026-01-25'
 - id: cloud-spark-adapter-consolidation
   file: DONE/platform-expansion/active/cloud-spark-adapter-consolidation.yaml
   title: Cloud Spark Adapter Consolidation - Extract Common Patterns
