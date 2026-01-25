@@ -1,4 +1,4 @@
-generated_at: '2026-01-25T13:20:22.614042'
+generated_at: '2026-01-25T14:27:36.480970'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -86,17 +86,47 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 9
+    count: 15
     items:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
       priority: Medium
       status: Not Started
+    - id: dataframe-maintenance-operations
+      file: TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml
+      title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
+      priority: Medium-High
+      status: In Progress
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       priority: Medium-High
+      status: Not Started
+    - id: dataframe-ai-primitives
+      file: TODO/dataframe-expansion/planning/dataframe-ai-primitives.yaml
+      title: Implement DataFrame Version of AI Primitives Benchmark
+      priority: Medium
+      status: Not Started
+    - id: dataframe-metadata-primitives
+      file: TODO/dataframe-expansion/planning/dataframe-metadata-primitives.yaml
+      title: Implement DataFrame Version of Metadata Primitives Benchmark
+      priority: Medium
+      status: Not Started
+    - id: dataframe-read-primitives
+      file: TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml
+      title: Implement DataFrame Version of Read Primitives Benchmark
+      priority: High
+      status: Not Started
+    - id: dataframe-transaction-primitives
+      file: TODO/dataframe-expansion/planning/dataframe-transaction-primitives.yaml
+      title: Implement DataFrame Version of Transaction Primitives Benchmark
+      priority: Medium
+      status: Not Started
+    - id: dataframe-write-primitives
+      file: TODO/dataframe-expansion/planning/dataframe-write-primitives.yaml
+      title: Implement DataFrame Version of Write Primitives Benchmark
+      priority: High
       status: Not Started
     - id: migrate-clickhouse-firebolt-deployment
       file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml

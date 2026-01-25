@@ -1,0 +1,226 @@
+title: "Implement DataFrame Version of Write Primitives Benchmark"
+worktree: dataframe-expansion
+priority: High
+status: Not Started
+category: Core Functionality
+description: |
+  Implement DataFrame versions of Write Primitives benchmark operations. This benchmark
+  tests fundamental write operations: INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL,
+  and TRANSACTION operations.
+
+  DataFrame platforms have extensive write capabilities that map to these operations:
+
+  **PySpark + Delta Lake:**
+  - INSERT → df.write.mode("append").saveAsTable()
+  - UPDATE → DeltaTable.update()
+  - DELETE → DeltaTable.delete()
+  - MERGE → DeltaTable.merge()
+  - DDL → spark.sql() for schema operations
+
+  **PySpark + Iceberg:**
+  - INSERT → df.writeTo().append()
+  - UPDATE → Row-level updates via MERGE
+  - DELETE → Row-level deletes
+  - MERGE → df.writeTo().overwritePartitions()
+
+  **Polars:**
+  - INSERT → write_parquet() with append
+  - BULK_LOAD → scan_parquet() + write_parquet()
+  - File-level operations (no row-level UPDATE/DELETE)
+
+  **All DataFrame Platforms:**
+  - BULK_LOAD → read + write with compression, partitioning, sorting
+  - Physical layout tuning (row groups, dictionary encoding)
+
+context_sections:
+  "Background and Motivation": |
+    Write Primitives tests INSERT, UPDATE, DELETE, MERGE, BULK_LOAD, DDL, and
+    TRANSACTION operations. These are NOT "SQL-only" - DataFrame platforms,
+    especially Spark-based ones with Delta Lake or Iceberg, have full support
+    for these operations.
+
+    The existing SQL implementation uses staging tables derived from TPC-H schema.
+    DataFrame implementations can follow similar patterns using table formats.
+
+  "Technical Context": |
+    Current Write Primitives implementation:
+    - `benchbox/core/write_primitives/benchmark.py` - Main benchmark class
+    - `benchbox/core/write_primitives/operations.py` - WriteOperationsManager
+    - Uses TPC-H data as foundation via get_data_source_benchmark() returning "tpch"
+
+    DataFrame write infrastructure exists:
+    - `benchbox/core/dataframe/write_config.py` - DataFrameWriteConfiguration
+    - Supports: compression, sorting, partitioning, row groups, repartitioning
+    - Platform-specific: PySpark has partitionBy, bucketBy, sortBy
+
+    Related TODO:
+    - `dataframe-maintenance-operations.yaml` covers TPC-H/TPC-DS maintenance
+    - Write Primitives is the microbenchmark version of similar operations
+
+  "Platform Capability Matrix": |
+    | Operation   | Delta Lake | Iceberg | Polars | Pandas | Dask |
+    |-------------|------------|---------|--------|--------|------|
+    | INSERT      | ✓ append   | ✓       | ✓ file | ✓ file | ✓    |
+    | UPDATE      | ✓ row      | ✓ row   | ✗      | ✗      | ✗    |
+    | DELETE      | ✓ row      | ✓ row   | ✗      | ✗      | ✗    |
+    | MERGE       | ✓          | ✓       | ✗      | ✗      | ✗    |
+    | BULK_LOAD   | ✓          | ✓       | ✓      | ✓      | ✓    |
+    | DDL         | ✓ SQL      | ✓ SQL   | ✗      | ✗      | ✗    |
+    | TRANSACTION | ✓ ACID     | ✓ ACID  | ✗      | ✗      | ✗    |
+
+    Row-level operations require Delta Lake or Iceberg table formats.
+    File-level operations work on all platforms.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Infrastructure"
+      done: false
+      items:
+        - summary: "Create dataframe_operations.py module structure"
+          done: false
+          subtasks:
+            - summary: "Create benchbox/core/write_primitives/dataframe_operations.py"
+              done: false
+            - summary: "Define WriteOperation dataclass for DataFrame operations"
+              done: false
+            - summary: "Define platform capability detection"
+              done: false
+        - summary: "Update WritePrimitivesBenchmark for DataFrame support"
+          done: false
+          subtasks:
+            - summary: "Add get_dataframe_operations() method"
+              done: false
+            - summary: "Add supports_dataframe_mode() capability check"
+              done: false
+
+    - phase: "Phase 2: File-Level Operations (All Platforms)"
+      done: false
+      items:
+        - summary: "Implement BULK_LOAD operations"
+          done: false
+          subtasks:
+            - summary: "CSV loading with various delimiters and encodings"
+              done: false
+            - summary: "Parquet loading with compression options"
+              done: false
+            - summary: "Performance comparison across formats"
+              done: false
+        - summary: "Implement file-level INSERT (append)"
+          done: false
+          subtasks:
+            - summary: "Expression family: write_parquet with mode='append'"
+              done: false
+            - summary: "Pandas family: to_parquet with append"
+              done: false
+        - summary: "Implement physical layout write operations"
+          done: false
+          subtasks:
+            - summary: "Sorted writes (all platforms except Dask)"
+              done: false
+            - summary: "Partitioned writes (PySpark, Dask)"
+              done: false
+            - summary: "Compression testing (zstd, gzip, lz4, snappy)"
+              done: false
+
+    - phase: "Phase 3: Row-Level Operations (Delta Lake/Iceberg)"
+      done: false
+      items:
+        - summary: "Implement Delta Lake operations"
+          done: false
+          subtasks:
+            - summary: "DeltaTable.update() - row-level UPDATE"
+              done: false
+            - summary: "DeltaTable.delete() - row-level DELETE"
+              done: false
+            - summary: "DeltaTable.merge() - UPSERT/MERGE"
+              done: false
+        - summary: "Implement Iceberg operations"
+          done: false
+          subtasks:
+            - summary: "Row-level UPDATE via MERGE"
+              done: false
+            - summary: "Row-level DELETE"
+              done: false
+            - summary: "Partition overwrite patterns"
+              done: false
+        - summary: "Add user feedback for unsupported platform/operation combinations"
+          done: false
+          subtasks:
+            - summary: "Detect when user runs row-level ops on Polars/Pandas (no Delta/Iceberg)"
+              done: false
+            - summary: "Raise clear error: 'Row-level UPDATE/DELETE requires Delta Lake or Iceberg table format'"
+              done: false
+            - summary: "Suggest alternatives: 'Use --platform pyspark-df with Delta Lake, or use file-level operations'"
+              done: false
+            - summary: "Add skip_platforms list for non-lakehouse platforms"
+              done: false
+
+    - phase: "Phase 4: DDL Operations (Spark SQL)"
+      done: false
+      items:
+        - summary: "Implement DDL via spark.sql() interface"
+          done: false
+          subtasks:
+            - summary: "CREATE TABLE operations"
+              done: false
+            - summary: "ALTER TABLE operations"
+              done: false
+            - summary: "DROP TABLE operations"
+              done: false
+
+    - phase: "Phase 5: Testing and Validation"
+      done: false
+      items:
+        - summary: "Unit tests for each operation type"
+          done: false
+        - summary: "Integration tests with polars-df (file-level only)"
+          done: false
+        - summary: "Integration tests with pyspark-df + Delta Lake"
+          done: false
+        - summary: "Verify skip_platforms works for unsupported operations"
+          done: false
+
+metadata:
+  tags:
+    - dataframe
+    - write-primitives
+    - delta-lake
+    - iceberg
+    - pyspark
+  estimated_effort: Large
+  created_date: "2026-01-25"
+
+files_affected:
+  added:
+    - "benchbox/core/write_primitives/dataframe_operations.py"
+  modified:
+    - "benchbox/core/write_primitives/benchmark.py"
+    - "tests/core/write_primitives/test_dataframe_operations.py"
+
+impact:
+  business_value: |
+    Enables benchmarking of write operations on DataFrame platforms including
+    Delta Lake and Iceberg, which are increasingly used in data lakehouse
+    architectures. Provides granular write performance metrics.
+  user_impact: |
+    Users can run: `benchbox run --platform pyspark-df --benchmark write_primitives`
+    to benchmark INSERT, UPDATE, DELETE, MERGE operations on Delta Lake.
+  technical_debt: |
+    Establishes write operation patterns that can be reused for TPC-H/TPC-DS
+    maintenance operations on DataFrame platforms.
+
+success_metrics:
+  - "BULK_LOAD operations work on all DataFrame platforms"
+  - "Row-level UPDATE/DELETE/MERGE work on PySpark + Delta Lake"
+  - "File-level INSERT (append) works on Polars, Pandas, PySpark"
+  - "Clear skip_platforms for unsupported operation/platform combinations"
+
+open_questions:
+  - "Should we require Delta Lake/Iceberg for row-level operations or provide fallbacks?"
+  - "How to handle DDL operations on platforms without SQL interface?"
+  - "Should TRANSACTION operations be in this benchmark or only in Transaction Primitives?"
+
+dependencies:
+  related:
+    - "_project/TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml"
+    - "_project/TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml"

@@ -1,13 +1,23 @@
-generated_at: '2026-01-25T13:20:22.614055'
-total_items: 44
+generated_at: '2026-01-25T14:27:36.480986'
+total_items: 50
 priorities:
   High:
-    count: 4
+    count: 6
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
+      status: Not Started
+    - id: dataframe-read-primitives
+      file: TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml
+      title: Implement DataFrame Version of Read Primitives Benchmark
+      category: Core Functionality
+      status: Not Started
+    - id: dataframe-write-primitives
+      file: TODO/dataframe-expansion/planning/dataframe-write-primitives.yaml
+      title: Implement DataFrame Version of Write Primitives Benchmark
+      category: Core Functionality
       status: Not Started
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
@@ -25,7 +35,7 @@ priorities:
       category: Core Functionality
       status: In Progress
   Medium-High:
-    count: 16
+    count: 17
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -52,6 +62,11 @@ priorities:
       title: Firebolt Cloud Deployment Mode
       category: Platform Expansion
       status: Not Started
+    - id: dataframe-maintenance-operations
+      file: TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml
+      title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
+      category: Core Functionality
+      status: In Progress
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -108,7 +123,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 19
+    count: 22
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -153,6 +168,21 @@ priorities:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
+      category: Core Functionality
+      status: Not Started
+    - id: dataframe-ai-primitives
+      file: TODO/dataframe-expansion/planning/dataframe-ai-primitives.yaml
+      title: Implement DataFrame Version of AI Primitives Benchmark
+      category: Core Functionality
+      status: Not Started
+    - id: dataframe-metadata-primitives
+      file: TODO/dataframe-expansion/planning/dataframe-metadata-primitives.yaml
+      title: Implement DataFrame Version of Metadata Primitives Benchmark
+      category: Core Functionality
+      status: Not Started
+    - id: dataframe-transaction-primitives
+      file: TODO/dataframe-expansion/planning/dataframe-transaction-primitives.yaml
+      title: Implement DataFrame Version of Transaction Primitives Benchmark
       category: Core Functionality
       status: Not Started
     - id: nyc-taxi-benchmark-expansion

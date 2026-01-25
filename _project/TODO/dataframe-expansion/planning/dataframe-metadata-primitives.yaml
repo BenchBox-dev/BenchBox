@@ -1,0 +1,254 @@
+title: "Implement DataFrame Version of Metadata Primitives Benchmark"
+worktree: dataframe-expansion
+priority: Medium
+status: Not Started
+category: Core Functionality
+description: |
+  Implement DataFrame versions of Metadata Primitives benchmark operations. This
+  benchmark tests metadata introspection operations: schema discovery, column
+  introspection, table statistics, and query introspection.
+
+  DataFrame platforms have metadata capabilities through various APIs:
+
+  **PySpark:**
+  - spark.catalog.listDatabases(), listTables(), listColumns()
+  - spark.sql("SHOW TABLES"), spark.sql("DESCRIBE TABLE")
+  - Delta Lake: DESCRIBE HISTORY, DESCRIBE DETAIL
+  - Iceberg: metadata tables (snapshots, manifests, files)
+
+  **Polars:**
+  - df.schema, df.dtypes, df.describe()
+  - Limited catalog capabilities (file-based, no central catalog)
+
+  **Pandas:**
+  - df.dtypes, df.info(), df.describe()
+  - No catalog capabilities
+
+  The benchmark should focus on operations that are meaningful across platforms,
+  with platform-specific extensions for lakehouse metadata.
+
+context_sections:
+  "Background and Motivation": |
+    Metadata Primitives tests INFORMATION_SCHEMA queries, SHOW/DESCRIBE commands,
+    and catalog introspection. These operations are critical for:
+    - Data catalog integration
+    - Schema discovery and IDE autocomplete
+    - BI tool connectivity
+    - Data governance workflows
+
+    While the SQL implementation uses INFORMATION_SCHEMA views, DataFrame platforms
+    have equivalent capabilities through catalog APIs and metadata tables.
+
+  "Technical Context": |
+    Current Metadata Primitives implementation:
+    - `benchbox/core/metadata_primitives/benchmark.py` - Main benchmark class
+    - `benchbox/core/metadata_primitives/queries.py` - Query manager
+    - Tests schema discovery, column introspection, table statistics
+
+    Complexity testing capability:
+    - Wide tables (100-1000+ columns)
+    - Nested view hierarchies
+    - Complex data types (ARRAY, STRUCT, MAP)
+    - Large catalogs (100-500+ tables)
+
+    DataFrame platforms expose metadata through:
+    - PySpark: spark.catalog API + SQL interface
+    - Delta Lake: delta.tables.DeltaTable.detail(), history()
+    - Iceberg: metadata tables accessible via SQL
+    - Polars/Pandas: schema introspection methods
+
+  "Platform Capability Matrix": |
+    | Operation              | PySpark | Delta Lake | Iceberg | Polars | Pandas |
+    |------------------------|---------|------------|---------|--------|--------|
+    | List tables            | ✓       | ✓          | ✓       | ✗      | ✗      |
+    | List columns           | ✓       | ✓          | ✓       | ✓      | ✓      |
+    | Column types           | ✓       | ✓          | ✓       | ✓      | ✓      |
+    | Table statistics       | ✓       | ✓          | ✓       | ✗      | ✗      |
+    | Row counts             | ✓       | ✓          | ✓       | ✓*     | ✓*     |
+    | Table history          | ✗       | ✓          | ✓       | ✗      | ✗      |
+    | File metadata          | ✗       | ✓          | ✓       | ✗      | ✗      |
+    | Partition info         | ✓       | ✓          | ✓       | ✗      | ✗      |
+
+    *Polars/Pandas require loading data to count rows (not catalog operation)
+
+tasks:
+  phases:
+    - phase: "Phase 1: Infrastructure"
+      done: false
+      items:
+        - summary: "Create dataframe_operations.py module structure"
+          done: false
+          subtasks:
+            - summary: "Create benchbox/core/metadata_primitives/dataframe_operations.py"
+              done: false
+            - summary: "Define MetadataOperation dataclass"
+              done: false
+            - summary: "Define platform capability detection"
+              done: false
+        - summary: "Update MetadataPrimitivesBenchmark for DataFrame support"
+          done: false
+          subtasks:
+            - summary: "Add get_dataframe_operations() method"
+              done: false
+            - summary: "Add supports_dataframe_mode() capability check"
+              done: false
+
+    - phase: "Phase 2: Schema Introspection (All Platforms)"
+      done: false
+      items:
+        - summary: "Implement column listing operations"
+          done: false
+          subtasks:
+            - summary: "Expression family: df.schema access"
+              done: false
+            - summary: "Pandas family: df.dtypes, df.info()"
+              done: false
+        - summary: "Implement type introspection"
+          done: false
+          subtasks:
+            - summary: "Data type mapping across platforms"
+              done: false
+            - summary: "Complex type handling (ARRAY, STRUCT, MAP)"
+              done: false
+        - summary: "Implement basic statistics"
+          done: false
+          subtasks:
+            - summary: "Row count (len(df) or df.count())"
+              done: false
+            - summary: "Column statistics (df.describe())"
+              done: false
+
+    - phase: "Phase 3: Catalog Operations (PySpark)"
+      done: false
+      items:
+        - summary: "Implement spark.catalog operations"
+          done: false
+          subtasks:
+            - summary: "listDatabases(), listTables(), listColumns()"
+              done: false
+            - summary: "tableExists(), getTable()"
+              done: false
+        - summary: "Implement SQL-based metadata queries"
+          done: false
+          subtasks:
+            - summary: "SHOW DATABASES, SHOW TABLES"
+              done: false
+            - summary: "DESCRIBE TABLE, DESCRIBE EXTENDED"
+              done: false
+
+    - phase: "Phase 4: Lakehouse Metadata (Delta Lake/Iceberg)"
+      done: false
+      items:
+        - summary: "Implement Delta Lake metadata operations"
+          done: false
+          subtasks:
+            - summary: "DeltaTable.detail() - table properties and statistics"
+              done: false
+            - summary: "DeltaTable.history() - transaction history"
+              done: false
+            - summary: "File-level metadata (parquet files, sizes)"
+              done: false
+        - summary: "Implement Iceberg metadata operations"
+          done: false
+          subtasks:
+            - summary: "Snapshots metadata table"
+              done: false
+            - summary: "Manifests metadata table"
+              done: false
+            - summary: "Files metadata table"
+              done: false
+
+    - phase: "Phase 5: Complexity Testing"
+      done: false
+      items:
+        - summary: "Adapt complexity testing for DataFrame platforms"
+          done: false
+          subtasks:
+            - summary: "Wide DataFrame introspection (100-1000+ columns)"
+              done: false
+            - summary: "Large catalog listing (100-500+ tables, PySpark only)"
+              done: false
+            - summary: "Complex nested types introspection"
+              done: false
+
+    - phase: "Phase 6: User Feedback for Unsupported Configurations"
+      done: false
+      items:
+        - summary: "Add validation when user runs catalog operations on non-catalog platforms"
+          done: false
+          subtasks:
+            - summary: "Detect when Polars/Pandas user attempts listTables, listDatabases operations"
+              done: false
+            - summary: "Raise clear error: 'Catalog operations require PySpark with configured catalog'"
+              done: false
+            - summary: "Suggest alternatives: 'Use schema introspection (df.schema) or switch to pyspark-df'"
+              done: false
+        - summary: "Add validation for lakehouse metadata operations"
+          done: false
+          subtasks:
+            - summary: "Check if Delta Lake tables exist before DESCRIBE HISTORY"
+              done: false
+            - summary: "Check if Iceberg catalog configured before metadata table queries"
+              done: false
+            - summary: "Provide actionable error with table format setup instructions"
+              done: false
+
+    - phase: "Phase 7: Testing and Validation"
+      done: false
+      items:
+        - summary: "Unit tests for each operation type"
+          done: false
+        - summary: "Integration tests with polars-df (schema ops only)"
+          done: false
+        - summary: "Integration tests with pyspark-df + Delta Lake"
+          done: false
+        - summary: "Test user feedback error messages are clear and actionable"
+          done: false
+
+metadata:
+  tags:
+    - dataframe
+    - metadata-primitives
+    - catalog
+    - delta-lake
+    - iceberg
+    - pyspark
+  estimated_effort: Medium
+  created_date: "2026-01-25"
+
+files_affected:
+  added:
+    - "benchbox/core/metadata_primitives/dataframe_operations.py"
+  modified:
+    - "benchbox/core/metadata_primitives/benchmark.py"
+    - "tests/core/metadata_primitives/test_dataframe_operations.py"
+
+impact:
+  business_value: |
+    Enables benchmarking of metadata operations on DataFrame platforms,
+    particularly important for data lakehouse architectures using Delta Lake
+    or Iceberg where metadata performance affects query planning.
+  user_impact: |
+    Users can run: `benchbox run --platform pyspark-df --benchmark metadata_primitives`
+    to benchmark catalog listing and table introspection on Spark.
+  technical_debt: |
+    Creates unified metadata introspection interface that abstracts platform
+    differences. Establishes patterns for catalog integration that can be
+    reused by data governance and lineage tracking features.
+
+success_metrics:
+  - "Schema introspection works on all DataFrame platforms"
+  - "Catalog operations work on PySpark"
+  - "Delta Lake/Iceberg metadata operations work with appropriate adapters"
+  - "Clear skip_platforms for catalog ops on non-catalog platforms (Polars, Pandas)"
+
+open_questions:
+  - "How to handle platforms without catalog capabilities (Polars, Pandas)?"
+  - "Should we include file system metadata (Parquet file sizes, etc.)?"
+  - "How to test complexity scaling on platforms without central catalogs?"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml"
+  related:
+    - "_project/TODO/dataframe-expansion/planning/dataframe-write-primitives.yaml"

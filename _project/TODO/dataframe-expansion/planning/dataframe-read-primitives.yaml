@@ -194,7 +194,29 @@ tasks:
             - summary: "Add docstring explaining optimizer tests require SQL execution plans"
               done: false
 
-    - phase: "Phase 6: Testing and Validation"
+    - phase: "Phase 6: User Feedback for Unsupported Configurations"
+      done: false
+      items:
+        - summary: "Add validation for expression-family-only queries on pandas platforms"
+          done: false
+          subtasks:
+            - summary: "Detect when pandas-df user attempts QUALIFY, lambda, ASOF JOIN queries"
+              done: false
+            - summary: "Raise clear error: 'QUALIFY clause requires expression-family platform (Polars, PySpark)'"
+              done: false
+            - summary: "Suggest alternatives: 'Use polars-df or pyspark-df, or filter manually after window function'"
+              done: false
+        - summary: "Add validation for optimizer queries"
+          done: false
+          subtasks:
+            - summary: "Detect when any DataFrame platform attempts optimizer test queries"
+              done: false
+            - summary: "Raise clear error: 'Optimizer queries test SQL query planning - use SQL mode'"
+              done: false
+            - summary: "List which 13 queries are skipped and why"
+              done: false
+
+    - phase: "Phase 7: Testing and Validation"
       done: false
       items:
         - summary: "Create unit tests for DataFrame implementations"
@@ -207,6 +229,8 @@ tasks:
         - summary: "Integration test with polars-df platform"
           done: false
         - summary: "Integration test with pandas-df platform"
+          done: false
+        - summary: "Test user feedback error messages are clear and actionable"
           done: false
         - summary: "Verify skip_platforms works correctly for unsupported queries"
           done: false

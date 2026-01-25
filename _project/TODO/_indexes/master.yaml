@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T13:20:22.614007'
-total_items: 44
+generated_at: '2026-01-25T14:27:36.480932'
+total_items: 50
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -20,6 +20,34 @@ items:
   - sql
   - platform
   - open-source
+  estimated_effort: Large
+- id: dataframe-read-primitives
+  file: TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml
+  title: Implement DataFrame Version of Read Primitives Benchmark
+  worktree: dataframe-expansion
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - dataframe
+  - read-primitives
+  - polars
+  - pandas
+  - expression-family
+  estimated_effort: Large
+- id: dataframe-write-primitives
+  file: TODO/dataframe-expansion/planning/dataframe-write-primitives.yaml
+  title: Implement DataFrame Version of Write Primitives Benchmark
+  worktree: dataframe-expansion
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - dataframe
+  - write-primitives
+  - delta-lake
+  - iceberg
+  - pyspark
   estimated_effort: Large
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
@@ -243,6 +271,53 @@ items:
   - zone-maps
   - data-loading
   estimated_effort: Medium
+- id: dataframe-ai-primitives
+  file: TODO/dataframe-expansion/planning/dataframe-ai-primitives.yaml
+  title: Implement DataFrame Version of AI Primitives Benchmark
+  worktree: dataframe-expansion
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - dataframe
+  - ai-primitives
+  - embeddings
+  - nlp
+  - sentiment
+  - classification
+  - pyspark-mllib
+  - sentence-transformers
+  estimated_effort: Large
+- id: dataframe-metadata-primitives
+  file: TODO/dataframe-expansion/planning/dataframe-metadata-primitives.yaml
+  title: Implement DataFrame Version of Metadata Primitives Benchmark
+  worktree: dataframe-expansion
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - dataframe
+  - metadata-primitives
+  - catalog
+  - delta-lake
+  - iceberg
+  - pyspark
+  estimated_effort: Medium
+- id: dataframe-transaction-primitives
+  file: TODO/dataframe-expansion/planning/dataframe-transaction-primitives.yaml
+  title: Implement DataFrame Version of Transaction Primitives Benchmark
+  worktree: dataframe-expansion
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - dataframe
+  - transaction-primitives
+  - acid
+  - delta-lake
+  - iceberg
+  - pyspark
+  estimated_effort: Large
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -462,6 +537,20 @@ items:
   - cloud
   - deployment-modes
   estimated_effort: 2-3 days
+- id: dataframe-maintenance-operations
+  file: TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml
+  title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
+  worktree: dataframe-expansion
+  category: Core Functionality
+  priority: Medium-High
+  status: In Progress
+  tags:
+  - dataframe
+  - maintenance
+  - tpc-compliance
+  - delta-lake
+  - iceberg
+  estimated_effort: Large
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks
