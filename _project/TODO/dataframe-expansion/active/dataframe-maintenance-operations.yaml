@@ -86,20 +86,22 @@ tasks:
     - phase: "Phase 3: Implementation"
       done: false
       items:
-        - summary: "Implement get_maintenance_operations_df() parallel to SQL version"
+        - summary: "Implement get_maintenance_operations_for_platform() factory function"
+          done: true
+        - summary: "Implement PolarsMaintenanceOperations (file-based insert + partition delete)"
+          done: true
+        - summary: "Implement DeltaLakeMaintenanceOperations (full ACID)"
           done: false
-        - summary: "Implement DeltaLakeMaintenanceOperations"
-          done: false
-        - summary: "Implement IcebergMaintenanceOperations"
-          done: false
-        - summary: "Implement ParquetFileMaintenanceOperations (partition-based)"
+        - summary: "Implement IcebergMaintenanceOperations (full ACID)"
           done: false
 
     - phase: "Phase 4: Testing and Validation"
       done: false
       items:
-        - summary: "Unit tests for each maintenance implementation"
-          done: false
+        - summary: "Unit tests for maintenance interface"
+          done: true
+        - summary: "Unit tests for Polars maintenance operations"
+          done: true
         - summary: "Integration tests with actual DataFrame platforms"
           done: false
         - summary: "TPC compliance validation for maintenance metrics"
