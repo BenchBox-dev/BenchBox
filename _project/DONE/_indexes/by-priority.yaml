@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T08:02:11.496314'
-total_items: 375
+generated_at: '2026-01-25T13:20:23.429401'
+total_items: 376
 priorities:
   Critical:
     count: 26
@@ -135,7 +135,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 126
+    count: 127
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -377,6 +377,11 @@ priorities:
       title: Implement schema creation with SQLGlot translation for PySpark
       category: Platform Expansion
       status: Not Started
+    - id: include-tpc-metrics-in-result-outputs
+      file: DONE/main/active/include-tpc-metrics-in-result-outputs.yaml
+      title: Include TPC Metrics (Power@Size, Throughput@Size, QphH/QphDS@Size) in All Result Outputs
+      category: Core Functionality
+      status: Completed
     - id: integrate-dataframe-mode-into-cli
       file: DONE/dataframe-cli/completed/integrate-dataframe-mode-into-cli.yaml
       title: Integrate DataFrame Mode into CLI

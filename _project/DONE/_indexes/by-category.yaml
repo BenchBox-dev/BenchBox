@@ -1,4 +1,4 @@
-generated_at: '2026-01-25T08:02:11.496227'
+generated_at: '2026-01-25T13:20:23.429313'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -335,7 +335,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 69
+    count: 70
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -546,6 +546,11 @@ categories:
       file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
       title: Improve interactive file selection in compare command
       priority: Medium-High
+      status: Completed
+    - id: include-tpc-metrics-in-result-outputs
+      file: DONE/main/active/include-tpc-metrics-in-result-outputs.yaml
+      title: Include TPC Metrics (Power@Size, Throughput@Size, QphH/QphDS@Size) in All Result Outputs
+      priority: High
       status: Completed
     - id: integrate-dataframe-mode-into-cli
       file: DONE/dataframe-cli/completed/integrate-dataframe-mode-into-cli.yaml

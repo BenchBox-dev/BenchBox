@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T08:02:11.496074'
-total_items: 375
+generated_at: '2026-01-25T13:20:23.429163'
+total_items: 376
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -986,6 +986,21 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Medium
+- id: include-tpc-metrics-in-result-outputs
+  file: DONE/main/active/include-tpc-metrics-in-result-outputs.yaml
+  title: Include TPC Metrics (Power@Size, Throughput@Size, QphH/QphDS@Size) in All Result Outputs
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tpc-metrics
+  - results
+  - json-output
+  - tpc-h
+  - tpc-ds
+  estimated_effort: 2-3 days
+  completed_date: '2026-01-25'
 - id: integrate-dataframe-mode-into-cli
   file: DONE/dataframe-cli/completed/integrate-dataframe-mode-into-cli.yaml
   title: Integrate DataFrame Mode into CLI
