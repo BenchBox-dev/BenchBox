@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T14:27:36.480998'
-total_items: 50
+generated_at: '2026-01-25T14:44:02.443246'
+total_items: 49
 statuses:
   In Progress:
     count: 8
@@ -9,10 +9,10 @@ statuses:
       title: Fix type checking errors ignored in ty config
       priority: Medium
       category: Testing and Quality Assurance
-    - id: dataframe-maintenance-operations
-      file: TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml
-      title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
-      priority: Medium-High
+    - id: dataframe-read-primitives
+      file: TODO/dataframe-expansion/active/dataframe-read-primitives.yaml
+      title: Implement DataFrame Version of Read Primitives Benchmark
+      priority: High
       category: Core Functionality
     - id: migrate-clickhouse-firebolt-deployment
       file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
@@ -45,7 +45,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 41
+    count: 40
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -146,11 +146,6 @@ statuses:
       file: TODO/dataframe-expansion/planning/dataframe-metadata-primitives.yaml
       title: Implement DataFrame Version of Metadata Primitives Benchmark
       priority: Medium
-      category: Core Functionality
-    - id: dataframe-read-primitives
-      file: TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml
-      title: Implement DataFrame Version of Read Primitives Benchmark
-      priority: High
       category: Core Functionality
     - id: dataframe-transaction-primitives
       file: TODO/dataframe-expansion/planning/dataframe-transaction-primitives.yaml

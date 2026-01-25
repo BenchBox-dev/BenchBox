@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T14:27:36.480986'
-total_items: 50
+generated_at: '2026-01-25T14:44:02.443234'
+total_items: 49
 priorities:
   High:
     count: 6
@@ -10,10 +10,10 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: dataframe-read-primitives
-      file: TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml
+      file: TODO/dataframe-expansion/active/dataframe-read-primitives.yaml
       title: Implement DataFrame Version of Read Primitives Benchmark
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: dataframe-write-primitives
       file: TODO/dataframe-expansion/planning/dataframe-write-primitives.yaml
       title: Implement DataFrame Version of Write Primitives Benchmark
@@ -35,7 +35,7 @@ priorities:
       category: Core Functionality
       status: In Progress
   Medium-High:
-    count: 17
+    count: 16
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -62,11 +62,6 @@ priorities:
       title: Firebolt Cloud Deployment Mode
       category: Platform Expansion
       status: Not Started
-    - id: dataframe-maintenance-operations
-      file: TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml
-      title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
-      category: Core Functionality
-      status: In Progress
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks

@@ -1,4 +1,4 @@
-generated_at: '2026-01-25T13:20:23.429313'
+generated_at: '2026-01-25T14:44:03.269643'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -335,7 +335,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 70
+    count: 71
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -507,6 +507,11 @@ categories:
       title: Harden plan comparison and visualization for unknown operator types
       priority: High
       status: Not Started
+    - id: dataframe-maintenance-operations
+      file: DONE/dataframe-expansion/active/dataframe-maintenance-operations.yaml
+      title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
+      priority: Medium-High
+      status: Complete
     - id: implement-expression-family-base-adapter-and-dialects
       file: DONE/dataframe-expression-family/completed/implement-expression-family-base-adapter-and-dialects.yaml
       title: Implement Expression Family Base Adapter and Dialects

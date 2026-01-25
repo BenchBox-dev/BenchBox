@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T14:27:36.480932'
-total_items: 50
+generated_at: '2026-01-25T14:44:02.443183'
+total_items: 49
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -22,12 +22,12 @@ items:
   - open-source
   estimated_effort: Large
 - id: dataframe-read-primitives
-  file: TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml
+  file: TODO/dataframe-expansion/active/dataframe-read-primitives.yaml
   title: Implement DataFrame Version of Read Primitives Benchmark
   worktree: dataframe-expansion
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - dataframe
   - read-primitives
@@ -537,20 +537,6 @@ items:
   - cloud
   - deployment-modes
   estimated_effort: 2-3 days
-- id: dataframe-maintenance-operations
-  file: TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml
-  title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
-  worktree: dataframe-expansion
-  category: Core Functionality
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - dataframe
-  - maintenance
-  - tpc-compliance
-  - delta-lake
-  - iceberg
-  estimated_effort: Large
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks

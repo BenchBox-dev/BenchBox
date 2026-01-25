@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T13:20:23.429401'
-total_items: 376
+generated_at: '2026-01-25T14:44:03.269732'
+total_items: 377
 priorities:
   Critical:
     count: 26
@@ -773,7 +773,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 19
+    count: 20
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -830,6 +830,11 @@ priorities:
       title: Embed Full Tuning Config in Result Output
       category: Core Functionality
       status: Completed
+    - id: dataframe-maintenance-operations
+      file: DONE/dataframe-expansion/active/dataframe-maintenance-operations.yaml
+      title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
+      category: Core Functionality
+      status: Complete
     - id: physical-tuning-ddl-generation
       file: DONE/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
       title: Implement Physical Tuning DDL Generation Across All Platforms
