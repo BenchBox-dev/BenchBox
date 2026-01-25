@@ -1,0 +1,164 @@
+title: "Implement DataFrame Version of AI Primitives Benchmark"
+worktree: dataframe-expansion
+priority: Medium
+status: Not Started
+category: Core Functionality
+description: |
+  Implement DataFrame versions of AI Primitives benchmark operations. This benchmark
+  tests AI/ML database operations including vector similarity search, embeddings,
+  and ML inference capabilities.
+
+  Unlike Read Primitives, AI Primitives is more specialized and platform-dependent.
+  DataFrame libraries have varying support for vector operations:
+  - Polars: Native vector operations, good NumPy interop
+  - PySpark: MLlib integration, vector columns
+  - Pandas: NumPy/scikit-learn integration
+  - DataFusion: Limited AI/ML support
+
+  This TODO focuses on the subset of AI operations that can be meaningfully
+  implemented across DataFrame platforms.
+
+context_sections:
+  "Background and Motivation": |
+    AI/ML workloads are increasingly run on DataFrame platforms:
+    - Feature engineering pipelines (Pandas, Polars)
+    - Distributed model training (PySpark MLlib)
+    - Vector similarity for recommendations
+
+    Testing these operations across platforms enables fair comparison of
+    AI/ML performance characteristics.
+
+  "Technical Context": |
+    The AI Primitives benchmark (`benchbox/core/ai_primitives/`) tests:
+    - Vector similarity search (cosine, euclidean, dot product)
+    - Embedding operations
+    - ML function integration (inference, scoring)
+
+    DataFrame implementations will use:
+    - Expression family: Native vector operations where available
+    - Pandas family: NumPy arrays for vector math
+
+    Key challenge: Many AI operations in SQL databases use proprietary extensions
+    (pgvector, ClickHouse array functions, Snowflake ML) that don't have direct
+    DataFrame equivalents.
+
+  "Scope Constraints": |
+    This implementation focuses on operations portable across DataFrame platforms:
+    - Vector math (dot product, cosine similarity, euclidean distance)
+    - Array operations (normalization, aggregation)
+    - Basic ML operations (softmax, sigmoid, normalization)
+
+    Excluded (SQL-only or platform-specific):
+    - Database-native vector indexes (HNSW, IVF)
+    - Proprietary ML functions (Snowflake Cortex, Databricks ML)
+    - GPU-accelerated operations (unless using cuDF)
+
+tasks:
+  phases:
+    - phase: "Phase 1: Analyze AI Primitives Coverage"
+      done: false
+      items:
+        - summary: "Audit current AI Primitives operations"
+          done: false
+          subtasks:
+            - summary: "List all operations in AIPrimitivesBenchmark"
+              done: false
+            - summary: "Categorize by DataFrame feasibility (portable, expression-only, SQL-only)"
+              done: false
+            - summary: "Estimate implementation effort per category"
+              done: false
+        - summary: "Research DataFrame platform AI capabilities"
+          done: false
+          subtasks:
+            - summary: "Polars vector/array operations"
+              done: false
+            - summary: "PySpark MLlib primitives"
+              done: false
+            - summary: "Pandas/NumPy interop patterns"
+              done: false
+
+    - phase: "Phase 2: Vector Operations Implementation"
+      done: false
+      items:
+        - summary: "Implement cosine similarity"
+          done: false
+          subtasks:
+            - summary: "Expression family: using dot product and norms"
+              done: false
+            - summary: "Pandas family: using NumPy operations"
+              done: false
+        - summary: "Implement euclidean distance"
+          done: false
+        - summary: "Implement dot product"
+          done: false
+        - summary: "Implement vector normalization (L1, L2)"
+          done: false
+
+    - phase: "Phase 3: Array Aggregation Operations"
+      done: false
+      items:
+        - summary: "Implement array_sum, array_mean, array_max"
+          done: false
+        - summary: "Implement array element-wise operations"
+          done: false
+        - summary: "Implement array slicing and indexing"
+          done: false
+
+    - phase: "Phase 4: Basic ML Operations"
+      done: false
+      items:
+        - summary: "Implement softmax"
+          done: false
+        - summary: "Implement sigmoid"
+          done: false
+        - summary: "Implement batch normalization"
+          done: false
+
+    - phase: "Phase 5: Testing and Validation"
+      done: false
+      items:
+        - summary: "Unit tests for vector operations"
+          done: false
+        - summary: "Numerical accuracy tests (compare to NumPy reference)"
+          done: false
+        - summary: "Integration tests on polars-df and pandas-df"
+          done: false
+
+metadata:
+  tags:
+    - dataframe
+    - ai-primitives
+    - vector-operations
+    - ml-functions
+  estimated_effort: Medium
+  created_date: "2026-01-25"
+
+files_affected:
+  added:
+    - "benchbox/core/ai_primitives/dataframe_operations.py"
+  modified:
+    - "benchbox/core/ai_primitives/benchmark.py"
+
+impact:
+  business_value: |
+    Enables benchmarking of AI/ML operations on DataFrame platforms, which is
+    increasingly important for feature engineering and ML pipeline optimization.
+  user_impact: |
+    Users can evaluate Polars vs Pandas vs PySpark for vector operations and
+    ML preprocessing workloads.
+
+success_metrics:
+  - "Core vector operations (cosine, euclidean, dot) implemented"
+  - "Works on polars-df and pandas-df platforms"
+  - "Numerical accuracy within 1e-6 of NumPy reference"
+
+open_questions:
+  - "Which AI operations are most commonly used and should be prioritized?"
+  - "Should we require NumPy as a dependency for pandas-family implementations?"
+  - "How to handle platforms without native vector support (skip vs emulate)?"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml"
+  related:
+    - "_project/TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml"

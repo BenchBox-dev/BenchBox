@@ -1,0 +1,149 @@
+title: "Implement DataFrame Maintenance Operations for TPC-H/TPC-DS"
+worktree: dataframe-expansion
+priority: Medium-High
+status: In Progress
+category: Core Functionality
+description: |
+  Implement maintenance operations (INSERT/UPDATE/DELETE equivalents) for DataFrame
+  platforms, enabling full TPC-H and TPC-DS compliance in DataFrame mode.
+
+  Currently, `get_maintenance_operations_sql()` only supports SQL mode. When users
+  run `--platform polars-df --benchmark tpch --phases maintenance`, no error is raised
+  and the maintenance phase silently does nothing useful.
+
+  DataFrame platforms like Spark (Delta Lake, Iceberg), Polars, and others support
+  write operations that can implement TPC maintenance semantics:
+  - Delta Lake: MERGE, UPDATE, DELETE operations
+  - Iceberg: Row-level deletes, upserts
+  - Polars: write_parquet() with append/overwrite modes
+  - Parquet files: Partition-based updates
+
+  This work involves:
+  1. Adding validation to error when maintenance+dataframe is attempted (short-term fix)
+  2. Designing a unified maintenance abstraction that works for both SQL and DataFrame
+  3. Implementing platform-specific maintenance operations
+
+context_sections:
+  "Background and Motivation": |
+    The TPC-H and TPC-DS benchmarks include maintenance tests (RF1/RF2 for TPC-H,
+    DM1-DM4 for TPC-DS) that test INSERT/UPDATE/DELETE performance. These are
+    currently only implemented for SQL mode via database connections.
+
+    As DataFrame platforms mature with features like Delta Lake and Iceberg,
+    they can support equivalent maintenance operations. This enables full TPC
+    compliance testing on DataFrame platforms.
+
+  "Technical Context": |
+    Current code path in dryrun.py:
+    ```python
+    if execution_mode == "dataframe":
+        return self._extract_dataframe_queries(...)  # Short-circuits before maintenance check
+    ```
+
+    The maintenance check happens AFTER this return, so DataFrame mode never
+    reaches the maintenance extraction code.
+
+    For actual execution, `dataframe_runner.py` only implements load and execute
+    (SELECT query) phases - no maintenance phase exists.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Short-term Fix (Validation)"
+      done: true
+      items:
+        - summary: "Add validation error when maintenance phase + DataFrame mode combined"
+          done: true
+          subtasks:
+            - summary: "Update _extract_queries() in dryrun.py to return error for maintenance+dataframe"
+              done: true
+            - summary: "Update run_dataframe_benchmark() to raise NotImplementedError for maintenance"
+              done: true
+            - summary: "Add user-friendly error message explaining the limitation"
+              done: true
+        - summary: "Add tests for the validation behavior"
+          done: true
+
+    - phase: "Phase 2: Design Unified Maintenance Abstraction"
+      done: false
+      items:
+        - summary: "Design MaintenanceOperationsInterface that works for SQL and DataFrame"
+          done: false
+          subtasks:
+            - summary: "Define abstract operations: insert_rows, update_rows, delete_rows"
+              done: false
+            - summary: "Define platform capability flags (supports_transactions, supports_merge, etc.)"
+              done: false
+        - summary: "Document which DataFrame platforms support which operations"
+          done: false
+          subtasks:
+            - summary: "Delta Lake capabilities (full ACID)"
+              done: false
+            - summary: "Iceberg capabilities (row-level operations)"
+              done: false
+            - summary: "Polars/Parquet capabilities (file-level operations)"
+              done: false
+
+    - phase: "Phase 3: Implementation"
+      done: false
+      items:
+        - summary: "Implement get_maintenance_operations_df() parallel to SQL version"
+          done: false
+        - summary: "Implement DeltaLakeMaintenanceOperations"
+          done: false
+        - summary: "Implement IcebergMaintenanceOperations"
+          done: false
+        - summary: "Implement ParquetFileMaintenanceOperations (partition-based)"
+          done: false
+
+    - phase: "Phase 4: Testing and Validation"
+      done: false
+      items:
+        - summary: "Unit tests for each maintenance implementation"
+          done: false
+        - summary: "Integration tests with actual DataFrame platforms"
+          done: false
+        - summary: "TPC compliance validation for maintenance metrics"
+          done: false
+
+metadata:
+  tags:
+    - dataframe
+    - maintenance
+    - tpc-compliance
+    - delta-lake
+    - iceberg
+  estimated_effort: Large
+  created_date: "2026-01-25"
+
+files_affected:
+  modified:
+    - "benchbox/core/dryrun.py"
+    - "benchbox/core/runner/dataframe_runner.py"
+    - "benchbox/core/tpch/maintenance_test.py"
+    - "benchbox/core/tpcds/maintenance_test.py"
+  added:
+    - "benchbox/core/dataframe/maintenance_operations.py"
+    - "benchbox/platforms/dataframe/delta_lake_maintenance.py"
+    - "benchbox/platforms/dataframe/iceberg_maintenance.py"
+
+impact:
+  business_value: |
+    Enables full TPC-H and TPC-DS compliance testing on DataFrame platforms,
+    which is increasingly important as data lake architectures become standard.
+  user_impact: |
+    Users can run complete TPC benchmarks (including maintenance tests) on
+    Spark/Delta Lake, Iceberg, and other DataFrame platforms.
+  technical_debt: |
+    Consolidates the SQL-only maintenance code into a unified abstraction,
+    reducing code duplication and improving maintainability.
+
+success_metrics:
+  - "Maintenance phase works on at least one DataFrame platform (Delta Lake)"
+  - "Clear error message when maintenance attempted on unsupported platform"
+  - "TPC-H RF1/RF2 metrics captured for DataFrame platforms"
+  - "TPC-DS DM1-DM4 metrics captured for DataFrame platforms"
+
+open_questions:
+  - "Should we prioritize Delta Lake or Iceberg for first implementation?"
+  - "How to handle platforms that only support file-level operations (no row-level updates)?"
+  - "Should maintenance operations be transactional where supported?"

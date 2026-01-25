@@ -1,0 +1,257 @@
+title: "Implement DataFrame Version of Read Primitives Benchmark"
+worktree: dataframe-expansion
+priority: High
+status: Not Started
+category: Core Functionality
+description: |
+  Implement DataFrame (Polars, Pandas, PySpark, DataFusion) versions of all 136 Read
+  Primitives queries. This benchmark tests fundamental database read operations and is
+  the ideal candidate for DataFrame expansion - it uses the TPC-H schema (already
+  supported by DataFrame loaders) and covers operations that map well to DataFrame APIs.
+
+  The Read Primitives catalog includes queries across 29 categories:
+  - Aggregation (13 queries): COUNT, SUM, AVG, COUNT DISTINCT, GROUP BY
+  - Filter (10 queries): WHERE clauses, predicate pushdown
+  - Optimizer (13 queries): Subquery decorrelation, join reordering, constant folding
+  - Array (9 queries): ARRAY operations, UNNEST, array aggregations
+  - String (11 queries): LIKE, CONCAT, SUBSTRING, string functions
+  - Order By (8 queries): Sorting, TOP-N, ORDER BY ALL
+  - Window (6 queries): ROW_NUMBER, RANK, LAG/LEAD, aggregate windows
+  - Qualify (6 queries): QUALIFY clause for window filtering
+  - Shuffle (5 queries): Data redistribution patterns
+  - Group By (5 queries): GROUP BY ALL, GROUP BY ROLLUP/CUBE
+  - And 19 more categories with 1-4 queries each
+
+  Implementation follows the established TPC-H DataFrame pattern using:
+  - Expression family (Polars, PySpark, DataFusion): ctx.col(), ctx.lit(), lazy expressions
+  - Pandas family (Pandas, Modin, Dask, cuDF): df['column'], boolean indexing, eager ops
+
+context_sections:
+  "Background and Motivation": |
+    Read Primitives is a microbenchmark testing isolated database operations without
+    the complexity of full TPC-H queries. It's ideal for:
+    - Identifying performance bottlenecks in specific operations
+    - Comparing optimizer effectiveness across platforms
+    - Testing modern SQL features (QUALIFY, MIN_BY, ARRAY, JSON)
+
+    DataFrame support enables the same granular analysis for expression-based and
+    pandas-based data processing libraries.
+
+  "Technical Context": |
+    The existing implementation pattern from TPC-H DataFrame support serves as the
+    template. Key files:
+    - `benchbox/core/tpch/dataframe_queries.py` - 22 TPC-H queries, both families
+    - `benchbox/core/dataframe/query.py` - DataFrameQuery, QueryRegistry classes
+    - `benchbox/core/dataframe/context.py` - DataFrameContext for table access
+
+    The Read Primitives queries are defined in:
+    - `benchbox/core/read_primitives/catalog/queries.yaml` - 136 SQL queries
+
+    Each SQL query needs two implementations:
+    1. expression_impl: Uses ctx.col(), ctx.lit(), method chaining
+    2. pandas_impl: Uses df['col'], boolean indexing, .groupby()
+
+  "Implementation Challenges": |
+    Some query categories have limited DataFrame support and may need skip_platforms:
+
+    **Well-Supported (all platforms):**
+    - aggregation, filter, groupby, orderby, shuffle, predicate, topn, count, limit
+
+    **Expression-Family Only:**
+    - qualify (QUALIFY clause - Polars, PySpark, DataFusion only)
+    - lambda (higher-order functions - Polars, PySpark only)
+    - timeseries (ASOF JOIN - Polars, PySpark only)
+
+    **Limited/Platform-Specific:**
+    - fulltext (text search - platform-specific implementations)
+    - json, struct, map (semi-structured - varies by platform)
+
+    **SQL-Only (skip for DataFrame):**
+    - optimizer (tests SQL optimizer behavior, not applicable to DataFrame)
+
+tasks:
+  phases:
+    - phase: "Phase 1: Foundation"
+      done: false
+      items:
+        - summary: "Create dataframe_queries.py module structure"
+          done: false
+          subtasks:
+            - summary: "Create benchbox/core/read_primitives/dataframe_queries.py"
+              done: false
+            - summary: "Define REGISTRY: QueryRegistry with category groupings"
+              done: false
+            - summary: "Add module docstring explaining the benchmark"
+              done: false
+        - summary: "Update benchmark.py to expose DataFrame queries"
+          done: false
+          subtasks:
+            - summary: "Add get_dataframe_queries() method to ReadPrimitivesBenchmark"
+              done: false
+            - summary: "Ensure benchmark returns proper QueryRegistry"
+              done: false
+
+    - phase: "Phase 2: Core Operations (70 queries)"
+      done: false
+      items:
+        - summary: "Implement aggregation queries (13)"
+          done: false
+          subtasks:
+            - summary: "aggregation_distinct - COUNT DISTINCT"
+              done: false
+            - summary: "aggregation_distinct_groupby - GROUP BY + COUNT DISTINCT"
+              done: false
+            - summary: "aggregation_groupby_large - High cardinality grouping"
+              done: false
+            - summary: "aggregation_groupby_small - Low cardinality grouping"
+              done: false
+            - summary: "aggregation_materialize - CTE aggregation"
+              done: false
+            - summary: "Remaining 8 aggregation queries"
+              done: false
+        - summary: "Implement filter queries (10)"
+          done: false
+          subtasks:
+            - summary: "filter_selective - High selectivity filters"
+              done: false
+            - summary: "filter_non_selective - Low selectivity filters"
+              done: false
+            - summary: "Remaining 8 filter queries"
+              done: false
+        - summary: "Implement groupby queries (5)"
+          done: false
+        - summary: "Implement orderby queries (8)"
+          done: false
+        - summary: "Implement shuffle queries (5)"
+          done: false
+        - summary: "Implement string queries (11)"
+          done: false
+        - summary: "Implement predicate queries (4)"
+          done: false
+        - summary: "Implement simple queries (count, decimal, empty, limit, long, topn, min, max)"
+          done: false
+
+    - phase: "Phase 3: Advanced Operations (40 queries)"
+      done: false
+      items:
+        - summary: "Implement window queries (6)"
+          done: false
+          subtasks:
+            - summary: "ROW_NUMBER, RANK implementations"
+              done: false
+            - summary: "LAG, LEAD implementations"
+              done: false
+            - summary: "Aggregate windows (SUM OVER, AVG OVER)"
+              done: false
+        - summary: "Implement qualify queries (6) - Expression family only"
+          done: false
+        - summary: "Implement statistical queries (3)"
+          done: false
+        - summary: "Implement pivot queries (2)"
+          done: false
+        - summary: "Implement olap queries (2)"
+          done: false
+        - summary: "Implement intrinsic queries (2)"
+          done: false
+        - summary: "Implement broadcast queries (3)"
+          done: false
+        - summary: "Implement exchange queries (3)"
+          done: false
+
+    - phase: "Phase 4: Semi-Structured Data (26 queries)"
+      done: false
+      items:
+        - summary: "Implement array queries (9)"
+          done: false
+          subtasks:
+            - summary: "ARRAY creation and access"
+              done: false
+            - summary: "UNNEST/EXPLODE operations"
+              done: false
+            - summary: "Array aggregations"
+              done: false
+        - summary: "Implement json queries (3)"
+          done: false
+        - summary: "Implement struct queries (3)"
+          done: false
+        - summary: "Implement map queries (3)"
+          done: false
+        - summary: "Implement lambda queries (3) - Expression family only"
+          done: false
+        - summary: "Implement timeseries queries (2) - Expression family only"
+          done: false
+        - summary: "Implement fulltext queries (3) - Platform-specific"
+          done: false
+
+    - phase: "Phase 5: Skip Optimizer Queries"
+      done: false
+      items:
+        - summary: "Document why optimizer queries are SQL-only"
+          done: false
+          subtasks:
+            - summary: "Add SKIP_FOR_DATAFRAME list with 13 optimizer query IDs"
+              done: false
+            - summary: "Add docstring explaining optimizer tests require SQL execution plans"
+              done: false
+
+    - phase: "Phase 6: Testing and Validation"
+      done: false
+      items:
+        - summary: "Create unit tests for DataFrame implementations"
+          done: false
+          subtasks:
+            - summary: "Test each query category against known results"
+              done: false
+            - summary: "Validate expression_impl and pandas_impl produce equivalent results"
+              done: false
+        - summary: "Integration test with polars-df platform"
+          done: false
+        - summary: "Integration test with pandas-df platform"
+          done: false
+        - summary: "Verify skip_platforms works correctly for unsupported queries"
+          done: false
+
+metadata:
+  tags:
+    - dataframe
+    - read-primitives
+    - polars
+    - pandas
+    - expression-family
+  estimated_effort: Large
+  created_date: "2026-01-25"
+
+files_affected:
+  added:
+    - "benchbox/core/read_primitives/dataframe_queries.py"
+  modified:
+    - "benchbox/core/read_primitives/benchmark.py"
+    - "tests/core/read_primitives/test_dataframe_queries.py"
+
+impact:
+  business_value: |
+    Enables microbenchmarking of DataFrame libraries (Polars, Pandas, PySpark) on
+    136 isolated operations. This provides granular performance insights beyond
+    full TPC-H queries, helping users identify specific bottlenecks.
+  user_impact: |
+    Users can run: `benchbox run --platform polars-df --benchmark read_primitives`
+    to get detailed performance profiles of Polars across aggregations, filters,
+    window functions, and more.
+  technical_debt: |
+    Establishes the pattern for DataFrame expansion of other primitives benchmarks,
+    creating reusable infrastructure for future work.
+
+success_metrics:
+  - "123+ of 136 queries implemented (optimizer queries excluded)"
+  - "Both expression_impl and pandas_impl provided for each query"
+  - "All tests pass on polars-df and pandas-df platforms"
+  - "Query results match SQL equivalents within tolerance"
+
+open_questions:
+  - "Should we implement all 136 queries or prioritize the most commonly used categories first?"
+  - "How to handle queries that use SQL-specific features (QUALIFY) on pandas-family platforms?"
+  - "Should optimizer queries be completely skipped or partially implemented where feasible?"
+
+dependencies:
+  related:
+    - "_project/TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml"
