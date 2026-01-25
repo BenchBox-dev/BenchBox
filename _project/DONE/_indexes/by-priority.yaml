@@ -1,14 +1,19 @@
-generated_at: '2026-01-23T17:10:42.780656'
-total_items: 373
+generated_at: '2026-01-24T19:21:50.766616'
+total_items: 374
 priorities:
   Critical:
-    count: 25
+    count: 26
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
       title: Add --dry-run option to interactive wizard with run summary
       category: User Experience
       status: Not Started
+    - id: bundle-tpc-query-templates-in-wheel
+      file: DONE/release-readiness/bundle-tpc-query-templates-in-wheel.yaml
+      title: Bundle TPC-H/TPC-DS query templates inside package for wheel distribution
+      category: Core Functionality
+      status: Completed
     - id: cloud-spark-shared-infrastructure
       file: DONE/platform-expansion/planning/cloud-spark-shared-infrastructure.yaml
       title: Cloud Spark Shared Infrastructure

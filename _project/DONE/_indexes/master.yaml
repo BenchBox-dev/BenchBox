@@ -1,5 +1,5 @@
-generated_at: '2026-01-23T17:10:42.780423'
-total_items: 373
+generated_at: '2026-01-24T19:21:50.766317'
+total_items: 374
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -15,6 +15,23 @@ items:
   - dry-run
   - critical
   estimated_effort: Medium
+- id: bundle-tpc-query-templates-in-wheel
+  file: DONE/release-readiness/bundle-tpc-query-templates-in-wheel.yaml
+  title: Bundle TPC-H/TPC-DS query templates inside package for wheel distribution
+  worktree: release-readiness
+  category: Core Functionality
+  priority: Critical
+  status: Completed
+  tags:
+  - packaging
+  - pypi
+  - tpc-h
+  - tpc-ds
+  - wheel
+  - critical-bug
+  owners:
+  - joeharris76
+  estimated_effort: 2-3 hours
 - id: cloud-spark-shared-infrastructure
   file: DONE/platform-expansion/planning/cloud-spark-shared-infrastructure.yaml
   title: Cloud Spark Shared Infrastructure

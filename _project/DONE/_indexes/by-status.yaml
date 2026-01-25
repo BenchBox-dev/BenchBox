@@ -1,5 +1,5 @@
-generated_at: '2026-01-23T17:10:42.780733'
-total_items: 373
+generated_at: '2026-01-24T19:21:50.766710'
+total_items: 374
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 183
+    count: 184
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -877,6 +877,11 @@ statuses:
       file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
       title: Bidirectional Sync and True-Up Releases for Public/Private Repos
       priority: Medium-High
+      category: Core Functionality
+    - id: bundle-tpc-query-templates-in-wheel
+      file: DONE/release-readiness/bundle-tpc-query-templates-in-wheel.yaml
+      title: Bundle TPC-H/TPC-DS query templates inside package for wheel distribution
+      priority: Critical
       category: Core Functionality
     - id: cli-help-examples-expansion
       file: DONE/docs-experience/planning/cli-help-examples-expansion.yaml

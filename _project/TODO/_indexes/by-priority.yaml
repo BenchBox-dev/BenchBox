@@ -1,5 +1,5 @@
-generated_at: '2026-01-24T07:41:42.016889'
-total_items: 43
+generated_at: '2026-01-24T19:21:49.017822'
+total_items: 44
 priorities:
   High:
     count: 4
@@ -25,7 +25,7 @@ priorities:
       category: Core Functionality
       status: In Progress
   Medium-High:
-    count: 15
+    count: 16
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -72,6 +72,11 @@ priorities:
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
       category: Core Functionality
       status: Not Started
+    - id: unified-adapter-interface
+      file: TODO/core-functionality/planning/unified-adapter-interface.yaml
+      title: Unify SQL and DataFrame Adapter Execution Interfaces
+      category: Core Functionality
+      status: Complete
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support

@@ -1,4 +1,4 @@
-generated_at: '2026-01-24T07:41:42.016872'
+generated_at: '2026-01-24T19:21:49.017806'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -86,7 +86,7 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 8
+    count: 9
     items:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
@@ -128,6 +128,11 @@ categories:
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
       priority: Medium-High
       status: Not Started
+    - id: unified-adapter-interface
+      file: TODO/core-functionality/planning/unified-adapter-interface.yaml
+      title: Unify SQL and DataFrame Adapter Execution Interfaces
+      priority: Medium-High
+      status: Complete
   Documentation:
     count: 2
     items:

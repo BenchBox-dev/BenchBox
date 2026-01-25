@@ -1,0 +1,258 @@
+title: "Unify SQL and DataFrame Adapter Execution Interfaces"
+worktree: core-functionality
+priority: Medium-High
+status: Complete
+category: Core Functionality
+description: |
+  Implement a unified `run_benchmark()` interface across SQL and DataFrame adapters,
+  eliminating the design defect identified in code review where DataFrame adapters
+  lack the same interface as SQL adapters.
+
+  The current architecture violates the Adapter pattern:
+
+  | Aspect | SQL Adapters | DataFrame Adapters |
+  |--------|-------------|-------------------|
+  | Has `run_benchmark()` | YES | NO |
+  | Entry point | `adapter.run_benchmark()` | `run_dataframe_benchmark()` function |
+  | Caller branching | None (polymorphic) | Required (orchestrator:287, MCP:175) |
+
+  **Design Violations:**
+  - Liskov Substitution Principle (adapters not interchangeable)
+  - Open/Closed Principle (new modes require caller changes)
+  - Adapter Pattern (no unified interface)
+
+  **Goal:** All adapters (SQL and DataFrame) should implement the same `run_benchmark()`
+  method, allowing callers to use adapters polymorphically without type-checking or
+  branching logic.
+
+context_sections:
+  "Current Architecture Problems": |
+    The orchestrator and MCP tools currently require branching logic:
+
+    ```python
+    # orchestrator.py:277-334
+    if execution_mode == "dataframe":
+        # Special DataFrame path with DataFramePhases, DataFrameRunOptions
+        result = run_dataframe_benchmark(adapter, ...)
+    else:
+        # Standard SQL path
+        result = run_benchmark_lifecycle(adapter, ...)
+    ```
+
+    ```python
+    # mcp/tools/benchmark.py:175-191
+    if _is_dataframe_platform(platform):
+        result = run_dataframe_benchmark(adapter, ...)
+    else:
+        result = benchmark_instance.run_with_platform(adapter)
+    ```
+
+    This violates the fundamental purpose of the Adapter pattern - callers should
+    not need to know which type of adapter they're using.
+
+  "Target Architecture": |
+    After refactoring, all callers use a single code path:
+
+    ```python
+    # Unified path - works for ALL adapters
+    result = adapter.run_benchmark(benchmark, config)
+    ```
+
+    The adapter implementation handles the differences internally:
+    - SQL adapters: Execute SQL queries against database
+    - DataFrame adapters: Load data into memory, execute DataFrame operations
+
+  "Files Affected Summary": |
+    | File | Change |
+    |------|--------|
+    | `benchbox/platforms/dataframe/expression_family.py` | +`run_benchmark()` (~150 lines) |
+    | `benchbox/core/runner/dataframe_runner.py` | Deprecate `run_dataframe_benchmark()` |
+    | `benchbox/cli/orchestrator.py` | Remove ~60 lines branching |
+    | `benchbox/mcp/tools/benchmark.py` | Remove ~20 lines branching |
+    | `tests/unit/platforms/dataframe/test_expression_family.py` | Add tests |
+
+tasks:
+  phases:
+    - phase: "Phase 1: Add run_benchmark() to DataFrame Adapters"
+      done: true
+      items:
+        - summary: "Add run_benchmark() method signature to ExpressionFamilyAdapter"
+          done: false
+          subtasks:
+            - summary: "Define method signature matching SQL adapter interface"
+              done: false
+            - summary: "Document expected parameters and return type"
+              done: false
+        - summary: "Implement _load_data_phase() method"
+          done: false
+          subtasks:
+            - summary: "Move logic from dataframe_runner._load_dataframe_data()"
+              done: false
+            - summary: "Integrate with existing data loading infrastructure"
+              done: false
+        - summary: "Implement _execute_query_phase() method"
+          done: false
+          subtasks:
+            - summary: "Move logic from dataframe_runner._execute_dataframe_queries()"
+              done: false
+            - summary: "Handle query iteration and timing"
+              done: false
+        - summary: "Implement result construction"
+          done: false
+          subtasks:
+            - summary: "Move logic from run_dataframe_benchmark() lines 177-202"
+              done: false
+            - summary: "Ensure return type matches BenchmarkResults"
+              done: false
+
+    - phase: "Phase 2: Remove Orchestrator Branching"
+      done: true
+      items:
+        - summary: "Remove if execution_mode == 'dataframe' branching"
+          done: false
+          subtasks:
+            - summary: "Identify all DataFrame-specific code paths (lines 277-334)"
+              done: false
+            - summary: "Remove DataFramePhases and DataFrameRunOptions handling"
+              done: false
+        - summary: "Use unified run_benchmark_lifecycle() for all platforms"
+          done: false
+          subtasks:
+            - summary: "Update adapter factory calls to work uniformly"
+              done: false
+            - summary: "Verify all configuration options pass through correctly"
+              done: false
+
+    - phase: "Phase 3: Remove MCP Branching"
+      done: true
+      items:
+        - summary: "Remove _is_dataframe_platform() helper"
+          done: false
+        - summary: "Remove run_dataframe_benchmark import and call"
+          done: false
+        - summary: "Use single benchmark_instance.run_with_platform(adapter) for all platforms"
+          done: false
+          subtasks:
+            - summary: "Verify MCP tool works for all platform types"
+              done: false
+            - summary: "Update MCP tests accordingly"
+              done: false
+
+    - phase: "Phase 4: Testing and Validation"
+      done: true
+      items:
+        - summary: "Add tests for ExpressionFamilyAdapter.run_benchmark()"
+          done: false
+          subtasks:
+            - summary: "Unit tests for each phase method"
+              done: false
+            - summary: "Integration test for full benchmark run"
+              done: false
+        - summary: "Verify DataFrame benchmarks produce identical results"
+          done: false
+          subtasks:
+            - summary: "Compare results before/after refactor"
+              done: false
+            - summary: "Validate query outputs match"
+              done: false
+        - summary: "Run full test suite for both SQL and DataFrame"
+          done: false
+        - summary: "Performance comparison before/after"
+          done: false
+          subtasks:
+            - summary: "Ensure no performance regression"
+              done: false
+            - summary: "Document any timing differences"
+              done: false
+
+    - phase: "Phase 5: Cleanup and Documentation"
+      done: true
+      items:
+        - summary: "Deprecate or remove run_dataframe_benchmark() function"
+          done: false
+          subtasks:
+            - summary: "Mark as deprecated with migration path"
+              done: false
+            - summary: "Remove after transition period (or immediately if internal only)"
+              done: false
+        - summary: "Update architecture documentation"
+          done: false
+          subtasks:
+            - summary: "Document unified adapter interface"
+              done: false
+            - summary: "Update AGENTS.md if needed"
+              done: false
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - architecture
+    - refactoring
+    - adapter-pattern
+    - dataframe
+    - design-patterns
+    - liskov-substitution
+  estimated_effort: "Medium (2-3 days)"
+  created_date: "2026-01-24"
+
+impact:
+  business_value: |
+    Establishes clean architecture that allows new execution modes (future: GPU,
+    distributed, streaming) to be added without modifying callers. Reduces
+    maintenance burden and bug surface area.
+  user_impact: |
+    No direct user impact - this is an internal refactoring. However, it enables
+    future features to be added more easily and reduces the likelihood of bugs
+    in DataFrame benchmarking.
+  technical_debt: |
+    Eliminates significant technical debt:
+    - Removes ~80 lines of branching code across orchestrator and MCP
+    - Establishes single responsibility for benchmark execution
+    - Makes codebase follow established design patterns
+
+files_affected:
+  modified:
+    - "benchbox/platforms/dataframe/expression_family.py"
+    - "benchbox/platforms/dataframe/pandas_family.py"
+    - "benchbox/core/runner/dataframe_runner.py"
+    - "benchbox/cli/orchestrator.py"
+    - "benchbox/mcp/tools/benchmark.py"
+    - "tests/unit/platforms/dataframe/test_expression_family.py"
+
+success_metrics:
+  - "All adapters (SQL and DataFrame) implement run_benchmark()"
+  - "Orchestrator has single execution path (no execution_mode branching)"
+  - "MCP tool has single execution path (no _is_dataframe_platform check)"
+  - "All existing tests pass"
+  - "No performance regression in DataFrame benchmarks"
+
+verification:
+  commands:
+    - "uv run -- python -m pytest tests/unit/platforms/dataframe/ -v"
+    - "uv run -- python -m pytest tests/unit/mcp/ -v"
+    - "uv run -- python -m pytest -m fast"
+    - "benchbox run --platform polars-df --benchmark tpch --scale 0.01"
+    - "benchbox run --platform datafusion-df --benchmark tpch --scale 0.01"
+
+open_questions:
+  - "Should we maintain backwards compatibility with run_dataframe_benchmark() or remove it entirely?"
+  - "What's the right abstraction for phases (SQL has different phases than DataFrame)?"
+
+design_decisions:
+  - decision: "Both ExpressionFamilyAdapter and PandasFamilyAdapter need run_benchmark()"
+    rationale: |
+      There are two DataFrame adapter families:
+      - ExpressionFamilyAdapter: Polars, PySpark, DataFusion (lazy evaluation)
+      - PandasFamilyAdapter: Pandas, Modin, cuDF, Dask (eager evaluation)
+      Both must implement run_benchmark() for true polymorphism and LSP compliance.
+
+technical_requirements:
+  constraints:
+    - "Must not change external API or CLI interface"
+    - "Must produce identical benchmark results"
+    - "No performance regression"
+  dependencies:
+    - "Existing ExpressionFamilyAdapter infrastructure"
+    - "BenchmarkResults type definition"
+    - "Data loading infrastructure"

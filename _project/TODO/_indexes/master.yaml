@@ -1,5 +1,5 @@
-generated_at: '2026-01-24T07:41:42.016830'
-total_items: 43
+generated_at: '2026-01-24T19:21:49.017759'
+total_items: 44
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -520,6 +520,23 @@ items:
   - z-order
   - performance
   estimated_effort: Large
+- id: unified-adapter-interface
+  file: TODO/core-functionality/planning/unified-adapter-interface.yaml
+  title: Unify SQL and DataFrame Adapter Execution Interfaces
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: Complete
+  tags:
+  - architecture
+  - refactoring
+  - adapter-pattern
+  - dataframe
+  - design-patterns
+  - liskov-substitution
+  owners:
+  - joe
+  estimated_effort: Medium (2-3 days)
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support
