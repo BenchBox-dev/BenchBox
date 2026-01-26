@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T14:44:03.269487'
-total_items: 377
+generated_at: '2026-01-25T19:00:25.037002'
+total_items: 378
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -907,6 +907,20 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 1 week
   completed_date: '2025-12-02'
+- id: dataframe-read-primitives
+  file: DONE/dataframe-expansion/active/dataframe-read-primitives.yaml
+  title: Implement DataFrame Version of Read Primitives Benchmark
+  worktree: dataframe-expansion
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - dataframe
+  - read-primitives
+  - polars
+  - pandas
+  - expression-family
+  estimated_effort: Large
 - id: implement-pandas-family-platform-adapters
   file: DONE/dataframe-pandas-platforms/completed/implement-pandas-family-platform-adapters.yaml
   title: Implement Pandas Family Platform Adapters

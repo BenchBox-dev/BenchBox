@@ -1,4 +1,4 @@
-generated_at: '2026-01-25T14:44:03.269643'
+generated_at: '2026-01-25T19:00:25.037181'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -335,7 +335,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 71
+    count: 72
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -512,6 +512,11 @@ categories:
       title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
       priority: Medium-High
       status: Complete
+    - id: dataframe-read-primitives
+      file: DONE/dataframe-expansion/active/dataframe-read-primitives.yaml
+      title: Implement DataFrame Version of Read Primitives Benchmark
+      priority: High
+      status: Completed
     - id: implement-expression-family-base-adapter-and-dialects
       file: DONE/dataframe-expression-family/completed/implement-expression-family-base-adapter-and-dialects.yaml
       title: Implement Expression Family Base Adapter and Dialects

@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T14:44:02.443246'
-total_items: 49
+generated_at: '2026-01-25T19:00:23.900855'
+total_items: 48
 statuses:
   In Progress:
     count: 8
@@ -9,9 +9,9 @@ statuses:
       title: Fix type checking errors ignored in ty config
       priority: Medium
       category: Testing and Quality Assurance
-    - id: dataframe-read-primitives
-      file: TODO/dataframe-expansion/active/dataframe-read-primitives.yaml
-      title: Implement DataFrame Version of Read Primitives Benchmark
+    - id: dataframe-write-primitives
+      file: TODO/dataframe-expansion/active/dataframe-write-primitives.yaml
+      title: Implement DataFrame Version of Write Primitives Benchmark
       priority: High
       category: Core Functionality
     - id: migrate-clickhouse-firebolt-deployment
@@ -45,7 +45,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 40
+    count: 39
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -151,11 +151,6 @@ statuses:
       file: TODO/dataframe-expansion/planning/dataframe-transaction-primitives.yaml
       title: Implement DataFrame Version of Transaction Primitives Benchmark
       priority: Medium
-      category: Core Functionality
-    - id: dataframe-write-primitives
-      file: TODO/dataframe-expansion/planning/dataframe-write-primitives.yaml
-      title: Implement DataFrame Version of Write Primitives Benchmark
-      priority: High
       category: Core Functionality
     - id: interactive-benchmark-explorer-web-ui
       file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
