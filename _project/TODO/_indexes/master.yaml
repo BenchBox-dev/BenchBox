@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T08:38:07.173975'
-total_items: 50
+generated_at: '2026-01-26T08:42:25.056296'
+total_items: 45
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -33,30 +33,6 @@ items:
   - motherduck
   - duckdb
   - cloud
-  estimated_effort: 3-4 days
-- id: deployment-factory-integration
-  file: TODO/platform-expansion/active/deployment-factory-integration.yaml
-  title: Platform Deployment Factory Integration
-  worktree: platform-expansion
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - architecture
-  - adapter-factory
-  - deployment-modes
-  estimated_effort: 2-3 days
-- id: deployment-registry-extensions
-  file: TODO/platform-expansion/active/deployment-registry-extensions.yaml
-  title: Platform Deployment Registry Extensions
-  worktree: platform-expansion
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - architecture
-  - platform-registry
-  - deployment-modes
   estimated_effort: 3-4 days
 - id: databend-cloud-olap-platform
   file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
@@ -352,18 +328,6 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks
-- id: deployment-config-inheritance
-  file: TODO/platform-expansion/active/deployment-config-inheritance.yaml
-  title: Platform Configuration Inheritance
-  worktree: platform-expansion
-  category: Core Functionality
-  priority: Medium
-  status: In Progress
-  tags:
-  - architecture
-  - configuration
-  - inheritance
-  estimated_effort: 2-3 days
 - id: reenable-comprehensive-ci
   file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
   title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
@@ -572,31 +536,6 @@ items:
   owners:
   - joe
   estimated_effort: Large (4-6 weeks total)
-- id: migrate-clickhouse-firebolt-deployment
-  file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
-  title: Migrate ClickHouse/Firebolt to Deployment Registry
-  worktree: platform-expansion
-  category: Core Functionality
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - migration
-  - clickhouse
-  - firebolt
-  - deployment-modes
-  estimated_effort: 2-3 days
-- id: deployment-cli-integration
-  file: TODO/platform-expansion/active/deployment-cli-integration.yaml
-  title: Platform Deployment CLI Integration
-  worktree: platform-expansion
-  category: Core Functionality
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - cli
-  - user-experience
-  - deployment-modes
-  estimated_effort: 2 days
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats

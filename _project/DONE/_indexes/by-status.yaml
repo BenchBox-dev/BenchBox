@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T08:22:22.994098'
-total_items: 381
+generated_at: '2026-01-26T08:42:25.951416'
+total_items: 386
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 188
+    count: 193
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1123,6 +1123,11 @@ statuses:
       title: Microsoft Fabric Spark Platform
       priority: Medium-High
       category: Platform Expansion
+    - id: migrate-clickhouse-firebolt-deployment
+      file: DONE/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
+      title: Migrate ClickHouse/Firebolt to Deployment Registry
+      priority: Medium-High
+      category: Core Functionality
     - id: multi-region-performance-testing
       file: DONE/enterprise-ops-multi-region/planning/multi-region-performance-testing.yaml
       title: Multi-Region Performance Testing
@@ -1188,6 +1193,26 @@ statuses:
       title: 'Platform Config Audit: Resource/Memory Settings'
       priority: Medium
       category: Platform Configuration
+    - id: deployment-config-inheritance
+      file: DONE/platform-expansion/active/deployment-config-inheritance.yaml
+      title: Platform Configuration Inheritance
+      priority: Medium
+      category: Core Functionality
+    - id: deployment-cli-integration
+      file: DONE/platform-expansion/active/deployment-cli-integration.yaml
+      title: Platform Deployment CLI Integration
+      priority: Medium-High
+      category: Core Functionality
+    - id: deployment-factory-integration
+      file: DONE/platform-expansion/active/deployment-factory-integration.yaml
+      title: Platform Deployment Factory Integration
+      priority: High
+      category: Core Functionality
+    - id: deployment-registry-extensions
+      file: DONE/platform-expansion/active/deployment-registry-extensions.yaml
+      title: Platform Deployment Registry Extensions
+      priority: High
+      category: Core Functionality
     - id: polars-platform-adapter
       file: DONE/platform-expansion-polars/completed/polars-platform-adapter.yaml
       title: Polars Platform Adapter

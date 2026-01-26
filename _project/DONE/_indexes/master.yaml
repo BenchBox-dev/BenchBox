@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T08:22:22.993732'
-total_items: 381
+generated_at: '2026-01-26T08:42:25.951035'
+total_items: 386
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1252,6 +1252,30 @@ items:
   priority: High
   status: Completed
   completed_date: '2025-11-27'
+- id: deployment-factory-integration
+  file: DONE/platform-expansion/active/deployment-factory-integration.yaml
+  title: Platform Deployment Factory Integration
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - architecture
+  - adapter-factory
+  - deployment-modes
+  estimated_effort: 2-3 days
+- id: deployment-registry-extensions
+  file: DONE/platform-expansion/active/deployment-registry-extensions.yaml
+  title: Platform Deployment Registry Extensions
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - architecture
+  - platform-registry
+  - deployment-modes
+  estimated_effort: 3-4 days
 - id: platform-documentation-completion
   file: DONE/docs-experience/planning/platform-documentation-completion.yaml
   title: Platform Documentation Completion
@@ -3089,6 +3113,18 @@ items:
   priority: Medium
   status: Completed
   completed_date: '2025-11-27'
+- id: deployment-config-inheritance
+  file: DONE/platform-expansion/active/deployment-config-inheritance.yaml
+  title: Platform Configuration Inheritance
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - architecture
+  - configuration
+  - inheritance
+  estimated_effort: 2-3 days
 - id: platform-documentation-and-extension-guide-completed
   file: DONE/unknown/planning/platform-documentation-and-extension-guide-completed.yaml
   title: Platform Documentation and Extension Guide ✅ COMPLETED
@@ -3860,6 +3896,19 @@ items:
   - saas
   estimated_effort: 2 weeks
   completed_date: '2025-12-24'
+- id: migrate-clickhouse-firebolt-deployment
+  file: DONE/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
+  title: Migrate ClickHouse/Firebolt to Deployment Registry
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - migration
+  - clickhouse
+  - firebolt
+  - deployment-modes
+  estimated_effort: 2-3 days
 - id: pt-06-trino-presto-athena-ddl
   file: DONE/physical-tuning/planning/pt-06-trino-presto-athena-ddl.yaml
   title: 'PT-06: Trino, Presto & Athena Physical Tuning DDL Generators'
@@ -3877,6 +3926,18 @@ items:
   owners:
   - joe
   estimated_effort: Large
+- id: deployment-cli-integration
+  file: DONE/platform-expansion/active/deployment-cli-integration.yaml
+  title: Platform Deployment CLI Integration
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - cli
+  - user-experience
+  - deployment-modes
+  estimated_effort: 2 days
 - id: platform-troubleshooting-guide
   file: DONE/docs-experience/planning/platform-troubleshooting-guide.yaml
   title: Platform Troubleshooting Guide

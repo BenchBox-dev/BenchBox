@@ -1,8 +1,8 @@
-generated_at: '2026-01-26T08:38:07.174033'
-total_items: 50
+generated_at: '2026-01-26T08:42:25.056348'
+total_items: 45
 priorities:
   High:
-    count: 4
+    count: 2
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -14,18 +14,8 @@ priorities:
       title: MotherDuck Platform Adapter
       category: Platform Expansion
       status: In Progress
-    - id: deployment-factory-integration
-      file: TODO/platform-expansion/active/deployment-factory-integration.yaml
-      title: Platform Deployment Factory Integration
-      category: Core Functionality
-      status: In Progress
-    - id: deployment-registry-extensions
-      file: TODO/platform-expansion/active/deployment-registry-extensions.yaml
-      title: Platform Deployment Registry Extensions
-      category: Core Functionality
-      status: In Progress
   Medium-High:
-    count: 16
+    count: 14
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -57,16 +47,6 @@ priorities:
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       category: Core Functionality
       status: Not Started
-    - id: migrate-clickhouse-firebolt-deployment
-      file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
-      title: Migrate ClickHouse/Firebolt to Deployment Registry
-      category: Core Functionality
-      status: In Progress
-    - id: deployment-cli-integration
-      file: TODO/platform-expansion/active/deployment-cli-integration.yaml
-      title: Platform Deployment CLI Integration
-      category: Core Functionality
-      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -108,7 +88,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 25
+    count: 24
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -190,11 +170,6 @@ priorities:
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
       status: Not Started
-    - id: deployment-config-inheritance
-      file: TODO/platform-expansion/active/deployment-config-inheritance.yaml
-      title: Platform Configuration Inheritance
-      category: Core Functionality
-      status: In Progress
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)

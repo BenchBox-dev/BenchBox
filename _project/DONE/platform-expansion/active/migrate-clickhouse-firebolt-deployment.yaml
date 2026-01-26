@@ -1,7 +1,8 @@
 title: "Migrate ClickHouse/Firebolt to Deployment Registry"
 worktree: platform-expansion
 priority: Medium-High
-status: In Progress
+status: Completed
+completion_date: "2026-01-26"
 category: Core Functionality
 description: |
   Align existing ClickHouse and Firebolt adapters with the new deployment registry

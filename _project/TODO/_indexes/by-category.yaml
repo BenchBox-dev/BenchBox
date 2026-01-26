@@ -1,4 +1,4 @@
-generated_at: '2026-01-26T08:38:07.174015'
+generated_at: '2026-01-26T08:42:25.056332'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -86,7 +86,7 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 12
+    count: 7
     items:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
@@ -113,31 +113,6 @@ categories:
       title: Implement DataFrame Version of Transaction Primitives Benchmark
       priority: Medium
       status: Not Started
-    - id: migrate-clickhouse-firebolt-deployment
-      file: TODO/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
-      title: Migrate ClickHouse/Firebolt to Deployment Registry
-      priority: Medium-High
-      status: In Progress
-    - id: deployment-config-inheritance
-      file: TODO/platform-expansion/active/deployment-config-inheritance.yaml
-      title: Platform Configuration Inheritance
-      priority: Medium
-      status: In Progress
-    - id: deployment-cli-integration
-      file: TODO/platform-expansion/active/deployment-cli-integration.yaml
-      title: Platform Deployment CLI Integration
-      priority: Medium-High
-      status: In Progress
-    - id: deployment-factory-integration
-      file: TODO/platform-expansion/active/deployment-factory-integration.yaml
-      title: Platform Deployment Factory Integration
-      priority: High
-      status: In Progress
-    - id: deployment-registry-extensions
-      file: TODO/platform-expansion/active/deployment-registry-extensions.yaml
-      title: Platform Deployment Registry Extensions
-      priority: High
-      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T08:22:22.994006'
-total_items: 381
+generated_at: '2026-01-26T08:42:25.951326'
+total_items: 386
 priorities:
   Critical:
     count: 27
@@ -140,7 +140,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 130
+    count: 132
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -477,6 +477,16 @@ priorities:
       title: 'Platform Config Audit: Query Behavior Overrides'
       category: Platform Configuration
       status: Completed
+    - id: deployment-factory-integration
+      file: DONE/platform-expansion/active/deployment-factory-integration.yaml
+      title: Platform Deployment Factory Integration
+      category: Core Functionality
+      status: Completed
+    - id: deployment-registry-extensions
+      file: DONE/platform-expansion/active/deployment-registry-extensions.yaml
+      title: Platform Deployment Registry Extensions
+      category: Core Functionality
+      status: Completed
     - id: platform-documentation-completion
       file: DONE/docs-experience/planning/platform-documentation-completion.yaml
       title: Platform Documentation Completion
@@ -793,7 +803,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 20
+    count: 22
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -875,11 +885,21 @@ priorities:
       title: Microsoft Fabric Spark Platform
       category: Platform Expansion
       status: Completed
+    - id: migrate-clickhouse-firebolt-deployment
+      file: DONE/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
+      title: Migrate ClickHouse/Firebolt to Deployment Registry
+      category: Core Functionality
+      status: Completed
     - id: pt-06-trino-presto-athena-ddl
       file: DONE/physical-tuning/planning/pt-06-trino-presto-athena-ddl.yaml
       title: 'PT-06: Trino, Presto & Athena Physical Tuning DDL Generators'
       category: Platform Expansion
       status: Not Started
+    - id: deployment-cli-integration
+      file: DONE/platform-expansion/active/deployment-cli-integration.yaml
+      title: Platform Deployment CLI Integration
+      category: Core Functionality
+      status: Completed
     - id: platform-troubleshooting-guide
       file: DONE/docs-experience/planning/platform-troubleshooting-guide.yaml
       title: Platform Troubleshooting Guide
@@ -896,7 +916,7 @@ priorities:
       category: Platform Expansion
       status: Complete
   Medium:
-    count: 189
+    count: 190
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1492,6 +1512,11 @@ priorities:
       file: DONE/platform-config-audit/completed/phase-3-resource-memory.yaml
       title: 'Platform Config Audit: Resource/Memory Settings'
       category: Platform Configuration
+      status: Completed
+    - id: deployment-config-inheritance
+      file: DONE/platform-expansion/active/deployment-config-inheritance.yaml
+      title: Platform Configuration Inheritance
+      category: Core Functionality
       status: Completed
     - id: platform-documentation-and-extension-guide-completed
       file: DONE/unknown/planning/platform-documentation-and-extension-guide-completed.yaml

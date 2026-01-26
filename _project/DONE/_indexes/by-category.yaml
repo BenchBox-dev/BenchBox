@@ -1,4 +1,4 @@
-generated_at: '2026-01-26T08:22:22.993905'
+generated_at: '2026-01-26T08:42:25.951222'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -335,7 +335,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 75
+    count: 80
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -602,6 +602,11 @@ categories:
       title: Make tuning file resolution explicit and transparent in CLI
       priority: Medium-High
       status: Completed
+    - id: migrate-clickhouse-firebolt-deployment
+      file: DONE/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
+      title: Migrate ClickHouse/Firebolt to Deployment Registry
+      priority: Medium-High
+      status: Completed
     - id: pt-01-ddl-generator-protocol
       file: DONE/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml
       title: 'PT-01: DDL Generator Protocol and Base Implementation'
@@ -625,6 +630,26 @@ categories:
     - id: patch-tpch-source-stdout
       file: DONE/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
       title: Patch TPC-H source to fix stdout data generation
+      priority: High
+      status: Completed
+    - id: deployment-config-inheritance
+      file: DONE/platform-expansion/active/deployment-config-inheritance.yaml
+      title: Platform Configuration Inheritance
+      priority: Medium
+      status: Completed
+    - id: deployment-cli-integration
+      file: DONE/platform-expansion/active/deployment-cli-integration.yaml
+      title: Platform Deployment CLI Integration
+      priority: Medium-High
+      status: Completed
+    - id: deployment-factory-integration
+      file: DONE/platform-expansion/active/deployment-factory-integration.yaml
+      title: Platform Deployment Factory Integration
+      priority: High
+      status: Completed
+    - id: deployment-registry-extensions
+      file: DONE/platform-expansion/active/deployment-registry-extensions.yaml
+      title: Platform Deployment Registry Extensions
       priority: High
       status: Completed
     - id: postgresql-code-quality-fixes
