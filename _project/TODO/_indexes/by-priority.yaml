@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T08:22:22.062877'
-total_items: 47
+generated_at: '2026-01-26T08:38:07.174033'
+total_items: 50
 priorities:
   High:
     count: 4
@@ -108,8 +108,13 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 22
+    count: 25
     items:
+    - id: cedardb-adapter
+      file: TODO/platform-expansion/planning/cedardb-adapter.yaml
+      title: Add CedarDB Platform Adapter
+      category: Platform Expansion
+      status: Not Started
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
       title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
@@ -118,6 +123,16 @@ priorities:
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
+      category: Platform Expansion
+      status: Not Started
+    - id: singlestore-adapter
+      file: TODO/platform-expansion/planning/singlestore-adapter.yaml
+      title: Add SingleStore Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: siriusdb-adapter
+      file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
+      title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
       status: Not Started
     - id: influxdb-blog-post-edits

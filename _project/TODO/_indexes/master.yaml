@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T08:22:22.062818'
-total_items: 47
+generated_at: '2026-01-26T08:38:07.173975'
+total_items: 50
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -104,6 +104,21 @@ items:
   priority: Low
   status: Not Started
   estimated_effort: 4 weeks (1.0 FTE)
+- id: cedardb-adapter
+  file: TODO/platform-expansion/planning/cedardb-adapter.yaml
+  title: Add CedarDB Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform
+  - sql
+  - postgresql-compatible
+  - olap
+  - oltp
+  - cedardb
+  estimated_effort: Medium
 - id: fabric-lakehouse-sql-platform
   file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
   title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
@@ -135,6 +150,37 @@ items:
   - platform
   - postgres-protocol
   - ilp
+  estimated_effort: Medium
+- id: singlestore-adapter
+  file: TODO/platform-expansion/planning/singlestore-adapter.yaml
+  title: Add SingleStore Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform
+  - sql
+  - mysql-compatible
+  - distributed
+  - olap
+  - cloud
+  - singlestore
+  estimated_effort: Medium
+- id: siriusdb-adapter
+  file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
+  title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform
+  - gpu
+  - cuda
+  - duckdb-extension
+  - high-performance
+  - siriusdb
   estimated_effort: Medium
 - id: influxdb-blog-post-edits
   file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml

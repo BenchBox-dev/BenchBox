@@ -1,4 +1,4 @@
-generated_at: '2026-01-26T08:22:22.062860'
+generated_at: '2026-01-26T08:38:07.174015'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -162,12 +162,17 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 12
+    count: 15
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
       priority: Medium-High
+      status: Not Started
+    - id: cedardb-adapter
+      file: TODO/platform-expansion/planning/cedardb-adapter.yaml
+      title: Add CedarDB Platform Adapter
+      priority: Medium
       status: Not Started
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -187,6 +192,16 @@ categories:
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
+      priority: Medium
+      status: Not Started
+    - id: singlestore-adapter
+      file: TODO/platform-expansion/planning/singlestore-adapter.yaml
+      title: Add SingleStore Platform Adapter
+      priority: Medium
+      status: Not Started
+    - id: siriusdb-adapter
+      file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
+      title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Medium
       status: Not Started
     - id: starrocks-olap-platform

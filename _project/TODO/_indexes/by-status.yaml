@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T08:22:22.062890'
-total_items: 47
+generated_at: '2026-01-26T08:38:07.174047'
+total_items: 50
 statuses:
   In Progress:
     count: 7
@@ -40,12 +40,17 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 39
+    count: 42
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
       priority: Medium-High
+      category: Platform Expansion
+    - id: cedardb-adapter
+      file: TODO/platform-expansion/planning/cedardb-adapter.yaml
+      title: Add CedarDB Platform Adapter
+      priority: Medium
       category: Platform Expansion
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -65,6 +70,16 @@ statuses:
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
+      priority: Medium
+      category: Platform Expansion
+    - id: singlestore-adapter
+      file: TODO/platform-expansion/planning/singlestore-adapter.yaml
+      title: Add SingleStore Platform Adapter
+      priority: Medium
+      category: Platform Expansion
+    - id: siriusdb-adapter
+      file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
+      title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Medium
       category: Platform Expansion
     - id: starrocks-olap-platform

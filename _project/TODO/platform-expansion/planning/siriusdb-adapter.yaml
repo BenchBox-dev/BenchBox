@@ -1,0 +1,143 @@
+title: "Add SiriusDB (GPU-Native SQL Engine) Platform Adapter"
+worktree: platform-expansion
+priority: Medium
+status: Not Started
+category: Platform Expansion
+description: |
+  Add support for SiriusDB, a GPU-native SQL engine that accelerates analytical queries
+  by offloading execution to graphics processors via DuckDB integration.
+
+  SiriusDB is notable for:
+  - 10x faster than DuckDB, 60x faster than ClickHouse at same hardware cost
+  - Integrates with DuckDB via Substrait query format
+  - Built on NVIDIA CUDA-X libraries (cuDF)
+  - Plug-and-play with CPU fallback when GPU unavailable
+  - Ideal for TPC benchmark acceleration
+
+  Reference: https://www.sirius-db.com, https://github.com/sirius-db/sirius
+
+context_sections:
+  "Technical Background": |
+    SiriusDB works as a DuckDB extension that offloads query execution to GPU:
+    1. Load sirius.duckdb_extension into DuckDB
+    2. Initialize GPU buffer: gpu_buffer_init('1 GB', '2 GB')
+    3. Execute queries - Sirius intercepts and runs on GPU
+    4. Falls back to CPU for unsupported operations
+
+    Python usage:
+    ```python
+    import duckdb
+    con = duckdb.connect('database.duckdb', config={"allow_unsigned_extensions": "true"})
+    con.execute("load '/path/to/sirius.duckdb_extension'")
+    con.execute("call gpu_buffer_init('1 GB', '2 GB')")
+    ```
+
+  "Hardware Requirements": |
+    - NVIDIA Volta or newer GPU (compute capability 7.0+)
+    - CUDA 11.2+
+    - Ubuntu 20.04+
+    - Sufficient GPU memory for data and intermediate results
+
+  "Benchmark Performance": |
+    On TPC-H SF 100:
+    - 10x faster than DuckDB
+    - 60x faster than ClickHouse
+    - At equivalent hardware rental cost
+
+tasks:
+  phases:
+    - phase: "Phase 1: Research and Setup"
+      done: false
+      items:
+        - summary: "Set up SiriusDB development environment with GPU"
+          done: false
+        - summary: "Test extension loading and GPU initialization"
+          done: false
+        - summary: "Identify supported vs unsupported query patterns"
+          done: false
+        - summary: "Document GPU memory requirements per scale factor"
+          done: false
+
+    - phase: "Phase 2: Adapter Implementation"
+      done: false
+      items:
+        - summary: "Create SiriusDBAdapter extending DuckDBAdapter"
+          done: false
+        - summary: "Add GPU initialization in connection factory"
+          done: false
+        - summary: "Implement GPU buffer size auto-configuration"
+          done: false
+        - summary: "Add CPU fallback detection and logging"
+          done: false
+        - summary: "Support both local extension and container deployment"
+          done: false
+
+    - phase: "Phase 3: Testing and Benchmarking"
+      done: false
+      items:
+        - summary: "Add unit tests (mocked GPU for CI)"
+          done: false
+        - summary: "Run TPC-H validation with GPU acceleration"
+          done: false
+        - summary: "Benchmark GPU vs CPU performance comparison"
+          done: false
+        - summary: "Document GPU memory requirements per SF"
+          done: false
+
+    - phase: "Phase 4: Documentation"
+      done: false
+      items:
+        - summary: "Create platform documentation with GPU setup guide"
+          done: false
+        - summary: "Add AWS GPU instance recommendations"
+          done: false
+        - summary: "Document container deployment option"
+          done: false
+        - summary: "Add performance comparison charts"
+          done: false
+
+metadata:
+  tags:
+    - platform
+    - gpu
+    - cuda
+    - duckdb-extension
+    - high-performance
+    - siriusdb
+  estimated_effort: Medium
+  created_date: "2026-01-26"
+
+technical_requirements:
+  dependencies:
+    - "duckdb (base engine)"
+    - "sirius.duckdb_extension (GPU acceleration)"
+    - "NVIDIA GPU with CUDA 11.2+"
+  constraints:
+    - "Requires NVIDIA GPU (Volta or newer)"
+    - "GPU memory limits data size"
+    - "Linux only (Ubuntu 20.04+)"
+  compatibility: |
+    SiriusDB is a DuckDB extension, so SQL compatibility matches DuckDB.
+    GPU acceleration transparent - same queries, faster execution.
+
+files_affected:
+  added:
+    - "benchbox/platforms/siriusdb.py"
+    - "tests/unit/platforms/test_siriusdb.py"
+    - "docs/platforms/siriusdb.md"
+  modified:
+    - "benchbox/platforms/__init__.py"
+    - "docs/platforms/index.md"
+
+success_metrics:
+  - "SiriusDB adapter passes all TPC-H queries with GPU acceleration"
+  - "Achieves >5x speedup over DuckDB at SF 10+"
+  - "Graceful fallback to CPU when GPU unavailable"
+  - "GPU memory auto-configuration works correctly"
+  - "Documentation includes AWS GPU instance guide"
+
+open_questions:
+  - "What GPU memory is needed per TPC-H scale factor?"
+  - "Which TPC-DS queries benefit most from GPU acceleration?"
+  - "Should we add GPU metrics to result output?"
+  - "How to handle CI testing without GPU hardware?"
