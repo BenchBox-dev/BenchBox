@@ -1,4 +1,4 @@
-generated_at: '2026-01-25T23:57:03.518627'
+generated_at: '2026-01-26T08:22:22.993905'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -335,7 +335,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 74
+    count: 75
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -417,6 +417,11 @@ categories:
       title: Cloud Spark Shared Infrastructure
       priority: Critical
       status: Complete
+    - id: dataframe-read-primitives-complete
+      file: DONE/dataframe-expansion/dataframe-read-primitives-complete.yaml
+      title: Complete Read Primitives DataFrame Implementation (All 136 Queries)
+      priority: Critical
+      status: Completed
     - id: consolidate-tuning-commands
       file: DONE/ux-improvements/planning/consolidate-tuning-commands.yaml
       title: Consolidate tuning commands under unified `tuning` group

@@ -1,14 +1,9 @@
-generated_at: '2026-01-25T23:57:02.659348'
-total_items: 48
+generated_at: '2026-01-26T08:22:22.062890'
+total_items: 47
 statuses:
   In Progress:
-    count: 8
+    count: 7
     items:
-    - id: dataframe-read-primitives-complete
-      file: TODO/dataframe-expansion/active/dataframe-read-primitives-complete.yaml
-      title: Complete Read Primitives DataFrame Implementation (All 136 Queries)
-      priority: Critical
-      category: Core Functionality
     - id: fix-type-checking-errors
       file: TODO/main/active/fix-type-checking-errors.yaml
       title: Fix type checking errors ignored in ty config

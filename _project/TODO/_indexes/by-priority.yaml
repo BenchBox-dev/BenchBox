@@ -1,14 +1,6 @@
-generated_at: '2026-01-25T23:57:02.659337'
-total_items: 48
+generated_at: '2026-01-26T08:22:22.062877'
+total_items: 47
 priorities:
-  Critical:
-    count: 1
-    items:
-    - id: dataframe-read-primitives-complete
-      file: TODO/dataframe-expansion/active/dataframe-read-primitives-complete.yaml
-      title: Complete Read Primitives DataFrame Implementation (All 136 Queries)
-      category: Core Functionality
-      status: In Progress
   High:
     count: 4
     items:

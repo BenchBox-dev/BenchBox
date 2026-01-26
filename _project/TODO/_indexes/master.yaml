@@ -1,21 +1,6 @@
-generated_at: '2026-01-25T23:57:02.659284'
-total_items: 48
+generated_at: '2026-01-26T08:22:22.062818'
+total_items: 47
 items:
-- id: dataframe-read-primitives-complete
-  file: TODO/dataframe-expansion/active/dataframe-read-primitives-complete.yaml
-  title: Complete Read Primitives DataFrame Implementation (All 136 Queries)
-  worktree: dataframe-expansion
-  category: Core Functionality
-  priority: Critical
-  status: In Progress
-  tags:
-  - dataframe
-  - read-primitives
-  - pyspark
-  - polars
-  - pandas
-  - critical-fix
-  estimated_effort: Large
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
   title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking

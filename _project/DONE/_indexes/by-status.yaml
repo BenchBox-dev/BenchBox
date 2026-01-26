@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T23:57:03.518792'
-total_items: 380
+generated_at: '2026-01-26T08:22:22.994098'
+total_items: 381
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 187
+    count: 188
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -913,6 +913,11 @@ statuses:
       title: Complete Modin, cuDF, and Dask DataFrame Adapters for Production
       priority: Medium
       category: Platform Expansion
+    - id: dataframe-read-primitives-complete
+      file: DONE/dataframe-expansion/dataframe-read-primitives-complete.yaml
+      title: Complete Read Primitives DataFrame Implementation (All 136 Queries)
+      priority: Critical
+      category: Core Functionality
     - id: comprehensive-docs-quality-audit
       file: DONE/docs-experience/active/comprehensive-docs-quality-audit.yaml
       title: Comprehensive Documentation Quality Audit

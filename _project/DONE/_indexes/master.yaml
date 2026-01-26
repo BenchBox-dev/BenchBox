@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T23:57:03.518479'
-total_items: 380
+generated_at: '2026-01-26T08:22:22.993732'
+total_items: 381
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -51,6 +51,21 @@ items:
   category: Marketing Content Enablement
   priority: Critical
   status: Completed
+- id: dataframe-read-primitives-complete
+  file: DONE/dataframe-expansion/dataframe-read-primitives-complete.yaml
+  title: Complete Read Primitives DataFrame Implementation (All 136 Queries)
+  worktree: dataframe-expansion
+  category: Core Functionality
+  priority: Critical
+  status: Completed
+  tags:
+  - dataframe
+  - read-primitives
+  - pyspark
+  - polars
+  - pandas
+  - critical-fix
+  estimated_effort: Large
 - id: dataframe-backwards-compatibility-and-mode-coexistence
   file: DONE/dataframe-phase0-compat/completed/dataframe-backwards-compatibility-and-mode-coexistence.yaml
   title: DataFrame Backwards Compatibility and Mode Coexistence

@@ -1,0 +1,627 @@
+title: "Complete Read Primitives DataFrame Implementation (All 136 Queries)"
+worktree: dataframe-expansion
+priority: Critical
+status: Completed
+completion_date: "2026-01-26"
+category: Core Functionality
+description: |
+  Complete the DataFrame implementation for ALL 136 Read Primitives queries.
+
+  Current state: 102 queries implemented, 34 remaining
+  Target: 133 queries with implementations (only 3 correlated-subquery queries are truly SQL-only)
+
+  This is a CORRECTION to the previous incomplete implementation that incorrectly
+  marked 49 queries as "skipped" or "expression-family-only" when they should have
+  been implemented.
+
+  KEY INSIGHT: Spark DataFrames are DECLARATIVE, not imperative. They build a logical
+  plan that goes through Catalyst optimizer — the same optimizations apply as SQL.
+  Therefore, 10 of the 13 "optimizer" queries CAN be tested via DataFrames by writing
+  them in "naive" form and letting Catalyst optimize.
+
+context_sections:
+  "Research Summary - PySpark DataFrame Capabilities": |
+    Based on research of PySpark 4.x DataFrame API, the following operations are
+    fully supported and should NOT be skipped:
+
+    **Array Operations** (pyspark.sql.functions):
+    - F.explode(col) / F.explode_outer(col) - UNNEST equivalent
+    - F.array_contains(col, value) - check if array contains element
+    - F.sort_array(col) / F.array_sort(col) - sort array elements
+    - F.size(col) / F.array_size(col) - array length
+    - F.slice(col, start, length) - array slice
+    - F.array_min(col) / F.array_max(col) - min/max of array
+    - F.array_distinct(col) - unique elements
+    - F.collect_list(col) / F.collect_set(col) - array aggregation
+
+    **Struct Operations**:
+    - F.struct(*cols) - create struct from columns
+    - df.select("struct_col.field") - access struct field
+    - F.from_json(col, schema) - parse JSON to struct
+    - F.to_json(col) - convert struct to JSON
+
+    **Map Operations**:
+    - F.create_map(*cols) - create map from key-value pairs
+    - F.map_keys(col) / F.map_values(col) - extract keys/values
+    - df.select("map_col.key") or F.element_at(col, key) - map access
+
+    **Higher-Order Functions** (PySpark 3.1+):
+    - F.transform(col, lambda) - apply function to each element
+    - F.filter(col, lambda) - filter array elements
+    - F.aggregate(col, init, merge) - reduce array to single value
+
+    **QUALIFY Equivalent** (two-step approach):
+    - Step 1: Add window column with withColumn()
+    - Step 2: Filter on window column with filter()
+    - Example: df.withColumn("rn", F.row_number().over(w)).filter(F.col("rn") == 1)
+
+    **CUBE/ROLLUP** (native support):
+    - df.groupBy(...).cube(...).agg(...)
+    - df.groupBy(...).rollup(...).agg(...)
+
+    **Pivot/Unpivot**:
+    - df.groupBy(...).pivot(col).agg(...)
+    - df.unpivot(ids, values, variable_col, value_col) - PySpark 3.4+
+
+    Sources:
+    - https://sparkbyexamples.com/pyspark/pyspark-explode-array-and-map-columns-to-rows/
+    - https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/functions.html
+    - https://sparkbyexamples.com/pyspark/pyspark-pivot-and-unpivot-dataframe/
+    - https://medium.com/globant/spark-higher-order-functions-f7cc17e8fbf
+
+  "Architecture Requirements": |
+    1. **NO direct pandas imports in pandas_impl functions**
+       - WRONG: `import pandas as pd` inside function
+       - RIGHT: Use ctx.get_table() and DataFrame operations only
+       - The runner handles platform-specific imports
+
+    2. **Expression implementations use ctx.col(), ctx.lit()**
+       - Use method chaining: df.filter(ctx.col("x") > ctx.lit(100))
+       - Window functions via ctx.window_* methods
+
+    3. **Pandas implementations use DataFrame indexing**
+       - Use df[df["col"] > 100] for filtering
+       - Use df.groupby().agg() for aggregation
+       - Handle platform differences (Polars vs Pandas) at runner level
+
+  "Correct Skip List": |
+    Only 3 queries should be in SKIP_FOR_DATAFRAME (correlated subquery constructs):
+    - optimizer_exists_to_semijoin (correlated EXISTS — no DataFrame equivalent)
+    - optimizer_in_to_exists (IN subquery with correlation — no DataFrame equivalent)
+    - optimizer_scalar_subquery_flattening (correlated scalar subqueries — no DataFrame equivalent)
+
+    The other 10 optimizer queries ARE implementable in DataFrames because Spark DataFrames
+    are DECLARATIVE — they build a logical plan that goes through Catalyst optimizer, just
+    like SQL. The key is to write them WITHOUT "baking in" the optimization.
+
+  "Spark DataFrame Execution Model (CRITICAL)": |
+    CORRECTION: Spark DataFrames are NOT imperative. They are declarative:
+    - DataFrame API builds a logical plan tree
+    - Catalyst optimizer rewrites the plan (same rules as SQL)
+    - Same optimizations apply: predicate pushdown, join reorder, CSE, column pruning, etc.
+
+    This means most "optimizer probe" queries CAN be tested via DataFrames by:
+    1. Writing the "naive" form (filter after join, not before)
+    2. Letting Catalyst optimize
+    3. Verifying via df.explain("formatted") that the optimization occurred
+
+  "No Hand-Optimization Coding Rules": |
+    For optimizer probe queries, follow these rules to avoid baking in the optimization:
+
+    | Optimization Being Tested | WRONG (bakes it in)                    | CORRECT (lets Catalyst optimize)           |
+    |---------------------------|----------------------------------------|---------------------------------------------|
+    | Predicate pushdown        | Filter before join                     | Filter AFTER join                           |
+    | Join reordering           | Order joins by cardinality, add hints  | Keep "bad" join order, no hints             |
+    | Limit pushdown            | Pre-limit inputs                       | orderBy().limit() at end                    |
+    | Column pruning            | Early select() minimal columns         | Select only at the very end                 |
+    | CSE                       | Name expression once, reuse column     | Repeat full expression multiple times       |
+    | Constant folding          | Python math: 2*3+4                     | Spark expr: lit(2)*lit(3)+lit(4)            |
+    | Aggregate pushdown        | Aggregate before join                  | Join first, then groupBy().agg()            |
+
+  "Plan Capture Requirement": |
+    For all optimizer probe queries, the benchmark runner should capture:
+    - df.explain("formatted") or df.explain("extended")
+    - Spark config snapshot (AQE, CBO, runtime filters, DPP settings)
+    - Optional: stage/operator metrics
+
+    This makes optimizer behavior VERIFIABLE, not hand-waved.
+
+  "Quality Assessment - Existing 102 Queries": |
+    Assessment of impact from flawed mental model on already-implemented queries:
+
+    **Issue 1: Skip Lists Are Fundamentally Wrong** (HIGH IMPACT)
+    - SKIP_FOR_DATAFRAME has 25 queries, should have 3
+    - EXPRESSION_FAMILY_ONLY has 24 queries, should be deleted entirely
+    - 22 queries incorrectly marked as not-implementable
+
+    **Issue 2: Direct pandas imports in 23 functions** (MEDIUM IMPACT)
+    Functions with `import pandas as pd` inside:
+    - aggregation_materialize_pandas_impl (line 1438)
+    - aggregation_selective_pandas_impl (line 1490)
+    - aggregation_simple_pandas_impl (line 1502)
+    - count_star_pandas_impl (line 1541)
+    - broadcast_join_two_tables_pandas_impl (line 1727)
+    - predicate_ordering_aggregation_pandas_impl (line 1752)
+    - filter_bigint_non_selective_pandas_impl (line 1810)
+    - filter_decimal_non_selective_pandas_impl (line 1843)
+    - filter_string_non_selective_pandas_impl (line 1865)
+    - string_equal_predicate_pandas_impl (line 2080)
+    - string_equal_predicate_lower_pandas_impl (line 2091)
+    - string_in_predicate_pandas_impl (line 2102)
+    - string_like_predicate_center_pandas_impl (line 2113)
+    - string_like_predicate_end_pandas_impl (line 2124)
+    - string_like_predicate_start_pandas_impl (line 2135)
+    - statistical_percentiles_pandas_impl (line 2344)
+    - statistical_variance_stddev_pandas_impl (line 2369)
+    - max_by_simple_pandas_impl (line 3051)
+    - min_by_simple_pandas_impl (line 3127)
+    - max_by_complex_pandas_impl (line 3150)
+    - min_by_complex_pandas_impl (line 3173)
+    - max_by_with_ties_pandas_impl (line 3199)
+    - min_by_with_ties_pandas_impl (line 3223)
+
+    These break compatibility with Modin, Dask, cuDF. Fix by:
+    - Using aggregation patterns that return DataFrames
+    - Or adding ctx.scalar_to_df() helper
+
+    **Issue 3: Regular queries are mostly OK** (LOW IMPACT)
+    The 102 implemented queries are functionally correct. Pre-filtering before
+    joins for semi-join patterns is semantically correct, not a mistake.
+
+tasks:
+  phases:
+    - phase: "Phase 0: Fix Existing Code Quality Issues (23 functions)"
+      done: false
+      note: |
+        Fix the 23 pandas_impl functions that have direct `import pandas as pd`.
+        This breaks compatibility with Modin, Dask, cuDF.
+      items:
+        - summary: "Add ctx.scalar_to_df() helper to DataFrameContext"
+          done: false
+          note: |
+            Add method to create single-row DataFrame from scalar value:
+            ctx.scalar_to_df(column_name, value) -> DataFrame
+            Implementation varies by platform but interface is uniform.
+        - summary: "Refactor aggregation_*_pandas_impl functions (4 functions)"
+          done: false
+          note: |
+            Functions: aggregation_materialize, aggregation_selective,
+            aggregation_simple, count_star
+            Replace: pd.DataFrame({"col": [val]})
+            With: ctx.scalar_to_df("col", val) or aggregation pattern
+        - summary: "Refactor filter_*_pandas_impl functions (3 functions)"
+          done: false
+          note: |
+            Functions: filter_bigint_non_selective, filter_decimal_non_selective,
+            filter_string_non_selective
+            Replace: pd.DataFrame({"count": [len(filtered)]})
+            With: ctx.scalar_to_df("count", len(filtered))
+        - summary: "Refactor string_*_pandas_impl functions (6 functions)"
+          done: false
+          note: |
+            Functions: string_equal_predicate, string_equal_predicate_lower,
+            string_in_predicate, string_like_predicate_center,
+            string_like_predicate_end, string_like_predicate_start
+        - summary: "Refactor statistical_*_pandas_impl functions (2 functions)"
+          done: false
+          note: "Functions: statistical_percentiles, statistical_variance_stddev"
+        - summary: "Refactor *_by_*_pandas_impl functions (6 functions)"
+          done: false
+          note: |
+            Functions: max_by_simple, min_by_simple, max_by_complex,
+            min_by_complex, max_by_with_ties, min_by_with_ties
+        - summary: "Refactor remaining pandas_impl functions (2 functions)"
+          done: false
+          note: "Functions: broadcast_join_two_tables, predicate_ordering_aggregation"
+
+    - phase: "Phase 1: Fix Skip Lists"
+      done: false
+      items:
+        - summary: "Reduce SKIP_FOR_DATAFRAME to only 3 correlated subquery queries"
+          done: false
+          note: |
+            Keep ONLY:
+            - optimizer_exists_to_semijoin
+            - optimizer_in_to_exists
+            - optimizer_scalar_subquery_flattening
+
+            Remove ALL others (22 queries):
+            - 10 optimizer queries (can be implemented in "naive" form)
+            - fulltext_* (3)
+            - json_* (3)
+            - olap_* (2)
+            - pivot_basic, unpivot_basic (2)
+            - intrinsic_* (2)
+        - summary: "Delete EXPRESSION_FAMILY_ONLY list entirely"
+          done: false
+          note: |
+            All 24 queries in this list should have both expression and pandas
+            implementations. The list was based on incorrect assumptions.
+
+    - phase: "Phase 2: Implement QUALIFY Queries (6)"
+      done: false
+      items:
+        - summary: "qualify_row_number - Top N per group"
+          done: false
+          note: |
+            PySpark: df.withColumn("rn", F.row_number().over(w)).filter(F.col("rn") <= 3)
+            Polars: df.filter(pl.col("rn").over("partition") <= 3)
+            Pandas: df.groupby().apply(lambda g: g.nsmallest(3, "col"))
+        - summary: "qualify_dense_rank - Top N with ties"
+          done: false
+        - summary: "qualify_percentile - Top percentile per group"
+          done: false
+        - summary: "qualify_ntile - Top quartile per group"
+          done: false
+        - summary: "qualify_cume_dist - Cumulative distribution filter"
+          done: false
+        - summary: "qualify_lag_lead - Filter on LAG comparison"
+          done: false
+
+    - phase: "Phase 3: Implement Array Queries (9)"
+      done: false
+      items:
+        - summary: "array_agg_simple - Already implemented, verify"
+          done: false
+        - summary: "array_agg_distinct - Already implemented, verify"
+          done: false
+        - summary: "array_unnest - Explode array to rows"
+          done: false
+          note: |
+            PySpark: df.select(F.explode("array_col").alias("element"))
+            Polars: df.explode("array_col")
+            Pandas: df.explode("array_col")
+        - summary: "array_contains - Check if array contains element"
+          done: false
+          note: |
+            PySpark: df.filter(F.array_contains("array_col", value))
+            Polars: df.filter(pl.col("array_col").list.contains(value))
+            Pandas: df[df["array_col"].apply(lambda x: value in x)]
+        - summary: "array_length - Get array size"
+          done: false
+          note: |
+            PySpark: df.select(F.size("array_col").alias("len"))
+            Polars: df.select(pl.col("array_col").list.len().alias("len"))
+            Pandas: df["array_col"].apply(len)
+        - summary: "array_slice - Extract array subset"
+          done: false
+          note: |
+            PySpark: df.select(F.slice("array_col", 1, 3).alias("sliced"))
+            Polars: df.select(pl.col("array_col").list.slice(0, 3).alias("sliced"))
+            Pandas: df["array_col"].apply(lambda x: x[0:3])
+        - summary: "array_min_max - Min/max of array elements"
+          done: false
+        - summary: "array_sort - Sort array elements"
+          done: false
+        - summary: "array_distinct - Unique array elements"
+          done: false
+
+    - phase: "Phase 4: Implement Struct Queries (3)"
+      done: false
+      items:
+        - summary: "struct_construction - Create struct from columns"
+          done: false
+          note: |
+            PySpark: df.select(F.struct("col1", "col2").alias("struct_col"))
+            Polars: df.select(pl.struct(["col1", "col2"]).alias("struct_col"))
+            Pandas: df.apply(lambda r: {"col1": r["col1"], "col2": r["col2"]}, axis=1)
+        - summary: "struct_access - Access struct fields"
+          done: false
+          note: |
+            PySpark: df.select("struct_col.field1", "struct_col.field2")
+            Polars: df.select(pl.col("struct_col").struct.field("field1"))
+            Pandas: df["struct_col"].apply(lambda x: x["field1"])
+        - summary: "array_of_struct - Array containing structs"
+          done: false
+
+    - phase: "Phase 5: Implement Map Queries (3)"
+      done: false
+      items:
+        - summary: "map_construction - Create map from key-value pairs"
+          done: false
+          note: |
+            PySpark: df.select(F.create_map("key_col", "value_col").alias("map_col"))
+            Polars: Not directly supported - use struct workaround
+            Pandas: df.apply(lambda r: {r["key"]: r["value"]}, axis=1)
+        - summary: "map_access - Access map values by key"
+          done: false
+          note: |
+            PySpark: df.select(F.element_at("map_col", "key").alias("value"))
+            Polars: Use struct access pattern
+            Pandas: df["map_col"].apply(lambda x: x.get("key"))
+        - summary: "map_keys_values - Extract keys and values"
+          done: false
+          note: |
+            PySpark: df.select(F.map_keys("map_col"), F.map_values("map_col"))
+
+    - phase: "Phase 6: Implement Higher-Order Function Queries (3)"
+      done: false
+      items:
+        - summary: "list_transform - Apply function to each array element"
+          done: false
+          note: |
+            PySpark: df.select(F.transform("array_col", lambda x: x * 2))
+            Polars: df.select(pl.col("array_col").list.eval(pl.element() * 2))
+            Pandas: df["array_col"].apply(lambda arr: [x * 2 for x in arr])
+        - summary: "list_filter - Filter array elements"
+          done: false
+          note: |
+            PySpark: df.select(F.filter("array_col", lambda x: x > 10))
+            Polars: df.select(pl.col("array_col").list.eval(pl.element().filter(pl.element() > 10)))
+            Pandas: df["array_col"].apply(lambda arr: [x for x in arr if x > 10])
+        - summary: "list_reduce - Reduce array to single value"
+          done: false
+          note: |
+            PySpark: df.select(F.aggregate("array_col", F.lit(0), lambda acc, x: acc + x))
+            Polars: df.select(pl.col("array_col").list.sum())  # for sum
+            Pandas: df["array_col"].apply(sum)  # for sum
+
+    - phase: "Phase 7: Implement OLAP Queries (2)"
+      done: false
+      items:
+        - summary: "olap_cube_analysis - CUBE multidimensional aggregation"
+          done: false
+          note: |
+            PySpark: df.groupBy(...).cube("dim1", "dim2").agg(F.sum("metric"))
+            Polars: Requires multiple groupby + union_all (no native CUBE)
+            Pandas: Use pd.crosstab with margins=True or multiple groupby
+        - summary: "olap_rollup_analysis - ROLLUP hierarchical aggregation"
+          done: false
+          note: |
+            PySpark: df.groupBy(...).rollup("dim1", "dim2").agg(F.sum("metric"))
+            Polars: Requires multiple groupby at different levels + union_all
+            Pandas: Use multiple groupby with different level combinations
+
+    - phase: "Phase 8: Implement Pivot/Unpivot Queries (2)"
+      done: false
+      items:
+        - summary: "pivot_basic - Pivot rows to columns"
+          done: false
+          note: |
+            PySpark: df.groupBy("row_key").pivot("pivot_col").agg(F.sum("value"))
+            Polars: df.pivot(values="value", index="row_key", columns="pivot_col")
+            Pandas: df.pivot_table(index="row_key", columns="pivot_col", values="value")
+        - summary: "unpivot_basic - Unpivot columns to rows"
+          done: false
+          note: |
+            PySpark 3.4+: df.unpivot(ids, values, "variable", "value")
+            PySpark <3.4: Use selectExpr with stack()
+            Polars: df.melt(id_vars, value_vars)
+            Pandas: df.melt(id_vars, value_vars)
+
+    - phase: "Phase 9: Implement Fulltext Queries (3)"
+      done: false
+      items:
+        - summary: "fulltext_simple_search - Basic text search"
+          done: false
+          note: |
+            Use .str.contains() pattern matching (not full-text indexing)
+            PySpark: df.filter(F.col("text").contains("word1") | F.col("text").contains("word2"))
+            Polars: df.filter(pl.col("text").str.contains("word1|word2"))
+            Pandas: df[df["text"].str.contains("word1|word2", case=False)]
+        - summary: "fulltext_boolean_search - AND/NOT text search"
+          done: false
+          note: |
+            PySpark: df.filter(F.col("text").contains("word1") & ~F.col("text").contains("word2"))
+            Polars: df.filter(pl.col("text").str.contains("word1") & ~pl.col("text").str.contains("word2"))
+        - summary: "fulltext_phrase_search - Exact phrase search"
+          done: false
+          note: |
+            PySpark: df.filter(F.col("text").contains("exact phrase"))
+            Polars: df.filter(pl.col("text").str.contains("exact phrase"))
+
+    - phase: "Phase 10: Implement JSON Queries (3)"
+      done: false
+      items:
+        - summary: "json_extract_simple - Extract JSON fields"
+          done: false
+          note: |
+            Note: TPC-H comment fields are plain text, not JSON. These queries test
+            JSON capabilities, so we use synthetic JSON or skip on TPC-H data.
+            PySpark: df.select(F.get_json_object("json_col", "$.field"))
+            Polars: df.select(pl.col("json_col").str.json_extract("$.field"))
+            Pandas: df["json_col"].apply(lambda x: json.loads(x).get("field"))
+        - summary: "json_extract_nested - Nested JSON extraction"
+          done: false
+        - summary: "json_aggregates - JSON array/object aggregation"
+          done: false
+          note: |
+            PySpark: F.to_json(F.collect_list("col"))
+            Polars: pl.col("col").list.to_json()
+            Pandas: df.groupby().apply(lambda g: json.dumps(g["col"].tolist()))
+
+    - phase: "Phase 11: Implement Intrinsic Queries (2)"
+      done: false
+      items:
+        - summary: "intrinsic_appx_median - Approximate median"
+          done: false
+          note: |
+            PySpark: F.percentile_approx("col", 0.5)
+            Polars: pl.col("col").median()
+            Pandas: df["col"].median()
+        - summary: "intrinsic_to_date - Date conversion"
+          done: false
+          note: |
+            PySpark: F.to_date("string_col", "yyyy-MM-dd")
+            Polars: pl.col("string_col").str.strptime(pl.Date, "%Y-%m-%d")
+            Pandas: pd.to_datetime(df["string_col"]).dt.date
+
+    - phase: "Phase 12: Implement Timeseries Queries (2)"
+      done: false
+      items:
+        - summary: "timeseries_trend_analysis - Time series with LAG/LEAD"
+          done: false
+          note: |
+            Use window functions with date-based partitioning
+            PySpark: Use Window.orderBy() with LAG/LEAD functions
+            Polars: Use pl.col().shift() or rolling operations
+            Pandas: Use df.shift() for lag/lead
+        - summary: "asof_join_basic - ASOF join for time series"
+          done: false
+          note: |
+            PySpark: No native ASOF join - use window function approach
+              - Add row_number within time window, then join on rn=1
+            Polars: df.join_asof(other, on="time_col", strategy="backward")
+            Pandas: pd.merge_asof(df1, df2, on="time_col")
+
+    - phase: "Phase 13: Implement Optimizer Probe Queries (10)"
+      done: false
+      note: |
+        These test Catalyst optimizer behavior. Write in "naive" form WITHOUT baking in optimization.
+        Spark DataFrames are declarative — Catalyst will optimize the plan.
+      items:
+        - summary: "distinct_elimination - DISTINCT on primary key"
+          done: false
+          note: |
+            Write: df.select(...).distinct() on columns that include PK
+            Don't: Pre-filter to obviously unique rows
+            PySpark: orders.select("o_orderkey", "o_custkey", ...).distinct()
+        - summary: "common_subexpression - Repeated complex expression"
+          done: false
+          note: |
+            Write: Repeat the SAME expression multiple times in select, filter, orderBy
+            Don't: Name it once with alias and reuse the column
+            PySpark:
+              revenue_expr = col("l_quantity") * col("l_extendedprice") * (lit(1) - col("l_discount"))
+              df.select(revenue_expr.alias("rev1"), revenue_expr.alias("rev2"))
+                .filter(revenue_expr > 1000)
+                .orderBy(revenue_expr.desc())
+        - summary: "predicate_pushdown - Filter after join"
+          done: false
+          note: |
+            Write: df1.join(df2).filter(condition_on_df1).filter(condition_on_df2)
+            Don't: Pre-filter before join
+            Catalyst WILL push predicates down automatically
+        - summary: "join_reordering - Suboptimal join order"
+          done: false
+          note: |
+            Write: orders.join(customer).join(nation) (largest first)
+            Don't: Add broadcast hints or reorder manually
+            Enable CBO: spark.sql.cbo.enabled, spark.sql.cbo.joinReorder.enabled
+        - summary: "limit_pushdown - Limit after orderBy"
+          done: false
+          note: |
+            Write: df1.join(df2).orderBy(...).limit(100)
+            Don't: Pre-limit inputs
+            Spark plans TakeOrderedAndProject
+        - summary: "aggregate_pushdown - Aggregate after join"
+          done: false
+          note: |
+            Write: customer.join(orders).groupBy(...).agg(...)
+            Don't: Pre-aggregate orders before joining
+            Catalyst can push partial aggregates before join
+        - summary: "constant_folding - Spark expressions for constants"
+          done: false
+          note: |
+            Write: col("qty") * (lit(2) * lit(3) + lit(4)) or expr("qty * (2*3+4)")
+            Don't: Python math like col("qty") * 10
+            Use Spark expressions so Catalyst can fold them
+        - summary: "column_pruning - Late projection"
+          done: false
+          note: |
+            Write: customer.join(orders).join(lineitem).filter(...).select("c_name")
+            Don't: Early select() before joins
+            Catalyst will prune unused columns at scan
+        - summary: "union_optimization - Multiple unions before sort"
+          done: false
+          note: |
+            Write: df1.union(df2).union(df3).orderBy(...)
+            Don't: Combine into single filter with OR
+            Tests whether Catalyst optimizes redundant scans
+        - summary: "runtime_filter - Selective join filter"
+          done: false
+          note: |
+            Write: lineitem.join(part.filter(selective_condition))
+            Spark generates bloom filter from selective side
+            Verify via explain() that DynamicPruning or RuntimeFilter appears
+
+    - phase: "Phase 14: Update Tests"
+      done: false
+      items:
+        - summary: "Update test_skip_for_dataframe_not_empty"
+          done: false
+          note: "Change assertion from 25 to 3 (only correlated subquery queries)"
+        - summary: "Update test_skip_for_dataframe_has_sql_only_queries"
+          done: false
+          note: "Only allow: exists_to_semijoin, in_to_exists, scalar_subquery_flattening"
+        - summary: "Update test_benchmark_get_dataframe_skip_queries_returns_list"
+          done: false
+          note: "Change assertion from 25 to 3"
+        - summary: "Remove tests for EXPRESSION_FAMILY_ONLY"
+          done: false
+          note: "This list should not exist"
+        - summary: "Add tests for optimizer probe query implementations"
+          done: false
+          note: "Verify 'no hand-optimization' patterns are followed"
+        - summary: "Add plan capture verification for optimizer probes"
+          done: false
+          note: "Test that explain() output is captured"
+
+    - phase: "Phase 15: Extend DataFrameContext for New Operations"
+      done: false
+      items:
+        - summary: "Add explode/unnest helper to DataFrameContext"
+          done: false
+          note: "ctx.explode(df, col) -> exploded DataFrame"
+        - summary: "Add array operations helpers"
+          done: false
+          note: "ctx.array_contains(), ctx.array_slice(), etc."
+        - summary: "Add pivot/unpivot helpers"
+          done: false
+          note: "ctx.pivot(df, index, columns, values), ctx.unpivot(df, ids, values)"
+        - summary: "Add cube/rollup helpers"
+          done: false
+          note: "For pandas family which lacks native support"
+        - summary: "Add explain/plan capture helper"
+          done: false
+          note: "ctx.explain(df) -> formatted plan string for optimizer verification"
+
+metadata:
+  tags:
+    - dataframe
+    - read-primitives
+    - pyspark
+    - polars
+    - pandas
+    - critical-fix
+  estimated_effort: Large
+  created_date: "2026-01-25"
+  research_sources:
+    - "https://sparkbyexamples.com/pyspark/pyspark-explode-array-and-map-columns-to-rows/"
+    - "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/functions.html"
+    - "https://sparkbyexamples.com/pyspark/pyspark-pivot-and-unpivot-dataframe/"
+    - "https://medium.com/globant/spark-higher-order-functions-f7cc17e8fbf"
+    - "https://sparkbyexamples.com/pyspark/pyspark-window-functions/"
+
+files_affected:
+  modified:
+    - "benchbox/core/read_primitives/dataframe_queries.py"
+    - "benchbox/core/dataframe/context.py"
+    - "tests/unit/benchmarks/test_read_primitives_dataframe_queries.py"
+
+success_metrics:
+  - "133 of 136 queries implemented (only 3 correlated-subquery queries skipped)"
+  - "Both expression_impl and pandas_impl for each query"
+  - "No EXPRESSION_FAMILY_ONLY list - all queries support both families"
+  - "No direct pandas imports in pandas_impl functions"
+  - "Optimizer probe queries follow 'no hand-optimization' coding rules"
+  - "Plan capture (explain output) for optimizer probe queries"
+  - "All tests pass"
+
+implementation_order: |
+  Recommended order based on complexity and dependencies:
+
+  0. **Fix existing code** (Phase 0) - Remove pandas imports from 23 functions
+  1. **Fix skip lists** (Phase 1) - Reduce to 3, delete EXPRESSION_FAMILY_ONLY
+  2. **Simple queries first** (Phases 11, 9) - intrinsic, fulltext (use str operations)
+  3. **Array operations** (Phase 3) - Foundation for later phases
+  4. **Struct/Map** (Phases 4, 5) - Build on array patterns
+  5. **Higher-order functions** (Phase 6) - Requires array understanding
+  6. **QUALIFY queries** (Phase 2) - Window + filter pattern
+  7. **OLAP queries** (Phase 7) - CUBE/ROLLUP (complex for pandas)
+  8. **Pivot/Unpivot** (Phase 8)
+  9. **JSON queries** (Phase 10) - May need synthetic data
+  10. **Timeseries** (Phase 12) - ASOF join is complex
+  11. **Optimizer probes** (Phase 13) - Write in "naive" form
+  12. **Context extensions** (Phase 15) - As needed during implementation
+  13. **Tests** (Phase 14) - Continuously update
