@@ -1,4 +1,4 @@
-generated_at: '2026-01-25T19:01:09.383278'
+generated_at: '2026-01-25T23:57:02.659321'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -86,8 +86,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 12
+    count: 13
     items:
+    - id: dataframe-read-primitives-complete
+      file: TODO/dataframe-expansion/active/dataframe-read-primitives-complete.yaml
+      title: Complete Read Primitives DataFrame Implementation (All 136 Queries)
+      priority: Critical
+      status: In Progress
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB

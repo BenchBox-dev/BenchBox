@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T19:01:10.314772'
-total_items: 379
+generated_at: '2026-01-25T23:57:03.518714'
+total_items: 380
 priorities:
   Critical:
     count: 26
@@ -135,7 +135,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 129
+    count: 130
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -326,6 +326,11 @@ priorities:
       file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml
       title: Fix Dask DataFrame Platform Compatibility
       category: Platform Expansion
+      status: Complete
+    - id: fix-pyspark-dataframe-write-operations
+      file: DONE/main/active/fix-pyspark-dataframe-write-operations.yaml
+      title: Fix PySpark DataFrame Write Operations
+      category: Core Functionality
       status: Complete
     - id: pyspark-unified-expr-methods
       file: DONE/dataframe-expansion/active/pyspark-unified-expr-methods.yaml

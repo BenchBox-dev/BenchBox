@@ -1,0 +1,186 @@
+# Fix PySpark DataFrame Write Operations
+# Location: _project/DONE/main/active/fix-pyspark-dataframe-write-operations.yaml
+
+title: "Fix PySpark DataFrame Write Operations"
+worktree: main
+priority: High
+status: Complete
+category: Core Functionality
+completed_date: "2026-01-25"
+completion_summary: |
+  Implemented proper PySpark DataFrame maintenance operations using actual DataFrame APIs
+  instead of SQL wrappers. Key changes:
+
+  1. Created benchbox/platforms/dataframe/pyspark_maintenance.py with:
+     - PySparkMaintenanceOperations class using df.write API for INSERT
+     - DeltaTable API for DELETE/UPDATE/MERGE (requires delta-spark)
+     - execute_bulk_load() using spark.read().write() pattern
+     - PYSPARK_DELTA_CAPABILITIES and PYSPARK_PARQUET_CAPABILITIES
+
+  2. Updated DataFrameWriteOperationsManager to accept spark_session parameter
+
+  3. Added comprehensive tests verifying DataFrame API usage (not spark.sql())
+
+  4. All tests pass: 61 passed, 3 skipped (delta-spark not installed)
+
+description: |
+  The current Write Primitives DataFrame implementation for PySpark is fundamentally broken.
+  The "DDL operations" are just SQL string builders wrapped in Python methods - this is NOT
+  DataFrame testing, it's SQL execution with extra steps.
+
+  Current (WRONG) implementation:
+  ```python
+  def execute_ddl(self, ddl_statement: str, spark_session: Any = None):
+      spark_session.sql(ddl_statement)  # Just executes raw SQL
+  ```
+
+  Correct PySpark DataFrame write operations should use the actual DataFrame API:
+  - INSERT: df.write.mode("append").parquet(path)
+  - BULK_LOAD: spark.read.parquet(src).write.parquet(tgt)
+  - UPDATE: DeltaTable.forPath(spark, path).update(condition, set)
+  - DELETE: DeltaTable.forPath(spark, path).delete(condition)
+  - MERGE: DeltaTable.alias("t").merge(source, cond).whenMatchedUpdate().execute()
+  - DDL: Should be REMOVED - DDL is SQL by definition, not DataFrame
+
+  Key design decisions (confirmed):
+  1. Row-level ops (UPDATE/DELETE/MERGE): Only support with Delta Lake/Iceberg
+     - Plain Parquet gets INSERT/BULK_LOAD only
+  2. SparkSession: Require explicit session parameter (consistent with PySparkDataFrameAdapter)
+
+tasks:
+  phases:
+    - phase: "Phase 1: Remove Fake DDL Operations"
+      done: true
+      items:
+        - summary: "Remove execute_ddl() method from DataFrameWriteOperationsManager"
+          done: true
+        - summary: "Remove execute_create_table() method from DataFrameWriteOperationsManager"
+          done: true
+        - summary: "Remove execute_drop_table() method from DataFrameWriteOperationsManager"
+          done: true
+        - summary: "Remove execute_alter_table() method from DataFrameWriteOperationsManager"
+          done: true
+        - summary: "Remove WriteOperationType.DDL enum value from WriteOperationType"
+          done: true
+        - summary: "Remove supports_ddl field from DataFrameWriteCapabilities"
+          done: true
+        - summary: "Update PYSPARK_WRITE_CAPABILITIES constant (remove DDL reference)"
+          done: true
+
+    - phase: "Phase 2: Create PySpark Maintenance Operations"
+      done: true
+      items:
+        - summary: "Create benchbox/platforms/dataframe/pyspark_maintenance.py"
+          done: true
+          subtasks:
+            - summary: "Implement PySparkMaintenanceOperations class extending BaseDataFrameMaintenanceOperations"
+              done: true
+            - summary: "Implement _get_capabilities() returning format-specific capabilities"
+              done: true
+            - summary: "Implement _do_insert() using df.write.mode().format().save()"
+              done: true
+            - summary: "Implement _do_delete() using DeltaTable.forPath().delete()"
+              done: true
+            - summary: "Implement _do_update() using DeltaTable.forPath().update()"
+              done: true
+            - summary: "Implement _do_merge() using DeltaTable.alias().merge().execute()"
+              done: true
+        - summary: "Implement execute_bulk_load() using spark.read().write() pattern"
+          done: true
+          subtasks:
+            - summary: "Support source formats: parquet, csv, json"
+              done: true
+            - summary: "Support partitionBy() and compression options"
+              done: true
+            - summary: "Support sorting via orderBy() before write"
+              done: true
+        - summary: "Define PYSPARK_DELTA_CAPABILITIES (full ACID support)"
+          done: true
+        - summary: "Define PYSPARK_PARQUET_CAPABILITIES (INSERT/BULK_LOAD only)"
+          done: true
+
+    - phase: "Phase 3: Wire Up Integration"
+      done: true
+      items:
+        - summary: "Add pyspark-df case to get_maintenance_operations_for_platform() in maintenance_interface.py"
+          done: true
+        - summary: "Update DataFrameWriteOperationsManager.__init__() to accept spark_session parameter"
+          done: true
+        - summary: "Update get_dataframe_write_manager() to pass spark_session to PySpark manager"
+          done: true
+        - summary: "Update exports in benchbox/platforms/dataframe/__init__.py"
+          done: true
+
+    - phase: "Phase 4: Update Tests"
+      done: true
+      items:
+        - summary: "Remove TestDDLOperations class from test_write_primitives_dataframe.py"
+          done: true
+          notes: "DDL tests were already removed in Phase 1"
+        - summary: "Remove TestDDLWithMockSparkSession class from test_write_primitives_dataframe.py"
+          done: true
+          notes: "DDL tests were already removed in Phase 1"
+        - summary: "Add TestPySparkCapabilities to verify Delta vs Parquet capabilities"
+          done: true
+        - summary: "Add TestPySparkInsert to verify df.write.mode().save() is called (not SQL)"
+          done: true
+        - summary: "Add TestPySparkBulkLoad to verify spark.read().write() pattern"
+          done: true
+        - summary: "Add TestPySparkDeltaOperations for UPDATE/DELETE/MERGE with mock DeltaTable"
+          done: true
+        - summary: "Add TestPySparkParquetLimitations to verify row-level ops raise NotImplementedError"
+          done: true
+
+    - phase: "Phase 5: Verification"
+      done: true
+      items:
+        - summary: "Run updated tests: pytest tests/unit/benchmarks/test_write_primitives_dataframe.py"
+          done: true
+          notes: "36 passed, 3 skipped"
+        - summary: "Run maintenance interface tests: pytest tests/unit/core/dataframe/"
+          done: true
+        - summary: "Verify Polars still works (regression): pytest tests/unit/platforms/dataframe/test_polars_maintenance.py"
+          done: true
+          notes: "25 passed"
+        - summary: "Lint and type check: make lint && make typecheck"
+          done: true
+
+metadata:
+  tags:
+    - dataframe
+    - pyspark
+    - write-primitives
+    - maintenance
+    - delta-lake
+  estimated_effort: "2-3 days"
+  actual_effort: "1 session"
+  created_date: "2026-01-25"
+  last_updated: "2026-01-25"
+
+impact:
+  business_value: |
+    Enables proper DataFrame-based benchmarking for PySpark platforms. Without this fix,
+    PySpark "DataFrame" tests are actually just SQL tests in disguise, which defeats the
+    purpose of having separate DataFrame benchmarking capabilities.
+  user_impact: |
+    Users benchmarking PySpark DataFrames will get accurate measurements of actual
+    DataFrame API performance rather than SQL execution times.
+  technical_debt: |
+    Removes fake DDL operations that were incorrectly implemented as SQL wrappers.
+    Aligns PySpark implementation with existing Polars/Delta Lake/Iceberg patterns.
+
+files_affected:
+  modified:
+    - "benchbox/core/write_primitives/dataframe_operations.py"
+    - "benchbox/core/dataframe/maintenance_interface.py"
+    - "benchbox/platforms/dataframe/__init__.py"
+    - "tests/unit/benchmarks/test_write_primitives_dataframe.py"
+  added:
+    - "benchbox/platforms/dataframe/pyspark_maintenance.py"
+
+success_metrics:
+  - "All DDL-related code removed from dataframe_operations.py"
+  - "PySparkMaintenanceOperations uses DeltaTable API, not spark.sql()"
+  - "Tests verify df.write.mode().save() is called, not SQL execution"
+  - "Polars regression tests still pass"
+  - "Lint and type check pass"

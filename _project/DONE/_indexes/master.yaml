@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T19:01:10.314475'
-total_items: 379
+generated_at: '2026-01-25T23:57:03.518479'
+total_items: 380
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -842,6 +842,21 @@ items:
   - tpc-h
   - api-compatibility
   estimated_effort: Medium
+- id: fix-pyspark-dataframe-write-operations
+  file: DONE/main/active/fix-pyspark-dataframe-write-operations.yaml
+  title: Fix PySpark DataFrame Write Operations
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Complete
+  tags:
+  - dataframe
+  - pyspark
+  - write-primitives
+  - maintenance
+  - delta-lake
+  estimated_effort: 2-3 days
+  completed_date: '2026-01-25'
 - id: pyspark-unified-expr-methods
   file: DONE/dataframe-expansion/active/pyspark-unified-expr-methods.yaml
   title: Fix PySpark DataFrame query failures - missing UnifiedExpr methods
