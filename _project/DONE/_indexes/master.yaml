@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T19:00:25.037002'
-total_items: 378
+generated_at: '2026-01-25T19:01:10.314475'
+total_items: 379
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -920,6 +920,20 @@ items:
   - polars
   - pandas
   - expression-family
+  estimated_effort: Large
+- id: dataframe-write-primitives
+  file: DONE/dataframe-expansion/active/dataframe-write-primitives.yaml
+  title: Implement DataFrame Version of Write Primitives Benchmark
+  worktree: dataframe-expansion
+  category: Core Functionality
+  priority: High
+  status: Complete
+  tags:
+  - dataframe
+  - write-primitives
+  - delta-lake
+  - iceberg
+  - pyspark
   estimated_effort: Large
 - id: implement-pandas-family-platform-adapters
   file: DONE/dataframe-pandas-platforms/completed/implement-pandas-family-platform-adapters.yaml

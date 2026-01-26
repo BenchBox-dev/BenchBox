@@ -1,5 +1,5 @@
-generated_at: '2026-01-25T19:00:23.900713'
-total_items: 48
+generated_at: '2026-01-25T19:01:09.383245'
+total_items: 47
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -20,20 +20,6 @@ items:
   - sql
   - platform
   - open-source
-  estimated_effort: Large
-- id: dataframe-write-primitives
-  file: TODO/dataframe-expansion/active/dataframe-write-primitives.yaml
-  title: Implement DataFrame Version of Write Primitives Benchmark
-  worktree: dataframe-expansion
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - dataframe
-  - write-primitives
-  - delta-lake
-  - iceberg
-  - pyspark
   estimated_effort: Large
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml

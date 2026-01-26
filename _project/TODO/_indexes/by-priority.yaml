@@ -1,19 +1,14 @@
-generated_at: '2026-01-25T19:00:23.900815'
-total_items: 48
+generated_at: '2026-01-25T19:01:09.383295'
+total_items: 47
 priorities:
   High:
-    count: 5
+    count: 4
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
       status: Not Started
-    - id: dataframe-write-primitives
-      file: TODO/dataframe-expansion/active/dataframe-write-primitives.yaml
-      title: Implement DataFrame Version of Write Primitives Benchmark
-      category: Core Functionality
-      status: In Progress
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
