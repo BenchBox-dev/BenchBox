@@ -1,0 +1,167 @@
+# YAML template for authoring TODO entries in the new distributed structure
+#
+# This template matches the actual usage patterns in BenchBox TODO items.
+# Fill in each section with task-specific content and remove any unused keys.
+#
+# Location: _project/TODO/{worktree}/{lifecycle-phase}/{item-slug}.yaml
+# Lifecycle phases: planning/ (for not-started, identified) or active/ (for in-progress)
+
+# =========================================================================
+# REQUIRED FIELDS
+# =========================================================================
+
+title: "Fix DataFusion DataFrame regression: .tbl loading, data prep, and fail-fast"
+worktree: "main"
+priority: "High"
+status: "Completed"
+description: |
+  DataFusion DataFrame mode regressed after dependency updates: the CLI now
+  fails to load TPC-H .tbl files (DataFusion enforces .csv extension), does not
+  generate or convert data in the adapter execution path, and continues running
+  queries after load failures. The fix must target the actual adapter path
+  (benchbox/platforms/dataframe/benchmark_mixin.py) and ensure robust behavior
+  across DataFusion versions.
+
+  Scope includes:
+  - Add explicit .tbl support in the DataFusion adapter (version-aware handling).
+  - Route DataFrame adapter loads through data preparation/conversion when
+    prefer_parquet is enabled.
+  - Validate data availability before load; fail early with actionable guidance.
+  - Fail fast on load errors to prevent query execution with empty tables.
+  - Add tests that exercise the adapter path (not only dataframe_runner).
+
+# =========================================================================
+# COMMON OPTIONAL FIELDS
+# =========================================================================
+
+category: "Core Functionality"
+
+tasks:
+  phases:
+    - phase: "Phase 1: Reproduce and Pinpoint"
+      done: true
+      items:
+        - summary: "Reproduce CLI regression and confirm adapter execution path"
+          done: true
+          subtasks:
+            - summary: "Capture resolved data paths/extensions for TPC-H SF=1"
+              done: true
+            - summary: "Record DataFusion version and API capabilities"
+              done: true
+
+    - phase: "Phase 2: Adapter Fixes and Data Prep"
+      done: true
+      items:
+        - summary: "Add .tbl handling in DataFusion adapter"
+          done: true
+          subtasks:
+            - summary: "Use DataFusion file_extension when supported"
+              done: true
+            - summary: "Fallback to PyArrow CSV read + DataFusion registration"
+              done: true
+        - summary: "Integrate DataFrame data preparation/conversion"
+          done: true
+          subtasks:
+            - summary: "Route adapter path through DataFrameDataLoader.prepare_benchmark_data"
+              done: true
+            - summary: "Use cache and convert .tbl → parquet when prefer_parquet"
+              done: true
+
+    - phase: "Phase 3: Validation and Fail-Fast Behavior"
+      done: true
+      items:
+        - summary: "Validate data existence before load"
+          done: true
+        - summary: "Fail fast on table load errors and stop query execution"
+          done: true
+
+    - phase: "Phase 4: Tests and Manual Verification"
+      done: true
+      items:
+        - summary: "Add tests covering adapter path for DataFusion .tbl handling"
+          done: true
+        - summary: "Add tests for missing data detection and load failure abort"
+          done: true
+        - summary: "Manual CLI verification (data present, missing data, fail-fast)"
+          done: true
+
+metadata:
+  owners:
+    - "@joeharris"
+  tags:
+    - "dataframe"
+    - "datafusion"
+    - "regression"
+  estimated_effort: "Medium"
+  created_date: "2026-01-26"
+  last_updated: "2026-01-26T13:40:00"
+
+impact:
+  business_value: |
+    Restores reliable DataFusion DataFrame mode for TPC-H workloads, preventing
+    regressions in core CLI functionality for users running benchmarks via wheel
+    installs.
+  user_impact: |
+    Users can run `benchbox run --platform datafusion --benchmark tpch --mode dataframe`
+    without manual data conversion and receive clear errors when data is missing.
+  technical_debt: |
+    Aligns adapter execution path with the data preparation pipeline and removes
+    hidden failure modes during load.
+
+files_affected:
+  modified:
+    - "benchbox/core/dataframe/data_loader.py"
+    - "benchbox/core/runner/runner.py"
+    - "benchbox/platforms/dataframe/datafusion_df.py"
+    - "benchbox/platforms/dataframe/benchmark_mixin.py"
+    - "tests/unit/core/dataframe/test_data_loader.py"
+    - "tests/unit/platforms/dataframe/test_datafusion_df.py"
+    - "tests/unit/platforms/dataframe/test_benchmark_mixin.py"
+
+context_sections:
+  "Research Findings": |
+    The regression is triggered by DataFusion enforcing file_extension filtering
+    in read_csv (default .csv), which rejects TPC-H .tbl files. The adapter path
+    loads .tbl directly and does not invoke data conversion. The dependency floor
+    for datafusion is >=50.1.0, so newer environments now hit the stricter check.
+
+technical_requirements:
+  constraints:
+    - "Must work across DataFusion versions with differing read_csv APIs"
+    - "Do not break non-DataFusion DataFrame adapters"
+  dependencies:
+    - "datafusion>=50.1.0 (runtime dependency)"
+    - "pyarrow for CSV read fallback"
+
+success_metrics:
+  - "DataFusion DataFrame run succeeds on TPC-H SF=0.01 and SF=1 using .tbl inputs"
+  - "Missing data surfaces a clear error before load; queries do not execute"
+  - "All DataFrame adapter tests pass"
+  - "Queries never execute after any table load failure"
+
+open_questions:
+  - "Which DataFusion versions expose file_extension in read_csv options?"
+  - "Should .tbl be normalized to .csv on disk or only in-memory via PyArrow?"
+
+completed_date: "2026-01-26"
+
+sections:
+  "Implementation Summary": |
+    Implemented DataFusion-safe .tbl loading with version-aware file_extension
+    support and PyArrow fallback (including compressed .zst streams). Updated
+    DataFrame adapter load path to fail fast on missing data and load errors,
+    and routed load-only flows for DataFrame adapters through the DataFrame
+    execution path in the core runner. Added tests for compressed and non-
+    trailing TBL conversion and adapter fail-fast behavior. Manual CLI
+    verification completed for load-only and power phases.
+
+  "Challenges and Solutions": |
+    DataFusion enforces .csv extensions and cannot read compressed .tbl.zst
+    directly. The fix uses DataFusion’s file_extension option when available,
+    and otherwise streams decompressed data through PyArrow. Conversion now
+    detects trailing delimiters dynamically to avoid column-mismatch errors.
+
+  "Lessons Learned": |
+    Load-only flows must detect DataFrame adapters before SQL-only paths.
+    TPC data generated with compression requires explicit decompression during
+    CSV→Parquet conversion to avoid parse errors.

@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T08:42:25.951326'
-total_items: 386
+generated_at: '2026-01-26T13:23:59.332160'
+total_items: 387
 priorities:
   Critical:
     count: 27
@@ -140,7 +140,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 132
+    count: 133
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -332,6 +332,11 @@ priorities:
       title: Fix Dask DataFrame Platform Compatibility
       category: Platform Expansion
       status: Complete
+    - id: fix-datafusion-dataframe-regression
+      file: DONE/main/active/fix-datafusion-dataframe-regression.yaml
+      title: 'Fix DataFusion DataFrame regression: .tbl loading, data prep, and fail-fast'
+      category: Core Functionality
+      status: Completed
     - id: fix-pyspark-dataframe-write-operations
       file: DONE/main/active/fix-pyspark-dataframe-write-operations.yaml
       title: Fix PySpark DataFrame Write Operations

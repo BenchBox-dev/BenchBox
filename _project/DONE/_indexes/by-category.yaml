@@ -1,4 +1,4 @@
-generated_at: '2026-01-26T08:42:25.951222'
+generated_at: '2026-01-26T13:23:59.332051'
 total_categories: 54
 categories:
   '"Bug Fixes & Reliability"':
@@ -335,7 +335,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 80
+    count: 81
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -482,6 +482,11 @@ categories:
       title: Fix CLI Power/Throughput Test Execution and Tuning Configuration Issues
       priority: Medium
       status: Not Started
+    - id: fix-datafusion-dataframe-regression
+      file: DONE/main/active/fix-datafusion-dataframe-regression.yaml
+      title: 'Fix DataFusion DataFrame regression: .tbl loading, data prep, and fail-fast'
+      priority: High
+      status: Completed
     - id: fix-pyspark-dataframe-write-operations
       file: DONE/main/active/fix-pyspark-dataframe-write-operations.yaml
       title: Fix PySpark DataFrame Write Operations

@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T08:42:25.951035'
-total_items: 386
+generated_at: '2026-01-26T13:23:59.331864'
+total_items: 387
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -857,6 +857,21 @@ items:
   - tpc-h
   - api-compatibility
   estimated_effort: Medium
+- id: fix-datafusion-dataframe-regression
+  file: DONE/main/active/fix-datafusion-dataframe-regression.yaml
+  title: 'Fix DataFusion DataFrame regression: .tbl loading, data prep, and fail-fast'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - dataframe
+  - datafusion
+  - regression
+  owners:
+  - '@joeharris'
+  estimated_effort: Medium
+  completed_date: '2026-01-26'
 - id: fix-pyspark-dataframe-write-operations
   file: DONE/main/active/fix-pyspark-dataframe-write-operations.yaml
   title: Fix PySpark DataFrame Write Operations
