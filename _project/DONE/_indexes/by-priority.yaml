@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T13:23:59.332160'
-total_items: 387
+generated_at: '2026-01-27T17:06:42.482459'
+total_items: 388
 priorities:
   Critical:
     count: 27
@@ -1874,7 +1874,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 10
+    count: 11
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -1891,6 +1891,11 @@ priorities:
       title: Add cost tracking for local/self-hosted platforms
       category: Platform Expansion
       status: Completed
+    - id: consolidate-benchmark-name-detection
+      file: DONE/core-functionality/active/consolidate-benchmark-name-detection.yaml
+      title: Consolidate benchmark name detection to use normalize_benchmark_id()
+      category: Code Quality
+      status: Complete
     - id: run-official-command-consolidation
       file: DONE/ux-improvements/active/run-official-command-consolidation.yaml
       title: Consolidate run-official into run --official flag

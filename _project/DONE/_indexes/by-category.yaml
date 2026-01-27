@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T13:23:59.332051'
-total_categories: 54
+generated_at: '2026-01-27T17:06:42.482354'
+total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -155,6 +155,14 @@ categories:
       title: Connection Parameter Conflicts in TPC Test Methods
       priority: Medium
       status: Not Started
+  Code Quality:
+    count: 1
+    items:
+    - id: consolidate-benchmark-name-detection
+      file: DONE/core-functionality/active/consolidate-benchmark-name-detection.yaml
+      title: Consolidate benchmark name detection to use normalize_benchmark_id()
+      priority: Low
+      status: Complete
   Code Quality and Documentation:
     count: 4
     items:
