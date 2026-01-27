@@ -1,5 +1,5 @@
-generated_at: '2026-01-27T17:21:58.909891'
-total_items: 389
+generated_at: '2026-01-27T18:19:02.611083'
+total_items: 390
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -872,6 +872,22 @@ items:
   - '@joeharris'
   estimated_effort: Medium
   completed_date: '2026-01-26'
+- id: fix-mcp-stdout-corruption
+  file: DONE/mcp-integration/active/fix-mcp-stdout-corruption.yaml
+  title: Fix MCP server stdout corruption from ResultExporter
+  worktree: mcp-integration
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - mcp
+  - bugfix
+  - stdout
+  - transport
+  owners:
+  - joe
+  estimated_effort: Small
+  completed_date: '2026-01-27'
 - id: fix-pyspark-dataframe-write-operations
   file: DONE/main/active/fix-pyspark-dataframe-write-operations.yaml
   title: Fix PySpark DataFrame Write Operations

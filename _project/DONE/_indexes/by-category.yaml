@@ -1,4 +1,4 @@
-generated_at: '2026-01-27T17:21:58.910039'
+generated_at: '2026-01-27T18:19:02.611357'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 81
+    count: 82
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -498,6 +498,11 @@ categories:
     - id: fix-datafusion-dataframe-regression
       file: DONE/main/active/fix-datafusion-dataframe-regression.yaml
       title: 'Fix DataFusion DataFrame regression: .tbl loading, data prep, and fail-fast'
+      priority: High
+      status: Completed
+    - id: fix-mcp-stdout-corruption
+      file: DONE/mcp-integration/active/fix-mcp-stdout-corruption.yaml
+      title: Fix MCP server stdout corruption from ResultExporter
       priority: High
       status: Completed
     - id: fix-pyspark-dataframe-write-operations

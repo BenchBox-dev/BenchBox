@@ -1,7 +1,8 @@
 title: "Fix MCP server stdout corruption from ResultExporter"
 worktree: "mcp-integration"
 priority: "High"
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-01-27"
 category: "Core Functionality"
 description: |
   The MCP server emits non-protocol output to stdout during result export,
@@ -119,3 +120,19 @@ success_metrics:
   - "codex CLI can complete benchmark runs without transport closure"
   - "All existing MCP tests continue to pass"
   - "No behavior change for CLI users"
+
+sections:
+  "Implementation Summary": |
+    Applied a belt-and-suspenders fix to prevent stdout corruption:
+    1. Set global quiet mode (set_quiet(True)) at MCP server startup
+    2. Pass quiet console to all ResultExporter instances in MCP tools
+    3. Added 5 regression tests for stdout isolation
+
+  "Files Changed": |
+    - benchbox/mcp/server.py - Added set_quiet(True) at server initialization
+    - benchbox/mcp/tools/benchmark.py - Added get_quiet_console import and usage
+    - benchbox/mcp/tools/results.py - Added get_quiet_console import and usage
+    - tests/unit/mcp/test_mcp_stdout_isolation.py - New test file with 5 tests
+
+commits:
+  - "06b7d395"

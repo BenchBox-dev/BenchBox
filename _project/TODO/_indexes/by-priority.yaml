@@ -1,5 +1,5 @@
-generated_at: '2026-01-27T17:21:58.050630'
-total_items: 46
+generated_at: '2026-01-27T18:19:00.143185'
+total_items: 47
 priorities:
   High:
     count: 2
@@ -88,7 +88,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 24
+    count: 25
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -114,6 +114,11 @@ priorities:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: consolidate-file-format-detection
+      file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
+      title: Consolidate file format detection to handle compressed and sharded files
+      category: Code Quality
       status: Not Started
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml

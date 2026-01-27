@@ -1,5 +1,5 @@
-generated_at: '2026-01-27T17:21:58.910213'
-total_items: 389
+generated_at: '2026-01-27T18:19:02.611583'
+total_items: 390
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 194
+    count: 195
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1026,6 +1026,11 @@ statuses:
     - id: fix-datafusion-dataframe-regression
       file: DONE/main/active/fix-datafusion-dataframe-regression.yaml
       title: 'Fix DataFusion DataFrame regression: .tbl loading, data prep, and fail-fast'
+      priority: High
+      category: Core Functionality
+    - id: fix-mcp-stdout-corruption
+      file: DONE/mcp-integration/active/fix-mcp-stdout-corruption.yaml
+      title: Fix MCP server stdout corruption from ResultExporter
       priority: High
       category: Core Functionality
     - id: pyspark-unified-expr-methods

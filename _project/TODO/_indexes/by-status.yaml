@@ -1,5 +1,5 @@
-generated_at: '2026-01-27T17:21:58.050642'
-total_items: 46
+generated_at: '2026-01-27T18:19:00.143198'
+total_items: 47
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 43
+    count: 44
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -67,6 +67,11 @@ statuses:
       title: ClickHouse Cloud Deployment Mode
       priority: Medium-High
       category: Platform Expansion
+    - id: consolidate-file-format-detection
+      file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
+      title: Consolidate file format detection to handle compressed and sharded files
+      priority: Medium
+      category: Code Quality
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration

@@ -1,5 +1,5 @@
-generated_at: '2026-01-27T17:21:58.050614'
-total_categories: 9
+generated_at: '2026-01-27T18:19:00.143167'
+total_categories: 10
 categories:
   AI/ML Capabilities:
     count: 1
@@ -83,6 +83,14 @@ categories:
     - id: tutorial-benchmark-verification
       file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
+      priority: Medium
+      status: Not Started
+  Code Quality:
+    count: 1
+    items:
+    - id: consolidate-file-format-detection
+      file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
+      title: Consolidate file format detection to handle compressed and sharded files
       priority: Medium
       status: Not Started
   Core Functionality:
