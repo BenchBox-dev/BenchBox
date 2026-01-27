@@ -1,0 +1,121 @@
+title: "Fix MCP server stdout corruption from ResultExporter"
+worktree: "mcp-integration"
+priority: "High"
+status: "In Progress"
+category: "Core Functionality"
+description: |
+  The MCP server emits non-protocol output to stdout during result export,
+  which breaks stdio MCP clients like the codex CLI. For stdio MCP servers,
+  stdout must contain exclusively JSON-RPC messages. When ResultExporter
+  prints status lines to stdout, it corrupts the JSON-RPC stream, causing
+  strict clients to close the transport with "Transport closed" errors.
+
+  Root cause: ResultExporter in benchbox/core/results/exporter.py uses
+  self.console.print() at multiple points (lines 167, 171, 175, 247, 255)
+  to output status messages. When MCP tools create ResultExporter without
+  a quiet console, these messages leak to stdout.
+
+  The fix uses the existing quiet-mode infrastructure in benchbox/utils/printing.py
+  which already provides get_quiet_console() and set_quiet() utilities.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Apply Belt-and-Suspenders Fix"
+      done: true
+      items:
+        - summary: "Set global quiet mode in MCP server initialization"
+          done: true
+          subtasks:
+            - summary: "Add set_quiet(True) at top of create_benchbox_server() in benchbox/mcp/server.py"
+              done: true
+        - summary: "Pass quiet console to ResultExporter in benchmark.py"
+          done: true
+          subtasks:
+            - summary: "Import get_quiet_console from benchbox.utils.printing"
+              done: true
+            - summary: "Change line ~211 to: exporter = ResultExporter(anonymize=False, console=get_quiet_console())"
+              done: true
+        - summary: "Pass quiet console to ResultExporter in results.py"
+          done: true
+          subtasks:
+            - summary: "Import get_quiet_console from benchbox.utils.printing"
+              done: true
+            - summary: "Change line ~237 to: exporter = ResultExporter(anonymize=False, console=get_quiet_console())"
+              done: true
+
+    - phase: "Phase 2: Add Regression Test"
+      done: true
+      items:
+        - summary: "Create tests/unit/mcp/test_mcp_stdout_isolation.py"
+          done: true
+          subtasks:
+            - summary: "Test that run_benchmark produces no stdout output"
+              done: true
+            - summary: "Test that compare_results produces no stdout output"
+              done: true
+
+    - phase: "Phase 3: Verification"
+      done: true
+      items:
+        - summary: "Run unit tests: uv run -- python -m pytest tests/unit/mcp/ -v"
+          done: true
+        - summary: "Run lint and typecheck: make lint && make typecheck"
+          done: true
+        - summary: "Manual verification with codex CLI (if available)"
+          done: true
+
+metadata:
+  owners:
+    - "joe"
+  tags:
+    - "mcp"
+    - "bugfix"
+    - "stdout"
+    - "transport"
+  estimated_effort: "Small"
+  created_date: "2026-01-27"
+
+impact:
+  business_value: |
+    Enables MCP server to work correctly with strict stdio clients like codex CLI,
+    expanding compatibility and user base.
+  user_impact: |
+    Users of codex CLI and other strict MCP clients will be able to run benchmarks
+    without transport closure errors.
+  technical_debt: |
+    Uses existing quiet-mode infrastructure, no new technical debt introduced.
+
+files_affected:
+  modified:
+    - "benchbox/mcp/server.py"
+    - "benchbox/mcp/tools/benchmark.py"
+    - "benchbox/mcp/tools/results.py"
+  added:
+    - "tests/unit/mcp/test_mcp_stdout_isolation.py"
+
+context_sections:
+  "Root Cause Analysis": |
+    ResultExporter (in benchbox/core/results/exporter.py) prints to stdout via
+    self.console.print() at these locations:
+    - Line 167: Warning for unknown export format
+    - Line 171: Success message "Exported {format}: {filepath}"
+    - Line 175: Error message "Failed to export {format}: {exc}"
+    - Line 247: Info message "Exported plans: {plans_path}"
+    - Line 255: Info message "Exported tuning: {tuning_path}"
+
+    MCP tool locations creating unquiet exporters:
+    - benchbox/mcp/tools/benchmark.py:211 - run_benchmark tool
+    - benchbox/mcp/tools/results.py:237 - compare_results tool
+
+  "Existing Infrastructure": |
+    The codebase already has proper quiet-mode utilities in benchbox/utils/printing.py:
+    - get_quiet_console() - Returns a sink console that discards output
+    - set_quiet(enabled: bool) - Global quiet mode flag
+    - silence_output() - Context manager for stdout/stderr suppression
+    - QuietConsoleProxy - Transparent proxy respecting quiet mode
+
+success_metrics:
+  - "No stdout output during MCP benchmark execution"
+  - "codex CLI can complete benchmark runs without transport closure"
+  - "All existing MCP tests continue to pass"
+  - "No behavior change for CLI users"
