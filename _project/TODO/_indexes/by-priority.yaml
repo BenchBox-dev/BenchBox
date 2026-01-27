@@ -1,5 +1,5 @@
-generated_at: '2026-01-27T16:57:27.338182'
-total_items: 47
+generated_at: '2026-01-27T17:00:26.978966'
+total_items: 48
 priorities:
   High:
     count: 2
@@ -211,8 +211,13 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 7
+    count: 8
     items:
+    - id: consolidate-tpc-delimiter-detection
+      file: TODO/core-functionality/planning/consolidate-tpc-delimiter-detection.yaml
+      title: Consolidate TPC delimiter detection to use get_delimiter_for_file()
+      category: Code Quality
+      status: Planning
     - id: consolidate-benchmark-name-detection
       file: TODO/core-functionality/planning/consolidate-benchmark-name-detection.yaml
       title: Consolidate benchmark name detection to use normalize_benchmark_id()
