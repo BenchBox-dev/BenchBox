@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T13:23:58.497198'
-total_items: 45
+generated_at: '2026-01-27T16:57:27.338182'
+total_items: 47
 priorities:
   High:
     count: 2
@@ -211,8 +211,13 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 5
+    count: 7
     items:
+    - id: consolidate-benchmark-name-detection
+      file: TODO/core-functionality/planning/consolidate-benchmark-name-detection.yaml
+      title: Consolidate benchmark name detection to use normalize_benchmark_id()
+      category: Code Quality
+      status: Planning
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
@@ -227,6 +232,11 @@ priorities:
       file: TODO/specialized-graph/planning/graph-query-benchmark-support-neo4j-neptune.yaml
       title: Graph Query Benchmark Support - Neo4j, Neptune
       category: Specialized Benchmarks
+      status: Not Started
+    - id: on-demand-tpc-answer-download
+      file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
+      title: Implement on-demand download of TPC answer files for validation
+      category: Core Functionality
       status: Not Started
     - id: interactive-benchmark-explorer-web-ui
       file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml

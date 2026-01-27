@@ -1,5 +1,5 @@
-generated_at: '2026-01-26T13:23:58.497209'
-total_items: 45
+generated_at: '2026-01-27T16:57:27.338193'
+total_items: 47
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 42
+    count: 43
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -136,6 +136,11 @@ statuses:
       file: TODO/dataframe-expansion/planning/dataframe-transaction-primitives.yaml
       title: Implement DataFrame Version of Transaction Primitives Benchmark
       priority: Medium
+      category: Core Functionality
+    - id: on-demand-tpc-answer-download
+      file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
+      title: Implement on-demand download of TPC answer files for validation
+      priority: Low
       category: Core Functionality
     - id: interactive-benchmark-explorer-web-ui
       file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
