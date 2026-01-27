@@ -1,5 +1,5 @@
-generated_at: '2026-01-27T17:06:41.606806'
-total_items: 47
+generated_at: '2026-01-27T17:21:58.050581'
+total_items: 46
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -34,19 +34,6 @@ items:
   - duckdb
   - cloud
   estimated_effort: 3-4 days
-- id: consolidate-tpc-delimiter-detection
-  file: TODO/core-functionality/planning/consolidate-tpc-delimiter-detection.yaml
-  title: Consolidate TPC delimiter detection to use get_delimiter_for_file()
-  worktree: core-functionality
-  category: Code Quality
-  priority: Low
-  status: Planning
-  tags:
-  - code-quality
-  - refactoring
-  - dry-principle
-  - file-format
-  estimated_effort: Small
 - id: databend-cloud-olap-platform
   file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
   title: Databend Cloud-Native OLAP Platform Integration

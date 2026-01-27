@@ -1,4 +1,4 @@
-generated_at: '2026-01-27T17:06:42.482354'
+generated_at: '2026-01-27T17:21:58.910039'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -156,8 +156,13 @@ categories:
       priority: Medium
       status: Not Started
   Code Quality:
-    count: 1
+    count: 2
     items:
+    - id: consolidate-tpc-delimiter-detection
+      file: DONE/core-functionality/consolidate-tpc-delimiter-detection.yaml
+      title: Consolidate TPC delimiter detection to use get_delimiter_for_file()
+      priority: Low
+      status: Done
     - id: consolidate-benchmark-name-detection
       file: DONE/core-functionality/active/consolidate-benchmark-name-detection.yaml
       title: Consolidate benchmark name detection to use normalize_benchmark_id()

@@ -1,0 +1,151 @@
+title: "Consolidate TPC delimiter detection to use get_delimiter_for_file()"
+worktree: core-functionality
+priority: Low
+status: Done
+category: Code Quality
+description: |
+  The codebase has ~15 locations that duplicate TPC file format detection
+  using patterns like `".tbl" in file_str or ".dat" in file_str`.
+
+  New utility functions were added in commit XXXX:
+  - `is_tpc_format(path)` - returns True for .tbl/.dat files
+  - `get_delimiter_for_file(path)` - returns "|" for TPC formats, "," otherwise
+  - `TPC_FORMAT_EXTENSIONS` - frozenset({".tbl", ".dat"})
+
+  These should replace the duplicated or-chains across platform adapters.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Update Cloud Platform Adapters"
+      done: true
+      items:
+        - summary: "platforms/firebolt.py line 713"
+          done: true
+        - summary: "platforms/redshift.py lines 1099, 1265"
+          done: true
+        - summary: "platforms/trino.py line 801"
+          done: true
+        - summary: "platforms/presto.py line 804"
+          done: true
+        - summary: "platforms/bigquery.py lines 1002, 1088"
+          done: true
+        - summary: "platforms/azure_synapse.py lines 545, 613"
+          done: true
+
+    - phase: "Phase 2: Update Local Platform Adapters"
+      done: true
+      items:
+        - summary: "platforms/datafusion.py line 484"
+          done: true
+        - summary: "platforms/duckdb.py line 358"
+          done: true
+        - summary: "platforms/clickhouse/workload.py line 151"
+          done: true
+
+    - phase: "Phase 3: Update Base Utilities"
+      done: true
+      items:
+        - summary: "platforms/base/utils.py line 47"
+          done: true
+        - summary: "core/manifest/io.py line 189"
+          done: true
+
+    - phase: "Phase 4: Update Other Platform Adapters"
+      done: true
+      items:
+        - summary: "platforms/fabric_warehouse.py lines 928, 1014"
+          done: true
+        - summary: "platforms/databricks/adapter.py line 1179"
+          done: true
+
+metadata:
+  tags:
+    - code-quality
+    - refactoring
+    - dry-principle
+    - file-format
+  estimated_effort: Small
+  created_date: "2026-01-27"
+  completed_date: "2026-01-27"
+
+context_sections:
+  "New Utilities Available": |
+    Added to `benchbox/utils/file_format.py`:
+
+    ```python
+    from benchbox.utils.file_format import (
+        is_tpc_format,
+        get_delimiter_for_file,
+        TPC_FORMAT_EXTENSIONS,
+    )
+
+    # Check if file is TPC format
+    is_tpc_format("lineitem.tbl")      # True
+    is_tpc_format("store_sales.dat")   # True
+    is_tpc_format("lineitem.tbl.zst")  # True (handles compression)
+    is_tpc_format("data.csv")          # False
+
+    # Get delimiter directly
+    get_delimiter_for_file("lineitem.tbl")  # "|"
+    get_delimiter_for_file("data.csv")      # ","
+    ```
+
+  "Patterns to Refactor": |
+    **Current (duplicate logic):**
+    ```python
+    delimiter = "|" if ".tbl" in file_str or ".dat" in file_str else ","
+    ```
+
+    **Target (centralized):**
+    ```python
+    delimiter = get_delimiter_for_file(file_path)
+    ```
+
+    Or for boolean checks:
+    ```python
+    # Current
+    if ".tbl" in file_str or ".dat" in file_str:
+
+    # Target
+    if is_tpc_format(file_path):
+    ```
+
+  "Note on Tuple/List Patterns": |
+    Locations using tuple/list membership like `suffix in (".tbl", ".dat")`
+    should ALSO be updated to use the centralized utilities. This ensures:
+    1. Single source of truth for TPC format extensions
+    2. Proper handling of compressed files (e.g., .tbl.zst)
+    3. Easier extension when new formats are added
+
+    If a platform needs custom logic, it should use the central utility
+    and override the result rather than duplicating the extension list.
+
+impact:
+  technical_debt: |
+    Low severity - code works correctly but has duplicated logic.
+    The new utilities handle compression extensions correctly, which
+    some current implementations may not handle properly.
+
+  user_impact: |
+    None - internal refactoring only.
+
+files_affected:
+  modified:
+    - benchbox/platforms/firebolt.py
+    - benchbox/platforms/redshift.py
+    - benchbox/platforms/trino.py
+    - benchbox/platforms/presto.py
+    - benchbox/platforms/bigquery.py
+    - benchbox/platforms/azure_synapse.py
+    - benchbox/platforms/datafusion.py
+    - benchbox/platforms/duckdb.py
+    - benchbox/platforms/clickhouse/workload.py
+    - benchbox/platforms/fabric_warehouse.py
+    - benchbox/platforms/databricks/adapter.py
+    - benchbox/platforms/base/utils.py
+    - benchbox/core/manifest/io.py
+
+success_metrics:
+  - "All TPC format detection uses is_tpc_format() or get_delimiter_for_file()"
+  - "No substring `or` chains for .tbl/.dat detection"
+  - "All tests pass"

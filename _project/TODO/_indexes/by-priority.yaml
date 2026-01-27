@@ -1,5 +1,5 @@
-generated_at: '2026-01-27T17:06:41.606860'
-total_items: 47
+generated_at: '2026-01-27T17:21:58.050630'
+total_items: 46
 priorities:
   High:
     count: 2
@@ -211,13 +211,8 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 7
+    count: 6
     items:
-    - id: consolidate-tpc-delimiter-detection
-      file: TODO/core-functionality/planning/consolidate-tpc-delimiter-detection.yaml
-      title: Consolidate TPC delimiter detection to use get_delimiter_for_file()
-      category: Code Quality
-      status: Planning
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
