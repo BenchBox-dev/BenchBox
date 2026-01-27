@@ -37,9 +37,9 @@ tasks:
       items:
         - summary: "platforms/datafusion.py line 484"
           done: false
-        - summary: "platforms/duckdb.py line 358 (already uses list check)"
+        - summary: "platforms/duckdb.py line 358"
           done: false
-        - summary: "platforms/clickhouse/workload.py line 151 (already uses list check)"
+        - summary: "platforms/clickhouse/workload.py line 151"
           done: false
 
     - phase: "Phase 3: Update Base Utilities"
@@ -48,6 +48,14 @@ tasks:
         - summary: "platforms/base/utils.py line 47"
           done: false
         - summary: "core/manifest/io.py line 189"
+          done: false
+
+    - phase: "Phase 4: Update Other Platform Adapters"
+      done: false
+      items:
+        - summary: "platforms/fabric_warehouse.py lines 928, 1014"
+          done: false
+        - summary: "platforms/databricks/adapter.py line 1179"
           done: false
 
 metadata:
@@ -101,12 +109,15 @@ context_sections:
     if is_tpc_format(file_path):
     ```
 
-  "Already Good (no change needed)": |
-    These locations already use clean patterns:
-    - `platforms/duckdb.py:358` - uses `base_ext in [".tbl", ".dat"]`
-    - `platforms/clickhouse/workload.py:151` - uses `base_ext in [".tbl", ".dat"]`
-    - `platforms/fabric_warehouse.py:928,1014` - uses `suffix in (".tbl", ".dat")`
-    - `platforms/databricks/adapter.py:1179` - uses `format_suffix in [".tbl", ".dat"]`
+  "Note on Tuple/List Patterns": |
+    Locations using tuple/list membership like `suffix in (".tbl", ".dat")`
+    should ALSO be updated to use the centralized utilities. This ensures:
+    1. Single source of truth for TPC format extensions
+    2. Proper handling of compressed files (e.g., .tbl.zst)
+    3. Easier extension when new formats are added
+
+    If a platform needs custom logic, it should use the central utility
+    and override the result rather than duplicating the extension list.
 
 impact:
   technical_debt: |
@@ -126,6 +137,10 @@ files_affected:
     - benchbox/platforms/bigquery.py
     - benchbox/platforms/azure_synapse.py
     - benchbox/platforms/datafusion.py
+    - benchbox/platforms/duckdb.py
+    - benchbox/platforms/clickhouse/workload.py
+    - benchbox/platforms/fabric_warehouse.py
+    - benchbox/platforms/databricks/adapter.py
     - benchbox/platforms/base/utils.py
     - benchbox/core/manifest/io.py
 
