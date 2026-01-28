@@ -1,4 +1,4 @@
-generated_at: '2026-01-28T14:18:40.121668'
+generated_at: '2026-01-28T16:34:04.866115'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -94,8 +94,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 8
+    count: 9
     items:
+    - id: consolidate-result-normalization
+      file: TODO/core-functionality/planning/consolidate-result-normalization.yaml
+      title: Consolidate Duplicated Result JSON Normalization Logic
+      priority: Medium
+      status: Not Started
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB

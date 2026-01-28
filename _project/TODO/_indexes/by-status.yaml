@@ -1,5 +1,5 @@
-generated_at: '2026-01-28T14:18:40.121698'
-total_items: 47
+generated_at: '2026-01-28T16:34:04.866145'
+total_items: 48
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 44
+    count: 45
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -67,6 +67,11 @@ statuses:
       title: ClickHouse Cloud Deployment Mode
       priority: Medium-High
       category: Platform Expansion
+    - id: consolidate-result-normalization
+      file: TODO/core-functionality/planning/consolidate-result-normalization.yaml
+      title: Consolidate Duplicated Result JSON Normalization Logic
+      priority: Medium
+      category: Core Functionality
     - id: consolidate-file-format-detection
       file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
       title: Consolidate file format detection to handle compressed and sharded files

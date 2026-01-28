@@ -1,5 +1,5 @@
-generated_at: '2026-01-28T14:18:40.121685'
-total_items: 47
+generated_at: '2026-01-28T16:34:04.866132'
+total_items: 48
 priorities:
   High:
     count: 2
@@ -88,7 +88,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 25
+    count: 26
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -114,6 +114,11 @@ priorities:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: consolidate-result-normalization
+      file: TODO/core-functionality/planning/consolidate-result-normalization.yaml
+      title: Consolidate Duplicated Result JSON Normalization Logic
+      category: Core Functionality
       status: Not Started
     - id: consolidate-file-format-detection
       file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
