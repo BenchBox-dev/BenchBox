@@ -1,5 +1,5 @@
-generated_at: '2026-01-27T19:06:35.432848'
-total_items: 390
+generated_at: '2026-01-28T14:08:51.743913'
+total_items: 391
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3785,6 +3785,22 @@ items:
   - interactive
   estimated_effort: Small
   completed_date: '2026-01-07'
+- id: mcp-visualization-tools
+  file: DONE/mcp-integration/mcp-visualization-tools.yaml
+  title: Add visualization tools to MCP server
+  worktree: mcp-integration
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - mcp
+  - visualization
+  - ai-agents
+  - plotly
+  owners:
+  - joe
+  estimated_effort: 3-5 days
+  completed_date: '2026-01-28'
 - id: emr-serverless-platform
   file: DONE/platform-expansion/planning/emr-serverless-platform.yaml
   title: Amazon EMR Serverless Platform

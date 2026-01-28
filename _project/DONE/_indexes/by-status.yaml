@@ -1,5 +1,5 @@
-generated_at: '2026-01-27T19:06:35.433224'
-total_items: 390
+generated_at: '2026-01-28T14:08:51.744377'
+total_items: 391
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 195
+    count: 196
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -848,6 +848,11 @@ statuses:
       title: Add sphinx-tags to BenchBox Documentation
       priority: Medium
       category: Documentation
+    - id: mcp-visualization-tools
+      file: DONE/mcp-integration/mcp-visualization-tools.yaml
+      title: Add visualization tools to MCP server
+      priority: Medium-High
+      category: Core Functionality
     - id: advanced-cost-analysis-framework-multi-region-pricing-models
       file: DONE/cost-intelligence-advanced/planning/advanced-cost-analysis-framework-multi-region-pricing-models.yaml
       title: Advanced Cost Analysis Framework - Multi-Region & Pricing Models

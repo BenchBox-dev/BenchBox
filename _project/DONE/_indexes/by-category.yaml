@@ -1,4 +1,4 @@
-generated_at: '2026-01-27T19:06:35.433024'
+generated_at: '2026-01-28T14:08:51.744163'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 82
+    count: 83
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -388,6 +388,11 @@ categories:
     - id: interactive-wizard-execution-style-selection
       file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml
       title: Add execution style selection step to interactive wizard
+      priority: Medium-High
+      status: Completed
+    - id: mcp-visualization-tools
+      file: DONE/mcp-integration/mcp-visualization-tools.yaml
+      title: Add visualization tools to MCP server
       priority: Medium-High
       status: Completed
     - id: auto-compile-tpc-binary-tools-completed
