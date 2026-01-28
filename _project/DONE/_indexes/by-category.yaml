@@ -1,4 +1,4 @@
-generated_at: '2026-01-28T14:08:51.744163'
+generated_at: '2026-01-28T16:46:22.702031'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 83
+    count: 85
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -439,6 +439,11 @@ categories:
       file: DONE/dataframe-expansion/dataframe-read-primitives-complete.yaml
       title: Complete Read Primitives DataFrame Implementation (All 136 Queries)
       priority: Critical
+      status: Completed
+    - id: consolidate-result-normalization
+      file: DONE/core-functionality/active/consolidate-result-normalization.yaml
+      title: Consolidate Duplicated Result JSON Normalization Logic
+      priority: Medium
       status: Completed
     - id: consolidate-tuning-commands
       file: DONE/ux-improvements/planning/consolidate-tuning-commands.yaml
@@ -755,6 +760,11 @@ categories:
       title: Switch TPC-DS Base Dialect from ANSI to Netezza ✅
       priority: Medium
       status: Not Started
+    - id: trim-viz-deps-plotly-only
+      file: DONE/main/active/trim-viz-deps-plotly-only.yaml
+      title: Trim visualization dependencies to Plotly-only (remove Kaleido, Pandas, Pillow)
+      priority: Medium
+      status: Completed
     - id: add-platform-info-to-benchmark-results
       file: DONE/unknown/planning/add-platform-info-to-benchmark-results.yaml
       title: ✅ Add platform_info to Benchmark Results

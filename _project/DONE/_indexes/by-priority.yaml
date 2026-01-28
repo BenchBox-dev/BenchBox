@@ -1,5 +1,5 @@
-generated_at: '2026-01-28T14:08:51.744278'
-total_items: 391
+generated_at: '2026-01-28T16:46:22.702138'
+total_items: 393
 priorities:
   Critical:
     count: 27
@@ -931,7 +931,7 @@ priorities:
       category: Platform Expansion
       status: Complete
   Medium:
-    count: 190
+    count: 192
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1213,6 +1213,11 @@ priorities:
       title: Connection Parameter Conflicts in TPC Test Methods
       category: Bug Fixes
       status: Not Started
+    - id: consolidate-result-normalization
+      file: DONE/core-functionality/active/consolidate-result-normalization.yaml
+      title: Consolidate Duplicated Result JSON Normalization Logic
+      category: Core Functionality
+      status: Completed
     - id: consolidate-tuning-commands
       file: DONE/ux-improvements/planning/consolidate-tuning-commands.yaml
       title: Consolidate tuning commands under unified `tuning` group
@@ -1688,6 +1693,11 @@ priorities:
       title: Test Suite Reliability ✅ COMPLETED
       category: Testing and Quality Assurance
       status: Not Started
+    - id: trim-viz-deps-plotly-only
+      file: DONE/main/active/trim-viz-deps-plotly-only.yaml
+      title: Trim visualization dependencies to Plotly-only (remove Kaleido, Pandas, Pillow)
+      category: Core Functionality
+      status: Completed
     - id: unified-platform-comparison-cli
       file: DONE/platform-comparison/active/unified-platform-comparison-cli.yaml
       title: Unified Platform Comparison CLI

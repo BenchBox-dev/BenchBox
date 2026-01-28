@@ -1,6 +1,6 @@
 # Consolidate Result Normalization Logic
 #
-# Location: _project/TODO/core-functionality/planning/consolidate-result-normalization.yaml
+# Location: _project/DONE/core-functionality/active/consolidate-result-normalization.yaml
 
 # ============================================================================
 # REQUIRED FIELDS
@@ -9,7 +9,8 @@
 title: "Consolidate Duplicated Result JSON Normalization Logic"
 worktree: "core-functionality"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-01-28"
 description: |
   Multiple modules implement nearly identical logic for extracting data from
   benchmark result JSON files, with duplicated schema version detection and
@@ -31,112 +32,112 @@ category: "Core Functionality"
 tasks:
   phases:
     - phase: "Phase 1: Analysis and Design"
-      done: false
+      done: true
       items:
         - summary: "Audit all result normalization code paths"
-          done: false
+          done: true
           subtasks:
             - summary: "Document ResultPlotter._normalize_dict() (result_plotter.py:152)"
-              done: false
+              done: true
             - summary: "Document ResultExporter._extract_performance_metrics() (exporter.py:704)"
-              done: false
+              done: true
             - summary: "Document ResultExporter._extract_query_map() (exporter.py:746)"
-              done: false
+              done: true
             - summary: "Document reconstruct_benchmark_results() (loader.py:176)"
-              done: false
+              done: true
             - summary: "Document _reconstruct_query_results() (loader.py:360)"
-              done: false
+              done: true
             - summary: "Check for additional duplication in comparison.py, report.py, compare.py"
-              done: false
+              done: true
         - summary: "Define unified intermediate data structure"
-          done: false
+          done: true
           subtasks:
             - summary: "Identify superset of fields needed by all consumers"
-              done: false
+              done: true
             - summary: "Design NormalizedResult or ResultSummary dataclass"
-              done: false
+              done: true
             - summary: "Document which fields are optional vs required"
-              done: false
+              done: true
         - summary: "Design normalize_result_dict() API"
-          done: false
+          done: true
           subtasks:
             - summary: "Decide location: extend loader.py or new normalizer.py"
-              done: false
+              done: true
             - summary: "Define function signature and return type"
-              done: false
+              done: true
             - summary: "Document schema version handling (v1.x, v2.0, v2.1)"
-              done: false
+              done: true
 
     - phase: "Phase 2: Implementation"
-      done: false
+      done: true
       items:
         - summary: "Create shared normalization module"
-          done: false
+          done: true
           subtasks:
             - summary: "Implement normalize_result_dict() with full schema support"
-              done: false
+              done: true
             - summary: "Handle both v1.x and v2.x schemas with clear branching"
-              done: false
+              done: true
             - summary: "Add docstrings documenting schema differences"
-              done: false
+              done: true
         - summary: "Refactor ResultPlotter to use shared normalizer"
-          done: false
+          done: true
           subtasks:
             - summary: "Replace _normalize_dict() with call to shared function"
-              done: false
+              done: true
             - summary: "Map shared result to NormalizedResult dataclass"
-              done: false
+              done: true
             - summary: "Verify chart generation still works"
-              done: false
+              done: true
         - summary: "Refactor ResultExporter to use shared normalizer"
-          done: false
+          done: true
           subtasks:
             - summary: "Replace _extract_performance_metrics() with shared function"
-              done: false
+              done: true
             - summary: "Replace _extract_query_map() with shared function"
-              done: false
+              done: true
             - summary: "Verify comparison reports still work"
-              done: false
+              done: true
         - summary: "Evaluate loader.py consolidation"
-          done: false
+          done: true
           subtasks:
             - summary: "Determine if reconstruct_benchmark_results() should use normalizer"
-              done: false
+              done: true
             - summary: "Note: loader.py does full reconstruction, may need separate path"
-              done: false
+              done: true
 
     - phase: "Phase 3: Testing and Validation"
-      done: false
+      done: true
       items:
         - summary: "Add unit tests for normalize_result_dict()"
-          done: false
+          done: true
           subtasks:
             - summary: "Test v1.x schema input"
-              done: false
+              done: true
             - summary: "Test v2.0 schema input"
-              done: false
+              done: true
             - summary: "Test v2.1 schema input"
-              done: false
+              done: true
             - summary: "Test missing/malformed fields"
-              done: false
+              done: true
         - summary: "Run existing visualization tests"
-          done: false
+          done: true
         - summary: "Run existing exporter tests"
-          done: false
+          done: true
         - summary: "Test MCP chart generation with real result files"
-          done: false
+          done: true
         - summary: "Verify no regressions in CLI compare command"
-          done: false
+          done: true
 
     - phase: "Phase 4: Cleanup and Documentation"
-      done: false
+      done: true
       items:
         - summary: "Remove dead code from individual modules"
-          done: false
+          done: true
         - summary: "Update result-schema-v1.md if needed"
-          done: false
+          done: true
         - summary: "Add inline comments explaining schema version handling"
-          done: false
+          done: true
 
 metadata:
   owners:
@@ -163,48 +164,34 @@ files_affected:
   modified:
     - "benchbox/core/visualization/result_plotter.py"
     - "benchbox/core/results/exporter.py"
-    - "benchbox/core/results/loader.py"
   added:
-    - "benchbox/core/results/normalizer.py"  # Or extend loader.py
-    - "tests/unit/results/test_normalizer.py"
+    - "benchbox/core/results/normalizer.py"
+    - "tests/unit/core/results/test_normalizer.py"
 
-context_sections:
-  "Background and Motivation": |
-    The ResultPlotter._normalize_dict() method was generating empty charts
-    because it expected v1.x schema paths (results.timing, results.queries.details)
-    but the benchmark runner outputs v2.x schema (summary.timing, top-level queries).
+sections:
+  "Implementation Summary": |
+    Created new benchbox/core/results/normalizer.py module with:
+    - NormalizedResultDict dataclass: unified view of v1.x and v2.x schemas
+    - NormalizedQuery dataclass: per-query result representation
+    - detect_schema_version(): detects "2.0", "2.1", or "1.x"
+    - normalize_result_dict(): extracts all fields with schema-specific paths
+    - get_query_map(): helper to convert query list to dict by ID
 
-    The immediate fix added v2.x support to result_plotter.py, but this created
-    more duplication since ResultExporter already had similar v2.x handling.
+    Refactored consumers:
+    - ResultPlotter._normalize_dict(): now calls shared normalizer, converts to viz-specific format
+    - ResultExporter._extract_performance_metrics(): uses normalizer for timing/counts
+    - ResultExporter._extract_query_map(): uses normalizer and get_query_map()
 
-  "Identified Duplication Points": |
-    1. ResultPlotter._normalize_dict() - extracts benchmark, platform, timing, queries
-    2. ResultExporter._extract_performance_metrics() - extracts timing, query counts
-    3. ResultExporter._extract_query_map() - extracts per-query timing data
-    4. loader.reconstruct_benchmark_results() - full reconstruction from JSON
-    5. loader._reconstruct_query_results() - extracts query details
+    Decision: loader.py's reconstruct_benchmark_results() was NOT refactored because
+    it does full BenchmarkResults reconstruction with additional fields beyond what
+    the normalizer provides. The normalizer is intentionally lightweight.
 
-    All implement: schema version detection, conditional field paths, field mapping.
+  "Lessons Learned": |
+    - Keep normalizer lightweight - don't try to handle every field
+    - Visualization-specific concerns (platform label decoration) stay in ResultPlotter
+    - The version parameter in _extract_* methods is now unused but kept for API compat
+    - comparison.py already uses loader.reconstruct_benchmark_results() so no changes needed
 
-  "Schema Differences": |
-    v1.x Schema:
-    - results.timing.total_ms
-    - results.queries.details[] with execution_time_ms
-    - execution.platform, execution.timestamp
-
-    v2.x Schema:
-    - summary.timing.total_ms
-    - queries[] (top-level) with ms field
-    - platform.name, run.timestamp
-
-success_metrics:
-  - "Single normalize_result_dict() function handles all schema versions"
-  - "ResultPlotter and ResultExporter use shared normalization"
-  - "All existing tests pass without modification"
-  - "MCP chart generation works with v2.x result files"
-  - "No duplicate schema version checks in calling code"
-
-open_questions:
-  - "Should loader.py's reconstruct_benchmark_results() also use the normalizer, or keep separate since it does full BenchmarkResults reconstruction?"
-  - "What's the best location: new normalizer.py module or extend existing loader.py?"
-  - "Should NormalizedResult be a dataclass, TypedDict, or plain dict?"
+commits:
+  - "5c7d521f fix(viz): support v2.x schema in ResultPlotter._normalize_dict"
+  - "ee933974 refactor(results): consolidate result JSON normalization into shared module"

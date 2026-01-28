@@ -1,5 +1,5 @@
-generated_at: '2026-01-28T16:34:04.866073'
-total_items: 48
+generated_at: '2026-01-28T16:46:21.777836'
+total_items: 47
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -171,21 +171,6 @@ items:
   - high-performance
   - siriusdb
   estimated_effort: Medium
-- id: consolidate-result-normalization
-  file: TODO/core-functionality/planning/consolidate-result-normalization.yaml
-  title: Consolidate Duplicated Result JSON Normalization Logic
-  worktree: core-functionality
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - refactoring
-  - code-quality
-  - schema
-  - visualization
-  owners:
-  - claude-code
-  estimated_effort: 2-3 days
 - id: consolidate-file-format-detection
   file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
   title: Consolidate file format detection to handle compressed and sharded files

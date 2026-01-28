@@ -1,5 +1,5 @@
-generated_at: '2026-01-28T14:08:51.743913'
-total_items: 391
+generated_at: '2026-01-28T16:46:22.701838'
+total_items: 393
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2568,6 +2568,22 @@ items:
   category: Bug Fixes
   priority: Medium
   status: Not Started
+- id: consolidate-result-normalization
+  file: DONE/core-functionality/active/consolidate-result-normalization.yaml
+  title: Consolidate Duplicated Result JSON Normalization Logic
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - refactoring
+  - code-quality
+  - schema
+  - visualization
+  owners:
+  - claude-code
+  estimated_effort: 2-3 days
+  completed_date: '2026-01-28'
 - id: consolidate-tuning-commands
   file: DONE/ux-improvements/planning/consolidate-tuning-commands.yaml
   title: Consolidate tuning commands under unified `tuning` group
@@ -3437,6 +3453,20 @@ items:
   category: Testing and Quality Assurance
   priority: Medium
   status: Not Started
+- id: trim-viz-deps-plotly-only
+  file: DONE/main/active/trim-viz-deps-plotly-only.yaml
+  title: Trim visualization dependencies to Plotly-only (remove Kaleido, Pandas, Pillow)
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - dependencies
+  - visualization
+  - simplification
+  - mcp
+  estimated_effort: 2-3 hours
+  completed_date: '2025-01-28'
 - id: unified-platform-comparison-cli
   file: DONE/platform-comparison/active/unified-platform-comparison-cli.yaml
   title: Unified Platform Comparison CLI

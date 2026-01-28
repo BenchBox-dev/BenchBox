@@ -1,5 +1,5 @@
-generated_at: '2026-01-28T14:08:51.744377'
-total_items: 391
+generated_at: '2026-01-28T16:46:22.702230'
+total_items: 393
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 196
+    count: 198
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -933,6 +933,11 @@ statuses:
       title: Concurrency Testing Framework
       priority: Medium
       category: Enterprise Operations
+    - id: consolidate-result-normalization
+      file: DONE/core-functionality/active/consolidate-result-normalization.yaml
+      title: Consolidate Duplicated Result JSON Normalization Logic
+      priority: Medium
+      category: Core Functionality
     - id: consolidate-tuning-commands
       file: DONE/ux-improvements/planning/consolidate-tuning-commands.yaml
       title: Consolidate tuning commands under unified `tuning` group
@@ -1383,6 +1388,11 @@ statuses:
       title: TPC-Havoc Query Variant System Implementation
       priority: Low
       category: Code Quality and Technical Debt
+    - id: trim-viz-deps-plotly-only
+      file: DONE/main/active/trim-viz-deps-plotly-only.yaml
+      title: Trim visualization dependencies to Plotly-only (remove Kaleido, Pandas, Pillow)
+      priority: Medium
+      category: Core Functionality
     - id: trino-platform-adapter
       file: DONE/platform-expansion-trino/completed/trino-platform-adapter.yaml
       title: Trino Platform Adapter
