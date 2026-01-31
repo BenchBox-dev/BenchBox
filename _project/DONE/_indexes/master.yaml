@@ -1,4 +1,4 @@
-generated_at: '2026-01-28T16:46:22.701838'
+generated_at: '2026-01-31T01:00:47.974425'
 total_items: 393
 items:
 - id: interactive-wizard-dry-run-support
@@ -2532,15 +2532,15 @@ items:
   category: Data Quality and Compatibility Issues
   priority: Medium
   status: Not Started
-- id: compressed-data-generation-completed
-  file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+- id: compressed-data-generation-completed-2
+  file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
   title: Compressed Data Generation ✅ COMPLETED
   worktree: unknown
   category: Performance and Efficiency
   priority: Medium
   status: Not Started
-- id: compressed-data-generation-completed-2
-  file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+- id: compressed-data-generation-completed
+  file: DONE/unknown/planning/compressed-data-generation-completed.yaml
   title: Compressed Data Generation ✅ COMPLETED
   worktree: unknown
   category: Performance and Efficiency
@@ -3619,15 +3619,15 @@ items:
   category: User Experience and CLI Enhancement
   priority: Medium
   status: Completed
-- id: implement-or-remove-incomplete-cli-commands
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+- id: implement-or-remove-incomplete-cli-commands-2
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)
   priority: Medium
   status: Not Started
-- id: implement-or-remove-incomplete-cli-commands-2
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+- id: implement-or-remove-incomplete-cli-commands
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)
