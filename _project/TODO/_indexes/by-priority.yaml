@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T09:06:47.146762'
-total_items: 47
+generated_at: '2026-01-31T18:27:38.374402'
+total_items: 46
 priorities:
   High:
     count: 2
@@ -88,7 +88,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 25
+    count: 24
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -163,11 +163,6 @@ priorities:
     - id: dataframe-metadata-primitives
       file: TODO/dataframe-benchmarks/planning/dataframe-metadata-primitives.yaml
       title: Implement DataFrame Version of Metadata Primitives Benchmark
-      category: Core Functionality
-      status: Not Started
-    - id: dataframe-transaction-primitives
-      file: TODO/dataframe-benchmarks/planning/dataframe-transaction-primitives.yaml
-      title: Implement DataFrame Version of Transaction Primitives Benchmark
       category: Core Functionality
       status: Not Started
     - id: nyc-taxi-benchmark-expansion

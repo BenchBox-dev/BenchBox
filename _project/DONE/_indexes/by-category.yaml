@@ -1,4 +1,4 @@
-generated_at: '2026-01-31T09:06:48.078316'
+generated_at: '2026-01-31T18:27:41.977969'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 85
+    count: 86
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -559,6 +559,11 @@ categories:
       file: DONE/dataframe-expansion/active/dataframe-read-primitives.yaml
       title: Implement DataFrame Version of Read Primitives Benchmark
       priority: High
+      status: Completed
+    - id: dataframe-transaction-primitives
+      file: DONE/dataframe-benchmarks/active/dataframe-transaction-primitives.yaml
+      title: Implement DataFrame Version of Transaction Primitives Benchmark
+      priority: Medium
       status: Completed
     - id: dataframe-write-primitives
       file: DONE/dataframe-expansion/active/dataframe-write-primitives.yaml

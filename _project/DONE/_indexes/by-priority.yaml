@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T09:06:48.078409'
-total_items: 393
+generated_at: '2026-01-31T18:27:41.978257'
+total_items: 394
 priorities:
   Critical:
     count: 27
@@ -931,7 +931,7 @@ priorities:
       category: Platform Expansion
       status: Complete
   Medium:
-    count: 192
+    count: 193
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1408,6 +1408,11 @@ priorities:
       title: GPU Acceleration Benchmarking & RAPIDS cuDF Integration
       category: AI/ML Capabilities
       status: Not Started
+    - id: dataframe-transaction-primitives
+      file: DONE/dataframe-benchmarks/active/dataframe-transaction-primitives.yaml
+      title: Implement DataFrame Version of Transaction Primitives Benchmark
+      category: Core Functionality
+      status: Completed
     - id: improve-benchmark-execution-reliability
       file: DONE/unknown/planning/improve-benchmark-execution-reliability.yaml
       title: Improve Benchmark Execution Reliability

@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T09:06:47.146710'
-total_items: 47
+generated_at: '2026-01-31T18:27:38.368568'
+total_items: 46
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -324,21 +324,6 @@ items:
   - iceberg
   - pyspark
   estimated_effort: Medium
-- id: dataframe-transaction-primitives
-  file: TODO/dataframe-benchmarks/planning/dataframe-transaction-primitives.yaml
-  title: Implement DataFrame Version of Transaction Primitives Benchmark
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - dataframe
-  - transaction-primitives
-  - acid
-  - delta-lake
-  - iceberg
-  - pyspark
-  estimated_effort: Large
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T09:06:47.146774'
-total_items: 47
+generated_at: '2026-01-31T18:27:38.374442'
+total_items: 46
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 44
+    count: 43
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -135,11 +135,6 @@ statuses:
     - id: dataframe-metadata-primitives
       file: TODO/dataframe-benchmarks/planning/dataframe-metadata-primitives.yaml
       title: Implement DataFrame Version of Metadata Primitives Benchmark
-      priority: Medium
-      category: Core Functionality
-    - id: dataframe-transaction-primitives
-      file: TODO/dataframe-benchmarks/planning/dataframe-transaction-primitives.yaml
-      title: Implement DataFrame Version of Transaction Primitives Benchmark
       priority: Medium
       category: Core Functionality
     - id: on-demand-tpc-answer-download

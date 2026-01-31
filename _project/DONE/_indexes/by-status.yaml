@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T09:06:48.078498'
-total_items: 393
+generated_at: '2026-01-31T18:27:41.978386'
+total_items: 394
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 198
+    count: 199
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1082,6 +1082,11 @@ statuses:
       file: DONE/dataframe-expansion/active/dataframe-read-primitives.yaml
       title: Implement DataFrame Version of Read Primitives Benchmark
       priority: High
+      category: Core Functionality
+    - id: dataframe-transaction-primitives
+      file: DONE/dataframe-benchmarks/active/dataframe-transaction-primitives.yaml
+      title: Implement DataFrame Version of Transaction Primitives Benchmark
+      priority: Medium
       category: Core Functionality
     - id: implement-pandas-family-platform-adapters
       file: DONE/dataframe-pandas-platforms/completed/implement-pandas-family-platform-adapters.yaml
