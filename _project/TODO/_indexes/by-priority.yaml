@@ -1,12 +1,17 @@
-generated_at: '2026-01-31T01:00:45.935355'
-total_items: 48
+generated_at: '2026-01-31T02:20:14.740828'
+total_items: 49
 priorities:
   High:
-    count: 2
+    count: 3
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+      category: Platform Expansion
+      status: Not Started
+    - id: onehouse-quanton-platform
+      file: TODO/platform-expansion/planning/onehouse-quanton-platform.yaml
+      title: Add Onehouse Quanton platform support for managed Spark benchmarking
       category: Platform Expansion
       status: Not Started
     - id: motherduck-platform-adapter

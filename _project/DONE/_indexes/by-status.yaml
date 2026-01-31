@@ -1,4 +1,4 @@
-generated_at: '2026-01-31T01:00:47.975180'
+generated_at: '2026-01-31T02:20:17.310993'
 total_items: 393
 statuses:
   In Progress:
@@ -552,13 +552,13 @@ statuses:
       title: Restrict Primary/Foreign Key Configuration to tuning.yaml Only
       priority: Medium
       category: Project Lifecycle Management
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
