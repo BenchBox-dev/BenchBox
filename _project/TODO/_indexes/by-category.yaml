@@ -1,4 +1,4 @@
-generated_at: '2026-01-28T16:46:21.777879'
+generated_at: '2026-01-31T09:06:47.146746'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -107,17 +107,17 @@ categories:
       priority: Medium-High
       status: Not Started
     - id: dataframe-ai-primitives
-      file: TODO/dataframe-expansion/planning/dataframe-ai-primitives.yaml
+      file: TODO/dataframe-benchmarks/planning/dataframe-ai-primitives.yaml
       title: Implement DataFrame Version of AI Primitives Benchmark
       priority: Medium
       status: Not Started
     - id: dataframe-metadata-primitives
-      file: TODO/dataframe-expansion/planning/dataframe-metadata-primitives.yaml
+      file: TODO/dataframe-benchmarks/planning/dataframe-metadata-primitives.yaml
       title: Implement DataFrame Version of Metadata Primitives Benchmark
       priority: Medium
       status: Not Started
     - id: dataframe-transaction-primitives
-      file: TODO/dataframe-expansion/planning/dataframe-transaction-primitives.yaml
+      file: TODO/dataframe-benchmarks/planning/dataframe-transaction-primitives.yaml
       title: Implement DataFrame Version of Transaction Primitives Benchmark
       priority: Medium
       status: Not Started

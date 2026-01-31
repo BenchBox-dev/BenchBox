@@ -123,5 +123,5 @@ success_metrics:
   - "Security audit catches real vulnerabilities"
 
 dependencies:
-  blocked_by:
-    - "_project/TODO/ci-infrastructure/planning/fix-ci-critical-issues.yaml"
+  related:
+    - "_project/DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml"

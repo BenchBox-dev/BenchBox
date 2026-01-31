@@ -146,9 +146,9 @@ files_affected:
   removed: []
 
 dependencies:
-  blocked_by:
-    - "_project/TODO/platform-expansion/active/deployment-factory-integration.yaml"
-    - "_project/TODO/platform-expansion/active/deployment-config-inheritance.yaml"
+  related:
+    - "_project/DONE/platform-expansion/active/deployment-factory-integration.yaml"
+    - "_project/DONE/platform-expansion/active/deployment-config-inheritance.yaml"
 
 technical_requirements:
   dependencies:

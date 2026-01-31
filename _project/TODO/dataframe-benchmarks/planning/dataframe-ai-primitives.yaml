@@ -1,5 +1,5 @@
 title: "Implement DataFrame Version of AI Primitives Benchmark"
-worktree: dataframe-expansion
+worktree: dataframe-benchmarks
 priority: Medium
 status: Not Started
 category: Core Functionality
@@ -281,7 +281,7 @@ open_questions:
   - "How to handle model download/caching across benchmark runs?"
 
 dependencies:
-  blocked_by:
-    - "_project/TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml"
   related:
-    - "_project/TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml"
+    - "_project/DONE/dataframe-expansion/active/dataframe-read-primitives.yaml"
+    - "_project/DONE/dataframe-expansion/active/dataframe-maintenance-operations.yaml"
+    - "_project/TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml"

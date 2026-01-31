@@ -1,4 +1,4 @@
-generated_at: '2026-01-28T16:46:21.777836'
+generated_at: '2026-01-31T09:06:47.146710'
 total_items: 47
 items:
 - id: lakesail-spark-platform
@@ -293,9 +293,9 @@ items:
   - data-loading
   estimated_effort: Medium
 - id: dataframe-ai-primitives
-  file: TODO/dataframe-expansion/planning/dataframe-ai-primitives.yaml
+  file: TODO/dataframe-benchmarks/planning/dataframe-ai-primitives.yaml
   title: Implement DataFrame Version of AI Primitives Benchmark
-  worktree: dataframe-expansion
+  worktree: dataframe-benchmarks
   category: Core Functionality
   priority: Medium
   status: Not Started
@@ -310,9 +310,9 @@ items:
   - sentence-transformers
   estimated_effort: Large
 - id: dataframe-metadata-primitives
-  file: TODO/dataframe-expansion/planning/dataframe-metadata-primitives.yaml
+  file: TODO/dataframe-benchmarks/planning/dataframe-metadata-primitives.yaml
   title: Implement DataFrame Version of Metadata Primitives Benchmark
-  worktree: dataframe-expansion
+  worktree: dataframe-benchmarks
   category: Core Functionality
   priority: Medium
   status: Not Started
@@ -325,9 +325,9 @@ items:
   - pyspark
   estimated_effort: Medium
 - id: dataframe-transaction-primitives
-  file: TODO/dataframe-expansion/planning/dataframe-transaction-primitives.yaml
+  file: TODO/dataframe-benchmarks/planning/dataframe-transaction-primitives.yaml
   title: Implement DataFrame Version of Transaction Primitives Benchmark
-  worktree: dataframe-expansion
+  worktree: dataframe-benchmarks
   category: Core Functionality
   priority: Medium
   status: Not Started

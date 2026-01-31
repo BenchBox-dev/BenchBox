@@ -1,4 +1,4 @@
-generated_at: '2026-01-28T16:46:21.777908'
+generated_at: '2026-01-31T09:06:47.146774'
 total_items: 47
 statuses:
   In Progress:
@@ -128,17 +128,17 @@ statuses:
       priority: Medium-High
       category: Core Functionality
     - id: dataframe-ai-primitives
-      file: TODO/dataframe-expansion/planning/dataframe-ai-primitives.yaml
+      file: TODO/dataframe-benchmarks/planning/dataframe-ai-primitives.yaml
       title: Implement DataFrame Version of AI Primitives Benchmark
       priority: Medium
       category: Core Functionality
     - id: dataframe-metadata-primitives
-      file: TODO/dataframe-expansion/planning/dataframe-metadata-primitives.yaml
+      file: TODO/dataframe-benchmarks/planning/dataframe-metadata-primitives.yaml
       title: Implement DataFrame Version of Metadata Primitives Benchmark
       priority: Medium
       category: Core Functionality
     - id: dataframe-transaction-primitives
-      file: TODO/dataframe-expansion/planning/dataframe-transaction-primitives.yaml
+      file: TODO/dataframe-benchmarks/planning/dataframe-transaction-primitives.yaml
       title: Implement DataFrame Version of Transaction Primitives Benchmark
       priority: Medium
       category: Core Functionality

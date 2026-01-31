@@ -126,8 +126,8 @@ files_affected:
   removed: []
 
 dependencies:
-  blocked_by:
-    - "_project/TODO/platform-expansion/planning/migrate-clickhouse-firebolt-deployment.yaml"
+  related:
+    - "_project/DONE/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml"
 
 technical_requirements:
   dependencies:
