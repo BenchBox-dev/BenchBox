@@ -1,5 +1,5 @@
-generated_at: '2026-01-28T16:46:21.777836'
-total_items: 47
+generated_at: '2026-01-31T01:00:45.935276'
+total_items: 48
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -486,6 +486,21 @@ items:
   - velodb
   - selectdb
   - cloud
+  estimated_effort: Medium
+- id: ducklake-open-table-format
+  file: TODO/platform-expansion/planning/ducklake-open-table-format.yaml
+  title: Add DuckLake Open Table Format Support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - open-table-format
+  - ducklake
+  - duckdb
+  - format-converter
+  - acid-transactions
+  - time-travel
   estimated_effort: Medium
 - id: fabric-spark-notebooks-platform
   file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
