@@ -1,4 +1,4 @@
-generated_at: '2026-01-31T01:00:47.974849'
+generated_at: '2026-01-31T02:20:17.310588'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -1448,13 +1448,13 @@ categories:
       title: DuckDB TPC-DS and TPC-H Example Updates for Enhanced Tuning ✅ COMPLETED
       priority: Medium
       status: Not Started
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Not Started
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Not Started

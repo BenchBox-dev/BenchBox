@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T01:00:45.935276'
-total_items: 48
+generated_at: '2026-01-31T02:20:14.740722'
+total_items: 49
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -19,6 +19,30 @@ items:
   - dataframe
   - sql
   - platform
+  - open-source
+  estimated_effort: Large
+- id: onehouse-quanton-platform
+  file: TODO/platform-expansion/planning/onehouse-quanton-platform.yaml
+  title: Add Onehouse Quanton platform support for managed Spark benchmarking
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - onehouse
+  - quanton
+  - spark
+  - managed-spark
+  - serverless
+  - hudi
+  - iceberg
+  - delta-lake
+  - lakehouse
+  - aws
+  - s3
+  - platform
+  - cloud
+  - xtable
   - open-source
   estimated_effort: Large
 - id: motherduck-platform-adapter

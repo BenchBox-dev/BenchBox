@@ -1,4 +1,4 @@
-generated_at: '2026-01-31T01:00:47.974425'
+generated_at: '2026-01-31T02:20:17.310156'
 total_items: 393
 items:
 - id: interactive-wizard-dry-run-support
@@ -3347,15 +3347,15 @@ items:
   priority: Medium
   status: Completed
   completed_date: 2025-11-27
-- id: simple-cloud-storage-path-support-completed
-  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+- id: simple-cloud-storage-path-support-completed-2
+  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
   title: Simple Cloud Storage Path Support ✅ COMPLETED
   worktree: unknown
   category: Platform Support and Deployment
   priority: Medium
   status: Not Started
-- id: simple-cloud-storage-path-support-completed-2
-  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+- id: simple-cloud-storage-path-support-completed
+  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
   title: Simple Cloud Storage Path Support ✅ COMPLETED
   worktree: unknown
   category: Platform Support and Deployment
