@@ -1,0 +1,319 @@
+title: "Implement DataFrame Version of AI Primitives Benchmark"
+worktree: dataframe-benchmarks
+priority: Medium
+status: Completed
+category: Core Functionality
+completed_date: "2026-01-31"
+completion_summary: |
+  Implemented DataFrame operations module for AI Primitives benchmark, enabling
+  benchmarking of AI/ML operations on DataFrame platforms using local models.
+
+  **Key Deliverables:**
+  - Created `benchbox/core/ai_primitives/dataframe_operations.py` with:
+    - AIOperationType enum (11 operation types)
+    - AIModelCapabilities class for ML library detection
+    - DataFrameAICapabilities class for platform capabilities
+    - DataFrameAIResult dataclass for operation results
+    - DataFrameAIOperationsManager class for executing operations
+    - Core operations: embeddings, sentiment, classification, entities, similarity
+  - Updated `benchbox/core/ai_primitives/benchmark.py` with DataFrame methods:
+    - supports_dataframe_mode()
+    - get_dataframe_operations()
+    - get_dataframe_skip_queries()
+    - get_dataframe_supported_queries()
+  - Created comprehensive unit tests (32 tests, all passing)
+
+  **Scope:**
+  - In scope (8 queries): embedding_single/batch/large_dimension, nlp_sentiment_single/batch,
+    nlp_classify_priority/segment, nlp_entity_extraction
+  - Out of scope (8 queries): generative_* and transform_* queries (require LLM API)
+
+  **Dependencies handled gracefully:**
+  - sentence-transformers (optional): for embeddings
+  - textblob (optional): for sentiment analysis
+  - spacy (optional): for entity extraction
+  - Capability detection provides clear error messages with install commands
+
+description: |
+  Implement DataFrame versions of AI Primitives benchmark operations. The current
+  benchmark has **16 SQL queries** across 4 categories testing AI/ML functions:
+
+  **Categories (16 queries total):**
+  - Generative (4): text completion, customer profile summary, Q&A, SQL generation
+  - NLP (5): sentiment analysis (single/batch), classification (priority/segment), entity extraction
+  - Transform (4): summarization (short/long), translation, grammar correction
+  - Embedding (3): single embedding, batch embeddings, large-dimension embeddings
+
+  **DataFrame Implementation Approach:**
+  The SQL benchmark uses platform-specific AI functions (Snowflake Cortex, BigQuery ML,
+  Databricks AI). DataFrame implementations would use:
+
+  - **PySpark MLlib**: Native ML functions, model inference pipelines
+  - **Sentence Transformers**: For embeddings via Hugging Face integration
+  - **Polars + NumPy**: Vector operations, embedding similarity
+  - **Pandas + scikit-learn**: Classification, NLP pipelines
+
+  Not all 16 SQL queries translate directly - generative queries require LLM APIs
+  while embedding/vector operations map well to DataFrame native operations.
+
+context_sections:
+  "Background and Motivation": |
+    AI/ML workloads are increasingly run on DataFrame platforms:
+    - Feature engineering pipelines (Pandas, Polars)
+    - Distributed model training (PySpark MLlib)
+    - Vector similarity for recommendations
+    - Embedding generation and similarity search
+
+    The SQL AI Primitives benchmark tests cloud-platform AI functions. DataFrame
+    implementations enable the same benchmarks on local/OSS ML stacks.
+
+  "Technical Context": |
+    Current AI Primitives implementation (`benchbox/core/ai_primitives/`):
+    - 16 SQL queries in `catalog/queries.yaml`
+    - Platform variants for Snowflake, BigQuery, Databricks
+    - Categories: generative (4), nlp (5), transform (4), embedding (3)
+    - Uses TPC-H data via get_data_source_benchmark() returning "tpch"
+
+    DataFrame ML integrations available:
+    - PySpark MLlib: VectorAssembler, ML pipelines, model inference
+    - Sentence Transformers: Embedding generation (Hugging Face)
+    - spaCy/TextBlob: NLP (sentiment, entity extraction)
+    - scikit-learn: Classification, text vectorization
+
+  "Platform Capability Matrix": |
+    | Operation           | PySpark MLlib | Polars+NumPy | Pandas+sklearn | Requires LLM API |
+    |---------------------|---------------|--------------|----------------|------------------|
+    | Text completion     | X             | X            | X              | Y                |
+    | Sentiment analysis  | Y spark-nlp   | Y textblob   | Y textblob     | X                |
+    | Classification      | Y ML pipeline | Y sklearn    | Y sklearn      | X                |
+    | Entity extraction   | Y spark-nlp   | Y spacy      | Y spacy        | X                |
+    | Summarization       | X             | X            | X              | Y                |
+    | Translation         | X             | X            | X              | Y                |
+    | Embedding (768d)    | Y sentence-tr | Y sentence-tr| Y sentence-tr  | X                |
+    | Vector similarity   | Y native      | Y numpy      | Y numpy        | X                |
+
+    Generative/transform queries (8 of 16) require LLM API integration.
+    Embedding/NLP queries (8 of 16) can use local models.
+
+  "Scope Constraints": |
+    **In Scope (8 queries - local model support):**
+    - Sentiment analysis (nlp_sentiment_single, nlp_sentiment_batch)
+    - Classification (nlp_classify_priority, nlp_classify_segment)
+    - Entity extraction (nlp_entity_extraction)
+    - Embedding generation (embedding_single, embedding_batch, embedding_large_dimension)
+
+    **Out of Scope (8 queries - require LLM API):**
+    - Text completion (generative_complete_simple, generative_complete_customer_profile)
+    - Question answering (generative_question_answer)
+    - SQL generation (generative_sql_generation)
+    - Summarization (transform_summarize_short, transform_summarize_long)
+    - Translation (transform_translate_comment)
+    - Grammar correction (transform_grammar_fix)
+
+    Out-of-scope queries could be added later with optional LLM API integration
+    (OpenAI, Anthropic, local Ollama) as a separate enhancement.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Infrastructure"
+      done: true
+      items:
+        - summary: "Create dataframe_operations.py module structure"
+          done: true
+          subtasks:
+            - summary: "Create benchbox/core/ai_primitives/dataframe_operations.py"
+              done: true
+            - summary: "Define AIOperation dataclass for DataFrame operations"
+              done: true
+            - summary: "Define model/library capability detection"
+              done: true
+        - summary: "Update AIPrimitivesBenchmark for DataFrame support"
+          done: true
+          subtasks:
+            - summary: "Add get_dataframe_operations() method"
+              done: true
+            - summary: "Add supports_dataframe_mode() capability check"
+              done: true
+            - summary: "Add SKIP_FOR_DATAFRAME list with 8 generative/transform query IDs"
+              done: true
+
+    - phase: "Phase 2: Embedding Operations (3 queries)"
+      done: true
+      items:
+        - summary: "Implement embedding_single query"
+          done: true
+          subtasks:
+            - summary: "PySpark: sentence-transformers integration"
+              done: true
+            - summary: "Polars/Pandas: sentence-transformers via apply"
+              done: true
+        - summary: "Implement embedding_batch query"
+          done: true
+          subtasks:
+            - summary: "Batch processing with configurable batch size"
+              done: true
+            - summary: "Memory-efficient chunked embedding"
+              done: true
+        - summary: "Implement embedding_large_dimension query"
+          done: true
+          subtasks:
+            - summary: "768d vs 1024d model selection"
+              done: true
+            - summary: "Vector storage as list/array column"
+              done: true
+
+    - phase: "Phase 3: NLP Sentiment Operations (2 queries)"
+      done: true
+      items:
+        - summary: "Implement nlp_sentiment_single query"
+          done: true
+          subtasks:
+            - summary: "PySpark: spark-nlp or TextBlob UDF"
+              done: true
+            - summary: "Polars/Pandas: TextBlob integration"
+              done: true
+        - summary: "Implement nlp_sentiment_batch query"
+          done: true
+          subtasks:
+            - summary: "Batch sentiment scoring"
+              done: true
+            - summary: "Result format matching SQL (sentiment_score float)"
+              done: true
+
+    - phase: "Phase 4: NLP Classification Operations (2 queries)"
+      done: true
+      items:
+        - summary: "Implement nlp_classify_priority query"
+          done: true
+          subtasks:
+            - summary: "Zero-shot classification via transformers"
+              done: true
+            - summary: "Or: pre-trained classifier with category labels"
+              done: true
+        - summary: "Implement nlp_classify_segment query"
+          done: true
+          subtasks:
+            - summary: "Multi-class classification (5 market segments)"
+              done: true
+            - summary: "Return predicted_segment matching SQL output"
+              done: true
+
+    - phase: "Phase 5: NLP Entity Extraction (1 query)"
+      done: true
+      items:
+        - summary: "Implement nlp_entity_extraction query"
+          done: true
+          subtasks:
+            - summary: "PySpark: spark-nlp NER pipeline"
+              done: true
+            - summary: "Polars/Pandas: spaCy NER integration"
+              done: true
+            - summary: "Extract: feature, material, color, size entities"
+              done: true
+
+    - phase: "Phase 6: Vector Similarity Operations (bonus)"
+      done: true
+      items:
+        - summary: "Implement cosine similarity between embeddings"
+          done: true
+          subtasks:
+            - summary: "Expression family: native vector ops"
+              done: true
+            - summary: "Pandas family: NumPy dot product / norms"
+              done: true
+        - summary: "Implement euclidean distance"
+          done: true
+        - summary: "Implement top-K similarity search"
+          done: true
+
+    - phase: "Phase 7: User Feedback for Unsupported Configurations"
+      done: true
+      items:
+        - summary: "Add validation when user attempts generative/transform queries"
+          done: true
+          subtasks:
+            - summary: "Detect when user runs text completion, summarization, translation queries"
+              done: true
+            - summary: "Raise clear error: 'Generative AI queries require LLM API (not yet implemented for DataFrame)'"
+              done: true
+            - summary: "Suggest alternatives: 'Use SQL mode with Snowflake/BigQuery/Databricks, or use embedding/NLP queries'"
+              done: true
+        - summary: "Add validation for missing ML dependencies"
+          done: true
+          subtasks:
+            - summary: "Check if sentence-transformers installed before embedding queries"
+              done: true
+            - summary: "Check if TextBlob/spaCy installed before NLP queries"
+              done: true
+            - summary: "Provide actionable error: 'pip install sentence-transformers' with version"
+              done: true
+
+    - phase: "Phase 8: Testing and Validation"
+      done: true
+      items:
+        - summary: "Unit tests for each operation (8 queries)"
+          done: true
+        - summary: "Model loading and caching tests"
+          done: true
+        - summary: "Integration tests with polars-df platform"
+          done: true
+        - summary: "Integration tests with pyspark-df platform"
+          done: true
+        - summary: "Test user feedback error messages are clear and actionable"
+          done: true
+        - summary: "Verify skip_platforms for out-of-scope queries"
+          done: true
+
+metadata:
+  tags:
+    - dataframe
+    - ai-primitives
+    - embeddings
+    - nlp
+    - sentiment
+    - classification
+    - pyspark-mllib
+    - sentence-transformers
+  estimated_effort: Large
+  created_date: "2026-01-25"
+
+files_affected:
+  added:
+    - "benchbox/core/ai_primitives/dataframe_operations.py"
+    - "tests/unit/benchmarks/test_ai_primitives_dataframe.py"
+  modified:
+    - "benchbox/core/ai_primitives/benchmark.py"
+
+impact:
+  business_value: |
+    Enables benchmarking of AI/ML operations on DataFrame platforms using local
+    models (sentence-transformers, spaCy, TextBlob). Covers 8 of 16 AI Primitives
+    queries without requiring cloud AI APIs.
+  user_impact: |
+    Users can run: `benchbox run --platform pyspark-df --benchmark ai_primitives`
+    to benchmark embedding generation, sentiment analysis, and classification
+    on local ML models.
+  technical_debt: |
+    Establishes ML model integration patterns for DataFrame platforms. Creates
+    foundation for future AI benchmark expansions including LLM API integration
+    for the remaining 8 generative/transform queries.
+
+success_metrics:
+  - "8 of 16 AI Primitives queries implemented (embedding + NLP categories)"
+  - "Embedding operations work with sentence-transformers models"
+  - "Sentiment/classification work with TextBlob or zero-shot classifiers"
+  - "Works on polars-df, pandas-df, and pyspark-df platforms"
+  - "Clear skip_platforms for 8 generative/transform queries (require LLM API)"
+  - "32 unit tests passing"
+
+open_questions:
+  - "Should sentence-transformers be a required or optional dependency?"
+  - "Which embedding model sizes to support (384d, 768d, 1024d)?"
+  - "Should we add optional LLM API integration (OpenAI/Anthropic) for generative queries?"
+  - "How to handle model download/caching across benchmark runs?"
+
+dependencies:
+  related:
+    - "_project/DONE/dataframe-expansion/active/dataframe-read-primitives.yaml"
+    - "_project/DONE/dataframe-expansion/active/dataframe-maintenance-operations.yaml"
+    - "_project/TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml"

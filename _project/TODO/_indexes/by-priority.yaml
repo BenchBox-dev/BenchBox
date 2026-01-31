@@ -1,12 +1,17 @@
-generated_at: '2026-01-31T18:27:38.374402'
+generated_at: '2026-01-31T18:34:45.636590'
 total_items: 46
 priorities:
   High:
-    count: 2
+    count: 3
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+      category: Platform Expansion
+      status: Not Started
+    - id: onehouse-quanton-platform
+      file: TODO/platform-expansion/planning/onehouse-quanton-platform.yaml
+      title: Add Onehouse Quanton platform support for managed Spark benchmarking
       category: Platform Expansion
       status: Not Started
     - id: motherduck-platform-adapter
@@ -15,11 +20,16 @@ priorities:
       category: Platform Expansion
       status: In Progress
   Medium-High:
-    count: 14
+    count: 15
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
+      category: Platform Expansion
+      status: Not Started
+    - id: ducklake-open-table-format
+      file: TODO/platform-expansion/planning/ducklake-open-table-format.yaml
+      title: Add DuckLake Open Table Format Support
       category: Platform Expansion
       status: Not Started
     - id: fabric-spark-notebooks-platform
@@ -88,7 +98,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Medium:
-    count: 24
+    count: 22
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -153,16 +163,6 @@ priorities:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
-      category: Core Functionality
-      status: Not Started
-    - id: dataframe-ai-primitives
-      file: TODO/dataframe-benchmarks/planning/dataframe-ai-primitives.yaml
-      title: Implement DataFrame Version of AI Primitives Benchmark
-      category: Core Functionality
-      status: Not Started
-    - id: dataframe-metadata-primitives
-      file: TODO/dataframe-benchmarks/planning/dataframe-metadata-primitives.yaml
-      title: Implement DataFrame Version of Metadata Primitives Benchmark
       category: Core Functionality
       status: Not Started
     - id: nyc-taxi-benchmark-expansion

@@ -1,4 +1,4 @@
-generated_at: '2026-01-31T18:27:38.374442'
+generated_at: '2026-01-31T18:34:45.636602'
 total_items: 46
 statuses:
   In Progress:
@@ -27,6 +27,11 @@ statuses:
       title: Add CedarDB Platform Adapter
       priority: Medium
       category: Platform Expansion
+    - id: ducklake-open-table-format
+      file: TODO/platform-expansion/planning/ducklake-open-table-format.yaml
+      title: Add DuckLake Open Table Format Support
+      priority: Medium-High
+      category: Platform Expansion
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
@@ -41,6 +46,11 @@ statuses:
       file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
       title: Add Microsoft Fabric Spark Notebooks platform support
       priority: Medium-High
+      category: Platform Expansion
+    - id: onehouse-quanton-platform
+      file: TODO/platform-expansion/planning/onehouse-quanton-platform.yaml
+      title: Add Onehouse Quanton platform support for managed Spark benchmarking
+      priority: High
       category: Platform Expansion
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
@@ -126,16 +136,6 @@ statuses:
       file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       priority: Medium-High
-      category: Core Functionality
-    - id: dataframe-ai-primitives
-      file: TODO/dataframe-benchmarks/planning/dataframe-ai-primitives.yaml
-      title: Implement DataFrame Version of AI Primitives Benchmark
-      priority: Medium
-      category: Core Functionality
-    - id: dataframe-metadata-primitives
-      file: TODO/dataframe-benchmarks/planning/dataframe-metadata-primitives.yaml
-      title: Implement DataFrame Version of Metadata Primitives Benchmark
-      priority: Medium
       category: Core Functionality
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
