@@ -1,0 +1,154 @@
+title: "[ARM Series] Run hyperscaler ARM comparison (Graviton 4 vs Cobalt 100 vs Axion)"
+worktree: blog-content
+priority: Medium
+status: Not Started
+category: Blog Revision
+description: |
+  Run identical benchmarks across all three hyperscaler ARM platforms to
+  transform the hyperscaler-comparison.md draft from architecture speculation
+  into a data-driven comparison.
+
+  Currently the post makes workload recommendations based on architecture
+  theory ("V2's higher IPC helps latency-sensitive work") without testing.
+  We need to replace speculation with measurements.
+
+  This is a unique opportunity - no one has published reproducible benchmark
+  comparisons of Graviton 4 vs Cobalt 100 vs Axion. We can be first.
+
+  Reference draft: _blog/arm-performance/drafts/hyperscaler-comparison.md
+
+tasks:
+  phases:
+    - phase: "Phase 1: AWS Graviton 4 (c8g.16xlarge)"
+      done: false
+      items:
+        - summary: "Launch c8g.16xlarge in us-east-1 (64 vCPU, 128GB)"
+          done: false
+        - summary: "Install BenchBox and dependencies"
+          done: false
+        - summary: "Run TPC-H SF10"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark tpch --scale 10"
+              done: false
+            - summary: "Record all 22 query times"
+              done: false
+        - summary: "Run TPC-DS SF10"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark tpcds --scale 10"
+              done: false
+        - summary: "Record instance cost, region, launch time"
+          done: false
+
+    - phase: "Phase 2: Azure Cobalt 100 (Standard_D64ps_v6)"
+      done: false
+      items:
+        - summary: "Launch Standard_D64ps_v6 in East US (64 vCPU, 256GB)"
+          done: false
+        - summary: "Install BenchBox and dependencies"
+          done: false
+        - summary: "Run identical benchmark suite (TPC-H SF10, TPC-DS SF10)"
+          done: false
+        - summary: "Record instance cost, region, launch time"
+          done: false
+
+    - phase: "Phase 3: GCP Axion (c4a-standard-64)"
+      done: false
+      items:
+        - summary: "Launch c4a-standard-64 in us-central1 (64 vCPU, 256GB)"
+          done: false
+        - summary: "Install BenchBox and dependencies"
+          done: false
+        - summary: "Run identical benchmark suite (TPC-H SF10, TPC-DS SF10)"
+          done: false
+        - summary: "Record instance cost, region, launch time"
+          done: false
+
+    - phase: "Phase 4: Cross-Platform Analysis"
+      done: false
+      items:
+        - summary: "Create query-by-query comparison table"
+          done: false
+        - summary: "Identify query patterns favoring each platform"
+          done: false
+          subtasks:
+            - summary: "Sort-heavy queries (Q3, Q10)"
+              done: false
+            - summary: "Join-heavy queries (Q9, Q21)"
+              done: false
+            - summary: "Scan-heavy queries (Q1, Q6)"
+              done: false
+        - summary: "Calculate price-performance ($/query) for each platform"
+          done: false
+        - summary: "Replace 'Workload Suitability Analysis' section with data"
+          done: false
+
+    - phase: "Phase 5: Draft Restructure"
+      done: false
+      items:
+        - summary: "Move Results section to beginning (after intro)"
+          done: false
+        - summary: "Reduce architecture section by 50%"
+          done: false
+        - summary: "Add BenchBox commands throughout"
+          done: false
+        - summary: "Replace vendor case studies with our results"
+          done: false
+        - summary: "Update decision framework table with benchmark evidence"
+          done: false
+
+metadata:
+  tags:
+    - arm-performance
+    - graviton
+    - cobalt
+    - axion
+    - cloud-benchmarking
+    - cross-cloud
+    - blog-data
+  estimated_effort: "3-4 hours"
+  budget_allocated: "$40-60 estimated (AWS + Azure + GCP)"
+  created_date: "2025-12-15"
+
+impact:
+  business_value: |
+    First-to-market with reproducible cross-hyperscaler ARM benchmarks.
+    Establishes Oxbow/BenchBox as the source for cloud platform comparisons.
+    Demonstrates multi-cloud benchmarking capability.
+  user_impact: |
+    Gives users concrete data for multi-cloud ARM decisions. Provides
+    reproducible methodology they can run on their own accounts.
+    Replaces vendor marketing with independent measurements.
+
+technical_requirements:
+  dependencies:
+    - "AWS account with EC2 access (c8g instances)"
+    - "Azure account with Cobalt 100 VMs (Dpsv6 series)"
+    - "GCP account with Axion access (C4A instances)"
+    - "BenchBox installed on each platform"
+  constraints:
+    - "Use equivalent vCPU count (64) for fair comparison"
+    - "Identical benchmark configuration across all platforms"
+    - "Document all regional variations"
+  compatibility: |
+    All platforms run Ubuntu 22.04 LTS with ARM64 architecture.
+    DuckDB ARM64 builds available for all three.
+
+success_metrics:
+  - "All 6 benchmark runs complete (3 platforms × 2 benchmarks)"
+  - "Query-level comparison table generated"
+  - "Price-performance calculated for each platform"
+  - "Draft restructured to be results-first"
+  - "Workload recommendations backed by data"
+
+open_questions:
+  - "Should we include ClickBench for single-table scan comparison?"
+  - "Do we have Azure and GCP credentials configured?"
+  - "Which regions give best pricing for ARM instances?"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml"
+  related:
+    - "_project/TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml"

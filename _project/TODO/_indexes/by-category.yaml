@@ -1,4 +1,4 @@
-generated_at: '2026-01-31T18:34:45.636571'
+generated_at: '2026-01-31T19:02:12.262300'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -48,12 +48,12 @@ categories:
     - id: arm-graviton-generations-benchmarks
       file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
       title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
-      priority: Medium-High
+      priority: Medium
       status: Not Started
     - id: arm-hyperscaler-comparison-benchmarks
       file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml
       title: '[ARM Series] Run hyperscaler ARM comparison (Graviton 4 vs Cobalt 100 vs Axion)'
-      priority: Medium-High
+      priority: Medium
       status: Not Started
     - id: cicd-benchmarking-demo
       file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
@@ -63,7 +63,7 @@ categories:
     - id: clickhouse-optimizer-analysis-benchmarks
       file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
       title: '[ClickHouse Analysis] Run comparative benchmark suite'
-      priority: Medium-High
+      priority: Medium
       status: Not Started
     - id: duckdb-architecture-verification
       file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
@@ -73,12 +73,12 @@ categories:
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/planning/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'
-      priority: Medium-High
+      priority: Medium
       status: Not Started
     - id: snowflake-gen2-comparison-benchmarks
       file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
-      priority: Medium-High
+      priority: Medium
       status: Not Started
     - id: tutorial-benchmark-verification
       file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
@@ -94,7 +94,7 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 5
+    count: 4
     items:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
@@ -104,7 +104,7 @@ categories:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
-      priority: Medium-High
+      priority: High
       status: Not Started
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
@@ -116,11 +116,6 @@ categories:
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
       priority: Medium-High
       status: Not Started
-    - id: unified-adapter-interface
-      file: TODO/core-functionality/planning/unified-adapter-interface.yaml
-      title: Unify SQL and DataFrame Adapter Execution Interfaces
-      priority: Medium-High
-      status: Complete
   Documentation:
     count: 2
     items:
@@ -195,7 +190,7 @@ categories:
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
-      priority: Medium-High
+      priority: Medium
       status: Not Started
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
@@ -205,7 +200,7 @@ categories:
     - id: firebolt-cloud-deployment
       file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode
-      priority: Medium-High
+      priority: Medium
       status: Not Started
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
@@ -249,13 +244,8 @@ categories:
       priority: Low
       status: Not Started
   Testing and Quality Assurance:
-    count: 2
+    count: 1
     items:
-    - id: fix-type-checking-errors
-      file: TODO/main/active/fix-type-checking-errors.yaml
-      title: Fix type checking errors ignored in ty config
-      priority: Medium
-      status: In Progress
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)

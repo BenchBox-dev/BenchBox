@@ -1,0 +1,126 @@
+title: "[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)"
+worktree: blog-content
+priority: Medium
+status: Not Started
+category: Blog Revision
+description: |
+  Run comparative benchmarks across AWS Graviton generations (G2, G3, G4) to
+  transform the graviton-generations.md draft from an architecture summary
+  into a data-driven benchmark analysis.
+
+  Currently the post cites AWS marketing claims ("+25% general compute",
+  "+2x floating point") without independent verification. We need to replace
+  these vendor numbers with our own measurements.
+
+  This aligns with the style guide principle: "Lead with data, not opinions...
+  Every claim should be backed by benchmark results with specific numbers,
+  reproducible methodology."
+
+  Reference draft: _blog/arm-performance/drafts/graviton-generations.md
+
+tasks:
+  phases:
+    - phase: "Phase 1: Graviton 2 Baseline (c6g.16xlarge)"
+      done: false
+      items:
+        - summary: "Launch c6g.16xlarge instance (64 vCPU, 128GB)"
+          done: false
+        - summary: "Run TPC-H SF10"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark tpch --scale 10"
+              done: false
+            - summary: "Record total time and per-query times"
+              done: false
+        - summary: "Run TPC-DS SF10"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark tpcds --scale 10"
+              done: false
+        - summary: "Run ClickBench"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark clickbench"
+              done: false
+        - summary: "Record instance cost and total runtime"
+          done: false
+
+    - phase: "Phase 2: Graviton 3 (c7g.16xlarge)"
+      done: false
+      items:
+        - summary: "Launch c7g.16xlarge instance (64 vCPU, 128GB)"
+          done: false
+        - summary: "Run identical benchmark suite (TPC-H, TPC-DS, ClickBench)"
+          done: false
+        - summary: "Record instance cost and total runtime"
+          done: false
+
+    - phase: "Phase 3: Graviton 4 (c8g.16xlarge)"
+      done: false
+      items:
+        - summary: "Launch c8g.16xlarge instance (64 vCPU, 128GB)"
+          done: false
+        - summary: "Run identical benchmark suite (TPC-H, TPC-DS, ClickBench)"
+          done: false
+        - summary: "Record instance cost and total runtime"
+          done: false
+
+    - phase: "Phase 4: Analysis and Draft Update"
+      done: false
+      items:
+        - summary: "Calculate generation-over-generation improvements"
+          done: false
+        - summary: "Compare with AWS's marketing claims (+25%, +2x, etc.)"
+          done: false
+        - summary: "Identify query patterns where improvements differ"
+          done: false
+        - summary: "Calculate price-performance for each generation"
+          done: false
+        - summary: "Update draft with benchmark results tables"
+          done: false
+        - summary: "Add BenchBox commands for reproducibility"
+          done: false
+
+metadata:
+  tags:
+    - arm-performance
+    - graviton
+    - aws
+    - cloud-benchmarking
+    - blog-data
+  estimated_effort: "2-3 hours"
+  budget_allocated: "$20-30 estimated AWS costs"
+  created_date: "2025-12-15"
+
+impact:
+  business_value: |
+    Transforms the post from a vendor spec summary (what WikiChip does) into
+    original benchmark analysis (unique Oxbow value). Validates or refutes
+    AWS's performance claims with independent data.
+  user_impact: |
+    Gives users reproducible commands to verify Graviton performance on their
+    own accounts. Provides concrete upgrade guidance based on benchmark patterns.
+
+technical_requirements:
+  dependencies:
+    - "AWS account with EC2 access"
+    - "Ability to launch c6g, c7g, c8g instance families"
+    - "BenchBox installed on each instance"
+  constraints:
+    - "Use identical vCPU count (64) for fair comparison"
+    - "Same scale factors across all runs"
+    - "Document instance launch time and region"
+
+success_metrics:
+  - "All 9 benchmark runs complete (3 generations × 3 benchmarks)"
+  - "Generation-over-generation improvement percentages calculated"
+  - "Results replace vendor claims in draft"
+  - "BenchBox commands added for reproducibility"
+
+open_questions:
+  - "Should we test SF100 in addition to SF10 for scale factor comparison?"
+  - "Should we include memory-optimized (r7g, r8g) instances for database focus?"
+
+dependencies:
+  related:
+    - "_project/TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml"

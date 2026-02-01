@@ -1,6 +1,6 @@
 title: "Implement DataFrame Support for All SQL-Only Benchmarks"
 worktree: dataframe-benchmarks
-priority: Medium-High
+priority: High
 status: Not Started
 description: |
   Extend BenchBox's DataFrame execution capability to all SQL-only benchmarks.

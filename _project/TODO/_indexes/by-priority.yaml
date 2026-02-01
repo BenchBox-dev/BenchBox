@@ -1,8 +1,8 @@
-generated_at: '2026-01-31T18:34:45.636590'
-total_items: 46
+generated_at: '2026-01-31T19:02:12.262318'
+total_items: 44
 priorities:
   High:
-    count: 3
+    count: 4
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -14,13 +14,18 @@ priorities:
       title: Add Onehouse Quanton platform support for managed Spark benchmarking
       category: Platform Expansion
       status: Not Started
+    - id: implement-dataframe-benchmarks
+      file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
+      title: Implement DataFrame Support for All SQL-Only Benchmarks
+      category: Core Functionality
+      status: Not Started
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
       category: Platform Expansion
       status: In Progress
   Medium-High:
-    count: 15
+    count: 6
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -42,63 +47,18 @@ priorities:
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
       status: Not Started
-    - id: clickhouse-cloud-deployment
-      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
-      title: ClickHouse Cloud Deployment Mode
-      category: Platform Expansion
-      status: Not Started
-    - id: firebolt-cloud-deployment
-      file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
-      title: Firebolt Cloud Deployment Mode
-      category: Platform Expansion
-      status: Not Started
-    - id: implement-dataframe-benchmarks
-      file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
-      title: Implement DataFrame Support for All SQL-Only Benchmarks
-      category: Core Functionality
-      status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
       category: Core Functionality
       status: Not Started
-    - id: unified-adapter-interface
-      file: TODO/core-functionality/planning/unified-adapter-interface.yaml
-      title: Unify SQL and DataFrame Adapter Execution Interfaces
-      category: Core Functionality
-      status: Complete
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
       category: AI/ML Capabilities
       status: Not Started
-    - id: arm-graviton-generations-benchmarks
-      file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
-      title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
-      category: Blog Revision
-      status: Not Started
-    - id: arm-hyperscaler-comparison-benchmarks
-      file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml
-      title: '[ARM Series] Run hyperscaler ARM comparison (Graviton 4 vs Cobalt 100 vs Axion)'
-      category: Blog Revision
-      status: Not Started
-    - id: clickhouse-optimizer-analysis-benchmarks
-      file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
-      title: '[ClickHouse Analysis] Run comparative benchmark suite'
-      category: Blog Revision
-      status: Not Started
-    - id: duckdb-version-performance-benchmarks
-      file: TODO/blog-content/planning/duckdb-version-performance-benchmarks.yaml
-      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
-      category: Blog Revision
-      status: Not Started
-    - id: snowflake-gen2-comparison-benchmarks
-      file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
-      title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
-      category: Blog Revision
-      status: Not Started
   Medium:
-    count: 22
+    count: 28
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -125,6 +85,11 @@ priorities:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
       status: Not Started
+    - id: clickhouse-cloud-deployment
+      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+      title: ClickHouse Cloud Deployment Mode
+      category: Platform Expansion
+      status: Not Started
     - id: consolidate-file-format-detection
       file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
       title: Consolidate file format detection to handle compressed and sharded files
@@ -140,11 +105,11 @@ priorities:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       category: Documentation
       status: Not Started
-    - id: fix-type-checking-errors
-      file: TODO/main/active/fix-type-checking-errors.yaml
-      title: Fix type checking errors ignored in ty config
-      category: Testing and Quality Assurance
-      status: In Progress
+    - id: firebolt-cloud-deployment
+      file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
+      title: Firebolt Cloud Deployment Mode
+      category: Platform Expansion
+      status: Not Started
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -195,14 +160,39 @@ priorities:
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       category: Benchmark Development
       status: Not Started
+    - id: arm-graviton-generations-benchmarks
+      file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
+      title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
+      category: Blog Revision
+      status: Not Started
+    - id: arm-hyperscaler-comparison-benchmarks
+      file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml
+      title: '[ARM Series] Run hyperscaler ARM comparison (Graviton 4 vs Cobalt 100 vs Axion)'
+      category: Blog Revision
+      status: Not Started
     - id: cicd-benchmarking-demo
       file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
       title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'
       category: Blog Revision
       status: Not Started
+    - id: clickhouse-optimizer-analysis-benchmarks
+      file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
+      title: '[ClickHouse Analysis] Run comparative benchmark suite'
+      category: Blog Revision
+      status: Not Started
     - id: duckdb-architecture-verification
       file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
       title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
+      category: Blog Revision
+      status: Not Started
+    - id: duckdb-version-performance-benchmarks
+      file: TODO/blog-content/planning/duckdb-version-performance-benchmarks.yaml
+      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+      category: Blog Revision
+      status: Not Started
+    - id: snowflake-gen2-comparison-benchmarks
+      file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
+      title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
       category: Blog Revision
       status: Not Started
     - id: tutorial-benchmark-verification

@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T18:27:41.978257'
-total_items: 394
+generated_at: '2026-01-31T19:02:13.257903'
+total_items: 398
 priorities:
   Critical:
     count: 27
@@ -813,7 +813,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 23
+    count: 25
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -875,6 +875,11 @@ priorities:
       title: Embed Full Tuning Config in Result Output
       category: Core Functionality
       status: Completed
+    - id: fix-type-checking-errors
+      file: DONE/main/active/fix-type-checking-errors.yaml
+      title: Fix type checking errors ignored in ty config
+      category: Testing and Quality Assurance
+      status: Complete
     - id: dataframe-maintenance-operations
       file: DONE/dataframe-expansion/active/dataframe-maintenance-operations.yaml
       title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
@@ -930,8 +935,13 @@ priorities:
       title: Snowpark Connect for Spark Platform
       category: Platform Expansion
       status: Complete
+    - id: unified-adapter-interface
+      file: DONE/core-functionality/planning/unified-adapter-interface.yaml
+      title: Unify SQL and DataFrame Adapter Execution Interfaces
+      category: Core Functionality
+      status: Complete
   Medium:
-    count: 193
+    count: 195
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1408,6 +1418,16 @@ priorities:
       title: GPU Acceleration Benchmarking & RAPIDS cuDF Integration
       category: AI/ML Capabilities
       status: Not Started
+    - id: dataframe-ai-primitives
+      file: DONE/dataframe-benchmarks/completed/dataframe-ai-primitives.yaml
+      title: Implement DataFrame Version of AI Primitives Benchmark
+      category: Core Functionality
+      status: Completed
+    - id: dataframe-metadata-primitives
+      file: DONE/dataframe-benchmarks/active/dataframe-metadata-primitives.yaml
+      title: Implement DataFrame Version of Metadata Primitives Benchmark
+      category: Core Functionality
+      status: Completed
     - id: dataframe-transaction-primitives
       file: DONE/dataframe-benchmarks/active/dataframe-transaction-primitives.yaml
       title: Implement DataFrame Version of Transaction Primitives Benchmark

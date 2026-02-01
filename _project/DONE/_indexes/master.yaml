@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T18:27:41.977621'
-total_items: 394
+generated_at: '2026-01-31T19:02:13.257595'
+total_items: 398
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2926,6 +2926,40 @@ items:
   priority: Medium
   status: Not Started
   estimated_effort: 3 weeks (0.75 FTE ML engineer)
+- id: dataframe-ai-primitives
+  file: DONE/dataframe-benchmarks/completed/dataframe-ai-primitives.yaml
+  title: Implement DataFrame Version of AI Primitives Benchmark
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - dataframe
+  - ai-primitives
+  - embeddings
+  - nlp
+  - sentiment
+  - classification
+  - pyspark-mllib
+  - sentence-transformers
+  estimated_effort: Large
+  completed_date: '2026-01-31'
+- id: dataframe-metadata-primitives
+  file: DONE/dataframe-benchmarks/active/dataframe-metadata-primitives.yaml
+  title: Implement DataFrame Version of Metadata Primitives Benchmark
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - dataframe
+  - metadata-primitives
+  - catalog
+  - delta-lake
+  - iceberg
+  - pyspark
+  estimated_effort: Medium
+  completed_date: '2026-01-31'
 - id: dataframe-transaction-primitives
   file: DONE/dataframe-benchmarks/active/dataframe-transaction-primitives.yaml
   title: Implement DataFrame Version of Transaction Primitives Benchmark
@@ -3943,6 +3977,19 @@ items:
   - reproducibility
   - schema
   estimated_effort: Medium
+- id: fix-type-checking-errors
+  file: DONE/main/active/fix-type-checking-errors.yaml
+  title: Fix type checking errors ignored in ty config
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium-High
+  status: Complete
+  tags:
+  - type-checking
+  - technical-debt
+  - code-quality
+  - ty
+  estimated_effort: Large
 - id: dataframe-maintenance-operations
   file: DONE/dataframe-expansion/active/dataframe-maintenance-operations.yaml
   title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
@@ -4099,6 +4146,23 @@ items:
   - snowpark
   - pyspark-compatible
   estimated_effort: 1.5 weeks
+- id: unified-adapter-interface
+  file: DONE/core-functionality/planning/unified-adapter-interface.yaml
+  title: Unify SQL and DataFrame Adapter Execution Interfaces
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: Complete
+  tags:
+  - architecture
+  - refactoring
+  - adapter-pattern
+  - dataframe
+  - design-patterns
+  - liskov-substitution
+  owners:
+  - joe
+  estimated_effort: Medium (2-3 days)
 - id: compare-command-unification
   file: DONE/ux-improvements/active/compare-command-unification.yaml
   title: Unify compare and compare-plans commands

@@ -1,0 +1,102 @@
+title: "[ClickHouse Analysis] Run comparative benchmark suite"
+worktree: blog-content
+priority: Medium
+status: Not Started
+category: Blog Revision
+description: |
+  Run benchmarks to validate the architectural analysis in the ClickHouse
+  optimizer post. The draft claims ClickHouse excels at single-table scans
+  (ClickBench) but struggles with complex joins (TPC-H, TPC-DS).
+
+  This benchmark suite tests both strengths (ClickBench) and weaknesses
+  (multi-table benchmarks) to provide balanced, evidence-based analysis.
+
+  Reference draft: _blog/platform-deep-dives/drafts/clickhouse-optimizer-clickbench.md
+
+tasks:
+  phases:
+    - phase: "Phase 1: ClickHouse ClickBench (Strength)"
+      done: false
+      items:
+        - summary: "Run ClickBench on ClickHouse"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform clickhouse --benchmark clickbench"
+              done: false
+            - summary: "Record all 43 query times"
+              done: false
+        - summary: "Run ClickBench on DuckDB (comparison)"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark clickbench"
+              done: false
+
+    - phase: "Phase 2: TPC-H Comparison (Multi-Table)"
+      done: false
+      items:
+        - summary: "Run TPC-H SF10 on ClickHouse"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform clickhouse --benchmark tpch --scale 10"
+              done: false
+            - summary: "Note any failed queries or timeouts"
+              done: false
+        - summary: "Run TPC-H SF10 on DuckDB (comparison)"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark tpch --scale 10"
+              done: false
+
+    - phase: "Phase 3: TPC-DS Comparison (Complex Queries)"
+      done: false
+      items:
+        - summary: "Run TPC-DS SF10 on ClickHouse"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform clickhouse --benchmark tpcds --scale 10"
+              done: false
+            - summary: "Document query completion rate (expected: some failures)"
+              done: false
+        - summary: "Run TPC-DS SF10 on DuckDB (comparison)"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark tpcds --scale 10"
+              done: false
+
+    - phase: "Phase 4: Analysis"
+      done: false
+      items:
+        - summary: "Calculate ClickBench vs TPC-H performance ratio"
+          done: false
+        - summary: "Identify join-heavy queries where ClickHouse struggles"
+          done: false
+        - summary: "Document any queries that timed out or failed"
+          done: false
+
+metadata:
+  tags:
+    - clickhouse
+    - platform-deep-dives
+    - benchmarking
+    - blog-data
+  estimated_effort: "1-2 hours"
+  created_date: "2025-12-15"
+
+impact:
+  business_value: |
+    Provides balanced, evidence-based analysis of ClickHouse's architecture.
+    Validates claims about optimizer limitations with real benchmark data
+    rather than speculation.
+  user_impact: |
+    Helps users understand when ClickHouse is the right choice (single-table
+    analytics) vs when alternatives are better (complex multi-table queries).
+
+success_metrics:
+  - "All benchmark runs complete (or document failures)"
+  - "ClickBench shows ClickHouse strength vs DuckDB"
+  - "TPC-H/TPC-DS show relative optimizer differences"
+  - "Data supports balanced architectural analysis"
+
+dependencies:
+  related:
+    - "_project/TODO/blog-content/planning/oxbow-tier1-benchmark-runs.yaml"

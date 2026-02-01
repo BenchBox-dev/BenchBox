@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T18:27:41.978386'
-total_items: 394
+generated_at: '2026-01-31T19:02:13.257998'
+total_items: 398
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 199
+    count: 201
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1078,6 +1078,16 @@ statuses:
       title: Guard TPC-DS Fractional Scale Defaults
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: dataframe-ai-primitives
+      file: DONE/dataframe-benchmarks/completed/dataframe-ai-primitives.yaml
+      title: Implement DataFrame Version of AI Primitives Benchmark
+      priority: Medium
+      category: Core Functionality
+    - id: dataframe-metadata-primitives
+      file: DONE/dataframe-benchmarks/active/dataframe-metadata-primitives.yaml
+      title: Implement DataFrame Version of Metadata Primitives Benchmark
+      priority: Medium
+      category: Core Functionality
     - id: dataframe-read-primitives
       file: DONE/dataframe-expansion/active/dataframe-read-primitives.yaml
       title: Implement DataFrame Version of Read Primitives Benchmark
