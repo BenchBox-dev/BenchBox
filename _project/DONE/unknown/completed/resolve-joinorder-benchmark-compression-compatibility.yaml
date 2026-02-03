@@ -1,0 +1,61 @@
+title: ✅ Resolve JoinOrder Benchmark Compression Compatibility
+category: '"Bug Fixes & Reliability"'
+status: Completed
+priority: High
+impact: Restores JoinOrder CLI runs by letting the benchmark accept and act on compression and parallel settings supplied by the orchestrator.
+sections:
+- name: Summary
+  text: Updated the JoinOrder benchmark stack to recognize compression kwargs, propagate them to the generator, and ensured the loader passes force_regenerate so CLI execution no longer crashes on instantiation.
+- name: Completed Tasks
+  items:
+  - text: ✅ Constructor alignment
+    children:
+    - text: '"Extended `JoinOrderBenchmark.__init__` with keyword-only parallel/compression parameters, validation, and state tracking, forwarding options to the generator."'
+    - text: Initialized the generator with normalized storage handlers so output_dir wiring stays consistent with the base benchmark.
+  - text: ✅ Generator propagation
+    children:
+    - text: '"Taught `JoinOrderGenerator` to accept explicit compression knobs, storing `force_regenerate` and exposing mixin-managed compression state for assertions."'
+  - text: '"✅ Loader & tests"'
+    children:
+    - text: '"Updated `get_benchmark_instance` to pass `force_regenerate` for JoinOrder and added regression tests verifying loader behaviour."'
+    - text: '"Added `tests/unit/core/test_joinorder_benchmark.py` covering constructor propagation and loader integration."'
+- name: Testing
+  text: '"`uv run -- python -m pytest tests/unit/core/test_joinorder_benchmark.py`
+
+    `uv run -- python -m pytest` *(fails: pre-existing ImportError for `_resolve_tpcds_tool_and_template_paths` in `tests/unit/core/test_tpcds_resource_resolution.py`.)*
+
+    "'
+- name: CLI Verification
+  text: '"`uv run benchbox run --database duckdb --benchmark joinorder --scale 0.001 --phases power -vv`
+
+    *(benchmark now loads and generates data; run later stops when DuckDB adapter reports no data files - existing loader limitation.)*
+
+    "'
+- name: Files Affected
+  items:
+  - text: benchbox/core/joinorder/benchmark.py
+  - text: benchbox/core/joinorder/generator.py
+  - text: benchbox/core/benchmark_loader.py
+  - text: tests/unit/core/test_joinorder_benchmark.py (new)
+- name: Testing
+  text: '"Attempted `UV_CACHE_DIR=.uv-cache uv run -- python -m pytest` (fails: offline sandbox blocked dependency sync).
+
+    Added focused unit tests covering version reporting, CLI JSON output, and lazy loader eager caching.
+
+    "'
+- name: Files Affected
+  items:
+  - text: benchbox/utils/version.py
+  - text: benchbox/utils/lazy_loader.py (new)
+  - text: benchbox/__init__.py
+  - text: benchbox/cli/main.py
+  - text: benchbox/cli/exceptions.py
+  - text: benchbox/utils/verbosity.py
+  - text: scripts/update_version.py
+  - text: benchbox/utils/VERSION_MANAGEMENT.md
+  - text: docs/README.md
+  - text: docs/development/import-patterns.md
+  - text: README.md
+  - text: tests/unit/test_version_management.py
+  - text: tests/unit/cli/test_cli_main.py
+  - text: tests/unit/test_init.py

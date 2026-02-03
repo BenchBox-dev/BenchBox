@@ -1499,7 +1499,7 @@ entries:
   - name: CLI Verification
     text: '"`uv run benchbox run --database duckdb --benchmark joinorder --scale 0.001 --phases power -vv`
 
-      *(benchmark now loads and generates data; run later stops when DuckDB adapter reports no data files — existing loader limitation.)*
+      *(benchmark now loads and generates data; run later stops when DuckDB adapter reports no data files - existing loader limitation.)*
 
       "'
   - name: Files Affected
@@ -4147,7 +4147,7 @@ entries:
       - text: '"**Primary**: `benchbox/cli/orchestrator.py` (comprehensive refactoring of path handling, type safety, and architecture patterns)"'
       - text: '"**Platform Base**: `benchbox/platforms/base.py` (add cleanup methods and RunConfig support) ✅"'
       - text: '"**Types**: `benchbox/cli/types.py` (add RunConfig dataclass) ✅"'
-      - text: '"**Testing**: New unit tests for cloud path handling, type safety, and dynamic loading — **recommended next step**"'
+      - text: '"**Testing**: New unit tests for cloud path handling, type safety, and dynamic loading - **recommended next step**"'
     - text: '"**Success Criteria**:"'
       children:
       - text: Cloud storage paths work without crashes or TypeErrors ✅
@@ -4286,8 +4286,8 @@ entries:
     - text: '"**Files Affected**:"'
       children:
       - text: '"**Primary**: `benchbox/cli/benchmarks.py` (comprehensive refactoring of metadata, methods, and validation logic)"'
-      - text: '"**Testing**: New unit tests for fixed functionality and edge cases — **recommended next step**"'
-      - text: '"**Documentation**: Update CLI help and examples if configuration options change — **recommended update**"'
+      - text: '"**Testing**: New unit tests for fixed functionality and edge cases - **recommended next step**"'
+      - text: '"**Documentation**: Update CLI help and examples if configuration options change - **recommended update**"'
     - text: '"**Success Criteria**:"'
       children:
       - text: '"All `isinstance()` type checks work correctly with consistent data types ✅"'

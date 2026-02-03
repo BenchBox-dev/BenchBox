@@ -1,0 +1,139 @@
+title: Fix CLI Benchmarks Module Critical Issues
+category: Code Quality and Technical Debt
+sections:
+- name: Notes
+  items:
+  - text: '"**Priority**: High"'
+  - text: '"**Status**: Completed"'
+  - text: '"**Description**: Critical issues in `benchbox/cli/benchmarks.py` causing silent failures, inaccurate resource estimates, and incomplete functionality have been resolved. The module now provides reliable benchmark selection, accurate system-aware configuration, and complete feature support."'
+  - text: '"**Root Cause Analysis**: Code review identified multiple design flaws and data inconsistencies affecting benchmark selection, configuration, and resource estimation"'
+  - text: '"**Tasks**:"'
+    children:
+    - text: '"[x] **Fix Inconsistent `queries` Field Type Issue (CRITICAL)**:"'
+      children:
+      - text: '"**Location**: `benchbox/cli/benchmarks.py:52,62,74,107,118,129,140` - benchmark metadata dictionary"'
+      - text: '"**Problem**: Mixed data types for `''queries''` field - some entries use `int` (52, 62, 151, 162) while others use `str` (''ETL Pipeline'', ''Multiple'')"'
+      - text: '"**Impact**: Breaks `isinstance(benchmark_info[''queries''], int)` checks in lines 349, 511, 525 causing silent failures in query subset logic and time estimation"'
+      - text: '"**Fix**: Replaced inconsistent `''queries''` field with two separate fields:"'
+        children:
+        - text: '"`''num_queries'': int` for numeric query counts (52, 62, 151, 162)"'
+        - text: '"`''query_description'': str` for descriptive text (''ETL Pipeline'', ''Multiple'', etc.)"'
+      - text: '"**Code Changes**: Updated all benchmark metadata entries; replaced type checks with `num_queries`; updated display logic in tables and trees; no further reliance on ambiguous typing"'
+      - text: '"**Status**: ✅ Resolved"'
+    - text: '"[x] **Fix Memory Estimation Fragile Lookup (CRITICAL)**:"'
+      children:
+      - text: '"**Location**: `benchbox/cli/benchmarks.py:468-474` - `_estimate_memory_usage()` method"'
+      - text: '"**Problem**: `benchmark_info.get(''name'', ''unknown'')` always returns `''unknown''` because benchmark metadata doesn''t have `''name''` keys, causing unreliable fallback lookup by display_name"'
+      - text: '"**Impact**: Memory estimates always use fallback values, making resource warnings unreliable and potentially dangerous for users"'
+      - text: '"**Fix**: Pass `benchmark_id` parameter directly to `_estimate_memory_usage()` method instead of trying to infer it from benchmark_info"'
+      - text: '"**Code Changes**:"'
+        children:
+        - text: '"Updated method signature: `_estimate_memory_usage(self, benchmark_id: str, scale: float) -> float`"'
+        - text: Removed fragile lookup logic (lines 468-474)
+        - text: '"Updated all callers to pass `benchmark_id` directly from context"'
+      - text: '"**Status**: ✅ Resolved"'
+    - text: '"[x] **Add Missing Test Execution Type Support**:"'
+      children:
+      - text: '"**Location**: `benchbox/cli/benchmarks.py:32` - `BenchmarkConfig.test_execution_type` field"'
+      - text: '"**Problem**: Field exists but is never set during configuration, missing TPC-specific execution modes (power, throughput)"'
+      - text: '"**Impact**: CLI doesn''t support full TPC benchmark capabilities despite having the field defined"'
+      - text: '"**Fix**: Added prompts for `test_execution_type` selection in `_configure_benchmark()` via new `_prompt_execution_type()` method for TPC benchmarks"'
+      - text: '"**Code Changes**:"'
+        children:
+        - text: '"Added conditional prompt for benchmarks starting with `''tpc''`"'
+        - text: '"Users select from: ''standard'', ''power'', ''throughput'', ''maintenance'', ''combined''"'
+        - text: '"Input validated using `IntPrompt.ask()` with default fallback"'
+      - text: '"**Status**: ✅ Resolved"'
+    - text: '"[x] **Fix Input Validation Gaps**:"'
+      children:
+      - text: '"**Location**: `benchbox/cli/benchmarks.py:342` - concurrency input handling"'
+      - text: '"**Problem**: `int(concurrency)` can raise `ValueError` on invalid user input causing poor UX"'
+      - text: '"**Impact**: CLI crashes instead of gracefully handling invalid input"'
+      - text: '"**Fix**: Replace `Prompt.ask()` + `int()` pattern with `IntPrompt.ask()` from rich.prompt"'
+      - text: '"**Code Changes**:"'
+        children:
+        - text: '"Imported `IntPrompt` and used in:"'
+          children:
+          - text: '"`_prompt_concurrency()`"'
+          - text: '"`_prompt_query_subset()`"'
+          - text: '"`_prompt_compression()` (for level input)"'
+        - text: All integer inputs now safely validated by Rich with retry logic
+      - text: '"**Status**: ✅ Resolved"'
+    - text: '"[x] **Consolidate Console Instance Usage**:"'
+      children:
+      - text: '"**Location**: `benchbox/cli/benchmarks.py:18,42` - duplicate Console instances"'
+      - text: '"**Problem**: Both module-level `console` and `self.console` exist, causing potential inconsistency"'
+      - text: '"**Impact**: Minor inefficiency and potential for inconsistent formatting"'
+      - text: '"**Fix**: Remove `self.console = Console()` from `__init__` and use module-level `console` consistently"'
+      - text: '"**Code Changes**:"'
+        children:
+        - text: '"Removed line 42 (`self.console = Console()`)"'
+        - text: '"Ensured all methods use module-level `console`"'
+        - text: Removed redundant Console imports or instances
+      - text: '"**Status**: ✅ Resolved"'
+    - text: '"[x] **Fix Time Estimation String Parsing**:"'
+      children:
+      - text: '"**Location**: `benchbox/cli/benchmarks.py:482-492` - `_estimate_execution_time()` method"'
+      - text: '"**Problem**: Regex parsing of time strings is brittle and fails on edge cases like \"1 hour\", natural language variations"'
+      - text: '"**Impact**: Unreliable time estimates for user planning"'
+      - text: '"**Fix**: Replace string parsing with structured `estimated_time_range: Tuple[int, int]` in benchmark metadata"'
+      - text: '"**Code Changes**:"'
+        children:
+        - text: '"Updated all benchmark metadata with `estimated_time_range` (e.g., `(2, 10)`)"'
+        - text: Simplified time calculation logic using average of range
+        - text: Subsetting now scales proportionally to query count
+      - text: '"**Status**: ✅ Resolved"'
+    - text: '"[x] **Add Missing Compression Configuration**:"'
+      children:
+      - text: '"**Location**: `benchbox/cli/benchmarks.py:29-31` - compression fields in BenchmarkConfig"'
+      - text: '"**Problem**: Fields exist (`compress_data`, `compression_type`, `compression_level`) but no prompts or configuration logic"'
+      - text: '"**Impact**: Incomplete feature that confuses users and wastes development effort"'
+      - text: '"**Fix**: Added configuration prompts for compression options in new `_prompt_compression()` method"'
+      - text: '"**Code Changes**:"'
+        children:
+        - text: '"Added interactive flow: enable? → type? → level? (if applicable)"'
+        - text: '"Supports `zstd`, `gzip`, `snappy`, `lz4`"'
+        - text: '"Values properly assigned to `BenchmarkConfig`"'
+      - text: '"**Status**: ✅ Resolved"'
+    - text: '"[x] **Refactor Long Configuration Method**:"'
+      children:
+      - text: '"**Location**: `benchbox/cli/benchmarks.py:299-381` - `_configure_benchmark()` method (82 lines)"'
+      - text: '"**Problem**: Single method handles scale selection, concurrency, query subset, and summary display making it hard to test and maintain"'
+      - text: '"**Impact**: Reduces code maintainability and makes unit testing difficult"'
+      - text: '"**Fix**: Broke into smaller methods: `_prompt_scale()`, `_prompt_concurrency()`, `_prompt_query_subset()`, `_prompt_compression()`, `_prompt_execution_type()`, `_display_configuration_summary()`"'
+      - text: '"**Code Changes**:"'
+        children:
+        - text: Each logical section extracted into its own method
+        - text: Clear separation of concerns and single responsibility
+        - text: Improved testability and readability
+      - text: '"**Status**: ✅ Resolved"'
+    - text: '"[x] **Make SystemProfiler Import Direct**:"'
+      children:
+      - text: '"**Location**: `benchbox/cli/benchmarks.py:386` - try-except import of SystemProfiler"'
+      - text: '"**Problem**: Try-except import pattern is unnecessary since SystemProfiler is part of the CLI package"'
+      - text: '"**Impact**: Minor - code clarity issue, not functional"'
+      - text: '"**Fix**: Make SystemProfiler a direct import since it''s always available in the CLI package"'
+      - text: '"**Code Changes**:"'
+        children:
+        - text: '"Moved `from benchbox.cli.system import SystemProfiler` to top-level imports"'
+        - text: Removed try-except wrapper
+        - text: '"Added graceful fallback in `_get_system_profile()` on method failure (not import)"'
+      - text: '"**Status**: ✅ Resolved"'
+  - text: '"**Files Affected**:"'
+    children:
+    - text: '"**Primary**: `benchbox/cli/benchmarks.py` (comprehensive refactoring of metadata, methods, and validation logic)"'
+    - text: '"**Testing**: New unit tests for fixed functionality and edge cases - **recommended next step**"'
+    - text: '"**Documentation**: Update CLI help and examples if configuration options change - **recommended update**"'
+  - text: '"**Success Criteria**:"'
+    children:
+    - text: '"All `isinstance()` type checks work correctly with consistent data types ✅"'
+    - text: Memory estimates are accurate and based on actual benchmark_id instead of fallback values ✅
+    - text: Test execution type prompts appear for TPC benchmarks with proper validation ✅
+    - text: Input validation prevents CLI crashes on invalid user input ✅
+    - text: Single Console instance used consistently throughout module ✅
+    - text: Time estimates are reliable and based on structured data instead of string parsing ✅
+    - text: All dataclass fields are either fully implemented or removed ✅
+    - text: Configuration method is broken into testable, maintainable components ✅
+    - text: System profiling works without hidden dependencies ✅
+  - text: '"**Risk Assessment**: High impact changes to CLI core functionality required comprehensive testing; all changes now modular and safe, with input validation and graceful fallbacks reducing risk of regressions"'
+  - text: '"**Impact**: Fixes critical CLI reliability issues, improves resource estimation accuracy, completes missing functionality, and significantly improves code maintainability for future development"'

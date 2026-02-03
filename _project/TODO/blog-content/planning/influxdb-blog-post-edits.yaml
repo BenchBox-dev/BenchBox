@@ -1,0 +1,102 @@
+title: "Edit InfluxDB 3.x FDAP Architecture blog post before publication"
+worktree: blog-content
+priority: Medium
+status: Not Started
+description: |
+  Action items from blog critique review for the InfluxDB 3.x FDAP Architecture
+  platform deep dive post.
+
+  Excellent voice and structure. Main issue is benchmark data applicability-
+  third-party benchmarks tested older InfluxDB versions (1.x/2.x), which could
+  mislead readers about 3.x performance.
+
+  Draft location: _blog/platform-deep-dives/drafts/influxdb-3x-fdap-architecture.md
+  Quality score: 8.5/10 (Good)
+  Recommendation: Publish Ready after Critical + High priority edits
+
+category: Documentation
+
+tasks:
+  phases:
+  - phase: "Phase 1: Critical Priority Edits"
+    done: false
+    items:
+    - summary: "Add caveat that cardinality benchmarks tested InfluxDB 1.x/2.x, not 3.x"
+      done: false
+      subtasks:
+      - summary: "Rewrite benchmarks section to clarify version tested"
+        done: false
+      - summary: "Add note: 'InfluxDB 3.x may perform differently - test before assuming'"
+        done: false
+      - summary: "Update references [^5] and [^6] with version context"
+        done: false
+
+  - phase: "Phase 2: High Priority Edits"
+    done: false
+    items:
+    - summary: "Add BenchBox command examples in benchmarking section and conclusion"
+      done: false
+      subtasks:
+      - summary: "Add benchbox run example in 'How to Benchmark Honestly' section"
+        done: false
+      - summary: "Replace 'Benchmark accordingly' ending with actionable command"
+        done: false
+      - summary: "Add comparison command for ClickHouse, TimescaleDB, DuckDB"
+        done: false
+    - summary: "Run original BenchBox benchmarks on InfluxDB 3.x"
+      done: false
+      subtasks:
+      - summary: "Run: benchbox run --platform influxdb --benchmark tsbs-devops --scale 1000"
+        done: false
+      - summary: "Add results to post or note data is from older versions"
+        done: false
+
+  - phase: "Phase 3: Medium Priority Edits"
+    done: false
+    items:
+    - summary: "Verify InfluxDB 3 Core limitations against current docs"
+      done: false
+      subtasks:
+      - summary: "Confirm Delete operations status in Core"
+        done: false
+      - summary: "Update Core vs Enterprise table if needed"
+        done: false
+    - summary: "Add citation for Parquet '90%+ storage reduction' claim"
+      done: false
+      subtasks:
+      - summary: "Find authoritative source or change to 'industry estimates'"
+        done: false
+
+  - phase: "Phase 4: Low Priority Polish"
+    done: false
+    items:
+    - summary: "Strengthen DuckDB comparison section"
+      done: false
+      subtasks:
+      - summary: "Add sentence about when to choose DuckDB over InfluxDB"
+        done: false
+    - summary: "Consider adding InfluxData perspective on Flux deprecation"
+      done: false
+      subtasks:
+      - summary: "Brief note on why Flux was deprecated from vendor POV"
+        done: false
+
+metadata:
+  tags:
+  - blog
+  - influxdb
+  - fdap
+  - editing
+  - platform-deep-dives
+  estimated_effort: Low
+  created_date: "2025-12-22"
+
+files_affected:
+  modified:
+  - _blog/platform-deep-dives/drafts/influxdb-3x-fdap-architecture.md
+
+success_metrics:
+- CRITICAL item addressed (version caveat)
+- All HIGH priority items addressed
+- BenchBox commands included in post
+- Benchmark data accuracy improved
