@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T19:05:35.873796'
-total_items: 44
+generated_at: '2026-02-03T03:00:42.821688'
+total_items: 43
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 43
+    count: 42
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -41,11 +41,6 @@ statuses:
       file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
       title: Add Microsoft Fabric Spark Notebooks platform support
       priority: Medium-High
-      category: Platform Expansion
-    - id: onehouse-quanton-platform
-      file: TODO/platform-expansion/planning/onehouse-quanton-platform.yaml
-      title: Add Onehouse Quanton platform support for managed Spark benchmarking
-      priority: High
       category: Platform Expansion
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml

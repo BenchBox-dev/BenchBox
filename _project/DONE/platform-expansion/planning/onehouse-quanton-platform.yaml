@@ -1,7 +1,26 @@
 title: "Add Onehouse Quanton platform support for managed Spark benchmarking"
 worktree: platform-expansion
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-02-03"
+completion_summary: |
+  Implemented Onehouse Quanton platform adapter with full managed Spark benchmarking support.
+
+  Files created/modified:
+  - benchbox/platforms/onehouse/__init__.py (package exports)
+  - benchbox/platforms/onehouse/quanton_adapter.py (main adapter class)
+  - benchbox/platforms/onehouse/onehouse_client.py (HTTP API client)
+  - benchbox/platforms/base/cloud_spark/config.py (added QUANTON to CloudPlatform enum)
+  - benchbox/core/platform_registry.py (platform metadata and registration)
+  - benchbox/platforms/__init__.py (lazy loading and CLI hooks)
+  - tests/unit/platforms/onehouse/ (40 unit tests, all passing)
+
+  Key features:
+  - Multi-table-format support (Iceberg, Hudi, Delta)
+  - Cloud-Spark infrastructure reuse (CloudSparkConfigMixin, SparkTuningMixin, SparkDDLGeneratorMixin)
+  - S3 staging via CloudSparkStaging
+  - Job submission and polling via REST API
+  - CLI integration with platform hooks
 description: |
   Integrate Onehouse Quanton as a supported BenchBox platform for high-performance
   managed Spark benchmarking with multi-table-format support.
