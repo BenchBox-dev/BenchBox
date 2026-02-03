@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T19:05:36.891737'
-total_items: 398
+generated_at: '2026-02-03T02:55:53.705323'
+total_items: 399
 priorities:
   Critical:
     count: 27
@@ -813,13 +813,18 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 25
+    count: 26
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
       title: AI/ML Primitives Benchmark - SQL-Based AI Functions
       category: Benchmark Development
       status: Not Started
+    - id: ducklake-open-table-format
+      file: DONE/platform-expansion/planning/ducklake-open-table-format.yaml
+      title: Add DuckLake Open Table Format Support
+      category: Platform Expansion
+      status: Completed
     - id: influxdb-timeseries-platform
       file: DONE/platform-expansion/active/influxdb-timeseries-platform.yaml
       title: Add InfluxDB Platform Support for Time Series Benchmarking
@@ -1198,13 +1203,13 @@ priorities:
       title: Compressed Data Generation Gaps (all benchmarks) ✅
       category: Data Quality and Compatibility Issues
       status: Not Started
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Not Started
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Not Started
@@ -1643,13 +1648,13 @@ priorities:
       title: Security Audit
       category: Pre-Release Medium Priority Tasks (Nice-to-Have)
       status: Completed
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       category: Platform Support and Deployment
       status: Not Started
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       category: Platform Support and Deployment
       status: Not Started
@@ -1823,13 +1828,13 @@ priorities:
       title: ✅ Implement Standalone Export Command
       category: User Experience and CLI Enhancement
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       category: Pre-Release High Priority Tasks (COMPLETED)
       status: Not Started
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       category: Pre-Release High Priority Tasks (COMPLETED)
       status: Not Started

@@ -1,4 +1,4 @@
-generated_at: '2026-02-03T03:00:42.821632'
+generated_at: '2026-02-03T02:55:51.212885'
 total_items: 43
 priorities:
   High:
@@ -20,16 +20,11 @@ priorities:
       category: Platform Expansion
       status: In Progress
   Medium-High:
-    count: 6
+    count: 5
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
-      category: Platform Expansion
-      status: Not Started
-    - id: ducklake-open-table-format
-      file: TODO/platform-expansion/planning/ducklake-open-table-format.yaml
-      title: Add DuckLake Open Table Format Support
       category: Platform Expansion
       status: Not Started
     - id: fabric-spark-notebooks-platform

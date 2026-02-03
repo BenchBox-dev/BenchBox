@@ -1,4 +1,4 @@
-generated_at: '2026-02-03T03:00:42.821688'
+generated_at: '2026-02-03T02:55:51.212913'
 total_items: 43
 statuses:
   In Progress:
@@ -21,11 +21,6 @@ statuses:
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
       priority: Medium
-      category: Platform Expansion
-    - id: ducklake-open-table-format
-      file: TODO/platform-expansion/planning/ducklake-open-table-format.yaml
-      title: Add DuckLake Open Table Format Support
-      priority: Medium-High
       category: Platform Expansion
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
