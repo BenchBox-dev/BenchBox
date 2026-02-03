@@ -1,0 +1,225 @@
+generated_at: '2026-02-03T17:14:59.690889'
+total_items: 42
+priorities:
+  High:
+    count: 3
+    items:
+    - id: lakesail-spark-platform
+      file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
+      title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+      category: Platform Expansion
+      status: Not Started
+    - id: implement-dataframe-benchmarks
+      file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
+      title: Implement DataFrame Support for All SQL-Only Benchmarks
+      category: Core Functionality
+      status: Not Started
+    - id: motherduck-platform-adapter
+      file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      category: Platform Expansion
+      status: In Progress
+  Medium-High:
+    count: 5
+    items:
+    - id: apache-doris-olap-platform
+      file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
+      title: Add Apache Doris MPP OLAP platform support
+      category: Platform Expansion
+      status: Not Started
+    - id: fabric-spark-notebooks-platform
+      file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
+      title: Add Microsoft Fabric Spark Notebooks platform support
+      category: Platform Expansion
+      status: Not Started
+    - id: starrocks-olap-platform
+      file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
+      title: Add StarRocks MPP OLAP platform support
+      category: Platform Expansion
+      status: Not Started
+    - id: presorted-open-table-format-datasets
+      file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
+      title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+      category: Core Functionality
+      status: Not Started
+    - id: vector-search-benchmark-support
+      file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
+      title: Vector Search Benchmark Support
+      category: AI/ML Capabilities
+      status: Not Started
+  Medium:
+    count: 28
+    items:
+    - id: cedardb-adapter
+      file: TODO/platform-expansion/planning/cedardb-adapter.yaml
+      title: Add CedarDB Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: fabric-lakehouse-sql-platform
+      file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
+      title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
+      category: Platform Expansion
+      status: Not Started
+    - id: questdb-timeseries-platform
+      file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
+      title: Add QuestDB time-series database platform support
+      category: Platform Expansion
+      status: Not Started
+    - id: singlestore-adapter
+      file: TODO/platform-expansion/planning/singlestore-adapter.yaml
+      title: Add SingleStore Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: siriusdb-adapter
+      file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
+      title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: clickhouse-cloud-deployment
+      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+      title: ClickHouse Cloud Deployment Mode
+      category: Platform Expansion
+      status: Not Started
+    - id: consolidate-file-format-detection
+      file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
+      title: Consolidate file format detection to handle compressed and sharded files
+      category: Code Quality
+      status: Not Started
+    - id: influxdb-blog-post-edits
+      file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
+      title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
+      category: Documentation
+      status: Not Started
+    - id: timescaledb-blog-post-edits
+      file: TODO/blog-content/planning/timescaledb-blog-post-edits.yaml
+      title: Edit TimescaleDB vs PostgreSQL blog post before publication
+      category: Documentation
+      status: Not Started
+    - id: firebolt-cloud-deployment
+      file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
+      title: Firebolt Cloud Deployment Mode
+      category: Platform Expansion
+      status: Not Started
+    - id: flight-data-benchmark
+      file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
+      title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
+      category: Benchmark Development
+      status: Not Started
+    - id: geospatial-primitives-benchmark
+      file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
+      title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
+      category: Benchmark Development
+      status: Not Started
+    - id: github-archive-benchmark
+      file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
+      title: GitHub Archive Benchmark - Developer Activity Analytics Workload
+      category: Benchmark Development
+      status: Not Started
+    - id: ctas-sorted-data-loading
+      file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
+      title: Implement CTAS-based sorted data loading for DuckDB
+      category: Core Functionality
+      status: Not Started
+    - id: nyc-taxi-benchmark-expansion
+      file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
+      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+      category: Benchmark Development
+      status: Not Started
+    - id: reenable-comprehensive-ci
+      file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
+      title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
+      category: Testing and Quality Assurance
+      status: Not Started
+    - id: stackoverflow-benchmark
+      file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
+      title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
+      category: Benchmark Development
+      status: Not Started
+    - id: starburst-platform-adapter
+      file: TODO/platform-expansion/planning/starburst-platform-adapter.yaml
+      title: Starburst Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: timescaledb-cloud-deployment
+      file: TODO/platform-expansion/planning/timescaledb-cloud-deployment.yaml
+      title: TimescaleDB Cloud Deployment Mode
+      category: Platform Expansion
+      status: Not Started
+    - id: wikipedia-pageviews-benchmark
+      file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
+      title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+      category: Benchmark Development
+      status: Not Started
+    - id: arm-graviton-generations-benchmarks
+      file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
+      title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
+      category: Blog Revision
+      status: Not Started
+    - id: arm-hyperscaler-comparison-benchmarks
+      file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml
+      title: '[ARM Series] Run hyperscaler ARM comparison (Graviton 4 vs Cobalt 100 vs Axion)'
+      category: Blog Revision
+      status: Not Started
+    - id: cicd-benchmarking-demo
+      file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
+      title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'
+      category: Blog Revision
+      status: Not Started
+    - id: clickhouse-optimizer-analysis-benchmarks
+      file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
+      title: '[ClickHouse Analysis] Run comparative benchmark suite'
+      category: Blog Revision
+      status: Not Started
+    - id: duckdb-architecture-verification
+      file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
+      title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
+      category: Blog Revision
+      status: Not Started
+    - id: duckdb-version-performance-benchmarks
+      file: TODO/blog-content/planning/duckdb-version-performance-benchmarks.yaml
+      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+      category: Blog Revision
+      status: Not Started
+    - id: snowflake-gen2-comparison-benchmarks
+      file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
+      title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
+      category: Blog Revision
+      status: Not Started
+    - id: tutorial-benchmark-verification
+      file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
+      title: '[Tutorials] Verify benchmark commands in tutorial posts'
+      category: Blog Revision
+      status: Not Started
+  Low:
+    count: 6
+    items:
+    - id: databend-cloud-olap-platform
+      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+      title: Databend Cloud-Native OLAP Platform Integration
+      category: Platform Expansion
+      status: Not Started
+    - id: geospatial-benchmark-support-postgis-integration
+      file: TODO/specialized-geospatial/planning/geospatial-benchmark-support-postgis-integration.yaml
+      title: Geospatial Benchmark Support - PostGIS Integration
+      category: Specialized Benchmarks
+      status: Not Started
+    - id: graph-query-benchmark-support-neo4j-neptune
+      file: TODO/specialized-graph/planning/graph-query-benchmark-support-neo4j-neptune.yaml
+      title: Graph Query Benchmark Support - Neo4j, Neptune
+      category: Specialized Benchmarks
+      status: Not Started
+    - id: on-demand-tpc-answer-download
+      file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
+      title: Implement on-demand download of TPC answer files for validation
+      category: Core Functionality
+      status: Not Started
+    - id: interactive-benchmark-explorer-web-ui
+      file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
+      title: Interactive Benchmark Explorer - Web UI
+      category: Supporting Infrastructure
+      status: Not Started
+    - id: streaming-benchmark-support-kafka-flink-spark-streaming
+      file: TODO/specialized-streaming/planning/streaming-benchmark-support-kafka-flink-spark-streaming.yaml
+      title: Streaming Benchmark Support - Kafka, Flink, Spark Streaming
+      category: Specialized Benchmarks
+      status: Not Started

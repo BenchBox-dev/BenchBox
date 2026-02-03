@@ -1,0 +1,598 @@
+generated_at: '2026-02-03T17:14:59.690829'
+total_items: 42
+items:
+- id: lakesail-spark-platform
+  file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
+  title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - lakesail
+  - sail
+  - spark
+  - spark-connect
+  - datafusion
+  - rust
+  - high-performance
+  - dataframe
+  - sql
+  - platform
+  - open-source
+  estimated_effort: Large
+- id: implement-dataframe-benchmarks
+  file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
+  title: Implement DataFrame Support for All SQL-Only Benchmarks
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - dataframe
+  - benchmarks
+  - polars
+  - pandas
+  - pyspark
+  - datafusion
+  owners:
+  - joe
+  estimated_effort: Large (4-6 weeks total)
+- id: motherduck-platform-adapter
+  file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
+  title: MotherDuck Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: In Progress
+  tags:
+  - platform-adapter
+  - motherduck
+  - duckdb
+  - cloud
+  estimated_effort: 3-4 days
+- id: databend-cloud-olap-platform
+  file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+  title: Databend Cloud-Native OLAP Platform Integration
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  tags:
+  - cloud-native
+  - olap
+  - snowflake-compatible
+  - rust
+  - object-storage
+  estimated_effort: 2-3 days
+- id: geospatial-benchmark-support-postgis-integration
+  file: TODO/specialized-geospatial/planning/geospatial-benchmark-support-postgis-integration.yaml
+  title: Geospatial Benchmark Support - PostGIS Integration
+  worktree: specialized-geospatial
+  category: Specialized Benchmarks
+  priority: Low
+  status: Not Started
+  estimated_effort: 2 weeks (0.5 FTE)
+- id: graph-query-benchmark-support-neo4j-neptune
+  file: TODO/specialized-graph/planning/graph-query-benchmark-support-neo4j-neptune.yaml
+  title: Graph Query Benchmark Support - Neo4j, Neptune
+  worktree: specialized-graph
+  category: Specialized Benchmarks
+  priority: Low
+  status: Not Started
+  estimated_effort: 4 weeks (1.0 FTE)
+- id: on-demand-tpc-answer-download
+  file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
+  title: Implement on-demand download of TPC answer files for validation
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - validation
+  - packaging
+  - wheel
+  - user-experience
+  estimated_effort: Medium
+- id: interactive-benchmark-explorer-web-ui
+  file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
+  title: Interactive Benchmark Explorer - Web UI
+  worktree: infrastructure-explorer
+  category: Supporting Infrastructure
+  priority: Low
+  status: Not Started
+  estimated_effort: 6 weeks (1.0 FTE frontend engineer)
+- id: streaming-benchmark-support-kafka-flink-spark-streaming
+  file: TODO/specialized-streaming/planning/streaming-benchmark-support-kafka-flink-spark-streaming.yaml
+  title: Streaming Benchmark Support - Kafka, Flink, Spark Streaming
+  worktree: specialized-streaming
+  category: Specialized Benchmarks
+  priority: Low
+  status: Not Started
+  estimated_effort: 4 weeks (1.0 FTE)
+- id: cedardb-adapter
+  file: TODO/platform-expansion/planning/cedardb-adapter.yaml
+  title: Add CedarDB Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform
+  - sql
+  - postgresql-compatible
+  - olap
+  - oltp
+  - cedardb
+  estimated_effort: Medium
+- id: fabric-lakehouse-sql-platform
+  file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
+  title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - fabric
+  - lakehouse
+  - sql-analytics
+  - read-only
+  - delta-lake
+  - azure
+  - platform
+  - cloud
+  estimated_effort: Medium
+- id: questdb-timeseries-platform
+  file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
+  title: Add QuestDB time-series database platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - questdb
+  - timeseries
+  - columnar
+  - platform
+  - postgres-protocol
+  - ilp
+  estimated_effort: Medium
+- id: singlestore-adapter
+  file: TODO/platform-expansion/planning/singlestore-adapter.yaml
+  title: Add SingleStore Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform
+  - sql
+  - mysql-compatible
+  - distributed
+  - olap
+  - cloud
+  - singlestore
+  estimated_effort: Medium
+- id: siriusdb-adapter
+  file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
+  title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform
+  - gpu
+  - cuda
+  - duckdb-extension
+  - high-performance
+  - siriusdb
+  estimated_effort: Medium
+- id: clickhouse-cloud-deployment
+  file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+  title: ClickHouse Cloud Deployment Mode
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform-adapter
+  - clickhouse
+  - cloud
+  - deployment-modes
+  estimated_effort: 2-3 days
+- id: consolidate-file-format-detection
+  file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
+  title: Consolidate file format detection to handle compressed and sharded files
+  worktree: core-functionality
+  category: Code Quality
+  priority: Medium
+  status: Not Started
+  tags:
+  - code-quality
+  - refactoring
+  - dry-principle
+  - file-format
+  - compression
+  estimated_effort: Small
+- id: influxdb-blog-post-edits
+  file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
+  title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
+  worktree: blog-content
+  category: Documentation
+  priority: Medium
+  status: Not Started
+  tags:
+  - blog
+  - influxdb
+  - fdap
+  - editing
+  - platform-deep-dives
+  estimated_effort: Low
+- id: timescaledb-blog-post-edits
+  file: TODO/blog-content/planning/timescaledb-blog-post-edits.yaml
+  title: Edit TimescaleDB vs PostgreSQL blog post before publication
+  worktree: blog-content
+  category: Documentation
+  priority: Medium
+  status: Not Started
+  tags:
+  - blog
+  - timescaledb
+  - postgresql
+  - editing
+  - platform-deep-dives
+  estimated_effort: Low
+- id: firebolt-cloud-deployment
+  file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
+  title: Firebolt Cloud Deployment Mode
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform-adapter
+  - firebolt
+  - cloud
+  - deployment-modes
+  estimated_effort: 2-3 days
+- id: flight-data-benchmark
+  file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
+  title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - flight-data
+  - bts
+  - time-series
+  - transportation
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 weeks
+- id: geospatial-primitives-benchmark
+  file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
+  title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - primitives
+  - benchmark
+  - geospatial
+  - geography
+  - geometry
+  - st_functions
+  - h3
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 3-4 weeks
+- id: github-archive-benchmark
+  file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
+  title: GitHub Archive Benchmark - Developer Activity Analytics Workload
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - github
+  - event-driven
+  - json
+  - semi-structured
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 3-4 weeks
+- id: ctas-sorted-data-loading
+  file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
+  title: Implement CTAS-based sorted data loading for DuckDB
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - duckdb
+  - performance
+  - zone-maps
+  - data-loading
+  estimated_effort: Medium
+- id: nyc-taxi-benchmark-expansion
+  file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
+  title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - nyc-taxi
+  - enhancement
+  - multi-source
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 weeks
+- id: reenable-comprehensive-ci
+  file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
+  title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
+  worktree: ci-infrastructure
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Not Started
+  tags:
+  - ci
+  - quality
+  - documentation
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+- id: stackoverflow-benchmark
+  file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
+  title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - stackoverflow
+  - olap
+  - multi-table
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 3-4 weeks
+- id: starburst-platform-adapter
+  file: TODO/platform-expansion/planning/starburst-platform-adapter.yaml
+  title: Starburst Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform-adapter
+  - starburst
+  - trino
+  - cloud
+  estimated_effort: 3-4 days
+- id: timescaledb-cloud-deployment
+  file: TODO/platform-expansion/planning/timescaledb-cloud-deployment.yaml
+  title: TimescaleDB Cloud Deployment Mode
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform-adapter
+  - timescaledb
+  - cloud
+  - deployment-modes
+  estimated_effort: 2 days
+- id: wikipedia-pageviews-benchmark
+  file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
+  title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - wikipedia
+  - time-series
+  - high-cardinality
+  - web-traffic
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 weeks
+- id: arm-graviton-generations-benchmarks
+  file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
+  title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - arm-performance
+  - graviton
+  - aws
+  - cloud-benchmarking
+  - blog-data
+  estimated_effort: 2-3 hours
+- id: arm-hyperscaler-comparison-benchmarks
+  file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml
+  title: '[ARM Series] Run hyperscaler ARM comparison (Graviton 4 vs Cobalt 100 vs Axion)'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - arm-performance
+  - graviton
+  - cobalt
+  - axion
+  - cloud-benchmarking
+  - cross-cloud
+  - blog-data
+  estimated_effort: 3-4 hours
+- id: cicd-benchmarking-demo
+  file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
+  title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - cicd
+  - business-of-analytics
+  - regression-detection
+  - demo
+  estimated_effort: 20-30 minutes
+- id: clickhouse-optimizer-analysis-benchmarks
+  file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
+  title: '[ClickHouse Analysis] Run comparative benchmark suite'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - clickhouse
+  - platform-deep-dives
+  - benchmarking
+  - blog-data
+  estimated_effort: 1-2 hours
+- id: duckdb-architecture-verification
+  file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
+  title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - duckdb
+  - platform-deep-dives
+  - verification
+  - quick-task
+  estimated_effort: 10-15 minutes
+- id: duckdb-version-performance-benchmarks
+  file: TODO/blog-content/planning/duckdb-version-performance-benchmarks.yaml
+  title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - duckdb-performance
+  - benchmarking
+  - blog-data
+  - multi-version
+  estimated_effort: 3-5 hours
+- id: snowflake-gen2-comparison-benchmarks
+  file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
+  title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - snowflake
+  - cloud-benchmarking
+  - gen2-comparison
+  - blog-data
+  estimated_effort: 2-4 hours
+- id: tutorial-benchmark-verification
+  file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
+  title: '[Tutorials] Verify benchmark commands in tutorial posts'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Not Started
+  tags:
+  - tutorials
+  - benchmarking
+  - blog-data
+  - verification
+  estimated_effort: 30-60 minutes
+- id: apache-doris-olap-platform
+  file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
+  title: Add Apache Doris MPP OLAP platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - doris
+  - apache
+  - olap
+  - mpp
+  - columnar
+  - platform
+  - mysql-protocol
+  - real-time-analytics
+  - velodb
+  - selectdb
+  - cloud
+  estimated_effort: Medium
+- id: fabric-spark-notebooks-platform
+  file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
+  title: Add Microsoft Fabric Spark Notebooks platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - fabric
+  - spark
+  - livy
+  - managed-spark
+  - lakehouse
+  - delta-lake
+  - azure
+  - platform
+  - cloud
+  estimated_effort: Large
+- id: starrocks-olap-platform
+  file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
+  title: Add StarRocks MPP OLAP platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - starrocks
+  - olap
+  - mpp
+  - columnar
+  - platform
+  - mysql-protocol
+  estimated_effort: Medium
+- id: presorted-open-table-format-datasets
+  file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
+  title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - data-generation
+  - parquet
+  - delta-lake
+  - iceberg
+  - zone-maps
+  - z-order
+  - performance
+  estimated_effort: Large
+- id: vector-search-benchmark-support
+  file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
+  title: Vector Search Benchmark Support
+  worktree: ai-ml-vector-search
+  category: AI/ML Capabilities
+  priority: Medium-High
+  status: Not Started
+  estimated_effort: 4 weeks (1.0 FTE ML engineer)
