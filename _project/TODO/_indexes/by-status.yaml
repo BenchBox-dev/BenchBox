@@ -1,5 +1,5 @@
-generated_at: '2026-01-31T19:05:35.873796'
-total_items: 44
+generated_at: '2026-02-03T02:55:51.212913'
+total_items: 43
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 43
+    count: 42
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -21,11 +21,6 @@ statuses:
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
       priority: Medium
-      category: Platform Expansion
-    - id: ducklake-open-table-format
-      file: TODO/platform-expansion/planning/ducklake-open-table-format.yaml
-      title: Add DuckLake Open Table Format Support
-      priority: Medium-High
       category: Platform Expansion
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
