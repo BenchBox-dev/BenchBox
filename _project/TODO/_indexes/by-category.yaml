@@ -157,11 +157,6 @@ categories:
       title: Add Microsoft Fabric Spark Notebooks platform support
       priority: Medium-High
       status: Not Started
-    - id: onehouse-quanton-platform
-      file: TODO/platform-expansion/planning/onehouse-quanton-platform.yaml
-      title: Add Onehouse Quanton platform support for managed Spark benchmarking
-      priority: High
-      status: Not Started
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support

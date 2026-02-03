@@ -21,30 +21,6 @@ items:
   - platform
   - open-source
   estimated_effort: Large
-- id: onehouse-quanton-platform
-  file: TODO/platform-expansion/planning/onehouse-quanton-platform.yaml
-  title: Add Onehouse Quanton platform support for managed Spark benchmarking
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: High
-  status: Not Started
-  tags:
-  - onehouse
-  - quanton
-  - spark
-  - managed-spark
-  - serverless
-  - hudi
-  - iceberg
-  - delta-lake
-  - lakehouse
-  - aws
-  - s3
-  - platform
-  - cloud
-  - xtable
-  - open-source
-  estimated_effort: Large
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks

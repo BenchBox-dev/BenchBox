@@ -6,7 +6,7 @@ category: Core Functionality
 description: |
   BenchBox v0.1.0 installed from PyPI (wheel) cannot run TPC-H or TPC-DS benchmarks.
   Query template files (.sql for TPC-H, .tpl for TPC-DS) live in `_sources/` at the
-  project root — outside the `benchbox/` package tree — and are never included in the
+  project root - outside the `benchbox/` package tree - and are never included in the
   wheel. The pyproject.toml `[tool.setuptools.package-data]` `"*"` glob is ineffective
   (patterns are relative to package dirs, not project root). MANIFEST.in correctly
   includes them for sdist only.
@@ -20,58 +20,58 @@ description: |
 
 tasks:
   phases:
-    - phase: "Phase 1: Bundle Template Files"
+  - phase: "Phase 1: Bundle Template Files"
+    done: true
+    items:
+    - summary: "Create benchbox/_binaries/tpc-h/templates/ with queries/, variants/, dists.dss"
       done: true
-      items:
-        - summary: "Create benchbox/_binaries/tpc-h/templates/ with queries/, variants/, dists.dss"
-          done: true
-        - summary: "Create benchbox/_binaries/tpc-ds/templates/ with query_templates/, query_variants/"
-          done: true
-        - summary: "Remove per-platform query_templates/ duplicates from TPC-DS platform dirs (5 dirs)"
-          done: true
+    - summary: "Create benchbox/_binaries/tpc-ds/templates/ with query_templates/, query_variants/"
+      done: true
+    - summary: "Remove per-platform query_templates/ duplicates from TPC-DS platform dirs (5 dirs)"
+      done: true
 
-    - phase: "Phase 2: Update Resolution Code"
+  - phase: "Phase 2: Update Resolution Code"
+    done: true
+    items:
+    - summary: "Add get_tpc_templates_dir() utility to benchbox/utils/tpc_compilation.py"
       done: true
-      items:
-        - summary: "Add get_tpc_templates_dir() utility to benchbox/utils/tpc_compilation.py"
-          done: true
-        - summary: "Update benchbox/core/tpch/queries.py _find_templates_dir() to use new utility"
-          done: true
-        - summary: "Update benchbox/core/tpch/streams.py __init__() template path resolution"
-          done: true
-        - summary: "Update benchbox/core/tpcds/c_tools.py _resolve_tpcds_tool_and_template_paths()"
-          done: true
+    - summary: "Update benchbox/core/tpch/queries.py _find_templates_dir() to use new utility"
+      done: true
+    - summary: "Update benchbox/core/tpch/streams.py __init__() template path resolution"
+      done: true
+    - summary: "Update benchbox/core/tpcds/c_tools.py _resolve_tpcds_tool_and_template_paths()"
+      done: true
 
-    - phase: "Phase 3: Update Packaging Config"
+  - phase: "Phase 3: Update Packaging Config"
+    done: true
+    items:
+    - summary: "Remove broken '*' package-data glob from pyproject.toml"
       done: true
-      items:
-        - summary: "Remove broken '*' package-data glob from pyproject.toml"
-          done: true
-        - summary: "Remove _sources/ runtime includes from MANIFEST.in"
-          done: true
+    - summary: "Remove _sources/ runtime includes from MANIFEST.in"
+      done: true
 
-    - phase: "Phase 4: Verification"
+  - phase: "Phase 4: Verification"
+    done: true
+    items:
+    - summary: "Build wheel and verify templates are included"
       done: true
-      items:
-        - summary: "Build wheel and verify templates are included"
-          done: true
-        - summary: "Install from wheel in fresh venv, test TPC-H query generation"
-          done: true
-        - summary: "Run existing tests (fast + tpcds_resource_resolution)"
-          done: true
-        - summary: "Verify editable install still works"
-          done: true
+    - summary: "Install from wheel in fresh venv, test TPC-H query generation"
+      done: true
+    - summary: "Run existing tests (fast + tpcds_resource_resolution)"
+      done: true
+    - summary: "Verify editable install still works"
+      done: true
 
 metadata:
   owners:
-    - joeharris76
+  - joeharris76
   tags:
-    - packaging
-    - pypi
-    - tpc-h
-    - tpc-ds
-    - wheel
-    - critical-bug
+  - packaging
+  - pypi
+  - tpc-h
+  - tpc-ds
+  - wheel
+  - critical-bug
   estimated_effort: "2-3 hours"
   created_date: "2026-01-23"
   completed_date: "2026-01-24"
@@ -91,28 +91,28 @@ impact:
 
 files_affected:
   modified:
-    - benchbox/utils/tpc_compilation.py
-    - benchbox/core/tpch/queries.py
-    - benchbox/core/tpch/streams.py
-    - benchbox/core/tpcds/c_tools.py
-    - pyproject.toml
-    - MANIFEST.in
+  - benchbox/utils/tpc_compilation.py
+  - benchbox/core/tpch/queries.py
+  - benchbox/core/tpch/streams.py
+  - benchbox/core/tpcds/c_tools.py
+  - pyproject.toml
+  - MANIFEST.in
   added:
-    - benchbox/_binaries/tpc-h/templates/queries/
-    - benchbox/_binaries/tpc-h/templates/variants/
-    - benchbox/_binaries/tpc-h/templates/dists.dss
-    - benchbox/_binaries/tpc-ds/templates/query_templates/
-    - benchbox/_binaries/tpc-ds/templates/query_variants/
+  - benchbox/_binaries/tpc-h/templates/queries/
+  - benchbox/_binaries/tpc-h/templates/variants/
+  - benchbox/_binaries/tpc-h/templates/dists.dss
+  - benchbox/_binaries/tpc-ds/templates/query_templates/
+  - benchbox/_binaries/tpc-ds/templates/query_variants/
   removed:
-    - benchbox/_binaries/tpc-ds/darwin-arm64/query_templates/
-    - benchbox/_binaries/tpc-ds/darwin-x86_64/query_templates/
-    - benchbox/_binaries/tpc-ds/linux-arm64/query_templates/
-    - benchbox/_binaries/tpc-ds/linux-x86_64/query_templates/
-    - benchbox/_binaries/tpc-ds/windows-x86_64/query_templates/
+  - benchbox/_binaries/tpc-ds/darwin-arm64/query_templates/
+  - benchbox/_binaries/tpc-ds/darwin-x86_64/query_templates/
+  - benchbox/_binaries/tpc-ds/linux-arm64/query_templates/
+  - benchbox/_binaries/tpc-ds/linux-x86_64/query_templates/
+  - benchbox/_binaries/tpc-ds/windows-x86_64/query_templates/
 
 context_sections:
   "Background and Motivation": |
-    The wheel format (PEP 427) does not use MANIFEST.in — only setuptools
+    The wheel format (PEP 427) does not use MANIFEST.in - only setuptools
     package-data configuration determines what non-Python files are included.
     The current pyproject.toml uses a wildcard `"*"` key which matches patterns
     relative to each discovered package directory, NOT the project root.
@@ -130,8 +130,8 @@ context_sections:
     Plan file: /Users/joe/.claude/plans/streamed-riding-canyon.md
 
 success_metrics:
-  - "TPC-H query generation works after wheel install (no _sources/ needed)"
-  - "TPC-DS query generation works after wheel install"
-  - "All existing tests pass"
-  - "Editable install (development mode) still works"
-  - "Wheel size does not increase significantly (templates ~700KB vs existing ~8MB)"
+- "TPC-H query generation works after wheel install (no _sources/ needed)"
+- "TPC-DS query generation works after wheel install"
+- "All existing tests pass"
+- "Editable install (development mode) still works"
+- "Wheel size does not increase significantly (templates ~700KB vs existing ~8MB)"

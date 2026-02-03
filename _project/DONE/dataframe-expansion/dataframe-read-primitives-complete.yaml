@@ -15,7 +15,7 @@ description: |
   been implemented.
 
   KEY INSIGHT: Spark DataFrames are DECLARATIVE, not imperative. They build a logical
-  plan that goes through Catalyst optimizer — the same optimizations apply as SQL.
+  plan that goes through Catalyst optimizer - the same optimizations apply as SQL.
   Therefore, 10 of the 13 "optimizer" queries CAN be tested via DataFrames by writing
   them in "naive" form and letting Catalyst optimize.
 
@@ -86,12 +86,12 @@ context_sections:
 
   "Correct Skip List": |
     Only 3 queries should be in SKIP_FOR_DATAFRAME (correlated subquery constructs):
-    - optimizer_exists_to_semijoin (correlated EXISTS — no DataFrame equivalent)
-    - optimizer_in_to_exists (IN subquery with correlation — no DataFrame equivalent)
-    - optimizer_scalar_subquery_flattening (correlated scalar subqueries — no DataFrame equivalent)
+    - optimizer_exists_to_semijoin (correlated EXISTS - no DataFrame equivalent)
+    - optimizer_in_to_exists (IN subquery with correlation - no DataFrame equivalent)
+    - optimizer_scalar_subquery_flattening (correlated scalar subqueries - no DataFrame equivalent)
 
     The other 10 optimizer queries ARE implementable in DataFrames because Spark DataFrames
-    are DECLARATIVE — they build a logical plan that goes through Catalyst optimizer, just
+    are DECLARATIVE - they build a logical plan that goes through Catalyst optimizer, just
     like SQL. The key is to write them WITHOUT "baking in" the optimization.
 
   "Spark DataFrame Execution Model (CRITICAL)": |
@@ -468,7 +468,7 @@ tasks:
       done: false
       note: |
         These test Catalyst optimizer behavior. Write in "naive" form WITHOUT baking in optimization.
-        Spark DataFrames are declarative — Catalyst will optimize the plan.
+        Spark DataFrames are declarative - Catalyst will optimize the plan.
       items:
         - summary: "distinct_elimination - DISTINCT on primary key"
           done: false
