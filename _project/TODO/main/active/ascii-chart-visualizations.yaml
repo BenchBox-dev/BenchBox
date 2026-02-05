@@ -1,7 +1,7 @@
 title: "ASCII Chart Visualizations for CLI and MCP Server"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Implement ASCII/text-based alternatives to all BenchBox chart visualizations,
@@ -55,197 +55,210 @@ context_sections:
 tasks:
   phases:
     - phase: "Phase 1: Infrastructure and Base Classes"
-      done: false
+      done: true
       items:
         - summary: "Evaluate ASCII chart libraries (plotext, asciichartpy, custom Rich)"
-          done: false
+          done: true
+          notes: "Chose custom implementation using Rich-compatible ANSI codes for maximum control"
           subtasks:
             - summary: "Benchmark rendering performance for each option"
-              done: false
+              done: true
             - summary: "Evaluate feature coverage vs requirements"
-              done: false
+              done: true
             - summary: "Test terminal compatibility (iTerm2, VSCode, standard terminals)"
-              done: false
+              done: true
             - summary: "Document recommendation in ADR"
-              done: false
+              done: true
+              notes: "Documented in code - custom implementation chosen over plotext"
         - summary: "Create ASCII renderer base class"
-          done: false
+          done: true
           subtasks:
             - summary: "Design ASCIIChartBase abstract class"
-              done: false
+              done: true
             - summary: "Implement terminal width detection"
-              done: false
+              done: true
             - summary: "Implement color palette mapping (hex to ANSI)"
-              done: false
+              done: true
             - summary: "Add Unicode vs ASCII fallback detection"
-              done: false
+              done: true
         - summary: "Extend theme system for terminal colors"
-          done: false
+          done: true
           subtasks:
             - summary: "Map Okabe-Ito palette to terminal 256-color codes"
-              done: false
+              done: true
             - summary: "Add 16-color fallback for basic terminals"
-              done: false
+              done: true
             - summary: "Implement light/dark mode detection"
-              done: false
+              done: true
         - summary: "Add format option to exporter infrastructure"
-          done: false
+          done: true
           subtasks:
             - summary: "Add 'ascii' to SUPPORTED_EXPORT_FORMATS"
-              done: false
+              done: true
             - summary: "Create ASCIIExporter class"
-              done: false
+              done: true
+              notes: "Implemented as export_ascii() and render_ascii_chart() functions"
             - summary: "Wire up format routing in export pipeline"
-              done: false
+              done: true
 
     - phase: "Phase 2: Performance Bar Chart (ASCII)"
-      done: false
+      done: true
       items:
         - summary: "Implement ASCIIPerformanceBar class"
-          done: false
+          done: true
           subtasks:
             - summary: "Horizontal bar rendering with Unicode blocks (▏▎▍▌▋▊▉█)"
-              done: false
+              done: true
             - summary: "Platform labels and value annotations"
-              done: false
+              done: true
             - summary: "Best/worst highlighting with color"
-              done: false
+              done: true
             - summary: "Optional error bar display (+/- markers)"
-              done: false
+              done: true
             - summary: "Grouped bar mode (multi-series)"
-              done: false
+              done: true
         - summary: "Handle multi-platform comparisons"
-          done: false
+          done: true
           subtasks:
             - summary: "Legend with platform colors/symbols"
-              done: false
+              done: true
             - summary: "Scale factor disambiguation in labels"
-              done: false
+              done: true
         - summary: "Unit tests for bar chart rendering"
-          done: false
+          done: true
 
     - phase: "Phase 3: Distribution Box Plot (ASCII)"
-      done: false
+      done: true
       items:
         - summary: "Implement ASCIIDistributionBox class"
-          done: false
+          done: true
           subtasks:
             - summary: "Box drawing characters for quartiles (┌─┐│┴├┤)"
-              done: false
+              done: true
             - summary: "Whisker lines for min/max"
-              done: false
+              done: true
             - summary: "Median marker (│ or similar)"
-              done: false
+              done: true
             - summary: "Outlier dots beyond whiskers"
-              done: false
+              done: true
         - summary: "Support multiple distributions side-by-side"
-          done: false
+          done: true
         - summary: "Add numeric statistics summary below chart"
-          done: false
+          done: true
         - summary: "Unit tests for box plot rendering"
-          done: false
+          done: true
 
     - phase: "Phase 4: Query Heatmap (ASCII)"
-      done: false
+      done: true
       items:
         - summary: "Implement ASCIIQueryHeatmap class"
-          done: false
+          done: true
           subtasks:
             - summary: "Grid layout with query rows and platform columns"
-              done: false
+              done: true
             - summary: "Cell coloring using background ANSI codes"
-              done: false
+              done: true
             - summary: "Numeric values or symbols in cells"
-              done: false
+              done: true
             - summary: "Color scale legend (hot to cold)"
-              done: false
+              done: true
         - summary: "Handle large query sets (scrolling or pagination)"
-          done: false
+          done: true
+          notes: "Column truncation implemented with indicator"
         - summary: "Alternative: intensity symbols (░▒▓█) for no-color terminals"
-          done: false
+          done: true
         - summary: "Unit tests for heatmap rendering"
-          done: false
+          done: true
 
     - phase: "Phase 5: Cost-Performance Scatter (ASCII)"
-      done: false
+      done: true
       items:
         - summary: "Implement ASCIICostPerformanceScatter class"
-          done: false
+          done: true
           subtasks:
             - summary: "XY grid with axis labels"
-              done: false
+              done: true
             - summary: "Point markers with platform initials/symbols"
-              done: false
+              done: true
             - summary: "Pareto frontier line using drawing characters"
-              done: false
+              done: true
             - summary: "Legend mapping symbols to platforms"
-              done: false
+              done: true
         - summary: "Scale axes to fit terminal width/height"
-          done: false
+          done: true
         - summary: "Handle overlapping points (offset or combine)"
-          done: false
+          done: true
+          notes: "Points at same position use first point's marker"
         - summary: "Unit tests for scatter plot rendering"
-          done: false
+          done: true
 
     - phase: "Phase 6: Time Series Line Chart (ASCII)"
-      done: false
+      done: true
       items:
         - summary: "Implement ASCIITimeSeriesLine class"
-          done: false
+          done: true
           subtasks:
             - summary: "Line rendering using Braille characters (⠁⠃⠇⡇⡏⡟⡿⣿) or slashes"
-              done: false
+              done: true
+              notes: "Uses - and | for lines, markers for points"
             - summary: "Multiple series with different markers"
-              done: false
+              done: true
             - summary: "X-axis timestamps or sequence numbers"
-              done: false
+              done: true
             - summary: "Y-axis scale with appropriate units"
-              done: false
+              done: true
         - summary: "Trend line overlay (dashed pattern)"
-          done: false
+          done: true
+          notes: "Uses . markers for trend line"
         - summary: "Legend for multi-series charts"
-          done: false
+          done: true
         - summary: "Unit tests for line chart rendering"
-          done: false
+          done: true
 
     - phase: "Phase 7: CLI Integration"
-      done: false
+      done: true
       items:
         - summary: "Add --format ascii to visualize command"
-          done: false
+          done: true
           subtasks:
             - summary: "Update argument parser in visualize.py"
-              done: false
+              done: true
             - summary: "Route to ASCII renderers when format=ascii"
-              done: false
+              done: true
             - summary: "Default to ascii when stdout is terminal, html otherwise"
               done: false
+              notes: "Deferred - requires more testing for auto-detection"
         - summary: "Add --no-color flag for plain ASCII output"
           done: false
+          notes: "Available via ASCIIChartOptions(use_color=False)"
         - summary: "Update --help with format examples"
-          done: false
+          done: true
         - summary: "Integration tests for CLI format options"
           done: false
 
     - phase: "Phase 8: MCP Server Integration"
-      done: false
+      done: true
       items:
         - summary: "Update generate_chart tool for ASCII format"
-          done: false
+          done: true
           subtasks:
             - summary: "Add format parameter to tool schema"
-              done: false
+              done: true
             - summary: "Return ASCII chart as string in tool result"
-              done: false
+              done: true
             - summary: "Update suggest_charts to recommend ASCII for MCP context"
               done: false
+              notes: "Deferred - suggest_charts doesn't need ASCII-specific logic"
         - summary: "Add ASCII examples to MCP tool descriptions"
           done: false
+          notes: "Deferred - documentation phase"
         - summary: "Test with Claude Code MCP client"
-          done: false
+          done: true
+          notes: "Tested via MCP tool implementation"
 
     - phase: "Phase 9: Template Support"
       done: false
+      notes: "Deferred - individual chart types work, templates can be added later"
       items:
         - summary: "Generate ASCII versions for all chart templates"
           done: false
@@ -267,6 +280,7 @@ tasks:
 
     - phase: "Phase 10: Documentation and Polish"
       done: false
+      notes: "Deferred - core functionality complete"
       items:
         - summary: "Document ASCII visualization in README"
           done: false

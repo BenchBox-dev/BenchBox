@@ -1,4 +1,4 @@
-generated_at: '2026-02-05T08:37:24.401129'
+generated_at: '2026-02-05T08:52:28.250435'
 total_items: 43
 items:
 - id: lakesail-spark-platform
@@ -525,7 +525,7 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - visualization
   - cli

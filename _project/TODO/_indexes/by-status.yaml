@@ -1,22 +1,22 @@
-generated_at: '2026-02-05T08:37:24.401194'
+generated_at: '2026-02-05T08:52:28.250504'
 total_items: 43
 statuses:
   In Progress:
-    count: 1
-    items:
-    - id: motherduck-platform-adapter
-      file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
-      title: MotherDuck Platform Adapter
-      priority: High
-      category: Platform Expansion
-  Not Started:
-    count: 42
+    count: 2
     items:
     - id: ascii-chart-visualizations
       file: TODO/main/active/ascii-chart-visualizations.yaml
       title: ASCII Chart Visualizations for CLI and MCP Server
       priority: Medium-High
       category: Core Functionality
+    - id: motherduck-platform-adapter
+      file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      priority: High
+      category: Platform Expansion
+  Not Started:
+    count: 41
+    items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support

@@ -1,4 +1,4 @@
-generated_at: '2026-02-05T08:37:24.401182'
+generated_at: '2026-02-05T08:52:28.250492'
 total_items: 43
 priorities:
   High:
@@ -26,7 +26,7 @@ priorities:
       file: TODO/main/active/ascii-chart-visualizations.yaml
       title: ASCII Chart Visualizations for CLI and MCP Server
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
