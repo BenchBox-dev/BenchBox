@@ -1,5 +1,5 @@
-generated_at: '2026-02-05T08:52:29.220839'
-total_items: 401
+generated_at: '2026-02-05T17:38:41.866895'
+total_items: 403
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 203
+    count: 205
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -768,6 +768,11 @@ statuses:
       title: '"✅ Version Management & Consistency"'
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: ascii-chart-visualizations
+      file: DONE/main/active/ascii-chart-visualizations.yaml
+      title: ASCII Chart Visualizations for CLI and MCP Server
+      priority: Medium-High
+      category: Core Functionality
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
       title: AWS Athena Platform Adapter
@@ -1283,6 +1288,11 @@ statuses:
       title: PySpark DataFrame Adapter Implementation
       priority: Medium
       category: Platform Enhancement
+    - id: query-latency-histogram
+      file: DONE/main/active/query-latency-histogram.yaml
+      title: Query Latency Histogram Visualization
+      priority: Medium
+      category: Core Functionality
     - id: query-plan-cli-visualization
       file: DONE/query-plan-cli/planning/query-plan-cli-visualization.yaml
       title: Query Plan CLI & Visualization

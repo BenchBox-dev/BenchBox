@@ -1,5 +1,5 @@
-generated_at: '2026-02-05T08:52:29.220747'
-total_items: 401
+generated_at: '2026-02-05T17:38:41.866810'
+total_items: 403
 priorities:
   Critical:
     count: 27
@@ -818,13 +818,18 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 27
+    count: 28
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
       title: AI/ML Primitives Benchmark - SQL-Based AI Functions
       category: Benchmark Development
       status: Not Started
+    - id: ascii-chart-visualizations
+      file: DONE/main/active/ascii-chart-visualizations.yaml
+      title: ASCII Chart Visualizations for CLI and MCP Server
+      category: Core Functionality
+      status: Completed
     - id: hudi-support-parity
       file: DONE/table-format-parity/hudi-support-parity.yaml
       title: Add Apache Hudi Support on Par with Delta Lake and Iceberg
@@ -956,7 +961,7 @@ priorities:
       category: Core Functionality
       status: Complete
   Medium:
-    count: 195
+    count: 196
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1602,6 +1607,11 @@ priorities:
       file: DONE/dataframe-expansion/planning/pyspark-dataframe-adapter.yaml
       title: PySpark DataFrame Adapter Implementation
       category: Platform Enhancement
+      status: Completed
+    - id: query-latency-histogram
+      file: DONE/main/active/query-latency-histogram.yaml
+      title: Query Latency Histogram Visualization
+      category: Core Functionality
       status: Completed
     - id: query-plan-documentation-testing
       file: DONE/query-plan-docs/planning/query-plan-documentation-testing.yaml

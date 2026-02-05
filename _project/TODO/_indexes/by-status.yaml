@@ -1,14 +1,9 @@
-generated_at: '2026-02-05T08:52:28.250504'
-total_items: 43
+generated_at: '2026-02-05T17:38:40.880308'
+total_items: 42
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: ascii-chart-visualizations
-      file: TODO/main/active/ascii-chart-visualizations.yaml
-      title: ASCII Chart Visualizations for CLI and MCP Server
-      priority: Medium-High
-      category: Core Functionality
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter

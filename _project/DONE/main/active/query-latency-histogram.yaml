@@ -1,7 +1,8 @@
 title: "Query Latency Histogram Visualization"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-02-05"
 category: Core Functionality
 description: |
   Add a new "query latency histogram" chart type that displays one vertical bar per query,
@@ -152,15 +153,17 @@ tasks:
           done: true
 
     - phase: "Phase 5: Documentation"
-      done: false
-      notes: "Deferred - core functionality complete"
+      done: true
       items:
         - summary: "Add histogram examples to CLI help"
-          done: false
+          done: true
+          notes: "Added to docs/visualization/cli-reference.md with ASCII and HTML examples"
         - summary: "Update visualization documentation"
-          done: false
+          done: true
+          notes: "Added to chart-types.md (full section) and overview.md (taxonomy)"
         - summary: "Add sample output screenshots"
-          done: false
+          done: true
+          notes: "Added ASCII example in chart-types.md; PNG screenshots deferred (require actual benchmark runs)"
 
 metadata:
   tags:
@@ -189,6 +192,9 @@ files_affected:
     - "benchbox/mcp/tools/visualization.py"
     - "tests/unit/visualization/ascii/test_ascii_charts.py"
     - "tests/unit/mcp/test_visualization_tools.py"
+    - "docs/visualization/chart-types.md"
+    - "docs/visualization/cli-reference.md"
+    - "docs/visualization/overview.md"
   added:
     - "benchbox/core/visualization/ascii/histogram.py"
   removed: []
@@ -222,4 +228,4 @@ open_questions:
   - "Should we include median/mean reference lines?" # Implemented: mean line
 
 commits:
-  - "pending"
+  - "2448e586"

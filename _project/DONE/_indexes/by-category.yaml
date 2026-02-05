@@ -1,4 +1,4 @@
-generated_at: '2026-02-05T08:52:29.220641'
+generated_at: '2026-02-05T17:38:41.866716'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 90
+    count: 92
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -360,6 +360,11 @@ categories:
       title: '"TPC-DS Dry Run: Execute Real Test SQL Capture (Power/Throughput/Maintenance) ✅"'
       priority: Medium
       status: Not Started
+    - id: ascii-chart-visualizations
+      file: DONE/main/active/ascii-chart-visualizations.yaml
+      title: ASCII Chart Visualizations for CLI and MCP Server
+      priority: Medium-High
+      status: Completed
     - id: hudi-support-parity
       file: DONE/table-format-parity/hudi-support-parity.yaml
       title: Add Apache Hudi Support on Par with Delta Lake and Iceberg
@@ -715,6 +720,11 @@ categories:
       title: Pre-Compile TPC Binaries for Multiple Platforms ✅ COMPLETED
       priority: Medium
       status: Not Started
+    - id: query-latency-histogram
+      file: DONE/main/active/query-latency-histogram.yaml
+      title: Query Latency Histogram Visualization
+      priority: Medium
+      status: Completed
     - id: query-plan-cli-visualization
       file: DONE/query-plan-cli/planning/query-plan-cli-visualization.yaml
       title: Query Plan CLI & Visualization

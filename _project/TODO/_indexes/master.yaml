@@ -1,5 +1,5 @@
-generated_at: '2026-02-05T08:52:28.250435'
-total_items: 43
+generated_at: '2026-02-05T17:38:40.880245'
+total_items: 42
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -519,21 +519,6 @@ items:
   - blog-data
   - verification
   estimated_effort: 30-60 minutes
-- id: ascii-chart-visualizations
-  file: TODO/main/active/ascii-chart-visualizations.yaml
-  title: ASCII Chart Visualizations for CLI and MCP Server
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - visualization
-  - cli
-  - mcp
-  - ascii-art
-  - terminal
-  - rich-library
-  estimated_effort: 2-3 weeks
 - id: apache-doris-olap-platform
   file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
   title: Add Apache Doris MPP OLAP platform support
