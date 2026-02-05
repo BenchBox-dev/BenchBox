@@ -1,4 +1,4 @@
-generated_at: '2026-02-03T17:14:59.690873'
+generated_at: '2026-02-05T08:37:24.401167'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -94,8 +94,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 4
+    count: 5
     items:
+    - id: ascii-chart-visualizations
+      file: TODO/main/active/ascii-chart-visualizations.yaml
+      title: ASCII Chart Visualizations for CLI and MCP Server
+      priority: Medium-High
+      status: Not Started
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB

@@ -1,0 +1,362 @@
+title: "ASCII Chart Visualizations for CLI and MCP Server"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+description: |
+  Implement ASCII/text-based alternatives to all BenchBox chart visualizations,
+  enabling rich visual output directly in terminal environments and MCP server
+  responses without requiring HTML files or external viewers.
+
+  The current visualization system uses Plotly to generate interactive HTML charts.
+  This TODO adds a parallel ASCII rendering capability that maintains the same
+  data models and interface while outputting terminal-friendly text graphics.
+
+context_sections:
+  "Background and Motivation": |
+    BenchBox's visualization pipeline currently generates Plotly HTML charts that
+    require opening in a browser. This creates friction for:
+
+    1. **CLI Users**: Want to see results inline without leaving the terminal
+    2. **MCP Server Users**: Claude and other LLM agents can't interpret HTML/images
+    3. **CI/CD Pipelines**: Need text-based summaries in logs
+    4. **SSH Sessions**: Remote terminals without X11 forwarding or browser access
+    5. **Accessibility**: Screen readers work better with structured text
+
+    ASCII charts provide immediate visual feedback while preserving the analytical
+    value of the graphical representations.
+
+  "Technical Context": |
+    **Current Visualization Architecture:**
+    - Core module: `benchbox/core/visualization/`
+    - Chart classes: `PerformanceBarChart`, `DistributionBoxPlot`, `QueryHeatmap`,
+      `CostPerformanceScatterPlot`, `TimeSeriesLineChart`
+    - CLI command: `benchbox visualize` (see `benchbox/cli/commands/visualize.py`)
+    - MCP tools: `suggest_charts()`, `generate_chart()` in `benchbox/mcp/tools/visualization.py`
+    - Data types: `BarDatum`, `DistributionSeries`, `CostPerformancePoint`, `TimeSeriesPoint`
+
+    **Existing Text Rendering:**
+    - Query plans already have ASCII tree rendering (`benchbox/core/query_plans/visualization.py`)
+    - Rich library is used extensively for tables, panels, and styled terminal output
+    - Report command uses Rich tables for rankings/trends/regressions
+
+    **Libraries Available:**
+    - Rich (already integrated): Tables, panels, progress bars, markup styling
+    - Potential additions: plotext (terminal plotting), asciichartpy, termgraph
+
+  "Design Principles": |
+    1. **Same Data Models**: Reuse existing `BarDatum`, `DistributionSeries`, etc.
+    2. **Parallel Implementation**: ASCII charts mirror Plotly chart classes
+    3. **Format Option**: Add `--format ascii` to CLI, `format: "ascii"` to MCP tools
+    4. **Theme Support**: Convert existing light/dark themes to ANSI colors
+    5. **Graceful Degradation**: Fall back to simpler output if terminal lacks Unicode/color
+    6. **Width Awareness**: Detect terminal width and scale charts appropriately
+
+tasks:
+  phases:
+    - phase: "Phase 1: Infrastructure and Base Classes"
+      done: false
+      items:
+        - summary: "Evaluate ASCII chart libraries (plotext, asciichartpy, custom Rich)"
+          done: false
+          subtasks:
+            - summary: "Benchmark rendering performance for each option"
+              done: false
+            - summary: "Evaluate feature coverage vs requirements"
+              done: false
+            - summary: "Test terminal compatibility (iTerm2, VSCode, standard terminals)"
+              done: false
+            - summary: "Document recommendation in ADR"
+              done: false
+        - summary: "Create ASCII renderer base class"
+          done: false
+          subtasks:
+            - summary: "Design ASCIIChartBase abstract class"
+              done: false
+            - summary: "Implement terminal width detection"
+              done: false
+            - summary: "Implement color palette mapping (hex to ANSI)"
+              done: false
+            - summary: "Add Unicode vs ASCII fallback detection"
+              done: false
+        - summary: "Extend theme system for terminal colors"
+          done: false
+          subtasks:
+            - summary: "Map Okabe-Ito palette to terminal 256-color codes"
+              done: false
+            - summary: "Add 16-color fallback for basic terminals"
+              done: false
+            - summary: "Implement light/dark mode detection"
+              done: false
+        - summary: "Add format option to exporter infrastructure"
+          done: false
+          subtasks:
+            - summary: "Add 'ascii' to SUPPORTED_EXPORT_FORMATS"
+              done: false
+            - summary: "Create ASCIIExporter class"
+              done: false
+            - summary: "Wire up format routing in export pipeline"
+              done: false
+
+    - phase: "Phase 2: Performance Bar Chart (ASCII)"
+      done: false
+      items:
+        - summary: "Implement ASCIIPerformanceBar class"
+          done: false
+          subtasks:
+            - summary: "Horizontal bar rendering with Unicode blocks (▏▎▍▌▋▊▉█)"
+              done: false
+            - summary: "Platform labels and value annotations"
+              done: false
+            - summary: "Best/worst highlighting with color"
+              done: false
+            - summary: "Optional error bar display (+/- markers)"
+              done: false
+            - summary: "Grouped bar mode (multi-series)"
+              done: false
+        - summary: "Handle multi-platform comparisons"
+          done: false
+          subtasks:
+            - summary: "Legend with platform colors/symbols"
+              done: false
+            - summary: "Scale factor disambiguation in labels"
+              done: false
+        - summary: "Unit tests for bar chart rendering"
+          done: false
+
+    - phase: "Phase 3: Distribution Box Plot (ASCII)"
+      done: false
+      items:
+        - summary: "Implement ASCIIDistributionBox class"
+          done: false
+          subtasks:
+            - summary: "Box drawing characters for quartiles (┌─┐│┴├┤)"
+              done: false
+            - summary: "Whisker lines for min/max"
+              done: false
+            - summary: "Median marker (│ or similar)"
+              done: false
+            - summary: "Outlier dots beyond whiskers"
+              done: false
+        - summary: "Support multiple distributions side-by-side"
+          done: false
+        - summary: "Add numeric statistics summary below chart"
+          done: false
+        - summary: "Unit tests for box plot rendering"
+          done: false
+
+    - phase: "Phase 4: Query Heatmap (ASCII)"
+      done: false
+      items:
+        - summary: "Implement ASCIIQueryHeatmap class"
+          done: false
+          subtasks:
+            - summary: "Grid layout with query rows and platform columns"
+              done: false
+            - summary: "Cell coloring using background ANSI codes"
+              done: false
+            - summary: "Numeric values or symbols in cells"
+              done: false
+            - summary: "Color scale legend (hot to cold)"
+              done: false
+        - summary: "Handle large query sets (scrolling or pagination)"
+          done: false
+        - summary: "Alternative: intensity symbols (░▒▓█) for no-color terminals"
+          done: false
+        - summary: "Unit tests for heatmap rendering"
+          done: false
+
+    - phase: "Phase 5: Cost-Performance Scatter (ASCII)"
+      done: false
+      items:
+        - summary: "Implement ASCIICostPerformanceScatter class"
+          done: false
+          subtasks:
+            - summary: "XY grid with axis labels"
+              done: false
+            - summary: "Point markers with platform initials/symbols"
+              done: false
+            - summary: "Pareto frontier line using drawing characters"
+              done: false
+            - summary: "Legend mapping symbols to platforms"
+              done: false
+        - summary: "Scale axes to fit terminal width/height"
+          done: false
+        - summary: "Handle overlapping points (offset or combine)"
+          done: false
+        - summary: "Unit tests for scatter plot rendering"
+          done: false
+
+    - phase: "Phase 6: Time Series Line Chart (ASCII)"
+      done: false
+      items:
+        - summary: "Implement ASCIITimeSeriesLine class"
+          done: false
+          subtasks:
+            - summary: "Line rendering using Braille characters (⠁⠃⠇⡇⡏⡟⡿⣿) or slashes"
+              done: false
+            - summary: "Multiple series with different markers"
+              done: false
+            - summary: "X-axis timestamps or sequence numbers"
+              done: false
+            - summary: "Y-axis scale with appropriate units"
+              done: false
+        - summary: "Trend line overlay (dashed pattern)"
+          done: false
+        - summary: "Legend for multi-series charts"
+          done: false
+        - summary: "Unit tests for line chart rendering"
+          done: false
+
+    - phase: "Phase 7: CLI Integration"
+      done: false
+      items:
+        - summary: "Add --format ascii to visualize command"
+          done: false
+          subtasks:
+            - summary: "Update argument parser in visualize.py"
+              done: false
+            - summary: "Route to ASCII renderers when format=ascii"
+              done: false
+            - summary: "Default to ascii when stdout is terminal, html otherwise"
+              done: false
+        - summary: "Add --no-color flag for plain ASCII output"
+          done: false
+        - summary: "Update --help with format examples"
+          done: false
+        - summary: "Integration tests for CLI format options"
+          done: false
+
+    - phase: "Phase 8: MCP Server Integration"
+      done: false
+      items:
+        - summary: "Update generate_chart tool for ASCII format"
+          done: false
+          subtasks:
+            - summary: "Add format parameter to tool schema"
+              done: false
+            - summary: "Return ASCII chart as string in tool result"
+              done: false
+            - summary: "Update suggest_charts to recommend ASCII for MCP context"
+              done: false
+        - summary: "Add ASCII examples to MCP tool descriptions"
+          done: false
+        - summary: "Test with Claude Code MCP client"
+          done: false
+
+    - phase: "Phase 9: Template Support"
+      done: false
+      items:
+        - summary: "Generate ASCII versions for all chart templates"
+          done: false
+          subtasks:
+            - summary: "default template (bar, box, heatmap)"
+              done: false
+            - summary: "flagship template (bar, heatmap, scatter, box)"
+              done: false
+            - summary: "head_to_head template (bar, box, heatmap)"
+              done: false
+            - summary: "trends template (line, bar)"
+              done: false
+            - summary: "cost_optimization template (scatter, bar)"
+              done: false
+        - summary: "Combine multiple ASCII charts with separators"
+          done: false
+        - summary: "Add template option to ASCII exporter"
+          done: false
+
+    - phase: "Phase 10: Documentation and Polish"
+      done: false
+      items:
+        - summary: "Document ASCII visualization in README"
+          done: false
+        - summary: "Add examples to CLI help (--help examples)"
+          done: false
+        - summary: "Update MCP server documentation"
+          done: false
+        - summary: "Add screenshots/recordings of ASCII output"
+          done: false
+        - summary: "Performance benchmark: ASCII vs HTML generation time"
+          done: false
+
+metadata:
+  tags:
+    - visualization
+    - cli
+    - mcp
+    - ascii-art
+    - terminal
+    - rich-library
+  estimated_effort: "2-3 weeks"
+  created_date: "2025-02-05"
+
+impact:
+  business_value: |
+    ASCII visualizations transform BenchBox from a "generate HTML and open browser"
+    tool into a truly terminal-native experience. This is especially valuable for:
+    - LLM/MCP integration where agents can interpret text charts
+    - CI/CD pipelines that want visual summaries in logs
+    - Remote server administration without GUI access
+    - Quick iteration during benchmark development
+
+  user_impact: |
+    Users can see performance charts instantly in their terminal without context
+    switching to a browser. MCP users (Claude Code) can request and interpret
+    benchmark visualizations directly in conversation.
+
+files_affected:
+  modified:
+    - "benchbox/core/visualization/exporters.py"
+    - "benchbox/core/visualization/styles.py"
+    - "benchbox/cli/commands/visualize.py"
+    - "benchbox/mcp/tools/visualization.py"
+  added:
+    - "benchbox/core/visualization/ascii/__init__.py"
+    - "benchbox/core/visualization/ascii/base.py"
+    - "benchbox/core/visualization/ascii/bar_chart.py"
+    - "benchbox/core/visualization/ascii/box_plot.py"
+    - "benchbox/core/visualization/ascii/heatmap.py"
+    - "benchbox/core/visualization/ascii/scatter_plot.py"
+    - "benchbox/core/visualization/ascii/line_chart.py"
+    - "tests/unit/visualization/ascii/"
+  removed: []
+
+dependencies:
+  related:
+    - "benchbox/core/visualization/charts.py (Plotly chart classes to mirror)"
+    - "benchbox/core/query_plans/visualization.py (existing ASCII tree rendering)"
+  external:
+    - "Rich library (already integrated)"
+    - "Optional: plotext (terminal plotting library)"
+
+technical_requirements:
+  dependencies:
+    - "rich>=13.0 (already present)"
+    - "optional: plotext>=5.0 (evaluate in Phase 1)"
+  constraints:
+    - "Must work in 80-column terminals (minimum width)"
+    - "Must degrade gracefully without Unicode support"
+    - "Must work without color support (--no-color)"
+    - "Performance: ASCII generation should be <100ms per chart"
+
+success_metrics:
+  - "All 5 chart types render in ASCII with same data as Plotly versions"
+  - "CLI --format ascii produces inline output"
+  - "MCP generate_chart returns usable ASCII strings"
+  - "Output is readable in 80-column terminal"
+  - "Charts maintain analytical value (trends visible, comparisons clear)"
+  - "ASCII generation is faster than HTML generation"
+  - "Works in VSCode terminal, iTerm2, and standard terminals"
+
+open_questions:
+  - "Should we use plotext library or build custom Rich-based renderers?"
+  - "How to handle very wide charts (many platforms) in narrow terminals?"
+  - "Should ASCII be the default format when running in terminal?"
+  - "How detailed should heatmap cells be (colors vs symbols vs numbers)?"
+  - "Should we support interactive features (scrolling, zoom) via Rich Live?"
+
+related_work:
+  - "Query plan ASCII trees (benchbox/core/query_plans/visualization.py) - existing pattern"
+  - "Rich library documentation: https://rich.readthedocs.io/"
+  - "plotext library: https://github.com/piccolomo/plotext"
+  - "Terminal graphics standards: Unicode block elements, Braille patterns"
