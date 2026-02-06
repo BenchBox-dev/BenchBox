@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T10:57:57.879876'
-total_items: 404
+generated_at: '2026-02-06T12:53:19.056820'
+total_items: 405
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4076,6 +4076,21 @@ items:
   - reproducibility
   - schema
   estimated_effort: Medium
+- id: enhance-ascii-charting
+  file: DONE/core-functionality/planning/enhance-ascii-charting.yaml
+  title: Enhance and extend ASCII charting with new chart types and comparison visualizations
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - visualization
+  - ascii
+  - charting
+  - comparison
+  - terminal
+  estimated_effort: 3-5 days
+  completed_date: '2026-02-06'
 - id: fix-type-checking-errors
   file: DONE/main/active/fix-type-checking-errors.yaml
   title: Fix type checking errors ignored in ty config

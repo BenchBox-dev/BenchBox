@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T10:57:57.880064'
+generated_at: '2026-02-06T12:53:19.056979'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 93
+    count: 94
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -498,6 +498,11 @@ categories:
     - id: embed-tuning-config-in-results
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output
+      priority: Medium-High
+      status: Completed
+    - id: enhance-ascii-charting
+      file: DONE/core-functionality/planning/enhance-ascii-charting.yaml
+      title: Enhance and extend ASCII charting with new chart types and comparison visualizations
       priority: Medium-High
       status: Completed
     - id: expand-mcp-tool-surface

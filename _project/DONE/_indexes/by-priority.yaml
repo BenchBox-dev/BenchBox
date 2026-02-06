@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T10:57:57.880171'
-total_items: 404
+generated_at: '2026-02-06T12:53:19.057083'
+total_items: 405
 priorities:
   Critical:
     count: 27
@@ -823,7 +823,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 28
+    count: 29
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -898,6 +898,11 @@ priorities:
     - id: embed-tuning-config-in-results
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output
+      category: Core Functionality
+      status: Completed
+    - id: enhance-ascii-charting
+      file: DONE/core-functionality/planning/enhance-ascii-charting.yaml
+      title: Enhance and extend ASCII charting with new chart types and comparison visualizations
       category: Core Functionality
       status: Completed
     - id: fix-type-checking-errors

@@ -1,14 +1,9 @@
-generated_at: '2026-02-06T10:57:56.929245'
-total_items: 43
+generated_at: '2026-02-06T12:53:18.130035'
+total_items: 42
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: enhance-ascii-charting
-      file: TODO/core-functionality/planning/enhance-ascii-charting.yaml
-      title: Enhance and extend ASCII charting with new chart types and comparison visualizations
-      priority: Medium-High
-      category: Core Functionality
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
