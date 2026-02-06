@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T09:29:22.501273'
-total_items: 42
+generated_at: '2026-02-06T10:57:56.929233'
+total_items: 43
 priorities:
   High:
     count: 3
@@ -20,7 +20,7 @@ priorities:
       category: Platform Expansion
       status: In Progress
   Medium-High:
-    count: 5
+    count: 6
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -37,6 +37,11 @@ priorities:
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
       status: Not Started
+    - id: enhance-ascii-charting
+      file: TODO/core-functionality/planning/enhance-ascii-charting.yaml
+      title: Enhance and extend ASCII charting with new chart types and comparison visualizations
+      category: Core Functionality
+      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

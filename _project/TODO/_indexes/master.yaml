@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T09:29:22.501223'
-total_items: 42
+generated_at: '2026-02-06T10:57:56.929186'
+total_items: 43
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -572,6 +572,20 @@ items:
   - platform
   - mysql-protocol
   estimated_effort: Medium
+- id: enhance-ascii-charting
+  file: TODO/core-functionality/planning/enhance-ascii-charting.yaml
+  title: Enhance and extend ASCII charting with new chart types and comparison visualizations
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: In Progress
+  tags:
+  - visualization
+  - ascii
+  - charting
+  - comparison
+  - terminal
+  estimated_effort: 3-5 days
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats

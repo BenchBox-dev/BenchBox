@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T09:29:23.405873'
-total_items: 403
+generated_at: '2026-02-06T10:57:57.880171'
+total_items: 404
 priorities:
   Critical:
     count: 27
@@ -140,7 +140,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 135
+    count: 136
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -287,6 +287,11 @@ priorities:
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
       category: Documentation
       status: Completed
+    - id: drop-plotly-html-charts
+      file: DONE/core-functionality/active/drop-plotly-html-charts.yaml
+      title: Drop Plotly dependency and HTML chart rendering — go ASCII-only
+      category: Core Functionality
+      status: Done
     - id: e2e-cli-test-suite
       file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
       title: 'E2E CLI Test Suite: Complete Platform Coverage'

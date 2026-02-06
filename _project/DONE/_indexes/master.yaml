@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T09:29:23.405618'
-total_items: 403
+generated_at: '2026-02-06T10:57:57.879876'
+total_items: 404
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -747,6 +747,20 @@ items:
   - streaming
   estimated_effort: 2-3 hours
   completed_date: '2026-01-15'
+- id: drop-plotly-html-charts
+  file: DONE/core-functionality/active/drop-plotly-html-charts.yaml
+  title: Drop Plotly dependency and HTML chart rendering — go ASCII-only
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Done
+  tags:
+  - visualization
+  - plotly
+  - dependency-removal
+  - simplification
+  - architecture
+  estimated_effort: 2-3 days
 - id: e2e-cli-test-suite
   file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
   title: 'E2E CLI Test Suite: Complete Platform Coverage'
