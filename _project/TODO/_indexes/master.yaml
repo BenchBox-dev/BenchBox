@@ -1,6 +1,23 @@
-generated_at: '2026-02-06T17:01:43.790824'
-total_items: 43
+generated_at: '2026-02-06T18:51:51.734350'
+total_items: 45
 items:
+- id: fix-dataframe-parameter-parity-follow-up-findings
+  file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
+  title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Critical
+  status: Not Started
+  tags:
+  - tpcds
+  - dataframe
+  - parameter-substitution
+  - stream-parity
+  - correctness
+  - follow-up
+  owners:
+  - joe
+  estimated_effort: 2-4 days
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
   title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
@@ -587,6 +604,20 @@ items:
   - platform
   - mysql-protocol
   estimated_effort: Medium
+- id: ascii-chart-polish-and-ux-refinements
+  file: TODO/core-functionality/planning/ascii-chart-polish-and-ux-refinements.yaml
+  title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - visualization
+  - ascii
+  - charting
+  - ux
+  - polish
+  estimated_effort: 4-6 days
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats

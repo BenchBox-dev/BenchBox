@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T17:01:44.749332'
+generated_at: '2026-02-06T18:51:52.673189'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 95
+    count: 96
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -379,6 +379,11 @@ categories:
       file: DONE/benchmark-expansion/planning/datavault-benchmark-implementation.yaml
       title: Add Data Vault Benchmark Implementation
       priority: Medium
+      status: Completed
+    - id: datafusion-sql-query-transformer
+      file: DONE/core-functionality/active/datafusion-sql-query-transformer.yaml
+      title: Add DataFusion SQL query transformer for TPC-H Q11, Q16, Q18, Q20
+      priority: High
       status: Completed
     - id: tpcds-obt-benchmark-implementation
       file: DONE/benchmark-expansion/planning/tpcds-obt-benchmark-implementation.yaml

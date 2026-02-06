@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T17:01:43.790883'
-total_items: 43
+generated_at: '2026-02-06T18:51:51.734407'
+total_items: 45
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 42
+    count: 44
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -87,6 +87,11 @@ statuses:
       title: Firebolt Cloud Deployment Mode
       priority: Medium
       category: Platform Expansion
+    - id: fix-dataframe-parameter-parity-follow-up-findings
+      file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
+      title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
+      priority: Critical
+      category: Core Functionality
     - id: fix-tpch-reference-seed-and-parameter-parity
       file: TODO/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
       title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
@@ -142,6 +147,11 @@ statuses:
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       priority: Medium
       category: Benchmark Development
+    - id: ascii-chart-polish-and-ux-refinements
+      file: TODO/core-functionality/planning/ascii-chart-polish-and-ux-refinements.yaml
+      title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
+      priority: Medium-High
+      category: Core Functionality
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)

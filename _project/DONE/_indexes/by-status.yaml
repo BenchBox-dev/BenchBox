@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T17:01:44.749518'
-total_items: 407
+generated_at: '2026-02-06T18:51:52.673367'
+total_items: 408
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 209
+    count: 210
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -792,6 +792,11 @@ statuses:
       file: DONE/benchmark-expansion/planning/datavault-benchmark-implementation.yaml
       title: Add Data Vault Benchmark Implementation
       priority: Medium
+      category: Core Functionality
+    - id: datafusion-sql-query-transformer
+      file: DONE/core-functionality/active/datafusion-sql-query-transformer.yaml
+      title: Add DataFusion SQL query transformer for TPC-H Q11, Q16, Q18, Q20
+      priority: High
       category: Core Functionality
     - id: add-dry-run-support-to-all-example-scripts
       file: DONE/docs-experience/active/add-dry-run-support-to-all-example-scripts.yaml

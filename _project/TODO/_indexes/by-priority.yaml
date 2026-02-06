@@ -1,6 +1,14 @@
-generated_at: '2026-02-06T17:01:43.790873'
-total_items: 43
+generated_at: '2026-02-06T18:51:51.734396'
+total_items: 45
 priorities:
+  Critical:
+    count: 1
+    items:
+    - id: fix-dataframe-parameter-parity-follow-up-findings
+      file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
+      title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
+      category: Core Functionality
+      status: Not Started
   High:
     count: 4
     items:
@@ -25,7 +33,7 @@ priorities:
       category: Platform Expansion
       status: In Progress
   Medium-High:
-    count: 5
+    count: 6
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -41,6 +49,11 @@ priorities:
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
+      status: Not Started
+    - id: ascii-chart-polish-and-ux-refinements
+      file: TODO/core-functionality/planning/ascii-chart-polish-and-ux-refinements.yaml
+      title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
+      category: Core Functionality
       status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml

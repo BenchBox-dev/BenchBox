@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T17:01:44.749431'
-total_items: 407
+generated_at: '2026-02-06T18:51:52.673283'
+total_items: 408
 priorities:
   Critical:
     count: 27
@@ -140,7 +140,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 137
+    count: 138
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -192,6 +192,11 @@ priorities:
       title: Add --seed option to interactive wizard for reproducibility
       category: User Experience
       status: Not Started
+    - id: datafusion-sql-query-transformer
+      file: DONE/core-functionality/active/datafusion-sql-query-transformer.yaml
+      title: Add DataFusion SQL query transformer for TPC-H Q11, Q16, Q18, Q20
+      category: Core Functionality
+      status: Completed
     - id: onehouse-quanton-platform
       file: DONE/platform-expansion/planning/onehouse-quanton-platform.yaml
       title: Add Onehouse Quanton platform support for managed Spark benchmarking

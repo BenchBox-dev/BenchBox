@@ -1,0 +1,171 @@
+title: "Add DataFusion SQL query transformer for TPC-H Q11, Q16, Q18, Q20"
+worktree: "core-functionality"
+priority: "High"
+status: "Completed"
+completed_date: "2026-02-06"
+description: |
+  DataFusion's SQL engine misexecutes 4 TPC-H queries (Q11, Q16, Q18, Q20) that
+  use SQL patterns it handles differently from PostgreSQL: HAVING with scalar
+  subqueries, NOT IN subqueries, IN with HAVING, and nested correlated subqueries.
+
+  These failures were exposed when the seed parity fix changed validation from
+  "loose" (±50% tolerance) to "exact" (0% tolerance). The DataFrame implementations
+  of the same queries produce correct results because they use explicit joins,
+  anti-joins, and semi-joins instead of these problematic SQL patterns.
+
+  The fix follows the established ClickHouse pattern: create a DataFusionQueryTransformer
+  that rewrites the 4 problematic queries before execution, transforming them into
+  semantically equivalent SQL that DataFusion handles correctly.
+
+  Row count discrepancies at SF=1 with qgen -d defaults:
+    Q11: Expected 1,048 → Got 1,289 (HAVING + scalar subquery threshold)
+    Q16: Expected 18,314 → Got 18,200 (NOT IN subquery, NULL semantics)
+    Q18: Expected 57 → Got 9 (IN subquery with HAVING clause)
+    Q20: Expected 186 → Got 173 (nested IN with correlated subquery)
+
+category: "Core Functionality"
+
+tasks:
+  phases:
+    - phase: "Phase 1: Create DataFusionQueryTransformer"
+      done: true
+      items:
+        - summary: "Create benchbox/platforms/datafusion_query_transformer.py following ClickHouse pattern"
+          done: true
+          subtasks:
+            - summary: "Q11 rewrite: HAVING with scalar subquery → CTE with pre-computed threshold + WHERE filter"
+              done: true
+            - summary: "Q16 rewrite: NOT IN subquery → NOT EXISTS (fixes NULL semantics)"
+              done: true
+            - summary: "Q18 rewrite: IN with HAVING → EXISTS with derived table"
+              done: true
+            - summary: "Q20 rewrite: nested correlated IN → CTE with pre-aggregation + explicit JOIN"
+              done: true
+        - summary: "Use query_id dispatch (not fragile regex matching on arbitrary SQL)"
+          done: true
+
+    - phase: "Phase 2: Integration"
+      done: true
+      items:
+        - summary: "Add transformer call in datafusion.py execute_query() before connection.sql()"
+          done: true
+        - summary: "Add 'datafusion' → 'postgres' mapping in dialect_utils.py normalize_dialect_for_sqlglot()"
+          done: true
+
+    - phase: "Phase 3: Testing and Validation"
+      done: true
+      items:
+        - summary: "Create tests/unit/platforms/test_datafusion_query_transformer.py"
+          done: true
+          subtasks:
+            - summary: "Test each of Q11, Q16, Q18, Q20 rewrites with actual qgen output"
+              done: true
+            - summary: "Test passthrough for unaffected queries (Q1-Q10, Q12-Q15, Q17, Q19, Q21-Q22)"
+              done: true
+            - summary: "Test transformations_applied tracking"
+              done: true
+        - summary: "Integration test: run all 22 TPC-H queries on DataFusion SQL at SF=1, 0 validation failures"
+          done: true
+
+metadata:
+  tags:
+    - "datafusion"
+    - "tpch"
+    - "sql-compatibility"
+    - "query-transformer"
+  estimated_effort: "2-3 days"
+  created_date: "2026-02-06"
+
+impact:
+  business_value: |
+    Ensures DataFusion SQL-mode TPC-H benchmark produces correct, validated results.
+    Without this fix, 4 of 22 queries fail exact validation at SF=1.
+  user_impact: |
+    Users running TPC-H benchmarks on DataFusion in SQL mode will get correct results
+    with exact validation instead of silent mismatches or validation failures.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/datafusion.py"
+    - "benchbox/utils/dialect_utils.py"
+  added:
+    - "benchbox/platforms/datafusion_query_transformer.py"
+    - "tests/unit/platforms/test_datafusion_query_transformer.py"
+
+must_preserve:
+  - "DataFusionAdapter.execute_query() continues to work for non-TPC-H queries (no transformer applied when query_id is not Q11/Q16/Q18/Q20)"
+  - "All 18 non-affected TPC-H queries (Q1-Q10, Q12-Q15, Q17, Q19, Q21-Q22) pass through transformer unchanged"
+  - "DataFusion DataFrame mode (datafusion-df) execution path is not affected"
+  - "ClickHouseQueryTransformer remains independent and unchanged"
+
+approach: |
+  Follow the ClickHouse query transformer pattern exactly:
+  - Reference: benchbox/platforms/clickhouse/query_transformer.py (class structure, transform() entry point, transformations_applied tracking)
+  - Reference: benchbox/platforms/clickhouse/workload.py:293-295 (integration into execute_query())
+  - Reference: benchbox/core/tpch/dataframe_queries.py (DataFrame implementations of Q11, Q16, Q18, Q20 show the correct algorithmic approach to translate into SQL rewrites)
+
+  Use query_id-based dispatch rather than regex pattern matching on SQL text.
+  Each rewrite method extracts parameterized values (nation names, thresholds,
+  dates) from the qgen SQL via targeted regex, then reconstructs the query with
+  DataFusion-compatible structure. Literal values are preserved; only structure changes.
+
+anti_patterns:
+  - "DO NOT use generic regex-based SQL rewriting for complex structural changes — because nested SQL regex is fragile and unmaintainable — use query_id dispatch with targeted extraction instead"
+  - "DO NOT modify qgen output or query templates — because they are the official TPC-H reference — rewrite at the adapter level instead"
+  - "DO NOT modify the ClickHouse query transformer — because it is independent and already working — create a separate DataFusion-specific transformer"
+  - "DO NOT add rewrites to the SQLGlot translation layer — because the issue is DataFusion execution semantics not SQL syntax — keep rewrites in the platform adapter"
+
+verification:
+  - description: "New transformer unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_datafusion_query_transformer.py -v"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Existing DataFusion adapter tests still pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_datafusion_adapter.py -v"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Lint clean on new and modified files"
+    command: "uv run ruff check benchbox/platforms/datafusion_query_transformer.py benchbox/platforms/datafusion.py benchbox/utils/dialect_utils.py"
+    expected_output: "All checks passed!"
+  - description: "Integration: Q11, Q16, Q18, Q20 produce correct row counts at SF=1"
+    command: "benchbox run --platform datafusion --benchmark tpch --scale 1 --queries Q11,Q16,Q18,Q20"
+    expected_output: "Q11: 1048 rows, Q16: 18314 rows, Q18: 57 rows, Q20: 186 rows, 0 validation failures"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/datafusion.py"
+    - "benchbox/platforms/datafusion_query_transformer.py"
+    - "benchbox/utils/dialect_utils.py"
+    - "tests/unit/platforms/test_datafusion_query_transformer.py"
+  do_not_modify:
+    - "benchbox/platforms/clickhouse/"
+    - "benchbox/core/tpch/queries.py"
+    - "benchbox/core/tpch/benchmark.py"
+    - "benchbox/core/tpch/power_test.py"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml"
+  related:
+    - "_project/TODO/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml"
+
+context_sections:
+  "Background and Motivation": |
+    The seed parity fix changed TPCHPowerTestConfig.seed from int=1 to Optional[int]=None
+    and added the -d flag to qgen when seed is None. This produces official TPC-H default
+    parameters matching the answer files, enabling exact validation. Previously, seed=1
+    (not matching reference seed 17039360) triggered loose validation with ±50% tolerance,
+    masking these DataFusion SQL execution issues.
+
+  "Technical Context": |
+    DataFusion returns get_target_dialect() → "postgres", so queries are translated from
+    netezza → postgres via SQLGlot. The translation is essentially a no-op (netezza maps
+    to postgres). The raw qgen SQL passes through to DataFusion mostly unchanged.
+
+    DataFusion's SQL planner has known limitations with:
+    - NOT IN subqueries when NULLs may be present (different from PostgreSQL NULL semantics)
+    - IN subqueries containing HAVING clauses (subquery decorrelation bugs)
+    - HAVING clauses that reference scalar subqueries (floating-point comparison issues)
+    - Nested correlated subqueries (scope resolution issues)
+
+    The DataFrame implementations in dataframe_queries.py avoid all these patterns by using
+    explicit .join(), anti-joins (.how="anti"), semi-joins (.how="semi"), and pre-aggregation
+    with scalar extraction (ctx.scalar()).

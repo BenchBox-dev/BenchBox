@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T17:01:44.749174'
-total_items: 407
+generated_at: '2026-02-06T18:51:52.673027'
+total_items: 408
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -467,6 +467,20 @@ items:
   - interactive
   - reproducibility
   estimated_effort: Small
+- id: datafusion-sql-query-transformer
+  file: DONE/core-functionality/active/datafusion-sql-query-transformer.yaml
+  title: Add DataFusion SQL query transformer for TPC-H Q11, Q16, Q18, Q20
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - datafusion
+  - tpch
+  - sql-compatibility
+  - query-transformer
+  estimated_effort: 2-3 days
+  completed_date: '2026-02-06'
 - id: onehouse-quanton-platform
   file: DONE/platform-expansion/planning/onehouse-quanton-platform.yaml
   title: Add Onehouse Quanton platform support for managed Spark benchmarking
