@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T16:50:56.549820'
-total_items: 406
+generated_at: '2026-02-06T17:01:44.749431'
+total_items: 407
 priorities:
   Critical:
     count: 27
@@ -140,7 +140,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 136
+    count: 137
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -301,6 +301,12 @@ priorities:
       file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
       title: Elevate MCP Feature on Landing Page and Documentation
       category: Documentation
+      status: Completed
+    - id: dataframe-parameter-substitution-parity
+      file: DONE/core-functionality/active/dataframe-parameter-substitution-parity.yaml
+      title: Ensure DataFrame variants use identical parameter substitution and ordering permutations as SQL variants for
+        TPC-H and TPC-DS
+      category: Core Functionality
       status: Completed
     - id: local-ci-equivalents
       file: DONE/ci-infrastructure/active/local-ci-equivalents.yaml

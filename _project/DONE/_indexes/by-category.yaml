@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T16:50:56.549723'
+generated_at: '2026-02-06T17:01:44.749332'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 94
+    count: 95
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -504,6 +504,12 @@ categories:
       file: DONE/core-functionality/planning/enhance-ascii-charting.yaml
       title: Enhance and extend ASCII charting with new chart types and comparison visualizations
       priority: Medium-High
+      status: Completed
+    - id: dataframe-parameter-substitution-parity
+      file: DONE/core-functionality/active/dataframe-parameter-substitution-parity.yaml
+      title: Ensure DataFrame variants use identical parameter substitution and ordering permutations as SQL variants for
+        TPC-H and TPC-DS
+      priority: High
       status: Completed
     - id: expand-mcp-tool-surface
       file: DONE/mcp-integration/active/expand-mcp-tool-surface.yaml
