@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T12:55:25.111880'
-total_items: 405
+generated_at: '2026-02-06T16:50:56.549820'
+total_items: 406
 priorities:
   Critical:
     count: 27
@@ -823,7 +823,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 29
+    count: 30
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -850,6 +850,12 @@ priorities:
       title: Add InfluxDB Platform Support for Time Series Benchmarking
       category: Platform Expansion
       status: Complete
+    - id: release-automation-unit-tests
+      file: DONE/core-functionality/active/release-automation-unit-tests.yaml
+      title: Add comprehensive unit tests for release automation (fingerprinting, timestamps, content validation, size checks,
+        scripts)
+      category: Testing and Quality Assurance
+      status: Completed
     - id: interactive-wizard-execution-style-selection
       file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml
       title: Add execution style selection step to interactive wizard

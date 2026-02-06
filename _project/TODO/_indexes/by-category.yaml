@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T12:53:18.130007'
+generated_at: '2026-02-06T16:50:55.636877'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -94,8 +94,19 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 4
+    count: 6
     items:
+    - id: dataframe-parameter-substitution-parity
+      file: TODO/core-functionality/active/dataframe-parameter-substitution-parity.yaml
+      title: Ensure DataFrame variants use identical parameter substitution and ordering permutations as SQL variants for
+        TPC-H and TPC-DS
+      priority: High
+      status: In Progress
+    - id: fix-tpch-reference-seed-and-parameter-parity
+      file: TODO/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
+      title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
+      priority: High
+      status: Not Started
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB

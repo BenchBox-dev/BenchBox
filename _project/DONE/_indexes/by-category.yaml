@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T12:55:25.111789'
+generated_at: '2026-02-06T16:50:56.549723'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -1939,7 +1939,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 19
+    count: 20
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1951,6 +1951,12 @@ categories:
       title: Add comprehensive tests for PySpark SQL adapter
       priority: High
       status: Not Started
+    - id: release-automation-unit-tests
+      file: DONE/core-functionality/active/release-automation-unit-tests.yaml
+      title: Add comprehensive unit tests for release automation (fingerprinting, timestamps, content validation, size checks,
+        scripts)
+      priority: Medium-High
+      status: Completed
     - id: test-stdout-datagen
       file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
       title: Add regression tests for TPC-DS stdout data generation

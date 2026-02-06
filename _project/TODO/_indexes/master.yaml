@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T12:53:18.129967'
-total_items: 42
+generated_at: '2026-02-06T16:50:55.636843'
+total_items: 44
 items:
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -21,6 +21,39 @@ items:
   - platform
   - open-source
   estimated_effort: Large
+- id: dataframe-parameter-substitution-parity
+  file: TODO/core-functionality/active/dataframe-parameter-substitution-parity.yaml
+  title: Ensure DataFrame variants use identical parameter substitution and ordering permutations as SQL variants for TPC-H
+    and TPC-DS
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: In Progress
+  tags:
+  - tpch
+  - tpcds
+  - dataframe
+  - correctness
+  - parameter-substitution
+  - compliance
+  owners:
+  - joe
+  estimated_effort: 3-5 days (phases 1-5), +0.5 day (phase 6)
+- id: fix-tpch-reference-seed-and-parameter-parity
+  file: TODO/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
+  title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - tpch
+  - correctness
+  - seed
+  - validation
+  owners:
+  - joe
+  estimated_effort: 1-2 days
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks

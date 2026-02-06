@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T12:55:25.111962'
-total_items: 405
+generated_at: '2026-02-06T16:50:56.549905'
+total_items: 406
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 207
+    count: 208
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -828,6 +828,12 @@ statuses:
       title: Add blog to BenchBox site using ABlog Sphinx extension
       priority: Medium
       category: Documentation
+    - id: release-automation-unit-tests
+      file: DONE/core-functionality/active/release-automation-unit-tests.yaml
+      title: Add comprehensive unit tests for release automation (fingerprinting, timestamps, content validation, size checks,
+        scripts)
+      priority: Medium-High
+      category: Testing and Quality Assurance
     - id: cloud-platform-cost-estimation
       file: DONE/platform-expansion/active/cloud-platform-cost-estimation.yaml
       title: Add cost estimation support for cloud platforms (Firebolt, Fabric, Synapse)

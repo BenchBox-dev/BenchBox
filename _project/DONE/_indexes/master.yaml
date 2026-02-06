@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T12:55:25.111637'
-total_items: 405
+generated_at: '2026-02-06T16:50:56.549543'
+total_items: 406
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3935,6 +3935,22 @@ items:
   owners:
   - joe
   estimated_effort: Medium
+- id: release-automation-unit-tests
+  file: DONE/core-functionality/active/release-automation-unit-tests.yaml
+  title: Add comprehensive unit tests for release automation (fingerprinting, timestamps, content validation, size checks,
+    scripts)
+  worktree: core-functionality
+  category: Testing and Quality Assurance
+  priority: Medium-High
+  status: Completed
+  tags:
+  - testing
+  - release
+  - fingerprinting
+  - content-validation
+  - reproducible-builds
+  estimated_effort: 3-4 days
+  completed_date: '2026-02-06'
 - id: interactive-wizard-execution-style-selection
   file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml
   title: Add execution style selection step to interactive wizard

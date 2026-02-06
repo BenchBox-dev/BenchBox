@@ -1,16 +1,22 @@
-generated_at: '2026-02-06T12:53:18.130035'
-total_items: 42
+generated_at: '2026-02-06T16:50:55.636902'
+total_items: 44
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
+    - id: dataframe-parameter-substitution-parity
+      file: TODO/core-functionality/active/dataframe-parameter-substitution-parity.yaml
+      title: Ensure DataFrame variants use identical parameter substitution and ordering permutations as SQL variants for
+        TPC-H and TPC-DS
+      priority: High
+      category: Core Functionality
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 41
+    count: 42
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -87,6 +93,11 @@ statuses:
       title: Firebolt Cloud Deployment Mode
       priority: Medium
       category: Platform Expansion
+    - id: fix-tpch-reference-seed-and-parameter-parity
+      file: TODO/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
+      title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
+      priority: High
+      category: Core Functionality
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
