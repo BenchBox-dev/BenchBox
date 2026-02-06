@@ -1,7 +1,8 @@
 title: "Drop Plotly dependency and HTML chart rendering — go ASCII-only"
 worktree: core-functionality
 priority: High
-status: Done
+status: "Completed"
+completed_date: "2026-02-06"
 category: Core Functionality
 description: |
   Remove Plotly and the entire HTML chart rendering pipeline from BenchBox. The ASCII charting
@@ -34,21 +35,21 @@ tasks:
         This is the bulk of the removal (~80% of the win).
       items:
         - description: "Delete benchbox/core/visualization/charts.py (626 lines — 6 Plotly chart classes)"
-          done: false
+          done: true
         - description: "Delete benchbox/core/visualization/styles.py (137 lines — Plotly template/theme system)"
-          done: false
+          done: true
         - description: "Delete benchbox/core/visualization/dependencies.py (20 lines — require_plotly() gate)"
-          done: false
+          done: true
         - description: "Strip Plotly rendering from result_plotter.py — keep from_sources(), NormalizedResult, _suggest_chart_types(); remove .figure() calls and HTML generation"
-          done: false
+          done: true
         - description: "Strip Plotly export from exporters.py — keep export_ascii() and render_ascii_chart(); remove export_figure() and pio.write_html()"
-          done: false
+          done: true
         - description: "Strip Plotly code from mcp/tools/visualization.py — remove _check_visualization_dependencies(), HTML format branch, file-path response model"
-          done: false
+          done: true
         - description: "Update benchbox/core/visualization/__init__.py — remove Plotly class exports"
-          done: false
+          done: true
         - description: "Remove plotly from pyproject.toml viz extra, mcp extra, and dev group"
-          done: false
+          done: true
 
     - title: "Phase 2 — Unify data models"
       description: |
@@ -57,15 +58,15 @@ tasks:
         ResultPlotter produce ASCII-native data models directly.
       items:
         - description: "Audit both model hierarchies — Plotly (BarDatum, TimeSeriesPoint, CostPerformancePoint, DistributionSeries, QueryLatencyDatum) vs ASCII (BarData, BoxPlotSeries, LinePoint, ScatterPoint, HistogramBar)"
-          done: false
+          done: true
         - description: "Promote ASCII models as canonical — move to a shared data_models.py or keep in ascii/ module"
-          done: false
+          done: true
         - description: "Refactor ResultPlotter._render_* methods to produce ASCII data models directly instead of Plotly models"
-          done: false
+          done: true
         - description: "Remove the manual conversion layer in exporters.py:render_ascii_chart()"
-          done: false
+          done: true
         - description: "Verify all factory functions (from_bar_data, from_query_latency_data, etc.) work with unified models"
-          done: false
+          done: true
 
     - title: "Phase 3 — Simplify MCP tool and CLI"
       description: |
@@ -73,15 +74,15 @@ tasks:
         ASCII content. Remove the dependency check guard. Clean up CLI visualize command.
       items:
         - description: "Remove format parameter from generate_chart MCP tool (always ASCII)"
-          done: false
+          done: true
         - description: "Remove _check_visualization_dependencies() from MCP tools"
-          done: false
+          done: true
         - description: "Simplify generate_chart response model — always inline content, never file paths"
-          done: false
+          done: true
         - description: "Update CLI benchbox visualize command — remove --format html option"
-          done: false
+          done: true
         - description: "Update chart generation guide docs to reflect ASCII-only"
-          done: false
+          done: true
 
     - title: "Phase 4 — Delete Plotly tests and update remaining tests"
       description: |
@@ -89,19 +90,19 @@ tasks:
         tests to remove HTML format test cases. Verify ASCII test suite still passes.
       items:
         - description: "Delete tests/unit/visualization/test_charts.py (264 lines — tests Plotly chart classes)"
-          done: false
+          done: true
         - description: "Delete tests/unit/visualization/test_result_plotter.py (385 lines — tests Plotly rendering)"
-          done: false
+          done: true
         - description: "Delete tests/unit/visualization/test_styles.py (102 lines — tests Plotly themes)"
-          done: false
+          done: true
         - description: "Delete tests/integration/visualization/test_visualization_export.py (50 lines — tests HTML export)"
-          done: false
+          done: true
         - description: "Update tests/unit/mcp/test_visualization_tools.py — remove HTML format tests, Plotly import mock tests"
-          done: false
+          done: true
         - description: "Update tests/unit/visualization/test_visualize_cli.py — remove HTML format test cases"
-          done: false
+          done: true
         - description: "Verify tests/unit/visualization/ascii/test_ascii_charts.py passes unchanged"
-          done: false
+          done: true
 
     - title: "Phase 5 — Cleanup orphaned references"
       description: |
@@ -109,17 +110,17 @@ tasks:
         across the entire codebase. Clean up imports, docstrings, and documentation.
       items:
         - description: "Grep for 'plotly', 'html.*chart', 'go.Figure', 'pio.write', 'require_plotly' across codebase"
-          done: false
+          done: true
         - description: "Check benchbox/core/dataframe/benchmark_suite.py for conditional Plotly imports"
-          done: false
+          done: true
         - description: "Check benchbox/core/comparison/plotter.py for chart imports"
-          done: false
+          done: true
         - description: "Update docs/visualization/chart-generation-guide.md"
-          done: false
+          done: true
         - description: "Remove orphaned kaleido from venv if present (not in pyproject.toml but may be installed)"
-          done: false
+          done: true
         - description: "Run full test suite to confirm zero regressions"
-          done: false
+          done: true
 
 must_preserve:
   - "All 6 ASCII chart types (bar, histogram, heatmap, box, line, scatter) must remain fully functional"
@@ -272,6 +273,7 @@ context_sections:
 
 metadata:
   created_date: "2026-02-06"
+  completed_date: "2026-02-06"
   last_updated: "2026-02-06"
   estimated_effort: "2-3 days"
   tags:

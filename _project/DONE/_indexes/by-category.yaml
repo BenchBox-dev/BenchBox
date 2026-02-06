@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T12:53:19.056979'
+generated_at: '2026-02-06T12:55:25.111789'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -494,7 +494,7 @@ categories:
       file: DONE/core-functionality/active/drop-plotly-html-charts.yaml
       title: Drop Plotly dependency and HTML chart rendering — go ASCII-only
       priority: High
-      status: Done
+      status: Completed
     - id: embed-tuning-config-in-results
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output

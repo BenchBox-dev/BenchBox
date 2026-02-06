@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T12:53:19.057083'
+generated_at: '2026-02-06T12:55:25.111880'
 total_items: 405
 priorities:
   Critical:
@@ -291,7 +291,7 @@ priorities:
       file: DONE/core-functionality/active/drop-plotly-html-charts.yaml
       title: Drop Plotly dependency and HTML chart rendering — go ASCII-only
       category: Core Functionality
-      status: Done
+      status: Completed
     - id: e2e-cli-test-suite
       file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
       title: 'E2E CLI Test Suite: Complete Platform Coverage'

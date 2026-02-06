@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T12:53:19.056820'
+generated_at: '2026-02-06T12:55:25.111637'
 total_items: 405
 items:
 - id: interactive-wizard-dry-run-support
@@ -753,7 +753,7 @@ items:
   worktree: core-functionality
   category: Core Functionality
   priority: High
-  status: Done
+  status: Completed
   tags:
   - visualization
   - plotly
@@ -761,6 +761,7 @@ items:
   - simplification
   - architecture
   estimated_effort: 2-3 days
+  completed_date: '2026-02-06'
 - id: e2e-cli-test-suite
   file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
   title: 'E2E CLI Test Suite: Complete Platform Coverage'
