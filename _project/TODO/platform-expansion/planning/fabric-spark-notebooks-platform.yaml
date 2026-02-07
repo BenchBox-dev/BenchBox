@@ -1,6 +1,6 @@
 title: "Add Microsoft Fabric Spark Notebooks platform support"
 worktree: platform-expansion
-priority: Medium-High
+priority: Medium
 status: Not Started
 description: |
   Integrate Microsoft Fabric Spark Notebooks as a supported BenchBox platform for

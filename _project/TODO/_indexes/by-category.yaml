@@ -1,4 +1,4 @@
-generated_at: '2026-02-07T10:46:09.183864'
+generated_at: '2026-02-07T13:02:20.394682'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -20,12 +20,12 @@ categories:
     - id: geospatial-primitives-benchmark
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
       title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
-      priority: Medium
+      priority: Low
       status: Not Started
     - id: github-archive-benchmark
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
-      priority: Medium
+      priority: Low
       status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
@@ -40,7 +40,7 @@ categories:
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
-      priority: Medium
+      priority: Low
       status: Not Started
   Blog Revision:
     count: 8
@@ -91,10 +91,10 @@ categories:
     - id: consolidate-file-format-detection
       file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
       title: Consolidate file format detection to handle compressed and sharded files
-      priority: Medium
+      priority: Medium-High
       status: Not Started
   Core Functionality:
-    count: 9
+    count: 8
     items:
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -104,7 +104,7 @@ categories:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
@@ -112,30 +112,25 @@ categories:
       priority: High
       status: In Progress
     - id: implement-tpcdi-dataframe-pipeline
-      file: TODO/dataframe-benchmarks/planning/implement-tpcdi-dataframe-pipeline.yaml
+      file: TODO/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
       title: Implement TPC-DI DataFrame Pipeline Execution
       priority: High
-      status: Not Started
+      status: In Progress
     - id: implement-tpcds-obt-dataframe-queries
-      file: TODO/dataframe-benchmarks/planning/implement-tpcds-obt-dataframe-queries.yaml
+      file: TODO/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
       title: Implement TPC-DS-OBT DataFrame Query Families
       priority: Medium-High
-      status: Not Started
+      status: In Progress
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
     - id: integrate-read-primitives-dataframe-mode
-      file: TODO/dataframe-benchmarks/planning/integrate-read-primitives-dataframe-mode.yaml
+      file: TODO/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
       title: Integrate Read Primitives DataFrame Mode and Metadata
       priority: Medium
-      status: Not Started
-    - id: integrate-write-primitives-dataframe-mode
-      file: TODO/dataframe-benchmarks/planning/integrate-write-primitives-dataframe-mode.yaml
-      title: Integrate Write Primitives DataFrame Mode with Runner and Registry
-      priority: Medium-High
-      status: Not Started
+      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -180,7 +175,7 @@ categories:
     - id: fabric-spark-notebooks-platform
       file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
       title: Add Microsoft Fabric Spark Notebooks platform support
-      priority: Medium-High
+      priority: Medium
       status: Not Started
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
@@ -195,7 +190,7 @@ categories:
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
-      priority: Medium
+      priority: Low
       status: Not Started
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
@@ -261,7 +256,7 @@ categories:
     - id: coverage-core-utilities
       file: TODO/main/planning/coverage-core-utilities.yaml
       title: Improve test coverage for core utility and standalone modules to ≥50%
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: coverage-core-tpcdi
       file: TODO/main/planning/coverage-core-tpcdi.yaml
@@ -276,5 +271,5 @@ categories:
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
-      priority: Medium
+      priority: Medium-High
       status: Not Started

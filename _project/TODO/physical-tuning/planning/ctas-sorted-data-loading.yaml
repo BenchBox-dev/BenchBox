@@ -4,7 +4,7 @@
 
 title: "Implement CTAS-based sorted data loading for DuckDB"
 worktree: physical-tuning
-priority: Medium
+priority: Medium-High
 status: Not Started
 description: |
   BenchBox's tuning infrastructure generates sort clauses via DuckDBDDLGenerator

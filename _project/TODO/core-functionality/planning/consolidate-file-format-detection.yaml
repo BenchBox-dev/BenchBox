@@ -1,6 +1,6 @@
 title: "Consolidate file format detection to handle compressed and sharded files"
 worktree: core-functionality
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Code Quality
 description: |

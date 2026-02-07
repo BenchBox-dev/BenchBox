@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T10:46:09.183879'
-total_items: 50
+generated_at: '2026-02-07T13:02:20.394697'
+total_items: 49
 priorities:
   Critical:
     count: 1
@@ -23,10 +23,10 @@ priorities:
       category: Core Functionality
       status: In Progress
     - id: implement-tpcdi-dataframe-pipeline
-      file: TODO/dataframe-benchmarks/planning/implement-tpcdi-dataframe-pipeline.yaml
+      file: TODO/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
       title: Implement TPC-DI DataFrame Pipeline Execution
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: coverage-core-benchmarks
       file: TODO/main/planning/coverage-core-benchmarks.yaml
       title: Improve test coverage for core benchmark modules to ≥50%
@@ -38,16 +38,11 @@ priorities:
       category: Platform Expansion
       status: In Progress
   Medium-High:
-    count: 9
+    count: 11
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
-      category: Platform Expansion
-      status: Not Started
-    - id: fabric-spark-notebooks-platform
-      file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
-      title: Add Microsoft Fabric Spark Notebooks platform support
       category: Platform Expansion
       status: Not Started
     - id: starrocks-olap-platform
@@ -55,14 +50,29 @@ priorities:
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
       status: Not Started
-    - id: implement-tpcds-obt-dataframe-queries
-      file: TODO/dataframe-benchmarks/planning/implement-tpcds-obt-dataframe-queries.yaml
-      title: Implement TPC-DS-OBT DataFrame Query Families
+    - id: consolidate-file-format-detection
+      file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
+      title: Consolidate file format detection to handle compressed and sharded files
+      category: Code Quality
+      status: Not Started
+    - id: ctas-sorted-data-loading
+      file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
+      title: Implement CTAS-based sorted data loading for DuckDB
       category: Core Functionality
       status: Not Started
+    - id: implement-tpcds-obt-dataframe-queries
+      file: TODO/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
+      title: Implement TPC-DS-OBT DataFrame Query Families
+      category: Core Functionality
+      status: In Progress
     - id: coverage-cli-modules
       file: TODO/main/planning/coverage-cli-modules.yaml
       title: Improve test coverage for CLI modules to ≥50%
+      category: Testing and Quality Assurance
+      status: Not Started
+    - id: coverage-core-utilities
+      file: TODO/main/planning/coverage-core-utilities.yaml
+      title: Improve test coverage for core utility and standalone modules to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
     - id: coverage-core-tpcdi
@@ -70,10 +80,10 @@ priorities:
       title: Improve test coverage for core/tpcdi module to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
-    - id: integrate-write-primitives-dataframe-mode
-      file: TODO/dataframe-benchmarks/planning/integrate-write-primitives-dataframe-mode.yaml
-      title: Integrate Write Primitives DataFrame Mode with Runner and Registry
-      category: Core Functionality
+    - id: reenable-comprehensive-ci
+      file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
+      title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
+      category: Testing and Quality Assurance
       status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
@@ -86,7 +96,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 32
+    count: 25
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -96,6 +106,11 @@ priorities:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
       title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
+      category: Platform Expansion
+      status: Not Started
+    - id: fabric-spark-notebooks-platform
+      file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
+      title: Add Microsoft Fabric Spark Notebooks platform support
       category: Platform Expansion
       status: Not Started
     - id: questdb-timeseries-platform
@@ -108,20 +123,10 @@ priorities:
       title: Add SingleStore Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: siriusdb-adapter
-      file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
-      title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
-      category: Platform Expansion
-      status: Not Started
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
       category: Platform Expansion
-      status: Not Started
-    - id: consolidate-file-format-detection
-      file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
-      title: Consolidate file format detection to handle compressed and sharded files
-      category: Code Quality
       status: Not Started
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
@@ -148,45 +153,20 @@ priorities:
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
       status: Not Started
-    - id: geospatial-primitives-benchmark
-      file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
-      title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
-      category: Benchmark Development
-      status: Not Started
-    - id: github-archive-benchmark
-      file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
-      title: GitHub Archive Benchmark - Developer Activity Analytics Workload
-      category: Benchmark Development
-      status: Not Started
-    - id: ctas-sorted-data-loading
-      file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
-      title: Implement CTAS-based sorted data loading for DuckDB
-      category: Core Functionality
-      status: Not Started
-    - id: coverage-core-utilities
-      file: TODO/main/planning/coverage-core-utilities.yaml
-      title: Improve test coverage for core utility and standalone modules to ≥50%
-      category: Testing and Quality Assurance
-      status: Not Started
     - id: coverage-platforms
       file: TODO/main/planning/coverage-platforms.yaml
       title: Improve test coverage for platform adapter modules to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
     - id: integrate-read-primitives-dataframe-mode
-      file: TODO/dataframe-benchmarks/planning/integrate-read-primitives-dataframe-mode.yaml
+      file: TODO/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
       title: Integrate Read Primitives DataFrame Mode and Metadata
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
-      status: Not Started
-    - id: reenable-comprehensive-ci
-      file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
-      title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
-      category: Testing and Quality Assurance
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
@@ -202,11 +182,6 @@ priorities:
       file: TODO/platform-expansion/planning/timescaledb-cloud-deployment.yaml
       title: TimescaleDB Cloud Deployment Mode
       category: Platform Expansion
-      status: Not Started
-    - id: wikipedia-pageviews-benchmark
-      file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
-      title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
-      category: Benchmark Development
       status: Not Started
     - id: arm-graviton-generations-benchmarks
       file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
@@ -249,8 +224,13 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 3
+    count: 7
     items:
+    - id: siriusdb-adapter
+      file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
+      title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
+      category: Platform Expansion
+      status: Not Started
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
@@ -261,8 +241,23 @@ priorities:
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       category: Supporting Infrastructure
       status: Not Started
+    - id: geospatial-primitives-benchmark
+      file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
+      title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
+      category: Benchmark Development
+      status: Not Started
+    - id: github-archive-benchmark
+      file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
+      title: GitHub Archive Benchmark - Developer Activity Analytics Workload
+      category: Benchmark Development
+      status: Not Started
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       category: Core Functionality
+      status: Not Started
+    - id: wikipedia-pageviews-benchmark
+      file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
+      title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+      category: Benchmark Development
       status: Not Started

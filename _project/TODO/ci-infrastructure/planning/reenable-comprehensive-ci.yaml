@@ -1,6 +1,6 @@
 title: "Re-enable comprehensive CI checks (linkcheck, security, coverage)"
 worktree: ci-infrastructure
-priority: Medium
+priority: Medium-High
 status: Not Started
 description: |
   After fixing critical CI issues and achieving green builds, re-enable the

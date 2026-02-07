@@ -1,13 +1,28 @@
-generated_at: '2026-02-07T10:46:09.183891'
-total_items: 50
+generated_at: '2026-02-07T13:02:20.394709'
+total_items: 49
 statuses:
   In Progress:
-    count: 2
+    count: 5
     items:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       priority: High
+      category: Core Functionality
+    - id: implement-tpcdi-dataframe-pipeline
+      file: TODO/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
+      title: Implement TPC-DI DataFrame Pipeline Execution
+      priority: High
+      category: Core Functionality
+    - id: implement-tpcds-obt-dataframe-queries
+      file: TODO/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
+      title: Implement TPC-DS-OBT DataFrame Query Families
+      priority: Medium-High
+      category: Core Functionality
+    - id: integrate-read-primitives-dataframe-mode
+      file: TODO/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
+      title: Integrate Read Primitives DataFrame Mode and Metadata
+      priority: Medium
       category: Core Functionality
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
@@ -15,7 +30,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 48
+    count: 44
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -40,7 +55,7 @@ statuses:
     - id: fabric-spark-notebooks-platform
       file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
       title: Add Microsoft Fabric Spark Notebooks platform support
-      priority: Medium-High
+      priority: Medium
       category: Platform Expansion
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
@@ -55,7 +70,7 @@ statuses:
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
-      priority: Medium
+      priority: Low
       category: Platform Expansion
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
@@ -70,7 +85,7 @@ statuses:
     - id: consolidate-file-format-detection
       file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
       title: Consolidate file format detection to handle compressed and sharded files
-      priority: Medium
+      priority: Medium-High
       category: Code Quality
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
@@ -115,26 +130,16 @@ statuses:
     - id: geospatial-primitives-benchmark
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
       title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
-      priority: Medium
+      priority: Low
       category: Benchmark Development
     - id: github-archive-benchmark
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
-      priority: Medium
+      priority: Low
       category: Benchmark Development
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
-      priority: Medium
-      category: Core Functionality
-    - id: implement-tpcdi-dataframe-pipeline
-      file: TODO/dataframe-benchmarks/planning/implement-tpcdi-dataframe-pipeline.yaml
-      title: Implement TPC-DI DataFrame Pipeline Execution
-      priority: High
-      category: Core Functionality
-    - id: implement-tpcds-obt-dataframe-queries
-      file: TODO/dataframe-benchmarks/planning/implement-tpcds-obt-dataframe-queries.yaml
-      title: Implement TPC-DS-OBT DataFrame Query Families
       priority: Medium-High
       category: Core Functionality
     - id: on-demand-tpc-answer-download
@@ -155,7 +160,7 @@ statuses:
     - id: coverage-core-utilities
       file: TODO/main/planning/coverage-core-utilities.yaml
       title: Improve test coverage for core utility and standalone modules to ≥50%
-      priority: Medium
+      priority: Medium-High
       category: Testing and Quality Assurance
     - id: coverage-core-tpcdi
       file: TODO/main/planning/coverage-core-tpcdi.yaml
@@ -167,16 +172,6 @@ statuses:
       title: Improve test coverage for platform adapter modules to ≥50%
       priority: Medium
       category: Testing and Quality Assurance
-    - id: integrate-read-primitives-dataframe-mode
-      file: TODO/dataframe-benchmarks/planning/integrate-read-primitives-dataframe-mode.yaml
-      title: Integrate Read Primitives DataFrame Mode and Metadata
-      priority: Medium
-      category: Core Functionality
-    - id: integrate-write-primitives-dataframe-mode
-      file: TODO/dataframe-benchmarks/planning/integrate-write-primitives-dataframe-mode.yaml
-      title: Integrate Write Primitives DataFrame Mode with Runner and Registry
-      priority: Medium-High
-      category: Core Functionality
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -185,7 +180,7 @@ statuses:
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
-      priority: Medium
+      priority: Medium-High
       category: Testing and Quality Assurance
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
@@ -215,7 +210,7 @@ statuses:
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
-      priority: Medium
+      priority: Low
       category: Benchmark Development
     - id: arm-graviton-generations-benchmarks
       file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml

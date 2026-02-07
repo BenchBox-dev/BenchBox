@@ -1,4 +1,4 @@
-generated_at: '2026-02-07T10:46:10.107069'
+generated_at: '2026-02-07T13:02:21.358065'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 104
+    count: 105
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -695,6 +695,11 @@ categories:
       file: DONE/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
       title: Integrate TPC-H stdout datagen with compression and format pipelines
       priority: High
+      status: Completed
+    - id: integrate-write-primitives-dataframe-mode
+      file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml
+      title: Integrate Write Primitives DataFrame Mode with Runner and Registry
+      priority: Medium-High
       status: Completed
     - id: integrate-stdout-datagen
       file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml

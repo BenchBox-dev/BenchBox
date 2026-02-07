@@ -1,6 +1,6 @@
 title: "Improve test coverage for core utility and standalone modules to ≥50%"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Testing and Quality Assurance
 description: |

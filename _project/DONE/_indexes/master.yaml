@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T10:46:10.106911'
-total_items: 418
+generated_at: '2026-02-07T13:02:21.357881'
+total_items: 419
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4335,6 +4335,21 @@ items:
   - interactive
   estimated_effort: 1-2 days
   completed_date: '2025-12-15'
+- id: integrate-write-primitives-dataframe-mode
+  file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml
+  title: Integrate Write Primitives DataFrame Mode with Runner and Registry
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - dataframe
+  - write-primitives
+  - integration
+  owners:
+  - joe
+  estimated_effort: Medium
+  completed_date: '2026-02-07'
 - id: explicit-tuning-file-resolution
   file: DONE/ux-improvements/active/explicit-tuning-file-resolution.yaml
   title: Make tuning file resolution explicit and transparent in CLI

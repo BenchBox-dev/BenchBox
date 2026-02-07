@@ -1,6 +1,6 @@
 title: "Add SiriusDB (GPU-Native SQL Engine) Platform Adapter"
 worktree: platform-expansion
-priority: Medium
+priority: Low
 status: Not Started
 category: Platform Expansion
 description: |

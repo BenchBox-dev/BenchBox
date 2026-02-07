@@ -1,7 +1,7 @@
 title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
 worktree: benchmark-expansion
 category: Benchmark Development
-priority: Medium
+priority: Low
 status: Not Started
 description: |
   Implement a Wikipedia Pageviews benchmark using Wikimedia Foundation data dumps.
