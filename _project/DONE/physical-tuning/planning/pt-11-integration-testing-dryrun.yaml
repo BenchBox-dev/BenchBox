@@ -1,0 +1,249 @@
+# Physical Tuning #11: Integration, Testing & Dry-Run Enhancement
+#
+# Cross-cutting integration work after platform-specific generators are done.
+
+title: "PT-11: Physical Tuning Integration, Testing & Dry-Run Enhancement"
+worktree: "physical-tuning"
+priority: "Medium"
+status: "Completed"
+category: "Testing and Quality Assurance"
+
+description: |
+  Final integration work to ensure physical tuning is properly wired through
+  the entire system, with comprehensive testing and enhanced dry-run output.
+
+  ## Integration Goals
+
+  1. **Tuning Config → DDL Flow**: Ensure tuning YAML reaches DDL generators
+  2. **Dry-Run Enhancement**: Show exact DDL that will be executed
+  3. **Result Recording**: Record applied tuning in benchmark results
+  4. **Performance Validation**: Measure impact of tuning on query performance
+
+  ## Why This Is Separate
+
+  This TODO depends on all platform-specific DDL generators being complete.
+  It handles cross-cutting concerns that span multiple platforms.
+
+context_sections:
+  "Current Dry-Run Output": |
+    Current `--dry-run` shows:
+    - Data generation plan
+    - Table list
+    - Query list
+
+    **Missing**:
+    - Actual CREATE TABLE DDL
+    - Tuning clauses that will be applied
+    - Platform-specific optimizations
+
+  "Enhanced Dry-Run Output": |
+    ```
+    $ benchbox run --dry-run ./preview --platform redshift --benchmark tpch --tuning tuned
+
+    ╭─ Dry Run: TPC-H on Redshift ─────────────────────────────────────────────╮
+    │                                                                          │
+    │ Scale Factor: 1.0                                                        │
+    │ Tuning Config: examples/tunings/redshift/tpch_tuned.yaml                │
+    │                                                                          │
+    │ ══════════════════════════════════════════════════════════════════════  │
+    │ DDL PREVIEW                                                              │
+    │ ══════════════════════════════════════════════════════════════════════  │
+    │                                                                          │
+    │ CREATE TABLE lineitem (                                                  │
+    │     l_orderkey BIGINT NOT NULL ENCODE az64,                              │
+    │     l_partkey BIGINT NOT NULL ENCODE az64,                               │
+    │     ...                                                                  │
+    │ )                                                                        │
+    │ DISTSTYLE KEY                                                            │
+    │ DISTKEY (l_orderkey)                                                     │
+    │ COMPOUND SORTKEY (l_shipdate, l_orderkey);                               │
+    │                                                                          │
+    │ -- Tuning Applied:                                                       │
+    │ --   Distribution: KEY on l_orderkey                                     │
+    │ --   Sort Key: COMPOUND on (l_shipdate, l_orderkey)                      │
+    │ --   Encoding: az64 (numeric), lzo (varchar)                             │
+    │                                                                          │
+    │ CREATE TABLE region (...)                                                │
+    │ DISTSTYLE ALL;                                                           │
+    │                                                                          │
+    │ -- Tuning Applied:                                                       │
+    │ --   Distribution: ALL (dimension table)                                 │
+    │                                                                          │
+    │ ══════════════════════════════════════════════════════════════════════  │
+    │ POST-LOAD OPERATIONS                                                     │
+    │ ══════════════════════════════════════════════════════════════════════  │
+    │                                                                          │
+    │ VACUUM SORT ONLY lineitem;                                               │
+    │ ANALYZE lineitem;                                                        │
+    │                                                                          │
+    ╰──────────────────────────────────────────────────────────────────────────╯
+    ```
+
+  "Result Recording": |
+    Benchmark results should include applied tuning configuration:
+
+    ```json
+    {
+      "benchmark": "tpch",
+      "platform": "redshift",
+      "tuning_config": {
+        "mode": "tuned",
+        "source_file": "examples/tunings/redshift/tpch_tuned.yaml",
+        "applied_tunings": {
+          "lineitem": {
+            "distribution": "KEY(l_orderkey)",
+            "sort_key": "COMPOUND(l_shipdate, l_orderkey)"
+          },
+          "region": {
+            "distribution": "ALL"
+          }
+        },
+        "config_hash": "abc123..."
+      }
+    }
+    ```
+
+    This enables:
+    - Comparing tuned vs untuned runs
+    - Reproducing exact configuration
+    - Tracking tuning effectiveness over time
+
+tasks:
+  phases:
+    - phase: "Phase 1: Tuning Config Flow Verification"
+      done: false
+      items:
+        - summary: "Audit tuning config flow from CLI to DDL"
+          done: false
+          subtasks:
+            - summary: "Trace --tuning flag through run.py"
+              done: false
+            - summary: "Verify config reaches platform adapter"
+              done: false
+            - summary: "Verify config reaches DDL generator"
+              done: false
+        - summary: "Add logging for tuning config application"
+          done: false
+        - summary: "Create end-to-end test for config flow"
+          done: false
+
+    - phase: "Phase 2: Enhanced Dry-Run Output"
+      done: false
+      items:
+        - summary: "Modify dry-run to collect DDL from generators"
+          done: false
+        - summary: "Format DDL output with syntax highlighting"
+          done: false
+        - summary: "Show tuning summary per table"
+          done: false
+        - summary: "Show post-load operations (OPTIMIZE, etc.)"
+          done: false
+        - summary: "Support --dry-run --output-ddl to save DDL to file"
+          done: false
+
+    - phase: "Phase 3: Result Recording"
+      done: false
+      items:
+        - summary: "Add tuning_config section to result manifest"
+          done: false
+        - summary: "Record applied tunings per table"
+          done: false
+        - summary: "Record tuning config hash for comparison"
+          done: false
+        - summary: "Add tuning diff to compare command"
+          done: false
+
+    - phase: "Phase 4: Performance Validation Tests"
+      done: false
+      items:
+        - summary: "Create tuned vs untuned comparison test suite"
+          done: false
+          subtasks:
+            - summary: "DuckDB: sorted vs unsorted tables"
+              done: false
+            - summary: "Databricks: Z-ORDER vs no Z-ORDER"
+              done: false
+            - summary: "BigQuery: clustered vs unclustered"
+              done: false
+        - summary: "Measure query performance delta"
+          done: false
+        - summary: "Document expected performance improvements"
+          done: false
+
+    - phase: "Phase 5: Integration Test Suite"
+      done: false
+      items:
+        - summary: "Create tests/integration/tuning/ test directory"
+          done: false
+        - summary: "Test each platform DDL generator with actual database"
+          done: false
+          subtasks:
+            - summary: "DuckDB integration test (local)"
+              done: false
+            - summary: "PostgreSQL integration test (Docker)"
+              done: false
+            - summary: "Trino integration test (Docker)"
+              done: false
+        - summary: "Test tuning introspection (verify applied)"
+          done: false
+
+    - phase: "Phase 6: Documentation"
+      done: false
+      items:
+        - summary: "Document tuning configuration options per platform"
+          done: false
+        - summary: "Create tuning best practices guide"
+          done: false
+        - summary: "Update CLI help with tuning examples"
+          done: false
+        - summary: "Add tuning troubleshooting section"
+          done: false
+
+files_affected:
+  modified:
+    - "benchbox/cli/commands/run.py"
+    - "benchbox/cli/dryrun.py"
+    - "benchbox/core/results/manifest.py"
+    - "benchbox/cli/commands/compare.py"
+  added:
+    - "tests/integration/tuning/__init__.py"
+    - "tests/integration/tuning/test_duckdb_tuning.py"
+    - "tests/integration/tuning/test_postgresql_tuning.py"
+    - "tests/integration/tuning/test_trino_tuning.py"
+    - "tests/performance/test_tuning_effectiveness.py"
+    - "docs/guides/physical-tuning.md"
+
+technical_requirements:
+  constraints:
+    - "Dry-run must work without database connection"
+    - "Result recording must not break existing result format"
+    - "Performance tests must be opt-in (slow)"
+
+success_metrics:
+  - "Dry-run shows exact DDL for all platforms"
+  - "Result manifest includes tuning configuration"
+  - "Performance tests show measurable improvement with tuning"
+  - "Integration tests pass on local platforms"
+
+dependencies:
+  blocked_by:
+    - "_project/TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml"
+    - "_project/TODO/physical-tuning/planning/pt-03-redshift-ddl.yaml"
+    - "_project/TODO/physical-tuning/planning/pt-04-duckdb-ddl.yaml"
+    - "_project/TODO/physical-tuning/planning/pt-05-postgresql-timescaledb-ddl.yaml"
+    - "_project/TODO/physical-tuning/planning/pt-06-trino-presto-athena-ddl.yaml"
+    - "_project/TODO/physical-tuning/planning/pt-07-snowflake-ddl.yaml"
+    - "_project/TODO/physical-tuning/planning/pt-08-databricks-spark-ddl.yaml"
+    - "_project/TODO/physical-tuning/planning/pt-09-bigquery-ddl.yaml"
+
+metadata:
+  owners:
+    - "joe"
+  tags:
+    - "tuning"
+    - "integration"
+    - "testing"
+    - "dry-run"
+    - "documentation"
+  estimated_effort: "Medium-Large"
+  created_date: "2026-01-03"

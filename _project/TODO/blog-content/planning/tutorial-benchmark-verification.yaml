@@ -1,0 +1,98 @@
+title: "[Tutorials] Verify benchmark commands in tutorial posts"
+worktree: blog-content
+priority: Medium
+status: Not Started
+category: Blog Revision
+description: |
+  Run benchmarks referenced in the tutorial blog posts to verify that
+  all example commands work correctly and placeholder data can be replaced
+  with real results.
+
+  Tutorial posts affected:
+  - read-primitives-introduction.md (Read Primitives benchmark)
+  - tpchavoc-introduction.md (TPC-Havoc benchmark)
+  - write-primitives-introduction.md (Write Primitives benchmark)
+
+  Reference drafts: _blog/tutorials/drafts/
+
+tasks:
+  phases:
+    - phase: "Phase 1: Read Primitives Verification"
+      done: false
+      items:
+        - summary: "Run Read Primitives on DuckDB"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark primitives --scale 0.1"
+              done: false
+            - summary: "Verify all 136 queries execute"
+              done: false
+        - summary: "Run Read Primitives on SQLite (comparison)"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform sqlite --benchmark primitives --scale 0.1"
+              done: false
+            - summary: "Note any skipped queries (feature support)"
+              done: false
+
+    - phase: "Phase 2: TPC-Havoc Verification"
+      done: false
+      items:
+        - summary: "Run TPC-Havoc on DuckDB"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark tpchavoc --scale 0.1"
+              done: false
+            - summary: "Verify all 220 query variants execute"
+              done: false
+            - summary: "Document any variant result mismatches"
+              done: false
+
+    - phase: "Phase 3: Write Primitives Verification (if available)"
+      done: false
+      items:
+        - summary: "Check if write-primitives benchmark is implemented"
+          done: false
+        - summary: "Run Write Primitives if available"
+          done: false
+
+    - phase: "Phase 4: Update Tutorials"
+      done: false
+      items:
+        - summary: "Update platform patterns table in read-primitives-introduction.md"
+          done: false
+        - summary: "Update variant timing examples in tpchavoc-introduction.md"
+          done: false
+
+metadata:
+  tags:
+    - tutorials
+    - benchmarking
+    - blog-data
+    - verification
+  estimated_effort: "30-60 minutes"
+  created_date: "2025-12-15"
+
+impact:
+  business_value: |
+    Ensures tutorial posts accurately reflect BenchBox capabilities and
+    commands. Prevents documentation drift from implementation.
+  user_impact: |
+    Users following tutorials get working examples. Builds confidence
+    that documented commands produce expected results.
+
+files_affected:
+  modified:
+    - "_blog/tutorials/drafts/read-primitives-introduction.md"
+    - "_blog/tutorials/drafts/tpchavoc-introduction.md"
+    - "_blog/tutorials/drafts/write-primitives-introduction.md"
+
+success_metrics:
+  - "Read Primitives runs successfully with documented commands"
+  - "TPC-Havoc runs successfully with documented commands"
+  - "Platform comparison tables have real data"
+  - "All code examples verified working"
+
+dependencies:
+  related:
+    - "_project/TODO/blog-content/planning/oxbow-tier1-benchmark-runs.yaml"

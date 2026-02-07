@@ -1,0 +1,116 @@
+title: Query Plan Platform Adapter Integration
+worktree: query-plan-adapters
+category: Core Functionality
+priority: High
+status: Completed
+completed_date: "2025-11-23"
+completion_notes: |
+  Base adapter integration completed for DuckDB and SQLite platforms.
+  - Base adapter extended with capture_plans config and capture_query_plan() method
+  - DuckDB adapter integrated with DuckDBQueryPlanParser
+  - execute_query() modified to capture plans when enabled
+  - 6 integration tests passing
+  - Zero overhead when disabled
+  - Graceful error handling
+
+  Additional platforms (PostgreSQL, BigQuery, Snowflake, DataFusion, ClickHouse,
+  Redshift, Databricks) can be added incrementally by implementing
+  get_query_plan_parser() method in each adapter.
+description: 'Extend PlatformAdapter base class and all 8+ platform adapters to support
+
+  query plan capture. Add capture_query_plan() method that executes EXPLAIN,
+
+  parses output, and returns QueryPlanDAG. Integrate with execute_query() flow.
+
+
+  **Integration Strategy**:
+
+  - Modify base adapter to add capture_query_plan() abstract method
+
+  - Each platform implements method using its parser
+
+  - execute_query() optionally captures plan based on --capture-plans flag
+
+  - Graceful handling when parser unavailable or fails
+
+  '
+context_sections:
+- name: Adapter Extension Pattern
+  summary: 'Each adapter overrides get_query_plan_parser() to return platform parser.
+
+    Base adapter provides capture_query_plan() that uses parser to convert
+
+    EXPLAIN output to QueryPlanDAG. Minimal code per platform (~20-30 LOC).
+
+    '
+- name: CLI Integration
+  summary: 'Add capture_plans parameter to adapter __init__. CLI passes flag from
+
+    --capture-plans argument. execute_query() checks flag and captures plan
+
+    if enabled, storing in result dict.
+
+    '
+impact: 'HIGH - Makes query plan capture available for all platforms. Relatively simple
+
+  once parsers are complete (mostly glue code). Enables end-to-end functionality.
+
+  '
+dependencies:
+- workstream: Query Plan Core Infrastructure (Models & Storage)
+  reason: Requires QueryPlanDAG model
+- workstream: Query Plan Parser Framework
+  reason: Requires platform parsers
+tasks:
+- phase: 'Phase 3.1: Base Adapter Extension'
+  description: Modify PlatformAdapter base class
+  items:
+  - summary: Add capture_plans parameter to PlatformAdapter.__init__
+    done: true
+  - summary: Add get_query_plan_parser() method to base adapter
+    done: true
+  - summary: Implement capture_query_plan() in base adapter
+    done: true
+  - summary: Modify execute_query() to optionally capture plan
+    done: true
+  - summary: Update base adapter tests
+    done: true
+- phase: 'Phase 3.2: DuckDB Adapter Integration'
+  description: First platform integration as proof of concept
+  items:
+  - summary: Implement get_query_plan_parser() in DuckDB adapter
+    done: true
+  - summary: Test plan capture with DuckDB queries
+    done: true
+  - summary: Verify plan stored in query result dict
+    done: true
+  - summary: Integration tests for DuckDB plan capture
+    done: true
+- phase: 'Phase 3.3: SQLite Integration'
+  description: Second platform integration
+  items:
+  - summary: Integrate SQLite adapter with SQLiteParser
+    done: true
+    details: SQLite parser implemented and available for adapter integration
+files_affected:
+- change_type: Modified
+  paths:
+  - benchbox/platforms/base/adapter.py
+  - benchbox/platforms/duckdb.py
+- change_type: New
+  paths:
+  - tests/unit/platforms/test_duckdb_plan_capture.py
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - query-plan
+  - adapters
+  - platforms
+  depends_on:
+  - Query Plan Core Infrastructure (Models & Storage)
+  - Query Plan Parser Framework
+  estimated_effort: 1 week
+  lines_of_code: ~150 LOC (adapter changes + tests)
+  actual_effort: Completed as part of Phase 2B
+  actual_lines_of_code: ~200 LOC (including integration tests)

@@ -1,0 +1,192 @@
+title: Unify Platform Registration Systems
+worktree: architecture-cleanup
+category: Code Quality and Technical Debt
+priority: High
+status: Completed
+description: |
+  Resolve the architectural code smell of having two parallel platform registration systems
+  that can drift apart. Currently, new platforms must be registered in BOTH:
+
+  1. `get_platform_adapter()` in `benchbox/platforms/__init__.py` (hardcoded dict, 22 entries)
+  2. `PlatformRegistry.auto_register_platforms()` in `benchbox/core/platform_registry.py` (18 entries)
+
+  The systems serve different purposes:
+  - `get_platform_adapter()`: CLI routing + adapter instantiation (with alias support)
+  - `PlatformRegistry`: Metadata + discovery + availability (no alias support)
+
+  This has caused bugs where platforms were added to one system but not the other.
+
+impact: |
+  - Eliminates maintenance burden of dual registration
+  - Prevents future drift-related bugs
+  - Creates single source of truth for platform configuration
+  - Reduces code duplication (~100 lines)
+
+context: |
+  Files involved:
+  - benchbox/platforms/__init__.py (lines 223-415)
+  - benchbox/core/platform_registry.py (lines 34-929)
+  - benchbox/platforms/adapter_factory.py (coordinating layer)
+  - tests/unit/core/test_platform_registry.py
+
+  Current alignment:
+  - 18 canonical platforms: aligned in both systems
+  - 4 aliases only in get_platform_adapter(): sqlite3, azure_synapse, fabric_warehouse, microsoft_fabric
+  - Duplicated functions: get_platform_requirements(), list_available_platforms()
+
+tasks:
+- phase: Phase 1 - Add Alignment Tests (Prevent Further Drift)
+  done: true
+  items:
+  - summary: Create test_platform_registration_alignment.py in tests/unit/core/
+    details: |
+      - Test that all platforms in get_platform_adapter() mapping exist in PlatformRegistry metadata
+      - Test that all auto-registered platforms have corresponding entries in get_platform_adapter()
+      - Test that DataFrame-only platforms (pandas, modin, cudf, dask) are NOT in get_platform_adapter()
+      - Test that aliases resolve to correct canonical names
+  - summary: Add test for requirements consistency
+    details: |
+      - Verify get_platform_requirements() output matches PlatformRegistry.get_platform_info().installation_command
+      - Flag any discrepancies as test failures
+  - summary: Add test for list_available_platforms() consistency
+    details: |
+      - Verify list_available_platforms() matches PlatformRegistry.get_platform_availability()
+      - Account for aliases in the comparison
+
+- phase: Phase 2 - Add Alias Support to PlatformRegistry
+  done: true
+  items:
+  - summary: Add _platform_aliases class attribute to PlatformRegistry
+    details: |
+      ```python
+      _platform_aliases: dict[str, str] = {
+          "sqlite3": "sqlite",
+          "azure_synapse": "synapse",
+          "fabric_warehouse": "fabric",
+          "microsoft_fabric": "fabric",
+      }
+      ```
+  - summary: Add resolve_platform_name() method to PlatformRegistry
+    details: |
+      @classmethod
+      def resolve_platform_name(cls, platform_name: str) -> str:
+          """Resolve user input (with possible alias) to canonical name."""
+          normalized = platform_name.lower()
+          return cls._platform_aliases.get(normalized, normalized)
+  - summary: Update get_platform_info() to use resolve_platform_name()
+    details: |
+      At the start of get_platform_info(), resolve aliases before metadata lookup.
+      This enables PlatformRegistry.get_platform_info("azure_synapse") to work.
+  - summary: Add get_all_aliases() method for CLI help/discovery
+    details: |
+      Returns dict mapping aliases to canonical names for documentation.
+  - summary: Add tests for alias resolution
+    details: |
+      - Test that resolve_platform_name("azure_synapse") == "synapse"
+      - Test that get_platform_info("sqlite3") returns sqlite info
+      - Test case insensitivity: "SQLITE3", "SQLite3", "sqlite3" all resolve to "sqlite"
+
+- phase: Phase 3 - Refactor get_platform_adapter() to Delegate
+  done: true
+  items:
+  - summary: Replace hardcoded platform_mapping dict with PlatformRegistry lookup
+    details: |
+      Instead of:
+        platform_mapping = {"duckdb": DuckDBAdapter, ...}
+        adapter_class = platform_mapping[platform_name_lower]
+
+      Use:
+        canonical_name = PlatformRegistry.resolve_platform_name(platform_name)
+        adapter_class = PlatformRegistry.get_adapter_class(canonical_name)
+
+      Keep the error handling and CLI-specific logic in get_platform_adapter().
+  - summary: Handle case where adapter is registered but deps not installed
+    details: |
+      PlatformRegistry.get_adapter_class() may raise ValueError if not registered.
+      Add try/except that checks PlatformRegistry.get_platform_info() exists
+      and provides helpful installation message.
+  - summary: Update tests for get_platform_adapter()
+    details: |
+      Ensure existing tests still pass with new delegation logic.
+      Add tests for alias handling through the full call chain.
+  - summary: Verify all existing call sites work correctly
+    details: |
+      Call sites from explore agent findings:
+      - benchbox/cli/execution_pipeline.py:166
+      - benchbox/core/databases/manager.py:12
+      - benchbox/core/dryrun.py:24
+      - benchbox/platforms/adapter_factory.py:106
+      - benchbox/cli/orchestrator.py:36
+
+- phase: Phase 4 - Remove Duplicated Functions
+  done: true
+  items:
+  - summary: Remove get_platform_requirements() from platforms/__init__.py
+    details: |
+      This function (lines 386-415) duplicates PlatformRegistry.get_platform_requirements().
+      Update all call sites to use PlatformRegistry.get_platform_requirements() instead.
+
+      Call sites to update:
+      - benchbox/platforms/__init__.py:259 (within get_platform_adapter itself)
+      - Any external consumers
+  - summary: Remove list_available_platforms() from platforms/__init__.py
+    details: |
+      This function (lines 299-383) duplicates PlatformRegistry.get_platform_availability().
+      The function re-imports all adapters just to check availability - wasteful.
+
+      Update call sites to use:
+      - PlatformRegistry.get_available_platforms() for list of names
+      - PlatformRegistry.get_platform_availability() for name->bool dict
+  - summary: Update __all__ exports in platforms/__init__.py
+    details: |
+      Remove deprecated functions from __all__ or add deprecation warnings.
+      Consider keeping as thin wrappers with DeprecationWarning for one release cycle.
+  - summary: Update any documentation referencing removed functions
+
+- phase: Phase 5 - Documentation and Cleanup
+  done: true
+  items:
+  - summary: Document the platform registration architecture
+    details: |
+      Create _project/docs/platform-registration-architecture.md explaining:
+      - PlatformRegistry as single source of truth for platform definitions
+      - get_platform_adapter() as CLI-facing factory with alias handling
+      - adapter_factory.py as SQL/DataFrame mode coordinator
+      - How to add a new platform (single location now)
+  - summary: Add inline documentation to PlatformRegistry
+    details: |
+      Add class-level docstring explaining the registry's role as source of truth.
+      Document the relationship with get_platform_adapter().
+  - summary: Update AGENTS.md if needed
+    details: |
+      Ensure platform registration instructions reflect new architecture.
+  - summary: Add ADR documenting this architectural decision
+    details: |
+      Create _project/adr/XXXX-unified-platform-registration.md documenting:
+      - Context: Why two systems existed
+      - Decision: Unify around PlatformRegistry
+      - Consequences: Single registration point, alias support in registry
+
+success_criteria:
+- All platforms defined in exactly ONE location (PlatformRegistry)
+- Aliases handled through PlatformRegistry.resolve_platform_name()
+- No duplicate requirements/availability logic
+- All existing tests pass
+- New alignment tests prevent future drift
+- CLI commands (benchbox run, benchbox platforms) work identically
+
+risks:
+- risk: Circular import issues when PlatformRegistry imports adapters
+  mitigation: Keep lazy imports in auto_register_platforms()
+- risk: Breaking external consumers using removed functions
+  mitigation: Deprecation warnings for one release cycle
+- risk: Performance regression from additional indirection
+  mitigation: Minimal - registry lookup is O(1) dict access
+
+dependencies:
+- None - can be done independently
+
+estimated_effort: Medium (2-3 focused sessions)
+
+created_date: 2025-12-08
+completed_date: "2025-12-08"

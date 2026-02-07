@@ -1,0 +1,148 @@
+# CTAS-Based Sorted Data Loading for DuckDB and Compatible Platforms
+#
+# Location: _project/TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
+
+title: "Implement CTAS-based sorted data loading for DuckDB"
+worktree: physical-tuning
+priority: Medium
+status: Not Started
+description: |
+  BenchBox's tuning infrastructure generates sort clauses via DuckDBDDLGenerator
+  (e.g., `ORDER BY L_SHIPDATE, L_ORDERKEY`), but the data loader uses INSERT INTO
+  statements that don't preserve sorting.
+
+  DuckDB doesn't support inline ORDER BY in CREATE TABLE. Sorted tables must be
+  created via CTAS patterns:
+    CREATE TABLE sorted_table AS SELECT * FROM source ORDER BY col;
+
+  The current DataLoader uses INSERT INTO with VALUES, which doesn't apply sorting.
+  This gap was discovered during sorted data performance experiments showing 5-28x
+  speedups for selective queries when data is properly sorted (zone map pruning).
+
+  The fix requires modifying the data loading path to:
+  1. Detect when tuning config specifies sorting for a table
+  2. Use CTAS pattern instead of INSERT INTO for those tables
+  3. Support both fresh load (CTAS) and append scenarios
+
+category: Core Functionality
+
+tasks:
+  phases:
+    - phase: "Phase 1: Analysis and Design"
+      done: false
+      items:
+        - summary: "Document current data loading flow in DataLoader class"
+          done: false
+        - summary: "Identify integration point for tuning config in load path"
+          done: false
+        - summary: "Design CTAS-based loading strategy for DuckDB"
+          done: false
+          subtasks:
+            - summary: "Handle fresh load scenario (CTAS)"
+              done: false
+            - summary: "Handle append scenario (temp table + ordered insert)"
+              done: false
+
+    - phase: "Phase 2: Implementation"
+      done: false
+      items:
+        - summary: "Add tuning_config parameter to DataLoader"
+          done: false
+        - summary: "Implement DuckDB CTAS handler for sorted tables"
+          done: false
+        - summary: "Modify DuckDB adapter to pass tuning config to loader"
+          done: false
+        - summary: "Add generate_ctas_ddl usage in data loading path"
+          done: false
+
+    - phase: "Phase 3: Testing and Validation"
+      done: false
+      items:
+        - summary: "Unit tests for sorted CTAS loading"
+          done: false
+        - summary: "Integration test: verify sortedness after load"
+          done: false
+        - summary: "Performance validation: confirm zone map pruning benefit"
+          done: false
+
+metadata:
+  tags:
+    - tuning
+    - duckdb
+    - performance
+    - zone-maps
+    - data-loading
+  estimated_effort: "Medium"
+  created_date: "2026-01-07"
+
+impact:
+  business_value: |
+    Enables users to achieve 5-28x query speedups for selective queries
+    by leveraging zone map pruning on sorted data - a key differentiator
+    for BenchBox's physical tuning capabilities.
+  user_impact: |
+    Users specifying sorting in tuning configs will see the sorting
+    actually applied, enabling significant performance improvements
+    for date-range and other selective queries.
+  technical_debt: |
+    Completes the integration between tuning infrastructure (DDL generators)
+    and data loading (DataLoader), eliminating a gap where tuning configs
+    are generated but not applied.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/base/data_loading.py"
+    - "benchbox/platforms/duckdb.py"
+  added:
+    - "tests/unit/platforms/test_duckdb_sorted_loading.py"
+
+context_sections:
+  "Background and Motivation": |
+    DuckDB and other columnar databases use zone maps (min-max indexes) per
+    data block for query pruning. Zone maps only work when data is sorted -
+    unsorted data has min/max spanning the entire domain, preventing skipping.
+
+    Experiments at SF3 showed:
+    - Q6 (1-year date filter): 6.4x speedup with sorted data
+    - Single-day filter: 18x speedup
+    - 1-week range filter: 28x speedup
+    - Geometric mean for selective queries: 5.8x
+
+  "Technical Context": |
+    DuckDB DDL generator (benchbox/core/tuning/generators/duckdb.py) already
+    generates sort_by clauses and has generate_ctas_ddl() method. The gap is
+    in benchbox/platforms/base/data_loading.py which uses INSERT INTO instead
+    of CTAS for data loading.
+
+    Key code paths:
+    - DuckDBDDLGenerator.generate_tuning_clauses() → returns TuningClauses.sort_by
+    - DuckDBDDLGenerator.generate_ctas_ddl() → returns CTAS SQL with ORDER BY
+    - DataLoader.load() → currently uses INSERT INTO, needs CTAS option
+
+success_metrics:
+  - "Tuning config sorting is applied during DuckDB data loading"
+  - "Loaded data has expected sortedness (run length metrics)"
+  - "Zone map pruning confirmed via EXPLAIN output"
+  - "Performance improvement matches expectations (3-10x for selective queries)"
+
+must_preserve:
+  - "Existing INSERT INTO loading path unchanged for non-sorted tables"
+  - "DuckDB adapter backward compatible when no tuning config provided"
+  - "benchbox run --platform duckdb --benchmark tpch --scale 0.01 produces identical row counts"
+
+anti_patterns:
+  - "DO NOT modify DataLoader.load() default behavior — because existing platforms depend on INSERT INTO — add CTAS as an opt-in path triggered by tuning config"
+  - "DO NOT remove INSERT INTO fallback — because not all platforms support CTAS — keep both paths"
+
+verification:
+  - description: "Existing DuckDB tests still pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_duckdb*.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Row counts match after CTAS vs INSERT INTO loading"
+    command: "uv run -- python -m pytest tests/ -k 'sorted or ctas' -v --tb=short"
+    expected_output: "all tests pass"
+
+open_questions:
+  - "Should this be DuckDB-specific or generalized for other platforms?"
+  - "How to handle mixed scenarios (some tables sorted, some not)?"
+  - "Should we support incremental/append loads with maintained sorting?"

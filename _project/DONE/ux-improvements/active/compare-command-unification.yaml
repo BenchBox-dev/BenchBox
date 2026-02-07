@@ -1,0 +1,94 @@
+# Compare Command Unification TODO
+# Integrates compare-plans functionality into the main compare command
+
+id: compare-command-unification
+title: Unify compare and compare-plans commands
+category: ux-improvements
+priority: P2
+status: completed
+created: 2025-01-15
+completed_date: "2025-12-14"
+estimated_effort: medium
+
+description: |
+  The `benchbox compare` and `benchbox compare-plans` commands serve related
+  purposes (performance comparison vs optimizer analysis) but are completely
+  separate. This fragments the UX and creates confusion about which command
+  to use.
+
+  These should be unified so that all comparison functionality is accessible
+  from `benchbox compare`, with plan comparison as an optional deep-dive.
+
+motivation: |
+  - Same persona uses both: performance engineers who benchmark also analyze plans
+  - Same input files: both work on result JSON files
+  - Already correlated: compare-plans --summary correlates plans with performance
+  - UX friction: users must remember/discover two separate commands
+  - Consistent with compare-dataframes deprecation pattern
+
+context:
+  related_files:
+    - benchbox/cli/commands/compare.py
+    - benchbox/cli/commands/compare_plans.py
+    - benchbox/core/query_plans/comparison.py
+    - benchbox/core/results/exporter.py
+  dependencies:
+    - compare-command-ux-improvements (completed)
+  preconditions:
+    - Result files with --capture-plans must contain query_plan data
+
+acceptance_criteria:
+  - All compare-plans functionality accessible via benchbox compare
+  - Plan comparison is opt-in (--include-plans or interactive selection)
+  - Reports include plan section when requested
+  - compare-plans remains functional but deprecated+hidden
+  - Documentation updated
+
+implementation_plan:
+  phase_1:
+    title: Add plan flags to compare command
+    tasks:
+      - Add --include-plans flag to file mode
+      - Add --plan-threshold option (filter by similarity)
+      - Import plan comparison from core.query_plans.comparison
+      - Check if result files contain plan data, warn if missing
+
+  phase_2:
+    title: Integrate plan output into reports
+    tasks:
+      - Add plan comparison section to text output
+      - Add plan data to JSON output
+      - Add plan table to HTML/Markdown output
+      - Show correlation (plan changed + performance regressed)
+
+  phase_3:
+    title: Interactive and deprecation
+    tasks:
+      - Add plan option to interactive wizard
+      - Mark compare-plans as hidden+deprecated
+      - Add migration note to compare-plans help
+      - Update documentation
+
+  phase_4:
+    title: Testing and polish
+    tasks:
+      - Add tests for new plan integration
+      - Test with files that have/lack plan data
+      - Test backwards compatibility
+      - Update CLI reference docs
+
+out_of_scope:
+  - Changing core plan comparison algorithms
+  - Adding plan capture to run mode (separate feature)
+  - Cross-platform plan comparison visualization
+
+risks:
+  - Plan data may be large, could bloat JSON output
+  - Not all result files have plans (graceful degradation needed)
+  - Plan comparison has different output format than performance comparison
+
+notes: |
+  This follows the same pattern as compare-dataframes deprecation:
+  1. Add functionality to main compare command
+  2. Mark old command as hidden+deprecated
+  3. Keep old command functional for backwards compatibility

@@ -1,0 +1,155 @@
+# On-demand download of TPC answer files for validation
+#
+# Location: _project/TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
+
+title: "Implement on-demand download of TPC answer files for validation"
+worktree: core-functionality
+priority: Low
+status: Not Started
+category: Core Functionality
+description: |
+  Currently, TPC-H and TPC-DS answer files (~4.2 MB total) are only available in
+  source distributions, not in wheels. When running from an installed wheel,
+  validation is gracefully skipped with an INFO message.
+
+  This TODO implements Option C from the wheel packaging analysis: download
+  answer files on-demand from a CDN or GitHub releases, caching them locally
+  for subsequent runs.
+
+  Benefits:
+  - Zero wheel size impact (currently 7.1 MB, would be 11.3 MB with answers)
+  - Validation available for all installation methods
+  - Lazy loading - only downloads when validation is actually needed
+  - Cache invalidation possible for answer file updates
+
+  Current state (acceptable workaround):
+  - Commit be3843c9 caches FileNotFoundError to prevent repeated warnings
+  - Users see single INFO message: "Validation will be skipped"
+  - This TODO is enhancement, not critical fix
+
+tasks:
+  phases:
+    - phase: "Phase 1: Infrastructure"
+      done: false
+      items:
+        - summary: "Design cache directory structure (~/.cache/benchbox/answers/)"
+          done: false
+        - summary: "Implement download manager with retry logic and checksums"
+          done: false
+        - summary: "Add configuration for answer file source URL (GitHub releases or CDN)"
+          done: false
+
+    - phase: "Phase 2: Integration"
+      done: false
+      items:
+        - summary: "Update loader.py to check cache before raising FileNotFoundError"
+          done: false
+          subtasks:
+            - summary: "Check ~/.cache/benchbox/answers/tpch/ for TPC-H answers"
+              done: false
+            - summary: "Check ~/.cache/benchbox/answers/tpcds/ for TPC-DS answers"
+              done: false
+        - summary: "Trigger download when cache miss and validation enabled"
+          done: false
+        - summary: "Add CLI option to pre-download answers (benchbox download-answers)"
+          done: false
+
+    - phase: "Phase 3: Release Infrastructure"
+      done: false
+      items:
+        - summary: "Package answer files as GitHub release asset"
+          done: false
+        - summary: "Add checksum verification for downloaded files"
+          done: false
+        - summary: "Document download behavior in user guide"
+          done: false
+
+    - phase: "Phase 4: Testing"
+      done: false
+      items:
+        - summary: "Unit tests for download manager"
+          done: false
+        - summary: "Integration test: fresh install → validation triggers download"
+          done: false
+        - summary: "Test offline mode (cache hit, no network)"
+          done: false
+
+metadata:
+  tags:
+    - validation
+    - packaging
+    - wheel
+    - user-experience
+  estimated_effort: Medium
+  created_date: "2025-01-26"
+
+impact:
+  business_value: |
+    Enables result validation for all users regardless of installation method,
+    without bloating the wheel size.
+  user_impact: |
+    Users installing via pip get the same validation capabilities as those
+    building from source, with transparent on-demand downloading.
+
+files_affected:
+  modified:
+    - benchbox/core/expected_results/loader.py
+    - benchbox/core/expected_results/registry.py
+  added:
+    - benchbox/core/expected_results/download.py
+    - benchbox/cli/commands/download_answers.py
+
+context_sections:
+  "Background and Motivation": |
+    Analysis from wheel packaging investigation (2025-01-26):
+
+    - TPC-H answers: 1.6 MB (22 files in _sources/tpc-h/dbgen/answers/)
+    - TPC-DS answers: 2.6 MB (129 files in _sources/tpc-ds/answer_sets/)
+    - Total: 4.2 MB
+
+    Current wheel: 7.1 MB
+    With answers: ~11.3 MB (+59% size increase)
+
+    The answers are in _sources/ which is outside the benchbox/ package,
+    so they're included in sdist but not in wheels (by Python packaging design).
+
+  "Alternatives Considered": |
+    Option A: Move answers into benchbox/data/ package
+    - Pros: Always available, simple
+    - Cons: +59% wheel size, redundant for users who don't validate
+
+    Option B: Keep current behavior (already implemented)
+    - Pros: Zero effort, graceful degradation
+    - Cons: No validation for wheel installs
+
+    Option C: On-demand download (this TODO)
+    - Pros: Best of both worlds
+    - Cons: Requires network, adds complexity
+
+must_preserve:
+  - "Existing FileNotFoundError caching for answer sets (commit be3843c9) continues working for offline/no-download scenarios"
+  - "sdist installations continue working without network access"
+
+anti_patterns:
+  - "DO NOT make downloads mandatory — because corporate firewalls and air-gapped environments exist — always fall back to current skip behavior when download fails"
+  - "DO NOT store downloaded answers in the package directory — because it may be read-only — use a user-writable cache directory (XDG_CACHE_HOME or ~/.cache/benchbox/)"
+
+verification:
+  - description: "Validation tests still pass"
+    command: "uv run -- python -m pytest tests/ -k validation -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Offline mode works (no network required)"
+    command: "uv run -- python -c \"from benchbox.core.expected_results.loader import AnswerLoader; print('OK')\""
+    expected_output: "OK"
+
+open_questions:
+  - "Should download be automatic or require explicit opt-in?"
+  - "What CDN/hosting to use for answer files?"
+  - "How to handle corporate firewalls that block downloads?"
+  - "Should there be a --no-download flag to disable this behavior?"
+
+success_metrics:
+  - "Wheel size remains under 8 MB"
+  - "Validation works from wheel install with internet access"
+  - "Cache hit performance is <10ms overhead"
+  - "Download failure degrades gracefully (same as current behavior)"

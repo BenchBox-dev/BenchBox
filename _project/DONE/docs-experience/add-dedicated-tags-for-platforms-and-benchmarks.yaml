@@ -1,0 +1,87 @@
+title: "Add dedicated tags for all platforms and benchmarks"
+worktree: "docs-experience"
+priority: "Medium"
+status: "Completed"
+category: "Documentation"
+description: |
+  Currently only 8 platforms and 6 benchmarks have dedicated sphinx-tags.
+  The remaining 19 platforms and 12 benchmarks use category tags only
+  (sql-platform, dataframe-platform, cloud-platform, custom-benchmark),
+  which means users cannot filter documentation by specific platform or benchmark.
+
+  This task adds dedicated tags to all documented platforms and benchmarks
+  so users can find all pages related to a specific technology.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Add Platform Tags"
+      done: true
+      items:
+        - summary: "Add tags to SQL platform docs (PostgreSQL, DataFusion, Trino, Presto, Firebolt, TimescaleDB, InfluxDB)"
+          done: true
+        - summary: "Add tags to cloud platform docs (Redshift, Athena, AWS Glue, EMR Serverless, GCP Dataproc, Azure Synapse, Microsoft Fabric, Snowpark Connect)"
+          done: true
+        - summary: "Add tags to DataFrame platform docs (PySpark, Dask, Modin, cuDF, DataFusion DF)"
+          done: true
+
+    - phase: "Phase 2: Add Benchmark Tags"
+      done: true
+      items:
+        - summary: "Add tags to TPC variant benchmarks (TPC-HaVoC, TPC-H Skew)"
+          done: true
+        - summary: "Add tags to custom benchmarks (Join Order, AMPLab, NYC Taxi, CoffeeShop, DataVault, TSBS DevOps)"
+          done: true
+        - summary: "Add tags to primitive benchmarks (Read, Write, Transaction, Metadata, AI Primitives)"
+          done: true
+
+    - phase: "Phase 3: Update Tag Categories"
+      done: true
+      items:
+        - summary: "Update sphinx_tags_fix.py TAG_CATEGORIES to include new platform and benchmark tags"
+          done: true
+        - summary: "Rebuild docs and verify tag navigation"
+          done: true
+
+metadata:
+  tags:
+    - documentation
+    - sphinx-tags
+    - discoverability
+  estimated_effort: "2-3 hours"
+  created_date: "2026-01-12"
+  completed_date: "2026-01-12"
+
+impact:
+  user_impact: |
+    Users will be able to filter documentation by any specific platform
+    (e.g., "show me all Redshift pages") or benchmark (e.g., "show me all
+    Join Order benchmark pages"), improving documentation discoverability.
+
+files_affected:
+  modified:
+    - "docs/platforms/*.md"
+    - "docs/benchmarks/*.md"
+    - "docs/_extensions/sphinx_tags_fix.py"
+
+success_metrics:
+  - "All 27 platforms have dedicated tags"
+  - "All 18 benchmarks have dedicated tags"
+  - "Tag categories in sidebar include new tags"
+
+completion_notes: |
+  Added dedicated tags to:
+  - 24 platform documentation pages (postgresql, datafusion, trino, presto,
+    firebolt, timescaledb, influxdb, redshift, athena, aws-glue, emr-serverless,
+    dataproc, dataproc-serverless, azure, fabric, fabric-spark, synapse-spark,
+    athena-spark, pyspark, dask, modin, cudf, datafusion-df, spark)
+  - 13 benchmark documentation pages (tpc-havoc, tpch-skew, join-order, amplab,
+    nyctaxi, coffeeshop, datavault, tsbs-devops, read-primitives, write-primitives,
+    transaction-primitives, metadata-primitives, ai-primitives)
+
+  Updated TAG_CATEGORIES in sphinx_tags_fix.py with all new tags organized by
+  subcategory (TPC family, industry standard, real-world datasets, primitives
+  for benchmarks; embedded/local SQL, cloud warehouses, OLAP, time series,
+  AWS, GCP, Azure, Spark, DataFrame libraries for platforms).
+
+  Verified docs build succeeds with 82 tag pages generated and correct
+  hierarchical sidebar navigation.

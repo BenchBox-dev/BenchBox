@@ -1,0 +1,87 @@
+title: Implement DataFrame Result Validation Framework
+worktree: dataframe-validation
+category: Testing and Quality Assurance
+priority: High
+status: "Completed"
+completed_date: '2025-12-02'
+description: |
+  Create comprehensive validation framework to ensure DataFrame results match
+  SQL results and are consistent across platforms.
+
+implementation_summary: |
+  Implemented validation framework in benchbox/core/dataframe/validation.py:
+
+  Core Classes:
+  - ValidationResult: Dataclass with is_valid, status, errors, warnings, metrics
+  - ValidationConfig: Configurable tolerance levels and comparison options
+  - ValidationLevel: STRICT, STANDARD, LOOSE modes
+  - ComparisonStatus: MATCH, MISMATCH, PARTIAL_MATCH, ERROR
+  - DataFrameValidator: Stateful validator with summary reporting
+
+  Core Functions:
+  - compare_dataframes(): Sort-invariant comparison with fuzzy float tolerance
+  - compare_with_sql(): Compare DataFrame results with SQL results
+  - validate_query_result(): Validate against expected row count/columns
+  - validate_row_count(): Row count validation with tolerance
+  - validate_column_names(): Column schema validation
+  - fuzzy_float_compare(): Float comparison with relative/absolute tolerance
+
+  Features:
+  - Automatic conversion from Polars, Pandas, or dict inputs
+  - Sort-invariant comparison (results may have different ordering)
+  - Fuzzy float comparison with configurable tolerance (default 1e-6)
+  - NULL handling (NULL == NULL can be configured)
+  - Detailed error reporting with metrics
+
+  51 unit tests in tests/unit/core/dataframe/test_validation.py
+
+tasks:
+- phase: 'Phase 7.1: Validation Infrastructure'
+  items:
+  - summary: Create benchbox/core/dataframe/validation.py
+    done: true
+    details: |
+      Implemented all required functions:
+      - compare_dataframes(df1, df2) -> ValidationResult
+      - compare_with_sql(df_result, sql_result) -> ValidationResult
+      - fuzzy_float_compare() - handle precision differences
+      - validate_row_count()
+      - validate_column_names()
+      - Sort-invariant comparison via sorted column comparison
+  - summary: Implement ValidationResult dataclass
+    done: true
+    details: |
+      Implemented with fields:
+      - is_valid: bool
+      - status: ComparisonStatus
+      - errors: list[str]
+      - warnings: list[str]
+      - metrics: dict (row count, column count, etc.)
+      - details: dict (additional context)
+- phase: 'Phase 7.2: Cross-Platform Tests'
+  items:
+  - summary: Create tests/dataframe/test_cross_platform_validation.py
+    done: false
+    note: Requires multiple platform adapters to be complete
+  - summary: Create SQL vs DataFrame comparison tests
+    done: false
+    note: Requires orchestrator integration
+  - summary: Add performance comparison tests
+    done: false
+    note: Future enhancement
+
+files_affected:
+- change_type: New
+  paths:
+  - benchbox/core/dataframe/validation.py
+  - tests/unit/core/dataframe/test_validation.py
+
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - dataframe
+  - validation
+  - testing
+  estimated_effort: 1 week
+  actual_effort: Phase 7.1 complete, Phase 7.2 pending

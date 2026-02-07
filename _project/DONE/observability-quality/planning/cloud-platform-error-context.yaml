@@ -1,0 +1,160 @@
+title: Cloud Platform Error Message Context
+worktree: observability-quality
+priority: Medium
+status: "Completed"
+category: Platform Polish
+description: |
+  Improve error messages across cloud platform adapters with actionable context.
+
+  Current issues:
+  - Generic "Query failed" errors without diagnosis hints
+  - Network errors don't suggest common causes
+  - Authentication failures lack credential verification steps
+  - Quota/limit errors not clearly identified
+
+  Goal: Wrap common exceptions with context that helps users
+  diagnose and fix issues without searching external docs.
+
+  Platforms to improve:
+  - BigQuery (quota, auth, project errors)
+  - Redshift (security group, cluster state, IAM)
+  - Snowflake (warehouse suspend, role permissions)
+  - Databricks (cluster state, token expiry)
+
+tasks:
+  - phase: "Error Context Helpers"
+    done: true
+    items:
+      - summary: "Create reusable error context wrapper"
+        done: true
+      - summary: "Define common error categories (auth, network, quota, config)"
+        done: true
+  - phase: "BigQuery Improvements"
+    done: true
+    items:
+      - summary: "Add quota exhaustion detection and message"
+        done: true
+      - summary: "Add service account permission hints"
+        done: true
+  - phase: "Redshift Improvements"
+    done: true
+    items:
+      - summary: "Add cluster state check suggestion"
+        done: true
+      - summary: "Add security group troubleshooting"
+        done: true
+  - phase: "Snowflake Improvements"
+    done: true
+    items:
+      - summary: "Add warehouse auto-suspend detection"
+        done: true
+      - summary: "Add role permission suggestions"
+        done: true
+  - phase: "Databricks Improvements"
+    done: true
+    items:
+      - summary: "Add cluster startup state handling"
+        done: true
+      - summary: "Add token expiry detection"
+        done: true
+  - phase: "Testing"
+    done: true
+    items:
+      - summary: "Add error context tests"
+        done: true
+      - summary: "Verify message quality"
+        done: true
+
+completion_notes: |
+  Created benchbox/platforms/cloud_error_context.py with comprehensive
+  error pattern matching for 4 cloud platforms.
+
+  Module Structure:
+  - CloudErrorContext dataclass with error_type, original_message, platform,
+    suggestions, diagnostic_commands, and documentation_url fields
+  - format_message() method for user-friendly output
+
+  Error Categories Implemented:
+  - auth: Authentication/credential issues
+  - network: Connectivity and firewall issues
+  - quota: Rate limits and resource quotas
+  - config: Configuration and project/dataset issues
+  - permission: IAM and access control issues
+  - cluster_state: Warehouse/cluster status (paused, terminated, etc.)
+
+  Platform Pattern Coverage:
+  1. BigQuery (4 patterns):
+     - Quota exhaustion with GCloud quota commands
+     - Permission errors with IAM hints
+     - Not found errors for projects/datasets
+     - Credentials errors with GOOGLE_APPLICATION_CREDENTIALS hints
+
+  2. Redshift (4 patterns):
+     - Connection/network errors with security group hints
+     - Cluster paused/maintenance detection
+     - Permission errors with GRANT command suggestions
+     - Password authentication failures
+
+  3. Snowflake (4 patterns):
+     - Warehouse suspended with ALTER WAREHOUSE resume hint
+     - Role does not exist with USE ROLE suggestions
+     - Account not found with identifier format hints
+     - Authentication failed with MFA/key-pair suggestions
+
+  4. Databricks (4 patterns):
+     - Cluster terminated with startup guidance
+     - Token expired with regeneration steps
+     - Permission denied with cluster permissions hints
+     - Network errors with workspace URL validation
+
+  API Functions:
+  - detect_error_type(error_message, platform) -> CloudErrorContext | None
+  - enhance_cloud_error(exception, platform) -> ConfigurationError
+  - wrap_cloud_operation(platform, operation) decorator
+
+  Testing:
+  - 36 tests in test_cloud_error_context.py
+  - TestCloudErrorContext: 4 tests for message formatting
+  - TestBigQueryErrorPatterns: 4 tests
+  - TestRedshiftErrorPatterns: 4 tests
+  - TestSnowflakeErrorPatterns: 4 tests
+  - TestDatabricksErrorPatterns: 4 tests
+  - TestDetectErrorType: 4 tests for edge cases
+  - TestEnhanceCloudError: 3 tests
+  - TestWrapCloudOperation: 4 tests
+  - TestErrorPatternCoverage: 5 tests for pattern quality
+
+  All 36 tests pass.
+
+metadata:
+  owners:
+    - "@benchbox-maintainers"
+  tags:
+    - error-handling
+    - user-experience
+    - cloud
+    - bigquery
+    - redshift
+    - snowflake
+    - databricks
+  estimated_effort: 4-6 hours
+  created_date: "2025-12-13"
+
+impact:
+  business_value: |
+    Reduces support burden - users self-diagnose issues.
+    Professional error handling differentiates BenchBox.
+  user_impact: |
+    Faster issue resolution.
+    No need to search external docs for common errors.
+
+success_metrics:
+  - Common cloud errors have actionable suggestions
+  - Error messages include next steps
+  - Tests verify error context quality (36 tests)
+
+files_created:
+  - benchbox/platforms/cloud_error_context.py (407 lines)
+  - tests/unit/platforms/test_cloud_error_context.py (448 lines)
+
+reference_pattern: benchbox/cli/exceptions.py

@@ -1,0 +1,135 @@
+title: "Add CedarDB Platform Adapter"
+worktree: platform-expansion
+priority: Medium
+status: Not Started
+category: Platform Expansion
+description: |
+  Add support for CedarDB (formerly Umbra), a high-performance RDBMS that handles both
+  OLAP and OLTP workloads with PostgreSQL wire protocol compatibility.
+
+  CedarDB is notable for:
+  - Blazingly fast analytical and transactional query execution
+  - Full PostgreSQL SQL dialect and wire protocol compatibility
+  - Strong ACID guarantees with MVCC
+  - Works with existing PostgreSQL tools (psql, DBeaver, DataGrip)
+  - Python connectivity via psycopg2/psycopg3 (PostgreSQL drivers)
+
+  Reference: https://cedardb.com/docs/
+
+context_sections:
+  "Technical Background": |
+    CedarDB uses PostgreSQL wire protocol, meaning we can likely reuse much of the
+    PostgreSQL adapter pattern. Key differences may be in:
+    - Query optimization hints
+    - Bulk loading mechanisms
+    - Platform-specific tuning options
+
+  "Connection Details": |
+    Python drivers: psycopg2, psycopg3 (standard PostgreSQL drivers)
+    Connection string: Standard PostgreSQL format
+    Default port: 5432 (configurable)
+
+tasks:
+  phases:
+    - phase: "Phase 1: Research and Design"
+      done: false
+      items:
+        - summary: "Document CedarDB-specific SQL extensions and limitations"
+          done: false
+        - summary: "Identify bulk loading capabilities and COPY support"
+          done: false
+        - summary: "Research tuning parameters and configuration options"
+          done: false
+
+    - phase: "Phase 2: Adapter Implementation"
+      done: false
+      items:
+        - summary: "Create CedarDBAdapter class extending PostgreSQL base"
+          done: false
+        - summary: "Implement connection factory with CedarDB defaults"
+          done: false
+        - summary: "Add bulk loading support (COPY or custom)"
+          done: false
+        - summary: "Implement platform-specific tuning configuration"
+          done: false
+
+    - phase: "Phase 3: Testing and Documentation"
+      done: false
+      items:
+        - summary: "Add unit tests for CedarDB adapter"
+          done: false
+        - summary: "Run TPC-H/TPC-DS validation at SF 0.01 and 1"
+          done: false
+        - summary: "Create platform documentation page"
+          done: false
+        - summary: "Add to platform comparison matrix"
+          done: false
+
+metadata:
+  tags:
+    - platform
+    - sql
+    - postgresql-compatible
+    - olap
+    - oltp
+    - cedardb
+  estimated_effort: Medium
+  created_date: "2026-01-26"
+
+technical_requirements:
+  dependencies:
+    - "psycopg2 or psycopg3 (PostgreSQL driver)"
+  compatibility: |
+    CedarDB supports PostgreSQL SQL dialect and wire protocol.
+    Should work with existing PostgreSQL tooling.
+
+files_affected:
+  added:
+    - "benchbox/platforms/cedardb.py"
+    - "tests/unit/platforms/test_cedardb.py"
+    - "docs/platforms/cedardb.md"
+  modified:
+    - "benchbox/platforms/__init__.py"
+    - "docs/platforms/index.md"
+
+must_preserve:
+  - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  - "Platform registry autodiscovery continues working for all existing platforms"
+  - "Existing PostgreSQL adapter behavior unchanged"
+
+anti_patterns:
+  - "DO NOT modify existing adapter files — because CedarDB is additive — create a new cedardb.py file"
+  - "DO NOT duplicate PostgreSQL adapter logic — because CedarDB uses PG wire protocol — extend or compose from existing PostgreSQL patterns"
+  - "DO NOT hardcode PostgreSQL default port 5432 — because CedarDB may use a different port — make port configurable with a CedarDB-appropriate default"
+
+verification:
+  - description: "New adapter imports correctly"
+    command: "uv run -- python -c \"from benchbox.platforms.cedardb import CedarDBAdapter; print('import OK')\""
+    expected_output: "import OK"
+  - description: "Unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_cedardb.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Existing platform tests unaffected"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/cedardb.py"
+    - "benchbox/platforms/credentials/cedardb.py"
+    - "tests/unit/platforms/test_cedardb.py"
+  do_not_modify:
+    - "benchbox/platforms/postgresql.py"
+    - "benchbox/platforms/timescaledb.py"
+    - "benchbox/core/runner.py"
+
+success_metrics:
+  - "CedarDB adapter passes all TPC-H queries at SF 1"
+  - "CedarDB adapter passes all TPC-DS queries at SF 1"
+  - "Bulk loading performance within 2x of native COPY"
+  - "Documentation complete with connection examples"
+
+open_questions:
+  - "Does CedarDB have any TPC benchmark-specific optimizations?"
+  - "What are the recommended tuning parameters for OLAP workloads?"
+  - "Is there a cloud-hosted version that needs separate adapter?"

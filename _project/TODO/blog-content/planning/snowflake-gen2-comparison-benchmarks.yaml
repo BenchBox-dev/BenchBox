@@ -1,0 +1,141 @@
+title: "[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite"
+worktree: blog-content
+priority: Medium
+status: Not Started
+category: Blog Revision
+description: |
+  Run comprehensive Gen1 vs Gen2 Snowflake benchmarks to fill placeholder
+  data in the gen2-comparison.md draft. This requires Snowflake credentials
+  and will incur cloud costs.
+
+  The draft claims 35-50% average speedup from Gen2 over Gen1, which needs
+  validation with real benchmark data across multiple warehouse sizes and
+  benchmark types.
+
+  Key questions to answer:
+  - Does Gen2 exceed the 26% break-even threshold (35% price premium)?
+  - Which query patterns benefit most from Gen2?
+  - Is there evidence of software-only optimizations (>80% speedup)?
+
+  Reference draft: _blog/snowflake-comparison/drafts/gen2-comparison.md
+
+tasks:
+  phases:
+    - phase: "Phase 1: Warehouse Setup"
+      done: false
+      items:
+        - summary: "Create Gen1 warehouses (Small, Medium, Large)"
+          done: false
+          subtasks:
+            - summary: "CREATE WAREHOUSE BENCHBOX_GEN1_SMALL WAREHOUSE_SIZE='SMALL' RESOURCE_CONSTRAINT='GENERATION_1'"
+              done: false
+            - summary: "CREATE WAREHOUSE BENCHBOX_GEN1_MEDIUM WAREHOUSE_SIZE='MEDIUM' RESOURCE_CONSTRAINT='GENERATION_1'"
+              done: false
+            - summary: "CREATE WAREHOUSE BENCHBOX_GEN1_LARGE WAREHOUSE_SIZE='LARGE' RESOURCE_CONSTRAINT='GENERATION_1'"
+              done: false
+        - summary: "Create Gen2 warehouses (Small, Medium, Large)"
+          done: false
+          subtasks:
+            - summary: "CREATE WAREHOUSE BENCHBOX_GEN2_SMALL WAREHOUSE_SIZE='SMALL' RESOURCE_CONSTRAINT='GENERATION_2'"
+              done: false
+            - summary: "CREATE WAREHOUSE BENCHBOX_GEN2_MEDIUM WAREHOUSE_SIZE='MEDIUM' RESOURCE_CONSTRAINT='GENERATION_2'"
+              done: false
+            - summary: "CREATE WAREHOUSE BENCHBOX_GEN2_LARGE WAREHOUSE_SIZE='LARGE' RESOURCE_CONSTRAINT='GENERATION_2'"
+              done: false
+
+    - phase: "Phase 2: TPC-H Comparison Matrix"
+      done: false
+      items:
+        - summary: "TPC-H SF10 - Gen1 Small"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform snowflake --benchmark tpch --scale 10 --config warehouse=BENCHBOX_GEN1_SMALL"
+              done: false
+        - summary: "TPC-H SF10 - Gen2 Small"
+          done: false
+        - summary: "TPC-H SF10 - Gen1 Medium"
+          done: false
+        - summary: "TPC-H SF10 - Gen2 Medium"
+          done: false
+        - summary: "TPC-H SF100 - Gen1 Large"
+          done: false
+        - summary: "TPC-H SF100 - Gen2 Large"
+          done: false
+
+    - phase: "Phase 3: TPC-DS Comparison (Medium Warehouse)"
+      done: false
+      items:
+        - summary: "TPC-DS SF10 - Gen1 Medium"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform snowflake --benchmark tpcds --scale 10 --config warehouse=BENCHBOX_GEN1_MEDIUM"
+              done: false
+        - summary: "TPC-DS SF10 - Gen2 Medium"
+          done: false
+
+    - phase: "Phase 4: ClickBench Comparison (Medium Warehouse)"
+      done: false
+      items:
+        - summary: "ClickBench - Gen1 Medium"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform snowflake --benchmark clickbench --config warehouse=BENCHBOX_GEN1_MEDIUM"
+              done: false
+        - summary: "ClickBench - Gen2 Medium"
+          done: false
+
+    - phase: "Phase 5: Analysis"
+      done: false
+      items:
+        - summary: "Calculate per-query speedups for all benchmarks"
+          done: false
+        - summary: "Identify queries with >80% speedup (software optimization evidence)"
+          done: false
+        - summary: "Calculate break-even analysis (speedup vs 35% premium)"
+          done: false
+        - summary: "Calculate credits consumed per benchmark run"
+          done: false
+
+metadata:
+  tags:
+    - snowflake
+    - cloud-benchmarking
+    - gen2-comparison
+    - blog-data
+  estimated_effort: "2-4 hours"
+  budget_allocated: "$20-50 estimated cloud costs"
+  created_date: "2025-12-15"
+
+impact:
+  business_value: |
+    Provides real-world cost-performance data for Snowflake's Gen2 upgrade
+    decision. This is a common customer question with significant budget
+    implications.
+  user_impact: |
+    Gives Snowflake users concrete data to justify Gen2 migration to
+    finance/leadership. Helps identify which workloads benefit most.
+
+technical_requirements:
+  dependencies:
+    - "Snowflake account with credentials"
+    - "Permission to create warehouses"
+    - "Budget approval for cloud costs"
+
+files_affected:
+  modified:
+    - "_blog/snowflake-comparison/drafts/gen2-comparison.md"
+
+success_metrics:
+  - "All 12 benchmark runs complete successfully"
+  - "Speedup calculations for each query category"
+  - "Break-even analysis confirms/refutes 35-50% claim"
+  - "Cloud costs documented for reproducibility"
+
+open_questions:
+  - "Do we have Snowflake credentials configured?"
+  - "Is budget approved for $20-50 in benchmark costs?"
+  - "Which AWS region should we use (us-west-2 recommended)?"
+
+dependencies:
+  related:
+    - "_project/TODO/blog-content/planning/oxbow-tier3-cloud-benchmark-runs.yaml"

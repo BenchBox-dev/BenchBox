@@ -1,0 +1,166 @@
+title: "TimescaleDB Cloud Deployment Mode"
+worktree: platform-expansion
+priority: Medium
+status: Not Started
+category: Platform Expansion
+description: |
+  Add TimescaleDB Cloud deployment mode to the existing TimescaleDB adapter,
+  enabling benchmarking of Timescale's managed cloud service via the
+  timescaledb:cloud syntax.
+
+context_sections:
+  "Background and Motivation": |
+    Timescale Cloud is Timescale's managed PostgreSQL service with TimescaleDB:
+    - Fully managed TimescaleDB instances
+    - Automatic scaling and maintenance
+    - Cloud-native features (continuous aggregates, compression)
+    - PostgreSQL wire protocol compatibility
+
+    Adding cloud support enables users to compare self-hosted TimescaleDB
+    performance with the managed service.
+
+  "Technical Context": |
+    TimescaleDB Cloud uses standard PostgreSQL wire protocol, so connection
+    handling is similar to self-hosted. Key differences:
+    - Connection string format (cloud hostnames)
+    - SSL requirements
+    - Authentication (password, certificates)
+    - Service tier configuration
+
+tasks:
+  phases:
+    - phase: "Phase 1: Registry and Configuration"
+      done: false
+      items:
+        - summary: "Add 'cloud' deployment mode to TimescaleDB registry metadata"
+          done: false
+          subtasks:
+            - summary: "Set requires_credentials=True"
+              done: false
+            - summary: "Set requires_network=True"
+              done: false
+            - summary: "Define auth_methods=['password', 'certificate']"
+              done: false
+        - summary: "Add cloud-specific configuration options"
+          done: false
+          subtasks:
+            - summary: "Cloud host endpoint"
+              done: false
+            - summary: "Service ID"
+              done: false
+            - summary: "SSL configuration"
+              done: false
+
+    - phase: "Phase 2: Authentication"
+      done: false
+      items:
+        - summary: "Implement password authentication for cloud"
+          done: false
+        - summary: "Implement certificate authentication"
+          done: false
+        - summary: "Add credential setup wizard for TimescaleDB Cloud"
+          done: false
+        - summary: "Support environment variables"
+          done: false
+          subtasks:
+            - summary: "TIMESCALE_CLOUD_HOST"
+              done: false
+            - summary: "TIMESCALE_CLOUD_PASSWORD"
+              done: false
+
+    - phase: "Phase 3: Connection"
+      done: false
+      items:
+        - summary: "Implement cloud endpoint connection with SSL"
+          done: false
+        - summary: "Handle cloud-specific connection pooling"
+          done: false
+        - summary: "Configure query timeout for cloud latency"
+          done: false
+
+    - phase: "Phase 4: Testing"
+      done: false
+      items:
+        - summary: "Unit tests for cloud authentication"
+          done: false
+        - summary: "Integration tests with TimescaleDB Cloud (requires account)"
+          done: false
+        - summary: "Test TPC-H benchmark at scale 0.1"
+          done: false
+        - summary: "Compare results with self-hosted TimescaleDB"
+          done: false
+
+metadata:
+  tags:
+    - platform-adapter
+    - timescaledb
+    - cloud
+    - deployment-modes
+  estimated_effort: "2 days"
+  created_date: "2026-01-14"
+
+impact:
+  business_value: |
+    Enables comparison of self-hosted vs managed TimescaleDB, particularly
+    valuable for time-series workload benchmarking.
+  user_impact: |
+    Users can benchmark TimescaleDB Cloud alongside self-hosted TimescaleDB
+    using the same benchmark suite.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/timescaledb.py"
+    - "benchbox/core/platform_registry.py"
+  added:
+    - "benchbox/platforms/credentials/timescaledb_cloud.py"
+  removed: []
+
+dependencies:
+  related:
+    - "_project/DONE/platform-expansion/active/deployment-factory-integration.yaml"
+
+technical_requirements:
+  dependencies:
+    - "psycopg2 or asyncpg (existing)"
+  constraints:
+    - "Requires TimescaleDB Cloud account for testing"
+    - "SSL connection required"
+
+must_preserve:
+  - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  - "Platform registry autodiscovery continues working for all existing platforms"
+  - "Existing self-hosted TimescaleDB mode unchanged"
+  - "Existing TimescaleDB unit tests continue to pass"
+
+anti_patterns:
+  - "DO NOT break existing self-hosted TimescaleDB mode — because self-hosted users depend on current behavior — add cloud as an additional deployment option"
+  - "DO NOT require cloud credentials for self-hosted mode — because self-hosted users connect directly — gate cloud configuration behind deployment mode checks"
+  - "DO NOT remove existing connection logic — because the self-hosted path is stable and tested — add cloud connection as a separate code path"
+
+verification:
+  - description: "Cloud credentials module imports correctly"
+    command: "uv run -- python -c \"from benchbox.platforms.credentials.timescaledb_cloud import *; print('import OK')\""
+    expected_output: "import OK"
+  - description: "TimescaleDB adapter unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_timescaledb_adapter.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Existing platform tests unaffected"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/timescaledb.py"
+    - "benchbox/platforms/credentials/timescaledb_cloud.py"
+    - "benchbox/core/platform_registry.py"
+    - "tests/unit/platforms/test_timescaledb_adapter.py"
+  do_not_modify:
+    - "benchbox/platforms/postgresql.py"
+    - "benchbox/platforms/duckdb.py"
+    - "benchbox/core/runner.py"
+
+success_metrics:
+  - "timescaledb:cloud connects successfully"
+  - "TPC-H benchmark runs at scale 0.1"
+  - "Results comparable with self-hosted TimescaleDB"
+  - "SSL connection works correctly"

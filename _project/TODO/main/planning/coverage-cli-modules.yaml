@@ -1,0 +1,126 @@
+title: "Improve test coverage for CLI modules to ≥50%"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Testing and Quality Assurance
+description: |
+  Several CLI modules are below 50% test coverage. These handle user-facing
+  commands, configuration, output formatting, and error handling.
+
+  Current coverage breakdown:
+    - cli/commands/compare.py: 30.2% (623 missing)
+    - cli/commands/run.py: 49.8% (516 missing) — nearly there
+    - cli/commands/shell.py: 30.0% (301 missing)
+    - cli/commands/compare_plans.py: 11.6% (229 missing)
+    - cli/commands/compare_dataframes.py: 12.7% (200 missing)
+    - cli/tuning.py: 0.0% (397 missing)
+    - cli/config.py: 47.6% (267 missing) — nearly there
+    - cli/onboarding.py: 0.0% (192 missing)
+    - cli/output.py: 49.0% (177 missing) — nearly there
+    - cli/exceptions.py: 36.9% (178 missing)
+    - cli/preferences.py: 19.2% (126 missing)
+    - cli/composite_params.py: 46.4% (120 missing)
+    - cli/presentation/system.py: 16.7% (20 missing)
+    - cli/system.py: 43.3% (17 missing)
+
+  Three modules (run.py, config.py, output.py) are very close to 50% and
+  need minimal effort. The zero-coverage modules (tuning.py, onboarding.py)
+  need foundational test suites.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Quick wins — modules near 50%"
+      done: false
+      items:
+        - summary: "Add tests for cli/commands/run.py (49.8% → 50%)"
+          done: false
+        - summary: "Add tests for cli/config.py (47.6% → 50%)"
+          done: false
+        - summary: "Add tests for cli/output.py (49.0% → 50%)"
+          done: false
+        - summary: "Add tests for cli/composite_params.py (46.4% → 50%)"
+          done: false
+        - summary: "Add tests for cli/system.py (43.3% → 50%)"
+          done: false
+
+    - phase: "Phase 2: Zero-coverage modules"
+      done: false
+      items:
+        - summary: "Add tests for cli/tuning.py (0% → 50%)"
+          done: false
+        - summary: "Add tests for cli/onboarding.py (0% → 50%)"
+          done: false
+
+    - phase: "Phase 3: Compare commands and remaining CLI"
+      done: false
+      items:
+        - summary: "Add tests for cli/commands/compare.py (30.2% → 50%)"
+          done: false
+        - summary: "Add tests for cli/commands/shell.py (30.0% → 50%)"
+          done: false
+        - summary: "Add tests for cli/commands/compare_plans.py (11.6% → 50%)"
+          done: false
+        - summary: "Add tests for cli/commands/compare_dataframes.py (12.7% → 50%)"
+          done: false
+        - summary: "Add tests for cli/exceptions.py (36.9% → 50%)"
+          done: false
+        - summary: "Add tests for cli/preferences.py (19.2% → 50%)"
+          done: false
+        - summary: "Add tests for cli/presentation/system.py (16.7% → 50%)"
+          done: false
+
+metadata:
+  tags:
+    - testing
+    - coverage
+    - cli
+  estimated_effort: Medium
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T09:00:00"
+
+impact:
+  business_value: |
+    CLI is the primary user interface. Untested commands risk broken user
+    experience on release.
+  technical_debt: |
+    14 CLI files below 50% coverage. Phase 1 alone (5 files near threshold)
+    can be completed in a few hours.
+
+must_preserve:
+  - "All existing CLI tests continue to pass"
+  - "CLI --help output remains unchanged"
+  - "No changes to production code"
+
+approach: |
+  Follow existing patterns in tests/unit/cli/. Most CLI modules can be tested
+  by invoking Click commands with CliRunner or by testing individual functions
+  directly. For compare commands, create small mock result files. For tuning.py,
+  test YAML config parsing and parameter resolution. For onboarding.py, mock
+  user input and filesystem operations.
+
+anti_patterns:
+  - "DO NOT launch actual benchmark runs in CLI tests — because benchmark runs take 30+ seconds and require platform credentials — mock the runner with unittest.mock.patch"
+  - "DO NOT test by parsing CLI stdout strings — because stdout format changes would cause false failures — test return values, exit codes, and side effects instead"
+
+verification:
+  - description: "All CLI tests pass"
+    command: "uv run -- python -m pytest tests/unit/cli/ -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+
+success_metrics:
+  - "Every cli/* file listed above reaches ≥50% line coverage"
+  - "Zero test failures introduced"
+
+files_affected:
+  added:
+    - "tests/unit/cli/test_tuning_coverage.py"
+    - "tests/unit/cli/test_onboarding.py"
+    - "tests/unit/cli/test_compare_plans.py"
+    - "tests/unit/cli/test_compare_dataframes.py"
+    - "tests/unit/cli/commands/test_shell.py"
+
+scope_limit:
+  only_modify:
+    - "tests/unit/cli/"
+  do_not_modify:
+    - "benchbox/"

@@ -5,7 +5,7 @@
 title: "Add Apache Hudi Support on Par with Delta Lake and Iceberg"
 worktree: table-format-parity
 priority: Medium-High
-status: Complete
+status: "Completed"
 category: Core Functionality
 description: |
   Implement comprehensive Apache Hudi support to achieve feature parity with

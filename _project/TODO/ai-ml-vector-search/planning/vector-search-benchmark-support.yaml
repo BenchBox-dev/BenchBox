@@ -1,0 +1,145 @@
+title: "Vector Search Benchmark Support"
+worktree: ai-ml-vector-search
+priority: Medium-High
+status: Not Started
+category: AI/ML Capabilities
+description: |
+  Implement vector search benchmarking for OLAP databases with vector/embedding
+  support. Test similarity search performance across platforms that support
+  vector operations: BigQuery, Snowflake, Databricks, ClickHouse, PostgreSQL
+  (pgvector), and DuckDB (vss extension).
+
+  Focus on the core vector search operations used in RAG applications:
+  - k-Nearest Neighbor (kNN) exact search
+  - Approximate Nearest Neighbor (ANN) search with HNSW/IVF indexes
+  - Filtered vector search (metadata + vector similarity)
+  - Batch vector operations
+
+  Use the ANN-Benchmarks methodology as a reference standard for measuring
+  recall@k vs queries-per-second tradeoffs.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Research and Design"
+      done: false
+      items:
+        - summary: "Survey existing vector benchmarks (ANN-Benchmarks, VectorDBBench)"
+          done: false
+        - summary: "Define benchmark dataset (SIFT-128, GloVe-200, or synthetic)"
+          done: false
+        - summary: "Define metrics: recall@k, QPS, latency p50/p95/p99, index build time"
+          done: false
+        - summary: "Audit platform vector support (index types, distance functions per platform)"
+          done: false
+
+    - phase: "Phase 2: Data Generation and Schema"
+      done: false
+      items:
+        - summary: "Implement vector data generator (synthetic embeddings at configurable dimensions)"
+          done: false
+        - summary: "Define schema: vectors table + metadata table for filtered search"
+          done: false
+        - summary: "Support scale factors: SF=0.01 (10K vectors) to SF=100 (10M vectors)"
+          done: false
+
+    - phase: "Phase 3: Query Implementation"
+      done: false
+      items:
+        - summary: "Implement kNN exact search queries per platform dialect"
+          done: false
+        - summary: "Implement ANN search with platform-specific index syntax"
+          done: false
+        - summary: "Implement filtered vector search (WHERE metadata + ORDER BY distance)"
+          done: false
+        - summary: "Implement recall@k measurement against exact search ground truth"
+          done: false
+
+    - phase: "Phase 4: Platform Adapters"
+      done: false
+      items:
+        - summary: "PostgreSQL pgvector: CREATE INDEX USING hnsw, <=> operator"
+          done: false
+        - summary: "DuckDB vss: LOAD vss, array_distance functions"
+          done: false
+        - summary: "ClickHouse: annoy/usearch indexes, cosineDistance"
+          done: false
+        - summary: "Snowflake: VECTOR type, VECTOR_COSINE_SIMILARITY"
+          done: false
+
+    - phase: "Phase 5: Testing and Validation"
+      done: false
+      items:
+        - summary: "Unit tests for vector data generation and query construction"
+          done: false
+        - summary: "Integration test with DuckDB vss at SF=0.01"
+          done: false
+        - summary: "Validate recall@k measurement against known ANN-Benchmarks results"
+          done: false
+
+metadata:
+  tags:
+    - benchmark
+    - vector-search
+    - ai-ml
+    - embeddings
+  estimated_effort: "3-4 weeks"
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T10:00:00"
+
+impact:
+  business_value: |
+    Vector search is the fastest-growing OLAP feature, driven by RAG applications.
+    No existing tool benchmarks vector search across OLAP platforms consistently.
+    This positions BenchBox uniquely in the AI/ML benchmarking space.
+  user_impact: |
+    Users building RAG applications can compare vector search performance across
+    their existing OLAP platforms vs dedicated vector databases.
+  technical_debt: |
+    New benchmark module — no existing debt. Clean-slate implementation.
+
+must_preserve:
+  - "All existing benchmark modules unaffected"
+  - "BaseBenchmark interface contract unchanged"
+  - "Platform registry backward compatible"
+
+approach: |
+  Follow the pattern established by h2odb and amplab benchmarks (small, focused
+  benchmarks with synthetic data). Use benchbox/core/h2odb/ as a template for
+  directory structure. Generate synthetic embedding vectors using numpy random
+  with controlled seeds for reproducibility. Use cosine similarity as the
+  default distance function (most common in RAG applications).
+
+anti_patterns:
+  - "DO NOT use real ML model embeddings for benchmark data — because model inference adds uncontrolled variability — use synthetic vectors with known statistical properties"
+  - "DO NOT require vector database extensions to be pre-installed — because platforms may not have them — detect availability and skip gracefully with actionable error messages"
+  - "DO NOT benchmark index build time in the power run — because index creation is a one-time cost — measure it separately in the load phase"
+
+verification:
+  - description: "Vector benchmark module imports"
+    command: "uv run -- python -c \"from benchbox.core.vector_search import VectorSearchBenchmark; print('OK')\""
+    expected_output: "OK"
+  - description: "Unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/vector_search/ -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+
+files_affected:
+  added:
+    - "benchbox/core/vector_search/__init__.py"
+    - "benchbox/core/vector_search/benchmark.py"
+    - "benchbox/core/vector_search/generator.py"
+    - "benchbox/core/vector_search/queries.py"
+    - "benchbox/core/vector_search/schema.py"
+    - "tests/unit/core/vector_search/test_vector_benchmark.py"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/vector_search/"
+    - "tests/unit/core/vector_search/"
+  do_not_modify:
+    - "benchbox/core/tpch/"
+    - "benchbox/platforms/"
+
+open_questions:
+  - "Which embedding dimensions to support? 128 (SIFT), 200 (GloVe), 768 (BERT), 1536 (OpenAI)?"
+  - "Should we include a pre-built dataset option (download SIFT/GloVe) or only synthetic?"
+  - "How to handle platforms that don't support ANN indexes (exact search only)?"

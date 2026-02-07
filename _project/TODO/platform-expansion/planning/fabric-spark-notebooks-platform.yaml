@@ -1,0 +1,318 @@
+title: "Add Microsoft Fabric Spark Notebooks platform support"
+worktree: platform-expansion
+priority: Medium-High
+status: Not Started
+description: |
+  Integrate Microsoft Fabric Spark Notebooks as a supported BenchBox platform for
+  managed Spark-based benchmarking in the Fabric ecosystem.
+
+  Microsoft Fabric Spark is fundamentally different from Fabric Warehouse:
+  - **Fabric Warehouse** (existing): T-SQL based, uses COPY INTO for data loading
+  - **Fabric Spark** (this TODO): PySpark-based, uses Livy API for job submission
+
+  This fills a critical gap: the existing FabricWarehouseAdapter explicitly notes
+  that Lakehouse data loading requires Spark, which is currently unsupported.
+  This adapter would enable:
+  - Full Lakehouse benchmarking with read/write capabilities
+  - V-Order optimization (Spark-only feature in Fabric)
+  - Delta Lake native operations
+  - OneLake integration via Spark paths
+
+  Key technical characteristics:
+  - Spark 3.4+ runtime with Fabric-specific configurations
+  - Livy REST API for remote job submission (notebooks execute remotely)
+  - Entra ID authentication (consistent with Fabric ecosystem)
+  - OneLake paths: abfss://{workspace}@onelake.dfs.fabric.microsoft.com/...
+  - Delta Lake as default table format
+
+  Reference: fabric_warehouse.py:14-30 documents the Warehouse vs Lakehouse distinction
+  and explicitly states Lakehouse requires Spark for data loading.
+
+category: Platform Expansion
+
+tasks:
+  phases:
+    - phase: "Phase 1: Core Livy Integration"
+      done: false
+      items:
+        - summary: "Create benchbox/platforms/fabric_spark.py adapter"
+          done: false
+          subtasks:
+            - summary: "Implement FabricSparkAdapter class inheriting from PlatformAdapter"
+              done: false
+            - summary: "Set _dialect = 'spark' for SQLGlot transpilation"
+              done: false
+            - summary: "Implement Livy session management (create/poll/delete)"
+              done: false
+            - summary: "Implement Entra ID authentication for Livy API"
+              done: false
+        - summary: "Implement Livy statement execution"
+          done: false
+          subtasks:
+            - summary: "Create statement submission via POST /sessions/{id}/statements"
+              done: false
+            - summary: "Implement async polling for statement completion"
+              done: false
+            - summary: "Handle statement output parsing (JSON/DataFrame results)"
+              done: false
+            - summary: "Implement proper error handling and retry logic"
+              done: false
+        - summary: "Implement OneLake data staging"
+          done: false
+          subtasks:
+            - summary: "Reuse OneLake upload logic from fabric_warehouse.py"
+              done: false
+            - summary: "Generate abfss:// paths for Spark access"
+              done: false
+            - summary: "Handle Delta Lake table creation paths"
+              done: false
+
+    - phase: "Phase 2: Data Loading and Schema"
+      done: false
+      items:
+        - summary: "Implement schema creation via Spark SQL"
+          done: false
+          subtasks:
+            - summary: "Generate CREATE TABLE ... USING DELTA statements"
+              done: false
+            - summary: "Support OneLake table paths (managed tables in Lakehouse)"
+              done: false
+            - summary: "Handle Fabric-specific Spark configurations"
+              done: false
+        - summary: "Implement data loading"
+          done: false
+          subtasks:
+            - summary: "Load data via spark.read.csv/parquet from OneLake staging"
+              done: false
+            - summary: "Write to Delta tables with insertInto or saveAsTable"
+              done: false
+            - summary: "Support V-Order optimization during write"
+              done: false
+        - summary: "Implement query execution"
+          done: false
+          subtasks:
+            - summary: "Execute Spark SQL queries via Livy statements"
+              done: false
+            - summary: "Parse result schema and row counts"
+              done: false
+            - summary: "Handle Fabric-specific query timeout handling"
+              done: false
+
+    - phase: "Phase 3: Optimization and Platform Features"
+      done: false
+      items:
+        - summary: "Implement result cache control"
+          done: false
+          subtasks:
+            - summary: "Disable Spark SQL cache for benchmarking accuracy"
+              done: false
+            - summary: "Clear Delta Lake caches between queries"
+              done: false
+        - summary: "Implement Fabric Spark optimizations"
+          done: false
+          subtasks:
+            - summary: "Enable V-Order for columnar optimization"
+              done: false
+            - summary: "Configure appropriate Spark pool sizing via session conf"
+              done: false
+            - summary: "Implement OPTIMIZE and Z-ORDER for Delta tables"
+              done: false
+        - summary: "Add platform info collection"
+          done: false
+          subtasks:
+            - summary: "Capture Spark version from Livy session"
+              done: false
+            - summary: "Capture executor/driver configuration"
+              done: false
+            - summary: "Record Fabric capacity unit information if available"
+              done: false
+
+    - phase: "Phase 4: Testing and Documentation"
+      done: false
+      items:
+        - summary: "Create unit tests for Fabric Spark adapter"
+          done: false
+          subtasks:
+            - summary: "Test Livy session management mocking"
+              done: false
+            - summary: "Test statement execution and result parsing"
+              done: false
+            - summary: "Test OneLake path generation"
+              done: false
+        - summary: "Create integration tests"
+          done: false
+          subtasks:
+            - summary: "Test against actual Fabric workspace (requires credentials)"
+              done: false
+            - summary: "Test TPC-H SF=0.01 end-to-end"
+              done: false
+            - summary: "Document CI/CD approach (skip without credentials)"
+              done: false
+        - summary: "Create documentation"
+          done: false
+          subtasks:
+            - summary: "Create docs/platforms/fabric-spark.md with connection guide"
+              done: false
+            - summary: "Document Fabric workspace setup requirements"
+              done: false
+            - summary: "Document Lakehouse vs Warehouse usage guidance"
+              done: false
+            - summary: "Add authentication setup (service principal, managed identity)"
+              done: false
+
+metadata:
+  tags:
+    - fabric
+    - spark
+    - livy
+    - managed-spark
+    - lakehouse
+    - delta-lake
+    - azure
+    - platform
+    - cloud
+  estimated_effort: Large
+  created_date: "2026-01-12"
+
+impact:
+  business_value: |
+    Microsoft Fabric is Microsoft's unified analytics platform with growing
+    enterprise adoption. Supporting Fabric Spark enables:
+    - Complete Fabric ecosystem coverage (Warehouse already supported)
+    - Lakehouse benchmarking (currently blocked per fabric_warehouse.py notes)
+    - Comparison between Fabric Warehouse vs Fabric Spark performance
+    - Delta Lake optimization testing (V-Order, Z-Order, etc.)
+  user_impact: |
+    Users running Microsoft Fabric can benchmark both their SQL-based Warehouse
+    and Spark-based Lakehouse workloads. This enables:
+    - Apples-to-apples comparison within Fabric ecosystem
+    - Informed decisions about Warehouse vs Lakehouse for specific workloads
+    - Performance validation of Fabric Spark vs other managed Spark services
+  technical_debt: |
+    Clean implementation following established patterns. Can share OneLake
+    upload logic with fabric_warehouse.py to avoid duplication.
+
+technical_requirements:
+  constraints:
+    - "Requires Microsoft Fabric workspace with Spark capability"
+    - "Requires Entra ID authentication (service principal or managed identity)"
+    - "Livy API endpoint must be accessible from client"
+    - "Remote execution only (no local Spark session)"
+  dependencies:
+    - "azure-identity (Entra ID authentication)"
+    - "azure-storage-file-datalake (OneLake access)"
+    - "requests (Livy REST API)"
+  compatibility: |
+    - Python 3.10+
+    - Microsoft Fabric F2 capacity or higher
+    - Spark 3.4+ (Fabric default runtime)
+    - SQLGlot 'spark' dialect
+
+files_affected:
+  modified:
+    - benchbox/platforms/__init__.py
+    - benchbox/core/platform_registry.py
+    - pyproject.toml
+    - docs/platforms/overview.md
+  added:
+    - benchbox/platforms/fabric_spark.py
+    - tests/unit/platforms/test_fabric_spark_adapter.py
+    - tests/integration/platforms/test_fabric_spark_smoke.py
+    - docs/platforms/fabric-spark.md
+
+dependencies:
+  related:
+    - _project/TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+  blocks: []
+  blocked_by: []
+
+must_preserve:
+  - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  - "Platform registry autodiscovery continues working for all existing platforms"
+  - "FabricWarehouseAdapter continues to pass all tests"
+  - "fabric_warehouse.py public interface unchanged"
+
+anti_patterns:
+  - "DO NOT modify fabric_warehouse.py's public interface — because it's in production use — extract shared code to a new internal module if needed"
+  - "DO NOT create a local SparkSession — because Fabric Spark only runs remotely via Livy API — all Spark code must be submitted as string via POST /sessions/{id}/statements"
+  - "DO NOT duplicate OneLake upload logic — because fabric_warehouse.py already implements it — extract shared OneLake logic to a common internal module"
+
+verification:
+  - description: "New adapter imports correctly"
+    command: "uv run -- python -c \"from benchbox.platforms.fabric_spark import FabricSparkAdapter; print('import OK')\""
+    expected_output: "import OK"
+  - description: "Unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_fabric_spark_adapter.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Existing platform tests unaffected"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Fabric Warehouse adapter unaffected"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_fabric_warehouse_adapter.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/fabric_spark.py"
+    - "benchbox/platforms/credentials/fabric_spark.py"
+    - "tests/unit/platforms/test_fabric_spark_adapter.py"
+  do_not_modify:
+    - "benchbox/platforms/fabric_warehouse.py"
+    - "benchbox/platforms/spark.py"
+    - "benchbox/core/runner.py"
+
+success_metrics:
+  - "Fabric Spark adapter passes all unit tests"
+  - "TPC-H SF=0.01 completes successfully on Fabric Lakehouse"
+  - "Data loads correctly via OneLake staging"
+  - "Platform appears in CLI wizard and --help output"
+  - "Documentation covers full setup workflow"
+
+open_questions:
+  - "Should we support interactive notebooks via different API, or Livy-only?"
+  - "How to handle Fabric capacity pausing for cost optimization during benchmarks?"
+  - "Should we implement notebook artifact creation for reproducibility?"
+  - "What's the best approach for pool/session sizing recommendations?"
+
+context_sections:
+  "Fabric Lakehouse Architecture": |
+    Microsoft Fabric Lakehouse combines:
+    - OneLake (unified data lake storage)
+    - Delta Lake (table format with ACID transactions)
+    - Spark runtime (data processing engine)
+    - SQL Analytics Endpoint (read-only SQL access - NOT for data loading)
+
+    The existing FabricWarehouseAdapter targets SQL-based Warehouse items.
+    This adapter targets Spark-based Lakehouse items with full read/write.
+
+  "Livy API Overview": |
+    Apache Livy provides REST API for Spark job submission:
+    - POST /sessions - Create new Spark session
+    - GET /sessions/{id} - Get session status
+    - POST /sessions/{id}/statements - Submit Spark code
+    - GET /sessions/{id}/statements/{stmtId} - Get statement result
+    - DELETE /sessions/{id} - Terminate session
+
+    Fabric Livy endpoint: https://{workspace}.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/{pool}/
+
+  "OneLake Path Formats": |
+    Spark access to OneLake uses abfss:// protocol:
+    - abfss://{workspace}@onelake.dfs.fabric.microsoft.com/{item}.Lakehouse/Tables/{table}
+    - abfss://{workspace}@onelake.dfs.fabric.microsoft.com/{item}.Lakehouse/Files/{path}
+
+    Delta tables are stored under /Tables/, raw files under /Files/.
+
+  "V-Order Optimization": |
+    Fabric-specific columnar optimization:
+    - Improves parquet read performance by 10-50%
+    - Enabled via: spark.conf.set("spark.sql.parquet.vorder.enabled", "true")
+    - Only available in Fabric Spark runtime
+
+  "Related Platforms": |
+    Existing Spark-related adapters:
+    - spark.py: Generic Apache Spark (local, YARN, K8s)
+    - databricks.py: Databricks managed Spark (if exists)
+    - snowpark_connect.py: Snowflake Snowpark (DataFrame API)
+
+    This adapter follows similar patterns but uses Livy for remote execution
+    instead of direct SparkSession.

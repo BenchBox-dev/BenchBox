@@ -1,0 +1,32 @@
+title: Curate Release Branch and Changelog
+worktree: release-readiness
+category: Project Lifecycle Management
+priority: Medium
+status: Completed
+completed_date: "2025-11-28"
+description: Trim unrelated worktree changes, craft a focused release branch, and produce a user-facing changelog summary.
+context_sections:
+- name: Current State
+  summary: Repository contains numerous in-progress edits (monitoring, docs rewrites) that should not ship yet.
+impact: Ensures the first public release is coherent and easy to review.
+tasks:
+- phase: Change Audit
+  done: true
+  notes: v1.0.0 scope defined in RELEASE_PRIORITIZATION_v1.md
+- phase: Changelog Authoring
+  done: true
+  notes: CHANGELOG.md updated with v1.0.0 highlights, security section, and feature summaries
+- phase: Release Candidate Prep
+  done: true
+  notes: Main branch ready for tagging after final tests pass
+files_affected:
+- change_type: Documentation
+  paths:
+  - CHANGELOG.md
+sections:
+  - name: Implementation Summary
+    content: |
+      - Updated CHANGELOG.md from [Unreleased] to [1.0.0] - 2025-11-28
+      - Added highlights section summarizing core platforms, benchmarks, CLI, and security features
+      - Enhanced security section with credential handling, SQL injection prevention, and TPC-DS guard details
+      - Removed outdated 0.1.0 alpha section in favor of clean v1.0.0 release notes

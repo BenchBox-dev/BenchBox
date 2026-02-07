@@ -1,0 +1,196 @@
+title: "MotherDuck Platform Adapter"
+worktree: platform-expansion
+priority: High
+status: In Progress
+category: Platform Expansion
+description: |
+  Implement MotherDuck platform adapter as the first "distinct service name"
+  deployment variant. MotherDuck is DuckDB's managed cloud offering, providing
+  serverless DuckDB with cloud storage integration.
+
+  This adapter inherits DuckDB's SQL dialect and benchmark compatibility while
+  implementing MotherDuck-specific authentication and connection handling.
+
+context_sections:
+  "Background and Motivation": |
+    MotherDuck represents an important benchmark target:
+    - Serverless cloud data warehouse built on DuckDB
+    - Direct comparison with local DuckDB performance
+    - Cloud-native features (sharing, collaboration, hybrid queries)
+
+    As a distinct service (not just "DuckDB in the cloud"), MotherDuck gets its
+    own platform name rather than a deployment mode suffix (duckdb:cloud).
+
+  "Technical Context": |
+    MotherDuck connection uses the DuckDB Python library with a special
+    connection string: `md:database_name` or `md:?motherduck_token=TOKEN`.
+
+    Key differences from local DuckDB:
+    - Token-based authentication (MOTHERDUCK_TOKEN env var)
+    - Database lives in MotherDuck cloud
+    - Data can be loaded via MotherDuck's cloud storage
+    - Hybrid queries can access both local and cloud data
+
+tasks:
+  phases:
+    - phase: "Phase 1: Adapter Structure"
+      done: true
+      items:
+        - summary: "Create benchbox/platforms/motherduck.py"
+          done: true
+        - summary: "Implement MotherDuckAdapter class extending PlatformAdapter"
+          done: true
+        - summary: "Set up inheritance from DuckDB (dialect, capabilities)"
+          done: true
+        - summary: "Register platform in registry with deployment metadata"
+          done: true
+
+    - phase: "Phase 2: Authentication"
+      done: true
+      items:
+        - summary: "Implement token-based authentication"
+          done: true
+          subtasks:
+            - summary: "Support MOTHERDUCK_TOKEN environment variable"
+              done: true
+            - summary: "Support token in config/credentials file"
+              done: true
+            - summary: "Implement token validation on connect"
+              done: true
+        - summary: "Add credential setup wizard for MotherDuck"
+          done: false
+          notes: "Deferred - requires interactive credential setup"
+
+    - phase: "Phase 3: Connection and Data Loading"
+      done: true
+      items:
+        - summary: "Implement MotherDuck connection string handling"
+          done: true
+          subtasks:
+            - summary: "Support md:database_name syntax"
+              done: true
+            - summary: "Handle database creation if not exists"
+              done: false
+              notes: "MotherDuck handles this automatically"
+        - summary: "Implement data loading strategy"
+          done: true
+          subtasks:
+            - summary: "Option 1: Upload via MotherDuck cloud storage"
+              done: false
+              notes: "Deferred - requires cloud storage setup"
+            - summary: "Option 2: Hybrid query from local files"
+              done: true
+              notes: "Default strategy - load from local parquet files"
+            - summary: "Determine default strategy"
+              done: true
+        - summary: "Implement result cache control"
+          done: false
+          notes: "Deferred - requires understanding of MotherDuck cache APIs"
+
+    - phase: "Phase 4: Query Execution"
+      done: true
+      items:
+        - summary: "Inherit query execution from DuckDB adapter"
+          done: true
+          notes: "Uses DuckDB connection with MotherDuck backend"
+        - summary: "Handle MotherDuck-specific query features"
+          done: false
+          notes: "Deferred - basic execution works"
+        - summary: "Implement performance metrics collection"
+          done: true
+          notes: "Basic timing via execute_query"
+        - summary: "Handle cloud-specific error scenarios"
+          done: true
+          notes: "Connection errors handled with helpful messages"
+
+    - phase: "Phase 5: Testing"
+      done: true
+      items:
+        - summary: "Unit tests for adapter (mocked connection)"
+          done: true
+        - summary: "Integration tests with MotherDuck (requires account)"
+          done: false
+          notes: "Requires MotherDuck account - manual testing"
+        - summary: "Test TPC-H benchmark at scale 0.01"
+          done: false
+          notes: "Requires MotherDuck account"
+        - summary: "Compare results with local DuckDB"
+          done: false
+          notes: "Requires MotherDuck account"
+
+metadata:
+  tags:
+    - platform-adapter
+    - motherduck
+    - duckdb
+    - cloud
+  estimated_effort: "3-4 days"
+  created_date: "2026-01-14"
+  last_updated: "2026-02-07T10:00:00"
+
+impact:
+  business_value: |
+    Enables direct comparison of DuckDB local vs MotherDuck cloud performance,
+    a key use case for users evaluating cloud migration. MotherDuck is a
+    high-profile platform in the analytics community.
+  user_impact: |
+    Users can benchmark MotherDuck alongside local DuckDB with minimal
+    configuration, using the same benchmarks and query set.
+
+files_affected:
+  modified:
+    - "benchbox/core/platform_registry.py"
+    - "benchbox/platforms/__init__.py"
+  added:
+    - "benchbox/platforms/motherduck.py"
+    - "tests/unit/platforms/test_motherduck.py"
+  removed: []
+
+dependencies:
+  related:
+    - "_project/DONE/platform-expansion/active/deployment-factory-integration.yaml"
+    - "_project/DONE/platform-expansion/active/deployment-config-inheritance.yaml"
+
+technical_requirements:
+  dependencies:
+    - "duckdb>=0.9.0 (MotherDuck support)"
+  constraints:
+    - "Requires MotherDuck account for testing"
+    - "Token authentication only (no password auth)"
+
+success_metrics:
+  - "MotherDuck adapter passes connection test"
+  - "TPC-H benchmark runs successfully at scale 0.01"
+  - "Results are comparable with local DuckDB (same query plans)"
+  - "Authentication works via env var and config file"
+  - "Error messages are actionable for common issues"
+
+must_preserve:
+  - "DuckDB adapter (benchbox/platforms/duckdb.py) unchanged"
+  - "Platform registry backward compatible with existing platform names"
+  - "No new required runtime dependencies beyond duckdb>=0.9.0"
+
+anti_patterns:
+  - "DO NOT modify duckdb.py — because MotherDuck inherits from DuckDB but is a separate platform — keep all MotherDuck-specific code in motherduck.py"
+  - "DO NOT require MotherDuck account for unit tests — because CI has no cloud credentials — mock the md: connection string in tests"
+
+verification:
+  - description: "MotherDuck adapter imports correctly"
+    command: "uv run -- python -c \"from benchbox.platforms.motherduck import MotherDuckAdapter; print('import OK')\""
+    expected_output: "import OK"
+  - description: "Unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_motherduck.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "DuckDB adapter unaffected"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_duckdb*.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/motherduck.py"
+    - "tests/unit/platforms/test_motherduck.py"
+  do_not_modify:
+    - "benchbox/platforms/duckdb.py"
+
+open_questions:
+  - "How to handle MotherDuck-specific features like sharing? (Deferred — not needed for basic benchmarking)"

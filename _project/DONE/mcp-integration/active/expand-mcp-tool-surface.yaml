@@ -1,0 +1,195 @@
+title: "Expand MCP tool surface area to match CLI capabilities"
+worktree: mcp-integration
+priority: High
+status: "Completed"
+category: Core Functionality
+description: |
+  The MCP server currently exposes only 11 tools while the CLI has ~34 commands.
+  This creates a significant gap in what AI agents can accomplish via MCP vs CLI.
+
+  Current MCP coverage:
+  - Discovery: 4 tools (list_platforms, list_benchmarks, get_benchmark_info, system_profile)
+  - Execution: 4 tools (run_benchmark, dry_run, validate_config, get_query_details)
+  - Results: 3 tools (list_recent_runs, get_results, compare_results)
+
+  Major gaps identified:
+  - Data preparation (datagen, convert)
+  - Query plan analysis (show-plan, plan-history)
+  - Dependency checking (check-deps)
+  - Performance analytics (report trends, regressions, rankings)
+  - Result aggregation and export
+
+  This TODO adds 7+ new MCP tools and 2 new MCP prompts to close the most important gaps.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Core Workflow Tools"
+      done: true
+      items:
+        - summary: "Add export_results tool"
+          done: true
+          subtasks:
+            - summary: "Create export_results(result_file, format, output_path) tool"
+              done: true
+            - summary: "Support json, csv, html formats"
+              done: true
+            - summary: "Add input validation schema"
+              done: true
+        - summary: "Add generate_data tool"
+          done: true
+          subtasks:
+            - summary: "Create generate_data(benchmark, scale_factor, format, force) tool"
+              done: true
+            - summary: "Support parquet and csv formats"
+              done: true
+            - summary: "Return data location and statistics"
+              done: true
+        - summary: "Add check_dependencies tool"
+          done: true
+          subtasks:
+            - summary: "Create check_dependencies(platform, verbose) tool"
+              done: true
+            - summary: "Return missing dependencies with install commands"
+              done: true
+            - summary: "Support all-platform matrix view"
+              done: true
+        - summary: "Add benchmark_run MCP prompt"
+          done: true
+          subtasks:
+            - summary: "Create /benchbox:benchmark_run prompt in prompts/registry.py"
+              done: true
+            - summary: "Accept plan from benchmark_planning or user-specified config"
+              done: true
+            - summary: "Execute benchmark using run_benchmark tool with planned parameters"
+              done: true
+            - summary: "Return execution summary and link to results"
+              done: true
+        - summary: "Add platform_tuning MCP prompt"
+          done: true
+          subtasks:
+            - summary: "Create /benchbox:platform_tuning prompt in prompts/registry.py"
+              done: true
+            - summary: "Accept platform name and optional workload characteristics"
+              done: true
+            - summary: "Analyze system profile and recommend optimal tuning settings"
+              done: true
+            - summary: "Return tuning configuration with explanations for each setting"
+              done: true
+
+    - phase: "Phase 2: Analytics Tools"
+      done: true
+      items:
+        - summary: "Add get_query_plan tool"
+          done: true
+          subtasks:
+            - summary: "Create get_query_plan(platform, benchmark, query_id, format) tool"
+              done: true
+            - summary: "Support tree, json, summary formats"
+              done: true
+            - summary: "Handle platforms that don't support EXPLAIN"
+              done: true
+        - summary: "Add detect_regressions tool"
+          done: true
+          subtasks:
+            - summary: "Create detect_regressions(platform, benchmark, threshold, lookback) tool"
+              done: true
+            - summary: "Automatically find and compare recent runs"
+              done: true
+            - summary: "Return regression summary with affected queries"
+              done: true
+
+    - phase: "Phase 3: Historical Analysis Tools"
+      done: true
+      items:
+        - summary: "Add get_performance_trends tool"
+          done: true
+          subtasks:
+            - summary: "Create get_performance_trends(platform, benchmark, metric, limit) tool"
+              done: true
+            - summary: "Support geometric_mean, p50, p95, p99, total_time metrics"
+              done: true
+            - summary: "Return time-series data for trend analysis"
+              done: true
+        - summary: "Add aggregate_results tool"
+          done: true
+          subtasks:
+            - summary: "Create aggregate_results(platform, benchmark, group_by) tool"
+              done: true
+            - summary: "Support grouping by platform, benchmark, or date"
+              done: true
+            - summary: "Return statistical summaries (mean, stddev, min, max)"
+              done: true
+
+    - phase: "Phase 4: Testing and Documentation"
+      done: true
+      items:
+        - summary: "Add unit tests for all new tools"
+          done: true
+          subtasks:
+            - summary: "Test export_results with all formats"
+              done: true
+            - summary: "Test generate_data with mocked data generation"
+              done: true
+            - summary: "Test check_dependencies output"
+              done: true
+            - summary: "Test analytics tools with sample data"
+              done: true
+            - summary: "Test benchmark_run prompt integration"
+              done: true
+            - summary: "Test platform_tuning prompt integration"
+              done: true
+        - summary: "Update MCP documentation"
+          done: true
+          subtasks:
+            - summary: "Add new tools to docs/reference/mcp.md"
+              done: true
+            - summary: "Add examples for each new tool"
+              done: true
+            - summary: "Update tool count in overview"
+              done: true
+
+metadata:
+  tags:
+    - mcp
+    - api-surface
+    - cli-parity
+    - ai-integration
+  estimated_effort: "Large"
+  created_date: "2026-01-19"
+
+impact:
+  business_value: |
+    Significantly expands what AI agents can accomplish through the MCP interface,
+    enabling full benchmark workflow automation without falling back to CLI commands.
+  user_impact: |
+    AI assistants (Claude Code, ChatGPT, etc.) can perform data generation,
+    query plan analysis, regression detection, and historical analytics directly
+    through natural language requests.
+  technical_debt: |
+    Reduces the gap between CLI and MCP capabilities, making the MCP a first-class
+    interface rather than a limited subset.
+
+files_affected:
+  modified:
+    - "benchbox/mcp/tools/benchmark.py"
+    - "benchbox/mcp/tools/results.py"
+    - "benchbox/mcp/tools/discovery.py"
+    - "benchbox/mcp/prompts/registry.py"
+    - "benchbox/mcp/schemas.py"
+    - "docs/reference/mcp.md"
+  added:
+    - "benchbox/mcp/tools/analytics.py"
+    - "tests/unit/mcp/test_analytics_tools.py"
+
+success_metrics:
+  - "7+ new MCP tools implemented and tested"
+  - "2 new MCP prompts (benchmark_run, platform_tuning) implemented"
+  - "All new tools have input validation schemas"
+  - "Documentation updated with examples"
+  - "MCP tool count increases from 11 to 18+"
+  - "MCP prompt count increases from 5 to 7"
+  - "All MCP tests pass"
+
+dependencies:
+  related:
+    - "_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml"

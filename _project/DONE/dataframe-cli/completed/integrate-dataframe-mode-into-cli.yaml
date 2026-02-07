@@ -1,0 +1,74 @@
+title: Integrate DataFrame Mode into CLI
+worktree: dataframe-cli
+category: Core Functionality
+priority: High
+status: "Completed"
+completed_date: '2025-12-02'
+description: |
+  Add DataFrame mode to CLI with platform selection and execution integration.
+
+implementation_summary: |
+  Completed Phase 1 of CLI integration:
+  - get_dataframe_adapter() factory function for polars-df and pandas-df
+  - list_available_dataframe_platforms() for status discovery
+  - get_dataframe_requirements() for installation guidance
+  - is_dataframe_platform() helper for platform type detection
+  - Platform hook registration for Polars (streaming, rechunk, n_rows)
+    and Pandas (dtype_backend) configuration options
+
+  Not yet implemented:
+  - --mode flag for sql|dataframe selection
+  - Full orchestrator integration
+  - BenchmarkResults extensions for dataframe mode
+
+tasks:
+- phase: 'Phase 6.1: CLI Arguments'
+  items:
+  - summary: Add --mode flag to CLI (sql|dataframe)
+    done: false
+    note: Deferred - requires orchestrator integration
+  - summary: Update platform selection for dataframe mode
+    done: true
+    details: |
+      Platform factory implemented:
+      --platform polars-df  (Polars DataFrame)
+      --platform pandas-df  (Pandas DataFrame)
+  - summary: Add --dataframe-lazy flag for evaluation control
+    done: false
+  - summary: Add --validate-against-sql for result comparison
+    done: false
+- phase: 'Phase 6.2: Orchestrator Integration'
+  items:
+  - summary: Update benchbox/cli/orchestrator.py for dataframe mode
+    done: false
+  - summary: Add adapter factory for dataframe platforms
+    done: true
+    details: get_dataframe_adapter() factory in benchbox/platforms/__init__.py
+  - summary: Integrate with existing benchmark lifecycle
+    done: false
+- phase: 'Phase 6.3: Result Handling'
+  items:
+  - summary: Extend BenchmarkResults for dataframe mode
+    done: false
+  - summary: Update result exporters
+    done: false
+  - summary: Add dataframe-specific metrics
+    done: false
+
+files_affected:
+- change_type: Modified
+  paths:
+  - benchbox/platforms/__init__.py
+- change_type: New
+  paths:
+  - tests/unit/platforms/test_dataframe_factory.py
+
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - dataframe
+  - cli
+  - integration
+  estimated_effort: 3 days
+  actual_effort: Platform factory complete, orchestrator integration pending

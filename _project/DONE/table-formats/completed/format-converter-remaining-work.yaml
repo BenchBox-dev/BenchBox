@@ -1,0 +1,701 @@
+title: "Format Converter Integration - Remaining Work (Phases 3-6)"
+worktree: table-formats
+phase: planning
+priority: High
+estimated_hours: 10-12
+status: "Completed"
+created: 2025-11-23
+owner: ""
+
+context: |
+  Phases 1-2 of format converter fixes are COMPLETE:
+  - ✅ Security vulnerabilities fixed (tempfile.mktemp → mkstemp)
+  - ✅ Resource leaks fixed (catalog cleanup)
+  - ✅ Data integrity (row count validation)
+  - ✅ Code duplication eliminated (ArrowTypeMapper)
+  - ✅ Type system enhanced (TIMESTAMP, BOOLEAN support)
+  - ✅ All 133 tests passing
+
+  Remaining: Phases 3-6 to make converters user-accessible and production-ready.
+
+motivation: |
+  **Current State**: Format converters exist but are NOT accessible to users.
+  - No CLI integration
+  - No automatic conversion during benchmarks
+  - Manual Python scripting required
+  - Manifests don't track converted formats
+  - No TPC compliance validation
+
+  **Goal**: Production-ready format conversion system integrated into BenchBox core.
+
+success_metrics:
+  - Users can run: benchbox run --platform duckdb --benchmark tpch --scale 1 --convert-format parquet
+  - Converters work end-to-end without manual intervention
+  - TPC compliance validated for all conversions
+  - Full integration test coverage
+  - User documentation complete
+
+dependencies:
+  upstream: []
+  downstream:
+    - "Performance benchmarking of converted formats"
+    - "Platform-specific optimizations"
+    - "Streaming conversion for large tables"
+
+technical_notes: |
+  ## Architecture Overview
+
+  Format conversion fits into benchmark lifecycle:
+  1. Data generation (TBL files) ← EXISTING
+  2. **[NEW]** Format conversion (TBL → Parquet/Delta/Iceberg)
+  3. **[UPDATED]** Manifest v2 tracks multiple formats
+  4. Data loading uses preferred format ← UPDATE NEEDED
+  5. Query execution ← NO CHANGES
+
+  ## Key Integration Points
+
+  - `benchbox/core/runner/runner.py` - Add conversion orchestration
+  - `benchbox/core/base_benchmark.py` - Manifest v2 support
+  - `benchbox/cli/run.py` - Add --convert-format flag
+  - `benchbox/platforms/base/data_loading.py` - Format preference system
+
+tasks:
+  - id: phase3_orchestration
+    title: "Phase 3.1: Add Conversion Orchestration"
+    priority: critical
+    estimated_hours: 2-3
+    status: open
+    description: |
+      Integrate format conversion into benchmark lifecycle runner.
+
+      **Implementation**:
+      1. Add conversion step after data generation in runner.py
+      2. Create FormatConversionOrchestrator class
+      3. Handle conversion for all tables in manifest
+      4. Update manifest with converted file paths
+      5. Support --convert-format CLI flag
+
+      **Files to Modify**:
+      - benchbox/core/runner/runner.py
+      - benchbox/cli/run.py
+      - benchbox/cli/commands/run_benchmark.py
+
+      **Key Functions**:
+      ```python
+      def _run_format_conversion(
+          benchmark: Any,
+          benchmark_config: BenchmarkConfig,
+          target_format: str,
+          conversion_options: ConversionOptions | None = None
+      ) -> dict[str, list[Path]]:
+          """Convert all tables to target format."""
+          # Get manifest
+          # For each table:
+          #   - Get converter for target format
+          #   - Convert source files
+          #   - Track converted paths
+          # Return mapping: {table_name: [converted_paths]}
+      ```
+
+      **CLI Integration**:
+      ```python
+      @click.option(
+          "--convert-format",
+          type=click.Choice(["parquet", "delta", "iceberg"], case_sensitive=False),
+          help="Convert generated TBL files to specified format"
+      )
+      ```
+
+      **Tests Needed**:
+      - Unit test: conversion orchestration logic
+      - Integration test: full E2E with TPC-H SF0.01
+
+    acceptance_criteria:
+      - benchbox run --convert-format parquet works end-to-end
+      - All tables converted automatically
+      - Conversion errors reported clearly
+      - Progress displayed to user
+
+  - id: phase3_manifest_v2
+    title: "Phase 3.2: Implement Manifest v2"
+    priority: critical
+    estimated_hours: 2-3
+    status: open
+    description: |
+      Extend manifest schema to track multiple formats per table.
+
+      **Current Manifest v1**:
+      ```json
+      {
+        "benchmark": "tpch",
+        "scale_factor": 1,
+        "tables": {
+          "customer": {
+            "files": ["customer.tbl"],
+            "rows": 150000,
+            "size_bytes": 24000000
+          }
+        }
+      }
+      ```
+
+      **New Manifest v2**:
+      ```json
+      {
+        "version": 2,
+        "benchmark": "tpch",
+        "scale_factor": 1,
+        "format_preference": ["parquet", "delta", "tbl"],
+        "tables": {
+          "customer": {
+            "formats": {
+              "tbl": {
+                "files": ["customer.tbl"],
+                "rows": 150000,
+                "size_bytes": 24000000
+              },
+              "parquet": {
+                "files": ["customer.parquet"],
+                "rows": 150000,
+                "size_bytes": 10500000,
+                "converted_from": "tbl",
+                "conversion_timestamp": "2025-11-23T10:00:00Z",
+                "row_groups": 8,
+                "compression": "snappy"
+              }
+            }
+          }
+        }
+      }
+      ```
+
+      **Implementation**:
+      1. Add manifest version detection
+      2. Support both v1 (backward compat) and v2
+      3. Add format preference resolution
+      4. Update manifest writer for conversions
+      5. Update DataSourceResolver to use preferred format
+
+      **Files to Modify**:
+      - benchbox/core/base_benchmark.py (manifest I/O)
+      - benchbox/platforms/base/data_loading.py (format selection)
+      - benchbox/core/validation.py (manifest validation)
+
+      **Migration Strategy**:
+      - Read v1 → auto-upgrade to v2 structure in memory
+      - Write v2 for new conversions
+      - Never modify original v1 manifests
+
+    acceptance_criteria:
+      - Manifest v2 correctly tracks multiple formats
+      - Platform adapter loads preferred format automatically
+      - Backward compatible with v1 manifests
+      - Validation works for both versions
+
+  - id: phase3_partitioning
+    title: "Phase 3.3: Implement Partitioning Support"
+    priority: high
+    estimated_hours: 1-2
+    status: open
+    description: |
+      Add production-quality partitioning for all converters.
+
+      **Current State**: partition_cols option exists but:
+      - Parquet: Not implemented at all
+      - Delta/Iceberg: Passed to library but not validated
+
+      **Required Implementation**:
+
+      1. **Schema Validation**:
+      ```python
+      def _validate_partition_columns(
+          partition_cols: list[str],
+          schema: dict[str, Any]
+      ) -> None:
+          """Validate partition columns exist in schema."""
+          available = {col["name"] for col in schema["columns"]}
+          for col in partition_cols:
+              if col not in available:
+                  raise SchemaError(
+                      f"Partition column '{col}' not found in schema. "
+                      f"Available columns: {sorted(available)}"
+                  )
+      ```
+
+      2. **Parquet Hive Partitioning**:
+      ```python
+      # Use pyarrow.dataset for partitioned writes
+      import pyarrow.dataset as ds
+
+      if opts.partition_cols:
+          ds.write_dataset(
+              combined_table,
+              output_dir,
+              format="parquet",
+              partitioning=ds.partitioning(
+                  pa.schema([combined_table.schema.field(c) for c in opts.partition_cols]),
+                  flavor="hive"
+              ),
+              basename_template="part-{i}.parquet"
+          )
+      ```
+
+      3. **Delta/Iceberg**: Add validation before passing to library
+
+      **Test Cases**:
+      - Single partition column (e.g., date)
+      - Multiple partition columns (e.g., year, month)
+      - Invalid partition column → error
+      - Non-existent column → error
+      - Query performance improvement validation
+
+    acceptance_criteria:
+      - All converters validate partition columns
+      - Parquet implements Hive partitioning
+      - Delta/Iceberg work with partitions
+      - Tests cover happy path and errors
+      - Performance benefit demonstrated (10x on selective queries)
+
+  - id: phase4_compliance_validation
+    title: "Phase 4.1: Add TPC Compliance Validation"
+    priority: high
+    estimated_hours: 2-3
+    status: open
+    description: |
+      Ensure format conversions preserve TPC compliance.
+
+      **Validation Requirements**:
+      1. Row counts match exactly (already implemented ✅)
+      2. Sample data comparison (byte-level for critical columns)
+      3. Aggregate checksums (SUM, COUNT, MIN, MAX)
+      4. Data type preservation
+      5. NULL handling consistency
+
+      **Implementation**:
+      ```python
+      @dataclass
+      class ComplianceValidationResult:
+          is_compliant: bool
+          row_count_match: bool
+          sample_data_match: bool
+          aggregate_checksums_match: bool
+          errors: list[str]
+          warnings: list[str]
+          details: dict[str, Any]
+
+      def validate_conversion_compliance(
+          source_files: list[Path],
+          converted_file: Path,
+          schema: dict[str, Any],
+          format_type: str,
+          sample_size: int = 1000
+      ) -> ComplianceValidationResult:
+          """Comprehensive TPC compliance validation."""
+
+          # 1. Row count (already done via validate_row_count)
+
+          # 2. Sample random rows and compare values
+          source_samples = sample_tbl_rows(source_files, sample_size)
+          converted_samples = sample_format_rows(converted_file, format_type, sample_size)
+
+          # 3. Compute aggregate checksums
+          source_aggs = compute_aggregates(source_files, schema)
+          converted_aggs = compute_aggregates_from_format(converted_file, format_type, schema)
+
+          # 4. Compare with tolerance for floating point
+          matches = compare_with_tolerance(source_aggs, converted_aggs, fp_tolerance=1e-6)
+
+          return ComplianceValidationResult(...)
+      ```
+
+      **Files to Create**:
+      - benchbox/utils/format_converters/compliance.py
+
+      **Files to Modify**:
+      - benchbox/utils/format_converters/base.py (add validation call)
+      - All converters (call validation after conversion)
+
+    acceptance_criteria:
+      - Validation catches data loss
+      - Validation catches type mismatches
+      - Validation passes for correct conversions
+      - Floating-point tolerance configurable
+      - Results included in ConversionResult
+
+  - id: phase4_integration_tests
+    title: "Phase 4.2: Add Comprehensive Integration Tests"
+    priority: high
+    estimated_hours: 2-3
+    status: open
+    description: |
+      Full end-to-end testing of format conversion pipeline.
+
+      **Test Suite Structure**:
+
+      tests/integration/test_format_conversion_e2e.py:
+      ```python
+      class TestFormatConversionE2E:
+          \"\"\"End-to-end format conversion tests with real data.\"\"\"
+
+          def test_tpch_sf001_tbl_to_parquet_full_pipeline(self):
+              \"\"\"Test complete TPC-H SF0.01 conversion to Parquet.\"\"\"
+              # 1. Generate TPC-H SF0.01 data
+              # 2. Convert all 8 tables to Parquet
+              # 3. Load into DuckDB
+              # 4. Run TPC-H Q1
+              # 5. Validate results match TBL-based run
+
+          def test_parquet_delta_cross_format_results_identical(self):
+              \"\"\"Verify Parquet and Delta produce identical results.\"\"\"
+              # Generate same data → convert to both formats
+              # Run same query on both → assert results match
+
+          def test_conversion_with_partitioning(self):
+              \"\"\"Test partitioned format conversion.\"\"\"
+              # Convert with partition_cols=["year", "month"]
+              # Verify Hive directory structure
+              # Run selective query → measure pruning
+
+          def test_manifest_v2_format_preference(self):
+              \"\"\"Test manifest v2 format preference system.\"\"\"
+              # Generate + convert to multiple formats
+              # Set format_preference
+              # Verify platform loads correct format
+
+          def test_conversion_failure_handling(self):
+              \"\"\"Test error handling during conversion.\"\"\"
+              # Corrupt source file
+              # Verify clear error messages
+              # Verify partial success handling
+      ```
+
+      **Performance Regression Tests**:
+      ```python
+      @pytest.mark.benchmark
+      def test_parquet_conversion_performance_regression(benchmark):
+          \"\"\"Ensure conversion performance doesn't regress.\"\"\"
+          # Baseline: TPC-H SF1 lineitem → Parquet in <30s
+          result = benchmark(convert_lineitem_sf1)
+          assert result.conversion_time_ms < 30000
+      ```
+
+      **Files to Create**:
+      - tests/integration/test_format_conversion_e2e.py
+      - tests/integration/test_format_performance.py
+
+    acceptance_criteria:
+      - All E2E tests pass
+      - Cross-format results verified identical
+      - Partitioning tested and working
+      - Manifest v2 integration tested
+      - Performance baselines established
+
+  - id: phase5_cli_command
+    title: "Phase 5.1: Add Standalone CLI Conversion Command"
+    priority: medium
+    estimated_hours: 1-2
+    status: open
+    description: |
+      Add dedicated CLI command for format conversion.
+
+      **New Command**:
+      ```bash
+      benchbox convert \
+        --input data/tpch_sf1 \
+        --format parquet \
+        --output data/tpch_sf1_parquet \
+        --compression zstd \
+        --partition date \
+        --validate
+      ```
+
+      **Implementation**:
+
+      benchbox/cli/commands/convert.py:
+      ```python
+      @click.command()
+      @click.option("--input", required=True, help="Input directory with TBL files")
+      @click.option("--format", required=True, type=click.Choice(["parquet", "delta", "iceberg"]))
+      @click.option("--output", help="Output directory (default: input + _<format>)")
+      @click.option("--compression", default="snappy", type=click.Choice(["snappy", "gzip", "zstd", "none"]))
+      @click.option("--partition", multiple=True, help="Partition columns (can specify multiple)")
+      @click.option("--validate/--no-validate", default=True, help="Run TPC compliance validation")
+      @click.option("--row-group-size", type=int, help="Parquet row group size in bytes")
+      def convert_command(input, format, output, compression, partition, validate, row_group_size):
+          \"\"\"Convert benchmark data files to open table formats.\"\"\"
+
+          # 1. Discover TBL files in input directory
+          # 2. Load manifest to get schema
+          # 3. Create converter with options
+          # 4. Convert all tables
+          # 5. Optionally validate
+          # 6. Write updated manifest
+          # 7. Display summary
+      ```
+
+      **User Experience**:
+      - Progress bar for each table
+      - Summary statistics (time, compression ratio)
+      - Clear error messages
+      - Validation report
+
+    acceptance_criteria:
+      - Command works independently
+      - All options functional
+      - Progress feedback clear
+      - Validation integrated
+      - Help text comprehensive
+
+  - id: phase5_documentation
+    title: "Phase 5.2: Write Format Conversion Documentation"
+    priority: medium
+    estimated_hours: 1-2
+    status: open
+    description: |
+      Comprehensive user guide for format conversion.
+
+      **Documentation Structure**:
+
+      docs/format-conversion-guide.md:
+      ```markdown
+      # Format Conversion Guide
+
+      ## Overview
+      BenchBox supports converting benchmark data to three open table formats...
+
+      ## When to Use Each Format
+
+      ### Parquet
+      - **Best for**: Read-heavy analytics, cloud storage
+      - **Pros**: Universal support, excellent compression
+      - **Cons**: No ACID, no schema evolution
+      - **Platforms**: All (DuckDB, DataFusion, ClickHouse, etc.)
+
+      ### Delta Lake
+      - **Best for**: ACID requirements, time travel
+      - **Pros**: ACID, versioning, optimize/vacuum
+      - **Cons**: Databricks-centric
+      - **Platforms**: DuckDB (extension), Databricks, Spark
+
+      ### Iceberg
+      - **Best for**: Schema evolution, hidden partitioning
+      - **Pros**: Vendor-neutral, snapshot management
+      - **Cons**: Experimental support in DuckDB
+      - **Platforms**: DuckDB (experimental), Trino, Spark
+
+      ## Usage
+
+      ### During Benchmark Run
+      \`\`\`bash
+      benchbox run --platform duckdb --benchmark tpch --scale 1 --convert-format parquet
+      \`\`\`
+
+      ### Standalone Conversion
+      \`\`\`bash
+      benchbox convert --input data/tpch_sf10 --format parquet --compression zstd
+      \`\`\`
+
+      ## Performance Comparison
+
+      | Format  | Size (SF1) | Load Time | Q1 Time | Compression Ratio |
+      |---------|-----------|-----------|---------|-------------------|
+      | TBL     | 1.2 GB    | 12.5s     | 2.1s    | 1.0x              |
+      | Parquet | 450 MB    | 3.2s      | 1.8s    | 2.7x              |
+      | Delta   | 480 MB    | 3.8s      | 1.9s    | 2.5x              |
+      | Iceberg | 470 MB    | 4.1s      | 2.0s    | 2.6x              |
+
+      ## Partitioning Strategies
+
+      ### Date Partitioning (TPC-H Orders)
+      \`\`\`bash
+      benchbox convert --format parquet --partition o_orderdate
+      \`\`\`
+
+      ## API Reference
+
+      ### Programmatic Usage
+      \`\`\`python
+      from benchbox.utils.format_converters import ParquetConverter, ConversionOptions
+
+      converter = ParquetConverter()
+      result = converter.convert(
+          source_files=[Path("customer.tbl")],
+          table_name="customer",
+          schema=get_schema("customer"),
+          output_dir=Path("output"),
+          options=ConversionOptions(compression="zstd", row_group_size=256*1024*1024)
+      )
+      \`\`\`
+
+      ## Troubleshooting
+
+      ### Row Count Mismatch
+      ...
+
+      ### Memory Issues with Large Tables
+      ...
+      ```
+
+      **Files to Create**:
+      - docs/format-conversion-guide.md
+      - docs/api/format-converters.md
+      - Add section to README.md
+
+    acceptance_criteria:
+      - User guide complete
+      - API reference documented
+      - Performance benchmarks included
+      - Troubleshooting section
+      - Examples for all formats
+
+  - id: phase5_registry_pattern
+    title: "Phase 5.3: Implement FormatConverterRegistry"
+    priority: low
+    estimated_hours: 1
+    status: open
+    description: |
+      Add factory pattern for converter discovery.
+
+      **Current**:
+      ```python
+      from benchbox.utils.format_converters import ParquetConverter
+      converter = ParquetConverter()
+      ```
+
+      **Desired**:
+      ```python
+      from benchbox.utils.format_converters import FormatConverterRegistry
+      converter = FormatConverterRegistry.get("parquet")
+      ```
+
+      **Implementation**:
+      ```python
+      class FormatConverterRegistry:
+          \"\"\"Central registry for format converters.\"\"\"
+
+          _converters: dict[str, type[FormatConverter]] = {
+              "parquet": ParquetConverter,
+              "delta": DeltaConverter,
+              "iceberg": IcebergConverter,
+          }
+
+          @classmethod
+          def get(cls, format_name: str) -> FormatConverter:
+              \"\"\"Get converter instance by format name.\"\"\"
+              converter_class = cls._converters.get(format_name.lower())
+              if not converter_class:
+                  available = ", ".join(cls._converters.keys())
+                  raise ValueError(
+                      f"Unknown format '{format_name}'. "
+                      f"Available formats: {available}"
+                  )
+              return converter_class()
+
+          @classmethod
+          def register(cls, format_name: str, converter_class: type[FormatConverter]) -> None:
+              \"\"\"Register a custom converter.\"\"\"
+              cls._converters[format_name.lower()] = converter_class
+
+          @classmethod
+          def list_formats(cls) -> list[str]:
+              \"\"\"List all registered formats.\"\"\"
+              return sorted(cls._converters.keys())
+      ```
+
+      **Benefits**:
+      - Extensibility (plugins can register converters)
+      - Consistency across codebase
+      - Discovery (list_formats())
+
+    acceptance_criteria:
+      - Registry pattern implemented
+      - All existing code uses registry
+      - Plugin registration works
+      - Tests updated
+
+  - id: phase6_medium_priority_fixes
+    title: "Phase 6: Address Remaining Medium Priority Issues"
+    priority: low
+    estimated_hours: 2-3
+    status: open
+    description: |
+      Fix remaining M1-M6 issues from adversarial review.
+
+      **M1: Compression Validation**
+      - Check if codec available before conversion
+      - Clear error if pyarrow missing codec
+
+      **M2: Experimental Format Warnings**
+      - Warn when using Iceberg on DuckDB
+      - Check extension availability at runtime
+
+      **M3: Sharded File Edge Cases**
+      - Ensure handlers accept list[Path] consistently
+      - Test multi-chunk data generation
+
+      **M4: Progress Callbacks in Handlers**
+      - Add progress_callback parameter to FileFormatHandler
+      - Display progress during long loads
+
+      **M5: Error Type Consistency**
+      - Standardize exception hierarchy
+      - ConversionError for all conversion failures
+      - SchemaError for schema issues only
+
+      **M6: Dry-Run Support**
+      - Add dry_run to ConversionOptions
+      - Skip actual file I/O in dry-run mode
+      - Log what would be done
+
+    acceptance_criteria:
+      - All M1-M6 issues resolved
+      - Tests cover edge cases
+      - Error messages clear
+      - Warnings displayed appropriately
+
+blockers: []
+
+related_files:
+  - benchbox/utils/format_converters/base.py
+  - benchbox/utils/format_converters/parquet_converter.py
+  - benchbox/utils/format_converters/delta_converter.py
+  - benchbox/utils/format_converters/iceberg_converter.py
+  - benchbox/platforms/base/data_loading.py
+  - benchbox/core/runner/runner.py
+  - benchbox/core/base_benchmark.py
+  - benchbox/cli/run.py
+
+test_files:
+  - tests/unit/utils/format_converters/
+  - tests/integration/test_format_conversion_e2e.py (to create)
+
+documentation:
+  - docs/format-conversion-guide.md (to create)
+  - docs/api/format-converters.md (to create)
+  - README.md (add section)
+
+completion_notes: |
+  ## Phases 1-2 Completed (2025-11-23)
+
+  **Security & Data Integrity (Phase 1)**:
+  - Fixed tempfile.mktemp() vulnerability (CWE-377)
+  - Added resource cleanup for Iceberg catalogs
+  - Implemented row count validation for TPC compliance
+
+  **Code Quality & Type System (Phase 2)**:
+  - Extracted ArrowTypeMapper to eliminate 330+ LOC duplication
+  - Added TIMESTAMP, BOOLEAN, TEXT type support
+  - Improved error handling in type mapping
+
+  **Test Results**: 133/133 tests passing ✅
+
+  ## Next Steps (Phases 3-6)
+
+  1. **Phase 3** (Critical): Core integration - make converters user-accessible
+  2. **Phase 4** (High): TPC compliance validation and integration tests
+  3. **Phase 5** (Medium): CLI commands and documentation
+  4. **Phase 6** (Low): Polish and edge cases
+
+  **Estimated Total Effort**: 10-12 hours remaining
+
+  **Key Milestone**: After Phase 3, users can run benchmarks with automatic format conversion.

@@ -1,0 +1,363 @@
+title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+worktree: benchmark-expansion
+category: Benchmark Development
+priority: Medium
+status: Not Started
+description: |
+  Implement a Wikipedia Pageviews benchmark using Wikimedia Foundation data dumps.
+  This benchmark provides a high-volume time-series analytics workload based on
+  one of the world's largest websites, enabling performance testing of temporal
+  aggregations, trending analysis, and high-cardinality data processing.
+
+  Wikipedia Pageviews is excellent for benchmarking because:
+  - Massive scale: 400B+ rows, 10+ TB across all years
+  - Simple schema with high-cardinality string columns (page titles)
+  - Real traffic patterns with natural spikes and trends
+  - Time-series optimized workload (hourly granularity)
+  - Multiple access methods (BigQuery, direct download)
+
+  Use cases covered:
+  - Trending page detection
+  - Traffic pattern analysis (temporal, geographic)
+  - Cross-language comparisons
+  - Spike detection and event correlation
+  - High-cardinality aggregations
+
+context_sections:
+- name: Data Sources
+  summary: |
+    **Primary Sources:**
+    | Source | Access | Update | Cost | Scale |
+    |--------|--------|--------|------|-------|
+    | Wikimedia Dumps | HTTP download | Hourly | Free | Full history |
+    | BigQuery | SQL query | Hourly | Free 1TB/mo | Full history |
+
+    **Download Pattern:**
+    ```
+    http://dumps.wikimedia.org/other/pageviews/YYYY/YYYY-MM/pageviews-YYYYMMDD-HH0000.gz
+    Example: pageviews-20250112-150000.gz
+    ```
+
+    **Recommended for BenchBox:**
+    - Direct download for reproducible benchmarks
+    - BigQuery for development/testing (pre-indexed)
+    - Parquet conversion for efficient loading
+
+- name: Schema Structure
+  summary: |
+    **Pageviews Table (4 columns):**
+    | Field | Type | Description |
+    |-------|------|-------------|
+    | datehour | TIMESTAMP | Hour of aggregation (UTC) |
+    | wiki | STRING | Language/project code |
+    | title | STRING | Article title |
+    | views | INT64 | Pageview count |
+
+    **Wiki Codes:**
+    - "en" = English desktop
+    - "en.m" = English mobile
+    - "de", "fr", "ja", etc. = Other languages
+    - "commons", "wikidata" = Sister projects
+
+    **Key Characteristics:**
+    - High cardinality on title (millions of unique pages)
+    - Partitioned by date for efficient range queries
+    - Clustered by wiki and title in BigQuery
+    - Hourly granularity since May 2015
+
+- name: Data Volumes
+  summary: |
+    **Per-Hour Statistics:**
+    - 7-25 million rows per hourly file
+    - 50-200 MB uncompressed per hour
+    - 5-40 MB compressed (gzip) per hour
+
+    **Aggregated Volumes:**
+    | Period | Rows | Uncompressed | Compressed |
+    |--------|------|--------------|------------|
+    | 1 day | 168M | 4.8 GB | 480 MB |
+    | 1 week | 1.2B | 33 GB | 3.3 GB |
+    | 1 month | 4.3B | 120 GB | 12 GB |
+    | 1 year | 52B | 1.5 TB | 150 GB |
+    | Full history | 400B+ | 10+ TB | 1+ TB |
+
+    **Traffic Patterns:**
+    - Global monthly average: ~8 billion pageviews (English alone)
+    - Significant spikes during news events
+    - Clear temporal patterns (weekday/weekend, timezone effects)
+
+- name: Query Workload Categories
+  summary: |
+    **Trending & Top Pages (5+ queries):**
+    - Top N articles by views for date
+    - Most-viewed pages by language
+    - Trending pages (growth rate)
+    - Spike detection (vs baseline)
+    - Cross-period comparison
+
+    **Temporal Patterns (4+ queries):**
+    - Time-series for specific article
+    - Hourly patterns (timezone effects)
+    - Day-of-week distributions
+    - Seasonal trends
+
+    **Language Analysis (4+ queries):**
+    - Cross-language popularity
+    - Mobile vs desktop traffic
+    - Regional interest patterns
+    - Language coverage gaps
+
+    **Event Correlation (3+ queries):**
+    - News event impact
+    - Cultural event spikes
+    - Related article co-trending
+
+    **High-Cardinality (3+ queries):**
+    - Unique page counts
+    - Long-tail distribution
+    - Category aggregations
+
+- name: Scale Factor Design
+  summary: |
+    **TPC-aligned scale factors (SF=1 ≈ 1GB raw data):**
+
+    Wikipedia generates ~100-200 MB/hour uncompressed. Scale factors are
+    time-based to maintain temporal coherence for trend analysis.
+
+    | Scale | Period | Rows | Size (Raw) | Use Case |
+    |-------|--------|------|------------|----------|
+    | 0.01 | ~3 min | ~500K | ~10 MB | CI/testing |
+    | 0.1 | ~30 min | ~5M | ~100 MB | Development |
+    | 1.0 | ~5 hours | ~50M | ~1 GB | Standard |
+    | 10.0 | ~2 days | ~500M | ~10 GB | Large scale |
+    | 100.0 | ~3 weeks | ~5B | ~100 GB | Extended |
+    | 1000.0 | ~7 months | ~50B | ~1 TB | Very large |
+
+    **Scaling Strategy:**
+    - Time-based (contiguous periods) for trend analysis
+    - Single language subset option (English only) for reduced cardinality
+    - Hourly files allow fine-grained control
+    - SF=0.01 recommended for CI pipelines (~3 minutes of data)
+
+- name: Related Datasets (Future Enhancement - Out of Scope)
+  summary: |
+    The following datasets are **out of scope** for the initial implementation
+    but documented here for future enhancement consideration:
+
+    **Wikipedia Clickstream (potential Phase 6):**
+    - Shows navigation paths (referrer -> page)
+    - Monthly aggregates, 2-5 GB per month
+    - Available for English, German, Russian, Spanish, Japanese
+    - URL: dumps.wikimedia.org/other/clickstream/
+    - Would enable: path analysis, referral patterns, user journey queries
+
+    **Page Metadata via Wikidata (potential Phase 7):**
+    - 400 GB compressed entity data
+    - Enables categorical analysis
+    - Join pageviews with topic categories
+    - Would enable: category-based aggregations, entity type filtering
+
+    **Decision:** Focus initial implementation on pageviews only. Clickstream
+    and Wikidata integration can be separate TODO items if demand exists.
+
+tasks:
+- phase: "Phase 1: Data Infrastructure"
+  items:
+  - summary: Design data acquisition approach
+    done: false
+    details: |
+      - Implement hourly file downloader from Wikimedia
+      - Support date range specification
+      - Handle gzip decompression
+      - Convert TSV to Parquet for efficiency
+
+  - summary: Create wikipedia module structure
+    done: false
+    details: |
+      - benchbox/core/wikipedia/__init__.py
+      - benchbox/core/wikipedia/schema.py
+      - benchbox/core/wikipedia/downloader.py
+      - benchbox/core/wikipedia/queries.py
+      - benchbox/core/wikipedia/benchmark.py
+
+  - summary: Implement schema definitions
+    done: false
+    details: |
+      - Pageviews table (datehour, wiki, title, views)
+      - Optional: Wiki dimension table (code -> name, type)
+      - Partitioning strategy by date
+
+  - summary: Handle special characters in titles
+    done: false
+    details: |
+      - URL-encoded titles in raw data
+      - Unicode normalization
+      - Special page filtering (Main_Page, etc.)
+
+- phase: "Phase 2: Data Loading"
+  items:
+  - summary: Implement hourly file downloader
+    done: false
+    details: |
+      - Download from dumps.wikimedia.org
+      - Support date range: YYYY-MM-DD to YYYY-MM-DD
+      - Parallel downloads for efficiency
+      - Checksum validation
+
+  - summary: Implement TSV to Parquet conversion
+    done: false
+    details: |
+      - Parse space-separated format
+      - Handle title encoding
+      - Partition by date
+      - Compress with Zstandard
+
+  - summary: Implement platform data loading
+    done: false
+    details: |
+      - DuckDB: Direct Parquet loading
+      - ClickHouse: Native Parquet import
+      - PostgreSQL: COPY from CSV
+      - Snowflake: COPY INTO from stage
+
+- phase: "Phase 3: Query Catalog"
+  items:
+  - summary: Implement trending queries
+    done: false
+    details: |
+      - wiki_top_pages_daily: Top 100 by date
+      - wiki_top_by_language: Top pages per wiki
+      - wiki_trending: Growth vs baseline
+      - wiki_spike_detection: Unusual traffic
+      - wiki_cross_period: Period comparison
+
+  - summary: Implement temporal pattern queries
+    done: false
+    details: |
+      - wiki_page_timeseries: Views over time
+      - wiki_hourly_pattern: By hour of day
+      - wiki_weekly_pattern: By day of week
+      - wiki_seasonal_trend: Monthly trends
+
+  - summary: Implement language analysis queries
+    done: false
+    details: |
+      - wiki_cross_language: Same topic, different wikis
+      - wiki_mobile_ratio: Mobile vs desktop
+      - wiki_language_ranking: Traffic by language
+      - wiki_coverage_gaps: Topics in one language only
+
+  - summary: Implement event correlation queries
+    done: false
+    details: |
+      - wiki_news_impact: Spikes around dates
+      - wiki_cultural_events: Predictable spikes
+      - wiki_related_trending: Co-trending pages
+
+  - summary: Implement high-cardinality queries
+    done: false
+    details: |
+      - wiki_unique_pages: Distinct count per period
+      - wiki_longtail: Distribution analysis
+      - wiki_category_traffic: Aggregation by prefix
+
+- phase: "Phase 4: Benchmark Integration"
+  items:
+  - summary: Implement WikipediaBenchmark class
+    done: false
+    details: |
+      - Inherit from BaseBenchmark
+      - Handle high-cardinality string column
+      - Optimize for time-series patterns
+
+  - summary: Register benchmark with CLI
+    done: false
+    details: |
+      - Add to platform_registry.py
+      - Add to benchbox run --benchmark wikipedia
+
+  - summary: Add platform-specific variants
+    done: false
+    details: |
+      - String comparison/matching differences
+      - Timestamp handling variations
+      - High-cardinality optimization hints
+
+- phase: "Phase 5: Testing and Documentation"
+  items:
+  - summary: Create unit and integration tests
+    done: false
+
+  - summary: Document benchmark usage
+    done: false
+    details: |
+      - Scale factor recommendations
+      - Query catalog reference
+      - Title encoding notes
+
+files_affected:
+- change_type: New
+  paths:
+  - benchbox/core/wikipedia/__init__.py
+  - benchbox/core/wikipedia/schema.py
+  - benchbox/core/wikipedia/downloader.py
+  - benchbox/core/wikipedia/queries.py
+  - benchbox/core/wikipedia/benchmark.py
+  - tests/unit/core/wikipedia/
+  - tests/integration/test_wikipedia_duckdb.py
+
+- change_type: Modified
+  paths:
+  - benchbox/core/__init__.py
+  - benchbox/core/platform_registry.py
+
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - benchmark
+  - real-world
+  - wikipedia
+  - time-series
+  - high-cardinality
+  - web-traffic
+  estimated_effort: 2-3 weeks
+  created_date: "2026-01-12"
+  dependencies:
+  - Existing NYC Taxi benchmark pattern (benchbox/core/nyctaxi/) for downloader design
+  - BaseBenchmark class (benchbox/core/base.py) for benchmark integration
+  notes: |
+    - Data continuously updated hourly (24-48h lag)
+    - Title encoding requires careful handling (URL-encoded in raw data)
+    - Consider English-only subset for smaller scale and reduced cardinality
+    - Clickstream integration is out of scope (documented as future enhancement)
+    - Clear timezone effects in traffic patterns
+
+must_preserve:
+  - "BaseBenchmark interface contract unchanged"
+
+anti_patterns:
+  - "DO NOT assume ASCII-safe page titles — because Wikipedia titles contain arbitrary Unicode and URL-encoded characters — always decode and handle UTF-8 correctly"
+  - "DO NOT download Wikimedia dumps in unit tests — because hourly files are 50MB+ compressed — use synthetic pageview data"
+
+verification:
+  - description: "Wikipedia benchmark module imports"
+    command: "uv run -- python -c \"from benchbox.core.wikipedia_pageviews import WikipediaPageviewsBenchmark; print('OK')\""
+    expected_output: "OK"
+  - description: "Unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/wikipedia_pageviews/ -v --tb=short"
+    expected_output: "all tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/wikipedia_pageviews/"
+    - "tests/unit/core/wikipedia_pageviews/"
+  do_not_modify:
+    - "benchbox/core/runner.py"
+
+success_metrics:
+- Hourly file download and parsing working
+- 20+ analytical queries covering all categories
+- Scale factors from 0.01 (~10MB) to 100.0 (~100GB) working
+- High-cardinality queries efficient on DuckDB
+- Top-pages queries under 10 seconds for SF=1.0 (~1GB, ~50M rows)

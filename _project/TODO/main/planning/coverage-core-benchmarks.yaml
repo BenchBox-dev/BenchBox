@@ -1,0 +1,153 @@
+title: "Improve test coverage for core benchmark modules to ≥50%"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+description: |
+  Multiple core benchmark modules are below 50% test coverage. These are the
+  heart of BenchBox — the benchmark runners, generators, and query implementations.
+  Each module needs targeted unit tests to reach at least 50% line coverage.
+
+  Current coverage (from 2026-02-07 report, 53% overall):
+    - core/tpcds: 25.8% (6,488 missing / 8,740 total)
+    - core/tpch: 39.7% (1,923 missing / 3,188 total)
+    - core/ssb: 29.6% (702 missing / 997 total)
+    - core/clickbench: 34.9% (466 missing / 716 total)
+    - core/amplab: 30.5% (422 missing / 607 total)
+    - core/nyctaxi: 33.9% (585 missing / 885 total)
+    - core/h2odb: 46.2% (213 missing / 396 total)
+    - core/datavault: 45.2% (891 missing / 1,627 total)
+    - core/read_primitives: 28.0% (1,723 missing / 2,394 total)
+    - core/transaction_primitives: 30.8% (1,001 missing / 1,447 total)
+    - core/metadata_primitives: 46.3% (1,013 missing / 1,886 total)
+    - core/joinorder: 35.4% (275 missing / 426 total)
+
+  Focus on benchmark.py, generator.py, and runner.py files first — these are
+  the most testable units. DataFrame query files (dataframe_queries/queries.py)
+  are large auto-generated-style modules; test a representative subset rather
+  than aiming for full coverage on those.
+
+tasks:
+  phases:
+    - phase: "Phase 1: TPC-H and TPC-DS core (highest impact)"
+      done: false
+      items:
+        - summary: "Add tests for core/tpch/reporting.py (0% → 50%)"
+          done: false
+        - summary: "Add tests for core/tpch/maintenance_test.py (12.8% → 50%)"
+          done: false
+        - summary: "Add tests for core/tpch/parameter_extractor.py (23.9% → 50%)"
+          done: false
+        - summary: "Add tests for core/tpcds/reporting.py (0% → 50%)"
+          done: false
+        - summary: "Add tests for core/tpcds/maintenance_test.py (20.6% → 50%)"
+          done: false
+        - summary: "Add tests for core/tpcds/throughput_test.py (23.8% → 50%)"
+          done: false
+        - summary: "Add tests for core/tpcds/benchmark/runner.py (32.7% → 50%)"
+          done: false
+
+    - phase: "Phase 2: SSB, ClickBench, AMPLab, NYC Taxi, H2O benchmarks"
+      done: false
+      items:
+        - summary: "Add tests for core/ssb/benchmark.py (19.8% → 50%)"
+          done: false
+        - summary: "Add tests for core/ssb/generator.py (45.0% → 50%)"
+          done: false
+        - summary: "Add tests for core/clickbench/benchmark.py (25.8% → 50%)"
+          done: false
+        - summary: "Add tests for core/amplab/benchmark.py (18.4% → 50%)"
+          done: false
+        - summary: "Add tests for core/amplab/generator.py (29.1% → 50%)"
+          done: false
+        - summary: "Add tests for core/nyctaxi/benchmark.py (19.4% → 50%)"
+          done: false
+        - summary: "Add tests for core/nyctaxi/downloader.py (20.5% → 50%)"
+          done: false
+        - summary: "Add tests for core/h2odb/benchmark.py (28.8% → 50%)"
+          done: false
+
+    - phase: "Phase 3: Primitives and remaining benchmarks"
+      done: false
+      items:
+        - summary: "Add tests for core/read_primitives/dataframe_queries.py (16.5% → 50%)"
+          done: false
+        - summary: "Add tests for core/transaction_primitives/generator.py (12.9% → 50%)"
+          done: false
+        - summary: "Add tests for core/transaction_primitives/benchmark.py (24.5% → 50%)"
+          done: false
+        - summary: "Add tests for core/metadata_primitives/generator.py (8.0% → 50%)"
+          done: false
+        - summary: "Add tests for core/metadata_primitives/benchmark.py (40.6% → 50%)"
+          done: false
+        - summary: "Add tests for core/datavault/dataframe_queries/queries.py (6.7% → 50%)"
+          done: false
+        - summary: "Add tests for core/joinorder/generator.py (20.1% → 50%)"
+          done: false
+
+metadata:
+  tags:
+    - testing
+    - coverage
+    - core
+  estimated_effort: Large
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T09:00:00"
+
+impact:
+  business_value: |
+    Core benchmark modules are the primary value proposition of BenchBox.
+    Inadequate test coverage risks regressions in benchmark correctness,
+    which directly undermines user trust in results.
+  technical_debt: |
+    12 core packages below 50% coverage. Reaching the 50% floor across
+    all modules establishes a baseline for CI enforcement.
+
+must_preserve:
+  - "All existing tests continue to pass"
+  - "No changes to production code — tests only"
+
+approach: |
+  Follow existing test patterns in tests/unit/benchmarks/ (e.g., test_tpch_core.py,
+  test_tpcds_core.py). Use @pytest.mark.fast for tests <1s, @pytest.mark.unit for
+  all. Mock external dependencies (file I/O, database connections, TPC binaries).
+  For dataframe_queries files, test a representative subset of queries (5-10 per
+  benchmark) rather than exhaustive coverage.
+
+anti_patterns:
+  - "DO NOT modify production code to improve coverage — because the goal is to verify existing behavior, not refactor — write tests for code as-is"
+  - "DO NOT test auto-generated SQL strings character-by-character — because SQL formatting changes would cause false failures — test query structure, table references, and parameters instead"
+  - "DO NOT create integration tests requiring live databases — because CI has no database servers and tests must run in <1s — use mocks and in-memory fixtures"
+
+verification:
+  - description: "All new tests pass"
+    command: "uv run -- python -m pytest tests/unit/ -v --tb=short -m fast"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Coverage for each targeted module reaches ≥50%"
+    command: "uv run -- python -m pytest -c pytest-ci.ini -p pytest_cov --cov=benchbox/core --cov-report=term-missing -m fast -q"
+    expected_output: "all listed modules show ≥50% coverage"
+
+success_metrics:
+  - "Every core/* package listed above reaches ≥50% line coverage"
+  - "Zero test failures introduced"
+  - "All new tests marked @pytest.mark.fast and complete in <1s each"
+
+files_affected:
+  added:
+    - "tests/unit/benchmarks/test_tpch_reporting.py"
+    - "tests/unit/benchmarks/test_tpcds_reporting.py"
+    - "tests/unit/benchmarks/test_ssb_benchmark.py"
+    - "tests/unit/benchmarks/test_clickbench_benchmark.py"
+    - "tests/unit/benchmarks/test_amplab_benchmark.py"
+    - "tests/unit/benchmarks/test_nyctaxi_benchmark.py"
+    - "tests/unit/benchmarks/test_h2odb_benchmark.py"
+    - "tests/unit/benchmarks/test_primitives_coverage.py"
+    - "tests/unit/benchmarks/test_datavault_queries.py"
+    - "tests/unit/benchmarks/test_joinorder_generator.py"
+
+scope_limit:
+  only_modify:
+    - "tests/unit/benchmarks/"
+  do_not_modify:
+    - "benchbox/"
+    - "tests/integration/"

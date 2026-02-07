@@ -1,0 +1,70 @@
+title: "Future Ideas Backlog — Specialized Benchmarks and Infrastructure"
+worktree: main
+priority: Low
+status: Not Started
+category: Supporting Infrastructure
+description: |
+  Collection of aspirational future work items that are not yet ready for
+  implementation. Each entry needs significant research and design work
+  before it becomes an actionable TODO. These items were consolidated from
+  stub TODOs that lacked tasks, phases, or technical detail.
+
+  When any item below is ready for implementation, create a dedicated TODO
+  file with full tasks, phases, guardrails, and files_affected.
+
+tasks:
+  phases:
+    - phase: "Backlog Items (not prioritized)"
+      done: false
+      items:
+        - summary: "Geospatial Benchmark Support — PostGIS Integration"
+          done: false
+          subtasks:
+            - summary: "Research PostGIS benchmark standards and spatial query workloads"
+              done: false
+            - summary: "Evaluate overlap with geospatial-primitives-benchmark TODO"
+              done: false
+            - summary: "Define ST_* function coverage and test datasets"
+              done: false
+        - summary: "Graph Query Benchmark Support — Neo4j, Neptune"
+          done: false
+          subtasks:
+            - summary: "Research LDBC Social Network Benchmark (industry standard)"
+              done: false
+            - summary: "Evaluate Cypher vs Gremlin vs GQL query language strategy"
+              done: false
+            - summary: "Define graph traversal workload and dataset"
+              done: false
+        - summary: "Interactive Benchmark Explorer — Web UI"
+          done: false
+          subtasks:
+            - summary: "Define target users and use cases (why CLI + charts aren't sufficient)"
+              done: false
+            - summary: "Choose technology stack (React vs Vue, Flask vs FastAPI)"
+              done: false
+            - summary: "Design API for serving benchmark results"
+              done: false
+        - summary: "Streaming Benchmark Support — Kafka, Flink, Spark Streaming"
+          done: false
+          subtasks:
+            - summary: "Research Nexmark benchmark (streaming standard)"
+              done: false
+            - summary: "Evaluate overlap with existing TSBS DevOps benchmark"
+              done: false
+            - summary: "Separate concerns: Kafka (message broker) vs Flink/Spark (processing)"
+              done: false
+
+metadata:
+  tags:
+    - backlog
+    - future
+    - research-needed
+  estimated_effort: "Research phase: 1-2 weeks per item"
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T10:00:00"
+
+impact:
+  business_value: |
+    These represent potential long-term expansion of BenchBox into specialized
+    domains (geospatial, graph, streaming) and improved user experience (web UI).
+    Each needs research to validate demand and feasibility before investment.

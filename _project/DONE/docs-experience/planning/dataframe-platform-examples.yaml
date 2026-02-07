@@ -1,0 +1,101 @@
+title: DataFrame Platform Example Scripts
+worktree: docs-experience
+priority: Medium
+status: "Completed"
+category: Documentation and User Experience
+description: |
+  Create example Python scripts for DataFrame platforms.
+
+  DataFrame mode is a key differentiator for BenchBox but lacks examples.
+  Need examples for:
+  - Polars (fastest DataFrame platform)
+  - CuDF (GPU-accelerated)
+
+  Examples should demonstrate:
+  - DataFrame adapter initialization
+  - TPC-H benchmark execution
+  - Result interpretation
+
+tasks:
+  - phase: "Polars Examples"
+    done: true
+    items:
+      - summary: "Create examples/dataframe/polars_tpch.py"
+        done: true
+        note: "Already existed - comprehensive example"
+      - summary: "Document lazy vs eager evaluation"
+        done: true
+        note: "Covered in existing polars_tpch.py comments"
+      - summary: "Show memory management best practices"
+        done: true
+        note: "Uses lazy scanning from Parquet"
+  - phase: "CuDF Examples"
+    done: true
+    items:
+      - summary: "Create examples/dataframe/cudf_tpch.py"
+        done: true
+      - summary: "Document GPU requirements"
+        done: true
+      - summary: "Show GPU memory considerations"
+        done: true
+  - phase: "Validation"
+    done: true
+    items:
+      - summary: "Verify examples run with dry-run"
+        done: true
+        note: "Syntax validated"
+      - summary: "Add comments explaining DataFrame-specific concepts"
+        done: true
+
+completion_notes: |
+  polars_tpch.py already existed (113 lines):
+  - Demonstrates Expression family implementation
+  - Uses lazy evaluation with pl.scan_parquet()
+  - Executes Q1, Q3, Q6 sample queries
+  - Shows result collection and display
+
+  Created cudf_tpch.py (223 lines):
+  - Comprehensive GPU DataFrame example
+  - GPU prerequisites and CUDA requirements
+  - GPU memory estimation and checking
+  - Memory spilling configuration (--spill flag)
+  - CUDA device selection (--device flag)
+  - Performance notes and best practices
+  - Comparison tips with CPU implementations
+  - Cleanup and memory pool management
+
+  Also verified existing DataFrame examples:
+  - polars_tpcds.py (TPC-DS variant)
+  - pandas_tpch.py (CPU baseline)
+  - cross_platform_comparison.py (comparison script)
+  - sql_vs_dataframe.py (SQL vs DataFrame comparison)
+  - README.md (documentation)
+
+metadata:
+  owners:
+    - "@benchbox-maintainers"
+  tags:
+    - examples
+    - dataframe
+    - polars
+    - cudf
+    - gpu
+  estimated_effort: 2-3 hours
+  created_date: "2025-12-13"
+
+impact:
+  business_value: |
+    DataFrame mode is unique to BenchBox - examples showcase differentiator.
+    Growing interest in DataFrame-based analytics.
+  user_impact: |
+    Quick start for DataFrame benchmarking.
+    Learn DataFrame-specific patterns.
+
+success_metrics:
+  - "Runnable examples for Polars and CuDF - DONE"
+  - "Examples demonstrate DataFrame-specific features - DONE"
+  - "Comments explain memory and performance considerations - DONE"
+
+files_modified:
+  - examples/dataframe/polars_tpch.py (verified existing)
+  - examples/dataframe/cudf_tpch.py (created new)

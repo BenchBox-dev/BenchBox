@@ -1,0 +1,104 @@
+title: Expand TPC-DS OBT Query Coverage to 93 Queries
+worktree: benchmark-expansion
+category: Core Functionality
+priority: High
+status: "Completed"
+description: >
+  Convert all 93 convertible TPC-DS queries to work with the One Big Table (OBT) schema.
+  87 via automatic conversion, 6 via manual rewrites. 6 queries blocked (inventory).
+
+context_sections:
+- name: Query Coverage Summary
+  summary: |
+    93/99 TPC-DS queries now work with the OBT schema (94%):
+
+    | Category   | Count | Details                                        |
+    |------------|-------|------------------------------------------------|
+    | Automatic  | 87    | AST conversion with post-processing fixes      |
+    | Manual     | 6     | Q14, Q46, Q49, Q64, Q68, Q84                   |
+    | Blocked    | 6     | Q21, Q22, Q37, Q39, Q72, Q82 (inventory)       |
+
+- name: Manual Query Implementations
+  summary: |
+    Q14 (Cross-Channel INTERSECT):
+    - Rewrites INTERSECT as COUNT(DISTINCT channel) = 3
+
+    Q46, Q68 (Current vs Purchase Address):
+    - External joins to customer/customer_address for current address comparison
+
+    Q49 (Return Ratio Analysis):
+    - Uses OBT return columns with NULLIF for division safety
+
+    Q64 (Cross-Channel Year-over-Year):
+    - Self-join pattern (defeats OBT single-scan design - see caveats below)
+
+    Q84 (Income Band Filtering):
+    - External joins for customer's current demographics and income band
+
+- name: Blocked Queries - Inventory
+  summary: |
+    6 queries blocked due to grain mismatch (Q21, Q22, Q37, Q39, Q72, Q82):
+
+    OBT grain:       sale_id → item_sk → customer_sk → date_sk (transactions)
+    Inventory grain: item_sk → warehouse_sk → date_sk → quantity (snapshots)
+
+    Problem: Joining inventory to transactions creates M:N explosion.
+    Each inventory quantity would duplicate across every transaction,
+    breaking aggregation semantics (SUM, AVG, COUNT all become wrong).
+
+    Solutions (not implemented):
+    1. Separate inventory_obt at inventory grain
+    2. Accept 6% of queries are outside OBT scope
+    3. Hybrid approach with separate inventory table
+
+- name: Q64 Self-Join Caveats
+  summary: |
+    Q64 uses a self-join pattern that works semantically but defeats OBT purpose:
+
+    ┌─────────────────────────┬────────────────────────────────┐
+    │ Star Schema             │ OBT Design Goal                │
+    ├─────────────────────────┼────────────────────────────────┤
+    │ Multiple fact tables    │ Single wide table, no joins    │
+    │ Join cost at query time │ Pre-computed joins at ETL      │
+    │ Cross-fact flexibility  │ Single-pass filtered analytics │
+    └─────────────────────────┴────────────────────────────────┘
+
+    Self-join impact:
+    - Scans OBT twice (catalog filter, store filter)
+    - Same cost profile as joining original fact tables
+    - Included for coverage completeness, not as OBT showcase
+
+    OBT excels at:  WHERE channel = 'store' (one scan, no joins)
+    OBT struggles:  JOIN obt a ON obt b WHERE a.channel != b.channel
+
+tasks:
+- phase: Implementation
+  done: true
+  items:
+  - summary: Automated conversion of 87 queries via QueryConverter
+  - summary: Manual rewrites for 6 complex queries
+  - summary: Income band columns added to schema (8 columns, 4 hdemo roles)
+  - summary: Test infrastructure with dimension tables for manual queries
+
+technical_requirements:
+- category: Query Coverage
+  details: 93/99 queries (94%). 6 blocked by inventory grain mismatch.
+- category: Semantic Equivalence
+  details: All converted queries preserve original TPC-DS semantics.
+- category: Column Mapping
+  details: Role-based prefixes (bill/ship/returning) correctly assigned.
+
+success_metrics:
+- metric: 93/93 convertible queries working (100%)
+  status: achieved
+- metric: 6 queries blocked (inventory architectural limitation)
+  status: known_limitation
+- metric: Full test coverage with DuckDB syntax validation
+  status: achieved
+
+files_modified:
+- benchbox/core/tpcds_obt/schema.py (income_band columns)
+- benchbox/core/tpcds_obt/etl/transformer.py (income_band joins)
+- benchbox/core/tpcds_obt/manual_queries.py (Q14, Q46, Q49, Q64, Q68, Q84)
+- benchbox/core/tpcds_obt/queries.py (93 query IDs)
+- tests/unit/core/tpcds_obt/test_queries.py (dimension tables for testing)

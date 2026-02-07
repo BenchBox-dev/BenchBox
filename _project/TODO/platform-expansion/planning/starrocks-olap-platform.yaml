@@ -1,0 +1,248 @@
+title: "Add StarRocks MPP OLAP platform support"
+worktree: platform-expansion
+priority: Medium-High
+status: Not Started
+description: |
+  Integrate StarRocks as a supported BenchBox platform. StarRocks is an open-source
+  MPP columnar OLAP database (Linux Foundation project) with strong performance
+  characteristics and growing enterprise adoption (11K+ GitHub stars, used by
+  Airbnb, Alibaba, Coinbase, Pinterest, Tencent).
+
+  Technical fit analysis confirms:
+  - SQLGlot has official 'starrocks' dialect support (verified working)
+  - MySQL protocol connectivity via PyMySQL (port 9030)
+  - Full TPC-H (22 queries) and TPC-DS (99 queries) compatibility
+  - Competitive performance vs ClickHouse, Trino, Druid in benchmarks
+  - Multiple data loading options (Stream Load HTTP API, INSERT+FILES())
+
+  Strategic value:
+  - Fills gap in modern MPP OLAP coverage alongside ClickHouse
+  - Enables independent TPC-H/TPC-DS verification (vs vendor-published results)
+  - Native data lake support (Iceberg, Hudi, Delta Lake) enables lakehouse benchmarks
+  - Growing market adoption makes this relevant for users
+
+  Reference: Comprehensive analysis completed in conversation on 2026-01-07.
+
+category: Platform Expansion
+
+tasks:
+  phases:
+    - phase: "Phase 1: Core Integration"
+      done: false
+      items:
+        - summary: "Create benchbox/platforms/starrocks.py adapter"
+          done: false
+          subtasks:
+            - summary: "Implement StarRocksAdapter class inheriting from PlatformAdapter"
+              done: false
+            - summary: "Set _dialect = 'starrocks' for SQLGlot transpilation"
+              done: false
+            - summary: "Implement create_connection() using PyMySQL"
+              done: false
+            - summary: "Implement execute_query() with timing and row count validation"
+              done: false
+        - summary: "Implement data loading via Stream Load HTTP API"
+          done: false
+          subtasks:
+            - summary: "Create HTTP PUT to BE node for CSV data loading"
+              done: false
+            - summary: "Handle chunked loading for large files"
+              done: false
+            - summary: "Implement load status checking and error handling"
+              done: false
+        - summary: "Implement schema creation with StarRocks-specific DDL"
+          done: false
+          subtasks:
+            - summary: "Support Duplicate/Aggregate/Unique/Primary Key table models"
+              done: false
+            - summary: "Implement DISTRIBUTED BY HASH clause generation"
+              done: false
+            - summary: "Support partitioning for large tables"
+              done: false
+        - summary: "Register platform in platform_registry.py"
+          done: false
+        - summary: "Add pymysql to optional dependencies in pyproject.toml"
+          done: false
+
+    - phase: "Phase 2: Optimization and Tuning"
+      done: false
+      items:
+        - summary: "Implement result cache control"
+          done: false
+          subtasks:
+            - summary: "Disable query cache via SET enable_query_cache = false"
+              done: false
+            - summary: "Add validation that cache is disabled"
+              done: false
+        - summary: "Implement platform optimizations"
+          done: false
+          subtasks:
+            - summary: "Add Bitmap index support for low-cardinality columns"
+              done: false
+            - summary: "Add Bloom filter index support"
+              done: false
+            - summary: "Implement ANALYZE TABLE for statistics collection"
+              done: false
+        - summary: "Create tuning profile for StarRocks"
+          done: false
+          subtasks:
+            - summary: "Define TPC-H specific tuning (distribution keys, indexes)"
+              done: false
+            - summary: "Define TPC-DS specific tuning"
+              done: false
+
+    - phase: "Phase 3: Testing and Documentation"
+      done: false
+      items:
+        - summary: "Create unit tests for StarRocks adapter"
+          done: false
+          subtasks:
+            - summary: "Test connection handling and configuration"
+              done: false
+            - summary: "Test SQL generation and dialect handling"
+              done: false
+            - summary: "Test Stream Load request formatting"
+              done: false
+        - summary: "Create integration tests"
+          done: false
+          subtasks:
+            - summary: "Add Docker Compose for local StarRocks cluster"
+              done: false
+            - summary: "Test TPC-H SF=0.01 end-to-end"
+              done: false
+            - summary: "Test TPC-DS SF=1 end-to-end"
+              done: false
+        - summary: "Create documentation"
+          done: false
+          subtasks:
+            - summary: "Create docs/platforms/starrocks.md with connection guide"
+              done: false
+            - summary: "Document Stream Load data loading process"
+              done: false
+            - summary: "Add deployment options (self-hosted, CelerData Cloud)"
+              done: false
+        - summary: "Create example script"
+          done: false
+          subtasks:
+            - summary: "Create examples/getting_started/sql/starrocks_tpch.py"
+              done: false
+
+metadata:
+  tags:
+    - starrocks
+    - olap
+    - mpp
+    - columnar
+    - platform
+    - mysql-protocol
+  estimated_effort: Medium
+  created_date: "2026-01-07"
+
+impact:
+  business_value: |
+    StarRocks is gaining significant enterprise adoption as an open-source
+    alternative to commercial OLAP systems. Supporting it expands BenchBox's
+    relevance to a growing user base and enables independent performance
+    verification of vendor benchmark claims.
+  user_impact: |
+    Users running StarRocks deployments can benchmark their systems with
+    industry-standard TPC-H/TPC-DS workloads. Comparative analysis against
+    ClickHouse, Trino, and other platforms becomes straightforward.
+  technical_debt: |
+    Clean implementation following established patterns (similar to ClickHouse).
+    No technical debt expected.
+
+technical_requirements:
+  constraints:
+    - "Requires StarRocks FE node accessible on port 9030 (MySQL protocol)"
+    - "Stream Load requires direct access to BE nodes (HTTP port 8030)"
+    - "No embedded/local mode available (unlike ClickHouse chDB)"
+  dependencies:
+    - "pymysql (Python MySQL client)"
+    - "requests (for Stream Load HTTP API)"
+  compatibility: |
+    - Python 3.10+
+    - StarRocks 3.0+ (storage-compute separation architecture)
+    - SQLGlot 23+ (official starrocks dialect)
+
+files_affected:
+  modified:
+    - benchbox/platforms/__init__.py
+    - benchbox/core/platform_registry.py
+    - pyproject.toml
+  added:
+    - benchbox/platforms/starrocks.py
+    - tests/unit/platforms/test_starrocks_adapter.py
+    - tests/integration/platforms/test_starrocks_smoke.py
+    - docs/platforms/starrocks.md
+    - examples/getting_started/sql/starrocks_tpch.py
+
+dependencies:
+  related:
+    - _project/TODO/platform-expansion/planning/postgresql-first-class-platform.yaml
+
+must_preserve:
+  - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  - "Platform registry autodiscovery continues working for all existing platforms"
+  - "ClickHouse adapter's PyMySQL usage unaffected by StarRocks's PyMySQL dependency"
+
+anti_patterns:
+  - "DO NOT modify existing adapter files — because StarRocks is additive — create a new starrocks.py file"
+  - "DO NOT use port 8030 for Stream Load — because StarRocks routes Stream Load to BE on port 8040, unlike Doris which routes to FE on port 8030 — verify port in StarRocks documentation"
+  - "DO NOT create a shared DorisStarRocksBase class — because the projects have diverged and coupling creates fragile inheritance — implement independently"
+
+verification:
+  - description: "New adapter imports correctly"
+    command: "uv run -- python -c \"from benchbox.platforms.starrocks import StarRocksAdapter; print('import OK')\""
+    expected_output: "import OK"
+  - description: "Unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_starrocks_adapter.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Existing platform tests unaffected"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/starrocks.py"
+    - "benchbox/platforms/credentials/starrocks.py"
+    - "tests/unit/platforms/test_starrocks_adapter.py"
+  do_not_modify:
+    - "benchbox/platforms/clickhouse/"
+    - "benchbox/platforms/doris.py"
+    - "benchbox/core/runner.py"
+
+success_metrics:
+  - "StarRocks adapter passes all unit tests"
+  - "TPC-H SF=0.01 completes successfully with correct row counts"
+  - "TPC-DS SF=1 completes all 99 queries"
+  - "Platform appears in CLI wizard and --help output"
+  - "Documentation published on docs site"
+
+open_questions:
+  - "Should we support CelerData Cloud API for managed deployments?"
+  - "Should we implement materialized view benchmarking as an advanced feature?"
+  - "What's the best approach for Docker-based integration testing?"
+
+context_sections:
+  "Performance Positioning": |
+    Based on CelerData benchmark reports (vendor-published, caveat applies):
+    - 2-2.2x faster than ClickHouse on SSB wide-table workloads
+    - 6.9-8.1x faster than Trino on TPC-DS 1TB
+    - Competitive with ClickHouse on ClickBench
+
+    BenchBox can provide independent verification of these claims.
+
+  "Architecture Comparison": |
+    StarRocks vs similar platforms:
+    - vs ClickHouse: Similar columnar MPP, but better multi-table joins
+    - vs Trino: Native storage (not just federated), vectorized execution
+    - vs Druid: Full SQL support, better ad-hoc query flexibility
+
+  "Data Loading Strategy": |
+    Recommended approach for BenchBox:
+    1. Stream Load (HTTP PUT) for CSV files - primary method
+    2. INSERT+FILES() for cloud storage (S3, GCS) scenarios
+    3. Standard INSERT for small datasets/testing
+
+    Stream Load endpoint: http://{be_host}:8040/api/{database}/{table}/_stream_load

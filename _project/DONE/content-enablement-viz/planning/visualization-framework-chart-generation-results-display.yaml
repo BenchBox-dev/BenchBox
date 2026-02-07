@@ -1,0 +1,430 @@
+title: Visualization Framework - Chart Generation & Results Display
+worktree: content-enablement-viz
+category: Marketing Content Enablement
+priority: Critical
+status: "Completed"
+description: 'Build comprehensive visualization system to generate publication-ready charts
+
+  from benchmark results. This is THE blocking feature for ALL 128 blog posts in
+
+  the marketing calendar - without automated chart generation, content creation
+
+  is impossible.
+
+
+  Current state: Raw JSON results with basic display.py
+
+  Target state: Automated generation of bar charts, line charts, scatter plots,
+
+  heatmaps, and interactive visualizations for blog posts.
+
+  '
+context_sections:
+- name: Marketing Dependency
+  summary: 'ALL 128 blog posts require performance charts. Every flagship post
+
+    ($28,700 budget) needs multi-platform comparison visualizations.
+
+    Without this, content marketing is impossible.
+
+    '
+- name: Content Examples Blocked
+  summary: '- Week 2: "2026 Data Warehouse State of the Union" (needs 8-platform charts)
+
+    - Week 6: "Read Primitives Complete Results" (needs benchmark comparisons)
+
+    - All flagship posts (14 posts, $28,700) require professional visualizations
+
+    '
+- name: Technical Gap
+  summary: 'No automated chart generation exists. Results are JSON files that must be
+
+    manually processed into charts. Content team cannot create blog posts
+
+    without engineering support for every chart.
+
+    '
+impact: 'CRITICAL - Blocks ALL 128 blog posts. First post deadline is January 15, 2026
+
+  (~8 weeks away). This is the highest priority feature in the entire project.
+
+
+  Without this:
+
+  - No blog posts can be published
+
+  - $260K-350K content investment is wasted
+
+  - Marketing launch delayed indefinitely
+
+  - BenchBox cannot demonstrate value to users
+
+  '
+tasks:
+- phase: 'Phase 1: Architecture Design & Tool Selection'
+  done: true
+  description: 'Design visualization architecture and select libraries
+
+    '
+  items:
+  - summary: Evaluate visualization libraries (Plotly vs Matplotlib vs Altair)
+    details: 'Requirements:
+
+      - Interactive charts for web (Plotly)
+
+      - Static high-res charts for blog images (Matplotlib)
+
+      - Support for bar, line, scatter, heatmap, box plot
+
+      - Theming and customization
+
+      - Export to PNG, SVG, HTML
+
+      Decision: Plotly + Kaleido primary (interactive + headless), Matplotlib fallback-only,
+      avoid JS toolchains (Chart.js/Altair/Node) to keep BenchBox self contained.
+      '
+  - summary: Design chart type taxonomy and template system
+    details: 'Chart types needed:
+
+      - Performance bar charts (multi-platform comparison)
+
+      - Time-series line charts (performance trends)
+
+      - Cost-performance scatter plots (price/performance frontier)
+
+      - Query variance heatmaps (TPC-Havoc consistency)
+
+      - Distribution box plots (latency distributions)
+
+      '
+  - summary: Create BenchBox visual style guide
+    details: '- Color palette (colorblind-friendly)
+
+      - Typography (consistent with brand)
+
+      - Chart dimensions for blog posts (standard sizes)
+
+      - Annotation styles (winners, statistical significance markers)
+
+      '
+  - summary: Design CLI interface for visualization commands
+    details: 'benchbox visualize <results> --output-dir ./charts/
+
+      benchbox visualize <results> --chart-type bar --format png
+
+      benchbox visualize <results> --template flagship-comparison
+
+      '
+- phase: 'Phase 2: Core Visualization Engine'
+  done: true
+  description: 'Implement core chart generation functionality
+
+    '
+  items:
+  - summary: Create benchbox/core/visualization/ module structure
+    details: "benchbox/core/visualization/\n  __init__.py\n  charts.py           # Chart generation classes\n  result_plotter.py\
+      \   # Integration with BenchmarkResults\n  templates.py        # Chart templates for common patterns\n  styles.py  \
+      \         # Visual styling and themes\n  exporters.py        # Export to PNG, SVG, HTML\n"
+  - summary: Implement PerformanceBarChart class for platform comparisons
+    details: 'Features:
+
+      - Multi-platform bar chart with grouped/stacked options
+
+      - Automatic sorting (by performance, alphabetically, custom)
+
+      - Error bars for variance/confidence intervals
+
+      - Highlight best/worst performers
+
+      - Annotations for significant differences
+
+      '
+  - summary: Implement TimeSeriesLineChart for performance trends
+    details: 'Features:
+
+      - Multi-line charts for platform evolution
+
+      - Trend detection and regression lines
+
+      - Annotate platform version changes
+
+      - Support for multiple benchmarks on same axes
+
+      '
+  - summary: Implement CostPerformanceScatterPlot for price/performance analysis
+    details: 'Features:
+
+      - Pareto frontier highlighting
+
+      - Platform labels with custom positioning
+
+      - Quadrant analysis (fast & cheap, slow & expensive, etc.)
+
+      - Cost per query vs performance visualization
+
+      '
+  - summary: Implement QueryVarianceHeatmap for consistency analysis
+    details: 'Features:
+
+      - Query × Platform heatmap
+
+      - Color scale for variance/coefficient of variation
+
+      - Integration with TPC-Havoc variant results
+
+      '
+  - summary: Add comprehensive theming and customization system
+    details: '- Light/dark mode support
+
+      - Custom color palettes
+
+      - Font size configuration
+
+      - Export resolution settings (72 DPI for web, 300 DPI for print)
+
+      '
+- phase: 'Phase 3: Result Integration & Automation'
+  done: true
+  description: 'Integrate with BenchmarkResults and automate chart generation
+
+    '
+  items:
+  - summary: Create ResultPlotter class to auto-generate charts from results
+    details: 'from benchbox.core.visualization import ResultPlotter
+
+
+      plotter = ResultPlotter(results)
+
+      plotter.generate_all_charts(output_dir="./charts")
+
+      # Creates: performance.png, cost_analysis.png, query_breakdown.png, etc.
+
+      '
+  - summary: Implement CLI command 'benchbox visualize'
+    details: 'benchbox visualize benchmark_runs/*/results/*.json
+
+      benchbox visualize run1/ run2/ --compare
+
+      benchbox visualize run1/ --output charts/ --format png,svg,html
+
+      '
+  - summary: Add batch visualization for multiple results
+    details: 'benchbox visualize benchmark_runs/**/*.json --group-by platform
+
+      benchbox visualize benchmark_runs/**/*.json --group-by benchmark
+
+      # Generates comparison charts across all results
+
+      '
+  - summary: Implement smart chart selection based on result type
+    details: 'Auto-detect appropriate charts:
+
+      - Single platform → query breakdown bar chart
+
+      - Multiple platforms → platform comparison bar chart
+
+      - Time-series data → line chart with trends
+
+      - Cost data present → add cost-performance scatter plot
+
+      '
+  - summary: Add export metadata and reproducibility info
+    details: 'Embed in chart:
+
+      - BenchBox version
+
+      - Benchmark name and scale factor
+
+      - Platforms and versions tested
+
+      - Date generated
+
+      - Link to raw data
+
+      '
+- phase: 'Phase 4: Blog Post Templates & Content Team Enablement'
+  done: true
+  description: 'Create chart templates specifically for blog post formats
+
+    '
+  items:
+  - summary: Create flagship post chart template (8-platform comparison)
+    details: 'benchbox visualize results/ --template flagship
+
+      # Generates complete chart set for flagship post:
+
+      #   - 8-platform performance comparison (bar chart)
+
+      #   - Query-by-query breakdown (heatmap)
+
+      #   - Cost-performance analysis (scatter plot)
+
+      #   - Winner summary table (annotated bar chart)
+
+      '
+  - summary: Create head-to-head post chart template (2-platform)
+    details: 'benchbox visualize run1/ run2/ --template head-to-head
+
+      # Generates:
+
+      #   - Side-by-side performance comparison
+
+      #   - Query-level win/loss matrix
+
+      #   - Performance distribution (box plots)
+
+      '
+  - summary: Create trend analysis chart template (time-series)
+    details: 'benchbox visualize runs/2024/ runs/2025/ runs/2026/ --template trends
+
+      # Generates:
+
+      #   - Platform evolution over time
+
+      #   - Performance regression detection highlights
+
+      #   - Year-over-year comparison
+
+      '
+  - summary: Create cost optimization chart template
+    details: 'benchbox visualize results/ --template cost-optimization
+
+      # Generates:
+
+      #   - Cost breakdown by operation type
+
+      #   - Price-performance frontier
+
+      #   - TCO comparison across platforms
+
+      '
+  - summary: Document chart generation workflow for content team
+    details: 'Create docs/content/chart-generation-guide.md:
+
+      - How to run benchmarks and generate results
+
+      - How to use benchbox visualize for different post types
+
+      - Chart customization options
+
+      - Troubleshooting common issues
+
+      - Best practices for chart selection
+
+      '
+  - summary: Create example notebooks with chart generation
+    details: "examples/visualization/\n  flagship_post_charts.ipynb\n  head_to_head_comparison.ipynb\n  cost_analysis_charts.ipynb\n\
+      \  trend_analysis.ipynb\n"
+- phase: 'Phase 5: Testing & Documentation'
+  done: true
+  description: 'Comprehensive testing and documentation for production readiness
+
+    '
+  items:
+  - summary: Unit tests for all chart types
+    details: "tests/unit/visualization/\n  test_performance_bar_chart.py\n  test_time_series_line_chart.py\n  test_cost_performance_scatter.py\n\
+      \  test_query_variance_heatmap.py\n  test_result_plotter.py\n"
+  - summary: Integration tests with real benchmark results
+    details: "tests/integration/visualization/\n  test_tpch_visualization.py (TPC-H charts)\n  test_tpcds_visualization.py\
+      \ (TPC-DS charts)\n  test_multi_platform_comparison.py\n"
+  - summary: Visual regression testing (chart output validation)
+    details: 'Use pytest-mpl or similar for visual regression:
+
+      - Generate charts from fixture data
+
+      - Compare against baseline images
+
+      - Flag visual regressions
+
+      '
+  - summary: Performance testing (chart generation speed)
+    details: '- Benchmark chart generation for 1, 10, 100 results
+
+      - Target: <5 seconds for typical blog post chart set
+
+      - Optimize slow paths
+
+      '
+  - summary: Create comprehensive documentation
+    details: "docs/visualization/\n  overview.md (visualization system overview)\n  chart-types.md (all available chart types)\n\
+      \  customization.md (theming and styling)\n  cli-reference.md (benchbox visualize command)\n  templates.md (blog post\
+      \ templates)\n"
+  - summary: Create tutorial video/walkthrough
+    details: '- Record screencast: "Generating Charts for Blog Posts"
+
+      - Cover common workflows
+
+      - Upload to YouTube/docs site
+
+      '
+dependencies:
+- None - this is foundational work
+technical_requirements:
+- category: Visualization Libraries
+  items:
+  - Plotly + Kaleido as primary (interactive + headless PNG/SVG/PDF)
+  - Matplotlib as fallback-only for niche plots
+  - Pillow for image processing
+  - Pandas for data manipulation
+  - Avoid JS toolchains (no Chart.js/Altair/Node deps)
+- category: Export Formats
+  items:
+  - PNG (72 DPI for web, 300 DPI for print)
+  - SVG (vector graphics for scaling)
+  - HTML (interactive charts)
+  - PDF (optional, for reports)
+- category: Performance
+  items:
+  - Generate typical blog post chart set in <5 seconds
+  - Support batch processing of 100+ results
+  - Memory-efficient for large result sets
+- category: Accessibility
+  items:
+  - Colorblind-friendly palettes
+  - WCAG AA contrast ratios
+  - Alt text support for charts
+  - Screen reader compatible HTML exports
+files_affected:
+- change_type: New
+  paths:
+  - benchbox/core/visualization/__init__.py
+  - benchbox/core/visualization/charts.py
+  - benchbox/core/visualization/result_plotter.py
+  - benchbox/core/visualization/templates.py
+  - benchbox/core/visualization/styles.py
+  - benchbox/core/visualization/exporters.py
+- change_type: Modified
+  paths:
+  - benchbox/cli/commands/visualize.py (new command)
+  - benchbox/core/results/display.py (integrate with viz)
+- change_type: New
+  paths:
+  - docs/visualization/overview.md
+  - docs/visualization/chart-types.md
+  - docs/visualization/cli-reference.md
+  - docs/content/chart-generation-guide.md
+  - examples/visualization/ (notebook examples)
+- change_type: New
+  paths:
+  - tests/unit/visualization/
+  - tests/integration/visualization/
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - tier-0
+  - foundational
+  - visualization
+  - marketing
+  - critical
+  estimated_effort: 3-4 weeks (1.5-2.0 FTE)
+  budget: $36K-48K
+  due_date: '2026-01-15'
+  blocking_posts: ALL 128 blog posts
+success_metrics:
+- Generate publication-ready charts from any benchmark result
+- Support all flagship post visualization needs
+- <5 minutes to create full chart set for blog post
+- Content team can generate charts without engineering support
+- 10+ chart templates available
+- Zero manual chart creation required

@@ -1,0 +1,101 @@
+title: Azure Synapse and Fabric Warehouse Documentation
+worktree: docs-experience
+priority: Medium
+status: "Completed"
+category: Documentation and User Experience
+description: |
+  Create platform documentation for Microsoft Azure data platforms.
+
+  Two platforms need documentation:
+  - Azure Synapse Analytics (dedicated + serverless SQL pools)
+  - Microsoft Fabric Warehouse (Power BI integration)
+
+  Both platforms share Azure AD authentication patterns but have
+  distinct features and use cases.
+
+tasks:
+  - phase: "Azure Synapse Documentation"
+    done: true
+    items:
+      - summary: "Create docs/platforms/azure_synapse.md"
+        done: true
+      - summary: "Document dedicated vs serverless pools"
+        done: true
+      - summary: "Document Azure AD authentication"
+        done: true
+      - summary: "Document data staging with ADLS"
+        done: true
+      - summary: "Add performance optimization tips"
+        done: true
+  - phase: "Fabric Warehouse Documentation"
+    done: true
+    items:
+      - summary: "Create docs/platforms/fabric_warehouse.md"
+        done: true
+      - summary: "Document workspace setup"
+        done: true
+      - summary: "Document authentication"
+        done: true
+      - summary: "Document Power BI integration considerations"
+        done: true
+  - phase: "Index Updates"
+    done: true
+    items:
+      - summary: "Update docs/platforms/index.md with both links"
+        done: true
+      - summary: "Add to cloud platforms category"
+        done: true
+
+completion_notes: |
+  Documentation already existed:
+
+  azure-platforms.md (116 lines):
+  - Overview of all Azure analytics platforms
+  - Platform comparison table (Fabric, Synapse, Data Explorer)
+  - Microsoft Fabric section with status, characteristics, use cases
+  - Azure Synapse Analytics section with technical details
+  - Azure Data Explorer (Kusto) section
+  - Implementation roadmap and priority ranking
+  - Current workarounds for users
+
+  microsoft-fabric.md (342 lines):
+  - Comprehensive Fabric Warehouse guide
+  - Detailed limitations table (Warehouse only, not Lakehouse)
+  - Installation instructions with ODBC driver requirements
+  - CLI and programmatic usage examples
+  - Authentication methods (default credential, service principal, interactive)
+  - Configuration options table
+  - OneLake data staging documentation
+  - SQL dialect notes and query translation
+  - Performance considerations (result cache, capacity units, cost optimization)
+  - Troubleshooting for connection, auth, and data loading errors
+  - Comparison table: Fabric vs Azure Synapse
+
+metadata:
+  owners:
+    - "@benchbox-maintainers"
+  tags:
+    - documentation
+    - azure
+    - synapse
+    - fabric
+    - microsoft
+  estimated_effort: 5-6 hours
+  created_date: "2025-12-13"
+
+impact:
+  business_value: |
+    Microsoft platforms have large enterprise user base.
+    Documentation enables Azure-focused organizations.
+  user_impact: |
+    Clear Azure AD authentication guidance.
+    Pool selection guidance for cost optimization.
+
+success_metrics:
+  - "Complete guides for both Azure platforms"
+  - "Authentication patterns clearly documented"
+  - "Cost considerations included"
+
+files_modified:
+  - docs/platforms/azure-platforms.md (existing, complete overview)
+  - docs/platforms/microsoft-fabric.md (existing, comprehensive)

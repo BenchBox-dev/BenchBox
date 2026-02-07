@@ -1,0 +1,120 @@
+title: Athena Configuration Validation
+worktree: platform-expansion
+priority: Medium
+status: "Completed"
+category: Platform Polish
+description: |
+  Improve Athena adapter configuration validation with actionable error messages.
+
+  Current gaps:
+  - No validation for required S3 bucket/output location
+  - Generic errors when AWS credentials are missing
+  - No workgroup existence check before connection
+  - Unclear errors for permission issues
+
+  Goal: When configuration is incomplete, users get specific guidance
+  on what's missing and how to fix it.
+
+tasks:
+  - phase: "Validation Implementation"
+    done: true
+    items:
+      - summary: "Add S3 output location validation"
+        done: true
+      - summary: "Add AWS credentials presence check"
+        done: true
+      - summary: "Add workgroup format validation"
+        done: true
+      - summary: "Use ConfigurationError with actionable messages"
+        done: true
+  - phase: "Error Messages"
+    done: true
+    items:
+      - summary: "Create helpful message for missing AWS credentials"
+        done: true
+      - summary: "Create helpful message for invalid S3 path"
+        done: true
+      - summary: "Create helpful message for workgroup not found"
+        done: true
+  - phase: "Testing"
+    done: true
+    items:
+      - summary: "Add tests for configuration validation"
+        done: true
+      - summary: "Test error message content"
+        done: true
+
+completion_notes: |
+  Added comprehensive configuration validation to AthenaAdapter.__init__():
+
+  Validation Checks Added:
+  1. S3 Path Format Validation
+     - Validates s3_output_location and s3_staging_dir match s3://bucket/path format
+     - Provides regex pattern examples in error messages
+
+  2. S3 Configuration Required
+     - Validates that either s3_bucket or s3_staging_dir is configured
+     - Error shows multiple configuration options (CLI, environment)
+
+  3. AWS Credentials Validation
+     - Checks for explicit credentials (access_key_id + secret_access_key)
+     - Checks for aws_profile
+     - Checks for environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+     - Checks for ~/.aws/credentials file
+     - Checks for instance metadata (EC2/ECS IAM roles)
+     - Suggests all configuration options in error message
+
+  4. Workgroup Format Validation
+     - Validates workgroup matches AWS naming rules (letters, numbers, dashes, underscores)
+     - Provides examples of valid workgroup names
+
+  5. Region Format Validation
+     - Validates region matches AWS region format (xx-xxxx-N)
+     - Lists common regions in error message
+
+  Error messages use ConfigurationError with details dict containing:
+  - platform: "athena"
+  - region, workgroup, s3_bucket values
+  - validation_errors count
+
+  Added 10 new tests in TestAthenaAdapterConfigurationValidation class:
+  - test_validation_fails_without_s3_config
+  - test_validation_fails_with_invalid_s3_path
+  - test_validation_fails_with_invalid_region
+  - test_validation_fails_with_invalid_workgroup
+  - test_validation_passes_with_explicit_credentials
+  - test_validation_passes_with_aws_profile
+  - test_validation_passes_with_env_credentials
+  - test_validation_error_includes_details
+  - test_validation_provides_fix_suggestions
+
+  Updated 24 existing tests to use mock_aws_credentials fixture.
+  All 34 Athena adapter tests pass.
+
+metadata:
+  owners:
+    - "@benchbox-maintainers"
+  tags:
+    - athena
+    - validation
+    - error-messages
+    - user-experience
+  estimated_effort: 3-4 hours
+  created_date: "2025-12-13"
+
+impact:
+  business_value: |
+    Reduces support burden from configuration issues.
+    Athena is popular for serverless analytics.
+  user_impact: |
+    Clear guidance when setup is incomplete.
+    Faster time-to-working-benchmark.
+
+success_metrics:
+  - "All required config validated before connection attempt"
+  - "Error messages include specific fix instructions"
+  - "Tests verify error message quality"
+
+files_modified:
+  - benchbox/platforms/athena.py
+  - tests/unit/platforms/test_athena_adapter.py

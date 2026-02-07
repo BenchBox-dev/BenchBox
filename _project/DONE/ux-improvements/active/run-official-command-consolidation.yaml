@@ -1,0 +1,86 @@
+# Run Official Command Consolidation TODO
+# Converts run-official to a --official flag on the run command
+
+id: run-official-command-consolidation
+title: Consolidate run-official into run --official flag
+worktree: ux-improvements
+category: ux-improvements
+priority: Low
+status: "Completed"
+created: 2025-12-14
+completed: 2025-12-14
+estimated_effort: small
+
+description: |
+  The `benchbox run-official` command is a thin wrapper around `run` that
+  enforces TPC compliance constraints. It validates scale factors, requires
+  seeds for reproducibility, and validates throughput stream configuration.
+
+  This should be consolidated into `benchbox run --official` following the
+  same deprecation pattern used for compare-dataframes and compare-plans.
+
+motivation: |
+  - Follows established CLI consolidation pattern (compare-dataframes, compare-plans)
+  - Reduces CLI surface area and cognitive load
+  - Single entry point for all benchmark execution
+  - run-official is literally just validation + ctx.invoke(run, **run_args)
+  - Consistent with BenchBox UX design principles
+
+context:
+  related_files:
+    - benchbox/cli/commands/run_official.py
+    - benchbox/cli/commands/run.py
+  dependencies: []
+  preconditions: []
+
+  current_behavior: |
+    benchbox run-official tpch --platform snowflake --scale 100 --phases power --seed 42
+
+  proposed_behavior: |
+    benchbox run --official --platform snowflake --benchmark tpch --scale 100 --phases power --seed 42
+
+acceptance_criteria:
+  - --official flag added to run command
+  - TPC scale factor validation when --official is set
+  - Seed warning when --official without --seed
+  - Throughput streams validation when --official with throughput phase
+  - run-official marked as hidden+deprecated (still functional)
+  - Documentation updated with migration guide
+
+implementation_plan:
+  phase_1:
+    title: Add --official flag to run command
+    tasks:
+      - Add --official flag to run command options
+      - Import TPC_ALLOWED_SCALE_FACTORS constant
+      - Add validation logic when --official is set
+      - Show compliance banner when --official
+
+  phase_2:
+    title: Deprecate run-official command
+    tasks:
+      - Mark run-official as hidden=True, deprecated=True
+      - Add migration note to run-official docstring
+      - Keep command functional for backwards compatibility
+
+  phase_3:
+    title: Documentation and testing
+    tasks:
+      - Update CLI documentation
+      - Add tests for --official flag validation
+      - Add test for run-official deprecation
+
+out_of_scope:
+  - Multi-stream throughput implementation (separate TODO)
+  - Result validation implementation
+  - TPC submission report generation
+
+notes: |
+  This is a low-priority cleanup item that follows the established pattern
+  from compare command unification. The run-official command works fine as-is,
+  this is purely a UX consistency improvement.
+
+  Key validation when --official:
+  - Scale factor must be in {1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000}
+  - Seed should be provided (warning if missing)
+  - Streams required for throughput phase

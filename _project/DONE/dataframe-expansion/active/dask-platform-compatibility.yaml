@@ -1,0 +1,157 @@
+# Dask DataFrame Platform Compatibility Fix
+#
+# Location: _project/DONE/dataframe-expansion/active/dask-platform-compatibility.yaml
+
+# ============================================================================
+# REQUIRED FIELDS
+# ============================================================================
+
+title: "Fix Dask DataFrame Platform Compatibility"
+worktree: dataframe-expansion
+priority: High
+status: "Completed"
+description: |
+  Dask runs fail on all 22 TPC-H queries due to API incompatibilities between
+  Dask and Pandas. The root cause is that pandas_impl query functions call
+  .groupby(as_index=False) directly, which Dask doesn't support.
+
+  Errors by category:
+  - as_index=False not supported: Q1-Q5, Q10-Q13, Q15-Q18, Q20, Q22 (16 queries)
+  - .dt.year on DatetimeIndex: Q7, Q8, Q9 (3 queries)
+  - nunique aggregate: Q16, Q21 (2 queries)
+  - Lazy scalar conversion: Q6, Q14, Q19 (3 queries)
+
+  Solution: Created UnifiedPandasFrame wrapper (following Expression family pattern)
+  that intercepts DataFrame operations and routes to adapter for platform-specific
+  handling. Also made minor query adaptations to handle lazy scalar computations.
+
+# ============================================================================
+# COMMON OPTIONAL FIELDS
+# ============================================================================
+
+category: Platform Expansion
+
+tasks:
+  phases:
+    - phase: "Phase 1: Create UnifiedPandasFrame Wrapper"
+      done: true
+      items:
+        - summary: "Create unified_pandas_frame.py with UnifiedPandasFrame class"
+          done: true
+          subtasks:
+            - summary: "Implement __getattr__ proxy for transparent DataFrame access"
+              done: true
+            - summary: "Implement groupby() interception returning UnifiedPandasGroupBy"
+              done: true
+            - summary: "Implement merge(), copy(), sort_values(), head() with wrapper preservation"
+              done: true
+        - summary: "Create UnifiedPandasGroupBy class"
+          done: true
+          subtasks:
+            - summary: "Route agg() calls to adapter.groupby_agg()"
+              done: true
+            - summary: "Handle both dict and named aggregation formats"
+              done: true
+
+    - phase: "Phase 2: Update Pandas Family Context"
+      done: true
+      items:
+        - summary: "Override get_table() in PandasFamilyContext to return wrapped frames"
+          done: true
+        - summary: "Add groupby_agg() method to PandasFamilyAdapter base class"
+          done: true
+          subtasks:
+            - summary: "Default implementation uses as_index=False (Pandas/Modin/cuDF)"
+              done: true
+
+    - phase: "Phase 3: Dask-Specific Overrides"
+      done: true
+      items:
+        - summary: "Override groupby_agg() in DaskDataFrameAdapter"
+          done: true
+          subtasks:
+            - summary: "Use reset_index() instead of as_index=False"
+              done: true
+            - summary: "Handle nunique separately (not supported in Dask agg)"
+              done: true
+        - summary: "Add datetime accessor handling for Dask"
+          done: true
+          notes: "Fixed by removing unnecessary pd.to_datetime() calls in queries - .dt accessor works directly on pyarrow date types"
+        - summary: "Add lazy scalar compute helper"
+          done: true
+          notes: "Added hasattr(val, 'compute') checks in queries that return scalar results"
+
+    - phase: "Phase 4: Testing and Validation"
+      done: true
+      items:
+        - summary: "Run TPC-H benchmark on Dask (all 22 queries must pass)"
+          done: true
+        - summary: "Verify no regression on Pandas/Polars"
+          done: true
+        - summary: "Add unit tests for UnifiedPandasFrame wrapper"
+          done: false
+          notes: "Deferred - integration tests via benchmark run provide coverage"
+        - summary: "Verify results match across platforms"
+          done: true
+
+metadata:
+  tags:
+    - dask
+    - dataframe
+    - pandas-family
+    - tpc-h
+    - api-compatibility
+  estimated_effort: Medium
+  created_date: "2026-01-03"
+  completed_date: "2026-01-03"
+
+impact:
+  business_value: |
+    Enables Dask as a fully-functional DataFrame platform, allowing users to
+    run TPC-H benchmarks on distributed Dask clusters for out-of-core datasets.
+  user_impact: |
+    Users can benchmark Dask performance and compare against other Pandas-family
+    platforms (Pandas, Modin, cuDF) using identical query implementations.
+  technical_debt: |
+    Adds abstraction layer consistent with Expression family pattern, reducing
+    platform-specific code in query implementations.
+
+files_affected:
+  modified:
+    - benchbox/platforms/dataframe/pandas_family.py
+    - benchbox/platforms/dataframe/dask_df.py
+    - benchbox/platforms/dataframe/pandas_df.py
+    - benchbox/core/tpch/dataframe_queries.py
+  added:
+    - benchbox/platforms/dataframe/unified_pandas_frame.py
+
+context_sections:
+  "Architectural Pattern": |
+    The Expression family already uses this pattern successfully:
+    - ExpressionFamilyContext.get_table() returns UnifiedLazyFrame wrapper
+    - UnifiedGroupBy intercepts agg() calls and routes to platform-specific handling
+    - Queries are platform-agnostic, wrappers handle differences transparently
+
+    Applied identical pattern to Pandas family:
+    - PandasFamilyContext.get_table() returns UnifiedPandasFrame wrapper
+    - UnifiedPandasGroupBy intercepts agg() and routes to adapter.groupby_agg()
+    - Each adapter (Pandas, Dask, Modin, cuDF) implements groupby_agg() appropriately
+
+  "Dask API Differences": |
+    Key incompatibilities addressed:
+    1. as_index=False: Dask groupby() doesn't support it, used reset_index() instead
+    2. nunique: Not supported in Dask agg(), computed separately and merged
+    3. .dt.year on DatetimeIndex: Fixed by using pyarrow dtype_backend for parquet loading
+    4. Lazy scalars: Added .compute() checks in queries returning scalar results
+
+  "Query Changes Made": |
+    Despite initial goal of "zero query changes", minimal adaptations were needed:
+    - Removed unnecessary pd.to_datetime() calls in Q7, Q8, Q9 (fixes Dask, improves Pandas)
+    - Added hasattr(val, 'compute') checks for scalar results in Q6, Q11, Q14, Q17, Q19
+    - Changed .query("value > @threshold") to explicit comparison in Q11
+
+success_metrics:
+  - "All 22 TPC-H queries pass on Dask ✓"
+  - "Zero regressions on Pandas, Polars platforms ✓"
+  - "Query results match across platforms ✓"
+  - "Minimal query changes (pattern improvements, not Dask-specific code)"

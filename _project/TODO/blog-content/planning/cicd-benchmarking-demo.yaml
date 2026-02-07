@@ -1,0 +1,84 @@
+title: "[CI/CD Benchmarking] Add BenchBox regression detection demo"
+worktree: blog-content
+priority: Medium
+status: Not Started
+category: Blog Revision
+description: |
+  Add a practical BenchBox-based example to the CI/CD benchmarking post.
+
+  The post argues for continuous benchmarking to detect platform regressions
+  but doesn't demonstrate how to do it. Adding a concrete BenchBox workflow
+  example would strengthen the argument and showcase BenchBox capabilities.
+
+  The example should show:
+  1. Running a baseline benchmark
+  2. Running a comparison benchmark
+  3. Detecting and reporting differences
+
+  Reference draft: _blog/business-of-analytics/drafts/p3.4-cicd-benchmarking.md
+
+tasks:
+  phases:
+    - phase: "Phase 1: Create Demo Workflow"
+      done: false
+      items:
+        - summary: "Run baseline benchmark"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark tpch --scale 1 --output baseline"
+              done: false
+        - summary: "Run comparison benchmark"
+          done: false
+          subtasks:
+            - summary: "benchbox run --platform duckdb --benchmark tpch --scale 1 --output current"
+              done: false
+        - summary: "Generate comparison report"
+          done: false
+          subtasks:
+            - summary: "benchbox compare baseline current --threshold 10%"
+              done: false
+            - summary: "Capture output showing query-level differences"
+              done: false
+
+    - phase: "Phase 2: Update Draft"
+      done: false
+      items:
+        - summary: "Add 'Implementing Continuous Benchmarking' section"
+          done: false
+        - summary: "Include shell commands with expected output"
+          done: false
+        - summary: "Show example regression detection (even if simulated)"
+          done: false
+        - summary: "Link to BenchBox documentation for CI integration"
+          done: false
+
+metadata:
+  tags:
+    - cicd
+    - business-of-analytics
+    - regression-detection
+    - demo
+  estimated_effort: "20-30 minutes"
+  created_date: "2025-12-15"
+
+impact:
+  business_value: |
+    Transforms a theoretical argument into a practical how-to.
+    Demonstrates BenchBox as the solution to the problem the post describes.
+  user_impact: |
+    Readers get actionable steps to implement continuous benchmarking.
+    Connects problem (platform regressions) to solution (BenchBox).
+
+files_affected:
+  modified:
+    - "_blog/business-of-analytics/drafts/p3.4-cicd-benchmarking.md"
+
+success_metrics:
+  - "Demo workflow runs successfully"
+  - "Comparison output captured"
+  - "Draft updated with practical example"
+  - "Commands are copy-paste ready"
+
+open_questions:
+  - "Does benchbox compare command exist, or is this manual diff?"
+  - "Should we simulate a regression for dramatic effect?"

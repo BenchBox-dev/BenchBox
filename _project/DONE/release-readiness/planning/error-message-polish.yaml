@@ -1,0 +1,89 @@
+title: Error Message Polish
+worktree: release-readiness
+priority: High
+status: "Completed"
+category: User Experience
+description: |
+  Systematic review and improvement of error messages across all platform adapters
+  and CLI commands.
+
+  Recent work (Presto/Trino catalog handling) demonstrated the value of actionable
+  error messages that suggest next steps. This pattern should be applied consistently
+  across the codebase.
+
+  Focus areas:
+  - Connection failures (credentials, network, permissions)
+  - Missing dependencies (optional packages not installed)
+  - Invalid configuration (wrong parameter combinations)
+  - Data loading errors (file not found, format mismatch)
+
+tasks:
+  - phase: "Phase 1: Audit"
+    done: true
+    items:
+      - summary: "Catalog all error paths in platform adapters"
+        done: true
+      - summary: "Identify errors that lack actionable guidance"
+        done: true
+      - summary: "Document common user-reported error scenarios"
+        done: true
+  - phase: "Phase 2: Improvement"
+    done: true
+    items:
+      - summary: "Add 'did you mean?' suggestions for common typos"
+        done: false
+        notes: "Deferred - lower priority, can be added incrementally"
+      - summary: "Include fix commands in dependency errors"
+        done: true
+      - summary: "Add platform-specific troubleshooting hints"
+        done: true
+      - summary: "Improve connection error messages with checklist"
+        done: true
+  - phase: "Phase 3: Validation"
+    done: true
+    items:
+      - summary: "Test error messages with fresh user perspective"
+        done: true
+      - summary: "Ensure consistency in error format across platforms"
+        done: true
+
+completion_notes: |
+  Implemented ConfigurationError with actionable guidance for 7 cloud platforms:
+  - Databricks: server_hostname, http_path, access_token with env var alternatives
+  - BigQuery: project_id and credentials with setup instructions
+  - Snowflake: account, user, password, warehouse with env var mapping
+  - Redshift: host, user, password, database with endpoint format hints
+  - Firebolt: Core URL and Cloud credentials with Docker startup command
+  - Azure Synapse: SQL auth credentials with AAD alternative suggestion
+  - Fabric Warehouse: workspace GUID, database, service principal with portal links
+
+  All error messages now include:
+  - List of specific missing fields
+  - Environment variable alternatives
+  - CLI option syntax examples
+  - Platform-specific setup hints
+
+  "Did you mean?" suggestions deferred as lower priority enhancement.
+
+metadata:
+  owners:
+    - "@benchbox-maintainers"
+  tags:
+    - ux
+    - errors
+    - polish
+  estimated_effort: 2-3 days
+  created_date: "2025-12-12"
+
+impact:
+  business_value: |
+    Reduces support requests by enabling self-service troubleshooting.
+    Professional error handling signals product maturity.
+  user_impact: |
+    Users can resolve common issues independently without searching docs
+    or asking for help. Faster path to successful benchmark execution.
+
+success_metrics:
+  - "All connection errors include actionable next steps"
+  - "Missing dependency errors include install command"
+  - "Consistent error format: [ERROR] Context: Message. Suggestion."

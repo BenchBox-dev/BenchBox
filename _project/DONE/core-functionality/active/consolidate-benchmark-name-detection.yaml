@@ -1,0 +1,116 @@
+title: "Consolidate benchmark name detection to use normalize_benchmark_id()"
+worktree: core-functionality
+priority: Low
+status: "Completed"
+completed_date: "2026-01-27"
+category: Code Quality
+description: |
+  The codebase has ~15 locations that duplicate benchmark name variant detection
+  using `or` chains like `"tpch" in x or "tpc-h" in x`. These should use the
+  centralized `normalize_benchmark_id()` utility introduced in commit 8117828c.
+
+  This is a code hygiene issue, not a bug. The current code works correctly but:
+  1. Duplicates logic that could drift out of sync
+  2. Is harder to extend when adding new benchmarks
+  3. Inconsistent with the now-canonical normalize_benchmark_id() pattern
+
+  Note: Some locations already use the cleaner tuple-membership pattern
+  `benchmark.lower() in ("tpch", "tpc-h")` which is acceptable and performant.
+
+tasks:
+  phases:
+    - phase: "Phase 1: Update DataFrame/Runner paths"
+      done: true
+      items:
+        - summary: "platforms/dataframe/benchmark_mixin.py lines 488, 696, 698, 741, 757"
+          done: true
+        - summary: "core/runner/dataframe_runner.py lines 278, 483, 501"
+          done: true
+
+    - phase: "Phase 2: Update Platform Adapter"
+      done: true
+      items:
+        - summary: "platforms/base/adapter.py lines 1347, 1349, 1359, 1363, 1367, 1371, 1373, 1381"
+          done: true
+
+    - phase: "Phase 3: Update Dry Run"
+      done: true
+      items:
+        - summary: "core/dryrun.py lines 348, 364, 409, 418"
+          done: true
+
+metadata:
+  tags:
+    - code-quality
+    - refactoring
+    - dry-principle
+    - benchmark-detection
+  estimated_effort: Small
+  created_date: "2026-01-27"
+
+context_sections:
+  "Background": |
+    Commit 8117828c introduced `normalize_benchmark_id()` in
+    `benchbox/core/results/builder.py` to fix inconsistent benchmark IDs
+    between SQL and DataFrame execution paths.
+
+    The function handles all TPC benchmark variants:
+    - TPC-H: "tpch", "tpc-h", "tpc_h", "TPC-H Benchmark"
+    - TPC-DS: "tpcds", "tpc-ds", "tpc_ds", "TPC-DS Benchmark"
+    - SSB: "ssb"
+    - ClickBench: "clickbench"
+
+  "Patterns to Refactor": |
+    **Current (duplicate logic):**
+    ```python
+    if "tpch" in benchmark_name or "tpc-h" in benchmark_name:
+        # handle TPC-H
+    elif "tpcds" in benchmark_name or "tpc-ds" in benchmark_name:
+        # handle TPC-DS
+    ```
+
+    **Target (centralized):**
+    ```python
+    benchmark_id = normalize_benchmark_id(benchmark_name)
+    if benchmark_id == "tpch":
+        # handle TPC-H
+    elif benchmark_id == "tpcds":
+        # handle TPC-DS
+    ```
+
+  "Already Good (no change needed)": |
+    These locations already use clean patterns:
+    - `core/validation/query_validation.py:78,88` - tuple membership
+    - `utils/input_validation.py:234,239` - tuple membership
+
+impact:
+  technical_debt: |
+    Low severity - code works correctly but has duplicated logic.
+    Risk of drift if new benchmark variants are added.
+
+  user_impact: |
+    None - internal refactoring only.
+
+files_affected:
+  modified:
+    - benchbox/platforms/dataframe/benchmark_mixin.py
+    - benchbox/platforms/base/adapter.py
+    - benchbox/core/runner/dataframe_runner.py
+    - benchbox/core/dryrun.py
+
+success_metrics:
+  - "All benchmark name detection uses normalize_benchmark_id() or tuple membership"
+  - "No substring `or` chains for benchmark variant detection"
+  - "All tests pass"
+
+completion_summary: |
+  All 15 locations with duplicate benchmark name detection or-chains have been
+  refactored to use the centralized normalize_benchmark_id() utility.
+
+  Files modified:
+  - benchbox/platforms/dataframe/benchmark_mixin.py (4 locations)
+  - benchbox/core/runner/dataframe_runner.py (3 locations)
+  - benchbox/platforms/base/adapter.py (8 locations in _get_benchmark_type)
+  - benchbox/core/dryrun.py (4 locations)
+
+  All 523 relevant tests pass.
