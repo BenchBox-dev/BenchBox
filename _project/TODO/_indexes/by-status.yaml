@@ -1,8 +1,8 @@
-generated_at: '2026-02-08T15:40:44.920370'
-total_items: 45
+generated_at: '2026-02-07T18:29:14.394768'
+total_items: 44
 statuses:
   In Progress:
-    count: 3
+    count: 2
     items:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
@@ -14,11 +14,6 @@ statuses:
       title: MotherDuck Platform Adapter
       priority: High
       category: Platform Expansion
-    - id: coverage-per-module-50-temporary-split
-      file: TODO/main/active/coverage-per-module-50-temporary-split.yaml
-      title: Raise benchbox/ per-module coverage to >=50% with temporary split
-      priority: High
-      category: Testing and Quality Assurance
   Not Started:
     count: 42
     items:
@@ -32,6 +27,11 @@ statuses:
       title: Add CedarDB Platform Adapter
       priority: Medium
       category: Platform Expansion
+    - id: fireducks-dataframe-adapter
+      file: TODO/dataframe-expansion/planning/fireducks-dataframe-adapter.yaml
+      title: Add FireDucks DataFrame platform support
+      priority: Medium-High
+      category: Platform Enhancement
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
@@ -45,7 +45,7 @@ statuses:
     - id: fabric-spark-notebooks-platform
       file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
       title: Add Microsoft Fabric Spark Notebooks platform support
-      priority: Medium
+      priority: Medium-High
       category: Platform Expansion
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
@@ -60,7 +60,7 @@ statuses:
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
-      priority: Low
+      priority: Medium
       category: Platform Expansion
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
@@ -72,6 +72,11 @@ statuses:
       title: ClickHouse Cloud Deployment Mode
       priority: Medium
       category: Platform Expansion
+    - id: consolidate-file-format-detection
+      file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
+      title: Consolidate file format detection to handle compressed and sharded files
+      priority: Medium
+      category: Code Quality
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
@@ -87,11 +92,6 @@ statuses:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       priority: Medium
       category: Documentation
-    - id: coverage-ci-enforcement
-      file: TODO/main/planning/coverage-ci-enforcement.yaml
-      title: Enforce per-module 50% coverage floor in CI
-      priority: Medium
-      category: Testing and Quality Assurance
     - id: firebolt-cloud-deployment
       file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode
@@ -107,51 +107,41 @@ statuses:
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       priority: Medium
       category: Benchmark Development
-    - id: future-ideas-backlog
-      file: TODO/main/planning/future-ideas-backlog.yaml
-      title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
+    - id: geospatial-benchmark-support-postgis-integration
+      file: TODO/specialized-geospatial/planning/geospatial-benchmark-support-postgis-integration.yaml
+      title: Geospatial Benchmark Support - PostGIS Integration
       priority: Low
-      category: Supporting Infrastructure
+      category: Specialized Benchmarks
     - id: geospatial-primitives-benchmark
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
       title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
-      priority: Low
+      priority: Medium
       category: Benchmark Development
     - id: github-archive-benchmark
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
-      priority: Low
+      priority: Medium
       category: Benchmark Development
+    - id: graph-query-benchmark-support-neo4j-neptune
+      file: TODO/specialized-graph/planning/graph-query-benchmark-support-neo4j-neptune.yaml
+      title: Graph Query Benchmark Support - Neo4j, Neptune
+      priority: Low
+      category: Specialized Benchmarks
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
-      priority: Medium-High
+      priority: Medium
       category: Core Functionality
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       category: Core Functionality
-    - id: coverage-cli-modules
-      file: TODO/main/planning/coverage-cli-modules.yaml
-      title: Improve test coverage for CLI modules to ≥50%
-      priority: Medium-High
-      category: Testing and Quality Assurance
-    - id: coverage-core-benchmarks
-      file: TODO/main/planning/coverage-core-benchmarks.yaml
-      title: Improve test coverage for core benchmark modules to ≥50%
-      priority: High
-      category: Testing and Quality Assurance
-    - id: coverage-core-tpcdi
-      file: TODO/main/planning/coverage-core-tpcdi.yaml
-      title: Improve test coverage for core/tpcdi module to ≥50%
-      priority: Medium-High
-      category: Testing and Quality Assurance
-    - id: coverage-platforms
-      file: TODO/main/planning/coverage-platforms.yaml
-      title: Improve test coverage for platform adapter modules to ≥50%
-      priority: Medium
-      category: Testing and Quality Assurance
+    - id: interactive-benchmark-explorer-web-ui
+      file: TODO/infrastructure-explorer/planning/interactive-benchmark-explorer-web-ui.yaml
+      title: Interactive Benchmark Explorer - Web UI
+      priority: Low
+      category: Supporting Infrastructure
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -160,7 +150,7 @@ statuses:
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
-      priority: Medium-High
+      priority: Medium
       category: Testing and Quality Assurance
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
@@ -172,6 +162,11 @@ statuses:
       title: Starburst Platform Adapter
       priority: Medium
       category: Platform Expansion
+    - id: streaming-benchmark-support-kafka-flink-spark-streaming
+      file: TODO/specialized-streaming/planning/streaming-benchmark-support-kafka-flink-spark-streaming.yaml
+      title: Streaming Benchmark Support - Kafka, Flink, Spark Streaming
+      priority: Low
+      category: Specialized Benchmarks
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -190,7 +185,7 @@ statuses:
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
-      priority: Low
+      priority: Medium
       category: Benchmark Development
     - id: arm-graviton-generations-benchmarks
       file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
