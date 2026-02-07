@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:15:44.308520'
-total_items: 423
+generated_at: '2026-02-07T13:28:24.056928'
+total_items: 424
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 277
+    count: 278
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1395,6 +1395,11 @@ statuses:
       title: Improve interactive file selection in compare command
       priority: Medium-High
       category: Core Functionality
+    - id: coverage-core-utilities
+      file: DONE/main/active/coverage-core-utilities.yaml
+      title: Improve test coverage for core utility and standalone modules to ≥50%
+      priority: Medium-High
+      category: Testing and Quality Assurance
     - id: include-tpc-metrics-in-result-outputs
       file: DONE/main/active/include-tpc-metrics-in-result-outputs.yaml
       title: Include TPC Metrics (Power@Size, Throughput@Size, QphH/QphDS@Size) in All Result Outputs

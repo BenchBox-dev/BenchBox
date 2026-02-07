@@ -1,4 +1,4 @@
-generated_at: '2026-02-07T13:15:44.308313'
+generated_at: '2026-02-07T13:28:24.056735'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -2025,7 +2025,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 20
+    count: 21
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2092,6 +2092,11 @@ categories:
       file: DONE/dataframe-validation/completed/implement-dataframe-result-validation-framework.yaml
       title: Implement DataFrame Result Validation Framework
       priority: High
+      status: Completed
+    - id: coverage-core-utilities
+      file: DONE/main/active/coverage-core-utilities.yaml
+      title: Improve test coverage for core utility and standalone modules to ≥50%
+      priority: Medium-High
       status: Completed
     - id: integration-test-suite-cleanup-remove-placeholder-and-failing-tests
       file: DONE/unknown/planning/integration-test-suite-cleanup-remove-placeholder-and-failing-tests.yaml

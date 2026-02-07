@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:15:44.308423'
-total_items: 423
+generated_at: '2026-02-07T13:28:24.056839'
+total_items: 424
 priorities:
   Critical:
     count: 27
@@ -859,7 +859,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 36
+    count: 37
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -981,6 +981,11 @@ priorities:
       file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
       title: Improve interactive file selection in compare command
       category: Core Functionality
+      status: Completed
+    - id: coverage-core-utilities
+      file: DONE/main/active/coverage-core-utilities.yaml
+      title: Improve test coverage for core utility and standalone modules to ≥50%
+      category: Testing and Quality Assurance
       status: Completed
     - id: integrate-write-primitives-dataframe-mode
       file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml

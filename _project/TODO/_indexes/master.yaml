@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:15:43.348215'
-total_items: 45
+generated_at: '2026-02-07T13:28:23.071214'
+total_items: 44
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -590,19 +590,6 @@ items:
   - coverage
   - cli
   estimated_effort: Medium
-- id: coverage-core-utilities
-  file: TODO/main/active/coverage-core-utilities.yaml
-  title: Improve test coverage for core utility and standalone modules to ≥50%
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - testing
-  - coverage
-  - utilities
-  - quick-wins
-  estimated_effort: Small
 - id: coverage-core-tpcdi
   file: TODO/main/planning/coverage-core-tpcdi.yaml
   title: Improve test coverage for core/tpcdi module to ≥50%

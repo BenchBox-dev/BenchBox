@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:15:44.308114'
-total_items: 423
+generated_at: '2026-02-07T13:28:24.056555'
+total_items: 424
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4395,6 +4395,20 @@ items:
   - interactive
   estimated_effort: 1-2 days
   completed_date: '2025-12-15'
+- id: coverage-core-utilities
+  file: DONE/main/active/coverage-core-utilities.yaml
+  title: Improve test coverage for core utility and standalone modules to ≥50%
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium-High
+  status: Completed
+  tags:
+  - testing
+  - coverage
+  - utilities
+  - quick-wins
+  estimated_effort: Small
+  completed_date: '2026-02-07'
 - id: integrate-write-primitives-dataframe-mode
   file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml
   title: Integrate Write Primitives DataFrame Mode with Runner and Registry

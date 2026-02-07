@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:15:43.348268'
-total_items: 45
+generated_at: '2026-02-07T13:28:23.071269'
+total_items: 44
 priorities:
   Critical:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Platform Expansion
       status: In Progress
   Medium-High:
-    count: 9
+    count: 8
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -55,11 +55,6 @@ priorities:
       title: Improve test coverage for CLI modules to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
-    - id: coverage-core-utilities
-      file: TODO/main/active/coverage-core-utilities.yaml
-      title: Improve test coverage for core utility and standalone modules to ≥50%
-      category: Testing and Quality Assurance
-      status: In Progress
     - id: coverage-core-tpcdi
       file: TODO/main/planning/coverage-core-tpcdi.yaml
       title: Improve test coverage for core/tpcdi module to ≥50%

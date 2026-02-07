@@ -1,7 +1,8 @@
 title: "Improve test coverage for core utility and standalone modules to ≥50%"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-02-07"
 category: Testing and Quality Assurance
 description: |
   Several standalone core modules and utility files have zero or low test
@@ -47,18 +48,18 @@ tasks:
           done: true
 
     - phase: "Phase 2: Low-coverage utilities and MCP"
-      done: false
+      done: true
       items:
-        - summary: "Add tests for core/dryrun.py (49.3% → 50%)"
-          done: false
-        - summary: "Add tests for utils/cloud_storage.py (37.5% → 50%)"
-          done: false
-        - summary: "Add tests for utils/config_helpers.py (37.8% → 50%)"
-          done: false
-        - summary: "Add tests for mcp/resources/registry.py (27.0% → 50%)"
-          done: false
-        - summary: "Add tests for mcp/prompts/registry.py (40.4% → 50%)"
-          done: false
+        - summary: "Add tests for core/dryrun.py (40% → 53%)"
+          done: true
+        - summary: "Add tests for utils/cloud_storage.py (71% — already above target)"
+          done: true
+        - summary: "Add tests for utils/config_helpers.py (34% → 98%)"
+          done: true
+        - summary: "Add tests for mcp/resources/registry.py (0% → 89%)"
+          done: true
+        - summary: "Add tests for mcp/prompts/registry.py (0% → 100%)"
+          done: true
 
 metadata:
   tags:
@@ -68,7 +69,7 @@ metadata:
     - quick-wins
   estimated_effort: Small
   created_date: "2026-02-07"
-  last_updated: "2026-02-07T09:00:00"
+  last_updated: "2026-02-07T13:30:00"
 
 impact:
   business_value: |
@@ -112,6 +113,8 @@ files_affected:
     - "tests/unit/test_release_sync.py"
     - "tests/unit/test_lazy_loader.py"
     - "tests/unit/mcp/test_mcp_registries.py"
+    - "tests/unit/core/test_dryrun.py"
+    - "tests/unit/utils/test_config_helpers.py"
 
 scope_limit:
   only_modify:
