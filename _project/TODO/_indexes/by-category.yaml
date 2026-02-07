@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T18:51:51.734382'
+generated_at: '2026-02-06T19:00:58.698000'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -122,10 +122,10 @@ categories:
       priority: Low
       status: Not Started
     - id: ascii-chart-polish-and-ux-refinements
-      file: TODO/core-functionality/planning/ascii-chart-polish-and-ux-refinements.yaml
+      file: TODO/core-functionality/active/ascii-chart-polish-and-ux-refinements.yaml
       title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
       priority: Medium-High
-      status: Not Started
+      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

@@ -1,16 +1,21 @@
-generated_at: '2026-02-06T18:51:51.734407'
+generated_at: '2026-02-06T19:00:58.698028'
 total_items: 45
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
       priority: High
       category: Platform Expansion
+    - id: ascii-chart-polish-and-ux-refinements
+      file: TODO/core-functionality/active/ascii-chart-polish-and-ux-refinements.yaml
+      title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
+      priority: Medium-High
+      category: Core Functionality
   Not Started:
-    count: 44
+    count: 43
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -147,11 +152,6 @@ statuses:
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       priority: Medium
       category: Benchmark Development
-    - id: ascii-chart-polish-and-ux-refinements
-      file: TODO/core-functionality/planning/ascii-chart-polish-and-ux-refinements.yaml
-      title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
-      priority: Medium-High
-      category: Core Functionality
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
