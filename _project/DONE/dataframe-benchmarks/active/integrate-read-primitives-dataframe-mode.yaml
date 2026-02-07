@@ -1,7 +1,8 @@
 title: "Integrate Read Primitives DataFrame Mode and Metadata"
 worktree: dataframe-benchmarks
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-02-07"
 description: |
   Integrate existing Read Primitives DataFrame query support with benchmark
   registry metadata, runner execution, and user-visible reporting.
@@ -21,17 +22,17 @@ tasks:
         - summary: "Ensure CLI discovery reflects DataFrame availability"
           done: true
     - phase: "Phase 2: Execution and Reporting"
-      done: false
+      done: true
       items:
         - summary: "Wire skip-list aware DataFrame execution paths"
-          done: false
+          done: true
         - summary: "Report executed/skipped primitive counts by category"
-          done: false
+          done: true
     - phase: "Phase 3: Validation"
-      done: false
+      done: true
       items:
         - summary: "Add integration tests for DataFrame read primitives mode"
-          done: false
+          done: true
 
 metadata:
   owners:
@@ -45,10 +46,16 @@ metadata:
   last_updated: "2026-02-07T00:00:00"
 
 sections:
-  "Progress Update": |
-    Metadata and discoverability alignment is implemented: benchmark registry
-    now marks Read Primitives as DataFrame-capable and metadata validation
-    tests cover this path.
+  "Implementation Summary": |
+    Completed Read Primitives DataFrame integration across execution and
+    reporting paths.
 
-    Execution/reporting follow-through remains in progress for explicit
-    executed/skipped primitive category summaries under DataFrame mode.
+    Delivered:
+    - DataFrame runner now supports `QueryRegistry` return values from
+      benchmark query providers.
+    - Added skip-list aware execution filtering via
+      `get_dataframe_skip_queries()` integration.
+    - Added skip metadata results plus `DF_SKIP_SUMMARY` with executed/skipped
+      category counts.
+    - Added integration test coverage for registry + skip-summary behavior in
+      benchmark mixin tests.

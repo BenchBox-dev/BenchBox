@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:07:26.353279'
-total_categories: 9
+generated_at: '2026-02-07T13:15:43.348252'
+total_categories: 8
 categories:
   AI/ML Capabilities:
     count: 1
@@ -85,16 +85,8 @@ categories:
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
       status: Not Started
-  Code Quality:
-    count: 1
-    items:
-    - id: consolidate-file-format-detection
-      file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
-      title: Consolidate file format detection to handle compressed and sharded files
-      priority: Medium-High
-      status: Not Started
   Core Functionality:
-    count: 7
+    count: 5
     items:
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -111,21 +103,11 @@ categories:
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       priority: High
       status: In Progress
-    - id: implement-tpcds-obt-dataframe-queries
-      file: TODO/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
-      title: Implement TPC-DS-OBT DataFrame Query Families
-      priority: Medium-High
-      status: In Progress
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
-    - id: integrate-read-primitives-dataframe-mode
-      file: TODO/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
-      title: Integrate Read Primitives DataFrame Mode and Metadata
-      priority: Medium
-      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -249,7 +231,7 @@ categories:
       priority: High
       status: Not Started
     - id: coverage-core-utilities
-      file: TODO/main/planning/coverage-core-utilities.yaml
+      file: TODO/main/active/coverage-core-utilities.yaml
       title: Improve test coverage for core utility and standalone modules to ≥50%
       priority: Medium-High
       status: In Progress

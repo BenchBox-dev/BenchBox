@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:07:26.353295'
-total_items: 48
+generated_at: '2026-02-07T13:15:43.348268'
+total_items: 45
 priorities:
   Critical:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Platform Expansion
       status: In Progress
   Medium-High:
-    count: 11
+    count: 9
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -45,28 +45,18 @@ priorities:
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
       status: Not Started
-    - id: consolidate-file-format-detection
-      file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
-      title: Consolidate file format detection to handle compressed and sharded files
-      category: Code Quality
-      status: Not Started
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
       category: Core Functionality
       status: Not Started
-    - id: implement-tpcds-obt-dataframe-queries
-      file: TODO/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
-      title: Implement TPC-DS-OBT DataFrame Query Families
-      category: Core Functionality
-      status: In Progress
     - id: coverage-cli-modules
       file: TODO/main/planning/coverage-cli-modules.yaml
       title: Improve test coverage for CLI modules to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
     - id: coverage-core-utilities
-      file: TODO/main/planning/coverage-core-utilities.yaml
+      file: TODO/main/active/coverage-core-utilities.yaml
       title: Improve test coverage for core utility and standalone modules to ≥50%
       category: Testing and Quality Assurance
       status: In Progress
@@ -91,7 +81,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 25
+    count: 24
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -153,11 +143,6 @@ priorities:
       title: Improve test coverage for platform adapter modules to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
-    - id: integrate-read-primitives-dataframe-mode
-      file: TODO/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
-      title: Integrate Read Primitives DataFrame Mode and Metadata
-      category: Core Functionality
-      status: In Progress
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

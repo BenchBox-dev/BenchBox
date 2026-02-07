@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:07:27.446768'
-total_items: 420
+generated_at: '2026-02-07T13:15:44.308423'
+total_items: 423
 priorities:
   Critical:
     count: 27
@@ -859,7 +859,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 34
+    count: 36
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -937,6 +937,11 @@ priorities:
       title: Cloud Spark Dependency Groups in pyproject.toml
       category: Core Functionality
       status: Completed
+    - id: consolidate-file-format-detection
+      file: DONE/core-functionality/consolidate-file-format-detection.yaml
+      title: Consolidate file format detection to handle compressed and sharded files
+      category: Code Quality
+      status: Completed
     - id: dataframe-write-primitives-model
       file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
       title: Define DataFrame Execution Model for Write Primitives
@@ -965,6 +970,11 @@ priorities:
     - id: physical-tuning-ddl-generation
       file: DONE/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
       title: Implement Physical Tuning DDL Generation Across All Platforms
+      category: Core Functionality
+      status: Completed
+    - id: implement-tpcds-obt-dataframe-queries
+      file: DONE/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
+      title: Implement TPC-DS-OBT DataFrame Query Families
       category: Core Functionality
       status: Completed
     - id: compare-interactive-file-selection
@@ -1033,7 +1043,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 201
+    count: 202
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1559,6 +1569,11 @@ priorities:
       file: DONE/security-hardening/active/input-validation-and-sql-safety.yaml
       title: Input Validation and SQL Safety
       category: Security and Reliability
+      status: Completed
+    - id: integrate-read-primitives-dataframe-mode
+      file: DONE/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
+      title: Integrate Read Primitives DataFrame Mode and Metadata
+      category: Core Functionality
       status: Completed
     - id: logging-standardization
       file: DONE/observability-quality/active/logging-standardization.yaml

@@ -1,36 +1,26 @@
-generated_at: '2026-02-07T13:07:26.353306'
-total_items: 48
+generated_at: '2026-02-07T13:15:43.348280'
+total_items: 45
 statuses:
   In Progress:
-    count: 5
+    count: 3
     items:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       priority: High
       category: Core Functionality
-    - id: implement-tpcds-obt-dataframe-queries
-      file: TODO/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
-      title: Implement TPC-DS-OBT DataFrame Query Families
-      priority: Medium-High
-      category: Core Functionality
     - id: coverage-core-utilities
-      file: TODO/main/planning/coverage-core-utilities.yaml
+      file: TODO/main/active/coverage-core-utilities.yaml
       title: Improve test coverage for core utility and standalone modules to ≥50%
       priority: Medium-High
       category: Testing and Quality Assurance
-    - id: integrate-read-primitives-dataframe-mode
-      file: TODO/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
-      title: Integrate Read Primitives DataFrame Mode and Metadata
-      priority: Medium
-      category: Core Functionality
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 43
+    count: 42
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -82,11 +72,6 @@ statuses:
       title: ClickHouse Cloud Deployment Mode
       priority: Medium
       category: Platform Expansion
-    - id: consolidate-file-format-detection
-      file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
-      title: Consolidate file format detection to handle compressed and sharded files
-      priority: Medium-High
-      category: Code Quality
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration

@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:07:27.446867'
-total_items: 420
+generated_at: '2026-02-07T13:15:44.308520'
+total_items: 423
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 274
+    count: 277
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1054,6 +1054,11 @@ statuses:
       title: Consolidate benchmark name detection to use normalize_benchmark_id()
       priority: Low
       category: Code Quality
+    - id: consolidate-file-format-detection
+      file: DONE/core-functionality/consolidate-file-format-detection.yaml
+      title: Consolidate file format detection to handle compressed and sharded files
+      priority: Medium-High
+      category: Code Quality
     - id: run-official-command-consolidation
       file: DONE/ux-improvements/active/run-official-command-consolidation.yaml
       title: Consolidate run-official into run --official flag
@@ -1370,6 +1375,11 @@ statuses:
       title: Implement TPC-DI DataFrame Pipeline Execution
       priority: High
       category: Core Functionality
+    - id: implement-tpcds-obt-dataframe-queries
+      file: DONE/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
+      title: Implement TPC-DS-OBT DataFrame Query Families
+      priority: Medium-High
+      category: Core Functionality
     - id: implement-tpc-h-queries-for-expression-family
       file: DONE/dataframe-tpch-expression/completed/implement-tpc-h-queries-for-expression-family.yaml
       title: Implement TPC-H Queries for Expression Family
@@ -1399,6 +1409,11 @@ statuses:
       file: DONE/dataframe-cli/completed/integrate-dataframe-mode-into-cli.yaml
       title: Integrate DataFrame Mode into CLI
       priority: High
+      category: Core Functionality
+    - id: integrate-read-primitives-dataframe-mode
+      file: DONE/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
+      title: Integrate Read Primitives DataFrame Mode and Metadata
+      priority: Medium
       category: Core Functionality
     - id: integrate-stdout-datagen
       file: DONE/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml

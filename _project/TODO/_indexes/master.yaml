@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:07:26.353245'
-total_items: 48
+generated_at: '2026-02-07T13:15:43.348215'
+total_items: 45
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -363,20 +363,6 @@ items:
   - coverage
   - platforms
   estimated_effort: Medium
-- id: integrate-read-primitives-dataframe-mode
-  file: TODO/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
-  title: Integrate Read Primitives DataFrame Mode and Metadata
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium
-  status: In Progress
-  tags:
-  - dataframe
-  - read-primitives
-  - integration
-  owners:
-  - joe
-  estimated_effort: Medium
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -578,20 +564,6 @@ items:
   - platform
   - mysql-protocol
   estimated_effort: Medium
-- id: consolidate-file-format-detection
-  file: TODO/core-functionality/planning/consolidate-file-format-detection.yaml
-  title: Consolidate file format detection to handle compressed and sharded files
-  worktree: core-functionality
-  category: Code Quality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - code-quality
-  - refactoring
-  - dry-principle
-  - file-format
-  - compression
-  estimated_effort: Small
 - id: ctas-sorted-data-loading
   file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
   title: Implement CTAS-based sorted data loading for DuckDB
@@ -606,20 +578,6 @@ items:
   - zone-maps
   - data-loading
   estimated_effort: Medium
-- id: implement-tpcds-obt-dataframe-queries
-  file: TODO/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
-  title: Implement TPC-DS-OBT DataFrame Query Families
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - dataframe
-  - tpcds-obt
-  - implementation
-  owners:
-  - joe
-  estimated_effort: Large
 - id: coverage-cli-modules
   file: TODO/main/planning/coverage-cli-modules.yaml
   title: Improve test coverage for CLI modules to ≥50%
@@ -633,7 +591,7 @@ items:
   - cli
   estimated_effort: Medium
 - id: coverage-core-utilities
-  file: TODO/main/planning/coverage-core-utilities.yaml
+  file: TODO/main/active/coverage-core-utilities.yaml
   title: Improve test coverage for core utility and standalone modules to ≥50%
   worktree: main
   category: Testing and Quality Assurance

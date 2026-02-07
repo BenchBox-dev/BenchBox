@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:07:27.446458'
-total_items: 420
+generated_at: '2026-02-07T13:15:44.308114'
+total_items: 423
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3200,6 +3200,21 @@ items:
   category: Security and Reliability
   priority: Medium
   status: Completed
+- id: integrate-read-primitives-dataframe-mode
+  file: DONE/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
+  title: Integrate Read Primitives DataFrame Mode and Metadata
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - dataframe
+  - read-primitives
+  - integration
+  owners:
+  - joe
+  estimated_effort: Medium
+  completed_date: '2026-02-07'
 - id: logging-standardization
   file: DONE/observability-quality/active/logging-standardization.yaml
   title: Logging Standardization
@@ -4250,6 +4265,21 @@ items:
   - pyproject
   - documentation
   estimated_effort: Small
+- id: consolidate-file-format-detection
+  file: DONE/core-functionality/consolidate-file-format-detection.yaml
+  title: Consolidate file format detection to handle compressed and sharded files
+  worktree: core-functionality
+  category: Code Quality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - code-quality
+  - refactoring
+  - dry-principle
+  - file-format
+  - compression
+  estimated_effort: Small
+  completed_date: '2026-02-07'
 - id: dataframe-write-primitives-model
   file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
   title: Define DataFrame Execution Model for Write Primitives
@@ -4336,6 +4366,21 @@ items:
   - joe
   estimated_effort: Large
   completed_date: '2026-01-04'
+- id: implement-tpcds-obt-dataframe-queries
+  file: DONE/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
+  title: Implement TPC-DS-OBT DataFrame Query Families
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - dataframe
+  - tpcds-obt
+  - implementation
+  owners:
+  - joe
+  estimated_effort: Large
+  completed_date: '2026-02-07'
 - id: compare-interactive-file-selection
   file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
   title: Improve interactive file selection in compare command
