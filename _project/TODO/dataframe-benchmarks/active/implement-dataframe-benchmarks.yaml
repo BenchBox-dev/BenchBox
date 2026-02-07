@@ -475,7 +475,7 @@ metadata:
     - datafusion
   estimated_effort: "Large (4-6 weeks total)"
   created_date: "2026-01-19"
-  last_updated: "2026-02-06T12:00:00"
+  last_updated: "2026-02-07T00:00:00"
 
 impact:
   business_value: |
@@ -536,6 +536,12 @@ dependencies:
     - "_project/TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml"
   related:
     - "_project/DONE/core-functionality/active/dataframe-parameter-substitution-parity.yaml"
+    - "_project/TODO/dataframe-benchmarks/planning/dataframe-tpcdi-architecture.yaml"
+    - "_project/TODO/dataframe-benchmarks/planning/dataframe-write-primitives-model.yaml"
+    - "_project/TODO/dataframe-benchmarks/planning/dataframe-tpcds-obt-adaptation.yaml"
+    - "_project/TODO/dataframe-benchmarks/planning/dataframe-tpchavoc-feasibility.yaml"
+    - "_project/TODO/dataframe-benchmarks/planning/dataframe-joinorder-feasibility.yaml"
+    - "_project/TODO/dataframe-benchmarks/planning/dataframe-read-primitives-architecture.yaml"
 
 technical_requirements:
   constraints:

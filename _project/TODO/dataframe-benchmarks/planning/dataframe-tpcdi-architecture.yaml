@@ -1,0 +1,60 @@
+title: "Design DataFrame Architecture for TPC-DI ETL Workload"
+worktree: dataframe-benchmarks
+priority: High
+status: Identified
+description: |
+  Define a dedicated architecture for TPC-DI DataFrame support.
+
+  TPC-DI includes mutation-heavy ETL semantics (SCD Type 2, incremental loads,
+  stateful transforms) that do not fit the current read-oriented DataFrameQuery/
+  DataFrameContext pattern used for analytical query benchmarks.
+
+  This item designs a fit-for-purpose model before implementation.
+
+category: Core Functionality
+
+tasks:
+  phases:
+    - phase: "Phase 1: Gap Analysis"
+      done: false
+      items:
+        - summary: "Map TPC-DI operations to required DataFrame abstractions"
+          done: false
+        - summary: "Identify missing interfaces for stateful and write workflows"
+          done: false
+    - phase: "Phase 2: Architecture Proposal"
+      done: false
+      items:
+        - summary: "Propose execution model for ETL mutation pipelines"
+          done: false
+        - summary: "Define adapter-layer responsibilities and boundaries"
+          done: false
+        - summary: "Define correctness and validation strategy"
+          done: false
+    - phase: "Phase 3: Implementation Plan"
+      done: false
+      items:
+        - summary: "Create phased implementation TODO with milestones"
+          done: false
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - dataframe
+    - tpcdi
+    - architecture
+    - etl
+  estimated_effort: Medium
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T00:00:00"
+
+impact:
+  business_value: |
+    Enables correct long-term support for TPC-DI instead of forcing a poor fit.
+  user_impact: |
+    Prevents partially-correct ETL benchmark behavior.
+
+success_metrics:
+  - "Architecture proposal accepted with clear interface boundaries"
+  - "Follow-on implementation TODO created"

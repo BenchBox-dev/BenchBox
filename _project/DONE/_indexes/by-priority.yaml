@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T09:50:42.411187'
-total_items: 410
+generated_at: '2026-02-07T10:36:52.346134'
+total_items: 412
 priorities:
   Critical:
     count: 27
@@ -1008,7 +1008,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 196
+    count: 198
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1330,6 +1330,11 @@ priorities:
       title: DataFrame Performance Optimization and Analysis
       category: Performance and Efficiency
       status: Completed
+    - id: dataframe-platform-examples
+      file: DONE/docs-experience/planning/dataframe-platform-examples.yaml
+      title: DataFrame Platform Example Scripts
+      category: Documentation and User Experience
+      status: Completed
     - id: datafusion-dataframe-adapter
       file: DONE/dataframe-expansion/planning/datafusion-dataframe-adapter.yaml
       title: DataFusion DataFrame Adapter Implementation
@@ -1429,6 +1434,11 @@ priorities:
       file: DONE/observability-quality/completed/finalize-monitoring-module-scope.yaml
       title: Finalize Monitoring Module Scope
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+      status: Completed
+    - id: firebolt-mode-validation
+      file: DONE/platform-expansion/planning/firebolt-mode-validation.yaml
+      title: Firebolt Core/Cloud Mode Validation
+      category: Platform Polish
       status: Completed
     - id: fix-cli-benchmarks-module-critical-issues
       file: DONE/unknown/planning/fix-cli-benchmarks-module-critical-issues.yaml

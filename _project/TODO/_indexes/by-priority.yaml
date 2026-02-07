@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T09:50:41.501468'
-total_items: 46
+generated_at: '2026-02-07T10:36:51.399855'
+total_items: 52
 priorities:
   Critical:
     count: 1
@@ -10,13 +10,18 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 4
+    count: 5
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
       status: Not Started
+    - id: dataframe-tpcdi-architecture
+      file: TODO/dataframe-benchmarks/planning/dataframe-tpcdi-architecture.yaml
+      title: Design DataFrame Architecture for TPC-DI ETL Workload
+      category: Core Functionality
+      status: Identified
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -33,7 +38,7 @@ priorities:
       category: Platform Expansion
       status: In Progress
   Medium-High:
-    count: 7
+    count: 9
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -50,6 +55,11 @@ priorities:
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
       status: Not Started
+    - id: dataframe-write-primitives-model
+      file: TODO/dataframe-benchmarks/planning/dataframe-write-primitives-model.yaml
+      title: Define DataFrame Execution Model for Write Primitives
+      category: Core Functionality
+      status: Identified
     - id: coverage-cli-modules
       file: TODO/main/planning/coverage-cli-modules.yaml
       title: Improve test coverage for CLI modules to ≥50%
@@ -60,6 +70,11 @@ priorities:
       title: Improve test coverage for core/tpcdi module to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
+    - id: dataframe-tpcds-obt-adaptation
+      file: TODO/dataframe-benchmarks/planning/dataframe-tpcds-obt-adaptation.yaml
+      title: Plan DataFrame Adaptation for TPC-DS-OBT
+      category: Core Functionality
+      status: Identified
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -71,7 +86,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 31
+    count: 34
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -98,6 +113,11 @@ priorities:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
       status: Not Started
+    - id: dataframe-read-primitives-architecture
+      file: TODO/dataframe-benchmarks/planning/dataframe-read-primitives-architecture.yaml
+      title: Assess DataFrame Architecture for Read Primitives Integration
+      category: Core Functionality
+      status: Identified
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
@@ -123,6 +143,16 @@ priorities:
       title: Enforce per-module 50% coverage floor in CI
       category: Testing and Quality Assurance
       status: Not Started
+    - id: dataframe-joinorder-feasibility
+      file: TODO/dataframe-benchmarks/planning/dataframe-joinorder-feasibility.yaml
+      title: Evaluate DataFrame Relevance for JoinOrder Benchmark
+      category: Core Functionality
+      status: Identified
+    - id: dataframe-tpchavoc-feasibility
+      file: TODO/dataframe-benchmarks/planning/dataframe-tpchavoc-feasibility.yaml
+      title: Evaluate DataFrame Scope for TPC-Havoc
+      category: Core Functionality
+      status: Identified
     - id: firebolt-cloud-deployment
       file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode

@@ -1,0 +1,55 @@
+title: "Plan DataFrame Adaptation for TPC-DS-OBT"
+worktree: dataframe-benchmarks
+priority: Medium-High
+status: Identified
+description: |
+  Plan DataFrame support for TPC-DS-OBT with explicit OBT-specific adaptation.
+
+  TPC-DS-OBT query set and schema differ materially from normalized TPC-DS.
+  Existing TPC-DS DataFrame implementations are not directly reusable without
+  denormalized-schema-specific rewriting.
+
+category: Core Functionality
+
+tasks:
+  phases:
+    - phase: "Phase 1: Query Inventory"
+      done: false
+      items:
+        - summary: "Confirm authoritative OBT query count and categories"
+          done: false
+        - summary: "Group queries by reusable transformation patterns"
+          done: false
+    - phase: "Phase 2: Adaptation Design"
+      done: false
+      items:
+        - summary: "Define single-table implementation patterns for both families"
+          done: false
+        - summary: "Define parameter and validation strategy against SQL results"
+          done: false
+    - phase: "Phase 3: Delivery Plan"
+      done: false
+      items:
+        - summary: "Create phased implementation TODO with realistic batch sizes"
+          done: false
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - dataframe
+    - tpcds-obt
+    - planning
+  estimated_effort: Medium
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T00:00:00"
+
+impact:
+  business_value: |
+    Avoids under-scoped implementation estimates and late rework.
+  user_impact: |
+    Improves confidence in OBT correctness and comparability.
+
+success_metrics:
+  - "Approved adaptation plan with scoped query batches"
+  - "Follow-on implementation TODO created"

@@ -1,4 +1,4 @@
-generated_at: '2026-02-07T09:50:41.501448'
+generated_at: '2026-02-07T10:36:51.399836'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -94,8 +94,33 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 5
+    count: 11
     items:
+    - id: dataframe-read-primitives-architecture
+      file: TODO/dataframe-benchmarks/planning/dataframe-read-primitives-architecture.yaml
+      title: Assess DataFrame Architecture for Read Primitives Integration
+      priority: Medium
+      status: Identified
+    - id: dataframe-write-primitives-model
+      file: TODO/dataframe-benchmarks/planning/dataframe-write-primitives-model.yaml
+      title: Define DataFrame Execution Model for Write Primitives
+      priority: Medium-High
+      status: Identified
+    - id: dataframe-tpcdi-architecture
+      file: TODO/dataframe-benchmarks/planning/dataframe-tpcdi-architecture.yaml
+      title: Design DataFrame Architecture for TPC-DI ETL Workload
+      priority: High
+      status: Identified
+    - id: dataframe-joinorder-feasibility
+      file: TODO/dataframe-benchmarks/planning/dataframe-joinorder-feasibility.yaml
+      title: Evaluate DataFrame Relevance for JoinOrder Benchmark
+      priority: Medium
+      status: Identified
+    - id: dataframe-tpchavoc-feasibility
+      file: TODO/dataframe-benchmarks/planning/dataframe-tpchavoc-feasibility.yaml
+      title: Evaluate DataFrame Scope for TPC-Havoc
+      priority: Medium
+      status: Identified
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
       title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
@@ -116,6 +141,11 @@ categories:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
+    - id: dataframe-tpcds-obt-adaptation
+      file: TODO/dataframe-benchmarks/planning/dataframe-tpcds-obt-adaptation.yaml
+      title: Plan DataFrame Adaptation for TPC-DS-OBT
+      priority: Medium-High
+      status: Identified
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

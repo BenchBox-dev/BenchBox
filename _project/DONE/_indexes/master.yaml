@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T09:50:42.410930'
-total_items: 410
+generated_at: '2026-02-07T10:36:52.345862'
+total_items: 412
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2757,6 +2757,22 @@ items:
   - optimization
   owners:
   - '@benchbox-maintainers'
+- id: dataframe-platform-examples
+  file: DONE/docs-experience/planning/dataframe-platform-examples.yaml
+  title: DataFrame Platform Example Scripts
+  worktree: docs-experience
+  category: Documentation and User Experience
+  priority: Medium
+  status: Completed
+  tags:
+  - examples
+  - dataframe
+  - polars
+  - cudf
+  - gpu
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 hours
 - id: datafusion-dataframe-adapter
   file: DONE/dataframe-expansion/planning/datafusion-dataframe-adapter.yaml
   title: DataFusion DataFrame Adapter Implementation
@@ -2932,6 +2948,21 @@ items:
   category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   priority: Medium
   status: Completed
+- id: firebolt-mode-validation
+  file: DONE/platform-expansion/planning/firebolt-mode-validation.yaml
+  title: Firebolt Core/Cloud Mode Validation
+  worktree: platform-expansion
+  category: Platform Polish
+  priority: Medium
+  status: Completed
+  tags:
+  - firebolt
+  - validation
+  - error-messages
+  - user-experience
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 3-4 hours (already implemented)
 - id: fix-cli-benchmarks-module-critical-issues
   file: DONE/unknown/planning/fix-cli-benchmarks-module-critical-issues.yaml
   title: Fix CLI Benchmarks Module Critical Issues

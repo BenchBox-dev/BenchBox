@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T09:50:41.501413'
-total_items: 46
+generated_at: '2026-02-07T10:36:51.399789'
+total_items: 52
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -38,6 +38,21 @@ items:
   - platform
   - open-source
   estimated_effort: Large
+- id: dataframe-tpcdi-architecture
+  file: TODO/dataframe-benchmarks/planning/dataframe-tpcdi-architecture.yaml
+  title: Design DataFrame Architecture for TPC-DI ETL Workload
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: High
+  status: Identified
+  tags:
+  - dataframe
+  - tpcdi
+  - architecture
+  - etl
+  owners:
+  - joe
+  estimated_effort: Medium
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -197,6 +212,20 @@ items:
   - high-performance
   - siriusdb
   estimated_effort: Medium
+- id: dataframe-read-primitives-architecture
+  file: TODO/dataframe-benchmarks/planning/dataframe-read-primitives-architecture.yaml
+  title: Assess DataFrame Architecture for Read Primitives Integration
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium
+  status: Identified
+  tags:
+  - dataframe
+  - read-primitives
+  - planning
+  owners:
+  - joe
+  estimated_effort: Medium
 - id: clickhouse-cloud-deployment
   file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
   title: ClickHouse Cloud Deployment Mode
@@ -264,6 +293,34 @@ items:
   - coverage
   - ci
   - enforcement
+  estimated_effort: Small
+- id: dataframe-joinorder-feasibility
+  file: TODO/dataframe-benchmarks/planning/dataframe-joinorder-feasibility.yaml
+  title: Evaluate DataFrame Relevance for JoinOrder Benchmark
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium
+  status: Identified
+  tags:
+  - dataframe
+  - joinorder
+  - feasibility
+  owners:
+  - joe
+  estimated_effort: Small
+- id: dataframe-tpchavoc-feasibility
+  file: TODO/dataframe-benchmarks/planning/dataframe-tpchavoc-feasibility.yaml
+  title: Evaluate DataFrame Scope for TPC-Havoc
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium
+  status: Identified
+  tags:
+  - dataframe
+  - tpchavoc
+  - feasibility
+  owners:
+  - joe
   estimated_effort: Small
 - id: firebolt-cloud-deployment
   file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
@@ -619,6 +676,20 @@ items:
   - platform
   - mysql-protocol
   estimated_effort: Medium
+- id: dataframe-write-primitives-model
+  file: TODO/dataframe-benchmarks/planning/dataframe-write-primitives-model.yaml
+  title: Define DataFrame Execution Model for Write Primitives
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium-High
+  status: Identified
+  tags:
+  - dataframe
+  - write-primitives
+  - architecture
+  owners:
+  - joe
+  estimated_effort: Medium
 - id: coverage-cli-modules
   file: TODO/main/planning/coverage-cli-modules.yaml
   title: Improve test coverage for CLI modules to ≥50%
@@ -642,6 +713,20 @@ items:
   - testing
   - coverage
   - tpcdi
+  estimated_effort: Medium
+- id: dataframe-tpcds-obt-adaptation
+  file: TODO/dataframe-benchmarks/planning/dataframe-tpcds-obt-adaptation.yaml
+  title: Plan DataFrame Adaptation for TPC-DS-OBT
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium-High
+  status: Identified
+  tags:
+  - dataframe
+  - tpcds-obt
+  - planning
+  owners:
+  - joe
   estimated_effort: Medium
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml

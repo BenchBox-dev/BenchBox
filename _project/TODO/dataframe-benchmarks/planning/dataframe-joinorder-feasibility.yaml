@@ -1,0 +1,50 @@
+title: "Evaluate DataFrame Relevance for JoinOrder Benchmark"
+worktree: dataframe-benchmarks
+priority: Medium
+status: Identified
+description: |
+  Evaluate whether JoinOrder should be implemented for DataFrame platforms.
+
+  JoinOrder primarily measures SQL optimizer join-order decisions. DataFrame
+  workloads typically specify join order directly, so benchmark intent may not
+  transfer meaningfully.
+
+category: Core Functionality
+
+tasks:
+  phases:
+    - phase: "Phase 1: Intent Mapping"
+      done: false
+      items:
+        - summary: "Map JoinOrder query goals to DataFrame execution semantics"
+          done: false
+        - summary: "Identify any subset with valid DataFrame signal"
+          done: false
+    - phase: "Phase 2: Recommendation"
+      done: false
+      items:
+        - summary: "Publish go/no-go recommendation"
+          done: false
+        - summary: "If go: define strict subset and validation approach"
+          done: false
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - dataframe
+    - joinorder
+    - feasibility
+  estimated_effort: Small
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T00:00:00"
+
+impact:
+  business_value: |
+    Keeps DataFrame expansion aligned with benchmark intent.
+  user_impact: |
+    Reduces confusion from low-signal benchmark results.
+
+success_metrics:
+  - "Documented recommendation and rationale"
+  - "No broad implementation without approved subset"

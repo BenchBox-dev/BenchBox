@@ -1,4 +1,4 @@
-generated_at: '2026-02-07T09:50:42.411091'
+generated_at: '2026-02-07T10:36:52.346035'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -1030,7 +1030,7 @@ categories:
       priority: Medium
       status: Completed
   Documentation and User Experience:
-    count: 11
+    count: 12
     items:
     - id: azure-fabric-platform-documentation
       file: DONE/docs-experience/planning/azure-fabric-platform-documentation.yaml
@@ -1046,6 +1046,11 @@ categories:
       file: DONE/docs-experience/planning/cli-help-examples-missing-platforms.yaml
       title: CLI Help Examples for Missing Platforms
       priority: High
+      status: Completed
+    - id: dataframe-platform-examples
+      file: DONE/docs-experience/planning/dataframe-platform-examples.yaml
+      title: DataFrame Platform Example Scripts
+      priority: Medium
       status: Completed
     - id: cloud-platform-example-scripts
       file: DONE/docs-experience/planning/cloud-platform-example-scripts.yaml
@@ -1494,7 +1499,7 @@ categories:
       priority: High
       status: Completed
   Platform Polish:
-    count: 2
+    count: 3
     items:
     - id: athena-configuration-validation
       file: DONE/platform-expansion/planning/athena-configuration-validation.yaml
@@ -1504,6 +1509,11 @@ categories:
     - id: cloud-platform-error-context
       file: DONE/observability-quality/planning/cloud-platform-error-context.yaml
       title: Cloud Platform Error Message Context
+      priority: Medium
+      status: Completed
+    - id: firebolt-mode-validation
+      file: DONE/platform-expansion/planning/firebolt-mode-validation.yaml
+      title: Firebolt Core/Cloud Mode Validation
       priority: Medium
       status: Completed
   Platform Support and Deployment:

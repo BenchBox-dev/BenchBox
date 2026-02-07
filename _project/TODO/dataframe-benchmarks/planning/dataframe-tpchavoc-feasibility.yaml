@@ -1,0 +1,55 @@
+title: "Evaluate DataFrame Scope for TPC-Havoc"
+worktree: dataframe-benchmarks
+priority: Medium
+status: Identified
+description: |
+  Evaluate whether any subset of TPC-Havoc is meaningful for DataFrame benchmarking.
+
+  TPC-Havoc variants primarily test SQL optimizer behavior (query rewrites,
+  predicate pushdown, planner choices). DataFrame execution bypasses SQL parsing
+  and optimizer layers, so direct translation likely provides low benchmark value.
+
+  This item captures a formal feasibility decision and, if justified, a narrowly
+  scoped DataFrame subset.
+
+category: Core Functionality
+
+tasks:
+  phases:
+    - phase: "Phase 1: Feasibility Assessment"
+      done: false
+      items:
+        - summary: "Classify TPC-Havoc variants by benchmark intent"
+          done: false
+        - summary: "Identify variants that measure logical semantics vs optimizer behavior"
+          done: false
+        - summary: "Define explicit go/no-go decision criteria for DataFrame support"
+          done: false
+    - phase: "Phase 2: Recommendation"
+      done: false
+      items:
+        - summary: "Publish recommendation with rationale and scope boundaries"
+          done: false
+        - summary: "If go: create implementation TODO for selected subset only"
+          done: false
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - dataframe
+    - tpchavoc
+    - feasibility
+  estimated_effort: Small
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T00:00:00"
+
+impact:
+  business_value: |
+    Avoids spending significant effort on low-value DataFrame translations.
+  user_impact: |
+    Keeps benchmark suite focused on meaningful SQL-vs-DataFrame comparisons.
+
+success_metrics:
+  - "Documented go/no-go decision with technical rationale"
+  - "No broad implementation starts without explicit approved scope"

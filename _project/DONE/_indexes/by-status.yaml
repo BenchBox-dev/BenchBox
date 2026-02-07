@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T09:50:42.411271'
-total_items: 410
+generated_at: '2026-02-07T10:36:52.346220'
+total_items: 412
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 264
+    count: 266
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1104,6 +1104,11 @@ statuses:
       title: DataFrame Performance Optimization and Analysis
       priority: Medium
       category: Performance and Efficiency
+    - id: dataframe-platform-examples
+      file: DONE/docs-experience/planning/dataframe-platform-examples.yaml
+      title: DataFrame Platform Example Scripts
+      priority: Medium
+      category: Documentation and User Experience
     - id: dataframe-support-release-preparation
       file: DONE/dataframe-release/completed/dataframe-support-release-preparation.yaml
       title: DataFrame Support Release Preparation
@@ -1195,6 +1200,11 @@ statuses:
       title: Finalize Monitoring Module Scope
       priority: Medium
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: firebolt-mode-validation
+      file: DONE/platform-expansion/planning/firebolt-mode-validation.yaml
+      title: Firebolt Core/Cloud Mode Validation
+      priority: Medium
+      category: Platform Polish
     - id: firebolt-platform-documentation
       file: DONE/docs-experience/planning/firebolt-platform-documentation.yaml
       title: Firebolt Platform Documentation

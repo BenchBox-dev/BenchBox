@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T09:50:41.501481'
-total_items: 46
+generated_at: '2026-02-07T10:36:51.399868'
+total_items: 52
 statuses:
   In Progress:
     count: 2
@@ -237,3 +237,36 @@ statuses:
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
       category: Blog Revision
+  Identified:
+    count: 6
+    items:
+    - id: dataframe-read-primitives-architecture
+      file: TODO/dataframe-benchmarks/planning/dataframe-read-primitives-architecture.yaml
+      title: Assess DataFrame Architecture for Read Primitives Integration
+      priority: Medium
+      category: Core Functionality
+    - id: dataframe-write-primitives-model
+      file: TODO/dataframe-benchmarks/planning/dataframe-write-primitives-model.yaml
+      title: Define DataFrame Execution Model for Write Primitives
+      priority: Medium-High
+      category: Core Functionality
+    - id: dataframe-tpcdi-architecture
+      file: TODO/dataframe-benchmarks/planning/dataframe-tpcdi-architecture.yaml
+      title: Design DataFrame Architecture for TPC-DI ETL Workload
+      priority: High
+      category: Core Functionality
+    - id: dataframe-joinorder-feasibility
+      file: TODO/dataframe-benchmarks/planning/dataframe-joinorder-feasibility.yaml
+      title: Evaluate DataFrame Relevance for JoinOrder Benchmark
+      priority: Medium
+      category: Core Functionality
+    - id: dataframe-tpchavoc-feasibility
+      file: TODO/dataframe-benchmarks/planning/dataframe-tpchavoc-feasibility.yaml
+      title: Evaluate DataFrame Scope for TPC-Havoc
+      priority: Medium
+      category: Core Functionality
+    - id: dataframe-tpcds-obt-adaptation
+      file: TODO/dataframe-benchmarks/planning/dataframe-tpcds-obt-adaptation.yaml
+      title: Plan DataFrame Adaptation for TPC-DS-OBT
+      priority: Medium-High
+      category: Core Functionality
