@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:28:24.056555'
-total_items: 424
+generated_at: '2026-02-07T15:08:22.267862'
+total_items: 425
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -301,6 +301,22 @@ items:
   category: Marketing Content Enablement
   priority: Critical
   status: Completed
+- id: unify-tpcdi-sql-dataframe-execution-contract
+  file: DONE/dataframe-benchmarks/active/unify-tpcdi-sql-dataframe-execution-contract.yaml
+  title: Unify TPC-DI SQL/DataFrame Execution Contract and ETL Path
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Critical
+  status: Completed
+  tags:
+  - tpcdi
+  - dataframe
+  - sql-parity
+  - execution-contract
+  owners:
+  - joe
+  estimated_effort: Large
+  completed_date: '2026-02-07'
 - id: visualization-framework-chart-generation-results-display
   file: DONE/content-enablement-viz/planning/visualization-framework-chart-generation-results-display.yaml
   title: Visualization Framework - Chart Generation & Results Display

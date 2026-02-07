@@ -1,4 +1,4 @@
-generated_at: '2026-02-07T13:28:24.056735'
+generated_at: '2026-02-07T15:08:22.268021'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -353,7 +353,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 108
+    count: 109
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -885,6 +885,11 @@ categories:
       file: DONE/core-functionality/planning/unified-adapter-interface.yaml
       title: Unify SQL and DataFrame Adapter Execution Interfaces
       priority: Medium-High
+      status: Completed
+    - id: unify-tpcdi-sql-dataframe-execution-contract
+      file: DONE/dataframe-benchmarks/active/unify-tpcdi-sql-dataframe-execution-contract.yaml
+      title: Unify TPC-DI SQL/DataFrame Execution Contract and ETL Path
+      priority: Critical
       status: Completed
     - id: add-platform-info-to-benchmark-results
       file: DONE/unknown/planning/add-platform-info-to-benchmark-results.yaml

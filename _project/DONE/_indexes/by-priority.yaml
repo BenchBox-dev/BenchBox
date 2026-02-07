@@ -1,8 +1,8 @@
-generated_at: '2026-02-07T13:28:24.056839'
-total_items: 424
+generated_at: '2026-02-07T15:08:22.268121'
+total_items: 425
 priorities:
   Critical:
-    count: 27
+    count: 28
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -108,6 +108,11 @@ priorities:
       file: DONE/content-enablement-ranking/completed/ranking-aggregation-system-platform-leaderboards-trends.yaml
       title: Ranking & Aggregation System - Platform Leaderboards & Trends
       category: Marketing Content Enablement
+      status: Completed
+    - id: unify-tpcdi-sql-dataframe-execution-contract
+      file: DONE/dataframe-benchmarks/active/unify-tpcdi-sql-dataframe-execution-contract.yaml
+      title: Unify TPC-DI SQL/DataFrame Execution Contract and ETL Path
+      category: Core Functionality
       status: Completed
     - id: visualization-framework-chart-generation-results-display
       file: DONE/content-enablement-viz/planning/visualization-framework-chart-generation-results-display.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:28:24.056928'
-total_items: 424
+generated_at: '2026-02-07T15:08:22.268209'
+total_items: 425
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 278
+    count: 279
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1804,6 +1804,11 @@ statuses:
       file: DONE/core-functionality/planning/unified-adapter-interface.yaml
       title: Unify SQL and DataFrame Adapter Execution Interfaces
       priority: Medium-High
+      category: Core Functionality
+    - id: unify-tpcdi-sql-dataframe-execution-contract
+      file: DONE/dataframe-benchmarks/active/unify-tpcdi-sql-dataframe-execution-contract.yaml
+      title: Unify TPC-DI SQL/DataFrame Execution Contract and ETL Path
+      priority: Critical
       category: Core Functionality
     - id: visualization-framework-chart-generation-results-display
       file: DONE/content-enablement-viz/planning/visualization-framework-chart-generation-results-display.yaml
