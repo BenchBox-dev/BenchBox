@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T19:22:37.328189'
-total_items: 409
+generated_at: '2026-02-06T20:39:17.230676'
+total_items: 410
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -991,6 +991,22 @@ items:
   - bug-fix
   estimated_effort: 1-2 days
   completed_date: '2025-12-26'
+- id: fix-tpch-reference-seed-and-parameter-parity
+  file: DONE/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
+  title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tpch
+  - correctness
+  - seed
+  - validation
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+  completed_date: '2026-02-06'
 - id: gcp-dataproc-platform
   file: DONE/platform-expansion/planning/gcp-dataproc-platform.yaml
   title: GCP Dataproc Managed Spark Platform

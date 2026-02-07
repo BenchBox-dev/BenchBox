@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T19:22:37.328454'
-total_items: 409
+generated_at: '2026-02-06T20:39:17.230942'
+total_items: 410
 priorities:
   Critical:
     count: 27
@@ -140,7 +140,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 138
+    count: 139
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -371,6 +371,11 @@ priorities:
     - id: pyspark-unified-expr-methods
       file: DONE/dataframe-expansion/active/pyspark-unified-expr-methods.yaml
       title: Fix PySpark DataFrame query failures - missing UnifiedExpr methods
+      category: Core Functionality
+      status: Completed
+    - id: fix-tpch-reference-seed-and-parameter-parity
+      file: DONE/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
+      title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
       category: Core Functionality
       status: Completed
     - id: gcp-dataproc-platform

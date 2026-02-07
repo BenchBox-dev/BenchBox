@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T19:22:36.353771'
-total_items: 44
+generated_at: '2026-02-06T20:39:16.300820'
+total_items: 43
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 43
+    count: 42
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -91,11 +91,6 @@ statuses:
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
       title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
       priority: Critical
-      category: Core Functionality
-    - id: fix-tpch-reference-seed-and-parameter-parity
-      file: TODO/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
-      title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
-      priority: High
       category: Core Functionality
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml

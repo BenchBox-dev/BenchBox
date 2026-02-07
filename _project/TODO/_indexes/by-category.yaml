@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T19:22:36.353744'
+generated_at: '2026-02-06T20:39:16.300795'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -94,17 +94,12 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 6
+    count: 5
     items:
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
       title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
       priority: Critical
-      status: Not Started
-    - id: fix-tpch-reference-seed-and-parameter-parity
-      file: TODO/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
-      title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
-      priority: High
       status: Not Started
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml

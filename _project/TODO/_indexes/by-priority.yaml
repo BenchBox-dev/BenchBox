@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T19:22:36.353760'
-total_items: 44
+generated_at: '2026-02-06T20:39:16.300809'
+total_items: 43
 priorities:
   Critical:
     count: 1
@@ -10,17 +10,12 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 4
+    count: 3
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
-      status: Not Started
-    - id: fix-tpch-reference-seed-and-parameter-parity
-      file: TODO/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
-      title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
-      category: Core Functionality
       status: Not Started
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml

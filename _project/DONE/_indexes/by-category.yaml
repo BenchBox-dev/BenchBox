@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T19:22:37.328357'
+generated_at: '2026-02-06T20:39:17.230844'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 97
+    count: 98
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -571,6 +571,11 @@ categories:
       title: Fix TPC-DS Test Mode CLI Dry Run Output to Show Actual Execution Plans ✅
       priority: Medium
       status: Not Started
+    - id: fix-tpch-reference-seed-and-parameter-parity
+      file: DONE/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
+      title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
+      priority: High
+      status: Completed
     - id: fix-result-filename-redundancy
       file: DONE/core-functionality/completed/fix-result-filename-redundancy.yaml
       title: Fix inconsistent result filename generation - remove redundant elements

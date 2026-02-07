@@ -1,7 +1,8 @@
 title: "Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity"
 worktree: "core-functionality"
 priority: "High"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-02-06"
 description: |
   The TPC-H reference seed constant has an incorrect octal-to-decimal mapping,
   and a recent seed default change (dbf159bd) broke SQL/DataFrame benchmark
@@ -34,45 +35,45 @@ category: "Core Functionality"
 tasks:
   phases:
     - phase: "Phase 1: Determine correct reference seed"
-      done: false
+      done: true
       items:
         - summary: "Verify which seed the SF=1 answer files were generated with by running qgen with candidate seeds and comparing output row counts against answer files"
-          done: false
+          done: true
         - summary: "Fix TPCH_SF1_REFERENCE_SEED so the octal literal, decimal comment, and answer files all agree"
-          done: false
+          done: true
         - summary: "Document the reference seed provenance in a code comment (which TPC-H spec version, how it was determined)"
-          done: false
+          done: true
 
     - phase: "Phase 2: Restore seed default behavior"
-      done: false
+      done: true
       items:
         - summary: "Decide policy: should no-seed default to reference_seed (exact validation) or seed=1 (DF parameter parity)? Document the decision."
-          done: false
+          done: true
           subtasks:
             - summary: "Option A: Keep reference_seed auto-select, update TPCH_PARAMS in dataframe_queries.py to match reference seed parameters"
               done: false
             - summary: "Option B: Restore seed=1 default, only use reference_seed when --validation=exact is explicitly requested"
               done: false
         - summary: "Implement chosen option and ensure both SQL and DF modes produce matching row counts for all 22 queries at SF=1"
-          done: false
+          done: true
 
     - phase: "Phase 3: Parameterize DataFrame queries"
-      done: false
+      done: true
       items:
         - summary: "Make TPCH_PARAMS in dataframe_queries.py derivable from seed rather than hardcoded, or at minimum validate that hardcoded values match the default seed"
-          done: false
+          done: true
         - summary: "Add a startup assertion or test that compares TPCH_PARAMS values against qgen output for the default seed"
-          done: false
+          done: true
 
     - phase: "Phase 4: Testing and validation"
-      done: false
+      done: true
       items:
         - summary: "Run both modes at SF=1 and confirm geometric mean ratio is within 1.0-1.5x (not 3.3x)"
-          done: false
+          done: true
         - summary: "Confirm all 22 queries pass validation in both modes with 0 row-count mismatches"
-          done: false
+          done: true
         - summary: "Add unit test asserting TPCH_SF1_REFERENCE_SEED decimal comment matches actual value"
-          done: false
+          done: true
 
 metadata:
   owners:
@@ -157,6 +158,7 @@ scope_limit:
 
 commits:
   - "dbf159bd"
+  - "44d280c0"
 
 context_sections:
   "Root Cause Analysis": |
@@ -170,13 +172,13 @@ context_sections:
     commit and may have been introduced when the constant was first created.
     Python's 0o prefix for octal literals is easy to misread as decimal.
 
-  "Affected Benchmark Runs": |
-    tpch_sf1_datafusion_sql_20260206_141231_c20da81e.json (SQL, seed=17039360)
-    tpch_sf1_datafusion_df_20260206_141251_1d7dbb77.json (DF, hardcoded params)
-
-    SQL run shows 4 validation failures (Q11, Q16, Q18, Q20) and 3.3x slower
-    geometric mean vs DF. Before dbf159bd, these modes produced near-identical
-    performance.
+  "Resolution": |
+    Fixed the reference seed comment to match the actual octal value (17039360).
+    Changed seed default behavior to use qgen -d flag (defaults mode) when
+    seed=None, which produces the official TPC-H default substitution parameters
+    matching the answer files. Updated DataFrame TPCH_PARAMS to match qgen -d
+    output. Both SQL and DF modes now produce identical row counts for all 22
+    TPC-H queries at SF=1.
 
 success_metrics:
   - "SQL and DF modes at SF=1 produce identical row counts for all 22 TPC-H queries"

@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T19:22:37.328542'
-total_items: 409
+generated_at: '2026-02-06T20:39:17.231037'
+total_items: 410
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 211
+    count: 212
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1095,6 +1095,11 @@ statuses:
       title: Fix SQL injection vulnerabilities in TimescaleDB adapter
       priority: Critical
       category: Security and Compliance
+    - id: fix-tpch-reference-seed-and-parameter-parity
+      file: DONE/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
+      title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
+      priority: High
+      category: Core Functionality
     - id: fix-ci-critical-issues
       file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml
       title: Fix critical CI issues for green builds
