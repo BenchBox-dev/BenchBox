@@ -1,4 +1,4 @@
-generated_at: '2026-02-07T13:04:31.917683'
+generated_at: '2026-02-07T13:07:27.446654'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 105
+    count: 106
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -660,6 +660,11 @@ categories:
       file: DONE/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
       title: Implement Physical Tuning DDL Generation Across All Platforms
       priority: Medium-High
+      status: Completed
+    - id: implement-tpcdi-dataframe-pipeline
+      file: DONE/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
+      title: Implement TPC-DI DataFrame Pipeline Execution
+      priority: High
       status: Completed
     - id: implement-tpc-ds-queries-for-both-families
       file: DONE/dataframe-tpcds/planning/implement-tpc-ds-queries-for-both-families.yaml

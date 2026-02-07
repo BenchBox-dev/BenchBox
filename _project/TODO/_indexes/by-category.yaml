@@ -1,4 +1,4 @@
-generated_at: '2026-02-07T13:04:31.004167'
+generated_at: '2026-02-07T13:07:26.353279'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -94,7 +94,7 @@ categories:
       priority: Medium-High
       status: Not Started
   Core Functionality:
-    count: 8
+    count: 7
     items:
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -109,11 +109,6 @@ categories:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
-      priority: High
-      status: In Progress
-    - id: implement-tpcdi-dataframe-pipeline
-      file: TODO/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
-      title: Implement TPC-DI DataFrame Pipeline Execution
       priority: High
       status: In Progress
     - id: implement-tpcds-obt-dataframe-queries
@@ -257,7 +252,7 @@ categories:
       file: TODO/main/planning/coverage-core-utilities.yaml
       title: Improve test coverage for core utility and standalone modules to ≥50%
       priority: Medium-High
-      status: Not Started
+      status: In Progress
     - id: coverage-core-tpcdi
       file: TODO/main/planning/coverage-core-tpcdi.yaml
       title: Improve test coverage for core/tpcdi module to ≥50%

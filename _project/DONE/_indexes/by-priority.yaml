@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:04:31.917781'
-total_items: 419
+generated_at: '2026-02-07T13:07:27.446768'
+total_items: 420
 priorities:
   Critical:
     count: 27
@@ -140,7 +140,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 142
+    count: 143
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -433,6 +433,11 @@ priorities:
       title: Implement PySparkSQLAdapter core functionality
       category: Platform Expansion
       status: Not Started
+    - id: implement-tpcdi-dataframe-pipeline
+      file: DONE/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
+      title: Implement TPC-DI DataFrame Pipeline Execution
+      category: Core Functionality
+      status: Completed
     - id: implement-tpc-ds-queries-for-both-families
       file: DONE/dataframe-tpcds/planning/implement-tpc-ds-queries-for-both-families.yaml
       title: Implement TPC-DS Queries for Both Families

@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:04:31.004183'
-total_items: 49
+generated_at: '2026-02-07T13:07:26.353295'
+total_items: 48
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 5
+    count: 4
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -20,11 +20,6 @@ priorities:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
-      category: Core Functionality
-      status: In Progress
-    - id: implement-tpcdi-dataframe-pipeline
-      file: TODO/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
-      title: Implement TPC-DI DataFrame Pipeline Execution
       category: Core Functionality
       status: In Progress
     - id: coverage-core-benchmarks
@@ -74,7 +69,7 @@ priorities:
       file: TODO/main/planning/coverage-core-utilities.yaml
       title: Improve test coverage for core utility and standalone modules to ≥50%
       category: Testing and Quality Assurance
-      status: Not Started
+      status: In Progress
     - id: coverage-core-tpcdi
       file: TODO/main/planning/coverage-core-tpcdi.yaml
       title: Improve test coverage for core/tpcdi module to ≥50%

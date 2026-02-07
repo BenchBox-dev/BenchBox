@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:04:31.917867'
-total_items: 419
+generated_at: '2026-02-07T13:07:27.446867'
+total_items: 420
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 273
+    count: 274
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1364,6 +1364,11 @@ statuses:
       file: DONE/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
       title: Implement Physical Tuning DDL Generation Across All Platforms
       priority: Medium-High
+      category: Core Functionality
+    - id: implement-tpcdi-dataframe-pipeline
+      file: DONE/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
+      title: Implement TPC-DI DataFrame Pipeline Execution
+      priority: High
       category: Core Functionality
     - id: implement-tpc-h-queries-for-expression-family
       file: DONE/dataframe-tpch-expression/completed/implement-tpc-h-queries-for-expression-family.yaml

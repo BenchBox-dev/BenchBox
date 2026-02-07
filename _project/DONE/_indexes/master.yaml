@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T13:04:31.917519'
-total_items: 419
+generated_at: '2026-02-07T13:07:27.446458'
+total_items: 420
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1156,6 +1156,21 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Large
+- id: implement-tpcdi-dataframe-pipeline
+  file: DONE/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
+  title: Implement TPC-DI DataFrame Pipeline Execution
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - dataframe
+  - tpcdi
+  - etl
+  owners:
+  - joe
+  estimated_effort: Large
+  completed_date: '2026-02-07'
 - id: implement-tpc-ds-queries-for-both-families
   file: DONE/dataframe-tpcds/planning/implement-tpc-ds-queries-for-both-families.yaml
   title: Implement TPC-DS Queries for Both Families
