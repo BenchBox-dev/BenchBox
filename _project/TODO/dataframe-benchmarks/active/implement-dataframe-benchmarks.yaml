@@ -119,12 +119,20 @@ scope_limit:
     - "benchbox/core/benchmark_registry.py"
     - "benchbox/core/dataframe/data_loader.py"
     - "tests/unit/core/*/test_*dataframe*.py"
+    # Abstraction layer: allowed for adding new methods needed by query implementations
+    # (amended per review of ea468d0e — adding new UnifiedExpr/UnifiedDtExpr methods is
+    # fundamentally different from modifying existing adapter behavior)
+    - "benchbox/platforms/dataframe/unified_frame.py"
+    - "benchbox/platforms/dataframe/unified_pandas_frame.py"
+    - "tests/unit/platforms/dataframe/test_datafusion_df.py"
   do_not_modify:
     - "benchbox/core/dataframe/query.py"
     - "benchbox/core/dataframe/context.py"
     - "benchbox/core/tpch/dataframe_queries.py"
     - "benchbox/core/tpcds/dataframe_queries/"
-    - "benchbox/platforms/dataframe/"
+    # Platform adapters (polars_df, pandas_df, datafusion_df, pyspark_df, etc.)
+    # remain off-limits — only the shared abstraction layer is allowed above
+    - "benchbox/platforms/dataframe/*_df.py"
 
 # ============================================================================
 # CONTEXT AND ARCHITECTURE
