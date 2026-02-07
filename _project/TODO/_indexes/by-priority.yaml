@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T19:00:58.698015'
-total_items: 45
+generated_at: '2026-02-06T19:22:36.353760'
+total_items: 44
 priorities:
   Critical:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Platform Expansion
       status: In Progress
   Medium-High:
-    count: 6
+    count: 5
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -50,11 +50,6 @@ priorities:
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
       status: Not Started
-    - id: ascii-chart-polish-and-ux-refinements
-      file: TODO/core-functionality/active/ascii-chart-polish-and-ux-refinements.yaml
-      title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
-      category: Core Functionality
-      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

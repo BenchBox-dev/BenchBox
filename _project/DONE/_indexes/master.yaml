@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T19:01:01.152331'
-total_items: 408
+generated_at: '2026-02-06T19:22:37.328189'
+total_items: 409
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4283,6 +4283,21 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 days
+- id: ascii-chart-polish-and-ux-refinements
+  file: DONE/core-functionality/active/ascii-chart-polish-and-ux-refinements.yaml
+  title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - visualization
+  - ascii
+  - charting
+  - ux
+  - polish
+  estimated_effort: 4-6 days
+  completed_date: '2026-02-06'
 - id: remove-polars-sql-mode
   file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml
   title: Remove Polars SQL mode support - DataFrame only

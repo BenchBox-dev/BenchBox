@@ -1,19 +1,14 @@
-generated_at: '2026-02-06T19:00:58.698028'
-total_items: 45
+generated_at: '2026-02-06T19:22:36.353771'
+total_items: 44
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
       priority: High
       category: Platform Expansion
-    - id: ascii-chart-polish-and-ux-refinements
-      file: TODO/core-functionality/active/ascii-chart-polish-and-ux-refinements.yaml
-      title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
-      priority: Medium-High
-      category: Core Functionality
   Not Started:
     count: 43
     items:

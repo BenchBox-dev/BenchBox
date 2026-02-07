@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T19:01:01.153143'
-total_items: 408
+generated_at: '2026-02-06T19:22:37.328454'
+total_items: 409
 priorities:
   Critical:
     count: 27
@@ -834,7 +834,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 30
+    count: 31
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -972,6 +972,11 @@ priorities:
       title: Platform Troubleshooting Guide
       category: Documentation and User Experience
       status: Done
+    - id: ascii-chart-polish-and-ux-refinements
+      file: DONE/core-functionality/active/ascii-chart-polish-and-ux-refinements.yaml
+      title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
+      category: Core Functionality
+      status: Completed
     - id: remove-polars-sql-mode
       file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml
       title: Remove Polars SQL mode support - DataFrame only

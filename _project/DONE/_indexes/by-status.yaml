@@ -1,5 +1,5 @@
-generated_at: '2026-02-06T19:01:01.153409'
-total_items: 408
+generated_at: '2026-02-06T19:22:37.328542'
+total_items: 409
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 210
+    count: 211
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1295,6 +1295,11 @@ statuses:
       title: Polars Platform Adapter
       priority: High
       category: Platform Expansion
+    - id: ascii-chart-polish-and-ux-refinements
+      file: DONE/core-functionality/active/ascii-chart-polish-and-ux-refinements.yaml
+      title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
+      priority: Medium-High
+      category: Core Functionality
     - id: postgresql-code-quality-fixes
       file: DONE/platform-expansion/active/postgresql-code-quality-fixes.yaml
       title: PostgreSQL adapter code quality fixes from code review
