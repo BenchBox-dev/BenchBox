@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T10:36:52.346220'
-total_items: 412
+generated_at: '2026-02-07T10:46:10.107258'
+total_items: 418
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 266
+    count: 272
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -924,6 +924,11 @@ statuses:
       title: Apache Spark Platform Adapter
       priority: High
       category: Platform Expansion
+    - id: dataframe-read-primitives-architecture
+      file: DONE/dataframe-benchmarks/active/dataframe-read-primitives-architecture.yaml
+      title: Assess DataFrame Architecture for Read Primitives Integration
+      priority: Medium
+      category: Core Functionality
     - id: athena-configuration-validation
       file: DONE/platform-expansion/planning/athena-configuration-validation.yaml
       title: Athena Configuration Validation
@@ -1119,6 +1124,16 @@ statuses:
       title: Databricks DataFrame Mode - CRITICAL PRIORITY
       priority: Critical
       category: Platform Expansion
+    - id: dataframe-write-primitives-model
+      file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
+      title: Define DataFrame Execution Model for Write Primitives
+      priority: Medium-High
+      category: Core Functionality
+    - id: dataframe-tpcdi-architecture
+      file: DONE/dataframe-benchmarks/active/dataframe-tpcdi-architecture.yaml
+      title: Design DataFrame Architecture for TPC-DI ETL Workload
+      priority: High
+      category: Core Functionality
     - id: design-and-implement-core-dataframe-abstractions
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
       title: Design and Implement Core DataFrame Abstractions
@@ -1180,6 +1195,16 @@ statuses:
       title: Error Message Polish
       priority: High
       category: User Experience
+    - id: dataframe-joinorder-feasibility
+      file: DONE/dataframe-benchmarks/active/dataframe-joinorder-feasibility.yaml
+      title: Evaluate DataFrame Relevance for JoinOrder Benchmark
+      priority: Medium
+      category: Core Functionality
+    - id: dataframe-tpchavoc-feasibility
+      file: DONE/dataframe-benchmarks/active/dataframe-tpchavoc-feasibility.yaml
+      title: Evaluate DataFrame Scope for TPC-Havoc
+      priority: Medium
+      category: Core Functionality
     - id: cloud-platform-example-scripts
       file: DONE/docs-experience/planning/cloud-platform-example-scripts.yaml
       title: Example Scripts for Cloud Platforms
@@ -1480,6 +1505,11 @@ statuses:
       title: 'Phase 3.1: Manifest v2 Implementation Specification'
       priority: critical
       category: Uncategorized
+    - id: dataframe-tpcds-obt-adaptation
+      file: DONE/dataframe-benchmarks/active/dataframe-tpcds-obt-adaptation.yaml
+      title: Plan DataFrame Adaptation for TPC-DS-OBT
+      priority: Medium-High
+      category: Core Functionality
     - id: phase-1-connection-network
       file: DONE/platform-config-audit/completed/phase-1-connection-network.yaml
       title: 'Platform Config Audit: Connection/Network Settings'

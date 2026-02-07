@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T10:36:51.399789'
-total_items: 52
+generated_at: '2026-02-07T10:46:09.183827'
+total_items: 50
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -38,21 +38,6 @@ items:
   - platform
   - open-source
   estimated_effort: Large
-- id: dataframe-tpcdi-architecture
-  file: TODO/dataframe-benchmarks/planning/dataframe-tpcdi-architecture.yaml
-  title: Design DataFrame Architecture for TPC-DI ETL Workload
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: High
-  status: Identified
-  tags:
-  - dataframe
-  - tpcdi
-  - architecture
-  - etl
-  owners:
-  - joe
-  estimated_effort: Medium
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -70,6 +55,20 @@ items:
   owners:
   - joe
   estimated_effort: Large (4-6 weeks total)
+- id: implement-tpcdi-dataframe-pipeline
+  file: TODO/dataframe-benchmarks/planning/implement-tpcdi-dataframe-pipeline.yaml
+  title: Implement TPC-DI DataFrame Pipeline Execution
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - dataframe
+  - tpcdi
+  - etl
+  owners:
+  - joe
+  estimated_effort: Large
 - id: coverage-core-benchmarks
   file: TODO/main/planning/coverage-core-benchmarks.yaml
   title: Improve test coverage for core benchmark modules to ≥50%
@@ -212,20 +211,6 @@ items:
   - high-performance
   - siriusdb
   estimated_effort: Medium
-- id: dataframe-read-primitives-architecture
-  file: TODO/dataframe-benchmarks/planning/dataframe-read-primitives-architecture.yaml
-  title: Assess DataFrame Architecture for Read Primitives Integration
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium
-  status: Identified
-  tags:
-  - dataframe
-  - read-primitives
-  - planning
-  owners:
-  - joe
-  estimated_effort: Medium
 - id: clickhouse-cloud-deployment
   file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
   title: ClickHouse Cloud Deployment Mode
@@ -293,34 +278,6 @@ items:
   - coverage
   - ci
   - enforcement
-  estimated_effort: Small
-- id: dataframe-joinorder-feasibility
-  file: TODO/dataframe-benchmarks/planning/dataframe-joinorder-feasibility.yaml
-  title: Evaluate DataFrame Relevance for JoinOrder Benchmark
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium
-  status: Identified
-  tags:
-  - dataframe
-  - joinorder
-  - feasibility
-  owners:
-  - joe
-  estimated_effort: Small
-- id: dataframe-tpchavoc-feasibility
-  file: TODO/dataframe-benchmarks/planning/dataframe-tpchavoc-feasibility.yaml
-  title: Evaluate DataFrame Scope for TPC-Havoc
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium
-  status: Identified
-  tags:
-  - dataframe
-  - tpchavoc
-  - feasibility
-  owners:
-  - joe
   estimated_effort: Small
 - id: firebolt-cloud-deployment
   file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
@@ -425,6 +382,20 @@ items:
   - testing
   - coverage
   - platforms
+  estimated_effort: Medium
+- id: integrate-read-primitives-dataframe-mode
+  file: TODO/dataframe-benchmarks/planning/integrate-read-primitives-dataframe-mode.yaml
+  title: Integrate Read Primitives DataFrame Mode and Metadata
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - dataframe
+  - read-primitives
+  - integration
+  owners:
+  - joe
   estimated_effort: Medium
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
@@ -676,20 +647,20 @@ items:
   - platform
   - mysql-protocol
   estimated_effort: Medium
-- id: dataframe-write-primitives-model
-  file: TODO/dataframe-benchmarks/planning/dataframe-write-primitives-model.yaml
-  title: Define DataFrame Execution Model for Write Primitives
+- id: implement-tpcds-obt-dataframe-queries
+  file: TODO/dataframe-benchmarks/planning/implement-tpcds-obt-dataframe-queries.yaml
+  title: Implement TPC-DS-OBT DataFrame Query Families
   worktree: dataframe-benchmarks
   category: Core Functionality
   priority: Medium-High
-  status: Identified
+  status: Not Started
   tags:
   - dataframe
-  - write-primitives
-  - architecture
+  - tpcds-obt
+  - implementation
   owners:
   - joe
-  estimated_effort: Medium
+  estimated_effort: Large
 - id: coverage-cli-modules
   file: TODO/main/planning/coverage-cli-modules.yaml
   title: Improve test coverage for CLI modules to ≥50%
@@ -714,17 +685,17 @@ items:
   - coverage
   - tpcdi
   estimated_effort: Medium
-- id: dataframe-tpcds-obt-adaptation
-  file: TODO/dataframe-benchmarks/planning/dataframe-tpcds-obt-adaptation.yaml
-  title: Plan DataFrame Adaptation for TPC-DS-OBT
+- id: integrate-write-primitives-dataframe-mode
+  file: TODO/dataframe-benchmarks/planning/integrate-write-primitives-dataframe-mode.yaml
+  title: Integrate Write Primitives DataFrame Mode with Runner and Registry
   worktree: dataframe-benchmarks
   category: Core Functionality
   priority: Medium-High
-  status: Identified
+  status: Not Started
   tags:
   - dataframe
-  - tpcds-obt
-  - planning
+  - write-primitives
+  - integration
   owners:
   - joe
   estimated_effort: Medium

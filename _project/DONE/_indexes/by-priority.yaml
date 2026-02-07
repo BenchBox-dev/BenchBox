@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T10:36:52.346134'
-total_items: 412
+generated_at: '2026-02-07T10:46:10.107172'
+total_items: 418
 priorities:
   Critical:
     count: 27
@@ -140,7 +140,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 141
+    count: 142
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -287,6 +287,11 @@ priorities:
       title: DataFrame Tuning Configuration Support
       category: Platform Enhancement
       status: Not Started
+    - id: dataframe-tpcdi-architecture
+      file: DONE/dataframe-benchmarks/active/dataframe-tpcdi-architecture.yaml
+      title: Design DataFrame Architecture for TPC-DI ETL Workload
+      category: Core Functionality
+      status: Completed
     - id: document-stdout-patches
       file: DONE/tpcds-docs/document-stdout-patches.yaml
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
@@ -849,7 +854,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 31
+    count: 33
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -927,6 +932,11 @@ priorities:
       title: Cloud Spark Dependency Groups in pyproject.toml
       category: Core Functionality
       status: Completed
+    - id: dataframe-write-primitives-model
+      file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
+      title: Define DataFrame Execution Model for Write Primitives
+      category: Core Functionality
+      status: Completed
     - id: embed-tuning-config-in-results
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output
@@ -977,6 +987,11 @@ priorities:
       title: 'PT-06: Trino, Presto & Athena Physical Tuning DDL Generators'
       category: Platform Expansion
       status: Not Started
+    - id: dataframe-tpcds-obt-adaptation
+      file: DONE/dataframe-benchmarks/active/dataframe-tpcds-obt-adaptation.yaml
+      title: Plan DataFrame Adaptation for TPC-DS-OBT
+      category: Core Functionality
+      status: Completed
     - id: deployment-cli-integration
       file: DONE/platform-expansion/active/deployment-cli-integration.yaml
       title: Platform Deployment CLI Integration
@@ -1008,7 +1023,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 198
+    count: 201
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1194,6 +1209,11 @@ priorities:
       file: DONE/platform-expansion/planning/athena-spark-platform.yaml
       title: Amazon Athena for Apache Spark Platform
       category: Platform Expansion
+      status: Completed
+    - id: dataframe-read-primitives-architecture
+      file: DONE/dataframe-benchmarks/active/dataframe-read-primitives-architecture.yaml
+      title: Assess DataFrame Architecture for Read Primitives Integration
+      category: Core Functionality
       status: Completed
     - id: athena-configuration-validation
       file: DONE/platform-expansion/planning/athena-configuration-validation.yaml
@@ -1409,6 +1429,16 @@ priorities:
       file: DONE/infrastructure-monitoring/planning/enhanced-resource-monitoring-profiling.yaml
       title: Enhanced Resource Monitoring & Profiling
       category: Supporting Infrastructure
+      status: Completed
+    - id: dataframe-joinorder-feasibility
+      file: DONE/dataframe-benchmarks/active/dataframe-joinorder-feasibility.yaml
+      title: Evaluate DataFrame Relevance for JoinOrder Benchmark
+      category: Core Functionality
+      status: Completed
+    - id: dataframe-tpchavoc-feasibility
+      file: DONE/dataframe-benchmarks/active/dataframe-tpchavoc-feasibility.yaml
+      title: Evaluate DataFrame Scope for TPC-Havoc
+      category: Core Functionality
       status: Completed
     - id: example-modernization-completed
       file: DONE/unknown/planning/example-modernization-completed.yaml

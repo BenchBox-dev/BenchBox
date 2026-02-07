@@ -1,0 +1,45 @@
+title: "Implement TPC-DS-OBT DataFrame Query Families"
+worktree: dataframe-benchmarks
+priority: Medium-High
+status: Not Started
+description: |
+  Implement DataFrame expression and pandas-family query implementations for
+  TPC-DS-OBT using OBT-specific semantics.
+
+  This work should use the OBT SQL query manager as validation reference and
+  avoid assuming normalized TPC-DS join structures.
+
+category: Core Functionality
+
+tasks:
+  phases:
+    - phase: "Phase 1: Query Family Scaffolding"
+      done: false
+      items:
+        - summary: "Create tpcds_obt/dataframe_queries module structure"
+          done: false
+        - summary: "Register query implementations and metadata"
+          done: false
+    - phase: "Phase 2: Query Implementation"
+      done: false
+      items:
+        - summary: "Implement expression-family queries in batches"
+          done: false
+        - summary: "Implement pandas-family queries in batches"
+          done: false
+    - phase: "Phase 3: Validation"
+      done: false
+      items:
+        - summary: "Validate DataFrame outputs against OBT SQL outputs"
+          done: false
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - dataframe
+    - tpcds-obt
+    - implementation
+  estimated_effort: Large
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T00:00:00"

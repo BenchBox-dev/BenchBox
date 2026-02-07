@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T10:36:51.399868'
-total_items: 52
+generated_at: '2026-02-07T10:46:09.183891'
+total_items: 50
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 44
+    count: 48
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -127,6 +127,16 @@ statuses:
       title: Implement CTAS-based sorted data loading for DuckDB
       priority: Medium
       category: Core Functionality
+    - id: implement-tpcdi-dataframe-pipeline
+      file: TODO/dataframe-benchmarks/planning/implement-tpcdi-dataframe-pipeline.yaml
+      title: Implement TPC-DI DataFrame Pipeline Execution
+      priority: High
+      category: Core Functionality
+    - id: implement-tpcds-obt-dataframe-queries
+      file: TODO/dataframe-benchmarks/planning/implement-tpcds-obt-dataframe-queries.yaml
+      title: Implement TPC-DS-OBT DataFrame Query Families
+      priority: Medium-High
+      category: Core Functionality
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
@@ -157,6 +167,16 @@ statuses:
       title: Improve test coverage for platform adapter modules to ≥50%
       priority: Medium
       category: Testing and Quality Assurance
+    - id: integrate-read-primitives-dataframe-mode
+      file: TODO/dataframe-benchmarks/planning/integrate-read-primitives-dataframe-mode.yaml
+      title: Integrate Read Primitives DataFrame Mode and Metadata
+      priority: Medium
+      category: Core Functionality
+    - id: integrate-write-primitives-dataframe-mode
+      file: TODO/dataframe-benchmarks/planning/integrate-write-primitives-dataframe-mode.yaml
+      title: Integrate Write Primitives DataFrame Mode with Runner and Registry
+      priority: Medium-High
+      category: Core Functionality
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -237,36 +257,3 @@ statuses:
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
       category: Blog Revision
-  Identified:
-    count: 6
-    items:
-    - id: dataframe-read-primitives-architecture
-      file: TODO/dataframe-benchmarks/planning/dataframe-read-primitives-architecture.yaml
-      title: Assess DataFrame Architecture for Read Primitives Integration
-      priority: Medium
-      category: Core Functionality
-    - id: dataframe-write-primitives-model
-      file: TODO/dataframe-benchmarks/planning/dataframe-write-primitives-model.yaml
-      title: Define DataFrame Execution Model for Write Primitives
-      priority: Medium-High
-      category: Core Functionality
-    - id: dataframe-tpcdi-architecture
-      file: TODO/dataframe-benchmarks/planning/dataframe-tpcdi-architecture.yaml
-      title: Design DataFrame Architecture for TPC-DI ETL Workload
-      priority: High
-      category: Core Functionality
-    - id: dataframe-joinorder-feasibility
-      file: TODO/dataframe-benchmarks/planning/dataframe-joinorder-feasibility.yaml
-      title: Evaluate DataFrame Relevance for JoinOrder Benchmark
-      priority: Medium
-      category: Core Functionality
-    - id: dataframe-tpchavoc-feasibility
-      file: TODO/dataframe-benchmarks/planning/dataframe-tpchavoc-feasibility.yaml
-      title: Evaluate DataFrame Scope for TPC-Havoc
-      priority: Medium
-      category: Core Functionality
-    - id: dataframe-tpcds-obt-adaptation
-      file: TODO/dataframe-benchmarks/planning/dataframe-tpcds-obt-adaptation.yaml
-      title: Plan DataFrame Adaptation for TPC-DS-OBT
-      priority: Medium-High
-      category: Core Functionality

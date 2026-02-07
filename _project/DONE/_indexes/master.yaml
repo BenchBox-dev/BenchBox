@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T10:36:52.345862'
-total_items: 412
+generated_at: '2026-02-07T10:46:10.106911'
+total_items: 418
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -747,6 +747,22 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks
+- id: dataframe-tpcdi-architecture
+  file: DONE/dataframe-benchmarks/active/dataframe-tpcdi-architecture.yaml
+  title: Design DataFrame Architecture for TPC-DI ETL Workload
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - dataframe
+  - tpcdi
+  - architecture
+  - etl
+  owners:
+  - joe
+  estimated_effort: Medium
+  completed_date: '2026-02-07'
 - id: document-stdout-patches
   file: DONE/tpcds-docs/document-stdout-patches.yaml
   title: Document TPC-DS stdout patches and credit tpcds-kit origin
@@ -2484,6 +2500,21 @@ items:
   - athena-spark
   - interactive
   estimated_effort: 1.5 weeks
+- id: dataframe-read-primitives-architecture
+  file: DONE/dataframe-benchmarks/active/dataframe-read-primitives-architecture.yaml
+  title: Assess DataFrame Architecture for Read Primitives Integration
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - dataframe
+  - read-primitives
+  - planning
+  owners:
+  - joe
+  estimated_effort: Medium
+  completed_date: '2026-02-07'
 - id: athena-configuration-validation
   file: DONE/platform-expansion/planning/athena-configuration-validation.yaml
   title: Athena Configuration Validation
@@ -2905,6 +2936,36 @@ items:
   priority: Medium
   status: Completed
   estimated_effort: 2 weeks (0.5 FTE)
+- id: dataframe-joinorder-feasibility
+  file: DONE/dataframe-benchmarks/active/dataframe-joinorder-feasibility.yaml
+  title: Evaluate DataFrame Relevance for JoinOrder Benchmark
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - dataframe
+  - joinorder
+  - feasibility
+  owners:
+  - joe
+  estimated_effort: Small
+  completed_date: '2026-02-07'
+- id: dataframe-tpchavoc-feasibility
+  file: DONE/dataframe-benchmarks/active/dataframe-tpchavoc-feasibility.yaml
+  title: Evaluate DataFrame Scope for TPC-Havoc
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - dataframe
+  - tpchavoc
+  - feasibility
+  owners:
+  - joe
+  estimated_effort: Small
+  completed_date: '2026-02-07'
 - id: example-modernization-completed
   file: DONE/unknown/planning/example-modernization-completed.yaml
   title: Example Modernization ✅ COMPLETED
@@ -4174,6 +4235,21 @@ items:
   - pyproject
   - documentation
   estimated_effort: Small
+- id: dataframe-write-primitives-model
+  file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
+  title: Define DataFrame Execution Model for Write Primitives
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - dataframe
+  - write-primitives
+  - architecture
+  owners:
+  - joe
+  estimated_effort: Medium
+  completed_date: '2026-02-07'
 - id: embed-tuning-config-in-results
   file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
   title: Embed Full Tuning Config in Result Output
@@ -4318,6 +4394,21 @@ items:
   owners:
   - joe
   estimated_effort: Large
+- id: dataframe-tpcds-obt-adaptation
+  file: DONE/dataframe-benchmarks/active/dataframe-tpcds-obt-adaptation.yaml
+  title: Plan DataFrame Adaptation for TPC-DS-OBT
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - dataframe
+  - tpcds-obt
+  - planning
+  owners:
+  - joe
+  estimated_effort: Medium
+  completed_date: '2026-02-07'
 - id: deployment-cli-integration
   file: DONE/platform-expansion/active/deployment-cli-integration.yaml
   title: Platform Deployment CLI Integration

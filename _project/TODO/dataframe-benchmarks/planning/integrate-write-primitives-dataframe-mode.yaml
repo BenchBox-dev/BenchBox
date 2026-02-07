@@ -1,0 +1,45 @@
+title: "Integrate Write Primitives DataFrame Mode with Runner and Registry"
+worktree: dataframe-benchmarks
+priority: Medium-High
+status: Not Started
+description: |
+  Integrate existing Write Primitives DataFrame operation support with benchmark
+  registry metadata and execution pathways.
+
+  Existing write operation capabilities and managers are implemented, but
+  benchmark-level discoverability and mode wiring remain inconsistent.
+
+category: Core Functionality
+
+tasks:
+  phases:
+    - phase: "Phase 1: Registry and Discovery"
+      done: false
+      items:
+        - summary: "Align benchmark metadata with DataFrame capability"
+          done: false
+        - summary: "Ensure CLI and MCP discovery surfaces DataFrame support"
+          done: false
+    - phase: "Phase 2: Execution Wiring"
+      done: false
+      items:
+        - summary: "Wire DataFrame mode operation dispatch in runner pathways"
+          done: false
+        - summary: "Add capability-driven skip/fail-fast reporting"
+          done: false
+    - phase: "Phase 3: Validation"
+      done: false
+      items:
+        - summary: "Add integration tests for DataFrame write mode execution"
+          done: false
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - dataframe
+    - write-primitives
+    - integration
+  estimated_effort: Medium
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T00:00:00"

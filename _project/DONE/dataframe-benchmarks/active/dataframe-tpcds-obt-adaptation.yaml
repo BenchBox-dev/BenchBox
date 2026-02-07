@@ -1,7 +1,8 @@
 title: "Plan DataFrame Adaptation for TPC-DS-OBT"
 worktree: dataframe-benchmarks
 priority: Medium-High
-status: Identified
+status: Completed
+completed_date: "2026-02-07"
 description: |
   Plan DataFrame support for TPC-DS-OBT with explicit OBT-specific adaptation.
 
@@ -14,24 +15,24 @@ category: Core Functionality
 tasks:
   phases:
     - phase: "Phase 1: Query Inventory"
-      done: false
+      done: true
       items:
         - summary: "Confirm authoritative OBT query count and categories"
-          done: false
+          done: true
         - summary: "Group queries by reusable transformation patterns"
-          done: false
+          done: true
     - phase: "Phase 2: Adaptation Design"
-      done: false
+      done: true
       items:
         - summary: "Define single-table implementation patterns for both families"
-          done: false
+          done: true
         - summary: "Define parameter and validation strategy against SQL results"
-          done: false
+          done: true
     - phase: "Phase 3: Delivery Plan"
-      done: false
+      done: true
       items:
         - summary: "Create phased implementation TODO with realistic batch sizes"
-          done: false
+          done: true
 
 metadata:
   owners:
@@ -53,3 +54,26 @@ impact:
 success_metrics:
   - "Approved adaptation plan with scoped query batches"
   - "Follow-on implementation TODO created"
+
+dependencies:
+  related:
+    - "_project/TODO/dataframe-benchmarks/planning/implement-tpcds-obt-dataframe-queries.yaml"
+
+sections:
+  "Decision Summary": |
+    Decision: TPC-DS-OBT needs dedicated DataFrame implementations; direct reuse
+    of normalized TPC-DS DataFrame queries is not viable.
+
+  "Current-State Evidence": |
+    `benchbox/core/tpcds_obt/queries.py` documents 89/99 convertible SQL queries,
+    including manual rewrites for complex cases. Current benchmark metadata still
+    reports `supports_dataframe: False`.
+
+  "Adaptation Plan": |
+    - Build query families around OBT single-table semantics and channel-aware logic.
+    - Reuse expression/pandas helper patterns, but not normalized table joins.
+    - Validate against OBT SQL query manager outputs and parameterized variants.
+
+  "Output": |
+    Created follow-on implementation TODO:
+    `_project/TODO/dataframe-benchmarks/planning/implement-tpcds-obt-dataframe-queries.yaml`.

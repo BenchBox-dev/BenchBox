@@ -1,4 +1,4 @@
-generated_at: '2026-02-07T10:36:52.346035'
+generated_at: '2026-02-07T10:46:10.107069'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -348,7 +348,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 98
+    count: 104
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -409,6 +409,11 @@ categories:
       file: DONE/mcp-integration/mcp-visualization-tools.yaml
       title: Add visualization tools to MCP server
       priority: Medium-High
+      status: Completed
+    - id: dataframe-read-primitives-architecture
+      file: DONE/dataframe-benchmarks/active/dataframe-read-primitives-architecture.yaml
+      title: Assess DataFrame Architecture for Read Primitives Integration
+      priority: Medium
       status: Completed
     - id: auto-compile-tpc-binary-tools-completed
       file: DONE/unknown/planning/auto-compile-tpc-binary-tools-completed.yaml
@@ -490,6 +495,16 @@ categories:
       title: DataFrame Platform Availability Detection and Error Handling
       priority: Critical
       status: Not Started
+    - id: dataframe-write-primitives-model
+      file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
+      title: Define DataFrame Execution Model for Write Primitives
+      priority: Medium-High
+      status: Completed
+    - id: dataframe-tpcdi-architecture
+      file: DONE/dataframe-benchmarks/active/dataframe-tpcdi-architecture.yaml
+      title: Design DataFrame Architecture for TPC-DI ETL Workload
+      priority: High
+      status: Completed
     - id: design-and-implement-core-dataframe-abstractions
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
       title: Design and Implement Core DataFrame Abstractions
@@ -515,6 +530,16 @@ categories:
       title: Ensure DataFrame variants use identical parameter substitution and ordering permutations as SQL variants for
         TPC-H and TPC-DS
       priority: High
+      status: Completed
+    - id: dataframe-joinorder-feasibility
+      file: DONE/dataframe-benchmarks/active/dataframe-joinorder-feasibility.yaml
+      title: Evaluate DataFrame Relevance for JoinOrder Benchmark
+      priority: Medium
+      status: Completed
+    - id: dataframe-tpchavoc-feasibility
+      file: DONE/dataframe-benchmarks/active/dataframe-tpchavoc-feasibility.yaml
+      title: Evaluate DataFrame Scope for TPC-Havoc
+      priority: Medium
       status: Completed
     - id: expand-mcp-tool-surface
       file: DONE/mcp-integration/active/expand-mcp-tool-surface.yaml
@@ -715,6 +740,11 @@ categories:
       file: DONE/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
       title: Patch TPC-H source to fix stdout data generation
       priority: High
+      status: Completed
+    - id: dataframe-tpcds-obt-adaptation
+      file: DONE/dataframe-benchmarks/active/dataframe-tpcds-obt-adaptation.yaml
+      title: Plan DataFrame Adaptation for TPC-DS-OBT
+      priority: Medium-High
       status: Completed
     - id: deployment-config-inheritance
       file: DONE/platform-expansion/active/deployment-config-inheritance.yaml

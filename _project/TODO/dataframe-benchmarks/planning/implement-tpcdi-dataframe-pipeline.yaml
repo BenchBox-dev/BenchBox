@@ -1,0 +1,45 @@
+title: "Implement TPC-DI DataFrame Pipeline Execution"
+worktree: dataframe-benchmarks
+priority: High
+status: Not Started
+description: |
+  Implement a dedicated DataFrame ETL execution path for TPC-DI based on the
+  approved architecture decision.
+
+  Scope includes stage orchestration, mutation-safe table lifecycle handling,
+  and correctness validation for SCD2 and incremental load semantics.
+
+category: Core Functionality
+
+tasks:
+  phases:
+    - phase: "Phase 1: Execution Interfaces"
+      done: false
+      items:
+        - summary: "Add TPC-DI DataFrame ETL orchestration interfaces"
+          done: false
+        - summary: "Add platform capability contracts for ETL writes/transactions"
+          done: false
+    - phase: "Phase 2: Pipeline Implementation"
+      done: false
+      items:
+        - summary: "Implement staged ETL execution flow for DataFrame mode"
+          done: false
+        - summary: "Integrate incremental load and SCD2 handling"
+          done: false
+    - phase: "Phase 3: Validation"
+      done: false
+      items:
+        - summary: "Add parity and integrity tests for ETL stages"
+          done: false
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - dataframe
+    - tpcdi
+    - etl
+  estimated_effort: Large
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T00:00:00"

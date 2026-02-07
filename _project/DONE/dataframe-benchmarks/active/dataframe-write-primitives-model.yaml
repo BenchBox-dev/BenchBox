@@ -1,7 +1,8 @@
 title: "Define DataFrame Execution Model for Write Primitives"
 worktree: dataframe-benchmarks
 priority: Medium-High
-status: Identified
+status: Completed
+completed_date: "2026-02-07"
 description: |
   Define how Write Primitives should execute in DataFrame mode.
 
@@ -14,24 +15,24 @@ category: Core Functionality
 tasks:
   phases:
     - phase: "Phase 1: Contract Design"
-      done: false
+      done: true
       items:
         - summary: "Define write operation abstractions and lifecycle"
-          done: false
+          done: true
         - summary: "Define platform capability matrix and skip semantics"
-          done: false
+          done: true
     - phase: "Phase 2: Integration Design"
-      done: false
+      done: true
       items:
         - summary: "Define integration points with benchmark runner and adapters"
-          done: false
+          done: true
         - summary: "Define persistence/output invariants"
-          done: false
+          done: true
     - phase: "Phase 3: Validation Strategy"
-      done: false
+      done: true
       items:
         - summary: "Define correctness checks for DML-like operations"
-          done: false
+          done: true
 
 metadata:
   owners:
@@ -53,3 +54,31 @@ impact:
 success_metrics:
   - "Execution model documented and approved"
   - "Implementation TODO created with platform-specific coverage plan"
+
+dependencies:
+  related:
+    - "_project/TODO/dataframe-benchmarks/planning/integrate-write-primitives-dataframe-mode.yaml"
+
+sections:
+  "Decision Summary": |
+    Decision: keep `WritePrimitivesBenchmark` as the benchmark facade and integrate
+    DataFrame mode via `DataFrameWriteOperationsManager` capability-driven dispatch.
+
+  "Current-State Evidence": |
+    Existing DataFrame write infrastructure is already present in:
+    - `benchbox/core/write_primitives/dataframe_operations.py`
+    - `benchbox/core/write_primitives/benchmark.py` (`supports_dataframe_mode()`,
+      `get_dataframe_operations()`, and capability accessors).
+
+    However benchmark metadata still advertises `supports_dataframe: False` in
+    `benchbox/core/benchmark_registry.py`, so runner/registry alignment is incomplete.
+
+  "Execution Model": |
+    - Operation lifecycle: prepare -> execute -> validate -> collect metrics.
+    - Capability matrix controls skip/fail-fast behavior for unsupported operations.
+    - Validation requires row-level assertions, file-level invariants, and operation
+      semantic checks (insert/update/delete/merge semantics).
+
+  "Output": |
+    Created follow-on implementation TODO:
+    `_project/TODO/dataframe-benchmarks/planning/integrate-write-primitives-dataframe-mode.yaml`.
