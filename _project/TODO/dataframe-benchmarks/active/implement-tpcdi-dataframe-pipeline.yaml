@@ -1,7 +1,7 @@
 title: "Implement TPC-DI DataFrame Pipeline Execution"
 worktree: dataframe-benchmarks
 priority: High
-status: Not Started
+status: In Progress
 description: |
   Implement a dedicated DataFrame ETL execution path for TPC-DI based on the
   approved architecture decision.
@@ -14,19 +14,19 @@ category: Core Functionality
 tasks:
   phases:
     - phase: "Phase 1: Execution Interfaces"
-      done: false
+      done: true
       items:
         - summary: "Add TPC-DI DataFrame ETL orchestration interfaces"
-          done: false
+          done: true
         - summary: "Add platform capability contracts for ETL writes/transactions"
-          done: false
+          done: true
     - phase: "Phase 2: Pipeline Implementation"
       done: false
       items:
         - summary: "Implement staged ETL execution flow for DataFrame mode"
-          done: false
+          done: true
         - summary: "Integrate incremental load and SCD2 handling"
-          done: false
+          done: true
     - phase: "Phase 3: Validation"
       done: false
       items:
@@ -43,3 +43,22 @@ metadata:
   estimated_effort: Large
   created_date: "2026-02-07"
   last_updated: "2026-02-07T00:00:00"
+
+sections:
+  "Progress Update": |
+    Implemented first-pass DataFrame ETL orchestration for TPC-DI via
+    benchmark-managed workload execution:
+    - Added `supports_dataframe_mode()`
+    - Added `skip_dataframe_data_loading()` to bypass generic query-loader flow
+    - Added `execute_dataframe_workload()` with stage-level execution for
+      historical/incremental/scd batches and query-filter support.
+
+    Backend selection is now explicit (`tpcdi_dataframe_backend`), with
+    fail-fast behavior for unsupported backends instead of implicit defaults.
+
+    Remaining work: define platform capability contracts for transactional ETL
+    writes and add parity/integrity validation against reference outputs.
+
+    Update: transactional ETL capability contracts are now implemented and
+    enforced via `get_dataframe_etl_capabilities()` and
+    `TDI_TRANSACTIONAL_CONTRACT` fail-fast checks.

@@ -1,7 +1,7 @@
 title: "Implement TPC-DS-OBT DataFrame Query Families"
 worktree: dataframe-benchmarks
 priority: Medium-High
-status: Not Started
+status: In Progress
 description: |
   Implement DataFrame expression and pandas-family query implementations for
   TPC-DS-OBT using OBT-specific semantics.
@@ -14,19 +14,19 @@ category: Core Functionality
 tasks:
   phases:
     - phase: "Phase 1: Query Family Scaffolding"
-      done: false
+      done: true
       items:
         - summary: "Create tpcds_obt/dataframe_queries module structure"
-          done: false
+          done: true
         - summary: "Register query implementations and metadata"
-          done: false
+          done: true
     - phase: "Phase 2: Query Implementation"
       done: false
       items:
         - summary: "Implement expression-family queries in batches"
-          done: false
+          done: true
         - summary: "Implement pandas-family queries in batches"
-          done: false
+          done: true
     - phase: "Phase 3: Validation"
       done: false
       items:
@@ -43,3 +43,16 @@ metadata:
   estimated_effort: Large
   created_date: "2026-02-07"
   last_updated: "2026-02-07T00:00:00"
+
+sections:
+  "Progress Update": |
+    Added initial TPC-DS-OBT DataFrame query families and benchmark wiring:
+    - New module: `benchbox/core/tpcds_obt/dataframe_queries.py`
+    - Registered initial expression/pandas implementations (Q1-Q3)
+    - Enabled DataFrame mode in benchmark and hooked query retrieval.
+
+    Added parity-style validation tests for expression vs pandas outputs on
+    representative sample data.
+
+    Remaining work: complete the full OBT query set in batches and validate
+    outputs against OBT SQL references at broader coverage.

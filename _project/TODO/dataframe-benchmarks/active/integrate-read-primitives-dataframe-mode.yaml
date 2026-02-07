@@ -1,7 +1,7 @@
 title: "Integrate Read Primitives DataFrame Mode and Metadata"
 worktree: dataframe-benchmarks
 priority: Medium
-status: Not Started
+status: In Progress
 description: |
   Integrate existing Read Primitives DataFrame query support with benchmark
   registry metadata, runner execution, and user-visible reporting.
@@ -14,12 +14,12 @@ category: Core Functionality
 tasks:
   phases:
     - phase: "Phase 1: Metadata Alignment"
-      done: false
+      done: true
       items:
         - summary: "Align benchmark registry supports_dataframe metadata"
-          done: false
+          done: true
         - summary: "Ensure CLI discovery reflects DataFrame availability"
-          done: false
+          done: true
     - phase: "Phase 2: Execution and Reporting"
       done: false
       items:
@@ -43,3 +43,12 @@ metadata:
   estimated_effort: Medium
   created_date: "2026-02-07"
   last_updated: "2026-02-07T00:00:00"
+
+sections:
+  "Progress Update": |
+    Metadata and discoverability alignment is implemented: benchmark registry
+    now marks Read Primitives as DataFrame-capable and metadata validation
+    tests cover this path.
+
+    Execution/reporting follow-through remains in progress for explicit
+    executed/skipped primitive category summaries under DataFrame mode.
