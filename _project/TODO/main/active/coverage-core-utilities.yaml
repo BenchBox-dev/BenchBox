@@ -1,7 +1,7 @@
 title: "Improve test coverage for core utility and standalone modules to ≥50%"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 description: |
   Several standalone core modules and utility files have zero or low test
@@ -31,20 +31,20 @@ description: |
 tasks:
   phases:
     - phase: "Phase 1: Zero-coverage quick wins"
-      done: false
+      done: true
       items:
-        - summary: "Add tests for core/tpc_metrics.py (0% → 50%)"
-          done: false
-        - summary: "Add tests for core/comparison/ (0% → 50%)"
-          done: false
-        - summary: "Add tests for core/platform_config_utils.py (0% → 50%)"
-          done: false
-        - summary: "Add tests for core/reports.py (0% → 50%)"
-          done: false
-        - summary: "Add tests for release/sync.py (0% → 50%)"
-          done: false
-        - summary: "Add tests for utils/lazy_loader.py (0% → 50%)"
-          done: false
+        - summary: "Add tests for core/tpc_metrics.py (0% → 88%)"
+          done: true
+        - summary: "Add tests for core/comparison/ (0% → 65%)"
+          done: true
+        - summary: "Add tests for core/platform_config_utils.py (0% → 98%)"
+          done: true
+        - summary: "Add tests for core/reports.py (0% → 92%)"
+          done: true
+        - summary: "Add tests for release/sync.py (0% → 57%)"
+          done: true
+        - summary: "Add tests for utils/lazy_loader.py (0% → 97%)"
+          done: true
 
     - phase: "Phase 2: Low-coverage utilities and MCP"
       done: false
