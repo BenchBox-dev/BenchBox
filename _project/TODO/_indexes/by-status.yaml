@@ -1,16 +1,21 @@
-generated_at: '2026-02-06T20:39:16.300820'
+generated_at: '2026-02-07T08:54:31.429213'
 total_items: 43
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
+    - id: implement-dataframe-benchmarks
+      file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
+      title: Implement DataFrame Support for All SQL-Only Benchmarks
+      priority: High
+      category: Core Functionality
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 42
+    count: 41
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -121,11 +126,6 @@ statuses:
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
       priority: Medium
-      category: Core Functionality
-    - id: implement-dataframe-benchmarks
-      file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
-      title: Implement DataFrame Support for All SQL-Only Benchmarks
-      priority: High
       category: Core Functionality
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml

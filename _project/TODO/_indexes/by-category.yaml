@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T20:39:16.300795'
+generated_at: '2026-02-07T08:54:31.429185'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -107,10 +107,10 @@ categories:
       priority: Medium
       status: Not Started
     - id: implement-dataframe-benchmarks
-      file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
+      file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       priority: High
-      status: Not Started
+      status: In Progress
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation

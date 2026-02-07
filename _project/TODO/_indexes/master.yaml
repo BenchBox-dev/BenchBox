@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T20:39:16.300765'
+generated_at: '2026-02-07T08:54:31.429152'
 total_items: 43
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -39,12 +39,12 @@ items:
   - open-source
   estimated_effort: Large
 - id: implement-dataframe-benchmarks
-  file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
+  file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks
   worktree: dataframe-benchmarks
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - dataframe
   - benchmarks

@@ -1,4 +1,4 @@
-generated_at: '2026-02-06T20:39:16.300809'
+generated_at: '2026-02-07T08:54:31.429201'
 total_items: 43
 priorities:
   Critical:
@@ -18,10 +18,10 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: implement-dataframe-benchmarks
-      file: TODO/dataframe-benchmarks/planning/implement-dataframe-benchmarks.yaml
+      file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: motherduck-platform-adapter
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
