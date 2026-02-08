@@ -1,5 +1,5 @@
-generated_at: '2026-02-08T13:30:22.374825'
-total_items: 45
+generated_at: '2026-02-08T13:31:40.437395'
+total_items: 46
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 43
+    count: 44
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -162,6 +162,11 @@ statuses:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: Medium-High
       category: Testing and Quality Assurance
+    - id: remove-sql-coupling-from-tpcdi-dataframe-mode
+      file: TODO/dataframe-benchmarks/planning/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
+      title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
+      priority: High
+      category: Core Functionality
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

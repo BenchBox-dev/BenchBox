@@ -1,7 +1,7 @@
 title: "Raise benchbox/ per-module coverage to >=50% with temporary split"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 description: |
   Close remaining test coverage gaps by enforcing a per-module >=50% floor for
@@ -323,7 +323,7 @@ metadata:
     - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-08T14:00:00"
+  last_updated: "2026-02-08T14:25:00"
 
 impact:
   business_value: |

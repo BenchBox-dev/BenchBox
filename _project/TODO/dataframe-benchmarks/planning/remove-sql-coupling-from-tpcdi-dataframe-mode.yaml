@@ -1,0 +1,279 @@
+title: "Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol"
+worktree: "dataframe-benchmarks"
+priority: "High"
+status: "Not Started"
+description: |
+  TPC-DI's execute_dataframe_workload() currently resolves a SQL connection via
+  SQLConnectionProvider.get_sql_connection() and passes it to run_etl_pipeline(),
+  which executes raw SQL INSERT INTO, executemany(), executescript(), and validation
+  via SELECT COUNT(*). The DataFrame variant should NEVER use SQL.
+
+  The fix: introduce a TPCDIETLBackend protocol with SQL and DataFrame implementations.
+  Extract a shared mode-agnostic ETL orchestrator for Extract + Transform, then create
+  separate Load/Validate/SCD backends. The DataFrame backend delegates to the existing
+  DataFrameMaintenanceOperations protocol (insert_rows, update_rows, merge_rows).
+  Additionally, eliminate the double CSV serialization in the Transform phase by having
+  transforms return DataFrames directly.
+
+  SQLConnectionProvider and get_sql_connection() are removed entirely from the
+  DataFrame subsystem since the concept is architecturally wrong — DataFrame adapters
+  should never be asked for SQL connections.
+
+category: "Core Functionality"
+
+tasks:
+  phases:
+    - phase: "Phase 1: ETL backend protocol and implementations"
+      done: false
+      items:
+        - summary: "Create TPCDIETLBackend protocol in benchbox/core/tpcdi/etl/backend.py"
+          done: false
+          subtasks:
+            - summary: "Define protocol methods: load_dataframes, validate_results, create_schema, execute_scd2_expire, execute_scd2_insert, read_current_dimension"
+              done: false
+        - summary: "Create SQLETLBackend in benchbox/core/tpcdi/etl/sql_backend.py"
+          done: false
+          subtasks:
+            - summary: "Extract load_dataframes() from benchmark.py:_load_warehouse_data() (line 1529) and _load_staging_file() (line 1557); accept DataFrames directly"
+              done: false
+            - summary: "Extract validate_results() from benchmark.py:validate_etl_results() (line 1615), _check_data_completeness/consistency/accuracy"
+              done: false
+            - summary: "Extract create_schema() from _load_warehouse_data() lines 1536-1543"
+              done: false
+            - summary: "Extract SCD2 and read_current_dimension methods from etl/scd_processor.py SQL stubs and etl/pipeline.py:run_scd_processing()"
+              done: false
+        - summary: "Create DataFrameETLBackend in benchbox/core/tpcdi/etl/dataframe_backend.py"
+          done: false
+          subtasks:
+            - summary: "Implement load_dataframes() delegating to maintenance_ops.insert_rows() per table"
+              done: false
+            - summary: "Implement SCD2 via update_rows() for expire and insert_rows() for new records (or merge_rows() if platform supports MERGE)"
+              done: false
+            - summary: "Implement validate_results() with DataFrame-native row counts or graceful skip"
+              done: false
+            - summary: "Wire to existing maintenance ops implementations: Polars, Delta Lake, Iceberg, DuckLake, Hudi, PySpark"
+              done: false
+        - summary: "Update benchbox/core/tpcdi/etl/__init__.py to export new types"
+          done: false
+
+    - phase: "Phase 2: Refactor Transform to return DataFrames directly"
+      done: false
+      items:
+        - summary: "Modify _transform_source_data() (benchmark.py:1287) to return staged_data dict[str, pd.DataFrame] instead of staging CSV file paths"
+          done: false
+        - summary: "Modify _transform_csv_file(), _transform_xml_file(), _transform_fixed_width_file(), _transform_json_file() to return (table_name, pd.DataFrame)"
+          done: false
+        - summary: "Modify _transform_source_data_parallel() (benchmark.py:1314) to use same aggregation pattern"
+          done: false
+
+    - phase: "Phase 3: Rewire run_etl_pipeline and entry points to use backend"
+      done: false
+      items:
+        - summary: "Refactor run_etl_pipeline() (benchmark.py:1169) to accept backend: TPCDIETLBackend instead of connection"
+          done: false
+          subtasks:
+            - summary: "Shared flow: Extract -> Transform -> backend.load_dataframes() -> backend.validate_results()"
+              done: false
+        - summary: "Rewire execute_dataframe_workload() (benchmark.py:612) to resolve maintenance ops and create DataFrameETLBackend"
+          done: false
+          subtasks:
+            - summary: "Replace _resolve_platform_connection() with get_maintenance_operations_for_platform(platform_name)"
+              done: false
+            - summary: "Remove SQLConnectionProvider import and error path"
+              done: false
+        - summary: "Rewire run_etl_benchmark() (benchmark.py:1955) to create SQLETLBackend from connection"
+          done: false
+        - summary: "Rewire _execute_etl_stage_queries() (benchmark.py:736) to accept backend instead of connection"
+          done: false
+        - summary: "Delete _resolve_platform_connection() (benchmark.py:721) — dead code"
+          done: false
+
+    - phase: "Phase 4: Remove SQLConnectionProvider entirely"
+      done: false
+      items:
+        - summary: "Remove SQLConnectionProvider protocol and get_sql_connection() from DataFrameContext/DataFrameContextImpl in benchbox/core/dataframe/context.py"
+          done: false
+        - summary: "Remove SQLConnectionProvider from benchbox/core/dataframe/__init__.py imports and __all__"
+          done: false
+        - summary: "Remove get_sql_connection() from BenchmarkExecutionMixin in benchbox/platforms/dataframe/benchmark_mixin.py"
+          done: false
+
+    - phase: "Phase 5: Update and add tests"
+      done: false
+      items:
+        - summary: "Rewrite tests/unit/core/tpcdi/test_tpcdi_dataframe_workload.py for backend-based mocking"
+          done: false
+          subtasks:
+            - summary: "Remove _ConnectionProvider class; mock get_maintenance_operations_for_platform instead"
+              done: false
+            - summary: "Add test_execute_dataframe_workload_never_uses_sql_connection"
+              done: false
+            - summary: "Rename fails_without_platform_connection to fails_without_maintenance_ops"
+              done: false
+        - summary: "Update tests/unit/core/tpcdi/test_tpcdi_sql_dataframe_parity.py for backend parity"
+          done: false
+        - summary: "Delete tests/unit/platforms/dataframe/test_connection_provider_contract.py"
+          done: false
+        - summary: "Create tests/unit/core/tpcdi/test_tpcdi_etl_backend.py with SQL and DataFrame backend unit tests"
+          done: false
+          subtasks:
+            - summary: "Test SQLETLBackend with mock connection"
+              done: false
+            - summary: "Test DataFrameETLBackend with mock DataFrameMaintenanceOperations"
+              done: false
+            - summary: "Verify both backends produce compatible result dictionaries"
+              done: false
+            - summary: "Verify SCD2 operations dispatch correctly per backend"
+              done: false
+
+metadata:
+  owners:
+    - "joe"
+  tags:
+    - "tpcdi"
+    - "dataframe"
+    - "etl"
+    - "architecture"
+    - "sql-decoupling"
+    - "maintenance-operations"
+  estimated_effort: "3-5 days"
+  created_date: "2026-02-08"
+
+impact:
+  business_value: |
+    Enables TPC-DI DataFrame benchmarking on platforms that have no SQL connection
+    (Polars, Delta Lake, Iceberg, etc.) using their native write operations. Currently
+    these platforms cannot run TPC-DI in DataFrame mode because the code requires a
+    SQL connection that doesn't exist.
+  technical_debt: |
+    Removes a fundamental architectural violation where the DataFrame subsystem
+    (benchbox/core/dataframe/) exposes SQL concepts (SQLConnectionProvider,
+    get_sql_connection). Eliminates double CSV serialization in the Transform phase.
+    Establishes a clean backend protocol for mode-specific ETL execution.
+
+files_affected:
+  modified:
+    - "benchbox/core/tpcdi/benchmark.py"
+    - "benchbox/core/tpcdi/etl/__init__.py"
+    - "benchbox/core/dataframe/context.py"
+    - "benchbox/core/dataframe/__init__.py"
+    - "benchbox/platforms/dataframe/benchmark_mixin.py"
+    - "tests/unit/core/tpcdi/test_tpcdi_dataframe_workload.py"
+    - "tests/unit/core/tpcdi/test_tpcdi_sql_dataframe_parity.py"
+  added:
+    - "benchbox/core/tpcdi/etl/backend.py"
+    - "benchbox/core/tpcdi/etl/sql_backend.py"
+    - "benchbox/core/tpcdi/etl/dataframe_backend.py"
+    - "tests/unit/core/tpcdi/test_tpcdi_etl_backend.py"
+  removed:
+    - "tests/unit/platforms/dataframe/test_connection_provider_contract.py"
+
+must_preserve:
+  - "SQL path (run_etl_benchmark → run_etl_pipeline → SQL INSERT) continues to work exactly as before via SQLETLBackend"
+  - "run_full_benchmark() and all SQL-mode TPC-DI entry points remain unbroken"
+  - "get_dataframe_etl_capabilities() capability checking remains functional"
+  - "TPC-DI stage result schema (query_id, status, execution_time, records_processed, records_loaded, rows_returned, first_row) is unchanged"
+  - "DataFrameMaintenanceOperations protocol and its concrete implementations (Polars, Delta Lake, Iceberg, DuckLake) are not modified"
+  - "ETLPhaseResult, ETLBatchResult, ETLResult dataclasses in etl/results.py are not modified"
+  - "Existing DataFrame platform tests (test_benchmark_mixin.py) continue to pass"
+
+approach: |
+  Reuse existing DataFrameMaintenanceOperations protocol (maintenance_interface.py:300-427)
+  and get_maintenance_operations_for_platform() (maintenance_interface.py:783-866) as the
+  DataFrame backend's write layer. Follow the WritePrimitivesBenchmark pattern
+  (write_primitives/benchmark.py:1196-1287) for capability-driven DataFrame execution.
+
+  Extract SQL logic from benchmark.py into SQLETLBackend — this is a move, not a rewrite.
+  The _load_warehouse_data(), validate_etl_results(), and SCD processor SQL methods become
+  methods on SQLETLBackend. The existing run_etl_pipeline() becomes the shared orchestrator
+  that accepts a backend parameter instead of a connection.
+
+  Phase order matters: backend protocol first, then Transform refactor, then wiring, then
+  cleanup. Run tests after each phase.
+
+anti_patterns:
+  - "DO NOT create a new write abstraction — because DataFrameMaintenanceOperations already provides insert_rows/update_rows/merge_rows with per-platform implementations — delegate to it"
+  - "DO NOT keep staging CSV files as an intermediate format — because the Transform phase already produces pandas DataFrames internally and writing/reading CSVs is wasteful double I/O — return DataFrames directly"
+  - "DO NOT leave SQLConnectionProvider in benchbox/core/dataframe/ — because the DataFrame subsystem should never expose SQL concepts — remove it entirely"
+  - "DO NOT modify the SQL path behavior — because run_etl_benchmark and run_full_benchmark must continue working identically — only extract their logic into SQLETLBackend"
+
+verification:
+  - description: "All TPC-DI unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/tpcdi/ -v"
+    expected_output: "All tests pass, 0 failures"
+  - description: "All DataFrame platform tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/ -v"
+    expected_output: "All tests pass, 0 failures"
+  - description: "No SQLConnectionProvider references remain in benchbox/"
+    command: "grep -r 'SQLConnectionProvider' benchbox/"
+    expected_output: "No output (zero hits)"
+  - description: "No get_sql_connection references remain in benchbox/"
+    command: "grep -r 'get_sql_connection' benchbox/"
+    expected_output: "No output (zero hits)"
+  - description: "Lint passes"
+    command: "uv run ruff check ."
+    expected_output: "No lint errors"
+  - description: "Fast test suite passes"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "All fast-marked tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpcdi/"
+    - "benchbox/core/dataframe/context.py"
+    - "benchbox/core/dataframe/__init__.py"
+    - "benchbox/platforms/dataframe/benchmark_mixin.py"
+    - "tests/unit/core/tpcdi/"
+    - "tests/unit/platforms/dataframe/test_connection_provider_contract.py"
+    - "tests/unit/platforms/dataframe/test_benchmark_mixin.py"
+  do_not_modify:
+    - "benchbox/core/dataframe/maintenance_interface.py"
+    - "benchbox/core/dataframe/query.py"
+    - "benchbox/core/tpcdi/etl/results.py"
+    - "benchbox/cli/"
+    - "benchbox/platforms/base/"
+
+dependencies:
+  related:
+    - "_project/DONE/dataframe-benchmarks/active/unify-tpcdi-sql-dataframe-execution-contract.yaml"
+    - "_project/TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml"
+
+commits:
+  - "8e66b2b5"
+  - "b79b3889"
+  - "9578b9a8"
+
+context_sections:
+  "Predecessor": |
+    The completed TODO "Unify TPC-DI SQL/DataFrame Execution Contract" (b79b3889)
+    unified the SQL and DataFrame paths through a shared _execute_etl_stage_queries()
+    method but introduced SQLConnectionProvider — requiring DataFrame adapters to
+    expose SQL connections. This was identified as a fundamental architectural defect
+    in review: DataFrame mode should never touch SQL.
+
+  "What Already Exists for Reuse": |
+    1. DataFrameMaintenanceOperations protocol (maintenance_interface.py:300-427)
+       with insert_rows, delete_rows, update_rows, merge_rows
+    2. Concrete implementations for Polars, Delta Lake, Iceberg, DuckLake, Hudi, PySpark
+    3. get_maintenance_operations_for_platform() factory (maintenance_interface.py:783-866)
+    4. DataFrameMaintenanceCapabilities with supports_transactions, supports_insert, etc.
+    5. WritePrimitivesBenchmark.execute_dataframe_workload() as a pattern for
+       capability-driven DataFrame workloads
+    6. FinWireProcessor and CustomerManagementXMLParser are already SQL-free parsers
+    7. TransformationRule ABC and DataTypeTransformation are pure pandas logic
+    8. get_dataframe_etl_capabilities() already queries the maintenance interface
+
+  "Definition of Done": |
+    - DataFrame TPC-DI path uses DataFrameMaintenanceOperations exclusively (no SQL)
+    - SQL TPC-DI path works identically to before via SQLETLBackend
+    - Both paths share Extract + Transform orchestration
+    - SQLConnectionProvider and get_sql_connection removed from codebase
+    - Transform produces DataFrames directly (no intermediate CSV files)
+    - All tests pass including new backend-specific tests
+
+success_metrics:
+  - "TPC-DI DataFrame workload executes without any SQL connection"
+  - "SQLETLBackend passes all existing SQL-path TPC-DI tests"
+  - "DataFrameETLBackend delegates to DataFrameMaintenanceOperations for all writes"
+  - "Zero references to SQLConnectionProvider or get_sql_connection in benchbox/"
+  - "Transform phase has zero intermediate file I/O (DataFrames flow directly to Load)"
