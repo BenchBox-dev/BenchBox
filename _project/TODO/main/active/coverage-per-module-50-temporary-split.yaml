@@ -135,14 +135,14 @@ tasks:
             - summary: "tests/unit/core/tuning/generators/test_firebolt_ddl.py → core/tuning/generators/firebolt.py (19% → 50%, ~4 tests)"
               done: true
         - summary: "Batch 3B: Credentials (3 files, ~21 tests)"
-          done: false
+          done: true
           subtasks:
             - summary: "tests/unit/platforms/credentials/test_snowflake_coverage.py → platforms/credentials/snowflake.py (32% → 50%, ~6 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/credentials/test_bigquery_coverage.py → platforms/credentials/bigquery.py (29% → 50%, ~6 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/credentials/test_databricks_credentials_coverage.py → platforms/databricks/credentials.py (28% → 50%, ~6 tests)"
-              done: false
+              done: true
         - summary: "Batch 3C: TPC benchmark runners (4 files, ~22 tests)"
           done: false
           subtasks:
@@ -323,7 +323,7 @@ metadata:
     - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-08T22:15:00"
+  last_updated: "2026-02-08T22:40:00"
 
 impact:
   business_value: |
