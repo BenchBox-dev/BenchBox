@@ -61,14 +61,14 @@ tasks:
       done: false
       items:
         - summary: "Batch 2A: Trivial small modules (3 files, ~8 tests)"
-          done: false
+          done: true
           subtasks:
             - summary: "tests/unit/core/visualization/test_visualization_exceptions.py → core/visualization/exceptions.py (33% → 50%, ~3 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/tpcds/schema/test_tpcds_schema_registry.py → core/tpcds/schema/registry.py (27% → 50%, ~3 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/dataframe/test_dataframe_init.py → platforms/dataframe/__init__.py (46% → 50%, ~2 tests)"
-              done: false
+              done: true
         - summary: "Batch 2B: Utils/core near-50% (5 files, ~15 tests)"
           done: false
           subtasks:
@@ -323,7 +323,7 @@ metadata:
     - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-08T14:25:00"
+  last_updated: "2026-02-08T15:10:00"
 
 impact:
   business_value: |
