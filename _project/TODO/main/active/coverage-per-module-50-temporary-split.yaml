@@ -98,18 +98,18 @@ tasks:
             - summary: "tests/unit/platforms/gcp/test_dataproc_coverage.py → platforms/gcp/dataproc_adapter.py (43% → 50%, ~3 tests)"
               done: true
         - summary: "Batch 2D: Core benchmark modules near-50% (5 files, ~18 tests)"
-          done: false
+          done: true
           subtasks:
             - summary: "tests/unit/core/tpcds/test_tpcds_maintenance_coverage.py → core/tpcds/maintenance_test.py (48% → 50%, ~3 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/tpcds/generator/test_streaming_coverage.py → core/tpcds/generator/streaming.py (45% → 50%, ~4 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/dataframe/test_pyspark_maintenance_coverage.py → platforms/dataframe/pyspark_maintenance.py (44% → 50%, ~3 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/tpch_skew/test_tpch_skew_benchmark_coverage.py → core/tpch_skew/benchmark.py (39% → 50%, ~4 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/test_cudf_coverage.py → platforms/cudf.py (42% → 50%, ~4 tests)"
-              done: false
+              done: true
         - summary: "Batch 2E: MCP and misc (2 files, ~6 tests)"
           done: false
           subtasks:
@@ -323,7 +323,7 @@ metadata:
     - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-08T18:05:00"
+  last_updated: "2026-02-08T20:35:00"
 
 impact:
   business_value: |
