@@ -58,7 +58,7 @@ tasks:
           done: true
 
     - phase: "Phase 2: Quick wins — modules at 43-49% (21 files, ~55 tests)"
-      done: false
+      done: true
       items:
         - summary: "Batch 2A: Trivial small modules (3 files, ~8 tests)"
           done: true
@@ -111,12 +111,12 @@ tasks:
             - summary: "tests/unit/platforms/test_cudf_coverage.py → platforms/cudf.py (42% → 50%, ~4 tests)"
               done: true
         - summary: "Batch 2E: MCP and misc (2 files, ~6 tests)"
-          done: false
+          done: true
           subtasks:
             - summary: "tests/unit/mcp/test_mcp_init_coverage.py → mcp/__init__.py (31% → 50%, ~3 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/utils/format_converters/test_vortex_converter_coverage.py → utils/format_converters/vortex_converter.py (14% → 50%, ~3 tests)"
-              done: false
+              done: true
 
     - phase: "Phase 3: Medium effort — tuning, credentials, TPC runners, adapters (20 files, ~95 tests)"
       done: false
@@ -323,7 +323,7 @@ metadata:
     - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-08T20:35:00"
+  last_updated: "2026-02-08T21:00:00"
 
 impact:
   business_value: |
