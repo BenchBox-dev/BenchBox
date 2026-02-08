@@ -1,5 +1,5 @@
-generated_at: '2026-02-08T13:31:41.492229'
-total_items: 425
+generated_at: '2026-02-08T13:46:58.126460'
+total_items: 426
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1674,6 +1674,23 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Small
+- id: remove-sql-coupling-from-tpcdi-dataframe-mode
+  file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
+  title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tpcdi
+  - dataframe
+  - etl
+  - architecture
+  - sql-decoupling
+  - maintenance-operations
+  owners:
+  - joe
+  estimated_effort: 3-5 days
 - id: comparison-matrix-restructure
   file: DONE/docs-experience/active/comparison-matrix-restructure.yaml
   title: Restructure Platform Comparison Matrix with Grouped Categories

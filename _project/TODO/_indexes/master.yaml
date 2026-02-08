@@ -1,5 +1,5 @@
-generated_at: '2026-02-08T13:38:52.023321'
-total_items: 46
+generated_at: '2026-02-08T13:46:57.148346'
+total_items: 45
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -97,23 +97,6 @@ items:
   - tuning
   - ci
   estimated_effort: Large
-- id: remove-sql-coupling-from-tpcdi-dataframe-mode
-  file: TODO/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
-  title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - tpcdi
-  - dataframe
-  - etl
-  - architecture
-  - sql-decoupling
-  - maintenance-operations
-  owners:
-  - joe
-  estimated_effort: 3-5 days
 - id: siriusdb-adapter
   file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
   title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter

@@ -1,8 +1,8 @@
-generated_at: '2026-02-08T13:38:52.023389'
-total_items: 46
+generated_at: '2026-02-08T13:46:57.148401'
+total_items: 45
 statuses:
   In Progress:
-    count: 4
+    count: 3
     items:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
@@ -19,11 +19,6 @@ statuses:
       title: Raise benchbox/ per-module coverage to >=50% with temporary split
       priority: High
       category: Testing and Quality Assurance
-    - id: remove-sql-coupling-from-tpcdi-dataframe-mode
-      file: TODO/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
-      title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
-      priority: High
-      category: Core Functionality
   Not Started:
     count: 42
     items:

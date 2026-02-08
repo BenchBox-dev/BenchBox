@@ -1,5 +1,5 @@
-generated_at: '2026-02-08T13:31:41.492665'
-total_items: 425
+generated_at: '2026-02-08T13:46:58.126843'
+total_items: 426
 statuses:
   In Progress:
     count: 1
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 281
+    count: 282
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -1700,6 +1700,11 @@ statuses:
       title: Remove Polars SQL mode support - DataFrame only
       priority: Medium-High
       category: Platform Expansion
+    - id: remove-sql-coupling-from-tpcdi-dataframe-mode
+      file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
+      title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
+      priority: High
+      category: Core Functionality
     - id: resource-management
       file: DONE/runtime-ops/completed/resource-management.yaml
       title: Resource Management

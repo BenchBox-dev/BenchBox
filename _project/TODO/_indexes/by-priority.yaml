@@ -1,5 +1,5 @@
-generated_at: '2026-02-08T13:38:52.023377'
-total_items: 46
+generated_at: '2026-02-08T13:46:57.148388'
+total_items: 45
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 6
+    count: 5
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -36,11 +36,6 @@ priorities:
       file: TODO/main/active/coverage-per-module-50-temporary-split.yaml
       title: Raise benchbox/ per-module coverage to >=50% with temporary split
       category: Testing and Quality Assurance
-      status: In Progress
-    - id: remove-sql-coupling-from-tpcdi-dataframe-mode
-      file: TODO/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
-      title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
-      category: Core Functionality
       status: In Progress
   Medium-High:
     count: 8

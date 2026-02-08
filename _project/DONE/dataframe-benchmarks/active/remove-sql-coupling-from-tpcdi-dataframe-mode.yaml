@@ -1,7 +1,7 @@
 title: "Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol"
 worktree: "dataframe-benchmarks"
 priority: "High"
-status: "Not Started"
+status: "Completed"
 description: |
   TPC-DI's execute_dataframe_workload() currently resolves a SQL connection via
   SQLConnectionProvider.get_sql_connection() and passes it to run_etl_pipeline(),
@@ -138,6 +138,7 @@ metadata:
     - "maintenance-operations"
   estimated_effort: "3-5 days"
   created_date: "2026-02-08"
+  completed_date: "2026-02-08"
 
 impact:
   business_value: |

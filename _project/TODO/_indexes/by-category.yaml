@@ -1,4 +1,4 @@
-generated_at: '2026-02-08T13:38:52.023361'
+generated_at: '2026-02-08T13:46:57.148374'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -86,7 +86,7 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 6
+    count: 5
     items:
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -108,11 +108,6 @@ categories:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
-    - id: remove-sql-coupling-from-tpcdi-dataframe-mode
-      file: TODO/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
-      title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
-      priority: High
-      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

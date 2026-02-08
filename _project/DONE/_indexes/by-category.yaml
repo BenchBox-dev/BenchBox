@@ -1,4 +1,4 @@
-generated_at: '2026-02-08T13:31:41.492445'
+generated_at: '2026-02-08T13:46:58.126638'
 total_categories: 55
 categories:
   '"Bug Fixes & Reliability"':
@@ -353,7 +353,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 109
+    count: 110
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -859,6 +859,11 @@ categories:
     - id: refactor-core-dependencies-to-optional
       file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
       title: Refactor platform-specific packages from core to optional dependencies
+      priority: High
+      status: Completed
+    - id: remove-sql-coupling-from-tpcdi-dataframe-mode
+      file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
+      title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
       priority: High
       status: Completed
     - id: result-schema-v2-redesign

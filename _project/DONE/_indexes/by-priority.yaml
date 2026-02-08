@@ -1,5 +1,5 @@
-generated_at: '2026-02-08T13:31:41.492565'
-total_items: 425
+generated_at: '2026-02-08T13:46:58.126747'
+total_items: 426
 priorities:
   Critical:
     count: 28
@@ -145,7 +145,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 143
+    count: 144
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -628,6 +628,11 @@ priorities:
       title: Register PySpark SQL mode in platform registry
       category: Platform Expansion
       status: Not Started
+    - id: remove-sql-coupling-from-tpcdi-dataframe-mode
+      file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
+      title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
+      category: Core Functionality
+      status: Completed
     - id: comparison-matrix-restructure
       file: DONE/docs-experience/active/comparison-matrix-restructure.yaml
       title: Restructure Platform Comparison Matrix with Grouped Categories
