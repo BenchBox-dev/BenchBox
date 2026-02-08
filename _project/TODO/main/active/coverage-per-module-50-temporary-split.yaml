@@ -122,18 +122,18 @@ tasks:
       done: false
       items:
         - summary: "Batch 3A: Tuning subsystem (5 files, ~32 tests)"
-          done: false
+          done: true
           subtasks:
             - summary: "tests/unit/core/tuning/test_tuning_validation.py → core/tuning/validation.py (13% → 50%, ~10 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/tuning/test_tuning_metadata.py → core/tuning/metadata.py (13% → 50%, ~10 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/tuning/generators/test_azure_synapse_ddl.py → core/tuning/generators/azure_synapse.py (24% → 50%, ~4 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/tuning/generators/test_clickhouse_ddl.py → core/tuning/generators/clickhouse.py (22% → 50%, ~4 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/tuning/generators/test_firebolt_ddl.py → core/tuning/generators/firebolt.py (19% → 50%, ~4 tests)"
-              done: false
+              done: true
         - summary: "Batch 3B: Credentials (3 files, ~21 tests)"
           done: false
           subtasks:
@@ -323,7 +323,7 @@ metadata:
     - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-08T21:00:00"
+  last_updated: "2026-02-08T22:15:00"
 
 impact:
   business_value: |
