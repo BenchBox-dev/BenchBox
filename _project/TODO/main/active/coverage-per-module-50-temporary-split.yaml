@@ -83,20 +83,20 @@ tasks:
             - summary: "tests/unit/platforms/test_clickhouse_cloud_coverage.py → platforms/clickhouse_cloud.py (46% → 50%, ~2 tests)"
               done: true
         - summary: "Batch 2C: Platform adapters near-50% (6 files, ~16 tests)"
-          done: false
+          done: true
           subtasks:
             - summary: "tests/unit/platforms/test_azure_synapse_coverage.py → platforms/azure_synapse.py (49% → 50%, ~3 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/gcp/test_dataproc_serverless_coverage.py → platforms/gcp/dataproc_serverless_adapter.py (49% → 50%, ~2 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/test_timescaledb_coverage.py → platforms/timescaledb.py (48% → 50%, ~2 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/aws/test_athena_spark_coverage.py → platforms/aws/athena_spark_adapter.py (45% → 50%, ~3 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/azure/test_synapse_spark_coverage.py → platforms/azure/synapse_spark_adapter.py (44% → 50%, ~3 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/gcp/test_dataproc_coverage.py → platforms/gcp/dataproc_adapter.py (43% → 50%, ~3 tests)"
-              done: false
+              done: true
         - summary: "Batch 2D: Core benchmark modules near-50% (5 files, ~18 tests)"
           done: false
           subtasks:
@@ -323,7 +323,7 @@ metadata:
     - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-08T16:30:00"
+  last_updated: "2026-02-08T18:05:00"
 
 impact:
   business_value: |
