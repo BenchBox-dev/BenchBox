@@ -70,18 +70,18 @@ tasks:
             - summary: "tests/unit/platforms/dataframe/test_dataframe_init.py → platforms/dataframe/__init__.py (46% → 50%, ~2 tests)"
               done: true
         - summary: "Batch 2B: Utils/core near-50% (5 files, ~15 tests)"
-          done: false
+          done: true
           subtasks:
             - summary: "tests/unit/utils/test_verbosity_coverage.py → utils/verbosity.py (49% → 50%, ~3 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/visualization/test_visualization_exporters.py → core/visualization/exporters.py (44% → 50%, ~4 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/examples/test_dryrun_utils.py → examples/dryrun_utils.py (47% → 50%, ~2 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/tsbs_devops/test_tsbs_benchmark_coverage.py → core/tsbs_devops/benchmark.py (43% → 50%, ~4 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/test_clickhouse_cloud_coverage.py → platforms/clickhouse_cloud.py (46% → 50%, ~2 tests)"
-              done: false
+              done: true
         - summary: "Batch 2C: Platform adapters near-50% (6 files, ~16 tests)"
           done: false
           subtasks:
@@ -323,7 +323,7 @@ metadata:
     - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-08T15:10:00"
+  last_updated: "2026-02-08T16:30:00"
 
 impact:
   business_value: |
