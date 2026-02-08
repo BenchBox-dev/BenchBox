@@ -30,7 +30,7 @@ description: |
 
   Reference: https://fireducks-dev.github.io/docs/user-guide/01-intro/
 
-category: Platform Enhancement
+category: Platform Expansion
 
 tasks:
   phases:
@@ -141,7 +141,7 @@ metadata:
     - drop-in-replacement
     - tpc-h
   estimated_effort: "3-5 days"
-  created_date: "2026-02-07"
+  created_date: "2026-02-08"
 
 impact:
   business_value: |
@@ -199,16 +199,16 @@ anti_patterns:
 verification:
   - description: "All existing DataFrame platform tests still pass"
     command: "uv run -- python -m pytest tests/unit/platforms/dataframe/ -v --ignore=tests/unit/platforms/dataframe/test_fireducks_df.py"
-    expected_output: "All tests pass, 0 failures"
+    expected_output: "Exit code 0, all tests pass with 0 failures"
   - description: "FireDucks adapter unit tests pass"
     command: "uv run -- python -m pytest tests/unit/platforms/dataframe/test_fireducks_df.py -v"
-    expected_output: "All tests pass (or skip if fireducks not installed)"
-  - description: "Lint and type checks pass"
+    expected_output: "Exit code 0 with all tests passed, or all tests skipped if fireducks not installed"
+  - description: "Lint checks pass"
     command: "uv run ruff check benchbox/platforms/dataframe/fireducks_df.py"
-    expected_output: "No errors"
+    expected_output: "Exit code 0, no output (clean lint)"
   - description: "Platform appears in platform checker"
     command: "uv run -- python -c \"from benchbox.platforms.dataframe.platform_checker import DATAFRAME_PLATFORMS; print('fireducks' in DATAFRAME_PLATFORMS)\""
-    expected_output: "True"
+    expected_output: "Prints 'True' to stdout"
 
 scope_limit:
   only_modify:
@@ -223,7 +223,10 @@ scope_limit:
     - benchbox/platforms/dataframe/pandas_family.py
     - benchbox/platforms/dataframe/pandas_df.py
     - benchbox/platforms/dataframe/modin_df.py
-    - benchbox/core/
+    - benchbox/core/dataframe/protocols.py
+    - benchbox/core/dataframe/context.py
+    - benchbox/core/dataframe/benchmark_suite.py
+    - benchbox/core/dataframe/tuning/types.py
 
 technical_requirements:
   constraints:

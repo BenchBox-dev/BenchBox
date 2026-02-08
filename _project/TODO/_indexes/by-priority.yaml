@@ -1,4 +1,4 @@
-generated_at: '2026-02-07T18:29:14.394746'
+generated_at: '2026-02-08T13:48:36.902173'
 total_items: 44
 priorities:
   Critical:
@@ -38,7 +38,7 @@ priorities:
     - id: fireducks-dataframe-adapter
       file: TODO/dataframe-expansion/planning/fireducks-dataframe-adapter.yaml
       title: Add FireDucks DataFrame platform support
-      category: Platform Enhancement
+      category: Platform Expansion
       status: Not Started
     - id: fabric-spark-notebooks-platform
       file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml

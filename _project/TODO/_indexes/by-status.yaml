@@ -1,4 +1,4 @@
-generated_at: '2026-02-07T18:29:14.394768'
+generated_at: '2026-02-08T13:48:36.902216'
 total_items: 44
 statuses:
   In Progress:
@@ -31,7 +31,7 @@ statuses:
       file: TODO/dataframe-expansion/planning/fireducks-dataframe-adapter.yaml
       title: Add FireDucks DataFrame platform support
       priority: Medium-High
-      category: Platform Enhancement
+      category: Platform Expansion
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
