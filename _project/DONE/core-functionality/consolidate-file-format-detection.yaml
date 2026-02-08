@@ -1,7 +1,8 @@
 title: "Consolidate file format detection to handle compressed and sharded files"
 worktree: core-functionality
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-02-07"
 category: Code Quality
 description: |
   The codebase has inconsistent file format detection patterns that fail to handle:
@@ -20,48 +21,48 @@ description: |
 tasks:
   phases:
     - phase: "Phase 1: Add New Utilities"
-      done: false
+      done: true
       items:
         - summary: "Add is_parquet_format() to benchbox/utils/file_format.py"
-          done: false
+          done: true
         - summary: "Add is_csv_format() to benchbox/utils/file_format.py"
-          done: false
+          done: true
         - summary: "Add unit tests for new utilities"
-          done: false
+          done: true
 
     - phase: "Phase 2: Update Platform Adapters"
-      done: false
+      done: true
       items:
         - summary: "fabric_warehouse.py:928-929 - Replace suffix == '.parquet' with is_parquet_format()"
-          done: false
+          done: true
         - summary: "postgresql.py:458-460,473 - Replace suffix checks with get_delimiter_for_file() and is_tpc_format()"
-          done: false
+          done: true
         - summary: "snowpark_connect.py:348 - Replace suffix == '.parquet' with is_parquet_format()"
-          done: false
+          done: true
 
     - phase: "Phase 3: Update DataFrame and Base Utilities"
-      done: false
+      done: true
       items:
         - summary: "pandas_family.py:1225-1231 - Replace _detect_format() implementation with detect_data_format()"
-          done: false
+          done: true
         - summary: "base/utils.py:42 - Replace endswith('.parquet') with is_parquet_format()"
-          done: false
+          done: true
 
     - phase: "Phase 4: Update Core Components"
-      done: false
+      done: true
       items:
         - summary: "tpcds/benchmark/runner.py:1016 - Replace suffix == '.csv' with get_delimiter_for_file()"
-          done: false
+          done: true
 
     - phase: "Phase 5: Verification"
-      done: false
+      done: true
       items:
         - summary: "Run lint checks"
-          done: false
+          done: true
         - summary: "Run file_format unit tests"
-          done: false
+          done: true
         - summary: "Run smoke tests"
-          done: false
+          done: true
 
 metadata:
   tags:
@@ -78,40 +79,23 @@ context_sections:
     In `benchbox/utils/file_format.py`:
     - `detect_data_format(path)` - Returns format name ('parquet', 'tbl', 'csv'), handles compression
     - `is_tpc_format(path)` - Returns True for .tbl/.dat, handles compression
+    - `is_parquet_format(path)` - Returns True for .parquet, handles compression
+    - `is_csv_format(path)` - Returns True for .csv, handles compression
     - `get_delimiter_for_file(path)` - Returns "|" for TPC, "," otherwise
     - `COMPRESSION_EXTENSIONS` - frozenset of compression extensions
 
     In `benchbox/platforms/base/data_loading.py`:
     - `FileFormatRegistry.get_base_data_extension()` - Handles sharding AND compression properly
 
-  "Missing Utilities": |
-    Need to add (following same pattern as is_tpc_format):
-    - `is_parquet_format(path)` - True for .parquet files including .parquet.zst
-    - `is_csv_format(path)` - True for .csv files including .csv.gz
-
-  "Pattern to Follow": |
-    The existing `is_tpc_format()` shows the correct pattern:
-
-    ```python
-    def is_tpc_format(path: Union[str, Path]) -> bool:
-        path = Path(path)
-        for suffix in path.suffixes:
-            suffix_lower = suffix.lower()
-            if suffix_lower in COMPRESSION_EXTENSIONS:
-                continue
-            return suffix_lower in TPC_FORMAT_EXTENSIONS
-        return False
-    ```
-
-  "Locations Requiring Fixes": |
-    | File | Line | Pattern | Issue |
-    |------|------|---------|-------|
-    | fabric_warehouse.py | 928-929 | `suffix == ".parquet"` | Doesn't handle .parquet.zst |
-    | postgresql.py | 458-460 | `suffix == ".tbl/.csv"` | Doesn't handle compression |
-    | pandas_family.py | 1225-1231 | `suffix == ".parquet"` | Doesn't handle compression |
-    | snowpark_connect.py | 348 | `suffix == ".parquet"` | Doesn't handle compression |
-    | base/utils.py | 42 | `endswith(".parquet")` | Doesn't handle sharding |
-    | tpcds/runner.py | 1016 | `suffix == ".csv"` | Doesn't handle compression |
+  "Locations Updated": |
+    | File | Lines | Utility Used | Status |
+    |------|-------|-------------|--------|
+    | fabric_warehouse.py | 932, 935, 940 | is_parquet_format(), is_tpc_format(), get_delimiter_for_file() | Done |
+    | postgresql.py | 459, 469 | get_delimiter_for_file(), is_tpc_format() | Done |
+    | snowpark_connect.py | 349 | is_parquet_format() | Done |
+    | pandas_family.py | 1228 | detect_data_format() | Done |
+    | base/utils.py | 42, 49 | is_parquet_format(), is_tpc_format() | Done |
+    | tpcds/benchmark/runner.py | 1017 | get_delimiter_for_file() | Done |
 
 impact:
   technical_debt: |
@@ -162,3 +146,17 @@ success_metrics:
   - "No direct suffix checks for .parquet, .csv, .tbl, .dat"
   - "Compressed files correctly detected (data.parquet.zst, data.csv.gz)"
   - "All tests pass"
+
+sections:
+  "Implementation Summary": |
+    All work was completed as part of prior commits that added is_parquet_format()
+    and is_csv_format() to file_format.py and updated all 6 call sites to use
+    centralized utilities. Tests cover all new functions with 159 passing tests
+    in test_file_format.py.
+
+  "Results": |
+    - All 159 file_format unit tests pass
+    - Lint checks pass (All checks passed!)
+    - 10,484 fast tests pass
+    - All 6 locations confirmed using centralized utilities
+    - No direct suffix checks remain for .parquet, .csv, .tbl, .dat
