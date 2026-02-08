@@ -1,7 +1,8 @@
 title: "Add FireDucks DataFrame platform support"
 worktree: dataframe-expansion
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-02-08"
 description: |
   Implement a FireDucks DataFrame adapter for BenchBox, enabling TPC-H benchmark
   execution using the FireDucks library. FireDucks is a compiler-accelerated
@@ -35,102 +36,102 @@ category: Platform Expansion
 tasks:
   phases:
     - phase: "Phase 1: Core Adapter Implementation"
-      done: false
+      done: true
       items:
         - summary: "Create FireDucksDataFrameAdapter class extending PandasFamilyAdapter"
-          done: false
+          done: true
           subtasks:
             - summary: "Create benchbox/platforms/dataframe/fireducks_df.py"
-              done: false
+              done: true
             - summary: "Implement try/except import pattern for fireducks.pandas"
-              done: false
+              done: true
             - summary: "Set FIREDUCKS_AVAILABLE flag for optional dependency handling"
-              done: false
+              done: true
         - summary: "Implement data loading methods (read_csv, read_parquet)"
-          done: false
+          done: true
           subtasks:
             - summary: "Implement read_csv with TPC .tbl file handling (trailing delimiter)"
-              done: false
+              done: true
             - summary: "Implement read_parquet with dtype_backend support"
-              done: false
+              done: true
         - summary: "Implement core DataFrame operations"
-          done: false
+          done: true
           subtasks:
             - summary: "Implement to_datetime, timedelta_days, concat, get_row_count"
-              done: false
+              done: true
             - summary: "Implement merge, groupby_agg, filter_rows, sort_values"
-              done: false
+              done: true
             - summary: "Implement select_columns, with_column, _get_first_row"
-              done: false
+              done: true
         - summary: "Implement platform_name property returning 'FireDucks'"
-          done: false
+          done: true
         - summary: "Implement _apply_tuning for FireDucks-specific settings"
-          done: false
+          done: true
 
     - phase: "Phase 2: Registration and Integration"
-      done: false
+      done: true
       items:
         - summary: "Register adapter in benchbox/platforms/dataframe/__init__.py"
-          done: false
+          done: true
           subtasks:
             - summary: "Add try/except import for FireDucksDataFrameAdapter"
-              done: false
+              done: true
             - summary: "Add FIREDUCKS_AVAILABLE to exports"
-              done: false
+              done: true
             - summary: "Add to __all__ list"
-              done: false
+              done: true
         - summary: "Add platform info to platform_checker.py DATAFRAME_PLATFORMS registry"
-          done: false
+          done: true
           subtasks:
             - summary: "Register as Pandas family with import_name='fireducks'"
-              done: false
+              done: true
             - summary: "Set appropriate min_version constraint"
-              done: false
+              done: true
         - summary: "Update pyproject.toml with optional dependency"
-          done: false
+          done: true
           subtasks:
             - summary: "Add dataframe-fireducks extra: fireducks>=1.0.0"
-              done: false
+              done: true
             - summary: "Add to dataframe-all extra group if it exists"
-              done: false
+              done: true
 
     - phase: "Phase 3: Testing"
-      done: false
+      done: true
       items:
         - summary: "Create unit tests for FireDucksDataFrameAdapter"
-          done: false
+          done: true
           subtasks:
             - summary: "Test adapter initialization and import handling"
-              done: false
+              done: true
             - summary: "Test read_csv with standard CSV and TPC .tbl files"
-              done: false
+              done: true
             - summary: "Test read_parquet"
-              done: false
+              done: true
             - summary: "Test DataFrame operations (merge, groupby_agg, filter, sort)"
-              done: false
+              done: true
             - summary: "Test platform_name and platform_info"
-              done: false
+              done: true
         - summary: "Create integration tests with TPC-H queries"
-          done: false
+          done: true
           subtasks:
             - summary: "Test TPC-H SF=0.01 data loading"
-              done: false
+              done: true
             - summary: "Test TPC-H Q1 (aggregation heavy)"
-              done: false
+              done: true
             - summary: "Test TPC-H Q6 (filter + aggregate)"
-              done: false
+              done: true
             - summary: "Verify row counts match expected results"
-              done: false
+              done: true
         - summary: "Run existing Pandas family test suite to verify compatibility"
-          done: false
+          done: true
 
     - phase: "Phase 4: Documentation and Examples"
-      done: false
+      done: true
       items:
         - summary: "Add FireDucks to DataFrame platform comparison documentation"
-          done: false
+          done: true
         - summary: "Create tuning profile example (examples/tunings/dataframe/fireducks_default.yaml)"
-          done: false
+          done: true
 
 metadata:
   tags:
