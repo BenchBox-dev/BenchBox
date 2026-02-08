@@ -144,16 +144,16 @@ tasks:
             - summary: "tests/unit/platforms/credentials/test_databricks_credentials_coverage.py → platforms/databricks/credentials.py (28% → 50%, ~6 tests)"
               done: true
         - summary: "Batch 3C: TPC benchmark runners (4 files, ~22 tests)"
-          done: false
+          done: true
           subtasks:
             - summary: "tests/unit/core/tpcds/benchmark/test_tpcds_runner_coverage.py → core/tpcds/benchmark/runner.py (34% → 50%, ~7 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/tpcds/test_throughput_test_coverage.py → core/tpcds/throughput_test.py (32% → 50%, ~5 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/tpch/test_official_benchmark_coverage.py → core/tpch/official_benchmark.py (32% → 50%, ~4 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py → core/transaction_primitives/dataframe_operations.py (38% → 50%, ~6 tests)"
-              done: false
+              done: true
         - summary: "Batch 3D: Platform adapters (5 files, ~24 tests)"
           done: false
           subtasks:
@@ -323,7 +323,7 @@ metadata:
     - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-08T22:40:00"
+  last_updated: "2026-02-08T23:30:00"
 
 impact:
   business_value: |
