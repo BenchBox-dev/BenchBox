@@ -5,7 +5,7 @@ id: compare-command-unification
 title: Unify compare and compare-plans commands
 category: ux-improvements
 priority: P2
-status: completed
+status: Completed
 created: 2025-01-15
 completed_date: "2025-12-14"
 estimated_effort: medium

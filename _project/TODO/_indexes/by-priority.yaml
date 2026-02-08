@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T15:08:21.327582'
-total_items: 44
+generated_at: '2026-02-08T13:30:22.374812'
+total_items: 45
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 4
+    count: 5
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -32,6 +32,11 @@ priorities:
       title: MotherDuck Platform Adapter
       category: Platform Expansion
       status: In Progress
+    - id: coverage-per-module-50-temporary-split
+      file: TODO/main/planning/coverage-per-module-50-temporary-split.yaml
+      title: Raise benchbox/ per-module coverage to >=50% with temporary split
+      category: Testing and Quality Assurance
+      status: Not Started
   Medium-High:
     count: 8
     items:

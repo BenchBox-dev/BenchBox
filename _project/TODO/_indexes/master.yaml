@@ -1,5 +1,5 @@
-generated_at: '2026-02-07T15:08:21.327523'
-total_items: 44
+generated_at: '2026-02-08T13:30:22.374739'
+total_items: 45
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -80,6 +80,23 @@ items:
   - duckdb
   - cloud
   estimated_effort: 3-4 days
+- id: coverage-per-module-50-temporary-split
+  file: TODO/main/planning/coverage-per-module-50-temporary-split.yaml
+  title: Raise benchbox/ per-module coverage to >=50% with temporary split
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: Not Started
+  tags:
+  - testing
+  - coverage
+  - core
+  - cli
+  - tpcdi
+  - platforms
+  - tuning
+  - ci
+  estimated_effort: Large
 - id: siriusdb-adapter
   file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
   title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
