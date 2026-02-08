@@ -41,21 +41,21 @@ description: |
 tasks:
   phases:
     - phase: "Phase 1: Add active-scope per-file coverage gate"
-      done: false
+      done: true
       items:
         - summary: "Add scripts/check_per_file_coverage.py for coverage.json-based active-scope checks"
-          done: false
+          done: true
           subtasks:
             - summary: "Fail when any active-scope benchbox/*.py file is below 50%"
-              done: false
+              done: true
             - summary: "Report sorted failing files with percentage and statement count"
-              done: false
+              done: true
             - summary: "Support deferred list and configurable threshold via CLI flags"
-              done: false
+              done: true
         - summary: "Add make coverage-per-file target and document usage"
-          done: false
+          done: true
         - summary: "Update pyproject coverage omit/deferred notes for temporary split"
-          done: false
+          done: true
 
     - phase: "Phase 2: Quick wins — modules at 43-49% (21 files, ~55 tests)"
       done: false

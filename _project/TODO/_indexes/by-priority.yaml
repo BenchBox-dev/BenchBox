@@ -1,4 +1,4 @@
-generated_at: '2026-02-08T13:31:40.437383'
+generated_at: '2026-02-08T13:38:52.023377'
 total_items: 46
 priorities:
   Critical:
@@ -33,15 +33,15 @@ priorities:
       category: Platform Expansion
       status: In Progress
     - id: coverage-per-module-50-temporary-split
-      file: TODO/main/planning/coverage-per-module-50-temporary-split.yaml
+      file: TODO/main/active/coverage-per-module-50-temporary-split.yaml
       title: Raise benchbox/ per-module coverage to >=50% with temporary split
       category: Testing and Quality Assurance
-      status: Not Started
+      status: In Progress
     - id: remove-sql-coupling-from-tpcdi-dataframe-mode
-      file: TODO/dataframe-benchmarks/planning/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
+      file: TODO/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
       title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
       category: Core Functionality
-      status: Not Started
+      status: In Progress
   Medium-High:
     count: 8
     items:

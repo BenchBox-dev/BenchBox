@@ -1,4 +1,4 @@
-generated_at: '2026-02-08T13:31:40.437367'
+generated_at: '2026-02-08T13:38:52.023361'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -109,10 +109,10 @@ categories:
       priority: Low
       status: Not Started
     - id: remove-sql-coupling-from-tpcdi-dataframe-mode
-      file: TODO/dataframe-benchmarks/planning/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
+      file: TODO/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
       title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
       priority: High
-      status: Not Started
+      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -246,10 +246,10 @@ categories:
       priority: Medium
       status: Not Started
     - id: coverage-per-module-50-temporary-split
-      file: TODO/main/planning/coverage-per-module-50-temporary-split.yaml
+      file: TODO/main/active/coverage-per-module-50-temporary-split.yaml
       title: Raise benchbox/ per-module coverage to >=50% with temporary split
       priority: High
-      status: Not Started
+      status: In Progress
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
