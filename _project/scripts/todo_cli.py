@@ -18,7 +18,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -655,24 +654,41 @@ class TodoCLI:
         if unmet and force:
             print(f"⚠️  Forcing completion of '{work_id}' with unmet dependencies: {', '.join(unmet)}")
 
-        # Regex replacement to preserve file formatting (no YAML round-trip)
-        with open(path) as f:
-            content = f.read()
+        # Structured YAML update to avoid format-sensitive text matching.
+        try:
+            from ruamel.yaml import YAML
+        except ImportError:
+            print(
+                "Missing dependency 'ruamel-yaml'. Install dev dependencies to use structured TODO edits.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
-        # Match the work unit's id line followed by its status line
-        pattern = re.compile(
-            rf"^([ \t]*-\s*id:\s*{re.escape(work_id)}\s*\n"
-            rf"(?:[ \t]+\w[^\n]*\n)*?"  # optional intermediate fields
-            rf"[ \t]+status:\s*)(?:pending|in_progress)(.*)$",
-            re.MULTILINE,
-        )
-        new_content, count = pattern.subn(r"\g<1>done\2", content)
-        if count == 0:
-            print(f"Failed to update {work_id} status in {path} (pattern not matched).", file=sys.stderr)
+        ryaml = YAML()
+        ryaml.preserve_quotes = True
+        ryaml.width = 120
+
+        with open(path) as f:
+            doc = ryaml.load(f)
+
+        doc_work = doc.get("work")
+        if not isinstance(doc_work, list):
+            print(f"Item '{slug}' has no work[] list in YAML document.", file=sys.stderr)
+            sys.exit(1)
+
+        updated = False
+        for u in doc_work:
+            if isinstance(u, dict) and u.get("id") == work_id:
+                u["status"] = "done"
+                updated = True
+                break
+
+        if not updated:
+            print(f"Failed to update {work_id} status in {path} (work id not found during YAML edit).", file=sys.stderr)
             sys.exit(1)
 
         with open(path, "w") as f:
-            f.write(new_content)
+            ryaml.dump(doc, f)
 
         print(f"Marked {slug}/{work_id} as done.")
 
