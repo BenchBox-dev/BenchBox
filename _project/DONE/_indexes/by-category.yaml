@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T09:26:16.854015'
+generated_at: '2026-02-09T09:38:08.989949'
 total_categories: 62
 categories:
   '"Bug Fixes & Reliability"':
@@ -1400,7 +1400,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 43
+    count: 41
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1415,11 +1415,6 @@ categories:
     - id: ducklake-open-table-format
       file: DONE/platform-expansion/planning/ducklake-open-table-format.yaml
       title: Add DuckLake Open Table Format Support
-      priority: Medium-High
-      status: Completed
-    - id: fireducks-dataframe-adapter
-      file: DONE/dataframe-expansion/active/fireducks-dataframe-adapter.yaml
-      title: Add FireDucks DataFrame platform support
       priority: Medium-High
       status: Completed
     - id: add-firebolt-platform-adapter
@@ -1610,11 +1605,6 @@ categories:
     - id: trino-platform-adapter
       file: DONE/platform-expansion-trino/completed/trino-platform-adapter.yaml
       title: Trino Platform Adapter
-      priority: High
-      status: Completed
-    - id: fireducks-integration-gaps
-      file: DONE/dataframe-expansion/planning/fireducks-integration-gaps.yaml
-      title: Wire FireDucks into adapter factory, CLI routing, and platform registry
       priority: High
       status: Completed
   Platform Polish:

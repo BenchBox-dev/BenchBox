@@ -125,7 +125,7 @@ files_affected:
 
 must_preserve:
   - "PandasFamilyAdapter base class interface and all existing method signatures unchanged"
-  - "Existing Pandas-family adapters (pandas_df, modin_df, dask_df, cudf_df, fireducks_df) continue to pass their test suites"
+  - "Existing Pandas-family adapters (pandas_df, modin_df, dask_df, cudf_df) continue to pass their test suites"
   - "adapter_factory.py mapping for existing platforms returns same adapter classes"
   - "Platform registry backward compatible with existing platform names"
 

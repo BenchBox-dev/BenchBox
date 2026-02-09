@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T09:26:15.886633'
+generated_at: '2026-02-09T09:38:07.652725'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -127,7 +127,7 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 15
+    count: 16
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -194,6 +194,11 @@ categories:
       title: MotherDuck Platform Adapter
       priority: High
       status: In Progress
+    - id: reenable-fireducks-after-upstream-fixes
+      file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
+      title: Re-enable FireDucks after upstream stability fixes
+      priority: High
+      status: Not Started
     - id: starburst-platform-adapter
       file: TODO/platform-expansion/planning/starburst-platform-adapter.yaml
       title: Starburst Platform Adapter

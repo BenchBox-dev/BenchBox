@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T09:26:15.886648'
-total_items: 45
+generated_at: '2026-02-09T09:38:07.652770'
+total_items: 46
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 5
+    count: 6
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -37,6 +37,11 @@ priorities:
       title: Raise benchbox/ per-module coverage to >=50% with temporary split
       category: Testing and Quality Assurance
       status: In Progress
+    - id: reenable-fireducks-after-upstream-fixes
+      file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
+      title: Re-enable FireDucks after upstream stability fixes
+      category: Platform Expansion
+      status: Not Started
   Medium-High:
     count: 8
     items:
