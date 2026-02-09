@@ -613,7 +613,7 @@ work:
   summary: "tests/unit/cli/commands/test_compare_plans_coverage.py → cli/commands/compare_plans.py (8% → 50%, ~5 tests)"
   needs:
   - w74
-  status: pending
+  status: done
 - id: w76
   summary: "tests/unit/cli/commands/test_compare_dataframes_coverage.py → cli/commands/compare_dataframes.py (9% → 50%, ~5
     tests)"
