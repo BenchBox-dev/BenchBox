@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T09:23:25.041830'
-total_items: 438
+generated_at: '2026-02-09T09:24:20.612551'
+total_items: 439
 priorities:
   Critical:
     count: 31
@@ -1103,7 +1103,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 207
+    count: 208
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1319,6 +1319,11 @@ priorities:
       file: DONE/docs-experience/planning/azure-fabric-platform-documentation.yaml
       title: Azure Synapse and Fabric Warehouse Documentation
       category: Documentation and User Experience
+      status: Completed
+    - id: bodo-dataframe-platform
+      file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
+      title: Bodo DataFrame Platform Adapter
+      category: Platform Expansion
       status: Completed
     - id: cli-data-only-and-load-only-execution-options
       file: DONE/unknown/planning/cli-data-only-and-load-only-execution-options.yaml

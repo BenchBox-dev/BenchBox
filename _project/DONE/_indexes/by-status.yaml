@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T09:23:25.041935'
-total_items: 438
+generated_at: '2026-02-09T09:24:20.612649'
+total_items: 439
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 391
+    count: 392
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -559,6 +559,11 @@ statuses:
       title: Bidirectional Sync and True-Up Releases for Public/Private Repos
       priority: Medium-High
       category: Core Functionality
+    - id: bodo-dataframe-platform
+      file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
+      title: Bodo DataFrame Platform Adapter
+      priority: Medium
+      category: Platform Expansion
     - id: bundle-tpc-query-templates-in-wheel
       file: DONE/release-readiness/bundle-tpc-query-templates-in-wheel.yaml
       title: Bundle TPC-H/TPC-DS query templates inside package for wheel distribution

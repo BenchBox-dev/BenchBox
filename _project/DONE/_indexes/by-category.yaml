@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T09:23:25.041708'
+generated_at: '2026-02-09T09:24:20.612435'
 total_categories: 62
 categories:
   '"Bug Fixes & Reliability"':
@@ -1400,7 +1400,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 42
+    count: 43
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1475,6 +1475,11 @@ categories:
     - id: synapse-spark-platform
       file: DONE/platform-expansion/planning/synapse-spark-platform.yaml
       title: Azure Synapse Spark Platform
+      priority: Medium
+      status: Completed
+    - id: bodo-dataframe-platform
+      file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
+      title: Bodo DataFrame Platform Adapter
       priority: Medium
       status: Completed
     - id: modin-cudf-dask-production-ready

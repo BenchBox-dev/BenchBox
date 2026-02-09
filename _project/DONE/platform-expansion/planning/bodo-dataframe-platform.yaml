@@ -2,7 +2,8 @@ id: bodo-dataframe-platform
 title: "Bodo DataFrame Platform Adapter"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-02-09"
 category: Platform Expansion
 description: |
   Implement Bodo as a new DataFrame platform adapter in the Pandas family.
@@ -45,7 +46,7 @@ context_sections:
 work:
   - id: w1
     summary: "Create BodoDataFrameAdapter in benchbox/platforms/dataframe/bodo_df.py"
-    status: pending
+    status: done
     notes: >
       Extend PandasFamilyAdapter. Override read_csv and read_parquet with
       Bodo-compatible implementations. Implement platform_name, get_platform_info,
@@ -55,7 +56,7 @@ work:
   - id: w2
     summary: "Register Bodo in adapter_factory, platform_registry, and platform_checker"
     needs: [w1]
-    status: pending
+    status: done
     notes: >
       Add to dataframe __init__.py exports, adapter_factory.py mapping,
       platform_registry.py metadata, and platform_checker.py DATAFRAME_PLATFORMS.
@@ -63,7 +64,7 @@ work:
   - id: w3
     summary: "Create unit tests in tests/unit/platforms/dataframe/test_bodo_df.py"
     needs: [w1]
-    status: pending
+    status: done
     notes: >
       Test import availability check, adapter instantiation (mocked),
       data loading methods (mocked), platform info and metadata.
@@ -72,7 +73,7 @@ work:
   - id: w4
     summary: "Create platform spec documentation in _project/specs/platforms/bodo.md"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
     notes: "Document Bodo-specific requirements, limitations, and usage."
 
 deferred:

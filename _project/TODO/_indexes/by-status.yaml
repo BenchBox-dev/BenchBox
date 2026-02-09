@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T09:23:23.427189'
-total_items: 46
+generated_at: '2026-02-09T09:24:19.705769'
+total_items: 45
 statuses:
   In Progress:
     count: 3
@@ -232,11 +232,3 @@ statuses:
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
       category: Blog Revision
-  Completed:
-    count: 1
-    items:
-    - id: bodo-dataframe-platform
-      file: TODO/platform-expansion/planning/bodo-dataframe-platform.yaml
-      title: Bodo DataFrame Platform Adapter
-      priority: Medium
-      category: Platform Expansion

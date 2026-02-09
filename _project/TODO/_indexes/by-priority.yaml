@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T09:23:23.427176'
-total_items: 46
+generated_at: '2026-02-09T09:24:19.705756'
+total_items: 45
 priorities:
   Critical:
     count: 1
@@ -81,7 +81,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 25
+    count: 24
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -108,11 +108,6 @@ priorities:
       title: Add SingleStore Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: bodo-dataframe-platform
-      file: TODO/platform-expansion/planning/bodo-dataframe-platform.yaml
-      title: Bodo DataFrame Platform Adapter
-      category: Platform Expansion
-      status: Completed
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
