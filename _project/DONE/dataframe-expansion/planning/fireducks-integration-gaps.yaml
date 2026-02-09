@@ -1,0 +1,140 @@
+id: fireducks-integration-gaps
+title: "Wire FireDucks into adapter factory, CLI routing, and platform registry"
+worktree: dataframe-expansion
+priority: High
+status: Completed
+completed_date: "2026-02-09"
+category: Platform Expansion
+description: |
+  The FireDucks DataFrame adapter (fireducks_df.py) was implemented and the
+  original TODO marked Completed, but 4 dispatch/routing layers were never
+  updated. As a result, `benchbox run --platform fireducks-df` fails, FireDucks
+  does not appear in CLI help or MCP platform listings, and users cannot
+  reach the adapter through any normal workflow.
+
+  Present (working):
+  - benchbox/platforms/dataframe/fireducks_df.py (adapter code)
+  - benchbox/platforms/dataframe/__init__.py (import/export)
+  - benchbox/platforms/dataframe/platform_checker.py (DATAFRAME_PLATFORMS entry)
+
+  Missing (blocking all user access):
+  - benchbox/platforms/adapter_factory.py (_get_dataframe_adapter mapping)
+  - benchbox/platforms/__init__.py (4 hardcoded dicts/sets)
+  - benchbox/core/platform_registry.py (auto_register_platforms)
+
+work:
+  - id: w1
+    summary: "Add FireDucks to adapter_factory.py _get_dataframe_adapter() mapping"
+    status: done
+    notes: >
+      Add import of FireDucksDataFrameAdapter and FIREDUCKS_AVAILABLE to the
+      dataframe import block (lines 215-230). Add entry to adapter_mapping dict
+      (lines 232-240): "fireducks": (FireDucksDataFrameAdapter, FIREDUCKS_AVAILABLE,
+      "pip install fireducks").
+
+  - id: w2
+    summary: "Add FireDucks to all 4 CLI routing functions in benchbox/platforms/__init__.py"
+    status: done
+    notes: >
+      Add "fireducks-df" to: get_dataframe_adapter() mapping (line ~445),
+      is_dataframe_platform() set (line ~529), list_available_dataframe_platforms()
+      dict (line ~481), get_dataframe_requirements() dict (line ~507).
+
+  - id: w3
+    summary: "Register FireDucks in auto_register_platforms() in platform_registry.py"
+    status: done
+    notes: >
+      Add try/except block following the DataFusion pattern: import
+      FireDucksDataFrameAdapter from benchbox.platforms.dataframe, register as
+      "fireducks-df".
+
+  - id: w4
+    summary: "Run lint, existing tests, and end-to-end verification commands"
+    needs: [w1, w2, w3]
+    status: done
+    notes: >
+      Run ruff check on all 3 modified files. Run existing dataframe tests to
+      confirm no regressions. Run verification commands below.
+
+metadata:
+  tags:
+    - fireducks
+    - dataframe
+    - integration-fix
+    - pandas-family
+  estimated_effort: "1-2 hours"
+  created_date: "2026-02-09"
+  last_updated: "2026-02-09T00:00:00"
+
+impact:
+  business_value: |
+    FireDucks adapter exists but is completely unreachable by users.
+    This blocks the entire value proposition of the FireDucks integration
+    work that was already completed.
+  user_impact: |
+    Users cannot run `benchbox run --platform fireducks-df` and FireDucks
+    does not appear in platform listings. After this fix, FireDucks becomes
+    a usable platform for DataFrame benchmarking.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/adapter_factory.py"
+    - "benchbox/platforms/__init__.py"
+    - "benchbox/core/platform_registry.py"
+  added: []
+  removed: []
+
+must_preserve:
+  - "All existing DataFrame adapters (polars-df, pandas-df, modin-df, cudf-df, dask-df, datafusion-df, pyspark-df) remain functional"
+  - "adapter_factory._get_dataframe_adapter() returns correct adapter class for all existing platform names"
+  - "is_dataframe_platform() returns True for all existing platform names"
+  - "list_available_dataframe_platforms() still lists all existing platforms"
+
+approach: |
+  Each integration point follows an identical pattern — add one entry to a
+  hardcoded dict or set alongside the existing DataFusion entry. The DataFusion
+  adapter was the most recently added DataFrame platform, so use it as the
+  reference pattern in each location:
+
+  1. adapter_factory.py: Add import + dict entry matching DataFusion pattern
+  2. platforms/__init__.py: Add "fireducks-df" to 4 dicts/sets
+  3. platform_registry.py: Add try/except registration block
+
+  All changes are single-line additions to existing data structures.
+
+anti_patterns:
+  - "DO NOT modify fireducks_df.py or platform_checker.py — because those layers already work — only the dispatch/routing layers need updates"
+  - "DO NOT make FireDucks a required dependency — because it is optional — follow the try/except import pattern used by all other DataFrame adapters"
+
+verification:
+  - description: "FireDucks recognized as a DataFrame platform"
+    command: "uv run -- python -c \"from benchbox.platforms import is_dataframe_platform; print(is_dataframe_platform('fireducks-df'))\""
+    expected_output: "True"
+  - description: "FireDucks appears in available platform list"
+    command: "uv run -- python -c \"from benchbox.platforms import list_available_dataframe_platforms; print('fireducks-df' in list_available_dataframe_platforms())\""
+    expected_output: "True"
+  - description: "FireDucks registered in platform registry"
+    command: "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry; PlatformRegistry.auto_register(); print('fireducks-df' in PlatformRegistry.list_platforms())\""
+    expected_output: "True"
+  - description: "Existing dataframe tests unaffected"
+    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/ -x -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Lint passes on modified files"
+    command: "uv run ruff check benchbox/platforms/adapter_factory.py benchbox/platforms/__init__.py benchbox/core/platform_registry.py"
+    expected_output: "All checks passed!"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/adapter_factory.py"
+    - "benchbox/platforms/__init__.py"
+    - "benchbox/core/platform_registry.py"
+  do_not_modify:
+    - "benchbox/platforms/dataframe/fireducks_df.py"
+    - "benchbox/platforms/dataframe/__init__.py"
+    - "benchbox/platforms/dataframe/platform_checker.py"
+    - "benchbox/platforms/dataframe/pandas_family.py"
+
+success_metrics:
+  - "`benchbox run --platform fireducks-df` reaches the adapter (or fails with 'fireducks not installed')"
+  - "FireDucks appears in MCP list_available output"
+  - "All existing DataFrame platform tests continue to pass"
