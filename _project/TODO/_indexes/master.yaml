@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T09:00:55.693555'
+generated_at: '2026-02-09T09:04:30.387032'
 total_items: 46
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -117,7 +117,7 @@ items:
   - ci
   estimated_effort: Large
   work_total: 101
-  work_done: 63
+  work_done: 64
   work_ready: 13
 - id: siriusdb-adapter
   file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
