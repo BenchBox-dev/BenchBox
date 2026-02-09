@@ -685,12 +685,12 @@ work:
   summary: "tests/unit/cli/test_config_coverage.py → cli/config.py (41% → 50%, ~5 tests)"
   needs:
   - w89
-  status: pending
+  status: done
 - id: w91
   summary: "tests/unit/cli/test_output_coverage.py → cli/output.py (43% → 50%, ~5 tests)"
   needs:
   - w89
-  status: pending
+  status: done
 - id: w92
   summary: "tests/unit/cli/commands/test_tuning_group_coverage.py → cli/commands/tuning_group.py (40% → 50%, ~4 tests)"
   needs:
