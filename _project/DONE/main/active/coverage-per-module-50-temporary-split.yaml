@@ -2,7 +2,7 @@ id: coverage-per-module-50-temporary-split
 title: "Raise benchbox/ per-module coverage to >=50% with temporary split"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Testing and Quality Assurance
 description: |
   Close remaining test coverage gaps by enforcing a per-module >=50% floor for
@@ -38,6 +38,77 @@ description: |
     - benchbox/core/tpc_metrics.py
     - benchbox/core/tpcdi/streaming.py
     - benchbox/core/tpcdi/worker_pool_examples.py
+    - benchbox/core/tpcds/reporting.py
+    - benchbox/core/tpch/reporting.py
+    - benchbox/platforms/dataframe/ducklake_maintenance.py
+    - benchbox/core/tpcds/dataframe_queries/rollup_helper.py
+    - benchbox/core/tpcds/dataframe_queries/channel_helper.py
+    - benchbox/core/visualization/chart_generator.py
+    - benchbox/mcp/__main__.py
+    - benchbox/core/results/display.py
+    - benchbox/core/metadata_primitives/generator.py
+    - benchbox/core/tpcds/dataframe_queries/queries.py
+    - benchbox/core/tpch/maintenance_test.py
+    - benchbox/core/tpcdi/etl/pipeline.py
+    - benchbox/core/query_plans/parsers/sqlite.py
+    - benchbox/core/analysis/insights.py
+    - benchbox/core/runner/conversion.py
+    - benchbox/core/datavault/dataframe_queries/queries.py
+    - benchbox/cli/commands/results.py
+    - benchbox/core/amplab/benchmark.py
+    - benchbox/core/analysis/ranking.py
+    - benchbox/core/ssb/benchmark.py
+    - benchbox/core/nyctaxi/benchmark.py
+    - benchbox/core/read_primitives/dataframe_queries.py
+    - benchbox/core/ssb/dataframe_queries/queries.py
+    - benchbox/core/joinorder/generator.py
+    - benchbox/core/nyctaxi/downloader.py
+    - benchbox/core/nyctaxi/dataframe_queries/queries.py
+    - benchbox/core/amplab/dataframe_queries/queries.py
+    - benchbox/core/clickbench/benchmark.py
+    - benchbox/core/tpcdi/etl/scd_processor.py
+    - benchbox/core/transaction_primitives/schema.py
+    - benchbox/core/transaction_primitives/benchmark.py
+    - benchbox/core/h2odb/benchmark.py
+    - benchbox/core/tpcdi/generator/dimensions.py
+    - benchbox/core/results/timing.py
+    - benchbox/core/concurrency/pool_tester.py
+    - benchbox/core/amplab/generator.py
+    - benchbox/core/metadata_primitives/schema.py
+    - benchbox/core/tpcdi/generator/facts.py
+    - benchbox/core/concurrency/executor.py
+    - benchbox/core/tpcds/official_benchmark.py
+    - benchbox/core/clickbench/dataframe_queries/queries.py
+    - benchbox/core/coffeeshop/dataframe_queries/queries.py
+    - benchbox/cli/exceptions.py
+    - benchbox/core/clickbench/generator.py
+    - benchbox/utils/cloud_storage.py
+    - benchbox/cli/commands/plot.py
+    - benchbox/core/joinorder/queries.py
+    - benchbox/platforms/athena.py
+    - benchbox/core/metadata_primitives/benchmark.py
+    - benchbox/platforms/influxdb/setup.py
+    - benchbox/platforms/fabric_warehouse.py
+    - benchbox/platforms/influxdb/client.py
+    - benchbox/core/write_primitives/benchmark.py
+    - benchbox/core/ssb/generator.py
+    - benchbox/core/tpch/throughput_test.py
+    - benchbox/core/tpcds/generator/runner.py
+    - benchbox/core/ai_primitives/dataframe_operations.py
+    - benchbox/core/amplab/queries.py
+    - benchbox/core/joinorder/schema.py
+    - benchbox/core/metadata_primitives/dataframe_operations.py
+    - benchbox/core/h2odb/generator.py
+    - benchbox/platforms/dataframe/__init__.py
+    - benchbox/core/tpcds/c_tools.py
+    - benchbox/cli/commands/run.py
+    - benchbox/platforms/redshift.py
+    - benchbox/core/tpchavoc/queries.py
+    - benchbox/core/results/anonymization.py
+    - benchbox/platforms/clickhouse/workload.py
+    - benchbox/platforms/bigquery.py
+    - benchbox/core/tpcds/power_test.py
+    - benchbox/platforms/databricks/adapter.py
 
 metadata:
   tags:
@@ -51,7 +122,8 @@ metadata:
   - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-09T09:22:11"
+  last_updated: "2026-02-09T10:20:00"
+  completed_date: "2026-02-09"
 
   related:
   - coverage-cli-modules
@@ -726,4 +798,4 @@ work:
   status: done
 - id: w101
   summary: "Confirm no active-scope module remains below 50%"
-  status: pending
+  status: done

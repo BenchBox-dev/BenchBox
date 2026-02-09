@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T16:17:10.224528'
+generated_at: '2026-02-09T18:45:09.960411'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -218,7 +218,7 @@ categories:
       priority: Low
       status: Not Started
   Testing and Quality Assurance:
-    count: 7
+    count: 6
     items:
     - id: coverage-ci-enforcement
       file: TODO/main/planning/coverage-ci-enforcement.yaml
@@ -245,11 +245,6 @@ categories:
       title: Improve test coverage for platform adapter modules to ≥50%
       priority: Medium
       status: Not Started
-    - id: coverage-per-module-50-temporary-split
-      file: TODO/main/active/coverage-per-module-50-temporary-split.yaml
-      title: Raise benchbox/ per-module coverage to >=50% with temporary split
-      priority: High
-      status: In Progress
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)

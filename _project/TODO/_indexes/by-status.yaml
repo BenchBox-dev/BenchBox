@@ -1,8 +1,8 @@
-generated_at: '2026-02-09T16:17:10.224559'
-total_items: 46
+generated_at: '2026-02-09T18:45:09.960436'
+total_items: 45
 statuses:
   In Progress:
-    count: 3
+    count: 2
     items:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
@@ -14,11 +14,6 @@ statuses:
       title: MotherDuck Platform Adapter
       priority: High
       category: Platform Expansion
-    - id: coverage-per-module-50-temporary-split
-      file: TODO/main/active/coverage-per-module-50-temporary-split.yaml
-      title: Raise benchbox/ per-module coverage to >=50% with temporary split
-      priority: High
-      category: Testing and Quality Assurance
   Not Started:
     count: 43
     items:

@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T16:17:11.137878'
-total_items: 439
+generated_at: '2026-02-09T18:45:10.784060'
+total_items: 440
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 392
+    count: 393
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1545,6 +1545,11 @@ statuses:
       title: Quick-Start Tutorials
       priority: High
       category: Documentation and User Experience
+    - id: coverage-per-module-50-temporary-split
+      file: DONE/main/active/coverage-per-module-50-temporary-split.yaml
+      title: Raise benchbox/ per-module coverage to >=50% with temporary split
+      priority: High
+      category: Testing and Quality Assurance
     - id: ranking-aggregation-system-platform-leaderboards-trends
       file: DONE/content-enablement-ranking/completed/ranking-aggregation-system-platform-leaderboards-trends.yaml
       title: Ranking & Aggregation System - Platform Leaderboards & Trends

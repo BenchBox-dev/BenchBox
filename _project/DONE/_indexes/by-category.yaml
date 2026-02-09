@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T16:17:11.137653'
+generated_at: '2026-02-09T18:45:10.783866'
 total_categories: 62
 categories:
   '"Bug Fixes & Reliability"':
@@ -2113,7 +2113,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 21
+    count: 22
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2200,6 +2200,11 @@ categories:
       file: DONE/physical-tuning/planning/pt-11-integration-testing-dryrun.yaml
       title: 'PT-11: Physical Tuning Integration, Testing & Dry-Run Enhancement'
       priority: Medium
+      status: Completed
+    - id: coverage-per-module-50-temporary-split
+      file: DONE/main/active/coverage-per-module-50-temporary-split.yaml
+      title: Raise benchbox/ per-module coverage to >=50% with temporary split
+      priority: High
       status: Completed
     - id: coverage-improvement
       file: DONE/observability-quality/active/coverage-improvement.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T16:17:11.137445'
-total_items: 439
+generated_at: '2026-02-09T18:45:10.783688'
+total_items: 440
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1703,6 +1703,26 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 3-5 days
   completed_date: '2025-12-12'
+- id: coverage-per-module-50-temporary-split
+  file: DONE/main/active/coverage-per-module-50-temporary-split.yaml
+  title: Raise benchbox/ per-module coverage to >=50% with temporary split
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - coverage
+  - core
+  - cli
+  - tpcdi
+  - platforms
+  - tuning
+  - ci
+  estimated_effort: Large
+  work_total: 101
+  work_done: 101
+  work_ready: 0
 - id: rebuild-tpcds-binaries
   file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
   title: Rebuild TPC-DS binaries with stdout fix for all platforms
