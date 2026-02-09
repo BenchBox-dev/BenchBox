@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T09:22:25.531941'
+generated_at: '2026-02-09T09:23:23.427176'
 total_items: 46
 priorities:
   Critical:
@@ -112,7 +112,7 @@ priorities:
       file: TODO/platform-expansion/planning/bodo-dataframe-platform.yaml
       title: Bodo DataFrame Platform Adapter
       category: Platform Expansion
-      status: Not Started
+      status: Completed
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
