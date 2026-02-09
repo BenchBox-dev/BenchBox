@@ -642,7 +642,7 @@ work:
   status: done
 - id: w81
   summary: "Batch 5C: Medium-coverage CLI (7 files, ~33 tests)"
-  status: pending
+  status: done
 - id: w82
   summary: "tests/unit/cli/commands/test_datagen_coverage.py → cli/commands/datagen.py (22% → 50%, ~5 tests)"
   needs:
@@ -667,7 +667,7 @@ work:
   summary: "tests/unit/cli/commands/test_run_official_coverage.py → cli/commands/run_official.py (33% → 50%, ~5 tests)"
   needs:
   - w81
-  status: pending
+  status: done
 - id: w87
   summary: "tests/unit/cli/test_system_coverage.py → cli/system.py (36% → 50%, ~4 tests)"
   needs:
@@ -677,7 +677,7 @@ work:
   summary: "tests/unit/cli/test_composite_params_coverage.py → cli/composite_params.py (39% → 50%, ~5 tests)"
   needs:
   - w81
-  status: pending
+  status: done
 - id: w89
   summary: "Batch 5D: Near-50% CLI modules (5 files, ~21 tests)"
   status: pending
