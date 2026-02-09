@@ -717,13 +717,13 @@ work:
   status: done
 - id: w98
   summary: "Add targeted tests for remaining gaps discovered after phases 2-6"
-  status: pending
+  status: done
 - id: w99
   summary: "Enable failing mode for coverage-per-file in local CI/test workflow"
-  status: pending
+  status: done
 - id: w100
   summary: "Record before/after failing-module snapshots per wave"
-  status: pending
+  status: done
 - id: w101
   summary: "Confirm no active-scope module remains below 50%"
   status: pending
