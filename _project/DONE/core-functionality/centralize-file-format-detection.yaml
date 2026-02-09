@@ -1,0 +1,220 @@
+id: centralize-file-format-detection
+title: Centralize File Format and Compression Extension Detection
+worktree: core-functionality
+priority: Medium-High
+status: Completed
+completed_date: '2026-01-25'
+description: 'Extract file format detection and compression extension handling to a centralized utility.
+
+
+  Currently, compression extension sets and format detection logic are duplicated across 5+ files
+
+  with inconsistent coverage (some include .snappy, others don''t; some handle .lz4, others don''t).
+
+
+  This violates DRY and creates maintenance burden - adding a new compression format requires
+
+  updating multiple scattered locations.
+
+  '
+category: Core Functionality
+tasks:
+  phases:
+  - phase: 'Phase 1: Create Centralized Utility'
+    done: true
+    items:
+    - summary: Create benchbox/utils/file_format.py with centralized constants and functions
+      done: true
+      subtasks:
+      - summary: 'Define COMPRESSION_EXTENSIONS constant: {''.zst'', ''.gz'', ''.bz2'', ''.xz'', ''.lz4'', ''.snappy''}'
+        done: true
+      - summary: 'Define DATA_FORMAT_EXTENSIONS constant: {''.parquet'', ''.tbl'', ''.csv'', ''.dat''}'
+        done: true
+      - summary: 'Implement detect_data_format(path: Path) -> str function'
+        done: true
+      - summary: 'Implement detect_compression(path: Path) -> str | None function'
+        done: true
+      - summary: 'Implement strip_compression_suffix(path: Path) -> Path function'
+        done: true
+      - summary: 'Implement is_compression_extension(suffix: str) -> bool helper'
+        done: true
+      - summary: Add comprehensive docstrings with examples
+        done: true
+  - phase: 'Phase 2: Update Compression Module'
+    done: true
+    items:
+    - summary: Update benchbox/utils/compression.py to use centralized constants
+      done: true
+      subtasks:
+      - summary: Import COMPRESSION_EXTENSIONS from file_format.py
+        done: true
+      - summary: Update CompressionManager.detect_compression() to use centralized set
+        done: true
+      - summary: Extend detect_compression() to recognize .bz2, .xz, .lz4, .snappy (even if unsupported)
+        done: true
+    - summary: Update benchbox/utils/compression_mixin.py suffix stripping (line 159)
+      done: true
+      subtasks:
+      - summary: Replace string slicing with strip_compression_suffix() call
+        done: true
+  - phase: 'Phase 3: Update DataFrame Module'
+    done: true
+    items:
+    - summary: Update benchbox/platforms/dataframe/expression_family.py
+      done: true
+      subtasks:
+      - summary: Import utilities from file_format.py
+        done: true
+      - summary: Replace _detect_format() method (lines 1263-1291) with detect_data_format() call
+        done: true
+      - summary: Remove hardcoded compression_exts set (line 1279)
+        done: true
+  - phase: 'Phase 4: Update Platform Adapters'
+    done: true
+    items:
+    - summary: Update benchbox/platforms/databricks/adapter.py
+      done: true
+      subtasks:
+      - summary: Import COMPRESSION_EXTENSIONS from file_format.py
+        done: true
+      - summary: Replace hardcoded set at line 811 with imported constant
+        done: true
+      - summary: Replace hardcoded set at line 1165 with imported constant
+        done: true
+    - summary: Update benchbox/platforms/base/data_loading.py
+      done: true
+      subtasks:
+      - summary: Import detect_compression from file_format.py
+        done: true
+      - summary: Replace hardcoded .zst check (line 1140) with detect_compression() call
+        done: true
+      - summary: Update FileFormatRegistry._compression_handlers to use COMPRESSION_EXTENSIONS
+        done: true
+  - phase: 'Phase 5: Update Data Generators and Validators'
+    done: true
+    items:
+    - summary: Update benchbox/utils/data_validation.py
+      done: true
+      subtasks:
+      - summary: Import utilities from file_format.py
+        done: true
+      - summary: Replace hardcoded .gz/.zst checks (lines 287-305) with detect_compression()
+        done: true
+      - summary: Replace string-based suffix stripping (line 341) with strip_compression_suffix()
+        done: true
+    - summary: Update benchbox/core/write_primitives/generator.py
+      done: true
+      subtasks:
+      - summary: Import detect_compression from file_format.py
+        done: true
+      - summary: Replace hardcoded suffix checks (lines 677-694) with detect_compression() call
+        done: true
+    - summary: Update benchbox/core/tpch/generator.py
+      done: true
+      subtasks:
+      - summary: Import COMPRESSION_EXTENSIONS from file_format.py
+        done: true
+      - summary: Replace hardcoded extension list (line 854) with imported constant
+        done: true
+    - summary: Update benchbox/core/transaction_primitives/generator.py (if similar patterns exist)
+      done: true
+  - phase: 'Phase 6: Testing'
+    done: true
+    items:
+    - summary: Create tests/unit/utils/test_file_format.py
+      done: true
+      subtasks:
+      - summary: Test detect_data_format() with all format/compression combinations
+        done: true
+      - summary: Test detect_compression() with all compression extensions
+        done: true
+      - summary: Test strip_compression_suffix() with single and multi-suffix paths
+        done: true
+      - summary: Test is_compression_extension() with valid and invalid inputs
+        done: true
+      - summary: 'Test edge cases: no suffix, unknown suffix, multiple compressions'
+        done: true
+    - summary: Update existing tests that may be affected
+      done: true
+      subtasks:
+      - summary: Review tests/unit/utils/test_compression.py for compatibility
+        done: true
+      - summary: Review tests/unit/platforms/test_compression_support.py for compatibility
+        done: true
+      - summary: Review tests/unit/platforms/dataframe/ tests for expression_family changes
+        done: true
+  - phase: 'Phase 7: Documentation and Cleanup'
+    done: true
+    items:
+    - summary: Run full test suite and fix any regressions
+      done: true
+    - summary: Run lint and format checks
+      done: true
+    - summary: Verify all imports are correct and no circular dependencies
+      done: true
+metadata:
+  tags:
+  - refactoring
+  - code-quality
+  - DRY
+  - utilities
+  estimated_effort: 2-3 days
+  created_date: '2026-01-25'
+impact:
+  technical_debt: 'Eliminates 5+ duplicate compression extension sets across the codebase.
+
+    Makes adding new compression formats a single-location change.
+
+    Improves code consistency and reduces maintenance burden.
+
+    '
+files_affected:
+  modified:
+  - benchbox/utils/compression.py
+  - benchbox/utils/compression_mixin.py
+  - benchbox/utils/data_validation.py
+  - benchbox/platforms/dataframe/expression_family.py
+  - benchbox/platforms/databricks/adapter.py
+  - benchbox/platforms/base/data_loading.py
+  - benchbox/core/write_primitives/generator.py
+  - benchbox/core/tpch/generator.py
+  - benchbox/core/transaction_primitives/generator.py
+  added:
+  - benchbox/utils/file_format.py
+  - tests/unit/utils/test_file_format.py
+sections:
+  Implementation Summary: 'Created benchbox/utils/file_format.py as single source of truth for:
+
+    - COMPRESSION_EXTENSIONS: frozenset of all recognized compression extensions
+
+    - DATA_FORMAT_EXTENSIONS: frozenset of all recognized data format extensions
+
+    - detect_data_format(): detects format handling compressed files
+
+    - detect_compression(): returns compression type name or None
+
+    - strip_compression_suffix(): removes compression extension from path
+
+    - is_compression_extension(): checks if suffix is compression
+
+
+    Updated 9 files to use centralized utilities, eliminating duplication.
+
+    Added 103 comprehensive tests for the new module.'
+  Results: '- All 8769 tests pass
+
+    - Lint checks pass
+
+    - No circular import dependencies
+
+    - Added support for .xz (lzma) compression in data_validation.py and generators'
+success_metrics:
+- All hardcoded compression extension sets replaced with centralized constant
+- All format detection uses centralized detect_data_format() function
+- All suffix stripping uses centralized strip_compression_suffix() function
+- New compression format can be added by modifying only file_format.py
+- All existing tests pass
+- New test file achieves >90% coverage of file_format.py
+commits:
+- ab7e6127
+- 5c606b16

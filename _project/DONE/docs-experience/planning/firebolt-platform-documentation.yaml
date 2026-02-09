@@ -1,3 +1,4 @@
+id: firebolt-platform-documentation
 title: Firebolt Platform Documentation
 worktree: docs-experience
 priority: High
@@ -14,25 +15,25 @@ description: |
   user-facing documentation in BenchBox.
 
 tasks:
-  - phase: "Documentation Creation"
+- phase: "Documentation Creation"
+  done: true
+  items:
+  - summary: "Create docs/platforms/firebolt.md"
     done: true
-    items:
-      - summary: "Create docs/platforms/firebolt.md"
-        done: true
-      - summary: "Document Firebolt Core setup (Docker installation)"
-        done: true
-      - summary: "Document Firebolt Cloud authentication (client credentials)"
-        done: true
-      - summary: "Document engine management and selection"
-        done: true
-      - summary: "Document database and schema configuration"
-        done: true
-      - summary: "Add performance optimization tips"
-        done: true
-      - summary: "Add troubleshooting section"
-        done: true
-      - summary: "Update docs/platforms/index.md with Firebolt link"
-        done: true
+  - summary: "Document Firebolt Core setup (Docker installation)"
+    done: true
+  - summary: "Document Firebolt Cloud authentication (client credentials)"
+    done: true
+  - summary: "Document engine management and selection"
+    done: true
+  - summary: "Document database and schema configuration"
+    done: true
+  - summary: "Add performance optimization tips"
+    done: true
+  - summary: "Add troubleshooting section"
+    done: true
+  - summary: "Update docs/platforms/index.md with Firebolt link"
+    done: true
 
 completion_notes: |
   Documentation already existed at docs/platforms/firebolt.md (232 lines).
@@ -48,11 +49,11 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - documentation
-    - firebolt
-    - platform
+  - documentation
+  - firebolt
+  - platform
   estimated_effort: 4-6 hours
   created_date: "2025-12-13"
 
@@ -65,9 +66,9 @@ impact:
     Reduces setup friction and support requests.
 
 success_metrics:
-  - "Complete Firebolt guide with Core and Cloud sections"
-  - "Troubleshooting covers common setup issues"
-  - "Docs build successfully with new page"
+- "Complete Firebolt guide with Core and Cloud sections"
+- "Troubleshooting covers common setup issues"
+- "Docs build successfully with new page"
 
 files_modified:
-  - docs/platforms/firebolt.md (existing, comprehensive)
+- docs/platforms/firebolt.md (existing, comprehensive)

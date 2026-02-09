@@ -1,0 +1,16 @@
+id: natural-language-to-sql-testing-framework
+title: Natural Language to SQL Testing Framework
+worktree: ai-ml-nl2sql
+category: AI/ML Capabilities
+priority: Medium
+status: Completed
+description: 'Test NL2SQL capabilities of platforms with AI query generation features.
+
+  Measure accuracy, latency, and cost of natural language query interfaces.
+
+  '
+metadata:
+  estimated_effort: 2 weeks (0.75 FTE ML engineer)
+  budget: $11K-15K
+  due_date: '2027-01-01'
+  blocking_posts: Future AI/ML content

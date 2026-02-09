@@ -1,3 +1,4 @@
+id: cli-help-examples-missing-platforms
 title: CLI Help Examples for Missing Platforms
 worktree: docs-experience
 priority: High
@@ -14,25 +15,25 @@ description: |
   - Common use cases (with comments explaining what each does)
 
 tasks:
-  - phase: "Implementation"
+- phase: "Implementation"
+  done: true
+  items:
+  - summary: "Add Firebolt examples (Core Docker + Cloud modes)"
     done: true
-    items:
-      - summary: "Add Firebolt examples (Core Docker + Cloud modes)"
-        done: true
-      - summary: "Add Presto examples (catalog selection, coordinator)"
-        done: true
-      - summary: "Add Trino examples (catalog selection, coordinator)"
-        done: true
-      - summary: "Add Athena examples (workgroup, S3 output location)"
-        done: true
-      - summary: "Add PostgreSQL examples (connection string, local setup)"
-        done: true
-      - summary: "Add Azure Synapse examples (dedicated vs serverless)"
-        done: true
-      - summary: "Add Fabric Warehouse examples"
-        done: true
-      - summary: "Update tests to verify new examples"
-        done: true
+  - summary: "Add Presto examples (catalog selection, coordinator)"
+    done: true
+  - summary: "Add Trino examples (catalog selection, coordinator)"
+    done: true
+  - summary: "Add Athena examples (workgroup, S3 output location)"
+    done: true
+  - summary: "Add PostgreSQL examples (connection string, local setup)"
+    done: true
+  - summary: "Add Azure Synapse examples (dedicated vs serverless)"
+    done: true
+  - summary: "Add Fabric Warehouse examples"
+    done: true
+  - summary: "Update tests to verify new examples"
+    done: true
 
 completion_notes: |
   Added 8 new platform sections to `benchbox run --help examples`:
@@ -55,12 +56,12 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - cli
-    - documentation
-    - examples
-    - user-experience
+  - cli
+  - documentation
+  - examples
+  - user-experience
   estimated_effort: 3-4 hours
   created_date: "2025-12-13"
 
@@ -73,10 +74,10 @@ impact:
     Platform-specific options explained in context.
 
 success_metrics:
-  - "All 7 missing platforms have dedicated example sections"
-  - "Examples tested and verified to be valid CLI syntax"
-  - "Tests updated to verify example presence"
+- "All 7 missing platforms have dedicated example sections"
+- "Examples tested and verified to be valid CLI syntax"
+- "Tests updated to verify example presence"
 
 files_modified:
-  - benchbox/cli/help.py
-  - tests/unit/test_cli_documentation.py
+- benchbox/cli/help.py
+- tests/unit/test_cli_documentation.py

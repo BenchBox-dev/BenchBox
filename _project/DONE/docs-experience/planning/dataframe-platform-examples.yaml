@@ -1,3 +1,4 @@
+id: dataframe-platform-examples
 title: DataFrame Platform Example Scripts
 worktree: docs-experience
 priority: Medium
@@ -17,35 +18,35 @@ description: |
   - Result interpretation
 
 tasks:
-  - phase: "Polars Examples"
+- phase: "Polars Examples"
+  done: true
+  items:
+  - summary: "Create examples/dataframe/polars_tpch.py"
     done: true
-    items:
-      - summary: "Create examples/dataframe/polars_tpch.py"
-        done: true
-        note: "Already existed - comprehensive example"
-      - summary: "Document lazy vs eager evaluation"
-        done: true
-        note: "Covered in existing polars_tpch.py comments"
-      - summary: "Show memory management best practices"
-        done: true
-        note: "Uses lazy scanning from Parquet"
-  - phase: "CuDF Examples"
+    note: "Already existed - comprehensive example"
+  - summary: "Document lazy vs eager evaluation"
     done: true
-    items:
-      - summary: "Create examples/dataframe/cudf_tpch.py"
-        done: true
-      - summary: "Document GPU requirements"
-        done: true
-      - summary: "Show GPU memory considerations"
-        done: true
-  - phase: "Validation"
+    note: "Covered in existing polars_tpch.py comments"
+  - summary: "Show memory management best practices"
     done: true
-    items:
-      - summary: "Verify examples run with dry-run"
-        done: true
-        note: "Syntax validated"
-      - summary: "Add comments explaining DataFrame-specific concepts"
-        done: true
+    note: "Uses lazy scanning from Parquet"
+- phase: "CuDF Examples"
+  done: true
+  items:
+  - summary: "Create examples/dataframe/cudf_tpch.py"
+    done: true
+  - summary: "Document GPU requirements"
+    done: true
+  - summary: "Show GPU memory considerations"
+    done: true
+- phase: "Validation"
+  done: true
+  items:
+  - summary: "Verify examples run with dry-run"
+    done: true
+    note: "Syntax validated"
+  - summary: "Add comments explaining DataFrame-specific concepts"
+    done: true
 
 completion_notes: |
   polars_tpch.py already existed (113 lines):
@@ -73,13 +74,13 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - examples
-    - dataframe
-    - polars
-    - cudf
-    - gpu
+  - examples
+  - dataframe
+  - polars
+  - cudf
+  - gpu
   estimated_effort: 2-3 hours
   created_date: "2025-12-13"
 
@@ -92,10 +93,10 @@ impact:
     Learn DataFrame-specific patterns.
 
 success_metrics:
-  - "Runnable examples for Polars and CuDF - DONE"
-  - "Examples demonstrate DataFrame-specific features - DONE"
-  - "Comments explain memory and performance considerations - DONE"
+- "Runnable examples for Polars and CuDF - DONE"
+- "Examples demonstrate DataFrame-specific features - DONE"
+- "Comments explain memory and performance considerations - DONE"
 
 files_modified:
-  - examples/dataframe/polars_tpch.py (verified existing)
-  - examples/dataframe/cudf_tpch.py (created new)
+- examples/dataframe/polars_tpch.py (verified existing)
+- examples/dataframe/cudf_tpch.py (created new)

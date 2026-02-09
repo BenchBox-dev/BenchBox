@@ -1,3 +1,4 @@
+id: consolidate-benchmark-name-detection
 title: "Consolidate benchmark name detection to use normalize_benchmark_id()"
 worktree: core-functionality
 priority: Low
@@ -19,32 +20,32 @@ description: |
 
 tasks:
   phases:
-    - phase: "Phase 1: Update DataFrame/Runner paths"
+  - phase: "Phase 1: Update DataFrame/Runner paths"
+    done: true
+    items:
+    - summary: "platforms/dataframe/benchmark_mixin.py lines 488, 696, 698, 741, 757"
       done: true
-      items:
-        - summary: "platforms/dataframe/benchmark_mixin.py lines 488, 696, 698, 741, 757"
-          done: true
-        - summary: "core/runner/dataframe_runner.py lines 278, 483, 501"
-          done: true
+    - summary: "core/runner/dataframe_runner.py lines 278, 483, 501"
+      done: true
 
-    - phase: "Phase 2: Update Platform Adapter"
+  - phase: "Phase 2: Update Platform Adapter"
+    done: true
+    items:
+    - summary: "platforms/base/adapter.py lines 1347, 1349, 1359, 1363, 1367, 1371, 1373, 1381"
       done: true
-      items:
-        - summary: "platforms/base/adapter.py lines 1347, 1349, 1359, 1363, 1367, 1371, 1373, 1381"
-          done: true
 
-    - phase: "Phase 3: Update Dry Run"
+  - phase: "Phase 3: Update Dry Run"
+    done: true
+    items:
+    - summary: "core/dryrun.py lines 348, 364, 409, 418"
       done: true
-      items:
-        - summary: "core/dryrun.py lines 348, 364, 409, 418"
-          done: true
 
 metadata:
   tags:
-    - code-quality
-    - refactoring
-    - dry-principle
-    - benchmark-detection
+  - code-quality
+  - refactoring
+  - dry-principle
+  - benchmark-detection
   estimated_effort: Small
   created_date: "2026-01-27"
 
@@ -93,15 +94,15 @@ impact:
 
 files_affected:
   modified:
-    - benchbox/platforms/dataframe/benchmark_mixin.py
-    - benchbox/platforms/base/adapter.py
-    - benchbox/core/runner/dataframe_runner.py
-    - benchbox/core/dryrun.py
+  - benchbox/platforms/dataframe/benchmark_mixin.py
+  - benchbox/platforms/base/adapter.py
+  - benchbox/core/runner/dataframe_runner.py
+  - benchbox/core/dryrun.py
 
 success_metrics:
-  - "All benchmark name detection uses normalize_benchmark_id() or tuple membership"
-  - "No substring `or` chains for benchmark variant detection"
-  - "All tests pass"
+- "All benchmark name detection uses normalize_benchmark_id() or tuple membership"
+- "No substring `or` chains for benchmark variant detection"
+- "All tests pass"
 
 completion_summary: |
   All 15 locations with duplicate benchmark name detection or-chains have been

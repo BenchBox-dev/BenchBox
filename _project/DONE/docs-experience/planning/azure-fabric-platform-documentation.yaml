@@ -1,3 +1,4 @@
+id: azure-fabric-platform-documentation
 title: Azure Synapse and Fabric Warehouse Documentation
 worktree: docs-experience
 priority: Medium
@@ -14,37 +15,37 @@ description: |
   distinct features and use cases.
 
 tasks:
-  - phase: "Azure Synapse Documentation"
+- phase: "Azure Synapse Documentation"
+  done: true
+  items:
+  - summary: "Create docs/platforms/azure_synapse.md"
     done: true
-    items:
-      - summary: "Create docs/platforms/azure_synapse.md"
-        done: true
-      - summary: "Document dedicated vs serverless pools"
-        done: true
-      - summary: "Document Azure AD authentication"
-        done: true
-      - summary: "Document data staging with ADLS"
-        done: true
-      - summary: "Add performance optimization tips"
-        done: true
-  - phase: "Fabric Warehouse Documentation"
+  - summary: "Document dedicated vs serverless pools"
     done: true
-    items:
-      - summary: "Create docs/platforms/fabric_warehouse.md"
-        done: true
-      - summary: "Document workspace setup"
-        done: true
-      - summary: "Document authentication"
-        done: true
-      - summary: "Document Power BI integration considerations"
-        done: true
-  - phase: "Index Updates"
+  - summary: "Document Azure AD authentication"
     done: true
-    items:
-      - summary: "Update docs/platforms/index.md with both links"
-        done: true
-      - summary: "Add to cloud platforms category"
-        done: true
+  - summary: "Document data staging with ADLS"
+    done: true
+  - summary: "Add performance optimization tips"
+    done: true
+- phase: "Fabric Warehouse Documentation"
+  done: true
+  items:
+  - summary: "Create docs/platforms/fabric_warehouse.md"
+    done: true
+  - summary: "Document workspace setup"
+    done: true
+  - summary: "Document authentication"
+    done: true
+  - summary: "Document Power BI integration considerations"
+    done: true
+- phase: "Index Updates"
+  done: true
+  items:
+  - summary: "Update docs/platforms/index.md with both links"
+    done: true
+  - summary: "Add to cloud platforms category"
+    done: true
 
 completion_notes: |
   Documentation already existed:
@@ -73,13 +74,13 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - documentation
-    - azure
-    - synapse
-    - fabric
-    - microsoft
+  - documentation
+  - azure
+  - synapse
+  - fabric
+  - microsoft
   estimated_effort: 5-6 hours
   created_date: "2025-12-13"
 
@@ -92,10 +93,10 @@ impact:
     Pool selection guidance for cost optimization.
 
 success_metrics:
-  - "Complete guides for both Azure platforms"
-  - "Authentication patterns clearly documented"
-  - "Cost considerations included"
+- "Complete guides for both Azure platforms"
+- "Authentication patterns clearly documented"
+- "Cost considerations included"
 
 files_modified:
-  - docs/platforms/azure-platforms.md (existing, complete overview)
-  - docs/platforms/microsoft-fabric.md (existing, comprehensive)
+- docs/platforms/azure-platforms.md (existing, complete overview)
+- docs/platforms/microsoft-fabric.md (existing, comprehensive)

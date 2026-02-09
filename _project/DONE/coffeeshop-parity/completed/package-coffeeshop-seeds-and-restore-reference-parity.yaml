@@ -1,0 +1,25 @@
+id: package-coffeeshop-seeds-and-restore-reference-parity
+title: ✅ Package CoffeeShop Seeds and Restore Reference Parity
+worktree: coffeeshop-parity
+category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+status: Completed
+priority: High
+impact: CoffeeShop generation now bundles the reference seed CSVs, resets runtime state between runs, and adopts shared BenchBox
+  datagen conventions so repeated executions are deterministic and manifest-friendly.
+sections:
+  Summary: Vendored the reference dim_locations/dim_products seed tables, updated packaging rules, and refreshed the generator
+    to default to shared datagen directories while resetting per-run state.
+  Key Changes: '- "Added `benchbox.data.coffeeshop` resource package and ensured wheels/sdists include the CSV assets."
+
+    - "Updated generator plumbing to use `get_datagen_path(...)` when no output is provided, reset cycle state before each
+    run, and emit manifests against the normalized root."
+
+    - Synced CLI metadata, documentation, and unit tests to cover packaged seeds, deterministic regeneration, and manifest
+    expectations.'
+  Testing: '"uv run -- python -m pytest tests/unit/test_coffeeshop.py
+
+    uv run -- python -m pytest  # still fails on known integration blockers (optional services, benchmark runners)
+
+    "'
+description: Vendored the reference dim_locations/dim_products seed tables, updated packaging rules, and refreshed the generator
+  to default to shared datagen directories while resetting per-run state.

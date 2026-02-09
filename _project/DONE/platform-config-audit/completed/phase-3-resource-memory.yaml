@@ -1,0 +1,56 @@
+id: phase-3-resource-memory
+title: 'Platform Config Audit: Resource/Memory Settings'
+worktree: platform-config-audit
+category: Platform Configuration
+priority: Medium
+status: Completed
+completed_date: '2025-11-27'
+description: 'Adversarial review of platform-config-audit.md identified forced resource/memory
+
+  settings that are NOT documented. These affect memory footprint, disk usage, and
+
+  compute resources.
+
+
+  Source: docs/platform-config-audit.md adversarial review (2025-11-26)
+
+  '
+context_sections:
+- name: SQLite PRAGMA cache_size
+  summary: "Location: benchbox/platforms/sqlite.py:220-221\nForced: PRAGMA cache_size = 10000 (~40MB with default page size)\n\
+    Impact: Significant memory/performance lever; audit mentions WAL, foreign_keys,\n        synchronous, temp_store but OMITS\
+    \ cache_size\nRecommendation: JUSTIFIED - necessary for OLAP performance; add to audit doc\n"
+- name: DataFusion Disk Manager
+  summary: "Location: benchbox/platforms/datafusion.py:232-237\nForced: with_disk_manager_os() ALWAYS called if RuntimeEnvBuilder\
+    \ available\nImpact: Enables disk spilling globally; may write to system temp without explicit\n        temp_dir configuration;\
+    \ audit mentions \"spill enablement\" but not the\n        forced disk manager activation\nRecommendation: JUSTIFIED but\
+    \ incomplete - document that disk_manager_os() is forced\n                and may use system temp\n"
+- name: DuckDB Thread and Temp Limits
+  summary: "Location: benchbox/platforms/duckdb.py:210-217\nForced: SET threads TO {thread_limit}, SET max_temp_directory_size\
+    \ = '{size}'\nImpact: Controls parallelism and disk spillover limits; audit mentions \"temp/thread\n        knobs\" generically\
+    \ but doesn't document specific enforcement\nRecommendation: JUSTIFIED but incomplete - document specific SET statements\
+    \ and defaults\n"
+impact: Memory footprint, disk usage, and performance characteristics; incomplete documentation
+tasks:
+- phase: Verification
+  done: true
+  items:
+  - summary: Verify line numbers are current in each source file
+  - summary: Confirm default values for each configuration
+- phase: Documentation Update
+  done: true
+  items:
+  - summary: Add SQLite cache_size to "Justified Configurations" section
+  - summary: Add DataFusion disk_manager_os() detail to existing entry
+  - summary: Add DuckDB thread/temp specifics to existing entry
+- phase: Testing
+  done: true
+  items:
+  - summary: 'SQLite: Verify cache_size impact on memory usage'
+  - summary: 'DataFusion: Confirm spill directory behavior'
+  - summary: 'DuckDB: Document default thread_limit and max_temp_directory_size'
+files_affected:
+  modified:
+  - docs/platform-config-audit.md
+  added: []
+  removed: []

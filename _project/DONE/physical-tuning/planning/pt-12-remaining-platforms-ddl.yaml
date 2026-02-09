@@ -3,6 +3,7 @@
 # Covers platforms with existing tuning implementations that need
 # alignment with the DDL Generator Protocol.
 
+id: pt-12-remaining-platforms-ddl
 title: "PT-12: Remaining Platforms Physical Tuning DDL Generator Enhancement"
 worktree: "physical-tuning"
 priority: "Medium"
@@ -158,146 +159,146 @@ context_sections:
 
 tasks:
   phases:
-    - phase: "Phase 1: ClickHouse Protocol Alignment"
+  - phase: "Phase 1: ClickHouse Protocol Alignment"
+    done: true
+    items:
+    - summary: "Refactor ClickHouseTuningMixin to DDL Generator protocol"
       done: true
-      items:
-        - summary: "Refactor ClickHouseTuningMixin to DDL Generator protocol"
-          done: true
-          subtasks:
-            - summary: "Implement generate_tuning_clauses() returning TuningClauses"
-              done: true
-            - summary: "Keep backward compat with existing generate_tuning_clause()"
-              done: true
-        - summary: "Add MergeTree engine selection based on tuning config"
-          done: true
-        - summary: "Add TTL support for time-series data"
-          done: true
-        - summary: "Unit tests for ClickHouse DDL generator"
-          done: true
+      subtasks:
+      - summary: "Implement generate_tuning_clauses() returning TuningClauses"
+        done: true
+      - summary: "Keep backward compat with existing generate_tuning_clause()"
+        done: true
+    - summary: "Add MergeTree engine selection based on tuning config"
+      done: true
+    - summary: "Add TTL support for time-series data"
+      done: true
+    - summary: "Unit tests for ClickHouse DDL generator"
+      done: true
 
-    - phase: "Phase 2: Firebolt Protocol Alignment"
+  - phase: "Phase 2: Firebolt Protocol Alignment"
+    done: true
+    items:
+    - summary: "Refactor to DDL Generator protocol"
       done: true
-      items:
-        - summary: "Refactor to DDL Generator protocol"
-          done: true
-        - summary: "Add AGGREGATING INDEX support"
-          done: true
-        - summary: "Add JOIN INDEX support"
-          done: true
-        - summary: "Unit tests for Firebolt DDL generator"
-          done: true
+    - summary: "Add AGGREGATING INDEX support"
+      done: true
+    - summary: "Add JOIN INDEX support"
+      done: true
+    - summary: "Unit tests for Firebolt DDL generator"
+      done: true
 
-    - phase: "Phase 3: Azure Synapse Protocol Alignment"
+  - phase: "Phase 3: Azure Synapse Protocol Alignment"
+    done: true
+    items:
+    - summary: "Refactor to DDL Generator protocol"
       done: true
-      items:
-        - summary: "Refactor to DDL Generator protocol"
-          done: true
-        - summary: "Add CLUSTERED INDEX with specific columns"
-          done: true
-        - summary: "Add PARTITION BY support (table partitioning)"
-          done: true
-        - summary: "Add HEAP table support for staging"
-          done: true
-        - summary: "Unit tests for Azure Synapse DDL generator"
-          done: true
+    - summary: "Add CLUSTERED INDEX with specific columns"
+      done: true
+    - summary: "Add PARTITION BY support (table partitioning)"
+      done: true
+    - summary: "Add HEAP table support for staging"
+      done: true
+    - summary: "Unit tests for Azure Synapse DDL generator"
+      done: true
 
-    - phase: "Phase 4: Fabric Warehouse Evaluation"
+  - phase: "Phase 4: Fabric Warehouse Evaluation"
+    done: true
+    items:
+    - summary: "Evaluate Fabric Warehouse tuning overlap with PT-08"
       done: true
-      items:
-        - summary: "Evaluate Fabric Warehouse tuning overlap with PT-08"
-          done: true
-        - summary: "If unique features, implement DDL generator"
-          done: true
-        - summary: "If shared with Spark/Delta, document in PT-08"
-          done: true
+    - summary: "If unique features, implement DDL generator"
+      done: true
+    - summary: "If shared with Spark/Delta, document in PT-08"
+      done: true
 
-    - phase: "Phase 5: Minimal Tuning Platforms"
+  - phase: "Phase 5: Minimal Tuning Platforms"
+    done: true
+    items:
+    - summary: "Implement no-op DDL generators for minimal platforms"
       done: true
-      items:
-        - summary: "Implement no-op DDL generators for minimal platforms"
-          done: true
-          subtasks:
-            - summary: "SQLite: Return empty TuningClauses with log"
-              done: true
-            - summary: "DataFusion: Return empty TuningClauses with log"
-              done: true
-            - summary: "Polars SQL: Return empty TuningClauses with log"
-              done: true
-            - summary: "InfluxDB: Return empty TuningClauses with log"
-              done: true
-        - summary: "Add tuning not supported message to dry-run output"
-          done: true
+      subtasks:
+      - summary: "SQLite: Return empty TuningClauses with log"
+        done: true
+      - summary: "DataFusion: Return empty TuningClauses with log"
+        done: true
+      - summary: "Polars SQL: Return empty TuningClauses with log"
+        done: true
+      - summary: "InfluxDB: Return empty TuningClauses with log"
+        done: true
+    - summary: "Add tuning not supported message to dry-run output"
+      done: true
 
-    - phase: "Phase 6: Testing"
+  - phase: "Phase 6: Testing"
+    done: true
+    items:
+    - summary: "Unit tests for ClickHouse DDL generator"
       done: true
-      items:
-        - summary: "Unit tests for ClickHouse DDL generator"
-          done: true
-        - summary: "Unit tests for Firebolt DDL generator"
-          done: true
-        - summary: "Unit tests for Azure Synapse DDL generator"
-          done: true
-        - summary: "Integration tests with ClickHouse (local/chdb)"
-          done: true
+    - summary: "Unit tests for Firebolt DDL generator"
+      done: true
+    - summary: "Unit tests for Azure Synapse DDL generator"
+      done: true
+    - summary: "Integration tests with ClickHouse (local/chdb)"
+      done: true
 
 files_affected:
   modified:
     # ClickHouse
-    - "benchbox/platforms/clickhouse/tuning.py"
-    - "benchbox/platforms/clickhouse/adapter.py"
+  - "benchbox/platforms/clickhouse/tuning.py"
+  - "benchbox/platforms/clickhouse/adapter.py"
     # Firebolt
-    - "benchbox/platforms/firebolt.py"
+  - "benchbox/platforms/firebolt.py"
     # Azure Synapse
-    - "benchbox/platforms/azure_synapse.py"
+  - "benchbox/platforms/azure_synapse.py"
     # Fabric Warehouse
-    - "benchbox/platforms/fabric_warehouse.py"
+  - "benchbox/platforms/fabric_warehouse.py"
     # Minimal platforms
-    - "benchbox/platforms/sqlite.py"
-    - "benchbox/platforms/datafusion.py"
-    - "benchbox/platforms/polars_platform.py"
-    - "benchbox/platforms/influxdb/adapter.py"
+  - "benchbox/platforms/sqlite.py"
+  - "benchbox/platforms/datafusion.py"
+  - "benchbox/platforms/polars_platform.py"
+  - "benchbox/platforms/influxdb/adapter.py"
   added:
-    - "benchbox/core/tuning/generators/clickhouse.py"
-    - "benchbox/core/tuning/generators/firebolt.py"
-    - "benchbox/core/tuning/generators/azure_synapse.py"
-    - "tests/unit/core/tuning/generators/test_clickhouse_ddl.py"
-    - "tests/unit/core/tuning/generators/test_firebolt_ddl.py"
-    - "tests/unit/core/tuning/generators/test_azure_synapse_ddl.py"
+  - "benchbox/core/tuning/generators/clickhouse.py"
+  - "benchbox/core/tuning/generators/firebolt.py"
+  - "benchbox/core/tuning/generators/azure_synapse.py"
+  - "tests/unit/core/tuning/generators/test_clickhouse_ddl.py"
+  - "tests/unit/core/tuning/generators/test_firebolt_ddl.py"
+  - "tests/unit/core/tuning/generators/test_azure_synapse_ddl.py"
 
 technical_requirements:
   constraints:
-    - "ClickHouse: Must maintain backward compat with existing mixin"
-    - "ClickHouse: Must support MergeTree engine variants"
-    - "Firebolt: Must support all index types (PRIMARY, AGGREGATING, JOIN)"
-    - "Azure Synapse: Must support all distribution types"
-    - "Minimal platforms: Must gracefully handle no-tuning scenarios"
+  - "ClickHouse: Must maintain backward compat with existing mixin"
+  - "ClickHouse: Must support MergeTree engine variants"
+  - "Firebolt: Must support all index types (PRIMARY, AGGREGATING, JOIN)"
+  - "Azure Synapse: Must support all distribution types"
+  - "Minimal platforms: Must gracefully handle no-tuning scenarios"
   dependencies:
-    - "clickhouse-connect for ClickHouse testing"
-    - "firebolt-sdk for Firebolt testing"
-    - "pyodbc or pymssql for Azure Synapse testing"
+  - "clickhouse-connect for ClickHouse testing"
+  - "firebolt-sdk for Firebolt testing"
+  - "pyodbc or pymssql for Azure Synapse testing"
 
 success_metrics:
-  - "ClickHouse: Tables created with correct PARTITION BY, ORDER BY"
-  - "Firebolt: Tables created with correct PRIMARY INDEX, PARTITION BY"
-  - "Azure Synapse: Tables created with correct DISTRIBUTION, INDEX type"
-  - "All platforms implement DDL Generator protocol consistently"
-  - "Minimal platforms show clear 'no tuning available' message"
+- "ClickHouse: Tables created with correct PARTITION BY, ORDER BY"
+- "Firebolt: Tables created with correct PRIMARY INDEX, PARTITION BY"
+- "Azure Synapse: Tables created with correct DISTRIBUTION, INDEX type"
+- "All platforms implement DDL Generator protocol consistently"
+- "Minimal platforms show clear 'no tuning available' message"
 
 dependencies:
   blocked_by:
-    - "_project/TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml"
+  - "_project/TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml"
   related_to:
-    - "_project/TODO/physical-tuning/planning/pt-08-databricks-spark-ddl.yaml"  # Fabric may share
+  - "_project/TODO/physical-tuning/planning/pt-08-databricks-spark-ddl.yaml"    # Fabric may share
 
 metadata:
   owners:
-    - "joe"
+  - "joe"
   tags:
-    - "tuning"
-    - "clickhouse"
-    - "firebolt"
-    - "azure-synapse"
-    - "fabric"
-    - "ddl-generation"
+  - "tuning"
+  - "clickhouse"
+  - "firebolt"
+  - "azure-synapse"
+  - "fabric"
+  - "ddl-generation"
   estimated_effort: "Medium"
   created_date: "2026-01-03"

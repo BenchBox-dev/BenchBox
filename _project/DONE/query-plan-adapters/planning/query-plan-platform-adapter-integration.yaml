@@ -1,21 +1,32 @@
+id: query-plan-platform-adapter-integration
 title: Query Plan Platform Adapter Integration
 worktree: query-plan-adapters
 category: Core Functionality
 priority: High
 status: Completed
-completed_date: "2025-11-23"
-completion_notes: |
-  Base adapter integration completed for DuckDB and SQLite platforms.
+completed_date: '2025-11-23'
+completion_notes: 'Base adapter integration completed for DuckDB and SQLite platforms.
+
   - Base adapter extended with capture_plans config and capture_query_plan() method
+
   - DuckDB adapter integrated with DuckDBQueryPlanParser
+
   - execute_query() modified to capture plans when enabled
+
   - 6 integration tests passing
+
   - Zero overhead when disabled
+
   - Graceful error handling
 
+
   Additional platforms (PostgreSQL, BigQuery, Snowflake, DataFusion, ClickHouse,
+
   Redshift, Databricks) can be added incrementally by implementing
+
   get_query_plan_parser() method in each adapter.
+
+  '
 description: 'Extend PlatformAdapter base class and all 8+ platform adapters to support
 
   query plan capture. Add capture_query_plan() method that executes EXPLAIN,
@@ -93,13 +104,12 @@ tasks:
     done: true
     details: SQLite parser implemented and available for adapter integration
 files_affected:
-- change_type: Modified
-  paths:
+  modified:
   - benchbox/platforms/base/adapter.py
   - benchbox/platforms/duckdb.py
-- change_type: New
-  paths:
   - tests/unit/platforms/test_duckdb_plan_capture.py
+  added: []
+  removed: []
 metadata:
   owners:
   - '@benchbox-maintainers'

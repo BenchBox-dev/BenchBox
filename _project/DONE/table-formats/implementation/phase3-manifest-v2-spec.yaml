@@ -1,497 +1,209 @@
-title: "Phase 3.1: Manifest v2 Implementation Specification"
+id: phase3-manifest-v2-spec
+title: 'Phase 3.1: Manifest v2 Implementation Specification'
 worktree: table-formats
 phase: implementation
-priority: critical
+priority: Critical
 estimated_hours: 2-3
-status: "Completed"
+status: Completed
 created: 2025-11-23
-owner: ""
+owner: ''
+context: "Current manifest format (v1):\n{\n  \"benchmark\": \"tpch\",\n  \"scale_factor\": 0.01,\n  \"compression\": {...},\n\
+  \  \"tables\": {\n    \"customer\": [\n      {\"path\": \"customer.tbl.zst\", \"size_bytes\": 93349, \"row_count\": 1500}\n\
+  \    ]\n  }\n}\n\nNeed: Support multiple formats per table while maintaining v1 compatibility.\n"
+motivation: 'After format conversion, manifests must track both original TBL files AND
 
-context: |
-  Current manifest format (v1):
-  {
-    "benchmark": "tpch",
-    "scale_factor": 0.01,
-    "compression": {...},
-    "tables": {
-      "customer": [
-        {"path": "customer.tbl.zst", "size_bytes": 93349, "row_count": 1500}
-      ]
-    }
-  }
-
-  Need: Support multiple formats per table while maintaining v1 compatibility.
-
-motivation: |
-  After format conversion, manifests must track both original TBL files AND
   converted formats (Parquet/Delta/Iceberg). Platform adapters need to:
+
   1. Discover available formats
+
   2. Select preferred format for loading
+
   3. Track conversion metadata
 
+
   WITHOUT manifest v2, converted files are orphaned - converters work but
+
   platform adapters ignore the converted data.
 
-technical_approach: |
-  ## Design Principles
-
-  1. **Backward Compatibility**: v1 manifests continue to work
-  2. **Opt-in v2**: Only write v2 when conversions exist
-  3. **Migration Path**: Read v1 → upgrade to v2 in-memory → write v2
-  4. **Schema Evolution**: Extensible for future format additions
-
-  ## Manifest v2 Schema
-
-  ```json
-  {
-    "version": 2,
-    "benchmark": "tpch",
-    "scale_factor": 0.01,
-    "compression": {...},
-    "format_preference": ["parquet", "delta", "tbl"],  // NEW
-    "created_at": "2025-11-23T10:00:00Z",
-    "generator_version": "0.1.0",
-    "tables": {
-      "customer": {
-        "formats": {  // NEW: nested by format
-          "tbl": [
-            {"path": "customer.tbl.zst", "size_bytes": 93349, "row_count": 1500}
-          ],
-          "parquet": [
-            {
-              "path": "customer.parquet",
-              "size_bytes": 42000,
-              "row_count": 1500,
-              "converted_from": "tbl",  // NEW
-              "converted_at": "2025-11-23T10:05:00Z",  // NEW
-              "compression": "snappy",  // NEW
-              "row_groups": 1,  // NEW
-              "conversion_options": {  // NEW
-                "merge_shards": true,
-                "validate_row_count": true
-              }
-            }
-          ]
-        }
-      }
-    }
-  }
-  ```
-
-  ## Version Detection
-
-  ```python
-  def detect_manifest_version(manifest_data: dict) -> int:
-      if "version" in manifest_data:
-          return manifest_data["version"]
-      # v1 has tables as dict[str, list]
-      # v2 has tables as dict[str, dict[str, dict]]
-      tables = manifest_data.get("tables", {})
-      if tables and isinstance(next(iter(tables.values())), dict):
-          # Check if it's v2 (has 'formats' key)
-          first_table = next(iter(tables.values()))
-          if "formats" in first_table:
-              return 2
-      return 1
-  ```
-
+  '
+technical_approach: "## Design Principles\n\n1. **Backward Compatibility**: v1 manifests continue to work\n2. **Opt-in v2**:\
+  \ Only write v2 when conversions exist\n3. **Migration Path**: Read v1 → upgrade to v2 in-memory → write v2\n4. **Schema\
+  \ Evolution**: Extensible for future format additions\n\n## Manifest v2 Schema\n\n```json\n{\n  \"version\": 2,\n  \"benchmark\"\
+  : \"tpch\",\n  \"scale_factor\": 0.01,\n  \"compression\": {...},\n  \"format_preference\": [\"parquet\", \"delta\", \"\
+  tbl\"],  // NEW\n  \"created_at\": \"2025-11-23T10:00:00Z\",\n  \"generator_version\": \"0.1.0\",\n  \"tables\": {\n   \
+  \ \"customer\": {\n      \"formats\": {  // NEW: nested by format\n        \"tbl\": [\n          {\"path\": \"customer.tbl.zst\"\
+  , \"size_bytes\": 93349, \"row_count\": 1500}\n        ],\n        \"parquet\": [\n          {\n            \"path\": \"\
+  customer.parquet\",\n            \"size_bytes\": 42000,\n            \"row_count\": 1500,\n            \"converted_from\"\
+  : \"tbl\",  // NEW\n            \"converted_at\": \"2025-11-23T10:05:00Z\",  // NEW\n            \"compression\": \"snappy\"\
+  ,  // NEW\n            \"row_groups\": 1,  // NEW\n            \"conversion_options\": {  // NEW\n              \"merge_shards\"\
+  : true,\n              \"validate_row_count\": true\n            }\n          }\n        ]\n      }\n    }\n  }\n}\n```\n\
+  \n## Version Detection\n\n```python\ndef detect_manifest_version(manifest_data: dict) -> int:\n    if \"version\" in manifest_data:\n\
+  \        return manifest_data[\"version\"]\n    # v1 has tables as dict[str, list]\n    # v2 has tables as dict[str, dict[str,\
+  \ dict]]\n    tables = manifest_data.get(\"tables\", {})\n    if tables and isinstance(next(iter(tables.values())), dict):\n\
+  \        # Check if it's v2 (has 'formats' key)\n        first_table = next(iter(tables.values()))\n        if \"formats\"\
+  \ in first_table:\n            return 2\n    return 1\n```\n"
 implementation:
   step1_manifest_models:
-    description: "Create Pydantic/dataclass models for manifest v1 and v2"
+    description: Create Pydantic/dataclass models for manifest v1 and v2
     file: benchbox/core/manifest/models.py (NEW FILE)
-    code: |
-      from __future__ import annotations
-      from dataclasses import dataclass, field
-      from datetime import datetime
-      from typing import Any
-
-      @dataclass
-      class FileEntry:
-          """Single file entry (v1 format)."""
-          path: str
-          size_bytes: int
-          row_count: int
-
-      @dataclass
-      class ConvertedFileEntry:
-          """File entry with conversion metadata (v2)."""
-          path: str
-          size_bytes: int
-          row_count: int
-          converted_from: str | None = None
-          converted_at: str | None = None
-          compression: str | None = None
-          row_groups: int | None = None
-          conversion_options: dict[str, Any] = field(default_factory=dict)
-
-      @dataclass
-      class TableFormats:
-          """v2: Multiple formats for a single table."""
-          formats: dict[str, list[ConvertedFileEntry]]
-
-      @dataclass
-      class ManifestV1:
-          """Original manifest format."""
-          benchmark: str
-          scale_factor: float
-          tables: dict[str, list[FileEntry]]
-          compression: dict[str, Any] | None = None
-          parallel: int | None = None
-          created_at: str | None = None
-          generator_version: str | None = None
-
-      @dataclass
-      class ManifestV2:
-          """Enhanced manifest with multi-format support."""
-          version: int = 2
-          benchmark: str | None = None
-          scale_factor: float | None = None
-          tables: dict[str, TableFormats] = field(default_factory=dict)
-          format_preference: list[str] = field(default_factory=list)
-          compression: dict[str, Any] | None = None
-          parallel: int | None = None
-          created_at: str | None = None
-          generator_version: str | None = None
-
+    code: "from __future__ import annotations\nfrom dataclasses import dataclass, field\nfrom datetime import datetime\nfrom\
+      \ typing import Any\n\n@dataclass\nclass FileEntry:\n    \"\"\"Single file entry (v1 format).\"\"\"\n    path: str\n\
+      \    size_bytes: int\n    row_count: int\n\n@dataclass\nclass ConvertedFileEntry:\n    \"\"\"File entry with conversion\
+      \ metadata (v2).\"\"\"\n    path: str\n    size_bytes: int\n    row_count: int\n    converted_from: str | None = None\n\
+      \    converted_at: str | None = None\n    compression: str | None = None\n    row_groups: int | None = None\n    conversion_options:\
+      \ dict[str, Any] = field(default_factory=dict)\n\n@dataclass\nclass TableFormats:\n    \"\"\"v2: Multiple formats for\
+      \ a single table.\"\"\"\n    formats: dict[str, list[ConvertedFileEntry]]\n\n@dataclass\nclass ManifestV1:\n    \"\"\
+      \"Original manifest format.\"\"\"\n    benchmark: str\n    scale_factor: float\n    tables: dict[str, list[FileEntry]]\n\
+      \    compression: dict[str, Any] | None = None\n    parallel: int | None = None\n    created_at: str | None = None\n\
+      \    generator_version: str | None = None\n\n@dataclass\nclass ManifestV2:\n    \"\"\"Enhanced manifest with multi-format\
+      \ support.\"\"\"\n    version: int = 2\n    benchmark: str | None = None\n    scale_factor: float | None = None\n  \
+      \  tables: dict[str, TableFormats] = field(default_factory=dict)\n    format_preference: list[str] = field(default_factory=list)\n\
+      \    compression: dict[str, Any] | None = None\n    parallel: int | None = None\n    created_at: str | None = None\n\
+      \    generator_version: str | None = None\n"
   step2_manifest_io:
-    description: "Implement v1/v2 readers and writers with migration"
+    description: Implement v1/v2 readers and writers with migration
     file: benchbox/core/manifest/io.py (NEW FILE)
-    code: |
-      import json
-      from pathlib import Path
-      from typing import Any
-      from benchbox.core.manifest.models import ManifestV1, ManifestV2, FileEntry, ConvertedFileEntry, TableFormats
-
-      def detect_version(manifest_dict: dict[str, Any]) -> int:
-          """Detect manifest version (1 or 2)."""
-          if "version" in manifest_dict:
-              return manifest_dict["version"]
-
-          # v1: tables -> {table_name: [files]}
-          # v2: tables -> {table_name: {formats: {format: [files]}}}
-          tables = manifest_dict.get("tables", {})
-          if not tables:
-              return 1
-
-          first_table_value = next(iter(tables.values()))
-          if isinstance(first_table_value, dict) and "formats" in first_table_value:
-              return 2
-
-          return 1
-
-      def load_manifest(manifest_path: Path) -> ManifestV1 | ManifestV2:
-          """Load manifest, auto-detecting version."""
-          with open(manifest_path) as f:
-              data = json.load(f)
-
-          version = detect_version(data)
-
-          if version == 1:
-              return _parse_v1(data)
-          else:
-              return _parse_v2(data)
-
-      def _parse_v1(data: dict) -> ManifestV1:
-          """Parse v1 manifest."""
-          tables = {}
-          for table_name, files in data.get("tables", {}).items():
-              tables[table_name] = [
-                  FileEntry(
-                      path=f["path"],
-                      size_bytes=f["size_bytes"],
-                      row_count=f["row_count"]
-                  )
-                  for f in files
-              ]
-
-          return ManifestV1(
-              benchmark=data["benchmark"],
-              scale_factor=data["scale_factor"],
-              tables=tables,
-              compression=data.get("compression"),
-              parallel=data.get("parallel"),
-              created_at=data.get("created_at"),
-              generator_version=data.get("generator_version")
-          )
-
-      def _parse_v2(data: dict) -> ManifestV2:
-          """Parse v2 manifest."""
-          tables = {}
-          for table_name, table_data in data.get("tables", {}).items():
-              formats_dict = {}
-              for format_name, files in table_data.get("formats", {}).items():
-                  formats_dict[format_name] = [
-                      ConvertedFileEntry(
-                          path=f["path"],
-                          size_bytes=f["size_bytes"],
-                          row_count=f["row_count"],
-                          converted_from=f.get("converted_from"),
-                          converted_at=f.get("converted_at"),
-                          compression=f.get("compression"),
-                          row_groups=f.get("row_groups"),
-                          conversion_options=f.get("conversion_options", {})
-                      )
-                      for f in files
-                  ]
-              tables[table_name] = TableFormats(formats=formats_dict)
-
-          return ManifestV2(
-              version=data.get("version", 2),
-              benchmark=data.get("benchmark"),
-              scale_factor=data.get("scale_factor"),
-              tables=tables,
-              format_preference=data.get("format_preference", []),
-              compression=data.get("compression"),
-              parallel=data.get("parallel"),
-              created_at=data.get("created_at"),
-              generator_version=data.get("generator_version")
-          )
-
-      def upgrade_v1_to_v2(v1: ManifestV1) -> ManifestV2:
-          """Migrate v1 manifest to v2 structure."""
-          tables = {}
-          for table_name, files in v1.tables.items():
-              # Detect format from file extension
-              format_name = _detect_format_from_files(files)
-
-              converted_files = [
-                  ConvertedFileEntry(
-                      path=f.path,
-                      size_bytes=f.size_bytes,
-                      row_count=f.row_count
-                  )
-                  for f in files
-              ]
-
-              tables[table_name] = TableFormats(
-                  formats={format_name: converted_files}
-              )
-
-          return ManifestV2(
-              version=2,
-              benchmark=v1.benchmark,
-              scale_factor=v1.scale_factor,
-              tables=tables,
-              format_preference=[format_name, "tbl", "csv"],  # Prefer detected format
-              compression=v1.compression,
-              parallel=v1.parallel,
-              created_at=v1.created_at,
-              generator_version=v1.generator_version
-          )
-
-      def _detect_format_from_files(files: list[FileEntry]) -> str:
-          """Detect format from file extensions."""
-          if not files:
-              return "tbl"
-
-          path = files[0].path
-          if ".parquet" in path:
-              return "parquet"
-          elif ".tbl" in path or ".dat" in path:
-              return "tbl"
-          elif ".csv" in path:
-              return "csv"
-          else:
-              return "tbl"
-
-      def write_manifest(manifest: ManifestV1 | ManifestV2, path: Path) -> None:
-          """Write manifest to JSON file."""
-          if isinstance(manifest, ManifestV1):
-              # Convert v1 to dict
-              data = _manifest_v1_to_dict(manifest)
-          else:
-              # Convert v2 to dict
-              data = _manifest_v2_to_dict(manifest)
-
-          with open(path, "w") as f:
-              json.dump(data, f, indent=2)
-
-      def _manifest_v1_to_dict(manifest: ManifestV1) -> dict:
-          """Convert ManifestV1 to dict."""
-          tables = {}
-          for table_name, files in manifest.tables.items():
-              tables[table_name] = [
-                  {
-                      "path": f.path,
-                      "size_bytes": f.size_bytes,
-                      "row_count": f.row_count
-                  }
-                  for f in files
-              ]
-
-          return {
-              "benchmark": manifest.benchmark,
-              "scale_factor": manifest.scale_factor,
-              "tables": tables,
-              "compression": manifest.compression,
-              "parallel": manifest.parallel,
-              "created_at": manifest.created_at,
-              "generator_version": manifest.generator_version
-          }
-
-      def _manifest_v2_to_dict(manifest: ManifestV2) -> dict:
-          """Convert ManifestV2 to dict."""
-          tables = {}
-          for table_name, table_formats in manifest.tables.items():
-              formats_dict = {}
-              for format_name, files in table_formats.formats.items():
-                  formats_dict[format_name] = [
-                      {
-                          "path": f.path,
-                          "size_bytes": f.size_bytes,
-                          "row_count": f.row_count,
-                          "converted_from": f.converted_from,
-                          "converted_at": f.converted_at,
-                          "compression": f.compression,
-                          "row_groups": f.row_groups,
-                          "conversion_options": f.conversion_options
-                      }
-                      for f in files
-                  ]
-              tables[table_name] = {"formats": formats_dict}
-
-          return {
-              "version": 2,
-              "benchmark": manifest.benchmark,
-              "scale_factor": manifest.scale_factor,
-              "tables": tables,
-              "format_preference": manifest.format_preference,
-              "compression": manifest.compression,
-              "parallel": manifest.parallel,
-              "created_at": manifest.created_at,
-              "generator_version": manifest.generator_version
-          }
-
+    code: "import json\nfrom pathlib import Path\nfrom typing import Any\nfrom benchbox.core.manifest.models import ManifestV1,\
+      \ ManifestV2, FileEntry, ConvertedFileEntry, TableFormats\n\ndef detect_version(manifest_dict: dict[str, Any]) -> int:\n\
+      \    \"\"\"Detect manifest version (1 or 2).\"\"\"\n    if \"version\" in manifest_dict:\n        return manifest_dict[\"\
+      version\"]\n\n    # v1: tables -> {table_name: [files]}\n    # v2: tables -> {table_name: {formats: {format: [files]}}}\n\
+      \    tables = manifest_dict.get(\"tables\", {})\n    if not tables:\n        return 1\n\n    first_table_value = next(iter(tables.values()))\n\
+      \    if isinstance(first_table_value, dict) and \"formats\" in first_table_value:\n        return 2\n\n    return 1\n\
+      \ndef load_manifest(manifest_path: Path) -> ManifestV1 | ManifestV2:\n    \"\"\"Load manifest, auto-detecting version.\"\
+      \"\"\n    with open(manifest_path) as f:\n        data = json.load(f)\n\n    version = detect_version(data)\n\n    if\
+      \ version == 1:\n        return _parse_v1(data)\n    else:\n        return _parse_v2(data)\n\ndef _parse_v1(data: dict)\
+      \ -> ManifestV1:\n    \"\"\"Parse v1 manifest.\"\"\"\n    tables = {}\n    for table_name, files in data.get(\"tables\"\
+      , {}).items():\n        tables[table_name] = [\n            FileEntry(\n                path=f[\"path\"],\n        \
+      \        size_bytes=f[\"size_bytes\"],\n                row_count=f[\"row_count\"]\n            )\n            for f\
+      \ in files\n        ]\n\n    return ManifestV1(\n        benchmark=data[\"benchmark\"],\n        scale_factor=data[\"\
+      scale_factor\"],\n        tables=tables,\n        compression=data.get(\"compression\"),\n        parallel=data.get(\"\
+      parallel\"),\n        created_at=data.get(\"created_at\"),\n        generator_version=data.get(\"generator_version\"\
+      )\n    )\n\ndef _parse_v2(data: dict) -> ManifestV2:\n    \"\"\"Parse v2 manifest.\"\"\"\n    tables = {}\n    for table_name,\
+      \ table_data in data.get(\"tables\", {}).items():\n        formats_dict = {}\n        for format_name, files in table_data.get(\"\
+      formats\", {}).items():\n            formats_dict[format_name] = [\n                ConvertedFileEntry(\n          \
+      \          path=f[\"path\"],\n                    size_bytes=f[\"size_bytes\"],\n                    row_count=f[\"\
+      row_count\"],\n                    converted_from=f.get(\"converted_from\"),\n                    converted_at=f.get(\"\
+      converted_at\"),\n                    compression=f.get(\"compression\"),\n                    row_groups=f.get(\"row_groups\"\
+      ),\n                    conversion_options=f.get(\"conversion_options\", {})\n                )\n                for\
+      \ f in files\n            ]\n        tables[table_name] = TableFormats(formats=formats_dict)\n\n    return ManifestV2(\n\
+      \        version=data.get(\"version\", 2),\n        benchmark=data.get(\"benchmark\"),\n        scale_factor=data.get(\"\
+      scale_factor\"),\n        tables=tables,\n        format_preference=data.get(\"format_preference\", []),\n        compression=data.get(\"\
+      compression\"),\n        parallel=data.get(\"parallel\"),\n        created_at=data.get(\"created_at\"),\n        generator_version=data.get(\"\
+      generator_version\")\n    )\n\ndef upgrade_v1_to_v2(v1: ManifestV1) -> ManifestV2:\n    \"\"\"Migrate v1 manifest to\
+      \ v2 structure.\"\"\"\n    tables = {}\n    for table_name, files in v1.tables.items():\n        # Detect format from\
+      \ file extension\n        format_name = _detect_format_from_files(files)\n\n        converted_files = [\n          \
+      \  ConvertedFileEntry(\n                path=f.path,\n                size_bytes=f.size_bytes,\n                row_count=f.row_count\n\
+      \            )\n            for f in files\n        ]\n\n        tables[table_name] = TableFormats(\n            formats={format_name:\
+      \ converted_files}\n        )\n\n    return ManifestV2(\n        version=2,\n        benchmark=v1.benchmark,\n     \
+      \   scale_factor=v1.scale_factor,\n        tables=tables,\n        format_preference=[format_name, \"tbl\", \"csv\"\
+      ],  # Prefer detected format\n        compression=v1.compression,\n        parallel=v1.parallel,\n        created_at=v1.created_at,\n\
+      \        generator_version=v1.generator_version\n    )\n\ndef _detect_format_from_files(files: list[FileEntry]) -> str:\n\
+      \    \"\"\"Detect format from file extensions.\"\"\"\n    if not files:\n        return \"tbl\"\n\n    path = files[0].path\n\
+      \    if \".parquet\" in path:\n        return \"parquet\"\n    elif \".tbl\" in path or \".dat\" in path:\n        return\
+      \ \"tbl\"\n    elif \".csv\" in path:\n        return \"csv\"\n    else:\n        return \"tbl\"\n\ndef write_manifest(manifest:\
+      \ ManifestV1 | ManifestV2, path: Path) -> None:\n    \"\"\"Write manifest to JSON file.\"\"\"\n    if isinstance(manifest,\
+      \ ManifestV1):\n        # Convert v1 to dict\n        data = _manifest_v1_to_dict(manifest)\n    else:\n        # Convert\
+      \ v2 to dict\n        data = _manifest_v2_to_dict(manifest)\n\n    with open(path, \"w\") as f:\n        json.dump(data,\
+      \ f, indent=2)\n\ndef _manifest_v1_to_dict(manifest: ManifestV1) -> dict:\n    \"\"\"Convert ManifestV1 to dict.\"\"\
+      \"\n    tables = {}\n    for table_name, files in manifest.tables.items():\n        tables[table_name] = [\n       \
+      \     {\n                \"path\": f.path,\n                \"size_bytes\": f.size_bytes,\n                \"row_count\"\
+      : f.row_count\n            }\n            for f in files\n        ]\n\n    return {\n        \"benchmark\": manifest.benchmark,\n\
+      \        \"scale_factor\": manifest.scale_factor,\n        \"tables\": tables,\n        \"compression\": manifest.compression,\n\
+      \        \"parallel\": manifest.parallel,\n        \"created_at\": manifest.created_at,\n        \"generator_version\"\
+      : manifest.generator_version\n    }\n\ndef _manifest_v2_to_dict(manifest: ManifestV2) -> dict:\n    \"\"\"Convert ManifestV2\
+      \ to dict.\"\"\"\n    tables = {}\n    for table_name, table_formats in manifest.tables.items():\n        formats_dict\
+      \ = {}\n        for format_name, files in table_formats.formats.items():\n            formats_dict[format_name] = [\n\
+      \                {\n                    \"path\": f.path,\n                    \"size_bytes\": f.size_bytes,\n     \
+      \               \"row_count\": f.row_count,\n                    \"converted_from\": f.converted_from,\n           \
+      \         \"converted_at\": f.converted_at,\n                    \"compression\": f.compression,\n                 \
+      \   \"row_groups\": f.row_groups,\n                    \"conversion_options\": f.conversion_options\n              \
+      \  }\n                for f in files\n            ]\n        tables[table_name] = {\"formats\": formats_dict}\n\n  \
+      \  return {\n        \"version\": 2,\n        \"benchmark\": manifest.benchmark,\n        \"scale_factor\": manifest.scale_factor,\n\
+      \        \"tables\": tables,\n        \"format_preference\": manifest.format_preference,\n        \"compression\": manifest.compression,\n\
+      \        \"parallel\": manifest.parallel,\n        \"created_at\": manifest.created_at,\n        \"generator_version\"\
+      : manifest.generator_version\n    }\n"
   step3_format_preference:
-    description: "Implement format preference resolution system"
+    description: Implement format preference resolution system
     file: benchbox/core/manifest/preferences.py (NEW FILE)
-    code: |
-      from benchbox.core.manifest.models import ManifestV2
-      from benchbox.platforms.base.format_capabilities import get_supported_formats
-
-      def get_preferred_format(
-          manifest: ManifestV2,
-          table_name: str,
-          platform_name: str
-      ) -> str | None:
-          """Get preferred format for a table on a platform.
-
-          Resolution order:
-          1. Manifest format_preference (user-specified)
-          2. Platform default preferences
-          3. First available format
-
-          Returns None if no supported formats available.
-          """
-          table_formats = manifest.tables.get(table_name)
-          if not table_formats:
-              return None
-
-          available_formats = list(table_formats.formats.keys())
-          if not available_formats:
-              return None
-
-          # Get platform supported formats (in preference order)
-          platform_formats = get_supported_formats(platform_name)
-
-          # Try manifest preference first
-          for fmt in manifest.format_preference:
-              if fmt in available_formats and fmt in platform_formats:
-                  return fmt
-
-          # Try platform preference
-          for fmt in platform_formats:
-              if fmt in available_formats:
-                  return fmt
-
-          # Fallback: first available
-          return available_formats[0]
-
-      def get_files_for_format(
-          manifest: ManifestV2,
-          table_name: str,
-          format_name: str
-      ) -> list[str]:
-          """Get file paths for a specific format."""
-          table_formats = manifest.tables.get(table_name)
-          if not table_formats:
-              return []
-
-          files = table_formats.formats.get(format_name, [])
-          return [f.path for f in files]
-
+    code: "from benchbox.core.manifest.models import ManifestV2\nfrom benchbox.platforms.base.format_capabilities import get_supported_formats\n\
+      \ndef get_preferred_format(\n    manifest: ManifestV2,\n    table_name: str,\n    platform_name: str\n) -> str | None:\n\
+      \    \"\"\"Get preferred format for a table on a platform.\n\n    Resolution order:\n    1. Manifest format_preference\
+      \ (user-specified)\n    2. Platform default preferences\n    3. First available format\n\n    Returns None if no supported\
+      \ formats available.\n    \"\"\"\n    table_formats = manifest.tables.get(table_name)\n    if not table_formats:\n \
+      \       return None\n\n    available_formats = list(table_formats.formats.keys())\n    if not available_formats:\n \
+      \       return None\n\n    # Get platform supported formats (in preference order)\n    platform_formats = get_supported_formats(platform_name)\n\
+      \n    # Try manifest preference first\n    for fmt in manifest.format_preference:\n        if fmt in available_formats\
+      \ and fmt in platform_formats:\n            return fmt\n\n    # Try platform preference\n    for fmt in platform_formats:\n\
+      \        if fmt in available_formats:\n            return fmt\n\n    # Fallback: first available\n    return available_formats[0]\n\
+      \ndef get_files_for_format(\n    manifest: ManifestV2,\n    table_name: str,\n    format_name: str\n) -> list[str]:\n\
+      \    \"\"\"Get file paths for a specific format.\"\"\"\n    table_formats = manifest.tables.get(table_name)\n    if\
+      \ not table_formats:\n        return []\n\n    files = table_formats.formats.get(format_name, [])\n    return [f.path\
+      \ for f in files]\n"
   step4_update_converters:
-    description: "Update converters to write conversion metadata to manifest"
+    description: Update converters to write conversion metadata to manifest
     file: benchbox/utils/format_converters/base.py
     changes:
-      - Add manifest update capability to ConversionResult
-      - Include conversion timestamp
-      - Include conversion options used
-
+    - Add manifest update capability to ConversionResult
+    - Include conversion timestamp
+    - Include conversion options used
   step5_integration:
-    description: "Integrate manifest v2 into platform adapters"
+    description: Integrate manifest v2 into platform adapters
     files:
-      - benchbox/platforms/base/data_loading.py
-      - benchbox/platforms/duckdb.py
-      - benchbox/platforms/datafusion.py
+    - benchbox/platforms/base/data_loading.py
+    - benchbox/platforms/duckdb.py
+    - benchbox/platforms/datafusion.py
     changes:
-      - Update load_data() to check manifest for formats
-      - Use format preference system
-      - Fallback to v1 behavior if v1 manifest
-
+    - Update load_data() to check manifest for formats
+    - Use format preference system
+    - Fallback to v1 behavior if v1 manifest
 tests:
   unit_tests:
     file: tests/unit/core/manifest/test_manifest_v2.py (NEW)
     cases:
-      - test_detect_version_v1
-      - test_detect_version_v2
-      - test_load_v1_manifest
-      - test_load_v2_manifest
-      - test_upgrade_v1_to_v2
-      - test_write_v2_manifest
-      - test_format_preference_resolution
-      - test_backward_compatibility
-
+    - test_detect_version_v1
+    - test_detect_version_v2
+    - test_load_v1_manifest
+    - test_load_v2_manifest
+    - test_upgrade_v1_to_v2
+    - test_write_v2_manifest
+    - test_format_preference_resolution
+    - test_backward_compatibility
   integration_tests:
     file: tests/integration/test_manifest_v2_integration.py (NEW)
     cases:
-      - test_convert_and_update_manifest
-      - test_platform_loads_preferred_format
-      - test_fallback_to_tbl_if_no_parquet
-
+    - test_convert_and_update_manifest
+    - test_platform_loads_preferred_format
+    - test_fallback_to_tbl_if_no_parquet
 acceptance_criteria:
-  - v1 manifests load correctly
-  - v2 manifests load correctly
-  - v1 → v2 upgrade works
-  - Format preference resolution works
-  - Platform adapters use preferred format
-  - All existing tests still pass
-  - New manifest tests at 100% coverage
-
+- v1 manifests load correctly
+- v2 manifests load correctly
+- v1 → v2 upgrade works
+- Format preference resolution works
+- Platform adapters use preferred format
+- All existing tests still pass
+- New manifest tests at 100% coverage
 files_to_create:
-  - benchbox/core/manifest/__init__.py
-  - benchbox/core/manifest/models.py
-  - benchbox/core/manifest/io.py
-  - benchbox/core/manifest/preferences.py
-  - tests/unit/core/manifest/test_manifest_v2.py
-  - tests/integration/test_manifest_v2_integration.py
-
+- benchbox/core/manifest/__init__.py
+- benchbox/core/manifest/models.py
+- benchbox/core/manifest/io.py
+- benchbox/core/manifest/preferences.py
+- tests/unit/core/manifest/test_manifest_v2.py
+- tests/integration/test_manifest_v2_integration.py
 files_to_modify:
-  - benchbox/utils/format_converters/base.py
-  - benchbox/platforms/base/data_loading.py
-  - benchbox/platforms/duckdb.py
-  - benchbox/platforms/datafusion.py
-
+- benchbox/utils/format_converters/base.py
+- benchbox/platforms/base/data_loading.py
+- benchbox/platforms/duckdb.py
+- benchbox/platforms/datafusion.py
 estimated_loc:
   new: ~500 lines
   modified: ~100 lines
   tests: ~400 lines
-
 related_work:
   blocking: []
   blocked_by:
-    - "Phase 3.2: Conversion orchestration (needs manifest update)"
+  - 'Phase 3.2: Conversion orchestration (needs manifest update)'
   enables:
-    - "Format preference per benchmark run"
-    - "Multi-format benchmarking comparisons"
-    - "Automatic format selection"
+  - Format preference per benchmark run
+  - Multi-format benchmarking comparisons
+  - Automatic format selection
+description: 'Archived DONE item for: Phase 3.1: Manifest v2 Implementation Specification'

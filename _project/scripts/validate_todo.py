@@ -151,6 +151,7 @@ class TodoValidator:
         """Validate cross-item deps.needs references and detect cycles."""
         errors = []
         items: Dict[str, dict] = {}  # slug -> data
+        todo_id_sources: Dict[str, Path] = {}
 
         # Load all items
         for yaml_file in todo_dir.rglob("*.yaml"):
@@ -161,6 +162,14 @@ class TodoValidator:
                     data = yaml.safe_load(f)
                 if data and isinstance(data, dict):
                     slug = data.get("id", yaml_file.stem)
+                    if slug in todo_id_sources:
+                        prev = todo_id_sources[slug]
+                        errors.append(
+                            f"duplicate TODO id '{slug}' in '{prev.relative_to(todo_dir.parent.parent)}' "
+                            f"and '{yaml_file.relative_to(todo_dir.parent.parent)}'"
+                        )
+                        continue
+                    todo_id_sources[slug] = yaml_file
                     items[slug] = data
             except Exception:
                 continue
@@ -168,6 +177,7 @@ class TodoValidator:
         # Also load DONE items to resolve references
         done_dir = todo_dir.parent / "DONE"
         done_slugs: Set[str] = set()
+        done_id_sources: Dict[str, Path] = {}
         if done_dir.exists():
             for yaml_file in done_dir.rglob("*.yaml"):
                 if "_indexes" in str(yaml_file):
@@ -177,9 +187,22 @@ class TodoValidator:
                         data = yaml.safe_load(f)
                     if data and isinstance(data, dict):
                         slug = data.get("id", yaml_file.stem)
+                        if slug in done_id_sources:
+                            prev = done_id_sources[slug]
+                            errors.append(
+                                f"duplicate DONE id '{slug}' in '{prev.relative_to(todo_dir.parent.parent)}' "
+                                f"and '{yaml_file.relative_to(todo_dir.parent.parent)}'"
+                            )
+                            continue
+                        done_id_sources[slug] = yaml_file
                         done_slugs.add(slug)
                 except Exception:
                     continue
+
+        # Global uniqueness across TODO + DONE
+        overlap = set(items.keys()) & done_slugs
+        for slug in sorted(overlap):
+            errors.append(f"duplicate id across TODO and DONE: '{slug}'")
 
         all_known = set(items.keys()) | done_slugs
 

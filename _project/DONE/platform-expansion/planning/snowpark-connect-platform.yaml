@@ -1,3 +1,4 @@
+id: snowpark-connect-platform
 title: "Snowpark Connect for Spark Platform"
 worktree: platform-expansion
 priority: Medium-High
@@ -16,58 +17,58 @@ description: |
 
 tasks:
   phases:
-    - phase: "Phase 1: Adapter Implementation"
+  - phase: "Phase 1: Adapter Implementation"
+    done: true
+    items:
+    - summary: "Create SnowparkConnectAdapter class"
       done: true
-      items:
-        - summary: "Create SnowparkConnectAdapter class"
-          done: true
-          subtasks:
-            - summary: "Implement create_connection() with Snowpark Session"
-              done: true
-            - summary: "Reuse existing Snowflake credential management"
-              done: true
-            - summary: "Implement execute_query() with Snowpark SQL"
-              done: true
-            - summary: "Add limitations handling (RDD, hint, repartition)"
-              done: true
-        - summary: "Support DataFrame execution mode (primary)"
-          done: true
-        - summary: "Register in platform_registry.py"
-          done: true
+      subtasks:
+      - summary: "Implement create_connection() with Snowpark Session"
+        done: true
+      - summary: "Reuse existing Snowflake credential management"
+        done: true
+      - summary: "Implement execute_query() with Snowpark SQL"
+        done: true
+      - summary: "Add limitations handling (RDD, hint, repartition)"
+        done: true
+    - summary: "Support DataFrame execution mode (primary)"
+      done: true
+    - summary: "Register in platform_registry.py"
+      done: true
 
-    - phase: "Phase 2: Configuration"
+  - phase: "Phase 2: Configuration"
+    done: true
+    items:
+    - summary: "Add snowpark-connect dependency group to dependencies.py"
       done: true
-      items:
-        - summary: "Add snowpark-connect dependency group to dependencies.py"
-          done: true
-        - summary: "Document Snowpark Connect limitations"
-          done: true
+    - summary: "Document Snowpark Connect limitations"
+      done: true
 
-    - phase: "Phase 3: Testing"
+  - phase: "Phase 3: Testing"
+    done: true
+    items:
+    - summary: "Create unit tests with mocked Snowpark Session"
       done: true
-      items:
-        - summary: "Create unit tests with mocked Snowpark Session"
-          done: true
-        - summary: "Add smoke test gated by @pytest.mark.live_snowpark"
-          done: false
-          notes: "Deferred - requires live Snowflake account for testing"
+    - summary: "Add smoke test gated by @pytest.mark.live_snowpark"
+      done: false
+      notes: "Deferred - requires live Snowflake account for testing"
 
-    - phase: "Phase 4: Documentation"
+  - phase: "Phase 4: Documentation"
+    done: true
+    items:
+    - summary: "Create examples/getting_started/cloud/snowpark_connect_tpch.py"
       done: true
-      items:
-        - summary: "Create examples/getting_started/cloud/snowpark_connect_tpch.py"
-          done: true
-        - summary: "Write docs/platforms/snowpark-connect.md"
-          done: true
-        - summary: "Document API compatibility limitations"
-          done: true
+    - summary: "Write docs/platforms/snowpark-connect.md"
+      done: true
+    - summary: "Document API compatibility limitations"
+      done: true
 
 metadata:
   tags:
-    - cloud-spark
-    - snowflake
-    - snowpark
-    - pyspark-compatible
+  - cloud-spark
+  - snowflake
+  - snowpark
+  - pyspark-compatible
   estimated_effort: 1.5 weeks
   created_date: "2025-12-24"
   completed_date: "2025-12-26"
@@ -82,27 +83,27 @@ impact:
 
 files_affected:
   modified:
-    - benchbox/core/platform_registry.py
-    - benchbox/utils/dependencies.py
+  - benchbox/core/platform_registry.py
+  - benchbox/utils/dependencies.py
   added:
-    - benchbox/platforms/snowpark_connect.py
-    - tests/unit/platforms/test_snowpark_connect_adapter.py
-    - examples/getting_started/cloud/snowpark_connect_tpch.py
-    - docs/platforms/snowpark-connect.md
+  - benchbox/platforms/snowpark_connect.py
+  - tests/unit/platforms/test_snowpark_connect_adapter.py
+  - examples/getting_started/cloud/snowpark_connect_tpch.py
+  - docs/platforms/snowpark-connect.md
 
 technical_requirements:
   dependencies:
-    - "snowflake-snowpark-python>=1.20.0"
+  - "snowflake-snowpark-python>=1.20.0"
   constraints:
-    - "RDD APIs not supported"
-    - "DataFrame.hint() is no-op"
-    - "DataFrame.repartition() is no-op"
-    - "Some advanced Spark features unavailable"
+  - "RDD APIs not supported"
+  - "DataFrame.hint() is no-op"
+  - "DataFrame.repartition() is no-op"
+  - "Some advanced Spark features unavailable"
 
 success_metrics:
-  - "Snowpark Connect runs TPC-H SF=0.01 power test"
-  - "Limitations clearly documented"
-  - "Unit test coverage > 85%"
+- "Snowpark Connect runs TPC-H SF=0.01 power test"
+- "Limitations clearly documented"
+- "Unit test coverage > 85%"
 
 completion_notes: |
   Implemented Snowpark Connect adapter with:

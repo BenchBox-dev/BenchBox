@@ -1,9 +1,10 @@
+id: query-plan-core-infrastructure-models-storage
 title: Query Plan Core Infrastructure (Models & Storage)
 worktree: query-plan-core
 category: Core Functionality
 priority: Critical
 status: Completed
-completed_date: "2025-11-23"
+completed_date: '2025-11-23'
 description: 'Implement foundational data models for query plan representation including
 
   two-tier DAG structure (logical + physical operators), storage schema
@@ -151,17 +152,14 @@ technical_requirements:
   - Serialization <50ms for typical plans
   - Memory overhead <1MB per plan for typical queries
 files_affected:
-- change_type: New
-  paths:
+  modified:
   - benchbox/core/results/query_plan_models.py
-- change_type: Modified
-  paths:
   - benchbox/core/results/models.py
   - benchbox/core/results/exporter.py
-- change_type: New
-  paths:
   - tests/unit/core/results/test_query_plan_models.py
   - tests/unit/core/results/test_query_plan_serialization.py
+  added: []
+  removed: []
 metadata:
   owners:
   - '@benchbox-maintainers'

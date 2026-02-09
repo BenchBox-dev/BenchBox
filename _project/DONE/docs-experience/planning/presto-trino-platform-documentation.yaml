@@ -1,3 +1,4 @@
+id: presto-trino-platform-documentation
 title: Presto and Trino Platform Documentation
 worktree: docs-experience
 priority: High
@@ -16,39 +17,39 @@ description: |
   Currently no user-facing documentation exists for either platform.
 
 tasks:
-  - phase: "Presto Documentation"
+- phase: "Presto Documentation"
+  done: true
+  items:
+  - summary: "Create docs/platforms/presto.md"
     done: true
-    items:
-      - summary: "Create docs/platforms/presto.md"
-        done: true
-      - summary: "Document coordinator connection"
-        done: true
-      - summary: "Document catalog discovery and selection"
-        done: true
-      - summary: "Document authentication options"
-        done: true
-      - summary: "Add query optimization tips"
-        done: true
-  - phase: "Trino Documentation"
+  - summary: "Document coordinator connection"
     done: true
-    items:
-      - summary: "Create docs/platforms/trino.md"
-        done: true
-      - summary: "Document coordinator connection"
-        done: true
-      - summary: "Document catalog discovery and selection"
-        done: true
-      - summary: "Document authentication options"
-        done: true
-      - summary: "Highlight Trino-specific features"
-        done: true
-  - phase: "Index Updates"
+  - summary: "Document catalog discovery and selection"
     done: true
-    items:
-      - summary: "Update docs/platforms/index.md with both links"
-        done: true
-      - summary: "Add cross-references between Presto and Trino docs"
-        done: true
+  - summary: "Document authentication options"
+    done: true
+  - summary: "Add query optimization tips"
+    done: true
+- phase: "Trino Documentation"
+  done: true
+  items:
+  - summary: "Create docs/platforms/trino.md"
+    done: true
+  - summary: "Document coordinator connection"
+    done: true
+  - summary: "Document catalog discovery and selection"
+    done: true
+  - summary: "Document authentication options"
+    done: true
+  - summary: "Highlight Trino-specific features"
+    done: true
+- phase: "Index Updates"
+  done: true
+  items:
+  - summary: "Update docs/platforms/index.md with both links"
+    done: true
+  - summary: "Add cross-references between Presto and Trino docs"
+    done: true
 
 completion_notes: |
   Documentation already existed:
@@ -75,12 +76,12 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - documentation
-    - presto
-    - trino
-    - platform
+  - documentation
+  - presto
+  - trino
+  - platform
   estimated_effort: 5-6 hours
   created_date: "2025-12-13"
 
@@ -93,10 +94,10 @@ impact:
     Authentication setup documented for enterprise environments.
 
 success_metrics:
-  - "Complete guides for both Presto and Trino"
-  - "Catalog auto-selection feature documented"
-  - "Troubleshooting covers connection and auth issues"
+- "Complete guides for both Presto and Trino"
+- "Catalog auto-selection feature documented"
+- "Troubleshooting covers connection and auth issues"
 
 files_modified:
-  - docs/platforms/presto.md (existing, complete)
-  - docs/platforms/trino.md (existing, comprehensive)
+- docs/platforms/presto.md (existing, complete)
+- docs/platforms/trino.md (existing, comprehensive)

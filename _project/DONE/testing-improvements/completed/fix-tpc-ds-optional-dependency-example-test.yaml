@@ -1,0 +1,51 @@
+id: fix-tpc-ds-optional-dependency-example-test
+title: Fix TPC-DS Optional Dependency Example Test
+worktree: testing-improvements
+category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+priority: Low
+status: Identified
+description: 'Single example test fails when TPC-DS source files are not installed in benchbox/_sources/tpc-ds/tools. The
+  test should gracefully skip when optional TPC-DS binaries are unavailable, matching the pattern used for other optional
+  dependencies.
+
+  '
+context_sections:
+- name: Failing Test
+  summary: '"tests/examples/test_getting_started_examples.py::test_duckdb_tpcds_power_runs raises FileNotFoundError when TPC-DS
+    sources are missing"'
+- name: Current Behavior
+  summary: Test attempts to instantiate TPCDS benchmark which requires compiled dsdgen binary
+impact: Improves first-run developer experience by skipping tests that require manual TPC binary setup
+tasks:
+- phase: Add Dependency Check
+  done: false
+  items:
+  - summary: Add pytest.skipif decorator checking for TPC-DS sources directory existence
+  - summary: Update test to provide clear skip message explaining how to install TPC-DS sources
+  - summary: Consider extracting dependency check to conftest.py for reuse across TPC-DS tests
+- phase: Documentation
+  done: false
+  items:
+  - summary: Ensure docs/testing.md documents TPC binary dependencies and skip behavior
+  - summary: Add comment in test file referencing TPC installation guide
+technical_requirements:
+- category: Skip Logic
+  items:
+  - Check for benchbox/_sources/tpc-ds/tools directory before test execution
+  - Provide actionable error message with documentation link
+- category: Consistency
+  items:
+  - Match skip pattern used for other optional dependencies (cloud SDKs, ClickHouse, etc.)
+files_affected:
+  modified:
+  - tests/examples/test_getting_started_examples.py
+  - docs/testing.md
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '"@benchbox-maintainers"'
+  tags:
+  - testing
+  - tpc-ds
+  - dependencies

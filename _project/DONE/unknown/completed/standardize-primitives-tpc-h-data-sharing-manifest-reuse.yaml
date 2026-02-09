@@ -1,0 +1,37 @@
+id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
+title: '"✅ Standardize Primitives ↔ TPC-H Data Sharing & Manifest Reuse"'
+category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+status: Completed
+priority: High
+impact: Restored true data sharing between Primitives and TPC-H by aligning default datagen paths and allowing manifest validation
+  to recognise declared aliases.
+sections:
+  Summary: '"Updated Primitives to target the canonical `benchmark_runs/datagen/tpch_sf*` directory, taught `_validate_manifest_if_present`
+    about `get_data_source_benchmark()` aliases, and added documentation plus lifecycle tests covering manifest reuse and
+    `--no-regenerate` flows."'
+  Completed Tasks: '- Path Standardisation
+
+    - Manifest Validation
+
+    - "Testing & Docs"'
+  Testing: '"uv run -- python -m pytest tests/unit/cli/test_orchestrator_data_sharing.py tests/unit/core/test_runner_lifecycle.py::test_manifest_reuse_accepts_data_source_alias
+    tests/unit/core/test_runner_lifecycle.py::test_no_regenerate_respects_alias_manifest
+
+    uv run -- python -m pytest  # fails on pre-existing integration/platform suites unrelated to this change
+
+    "'
+files_affected:
+  modified:
+  - benchbox/utils/path_utils.py
+  - benchbox/core/primitives/benchmark.py
+  - benchbox/core/primitives/generator.py
+  - benchbox/core/runner/runner.py
+  - tests/unit/cli/test_orchestrator_data_sharing.py
+  - tests/unit/core/test_runner_lifecycle.py
+  - docs/development/data-sharing.md
+  added: []
+  removed: []
+worktree: unknown
+description: '"Updated Primitives to target the canonical `benchmark_runs/datagen/tpch_sf*` directory, taught `_validate_manifest_if_present`
+  about `get_data_source_benchmark()` aliases, and added documentation plus lifecycle tests covering manifest reuse and `--no-regenerate`
+  flows."'

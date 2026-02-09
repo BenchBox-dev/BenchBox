@@ -1,0 +1,118 @@
+id: tpcds-stdout-fix-integrate-stdout-datagen
+title: Integrate stdout datagen with compression and format pipelines
+worktree: tpcds-stdout-fix
+priority: High
+status: Completed
+completed_date: '2026-01-15'
+category: Core Functionality
+description: 'With the fixed TPC-DS binaries supporting stdout output via -FILTER Y,
+
+  update BenchBox data generation modules to leverage streaming output
+
+  for direct compression and open table format writing.
+
+
+  NOTE: The streaming infrastructure already existed in benchbox/core/tpcds/generator/streaming.py
+
+  but was broken because it used the old "-_filter y" flag which didn''t work with unfixed dsdgen.
+
+  This TODO was reduced to updating the flag to use "-FILTER Y" (the fixed version).
+
+  '
+context_sections:
+  Current Data Generation Flow: '1. dsdgen writes .dat files to disk
+
+    2. BenchBox reads .dat files
+
+    3. Converts/loads to target platform
+
+    4. Cleanup .dat files
+
+    '
+  New Streaming Flow: "1. dsdgen -FILTER Y streams to stdout\n2. BenchBox pipes directly to:\n   a) Compression (zstd/gzip)\
+    \ → file\n   b) Parquet writer → file or cloud storage\n   c) Platform loader (direct ingest)\n3. No intermediate files\
+    \ needed\n"
+  Implementation Considerations: '- Need to handle sales/returns table pairs (returns skipped in FILTER mode)
+
+    - Consider adding returns support to dsdgen later
+
+    - Parallel table generation possible since each table is independent
+
+    - Must preserve existing file-based flow as fallback
+
+    '
+tasks:
+  phases:
+  - phase: 'Phase 1: Update binary wrapper module'
+    done: true
+    note: Streaming module already existed, just needed flag update
+    items:
+    - summary: Update -_filter y to -FILTER Y in streaming.py
+      done: true
+    - summary: Update checksums.md5 for all rebuilt binaries
+      done: true
+files_affected:
+  modified:
+  - benchbox/core/tpcds/generator/streaming.py
+  - _binaries/tpc-ds/darwin-arm64/checksums.md5
+  - _binaries/tpc-ds/darwin-x86_64/checksums.md5
+  - _binaries/tpc-ds/linux-x86_64/checksums.md5
+  - _binaries/tpc-ds/linux-arm64/checksums.md5
+impact:
+  business_value: 'Enables streaming data generation for large scale factors without disk staging,
+
+    reducing storage requirements and total benchmark execution time significantly.
+
+    '
+  user_impact: 'Users running SF10+ benchmarks will see 10-30% faster data generation and
+
+    significantly reduced disk space requirements (no intermediate .dat files).
+
+    '
+  technical_debt: 'Reduces complexity of data cleanup logic since intermediate files are eliminated.
+
+    Simplifies cloud deployments where disk space may be limited.
+
+    '
+dependencies:
+  blocked_by:
+  - _project/TODO/tpcds-stdout-fix/planning/rebuild-tpcds-binaries.yaml
+  blocks:
+  - _project/TODO/tpcds-stdout-fix/planning/test-stdout-datagen.yaml
+open_questions:
+- Should we support returns tables via separate dsdgen calls for sales/returns pairs?
+- What's the minimum row batch size for efficient Parquet writes (1K, 10K, 100K)?
+- Should streaming be opt-in (--datagen-stream) or default for large scale factors?
+- How should we handle streaming failures mid-generation (retry vs fallback to file)?
+success_metrics:
+- dsdgen stdout output can be piped directly to zstd compression
+- dsdgen stdout output can be written directly to Parquet format
+- Large scale factors (SF10+) work without intermediate .dat files
+- Existing file-based workflow continues to work as fallback
+- 10-30% reduction in total data generation time for large SFs
+sections:
+  Implementation Summary: 'The streaming functionality already existed in benchbox/core/tpcds/generator/streaming.py
+
+    with sophisticated handling of:
+
+    - Single table streaming with direct compression
+
+    - Parent/child table pairs (sales/returns)
+
+    - Parallel chunk generation
+
+    - Manifest tracking with row counts
+
+
+    The only change needed was updating the flag from "-_filter y" (broken) to "-FILTER Y"
+
+    (works with patched binaries). Also updated checksums.md5 for all rebuilt binaries.'
+metadata:
+  tags:
+  - tpc-ds
+  - streaming
+  - compression
+  - parquet
+  - performance
+  estimated_effort: 2-3 days
+  created_date: '2026-01-15'

@@ -1,6 +1,7 @@
 # Cloud Spark Adapter Consolidation
 # Extract common patterns into mixins and base classes
 
+id: cloud-spark-adapter-consolidation
 title: "Cloud Spark Adapter Consolidation - Extract Common Patterns"
 worktree: "platform-expansion"
 priority: "Medium-High"
@@ -23,91 +24,91 @@ description: |
 
 tasks:
   phases:
-    - phase: "Phase 1: High-Priority Mixins"
+  - phase: "Phase 1: High-Priority Mixins"
+    done: true
+    items:
+    - summary: "Create SparkTuningMixin with default constraint methods"
       done: true
-      items:
-        - summary: "Create SparkTuningMixin with default constraint methods"
-          done: true
-          subtasks:
-            - summary: "Extract apply_primary_keys() returning []"
-              done: true
-            - summary: "Extract apply_foreign_keys() returning []"
-              done: true
-            - summary: "Extract apply_platform_optimizations() returning []"
-              done: true
-            - summary: "Extract apply_constraint_configuration()"
-              done: true
-            - summary: "Update all 8 Spark adapters to inherit mixin"
-              done: true
-        - summary: "SKIPPED: CloudClientMixin (minimal savings ~20 LOC, adds complexity)"
-          done: true
-          subtasks:
-            - summary: "Evaluated: client patterns differ too much across adapters"
-              done: true
-            - summary: "Decision: Keep adapter-specific client management"
-              done: true
+      subtasks:
+      - summary: "Extract apply_primary_keys() returning []"
+        done: true
+      - summary: "Extract apply_foreign_keys() returning []"
+        done: true
+      - summary: "Extract apply_platform_optimizations() returning []"
+        done: true
+      - summary: "Extract apply_constraint_configuration()"
+        done: true
+      - summary: "Update all 8 Spark adapters to inherit mixin"
+        done: true
+    - summary: "SKIPPED: CloudClientMixin (minimal savings ~20 LOC, adds complexity)"
+      done: true
+      subtasks:
+      - summary: "Evaluated: client patterns differ too much across adapters"
+        done: true
+      - summary: "Decision: Keep adapter-specific client management"
+        done: true
 
-    - phase: "Phase 2: Medium-Priority Consolidation"
+  - phase: "Phase 2: Medium-Priority Consolidation"
+    done: true
+    items:
+    - summary: "Create CloudSparkConfigMixin for benchmark configuration"
       done: true
-      items:
-        - summary: "Create CloudSparkConfigMixin for benchmark configuration"
-          done: true
-          subtasks:
-            - summary: "Extract configure_for_benchmark() pattern"
-              done: true
-            - summary: "Parameterize CloudPlatform enum via class variable"
-              done: true
-            - summary: "Update 4 cloud Spark adapters (AWS/GCP)"
-              done: true
-              notes: "Athena Spark, EMR Serverless, Dataproc, Dataproc Serverless"
-            - summary: "Azure adapters incompatible (different method signature)"
-              done: true
-              notes: "Synapse/Fabric use (benchmark, scale_factor) not (connection, benchmark_type)"
-        - summary: "SKIPPED: URI parsing refactor (low ROI, ~3 lines per adapter)"
-          done: true
-          subtasks:
-            - summary: "Evaluated: Existing pattern is simple and readable"
-              done: true
-            - summary: "Decision: Keep adapter-specific URI parsing"
-              done: true
+      subtasks:
+      - summary: "Extract configure_for_benchmark() pattern"
+        done: true
+      - summary: "Parameterize CloudPlatform enum via class variable"
+        done: true
+      - summary: "Update 4 cloud Spark adapters (AWS/GCP)"
+        done: true
+        notes: "Athena Spark, EMR Serverless, Dataproc, Dataproc Serverless"
+      - summary: "Azure adapters incompatible (different method signature)"
+        done: true
+        notes: "Synapse/Fabric use (benchmark, scale_factor) not (connection, benchmark_type)"
+    - summary: "SKIPPED: URI parsing refactor (low ROI, ~3 lines per adapter)"
+      done: true
+      subtasks:
+      - summary: "Evaluated: Existing pattern is simple and readable"
+        done: true
+      - summary: "Decision: Keep adapter-specific URI parsing"
+        done: true
 
-    - phase: "Phase 3: Low-Priority Base Classes (Optional)"
+  - phase: "Phase 3: Low-Priority Base Classes (Optional)"
+    done: true
+    items:
+    - summary: "SKIPPED: CloudSparkBatchJobAdapter base class"
       done: true
-      items:
-        - summary: "SKIPPED: CloudSparkBatchJobAdapter base class"
-          done: true
-          subtasks:
-            - summary: "Evaluated: GCP uses synchronous wait, AWS uses async polling"
-              done: true
-            - summary: "Decision: Different APIs make abstraction low-value"
-              done: true
-        - summary: "SKIPPED: CloudSparkSessionAdapter base class"
-          done: true
-          subtasks:
-            - summary: "Evaluated: Synapse/Fabric Livy patterns ~100 LOC shared"
-              done: true
-            - summary: "Decision: Only 2 adapters benefit, complexity not justified"
-              done: true
+      subtasks:
+      - summary: "Evaluated: GCP uses synchronous wait, AWS uses async polling"
+        done: true
+      - summary: "Decision: Different APIs make abstraction low-value"
+        done: true
+    - summary: "SKIPPED: CloudSparkSessionAdapter base class"
+      done: true
+      subtasks:
+      - summary: "Evaluated: Synapse/Fabric Livy patterns ~100 LOC shared"
+        done: true
+      - summary: "Decision: Only 2 adapters benefit, complexity not justified"
+        done: true
 
-    - phase: "Phase 4: Testing and Validation"
+  - phase: "Phase 4: Testing and Validation"
+    done: true
+    items:
+    - summary: "Ensure all existing tests pass after refactoring"
       done: true
-      items:
-        - summary: "Ensure all existing tests pass after refactoring"
-          done: true
-          notes: "228 tests passed in 3.13s"
-        - summary: "Add unit tests for new mixins"
-          done: true
-          notes: "Mixin tests added in test_cloud_spark_config.py (Phase 1 commit)"
-        - summary: "Run lint and type checks"
-          done: true
-          notes: "Lint passes. Pre-existing type errors in optional import patterns."
+      notes: "228 tests passed in 3.13s"
+    - summary: "Add unit tests for new mixins"
+      done: true
+      notes: "Mixin tests added in test_cloud_spark_config.py (Phase 1 commit)"
+    - summary: "Run lint and type checks"
+      done: true
+      notes: "Lint passes. Pre-existing type errors in optional import patterns."
 
 metadata:
   tags:
-    - refactoring
-    - cloud-spark
-    - code-quality
-    - DRY
+  - refactoring
+  - cloud-spark
+  - code-quality
+  - DRY
   estimated_effort: "Medium (16-22 hours)"
   created_date: "2025-12-26"
   completed_date: "2025-12-27"
@@ -122,17 +123,17 @@ impact:
 
 files_affected:
   modified:
-    - benchbox/platforms/gcp/dataproc_serverless_adapter.py
-    - benchbox/platforms/gcp/dataproc_adapter.py
-    - benchbox/platforms/aws/athena_spark_adapter.py
-    - benchbox/platforms/aws/emr_serverless_adapter.py
-    - benchbox/platforms/aws/glue_adapter.py
-    - benchbox/platforms/azure/synapse_spark_adapter.py
-    - benchbox/platforms/azure/fabric_spark_adapter.py
-    - benchbox/platforms/snowpark_connect.py
-    - benchbox/platforms/databricks/dataframe_adapter.py
+  - benchbox/platforms/gcp/dataproc_serverless_adapter.py
+  - benchbox/platforms/gcp/dataproc_adapter.py
+  - benchbox/platforms/aws/athena_spark_adapter.py
+  - benchbox/platforms/aws/emr_serverless_adapter.py
+  - benchbox/platforms/aws/glue_adapter.py
+  - benchbox/platforms/azure/synapse_spark_adapter.py
+  - benchbox/platforms/azure/fabric_spark_adapter.py
+  - benchbox/platforms/snowpark_connect.py
+  - benchbox/platforms/databricks/dataframe_adapter.py
   added:
-    - benchbox/platforms/base/cloud_spark/mixins.py
+  - benchbox/platforms/base/cloud_spark/mixins.py
 
 context_sections:
   "Code Review Findings": |
@@ -158,9 +159,9 @@ context_sections:
        - ~80 LOC duplicated
 
 success_metrics:
-  - "All 8 Spark adapters use SparkTuningMixin (constraint methods)"
-  - "4 AWS/GCP adapters use CloudSparkConfigMixin (benchmark config)"
-  - "228 tests pass, no regressions"
-  - "Lint passes; pre-existing type issues unchanged"
-  - "Net reduction of ~170 LOC (Phase 1: ~120 LOC, Phase 2: ~50 LOC)"
-  - "Phase 3 base classes evaluated and SKIPPED (low ROI)"
+- "All 8 Spark adapters use SparkTuningMixin (constraint methods)"
+- "4 AWS/GCP adapters use CloudSparkConfigMixin (benchmark config)"
+- "228 tests pass, no regressions"
+- "Lint passes; pre-existing type issues unchanged"
+- "Net reduction of ~170 LOC (Phase 1: ~120 LOC, Phase 2: ~50 LOC)"
+- "Phase 3 base classes evaluated and SKIPPED (low ROI)"

@@ -1,0 +1,535 @@
+id: onehouse-quanton-platform
+title: "Add Onehouse Quanton platform support for managed Spark benchmarking"
+worktree: platform-expansion
+priority: High
+status: Completed
+completed_date: "2026-02-03"
+completion_summary: |
+  Implemented Onehouse Quanton platform adapter with full managed Spark benchmarking support.
+
+  Files created/modified:
+  - benchbox/platforms/onehouse/__init__.py (package exports)
+  - benchbox/platforms/onehouse/quanton_adapter.py (main adapter class)
+  - benchbox/platforms/onehouse/onehouse_client.py (HTTP API client)
+  - benchbox/platforms/base/cloud_spark/config.py (added QUANTON to CloudPlatform enum)
+  - benchbox/core/platform_registry.py (platform metadata and registration)
+  - benchbox/platforms/__init__.py (lazy loading and CLI hooks)
+  - tests/unit/platforms/onehouse/ (40 unit tests, all passing)
+
+  Key features:
+  - Multi-table-format support (Iceberg, Hudi, Delta)
+  - Cloud-Spark infrastructure reuse (CloudSparkConfigMixin, SparkTuningMixin, SparkDDLGeneratorMixin)
+  - S3 staging via CloudSparkStaging
+  - Job submission and polling via REST API
+  - CLI integration with platform hooks
+description: |
+  Integrate Onehouse Quanton as a supported BenchBox platform for high-performance
+  managed Spark benchmarking with multi-table-format support.
+
+  Onehouse Quanton is a serverless managed Spark compute runtime that delivers:
+  - **2-3x better price-performance** vs AWS EMR and Databricks
+  - **No per-cluster fees** unlike Databricks Photon
+  - **Multi-table-format support**: Apache Hudi, Apache Iceberg, and Delta Lake
+  - **Apache XTable integration**: Cross-format metadata translation
+  - **OneSync catalog sync**: Tables accessible from Snowflake, Databricks, Trino, Ray
+  - **Serverless architecture**: Auto-scaling with intelligent cluster management
+  - **100% open-source compatible**: Standard Spark/SQL interfaces, no vendor lock-in
+
+  Key technical characteristics:
+  - Spark 3.x runtime with Quanton execution engine optimizations
+  - Serverless clusters in Onehouse Compute Runtime
+  - AWS-first with S3 integration (potentially multi-cloud)
+  - Smart ETL processing with incremental operations
+  - Proven TPC-DS, TPCx-BB, TPC-DI benchmark performance (3x faster on Iceberg)
+
+  This is a strategic platform addition because:
+  1. Growing enterprise interest in open lakehouse alternatives
+  2. Direct EMR/Databricks comparison validates performance claims
+  3. Multi-table-format support enables format comparison benchmarking
+  4. Founded by Apache Hudi creators - deep lakehouse expertise
+  5. Unique XTable integration for cross-format interoperability testing
+
+  Technical approach:
+  - Leverage existing managed Spark patterns (EMR Serverless, Dataproc Serverless)
+  - Compose CloudSparkConfigMixin and SparkTuningMixin
+  - Use Onehouse API/SDK for cluster and job management
+  - Support multiple table formats via configuration
+  - SQLGlot 'spark' dialect for query translation
+
+  Reference implementations:
+  - benchbox/platforms/aws/emr_serverless_adapter.py (serverless Spark pattern)
+  - benchbox/platforms/gcp/dataproc_serverless_adapter.py (serverless pattern)
+  - benchbox/platforms/base/cloud_spark/ (shared Spark infrastructure)
+
+category: Platform Expansion
+
+tasks:
+  phases:
+  - phase: "Phase 1: Research and API Discovery"
+    done: false
+    items:
+    - summary: "Research Onehouse API/SDK documentation"
+      done: false
+      subtasks:
+      - summary: "Identify job submission API (REST, SDK, or Spark Connect)"
+        done: false
+      - summary: "Document authentication mechanism (API keys, OAuth, IAM)"
+        done: false
+      - summary: "Identify cluster configuration options"
+        done: false
+      - summary: "Document supported Spark versions and configurations"
+        done: false
+    - summary: "Research table format configuration"
+      done: false
+      subtasks:
+      - summary: "Document Hudi table creation and configuration"
+        done: false
+      - summary: "Document Iceberg table creation and configuration"
+        done: false
+      - summary: "Document Delta Lake table creation and configuration"
+        done: false
+      - summary: "Understand XTable metadata translation workflow"
+        done: false
+    - summary: "Set up Onehouse trial/development account"
+      done: false
+      subtasks:
+      - summary: "Create account and configure AWS integration"
+        done: false
+      - summary: "Document S3 bucket and IAM requirements"
+        done: false
+      - summary: "Test manual Spark job submission"
+        done: false
+
+  - phase: "Phase 2: Core Adapter Implementation"
+    done: false
+    items:
+    - summary: "Create benchbox/platforms/onehouse/ package"
+      done: false
+      subtasks:
+      - summary: "Create __init__.py with QuantonAdapter export"
+        done: false
+      - summary: "Create quanton_adapter.py inheriting from PlatformAdapter"
+        done: false
+      - summary: "Compose CloudSparkConfigMixin and SparkTuningMixin"
+        done: false
+      - summary: "Set _dialect = 'spark' for SQLGlot transpilation"
+        done: false
+    - summary: "Implement Onehouse API client"
+      done: false
+      subtasks:
+      - summary: "Create onehouse_client.py for API interactions"
+        done: false
+      - summary: "Implement authentication (API key or OAuth flow)"
+        done: false
+      - summary: "Implement cluster creation/management endpoints"
+        done: false
+      - summary: "Implement job submission and status polling"
+        done: false
+      - summary: "Implement proper error handling with retries"
+        done: false
+    - summary: "Implement connection management"
+      done: false
+      subtasks:
+      - summary: "Implement initialize_connection() with cluster provisioning"
+        done: false
+      - summary: "Implement test_connection() for API health check"
+        done: false
+      - summary: "Implement close_connection() with cluster cleanup"
+        done: false
+      - summary: "Handle serverless cluster lifecycle (ephemeral vs persistent)"
+        done: false
+
+  - phase: "Phase 3: Data Loading and Schema Management"
+    done: false
+    items:
+    - summary: "Implement S3 staging integration"
+      done: false
+      subtasks:
+      - summary: "Extend CloudSparkStaging for Onehouse-specific paths"
+        done: false
+      - summary: "Implement upload_tables() for S3 staging"
+        done: false
+      - summary: "Handle data format conversion (Parquet, CSV)"
+        done: false
+      - summary: "Implement cleanup_staging() for post-benchmark cleanup"
+        done: false
+    - summary: "Implement multi-format schema creation"
+      done: false
+      subtasks:
+      - summary: "Implement create_schema() with format selection"
+        done: false
+      - summary: "Generate Hudi DDL: USING HUDI with hoodie.* configs"
+        done: false
+      - summary: "Generate Iceberg DDL: USING ICEBERG with catalog config"
+        done: false
+      - summary: "Generate Delta DDL: USING DELTA with delta.* configs"
+        done: false
+      - summary: "Add --table-format CLI option (hudi|iceberg|delta)"
+        done: false
+    - summary: "Implement data loading"
+      done: false
+      subtasks:
+      - summary: "Load data from S3 staging via spark.read"
+        done: false
+      - summary: "Write to tables with format-specific writers"
+        done: false
+      - summary: "Handle format-specific optimization (compaction, clustering)"
+        done: false
+      - summary: "Support TPC trailing delimiter edge cases"
+        done: false
+
+  - phase: "Phase 4: Query Execution and Optimization"
+    done: false
+    items:
+    - summary: "Implement query execution"
+      done: false
+      subtasks:
+      - summary: "Implement execute_query() via Spark SQL"
+        done: false
+      - summary: "Implement result collection with timing measurement"
+        done: false
+      - summary: "Handle row count validation"
+        done: false
+      - summary: "Implement query plan capture for analysis"
+        done: false
+    - summary: "Implement Quanton-specific optimizations"
+      done: false
+      subtasks:
+      - summary: "Configure Quanton-optimized Spark settings"
+        done: false
+      - summary: "Enable/disable result caching for benchmark accuracy"
+        done: false
+      - summary: "Configure auto-scaling behavior for consistent results"
+        done: false
+      - summary: "Document Quanton-specific tuning parameters"
+        done: false
+    - summary: "Implement format-specific optimizations"
+      done: false
+      subtasks:
+      - summary: "Hudi: Configure indexing, compaction settings"
+        done: false
+      - summary: "Iceberg: Configure metadata refresh, partition evolution"
+        done: false
+      - summary: "Delta: Configure OPTIMIZE, Z-ORDER settings"
+        done: false
+
+  - phase: "Phase 5: Platform Registry and CLI Integration"
+    done: false
+    items:
+    - summary: "Add platform metadata to registry"
+      done: false
+      subtasks:
+      - summary: "Add 'quanton' entry to _build_platform_metadata() in platform_registry.py"
+        done: false
+      - summary: "Define capabilities (supports_sql=True, managed Spark)"
+        done: false
+      - summary: "Configure deployment_modes as ['managed'] (serverless only)"
+        done: false
+      - summary: "Set platform family as 'spark' for dialect inheritance"
+        done: false
+    - summary: "Implement adapter factory integration"
+      done: false
+      subtasks:
+      - summary: "Add QuantonAdapter import in platforms/__init__.py"
+        done: false
+      - summary: "Register in adapter_factory.py get_adapter() routing"
+        done: false
+      - summary: "Add aliases: 'onehouse', 'quanton', 'onehouse-quanton'"
+        done: false
+    - summary: "Implement CLI options"
+      done: false
+      subtasks:
+      - summary: "Add --onehouse-api-key option for authentication"
+        done: false
+      - summary: "Add --onehouse-region option for cluster region"
+        done: false
+      - summary: "Add --table-format option (hudi|iceberg|delta)"
+        done: false
+      - summary: "Add --onehouse-cluster-size option for scaling"
+        done: false
+      - summary: "Support environment variable ONEHOUSE_API_KEY"
+        done: false
+
+  - phase: "Phase 6: Testing"
+    done: false
+    items:
+    - summary: "Create unit tests for Quanton adapter"
+      done: false
+      subtasks:
+      - summary: "Create tests/unit/platforms/onehouse/test_quanton_adapter.py"
+        done: false
+      - summary: "Mock Onehouse API responses"
+        done: false
+      - summary: "Test initialization and configuration handling"
+        done: false
+      - summary: "Test multi-format DDL generation"
+        done: false
+      - summary: "Test query execution flow"
+        done: false
+    - summary: "Create unit tests for Onehouse client"
+      done: false
+      subtasks:
+      - summary: "Create tests/unit/platforms/onehouse/test_onehouse_client.py"
+        done: false
+      - summary: "Test authentication flow"
+        done: false
+      - summary: "Test job submission and polling"
+        done: false
+      - summary: "Test error handling and retries"
+        done: false
+    - summary: "Create integration tests"
+      done: false
+      subtasks:
+      - summary: "Create tests/integration/platforms/test_quanton_smoke.py"
+        done: false
+      - summary: "Test TPC-H SF=0.01 with Iceberg format"
+        done: false
+      - summary: "Test TPC-H SF=0.01 with Hudi format"
+        done: false
+      - summary: "Test TPC-H SF=0.01 with Delta format"
+        done: false
+      - summary: "Add skip markers for CI without Onehouse credentials"
+        done: false
+
+  - phase: "Phase 7: Documentation and Examples"
+    done: false
+    items:
+    - summary: "Create platform documentation"
+      done: false
+      subtasks:
+      - summary: "Create docs/platforms/onehouse-quanton.md with full user guide"
+        done: false
+      - summary: "Document Onehouse account setup requirements"
+        done: false
+      - summary: "Document AWS IAM and S3 configuration"
+        done: false
+      - summary: "Document table format selection guidance"
+        done: false
+      - summary: "Add CLI usage examples for each format"
+        done: false
+    - summary: "Create example scripts"
+      done: false
+      subtasks:
+      - summary: "Create examples/platforms/quanton_tpch_iceberg.py"
+        done: false
+      - summary: "Create examples/platforms/quanton_tpch_hudi.py"
+        done: false
+      - summary: "Create examples/platforms/quanton_format_comparison.py"
+        done: false
+      - summary: "Create examples/platforms/quanton_vs_emr_comparison.py"
+        done: false
+    - summary: "Update platform overview documentation"
+      done: false
+      subtasks:
+      - summary: "Add Quanton to docs/platforms/overview.md"
+        done: false
+      - summary: "Add to managed Spark platform comparison table"
+        done: false
+      - summary: "Document Quanton vs EMR vs Databricks benchmarking guidance"
+        done: false
+
+metadata:
+  tags:
+  - onehouse
+  - quanton
+  - spark
+  - managed-spark
+  - serverless
+  - hudi
+  - iceberg
+  - delta-lake
+  - lakehouse
+  - aws
+  - s3
+  - platform
+  - cloud
+  - xtable
+  - open-source
+  estimated_effort: Large
+  created_date: "2026-01-31"
+
+impact:
+  business_value: |
+    Onehouse Quanton represents a significant alternative in the managed Spark market,
+    offering competitive pricing and performance. Supporting Quanton enables:
+    - Independent validation of 2-3x performance claims vs EMR/Databricks
+    - Multi-table-format benchmarking (Hudi vs Iceberg vs Delta)
+    - Coverage of emerging open lakehouse platforms
+    - Comparison with existing managed Spark adapters (EMR, Dataproc, Databricks)
+    - Enterprise evaluation path for cost optimization initiatives
+  user_impact: |
+    Users can benchmark Onehouse Quanton against other managed Spark platforms:
+    - Direct TPC-H/TPC-DS comparison with EMR Serverless and Databricks
+    - Table format comparison (same queries on Hudi, Iceberg, Delta)
+    - Cost-performance analysis for migration decisions
+    - Validation of open-source compatibility claims
+    - Multi-cloud lakehouse strategy evaluation
+  technical_debt: |
+    Clean implementation leveraging existing cloud Spark patterns. Extensive code
+    reuse from CloudSparkConfigMixin, SparkTuningMixin, and CloudSparkStaging.
+    May enable shared abstractions for serverless Spark platforms. Multi-format
+    support could inform future format-agnostic benchmarking capabilities.
+
+technical_requirements:
+  constraints:
+  - "Requires Onehouse account with Quanton access"
+  - "Requires AWS account with S3 bucket for staging"
+  - "IAM cross-account access configuration for Onehouse"
+  - "API key or OAuth authentication required"
+  - "Remote execution only (serverless clusters)"
+  dependencies:
+  - "boto3 (S3 staging)"
+  - "requests (Onehouse API)"
+  - "onehouse-sdk (if available, else raw REST)"
+  - "pyspark (for local testing if applicable)"
+  compatibility: |
+    - Python 3.10+
+    - Spark 3.x (Quanton runtime version)
+    - AWS S3 for data staging
+    - SQLGlot 'spark' dialect for query translation
+    - Apache Hudi, Apache Iceberg, Delta Lake table formats
+
+files_affected:
+  modified:
+  - benchbox/platforms/__init__.py
+  - benchbox/core/platform_registry.py
+  - benchbox/platforms/adapter_factory.py
+  - docs/platforms/overview.md
+  - pyproject.toml
+  added:
+  - benchbox/platforms/onehouse/__init__.py
+  - benchbox/platforms/onehouse/quanton_adapter.py
+  - benchbox/platforms/onehouse/onehouse_client.py
+  - tests/unit/platforms/onehouse/test_quanton_adapter.py
+  - tests/unit/platforms/onehouse/test_onehouse_client.py
+  - tests/integration/platforms/test_quanton_smoke.py
+  - docs/platforms/onehouse-quanton.md
+  - examples/platforms/quanton_tpch_iceberg.py
+  - examples/platforms/quanton_tpch_hudi.py
+  - examples/platforms/quanton_format_comparison.py
+
+dependencies:
+  related:
+  - _project/TODO/platform-expansion/planning/lakesail-spark-platform.yaml
+  - _project/TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
+  - _project/TODO/platform-expansion/planning/starburst-platform-adapter.yaml
+  blocks: []
+  blocked_by: []
+
+success_metrics:
+- "Quanton adapter passes all unit tests with mocked API"
+- "Onehouse client passes unit tests for authentication and job submission"
+- "TPC-H SF=0.01 completes successfully with Iceberg format"
+- "TPC-H SF=0.01 completes successfully with Hudi format"
+- "TPC-H SF=0.01 completes successfully with Delta format"
+- "Platform appears in `benchbox platforms list` output"
+- "CLI options documented in `benchbox run --help`"
+- "Documentation covers full setup and usage workflow"
+- "Format comparison example demonstrates multi-format benchmarking"
+- "EMR comparison example validates performance claims"
+
+open_questions:
+- "What is the Onehouse API structure? REST, gRPC, or SDK-based?"
+- "Does Onehouse provide a Python SDK, or should we use raw REST API?"
+- "How is authentication handled? API keys, OAuth, AWS IAM integration?"
+- "What cluster sizing/scaling options are available for consistent benchmarks?"
+- "Does Quanton expose Spark configuration for tuning, or is it opaque?"
+- "How to handle cluster startup latency for benchmark timing accuracy?"
+- "Is there Spark Connect support for interactive session-based execution?"
+- "What catalogs are supported? AWS Glue, Unity Catalog, custom?"
+- "How does XTable integration work for cross-format benchmarking?"
+- "What regions/clouds are supported beyond AWS?"
+
+context_sections:
+  "Onehouse Quanton Architecture": |
+    Onehouse Quanton is a serverless managed Spark compute runtime:
+
+    Execution Model:
+    - Serverless clusters with automatic scaling
+    - Purpose-built Quanton execution engine
+    - Optimized for ETL and analytical workloads
+    - Smart incremental processing for CDC/temporal data
+
+    Performance Features:
+    - 2-3x better price-performance vs EMR/Databricks
+    - No per-cluster fees (unlike Databricks Photon)
+    - Intelligent lakehouse I/O optimization
+    - Minimal data scanning via incremental operations
+
+    Table Format Support:
+    - Native Apache Hudi support (founded by Hudi creators)
+    - Apache Iceberg support (3x faster on TPC-DS benchmarks)
+    - Delta Lake support
+    - XTable for cross-format metadata translation
+
+  "Multi-Table-Format Strategy": |
+    Quanton's multi-format support enables unique benchmarking scenarios:
+
+    Format Selection:
+    - --table-format hudi: COW or MOR tables, timeline-based versioning
+    - --table-format iceberg: Snapshot isolation, hidden partitioning
+    - --table-format delta: ACID transactions, time travel
+
+    Comparison Benchmarking:
+    - Same TPC-H/TPC-DS queries across all three formats
+    - Isolate format impact vs engine impact
+    - Validate format-specific optimizations
+
+    XTable Integration:
+    - Single Parquet data copy
+    - Multiple format metadata layers
+    - Query from any compatible engine
+
+  "Integration with Existing Cloud Spark Infrastructure": |
+    BenchBox cloud Spark infrastructure components to leverage:
+
+    Shared Components (benchbox/platforms/base/cloud_spark/):
+    - CloudSparkConfigMixin: Benchmark-aware Spark configuration
+    - SparkTuningMixin: Constraint configuration interface
+    - CloudSparkStaging: Multi-cloud storage staging (S3, GCS, ADLS)
+    - SparkConfigOptimizer: Scale-factor-aware tuning
+
+    Similar Patterns (reference adapters):
+    - EMR Serverless: Serverless cluster lifecycle, S3 staging
+    - Dataproc Serverless: Auto-scaling, GCS staging
+    - Databricks: API-based cluster management, Unity Catalog
+
+    Key Differences:
+    - Onehouse-specific API for cluster/job management
+    - Multi-format table creation (Hudi, Iceberg, Delta)
+    - Potential Quanton-specific configuration options
+
+  "Performance Claims to Validate": |
+    Onehouse published benchmarks to validate with BenchBox:
+
+    TPC-DS Performance:
+    - 3x faster than competitors on Iceberg workloads
+    - Within 15% of Databricks Photon (at much lower cost)
+
+    Cost Efficiency:
+    - 50% savings vs EMR for Hudi workloads
+    - No per-cluster fees (vs Photon premium)
+    - 40-60% acceleration for migrated jobs
+
+    BenchBox Validation:
+    - Run identical TPC-H/TPC-DS at various scale factors
+    - Compare with EMR Serverless and Databricks adapters
+    - Document cost and performance metrics
+
+  "AWS Integration Patterns": |
+    Expected AWS integration (based on documented patterns):
+
+    IAM Configuration:
+    - Cross-account role for Onehouse to access customer S3
+    - Quanton clusters assume role for data access
+    - Similar to EMR/Glue IAM patterns
+
+    S3 Integration:
+    - Staging bucket for TPC data upload
+    - Table data stored in customer S3
+    - Standard s3:// or s3a:// paths
+
+    Networking:
+    - Serverless clusters in Onehouse infrastructure
+    - VPC peering if private data access needed
+    - Public S3 access for standard benchmarks

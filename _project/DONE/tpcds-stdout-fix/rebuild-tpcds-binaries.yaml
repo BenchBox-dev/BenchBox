@@ -1,0 +1,164 @@
+id: rebuild-tpcds-binaries
+title: Rebuild TPC-DS binaries with stdout fix for all platforms
+worktree: tpcds-stdout-fix
+priority: High
+status: Completed
+completed_date: '2026-01-15'
+category: Core Functionality
+description: 'After patching the TPC-DS source files to fix stdout data generation,
+
+  rebuild all platform binaries in _binaries/tpc-ds/.
+
+
+  Completed platforms:
+
+  - darwin-arm64 (macOS Apple Silicon) - DONE
+
+  - darwin-x86_64 (macOS Intel) - DONE
+
+  - linux-arm64 (Linux ARM) - DONE
+
+  - linux-x86_64 (Linux x86) - DONE
+
+  - windows-arm64 (Windows ARM) - Skipped (no binaries existed, needs native CI)
+
+  - windows-x86_64 (Windows x86) - Skipped (no binaries existed, needs native CI)
+
+
+  Additional fixes made during build:
+
+  - Added MAXINT definition for LINUX in porting.h
+
+  - Added -fcommon flag to LINUX_CFLAGS in makefile (GCC 10+ compatibility)
+
+  '
+context_sections:
+  Build Environment Requirements: '- macOS: Xcode command line tools, make
+
+    - Linux: gcc, make (via Docker or native)
+
+    - Windows: MinGW or cross-compilation
+
+
+    Consider using Docker for cross-platform builds to ensure reproducibility.
+
+    '
+  Binary Verification: 'Each binary must be tested with:
+
+    1. dsdgen -help | grep "FILTER" (should show FILTER not _FILTER)
+
+    2. dsdgen -TABLE date_dim -SCALE 1 -FILTER Y (should output to stdout)
+
+    3. dsdgen -TABLE date_dim -SCALE 1 (should create file, backward compat)
+
+    '
+tasks:
+  phases:
+  - phase: 'Phase 1: Setup build environments'
+    done: true
+    items:
+    - summary: Verify darwin-arm64 build tools available
+      done: true
+    - summary: Setup Docker containers for linux builds
+      done: true
+    - summary: Setup cross-compilation for Windows (or identify CI)
+      done: true
+      note: Windows builds skipped - directories only had support files, not binaries
+  - phase: 'Phase 2: Build darwin binaries'
+    done: true
+    items:
+    - summary: Build darwin-arm64 dsdgen and dsqgen
+      done: true
+      subtasks:
+      - summary: make clean && make OS=MACOS
+        done: true
+      - summary: Verify binary with -FILTER Y test
+        done: true
+      - summary: Copy to _binaries/tpc-ds/darwin-arm64/
+        done: true
+    - summary: Build darwin-x86_64 (if cross-compile available)
+      done: true
+  - phase: 'Phase 3: Build linux binaries'
+    done: true
+    items:
+    - summary: Build linux-x86_64 in Docker
+      done: true
+    - summary: Build linux-arm64 in Docker
+      done: true
+    - summary: Verify binaries work on native Linux
+      done: true
+  - phase: 'Phase 4: Build windows binaries'
+    done: true
+    note: Skipped - Windows directories had no existing binaries, only support files
+    items:
+    - summary: Build windows-x86_64 with MinGW or MSVC
+      done: false
+      note: Requires native Windows CI runner
+    - summary: Build windows-arm64 if toolchain available
+      done: false
+      note: Requires native Windows CI runner
+  - phase: 'Phase 5: Verification'
+    done: true
+    items:
+    - summary: Run stdout test on each platform binary
+      done: true
+    - summary: Run backward compatibility test (file output)
+      done: true
+    - summary: Update binary version metadata if applicable
+      done: true
+files_affected:
+  modified:
+  - _binaries/tpc-ds/darwin-arm64/dsdgen
+  - _binaries/tpc-ds/darwin-arm64/dsqgen
+  - _binaries/tpc-ds/darwin-x86_64/dsdgen
+  - _binaries/tpc-ds/darwin-x86_64/dsqgen
+  - _binaries/tpc-ds/linux-arm64/dsdgen
+  - _binaries/tpc-ds/linux-arm64/dsqgen
+  - _binaries/tpc-ds/linux-x86_64/dsdgen
+  - _binaries/tpc-ds/linux-x86_64/dsqgen
+  - _sources/tpc-ds/tools/porting.h
+  - _sources/tpc-ds/tools/makefile
+open_questions:
+- Is there an existing build script or Dockerfile for cross-platform builds?
+- Should Windows builds use MinGW cross-compilation or native CI runner?
+- Do we need to update binary version metadata files after rebuild?
+dependencies:
+  blocked_by:
+  - _project/TODO/tpcds-stdout-fix/planning/patch-tpcds-source-stdout.yaml
+  blocks:
+  - _project/TODO/tpcds-stdout-fix/planning/integrate-stdout-datagen.yaml
+success_metrics:
+- All 6 platform binaries rebuilt with patched source
+- 'Each binary passes: dsdgen -FILTER Y outputs to stdout'
+- 'Each binary passes: dsdgen without FILTER creates files (backward compat)'
+- Binary sizes reasonable (no debug symbols in release)
+sections:
+  Implementation Summary: 'Successfully rebuilt TPC-DS binaries for 4 platforms:
+
+    - darwin-arm64: Native build with make OS=MACOS
+
+    - darwin-x86_64: Cross-compiled with -arch x86_64 flag
+
+    - linux-x86_64: Docker build with ubuntu:22.04
+
+    - linux-arm64: Docker build with ubuntu:22.04 (arm64 platform)
+
+
+    Additional source fixes required for Linux builds:
+
+    1. Added MAXINT definition for LINUX in porting.h (was missing)
+
+    2. Added -fcommon to LINUX_CFLAGS (GCC 10+ changed default to -fno-common)
+
+
+    Windows builds skipped as those directories only contained support files
+
+    (tpcds.dst, query_templates), not actual binaries.'
+metadata:
+  tags:
+  - tpc-ds
+  - binaries
+  - cross-platform
+  - build
+  estimated_effort: 4-6 hours
+  created_date: '2026-01-15'

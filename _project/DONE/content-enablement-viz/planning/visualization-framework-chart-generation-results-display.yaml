@@ -1,8 +1,9 @@
+id: visualization-framework-chart-generation-results-display
 title: Visualization Framework - Chart Generation & Results Display
 worktree: content-enablement-viz
 category: Marketing Content Enablement
 priority: Critical
-status: "Completed"
+status: Completed
 description: 'Build comprehensive visualization system to generate publication-ready charts
 
   from benchmark results. This is THE blocking feature for ALL 128 blog posts in
@@ -80,9 +81,8 @@ tasks:
 
       - Export to PNG, SVG, HTML
 
-      Decision: Plotly + Kaleido primary (interactive + headless), Matplotlib fallback-only,
-      avoid JS toolchains (Chart.js/Altair/Node) to keep BenchBox self contained.
-      '
+      Decision: Plotly + Kaleido primary (interactive + headless), Matplotlib fallback-only, avoid JS toolchains (Chart.js/Altair/Node)
+      to keep BenchBox self contained. '
   - summary: Design chart type taxonomy and template system
     details: 'Chart types needed:
 
@@ -385,29 +385,24 @@ technical_requirements:
   - Alt text support for charts
   - Screen reader compatible HTML exports
 files_affected:
-- change_type: New
-  paths:
+  modified:
   - benchbox/core/visualization/__init__.py
   - benchbox/core/visualization/charts.py
   - benchbox/core/visualization/result_plotter.py
   - benchbox/core/visualization/templates.py
   - benchbox/core/visualization/styles.py
   - benchbox/core/visualization/exporters.py
-- change_type: Modified
-  paths:
   - benchbox/cli/commands/visualize.py (new command)
   - benchbox/core/results/display.py (integrate with viz)
-- change_type: New
-  paths:
   - docs/visualization/overview.md
   - docs/visualization/chart-types.md
   - docs/visualization/cli-reference.md
   - docs/content/chart-generation-guide.md
   - examples/visualization/ (notebook examples)
-- change_type: New
-  paths:
   - tests/unit/visualization/
   - tests/integration/visualization/
+  added: []
+  removed: []
 metadata:
   owners:
   - '@benchbox-maintainers'

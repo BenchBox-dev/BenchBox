@@ -1,98 +1,89 @@
-title: "Design DataFrame Architecture for TPC-DI ETL Workload"
+id: dataframe-tpcdi-architecture
+title: Design DataFrame Architecture for TPC-DI ETL Workload
 worktree: dataframe-benchmarks
 priority: High
 status: Completed
-completed_date: "2026-02-07"
-description: |
-  Define a dedicated architecture for TPC-DI DataFrame support.
+completed_date: '2026-02-07'
+description: 'Define a dedicated architecture for TPC-DI DataFrame support.
+
 
   TPC-DI includes mutation-heavy ETL semantics (SCD Type 2, incremental loads,
+
   stateful transforms) that do not fit the current read-oriented DataFrameQuery/
+
   DataFrameContext pattern used for analytical query benchmarks.
+
 
   This item designs a fit-for-purpose model before implementation.
 
+  '
 category: Core Functionality
-
 tasks:
   phases:
-    - phase: "Phase 1: Gap Analysis"
+  - phase: 'Phase 1: Gap Analysis'
+    done: true
+    items:
+    - summary: Map TPC-DI operations to required DataFrame abstractions
       done: true
-      items:
-        - summary: "Map TPC-DI operations to required DataFrame abstractions"
-          done: true
-        - summary: "Identify missing interfaces for stateful and write workflows"
-          done: true
-    - phase: "Phase 2: Architecture Proposal"
+    - summary: Identify missing interfaces for stateful and write workflows
       done: true
-      items:
-        - summary: "Propose execution model for ETL mutation pipelines"
-          done: true
-        - summary: "Define adapter-layer responsibilities and boundaries"
-          done: true
-        - summary: "Define correctness and validation strategy"
-          done: true
-    - phase: "Phase 3: Implementation Plan"
+  - phase: 'Phase 2: Architecture Proposal'
+    done: true
+    items:
+    - summary: Propose execution model for ETL mutation pipelines
       done: true
-      items:
-        - summary: "Create phased implementation TODO with milestones"
-          done: true
-
+    - summary: Define adapter-layer responsibilities and boundaries
+      done: true
+    - summary: Define correctness and validation strategy
+      done: true
+  - phase: 'Phase 3: Implementation Plan'
+    done: true
+    items:
+    - summary: Create phased implementation TODO with milestones
+      done: true
 metadata:
   owners:
-    - joe
+  - joe
   tags:
-    - dataframe
-    - tpcdi
-    - architecture
-    - etl
+  - dataframe
+  - tpcdi
+  - architecture
+  - etl
   estimated_effort: Medium
-  created_date: "2026-02-07"
-  last_updated: "2026-02-07T00:00:00"
-
+  created_date: '2026-02-07'
+  last_updated: '2026-02-07T00:00:00'
 impact:
-  business_value: |
-    Enables correct long-term support for TPC-DI instead of forcing a poor fit.
-  user_impact: |
-    Prevents partially-correct ETL benchmark behavior.
+  business_value: 'Enables correct long-term support for TPC-DI instead of forcing a poor fit.
 
+    '
+  user_impact: 'Prevents partially-correct ETL benchmark behavior.
+
+    '
 success_metrics:
-  - "Architecture proposal accepted with clear interface boundaries"
-  - "Follow-on implementation TODO created"
-
+- Architecture proposal accepted with clear interface boundaries
+- Follow-on implementation TODO created
 dependencies:
   related:
-    - "_project/TODO/dataframe-benchmarks/planning/implement-tpcdi-dataframe-pipeline.yaml"
-
+  - _project/TODO/dataframe-benchmarks/planning/implement-tpcdi-dataframe-pipeline.yaml
 sections:
-  "Decision Summary": |
-    Decision: implement TPC-DI DataFrame support through a dedicated ETL execution
-    path, not through QueryRegistry/DataFrameQuery.
+  Decision Summary: "Decision: implement TPC-DI DataFrame support through a dedicated ETL execution\npath, not through QueryRegistry/DataFrameQuery.\n\
+    \nRationale:\n- TPC-DI workload is mutation/state oriented (dimension SCD2 versioning,\n  incremental loads, quality checks,\
+    \ multi-table pipeline stages).\n- Existing `DataFrameContext` contract is query-shaped and read-oriented."
+  Architecture Boundaries: "Proposed boundaries:\n- Keep existing SQL benchmark query execution path unchanged.\n- Add a TPC-DI-specific\
+    \ DataFrame ETL orchestrator interface for staged writes,\n  checkpointing, and validation hooks.\n- Platform adapters\
+    \ expose capability flags for transactional semantics and\n  persistence guarantees used by ETL stages."
+  Validation Strategy: 'Require parity checks at pipeline stage boundaries:
 
-    Rationale:
-    - TPC-DI workload is mutation/state oriented (dimension SCD2 versioning,
-      incremental loads, quality checks, multi-table pipeline stages).
-    - Existing `DataFrameContext` contract is query-shaped and read-oriented.
-
-  "Architecture Boundaries": |
-    Proposed boundaries:
-    - Keep existing SQL benchmark query execution path unchanged.
-    - Add a TPC-DI-specific DataFrame ETL orchestrator interface for staged writes,
-      checkpointing, and validation hooks.
-    - Platform adapters expose capability flags for transactional semantics and
-      persistence guarantees used by ETL stages.
-
-  "Validation Strategy": |
-    Require parity checks at pipeline stage boundaries:
     - Row-count and key-integrity checks per stage/table.
+
     - SCD2 invariants (current-row uniqueness, valid effective/end ranges).
-    - Deterministic replay checks for incremental batches.
 
-  "Evidence": |
-    Repository state confirms no benchmark-level DataFrame execution entry points
+    - Deterministic replay checks for incremental batches.'
+  Evidence: 'Repository state confirms no benchmark-level DataFrame execution entry points
+
     in `benchbox/core/tpcdi/benchmark.py`; current code is ETL-centric and pandas
-    data processing oriented.
 
-  "Output": |
-    Created follow-on implementation TODO:
-    `_project/TODO/dataframe-benchmarks/planning/implement-tpcdi-dataframe-pipeline.yaml`.
+    data processing oriented.'
+  Output: 'Created follow-on implementation TODO:
+
+    `_project/TODO/dataframe-benchmarks/planning/implement-tpcdi-dataframe-pipeline.yaml`.'

@@ -1,3 +1,4 @@
+id: consolidate-tpc-delimiter-detection
 title: "Consolidate TPC delimiter detection to use get_delimiter_for_file()"
 worktree: core-functionality
 priority: Low
@@ -16,54 +17,54 @@ description: |
 
 tasks:
   phases:
-    - phase: "Phase 1: Update Cloud Platform Adapters"
+  - phase: "Phase 1: Update Cloud Platform Adapters"
+    done: true
+    items:
+    - summary: "platforms/firebolt.py line 713"
       done: true
-      items:
-        - summary: "platforms/firebolt.py line 713"
-          done: true
-        - summary: "platforms/redshift.py lines 1099, 1265"
-          done: true
-        - summary: "platforms/trino.py line 801"
-          done: true
-        - summary: "platforms/presto.py line 804"
-          done: true
-        - summary: "platforms/bigquery.py lines 1002, 1088"
-          done: true
-        - summary: "platforms/azure_synapse.py lines 545, 613"
-          done: true
+    - summary: "platforms/redshift.py lines 1099, 1265"
+      done: true
+    - summary: "platforms/trino.py line 801"
+      done: true
+    - summary: "platforms/presto.py line 804"
+      done: true
+    - summary: "platforms/bigquery.py lines 1002, 1088"
+      done: true
+    - summary: "platforms/azure_synapse.py lines 545, 613"
+      done: true
 
-    - phase: "Phase 2: Update Local Platform Adapters"
+  - phase: "Phase 2: Update Local Platform Adapters"
+    done: true
+    items:
+    - summary: "platforms/datafusion.py line 484"
       done: true
-      items:
-        - summary: "platforms/datafusion.py line 484"
-          done: true
-        - summary: "platforms/duckdb.py line 358"
-          done: true
-        - summary: "platforms/clickhouse/workload.py line 151"
-          done: true
+    - summary: "platforms/duckdb.py line 358"
+      done: true
+    - summary: "platforms/clickhouse/workload.py line 151"
+      done: true
 
-    - phase: "Phase 3: Update Base Utilities"
+  - phase: "Phase 3: Update Base Utilities"
+    done: true
+    items:
+    - summary: "platforms/base/utils.py line 47"
       done: true
-      items:
-        - summary: "platforms/base/utils.py line 47"
-          done: true
-        - summary: "core/manifest/io.py line 189"
-          done: true
+    - summary: "core/manifest/io.py line 189"
+      done: true
 
-    - phase: "Phase 4: Update Other Platform Adapters"
+  - phase: "Phase 4: Update Other Platform Adapters"
+    done: true
+    items:
+    - summary: "platforms/fabric_warehouse.py lines 928, 1014"
       done: true
-      items:
-        - summary: "platforms/fabric_warehouse.py lines 928, 1014"
-          done: true
-        - summary: "platforms/databricks/adapter.py line 1179"
-          done: true
+    - summary: "platforms/databricks/adapter.py line 1179"
+      done: true
 
 metadata:
   tags:
-    - code-quality
-    - refactoring
-    - dry-principle
-    - file-format
+  - code-quality
+  - refactoring
+  - dry-principle
+  - file-format
   estimated_effort: Small
   created_date: "2026-01-27"
   completed_date: "2026-01-27"
@@ -131,21 +132,21 @@ impact:
 
 files_affected:
   modified:
-    - benchbox/platforms/firebolt.py
-    - benchbox/platforms/redshift.py
-    - benchbox/platforms/trino.py
-    - benchbox/platforms/presto.py
-    - benchbox/platforms/bigquery.py
-    - benchbox/platforms/azure_synapse.py
-    - benchbox/platforms/datafusion.py
-    - benchbox/platforms/duckdb.py
-    - benchbox/platforms/clickhouse/workload.py
-    - benchbox/platforms/fabric_warehouse.py
-    - benchbox/platforms/databricks/adapter.py
-    - benchbox/platforms/base/utils.py
-    - benchbox/core/manifest/io.py
+  - benchbox/platforms/firebolt.py
+  - benchbox/platforms/redshift.py
+  - benchbox/platforms/trino.py
+  - benchbox/platforms/presto.py
+  - benchbox/platforms/bigquery.py
+  - benchbox/platforms/azure_synapse.py
+  - benchbox/platforms/datafusion.py
+  - benchbox/platforms/duckdb.py
+  - benchbox/platforms/clickhouse/workload.py
+  - benchbox/platforms/fabric_warehouse.py
+  - benchbox/platforms/databricks/adapter.py
+  - benchbox/platforms/base/utils.py
+  - benchbox/core/manifest/io.py
 
 success_metrics:
-  - "All TPC format detection uses is_tpc_format() or get_delimiter_for_file()"
-  - "No substring `or` chains for .tbl/.dat detection"
-  - "All tests pass"
+- "All TPC format detection uses is_tpc_format() or get_delimiter_for_file()"
+- "No substring `or` chains for .tbl/.dat detection"
+- "All tests pass"

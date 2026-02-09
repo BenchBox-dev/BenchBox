@@ -1,0 +1,33 @@
+id: power-run-iterations-configuration-completed
+title: Power Run Iterations Configuration ✅ COMPLETED
+category: New Feature Requests
+sections:
+  Notes: '- "**Priority**: Medium"
+
+    - "**Status**: ✅ Completed"
+
+    - "**Description**: Add configurable query iterations for power tests with statistical analysis and performance profiles"
+
+    - "**Tasks**:"
+
+    - "**Files Affected**: `benchbox/cli/config.py`, `benchbox/utils/execution_manager.py`, `benchbox/utils/config_helpers.py`,
+    documentation, examples"
+
+    - "**Impact**: ✅ Provides professional-grade benchmarking with statistical confidence, eliminates outliers, enables regression
+    testing with statistical significance, and supports publication-quality benchmark reports with confidence intervals."'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Priority**: Medium"
+
+  - "**Status**: ✅ Completed"
+
+  - "**Description**: Add configurable query iterations for power tests with statistical analysis and performance profiles"
+
+  - "**Tasks**:"
+
+  - "**Files Affected**: `benchbox/cli/config.py`, `benchbox/utils/execution_manager.py`, `benchbox/utils/config_helpers.py`,
+  documentation, examples"
+
+  - "**Impact**: ✅ Provides professional-grade benchmarking with statistical confidence, eliminates outliers, enables regression
+  testing with statistical significance, and supports publication-quality benchmark reports with confidence intervals."'

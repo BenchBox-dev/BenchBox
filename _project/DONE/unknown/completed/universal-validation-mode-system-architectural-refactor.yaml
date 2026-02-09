@@ -1,0 +1,45 @@
+id: universal-validation-mode-system-architectural-refactor
+title: ✅ Universal Validation Mode System - Architectural Refactor
+category: Result Validation and Architecture
+status: Completed
+priority: High
+impact: Replaced benchmark-specific validation flags with universal --validation-mode flag. Unified validation system now
+  works consistently across all benchmarks (TPC-H, TPC-DS, future benchmarks). Improved architecture eliminates technical
+  debt and provides foundation for extensible validation. All 46 validation tests passing, end-to-end integration tests passing.
+sections:
+  Summary: Conducted adversarial review of validation system and identified architectural flaw in benchmark-specific --tpch-validation-mode
+    flag. Implemented universal validation system with single --validation-mode flag that works for all benchmarks. Removed
+    technical debt, improved consistency, and created scalable foundation for future benchmarks.
+  Completed Phases: '- Phase 1: Remove Benchmark-Specific Flag
+
+    - Phase 2: Update TPC-H Integration
+
+    - Phase 3: Update TPC-DS Integration
+
+    - Phase 4: Documentation Updates
+
+    - Phase 5: Testing and Validation'
+  Technical Details: '- Architecture: Single universal flag replaces per-benchmark flags
+
+    - Configuration Priority: Programmatic > CLI Config > Environment > Default
+
+    - Backward Compatibility: TPC-DS environment variable still works
+
+    - Validation Modes: EXACT (reference seed), LOOSE (±50% tolerance), RANGE (min/max), DISABLED
+
+    - Files Modified: run.py, adapter.py, tpch_results.py, tpcds_results.py (4 files)'
+  Impact and Benefits: '- Scalable: Works for all benchmarks, easy to add new benchmarks
+
+    - Consistent: Same flag and behavior across all benchmarks
+
+    - User-Friendly: Single flag to learn, clear documentation
+
+    - Maintainable: Eliminates technical debt from per-benchmark flags
+
+    - Extensible: Foundation for future validation enhancements'
+commit: e0fc503f
+date: 2025-11-21
+worktree: unknown
+description: Conducted adversarial review of validation system and identified architectural flaw in benchmark-specific --tpch-validation-mode
+  flag. Implemented universal validation system with single --validation-mode flag that works for all benchmarks. Removed
+  technical debt, improved consistency, and created scalable foundation for future benchmarks.

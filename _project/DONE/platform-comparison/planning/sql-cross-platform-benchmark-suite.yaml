@@ -1,0 +1,161 @@
+id: sql-cross-platform-benchmark-suite
+title: SQL Cross-Platform Benchmark Suite
+worktree: platform-comparison
+category: Performance and Efficiency
+priority: Low
+status: Completed
+description: |
+  *** SUPERSEDED BY: unified-platform-comparison-cli.yaml ***
+
+  This TODO was superseded by a unified approach that avoids CLI bloat.
+  Instead of adding a separate `compare-sql` command, we will:
+  - Extend existing `benchbox compare` command with --run mode
+  - Support both SQL and DataFrame via --type flag
+  - Share visualization and reporting code
+
+  New CLI pattern:
+  - benchbox compare results/*.json              # Existing: compare files
+  - benchbox compare --run -p duckdb -p sqlite   # NEW: run & compare
+
+  See: _project/TODO/platform-comparison/planning/unified-platform-comparison-cli.yaml
+
+  Original problem (still valid):
+  - MISSING: CLI command to RUN benchmarks across SQL platforms
+  - MISSING: Visualization integration for SQL comparison charts
+  - MISSING: User-friendly documentation for SQL comparison
+
+  These will be addressed in the unified TODO.
+
+context_sections:
+  "Existing Infrastructure (USE THIS)":
+    summary: |
+      The core analysis infrastructure already exists and should be used:
+      - benchbox/core/analysis/comparison.py - PlatformComparison class
+      - benchbox/core/analysis/insights.py - InsightGenerator, blog snippets
+      - benchbox/core/analysis/ranking.py - PlatformRanker
+      - benchbox/core/analysis/statistics.py - Statistical tests
+      - benchbox/core/visualization/ - Chart generation framework
+
+  "Reference Implementation":
+    summary: |
+      The DataFrame comparison CLI provides the UX template:
+      - benchbox/cli/commands/compare_dataframes.py - CLI command pattern
+      - docs/guides/dataframe-comparison.md - Documentation pattern
+
+  "What NOT to Duplicate":
+    summary: |
+      DO NOT recreate these (they exist in benchbox/core/analysis/):
+      - Statistical analysis (geometric mean, percentiles, etc.)
+      - Win/loss calculations
+      - Cost-performance analysis
+      - Insight generation
+
+tasks:
+- phase: "Phase 1: CLI Command Implementation"
+  done: false
+  items:
+  - summary: "Create benchbox compare-sql CLI command"
+    done: false
+    details: |
+      Create benchbox/cli/commands/compare_sql.py with:
+      - --platforms: SQL platforms to compare (comma-separated or multiple -p)
+      - --benchmark: Benchmark to run (tpch, tpcds, ssb, clickbench)
+      - --scale: Scale factor
+      - --from-results: Compare existing result files instead of running
+      - --output: Output directory
+      - --format: Output format (text, json, markdown)
+      - --generate-charts: Create visualizations
+      - --list-platforms: Show available SQL platforms
+  - summary: "Integrate with existing PlatformComparison class"
+    done: false
+    details: |
+      Use benchbox/core/analysis/comparison.py:
+      - PlatformComparison.from_files() for result comparison
+      - InsightGenerator for automated insights
+      - Leverage existing statistical analysis
+  - summary: "Add multi-platform benchmark runner"
+    done: false
+    details: |
+      Orchestrate running `benchbox run` across multiple platforms:
+      - Sequential or parallel execution
+      - Collect results to temp directory
+      - Feed results to PlatformComparison
+
+- phase: "Phase 2: Visualization Integration"
+  done: false
+  items:
+  - summary: "Create SQLComparisonPlotter class"
+    done: false
+    details: |
+      Bridge PlatformComparison results to visualization framework:
+      - Platform comparison bar charts
+      - Query-by-query breakdown heatmaps
+      - Win/loss visualization
+      - Cost vs performance scatter (if cost data available)
+  - summary: "Integrate with existing visualization framework"
+    done: false
+    details: |
+      Use benchbox/core/visualization/ components:
+      - PerformanceBarChart, DistributionBoxPlot, QueryVarianceHeatmap
+      - Export to PNG, HTML, SVG
+
+- phase: "Phase 3: Documentation"
+  done: false
+  items:
+  - summary: "Create docs/guides/sql-comparison.md"
+    done: false
+    details: |
+      Document the compare-sql command:
+      - Quick start examples
+      - All CLI options
+      - Programmatic API usage
+      - Interpreting results
+  - summary: "Add CLI help examples"
+    done: false
+    details: |
+      - Example: Compare embedded platforms
+      - Example: Compare cloud platforms
+      - Example: Compare from existing results
+  - summary: "Update platform comparison matrix docs"
+    done: false
+
+files_affected:
+  added:
+  - benchbox/cli/commands/compare_sql.py
+  - tests/unit/cli/test_compare_sql.py
+  - docs/guides/sql-comparison.md
+  modified:
+  - benchbox/cli/commands/__init__.py
+
+dependencies:
+  related:
+  - _project/DONE/dataframe-performance/planning/cross-platform-benchmark-suite.yaml
+
+metadata:
+  owners:
+  - "@benchbox-maintainers"
+  tags:
+  - sql
+  - performance
+  - benchmarking
+  - comparison
+  - platforms
+  estimated_effort: Small
+  created_date: "2025-12-14"
+
+impact:
+  business_value: |
+    Enables data-driven SQL platform selection content for marketing.
+    Powers "Which SQL database should I use?" blog posts.
+    Supports enterprise customers in platform selection decisions.
+  user_impact: |
+    Users can make informed platform choices based on their workload.
+    Reproducible benchmarks they can run on their own hardware.
+    Cost-performance trade-offs for cloud platform selection.
+
+success_metrics:
+- Benchmark suite covers all production SQL platforms
+- Reports generated automatically from benchmark results
+- Performance comparisons integrated with visualization framework
+- CLI command available for user-run comparisons
+- Cost tracking available for cloud platforms

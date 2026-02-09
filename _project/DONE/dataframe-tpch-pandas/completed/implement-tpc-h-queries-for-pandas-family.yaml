@@ -1,28 +1,41 @@
+id: implement-tpc-h-queries-for-pandas-family
 title: Implement TPC-H Queries for Pandas Family
 worktree: dataframe-tpch-pandas
 category: Core Functionality
 priority: Critical
-status: "Completed"
+status: Completed
 completed_date: '2025-12-02'
-description: |
-  Implement all 22 TPC-H queries using Pandas family API. Single implementation
+description: 'Implement all 22 TPC-H queries using Pandas family API. Single implementation
+
   works on Pandas, Modin, cuDF, Vaex, and Dask (5 platforms).
 
-implementation_summary: |
-  Implemented 6 of 22 TPC-H queries for Pandas family in
+  '
+implementation_summary: 'Implemented 6 of 22 TPC-H queries for Pandas family in
+
   benchbox/core/tpch/dataframe_queries.py:
+
   - Q1: Pricing Summary Report (aggregation)
+
   - Q3: Shipping Priority (3-way join)
+
   - Q4: Order Priority Checking (EXISTS pattern)
+
   - Q5: Local Supplier Volume (6-way join)
+
   - Q6: Forecasting Revenue Change (filter + aggregate)
+
   - Q10: Returned Item Reporting (4-way join)
 
+
   These represent the core patterns:
+
   - Aggregation (Q1, Q6)
+
   - Multi-way joins (Q3, Q5, Q10)
+
   - EXISTS/semi-join pattern (Q4)
 
+  '
 tasks:
 - phase: 'Phase 4.1: Simple TPC-H Queries (Pandas Family)'
   description: Implement simple aggregation and filter queries
@@ -78,20 +91,19 @@ tasks:
   - summary: Create comprehensive tests
     done: true
     details: Tests in tests/unit/core/tpch/test_dataframe_queries.py
+progress_summary: '6/22 queries implemented (27%)
 
-progress_summary: |
-  6/22 queries implemented (27%)
   Core patterns established
+
   Remaining 16 queries follow same patterns
 
+  '
 files_affected:
-- change_type: New
-  paths:
+  modified:
   - benchbox/core/tpch/dataframe_queries.py
-- change_type: New
-  paths:
   - tests/unit/core/tpch/test_dataframe_queries.py
-
+  added: []
+  removed: []
 metadata:
   owners:
   - '@benchbox-maintainers'

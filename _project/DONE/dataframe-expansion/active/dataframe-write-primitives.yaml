@@ -1,3 +1,4 @@
+id: dataframe-write-primitives
 title: "Implement DataFrame Version of Write Primitives Benchmark"
 worktree: dataframe-expansion
 priority: High
@@ -74,140 +75,140 @@ context_sections:
 
 tasks:
   phases:
-    - phase: "Phase 1: Infrastructure"
+  - phase: "Phase 1: Infrastructure"
+    done: true
+    items:
+    - summary: "Create dataframe_operations.py module structure"
       done: true
-      items:
-        - summary: "Create dataframe_operations.py module structure"
-          done: true
-          subtasks:
-            - summary: "Create benchbox/core/write_primitives/dataframe_operations.py"
-              done: true
-            - summary: "Define WriteOperation dataclass for DataFrame operations"
-              done: true
-            - summary: "Define platform capability detection"
-              done: true
-        - summary: "Update WritePrimitivesBenchmark for DataFrame support"
-          done: true
-          subtasks:
-            - summary: "Add get_dataframe_operations() method"
-              done: true
-            - summary: "Add supports_dataframe_mode() capability check"
-              done: true
+      subtasks:
+      - summary: "Create benchbox/core/write_primitives/dataframe_operations.py"
+        done: true
+      - summary: "Define WriteOperation dataclass for DataFrame operations"
+        done: true
+      - summary: "Define platform capability detection"
+        done: true
+    - summary: "Update WritePrimitivesBenchmark for DataFrame support"
+      done: true
+      subtasks:
+      - summary: "Add get_dataframe_operations() method"
+        done: true
+      - summary: "Add supports_dataframe_mode() capability check"
+        done: true
 
-    - phase: "Phase 2: File-Level Operations (All Platforms)"
+  - phase: "Phase 2: File-Level Operations (All Platforms)"
+    done: true
+    items:
+    - summary: "Implement BULK_LOAD operations"
       done: true
-      items:
-        - summary: "Implement BULK_LOAD operations"
-          done: true
-          subtasks:
-            - summary: "CSV loading with various delimiters and encodings"
-              done: true
-            - summary: "Parquet loading with compression options"
-              done: true
-            - summary: "Performance comparison across formats"
-              done: true
-        - summary: "Implement file-level INSERT (append)"
-          done: true
-          subtasks:
-            - summary: "Expression family: write_parquet with mode='append'"
-              done: true
-            - summary: "Pandas family: to_parquet with append"
-              done: true
-        - summary: "Implement physical layout write operations"
-          done: true
-          subtasks:
-            - summary: "Sorted writes (all platforms except Dask)"
-              done: true
-            - summary: "Partitioned writes (PySpark, Dask)"
-              done: true
-            - summary: "Compression testing (zstd, gzip, lz4, snappy)"
-              done: true
+      subtasks:
+      - summary: "CSV loading with various delimiters and encodings"
+        done: true
+      - summary: "Parquet loading with compression options"
+        done: true
+      - summary: "Performance comparison across formats"
+        done: true
+    - summary: "Implement file-level INSERT (append)"
+      done: true
+      subtasks:
+      - summary: "Expression family: write_parquet with mode='append'"
+        done: true
+      - summary: "Pandas family: to_parquet with append"
+        done: true
+    - summary: "Implement physical layout write operations"
+      done: true
+      subtasks:
+      - summary: "Sorted writes (all platforms except Dask)"
+        done: true
+      - summary: "Partitioned writes (PySpark, Dask)"
+        done: true
+      - summary: "Compression testing (zstd, gzip, lz4, snappy)"
+        done: true
 
-    - phase: "Phase 3: Row-Level Operations (Polars/Delta Lake/Iceberg)"
+  - phase: "Phase 3: Row-Level Operations (Polars/Delta Lake/Iceberg)"
+    done: true
+    notes: "Leverages existing dataframe-maintenance-operations infrastructure"
+    items:
+    - summary: "Implement Polars operations (via read-modify-write)"
       done: true
-      notes: "Leverages existing dataframe-maintenance-operations infrastructure"
-      items:
-        - summary: "Implement Polars operations (via read-modify-write)"
-          done: true
-          subtasks:
-            - summary: "UPDATE via CASE WHEN expressions"
-              done: true
-            - summary: "DELETE via read-filter-write"
-              done: true
-            - summary: "MERGE via read-join-write"
-              done: true
-        - summary: "Implement Delta Lake operations"
-          done: true
-          subtasks:
-            - summary: "DeltaTable.update() - row-level UPDATE"
-              done: true
-            - summary: "DeltaTable.delete() - row-level DELETE"
-              done: true
-            - summary: "DeltaTable.merge() - UPSERT/MERGE"
-              done: true
-        - summary: "Implement Iceberg operations"
-          done: true
-          subtasks:
-            - summary: "Row-level UPDATE via MERGE"
-              done: true
-            - summary: "Row-level DELETE"
-              done: true
-            - summary: "Partition overwrite patterns"
-              done: true
-        - summary: "Add user feedback for unsupported platform/operation combinations"
-          done: true
-          subtasks:
-            - summary: "Detect when user runs row-level ops on unsupported platforms"
-              done: true
-            - summary: "Raise clear error with alternatives"
-              done: true
-            - summary: "Suggest alternatives via get_unsupported_message()"
-              done: true
+      subtasks:
+      - summary: "UPDATE via CASE WHEN expressions"
+        done: true
+      - summary: "DELETE via read-filter-write"
+        done: true
+      - summary: "MERGE via read-join-write"
+        done: true
+    - summary: "Implement Delta Lake operations"
+      done: true
+      subtasks:
+      - summary: "DeltaTable.update() - row-level UPDATE"
+        done: true
+      - summary: "DeltaTable.delete() - row-level DELETE"
+        done: true
+      - summary: "DeltaTable.merge() - UPSERT/MERGE"
+        done: true
+    - summary: "Implement Iceberg operations"
+      done: true
+      subtasks:
+      - summary: "Row-level UPDATE via MERGE"
+        done: true
+      - summary: "Row-level DELETE"
+        done: true
+      - summary: "Partition overwrite patterns"
+        done: true
+    - summary: "Add user feedback for unsupported platform/operation combinations"
+      done: true
+      subtasks:
+      - summary: "Detect when user runs row-level ops on unsupported platforms"
+        done: true
+      - summary: "Raise clear error with alternatives"
+        done: true
+      - summary: "Suggest alternatives via get_unsupported_message()"
+        done: true
 
-    - phase: "Phase 4: DDL Operations (PySpark)"
+  - phase: "Phase 4: DDL Operations (PySpark)"
+    done: true
+    items:
+    - summary: "Implement DDL via spark.sql() interface"
       done: true
-      items:
-        - summary: "Implement DDL via spark.sql() interface"
-          done: true
-          subtasks:
-            - summary: "CREATE TABLE operations"
-              done: true
-            - summary: "ALTER TABLE operations"
-              done: true
-            - summary: "DROP TABLE operations"
-              done: true
+      subtasks:
+      - summary: "CREATE TABLE operations"
+        done: true
+      - summary: "ALTER TABLE operations"
+        done: true
+      - summary: "DROP TABLE operations"
+        done: true
 
-    - phase: "Phase 5: Testing and Validation"
+  - phase: "Phase 5: Testing and Validation"
+    done: true
+    items:
+    - summary: "Unit tests for each operation type"
       done: true
-      items:
-        - summary: "Unit tests for each operation type"
-          done: true
-        - summary: "Integration tests with polars-df (all operations)"
-          done: true
-        - summary: "Integration tests with pyspark-df + Delta Lake"
-          done: true
-          notes: "Tested via mock SparkSession; real PySpark tests in platform-specific tests"
-        - summary: "Verify unsupported operation error messages"
-          done: true
+    - summary: "Integration tests with polars-df (all operations)"
+      done: true
+    - summary: "Integration tests with pyspark-df + Delta Lake"
+      done: true
+      notes: "Tested via mock SparkSession; real PySpark tests in platform-specific tests"
+    - summary: "Verify unsupported operation error messages"
+      done: true
 
 metadata:
   tags:
-    - dataframe
-    - write-primitives
-    - delta-lake
-    - iceberg
-    - pyspark
+  - dataframe
+  - write-primitives
+  - delta-lake
+  - iceberg
+  - pyspark
   estimated_effort: Large
   created_date: "2026-01-25"
   completed_date: "2026-01-25"
 
 files_affected:
   added:
-    - "benchbox/core/write_primitives/dataframe_operations.py"
-    - "tests/unit/benchmarks/test_write_primitives_dataframe.py"
+  - "benchbox/core/write_primitives/dataframe_operations.py"
+  - "tests/unit/benchmarks/test_write_primitives_dataframe.py"
   modified:
-    - "benchbox/core/write_primitives/benchmark.py"
-    - "benchbox/core/write_primitives/__init__.py"
+  - "benchbox/core/write_primitives/benchmark.py"
+  - "benchbox/core/write_primitives/__init__.py"
 
 impact:
   business_value: |
@@ -222,18 +223,20 @@ impact:
     maintenance operations on DataFrame platforms.
 
 success_metrics:
-  - "BULK_LOAD operations work on all DataFrame platforms"
-  - "Row-level UPDATE/DELETE/MERGE work on PySpark + Delta Lake"
-  - "File-level INSERT (append) works on Polars, Pandas, PySpark"
-  - "Clear skip_platforms for unsupported operation/platform combinations"
+- "BULK_LOAD operations work on all DataFrame platforms"
+- "Row-level UPDATE/DELETE/MERGE work on PySpark + Delta Lake"
+- "File-level INSERT (append) works on Polars, Pandas, PySpark"
+- "Clear skip_platforms for unsupported operation/platform combinations"
 
 resolved_questions:
-  - question: "Should we require Delta Lake/Iceberg for row-level operations or provide fallbacks?"
-    answer: "Polars now supports row-level UPDATE/DELETE/MERGE via read-modify-write pattern (implemented in dataframe-maintenance-operations). Delta Lake/Iceberg provide native support."
-  - question: "How to handle DDL operations on platforms without SQL interface?"
-    answer: "DDL is only supported on PySpark (via spark.sql()). Other platforms return failure with helpful error message suggesting PySpark."
-  - question: "Should TRANSACTION operations be in this benchmark or only in Transaction Primitives?"
-    answer: "TRANSACTION operations deferred to Transaction Primitives benchmark. Write Primitives focuses on data operations."
+- question: "Should we require Delta Lake/Iceberg for row-level operations or provide fallbacks?"
+  answer: "Polars now supports row-level UPDATE/DELETE/MERGE via read-modify-write pattern (implemented in dataframe-maintenance-operations).
+    Delta Lake/Iceberg provide native support."
+- question: "How to handle DDL operations on platforms without SQL interface?"
+  answer: "DDL is only supported on PySpark (via spark.sql()). Other platforms return failure with helpful error message suggesting
+    PySpark."
+- question: "Should TRANSACTION operations be in this benchmark or only in Transaction Primitives?"
+  answer: "TRANSACTION operations deferred to Transaction Primitives benchmark. Write Primitives focuses on data operations."
 
 completion_summary: |
   Implemented DataFrame support for Write Primitives benchmark enabling write operations
@@ -249,5 +252,5 @@ completion_summary: |
 
 dependencies:
   related:
-    - "_project/TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml"
-    - "_project/TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml"
+  - "_project/TODO/dataframe-expansion/active/dataframe-maintenance-operations.yaml"
+  - "_project/TODO/dataframe-expansion/planning/dataframe-read-primitives.yaml"

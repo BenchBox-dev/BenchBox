@@ -1,3 +1,4 @@
+id: athena-configuration-validation
 title: Athena Configuration Validation
 worktree: platform-expansion
 priority: Medium
@@ -16,33 +17,33 @@ description: |
   on what's missing and how to fix it.
 
 tasks:
-  - phase: "Validation Implementation"
+- phase: "Validation Implementation"
+  done: true
+  items:
+  - summary: "Add S3 output location validation"
     done: true
-    items:
-      - summary: "Add S3 output location validation"
-        done: true
-      - summary: "Add AWS credentials presence check"
-        done: true
-      - summary: "Add workgroup format validation"
-        done: true
-      - summary: "Use ConfigurationError with actionable messages"
-        done: true
-  - phase: "Error Messages"
+  - summary: "Add AWS credentials presence check"
     done: true
-    items:
-      - summary: "Create helpful message for missing AWS credentials"
-        done: true
-      - summary: "Create helpful message for invalid S3 path"
-        done: true
-      - summary: "Create helpful message for workgroup not found"
-        done: true
-  - phase: "Testing"
+  - summary: "Add workgroup format validation"
     done: true
-    items:
-      - summary: "Add tests for configuration validation"
-        done: true
-      - summary: "Test error message content"
-        done: true
+  - summary: "Use ConfigurationError with actionable messages"
+    done: true
+- phase: "Error Messages"
+  done: true
+  items:
+  - summary: "Create helpful message for missing AWS credentials"
+    done: true
+  - summary: "Create helpful message for invalid S3 path"
+    done: true
+  - summary: "Create helpful message for workgroup not found"
+    done: true
+- phase: "Testing"
+  done: true
+  items:
+  - summary: "Add tests for configuration validation"
+    done: true
+  - summary: "Test error message content"
+    done: true
 
 completion_notes: |
   Added comprehensive configuration validation to AthenaAdapter.__init__():
@@ -93,12 +94,12 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - athena
-    - validation
-    - error-messages
-    - user-experience
+  - athena
+  - validation
+  - error-messages
+  - user-experience
   estimated_effort: 3-4 hours
   created_date: "2025-12-13"
 
@@ -111,10 +112,10 @@ impact:
     Faster time-to-working-benchmark.
 
 success_metrics:
-  - "All required config validated before connection attempt"
-  - "Error messages include specific fix instructions"
-  - "Tests verify error message quality"
+- "All required config validated before connection attempt"
+- "Error messages include specific fix instructions"
+- "Tests verify error message quality"
 
 files_modified:
-  - benchbox/platforms/athena.py
-  - tests/unit/platforms/test_athena_adapter.py
+- benchbox/platforms/athena.py
+- tests/unit/platforms/test_athena_adapter.py

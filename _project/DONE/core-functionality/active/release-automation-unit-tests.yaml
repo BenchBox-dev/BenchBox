@@ -2,7 +2,9 @@
 #
 # Location: _project/TODO/core-functionality/planning/release-automation-unit-tests.yaml
 
-title: "Add comprehensive unit tests for release automation (fingerprinting, timestamps, content validation, size checks, scripts)"
+id: release-automation-unit-tests
+title: "Add comprehensive unit tests for release automation (fingerprinting, timestamps, content validation, size checks,
+  scripts)"
 worktree: core-functionality
 priority: Medium-High
 status: Completed
@@ -25,288 +27,327 @@ description: |
 
 tasks:
   phases:
-    - title: "Phase 1: Source Fingerprinting + Timestamp Normalization (foundational)"
-      description: |
-        Test the two foundational functions that all downstream release steps depend on:
-        compute_source_fingerprint() for source/artifact identity verification, and
-        calculate_most_recent_saturday_midnight() / _normalize_timestamps() for reproducible builds.
-      items:
-        - description: "Create tests/unit/test_release_fingerprint.py with TestComputeSourceFingerprint class (~13 tests)"
-          done: true
-          subtasks:
-            - description: "test_deterministic_same_content: same directory produces identical fingerprint on repeated calls"
-              done: true
-            - description: "test_content_sensitivity: changing .py file content changes the fingerprint"
-              done: true
-            - description: "test_adding_file_changes_fingerprint: adding a new .py file changes the fingerprint"
-              done: true
-            - description: "test_ignores_non_py_files: adding .md, .json, .yaml files does not change fingerprint"
-              done: true
-            - description: "test_empty_directory: empty dir produces valid 64-char hex SHA256 string"
-              done: true
-            - description: "test_nested_packages: files in sub/sub/module.py are included and affect fingerprint"
-              done: true
-            - description: "test_uses_posix_paths: fingerprint is deterministic (as_posix() used internally)"
-              done: true
-            - description: "test_ignores_timestamps: os.utime() on .py file does not change fingerprint"
-              done: true
-            - description: "test_symlinks_followed: symlinked .py files are included via rglob (skip if OS unsupported)"
-              done: true
-            - description: "test_file_ordering_deterministic: same files created in different order produce same fingerprint"
-              done: true
-            - description: "test_different_content_different_fingerprint: two packages with different content differ"
-              done: true
-            - description: "test_path_sensitivity: same content at different relative paths produces different fingerprint"
-              done: true
-            - description: "test_sha256_hex_format: result is always 64-char lowercase hex string"
-              done: true
+  - title: "Phase 1: Source Fingerprinting + Timestamp Normalization (foundational)"
+    description: |
+      Test the two foundational functions that all downstream release steps depend on:
+      compute_source_fingerprint() for source/artifact identity verification, and
+      calculate_most_recent_saturday_midnight() / _normalize_timestamps() for reproducible builds.
+    items:
+    - description: "Create tests/unit/test_release_fingerprint.py with TestComputeSourceFingerprint class (~13 tests)"
+      done: true
+      subtasks:
+      - description: "test_deterministic_same_content: same directory produces identical fingerprint on repeated calls"
+        done: true
+      - description: "test_content_sensitivity: changing .py file content changes the fingerprint"
+        done: true
+      - description: "test_adding_file_changes_fingerprint: adding a new .py file changes the fingerprint"
+        done: true
+      - description: "test_ignores_non_py_files: adding .md, .json, .yaml files does not change fingerprint"
+        done: true
+      - description: "test_empty_directory: empty dir produces valid 64-char hex SHA256 string"
+        done: true
+      - description: "test_nested_packages: files in sub/sub/module.py are included and affect fingerprint"
+        done: true
+      - description: "test_uses_posix_paths: fingerprint is deterministic (as_posix() used internally)"
+        done: true
+      - description: "test_ignores_timestamps: os.utime() on .py file does not change fingerprint"
+        done: true
+      - description: "test_symlinks_followed: symlinked .py files are included via rglob (skip if OS unsupported)"
+        done: true
+      - description: "test_file_ordering_deterministic: same files created in different order produce same fingerprint"
+        done: true
+      - description: "test_different_content_different_fingerprint: two packages with different content differ"
+        done: true
+      - description: "test_path_sensitivity: same content at different relative paths produces different fingerprint"
+        done: true
+      - description: "test_sha256_hex_format: result is always 64-char lowercase hex string"
+        done: true
 
-        - description: "Create tests/unit/test_release_timestamps.py with TestCalculateMostRecentSaturdayMidnight (~10 tests) and TestNormalizeTimestamps (~7 tests)"
-          done: true
-          subtasks:
-            - description: "test_returns_correct_tuple_structure: returns (int, str, str) 3-tuple"
-              done: true
-            - description: "test_always_returns_saturday: datetime.fromtimestamp(unix_ts).weekday() == 5"
-              done: true
-            - description: "test_always_returns_midnight_utc: hour=0, minute=0, second=0, microsecond=0"
-              done: true
-            - description: "test_format_consistency_iso: datetime.fromisoformat(iso_fmt).timestamp() == unix_ts"
-              done: true
-            - description: "test_format_consistency_git: strptime(git_fmt, '%Y-%m-%d %H:%M:%S %z').timestamp() == unix_ts"
-              done: true
-            - description: "test_parametrized_weekdays: mock datetime.now() for Mon-Sun, verify correct Saturday selected (7 parametrized cases)"
-              done: true
-            - description: "test_boundary_saturday_just_after_midnight: Saturday 00:00:01 returns same Saturday, not previous"
-              done: true
-            - description: "test_result_is_in_the_past_or_today: unix_ts <= now"
-              done: true
-            - description: "test_result_is_within_seven_days: now - unix_ts < 7 days"
-              done: true
-            - description: "test_normalize_sets_mtime_and_atime: both st_mtime and st_atime set on files"
-              done: true
-            - description: "test_normalize_root_dir: the root directory itself gets normalized timestamps"
-              done: true
-            - description: "test_normalize_nested_files: files in sub/deep/ get normalized"
-              done: true
-            - description: "test_normalize_empty_dirs: empty subdirectories get normalized"
-              done: true
-            - description: "test_normalize_idempotency: running twice with same timestamp produces same result"
-              done: true
-            - description: "test_normalize_multiple_files: all files in tree get the same timestamp"
-              done: true
-            - description: "test_normalize_different_timestamps: different target timestamps produce different results"
-              done: true
+    - description: "Create tests/unit/test_release_timestamps.py with TestCalculateMostRecentSaturdayMidnight (~10 tests)
+        and TestNormalizeTimestamps (~7 tests)"
+      done: true
+      subtasks:
+      - description: "test_returns_correct_tuple_structure: returns (int, str, str) 3-tuple"
+        done: true
+      - description: "test_always_returns_saturday: datetime.fromtimestamp(unix_ts).weekday() == 5"
+        done: true
+      - description: "test_always_returns_midnight_utc: hour=0, minute=0, second=0, microsecond=0"
+        done: true
+      - description: "test_format_consistency_iso: datetime.fromisoformat(iso_fmt).timestamp() == unix_ts"
+        done: true
+      - description: "test_format_consistency_git: strptime(git_fmt, '%Y-%m-%d %H:%M:%S %z').timestamp() == unix_ts"
+        done: true
+      - description: "test_parametrized_weekdays: mock datetime.now() for Mon-Sun, verify correct Saturday selected (7 parametrized
+          cases)"
+        done: true
+      - description: "test_boundary_saturday_just_after_midnight: Saturday 00:00:01 returns same Saturday, not previous"
+        done: true
+      - description: "test_result_is_in_the_past_or_today: unix_ts <= now"
+        done: true
+      - description: "test_result_is_within_seven_days: now - unix_ts < 7 days"
+        done: true
+      - description: "test_normalize_sets_mtime_and_atime: both st_mtime and st_atime set on files"
+        done: true
+      - description: "test_normalize_root_dir: the root directory itself gets normalized timestamps"
+        done: true
+      - description: "test_normalize_nested_files: files in sub/deep/ get normalized"
+        done: true
+      - description: "test_normalize_empty_dirs: empty subdirectories get normalized"
+        done: true
+      - description: "test_normalize_idempotency: running twice with same timestamp produces same result"
+        done: true
+      - description: "test_normalize_multiple_files: all files in tree get the same timestamp"
+        done: true
+      - description: "test_normalize_different_timestamps: different target timestamps produce different results"
+        done: true
 
-    - title: "Phase 2: Content Validation (~74 tests)"
-      description: |
-        Test benchbox/release/content_validation.py end-to-end: dataclass formatting, all 8 rule
-        categories, example line detection, inline ignore directives, file exceptions, context
-        extraction, and the top-level validate_file / validate_content / check_content_for_release
-        entry points. This is the largest phase due to the breadth of rule categories.
-      items:
-        - description: "Create tests/unit/test_content_validation.py"
-          done: true
-          subtasks:
-            - description: "TestContentViolation (~4 tests): __str__ format includes severity emoji, file:line:col, matched_text, category, context, suggestion"
-              done: true
-            - description: "TestValidationResult (~6 tests): passed property (True when no ERROR violations), error_count/warning_count/suggestion_count, summary() with no violations, summary() with errors (FAILED prefix), summary() with warnings only (WARNINGS prefix), files_checked/files_with_violations tracking"
-              done: true
-            - description: "TestPunctuationRules (~4 tests): em-dash (U+2014) detected as ERROR, en-dash (U+2013) detected as ERROR, clean text with regular hyphens passes, mixed content flags only prohibited chars"
-              done: true
-            - description: "TestVagueClaimsRules (~4 tests): 'much faster' flagged as WARNING, 'significantly better' flagged, 'large dataset' flagged, clean quantified text ('2.3x faster') passes"
-              done: true
-            - description: "TestMarketingRules (~4 tests): 'revolutionary' flagged as WARNING, 'game-changing' flagged, 'leverage' flagged, clean descriptive text passes"
-              done: true
-            - description: "TestPlatformAdvocacyRules (~4 tests): 'clearly superior' flagged as ERROR, 'obviously better' flagged, 'the best choice' flagged, neutral comparison text passes"
-              done: true
-            - description: "TestVoiceRules (~4 tests): 'I think' flagged as WARNING, 'I found' flagged, 'In my opinion' flagged, 'we found' / 'our testing' passes"
-              done: true
-            - description: "TestRestrictedVendorRules (~3 tests): 'Oracle' flagged as WARNING, text without vendor names passes, case sensitivity verified"
-              done: true
-            - description: "TestHedgingRules (~3 tests): 'it might possibly' flagged as SUGGESTION, 'kind of' flagged, direct statements pass"
-              done: true
-            - description: "TestClicheRules (~3 tests): 'low-hanging fruit' flagged as SUGGESTION, 'deep dive' flagged, clean alternative text passes"
-              done: true
-            - description: "TestIsExampleLine (~5 tests): lines starting with cross emoji return True, '| cross_emoji' table cells return True, blockquote examples with cross emoji return True, lines under 'Don't' section headings return True, normal content lines return False"
-              done: true
-            - description: "TestHasInlineIgnore (~7 tests): same-line directive suppresses category, previous-line directive suppresses category, 'all' keyword suppresses any category, multiple comma-separated categories work, case-insensitive matching, wrong category does not suppress, line_idx=0 edge case (no previous line to check)"
-              done: true
-            - description: "TestGetContext (~3 tests): short lines returned as-is, long lines truncated with ellipsis, match at start/end of line handled correctly"
-              done: true
-            - description: "TestFileExceptions (~4 tests): dialect-translation.md excepted from restricted_vendor, blog glob patterns match correctly, non-matching files get no exceptions, _get_file_exceptions returns set of category strings"
-              done: true
-            - description: "TestShouldSkipFile (~3 tests): files under docs/_build skipped, files under docs/_tags skipped, normal docs/ files not skipped"
-              done: true
-            - description: "TestValidateFile (~5 tests): end-to-end with tmp_path file containing violations, category filtering (only check specific categories), file-level exceptions applied when repo_root provided, file that can't be read returns empty list, clean file returns empty list"
-              done: true
-            - description: "TestValidateContent (~4 tests): end-to-end scanning tmp_path with glob patterns, files_checked and files_with_violations counts correct, skipped files not counted, default patterns used when none specified"
-              done: true
-            - description: "TestCheckContentForRelease (~5 tests): returns True when no violations, returns False when ERROR violations present, auto_continue=True returns True despite violations, errors_only=True suppresses warning/suggestion display, prints summary to stdout (capture with capsys)"
-              done: true
+  - title: "Phase 2: Content Validation (~74 tests)"
+    description: |
+      Test benchbox/release/content_validation.py end-to-end: dataclass formatting, all 8 rule
+      categories, example line detection, inline ignore directives, file exceptions, context
+      extraction, and the top-level validate_file / validate_content / check_content_for_release
+      entry points. This is the largest phase due to the breadth of rule categories.
+    items:
+    - description: "Create tests/unit/test_content_validation.py"
+      done: true
+      subtasks:
+      - description: "TestContentViolation (~4 tests): __str__ format includes severity emoji, file:line:col, matched_text,
+          category, context, suggestion"
+        done: true
+      - description: "TestValidationResult (~6 tests): passed property (True when no ERROR violations), error_count/warning_count/suggestion_count,
+          summary() with no violations, summary() with errors (FAILED prefix), summary() with warnings only (WARNINGS prefix),
+          files_checked/files_with_violations tracking"
+        done: true
+      - description: "TestPunctuationRules (~4 tests): em-dash (U+2014) detected as ERROR, en-dash (U+2013) detected as ERROR,
+          clean text with regular hyphens passes, mixed content flags only prohibited chars"
+        done: true
+      - description: "TestVagueClaimsRules (~4 tests): 'much faster' flagged as WARNING, 'significantly better' flagged, 'large
+          dataset' flagged, clean quantified text ('2.3x faster') passes"
+        done: true
+      - description: "TestMarketingRules (~4 tests): 'revolutionary' flagged as WARNING, 'game-changing' flagged, 'leverage'
+          flagged, clean descriptive text passes"
+        done: true
+      - description: "TestPlatformAdvocacyRules (~4 tests): 'clearly superior' flagged as ERROR, 'obviously better' flagged,
+          'the best choice' flagged, neutral comparison text passes"
+        done: true
+      - description: "TestVoiceRules (~4 tests): 'I think' flagged as WARNING, 'I found' flagged, 'In my opinion' flagged,
+          'we found' / 'our testing' passes"
+        done: true
+      - description: "TestRestrictedVendorRules (~3 tests): 'Oracle' flagged as WARNING, text without vendor names passes,
+          case sensitivity verified"
+        done: true
+      - description: "TestHedgingRules (~3 tests): 'it might possibly' flagged as SUGGESTION, 'kind of' flagged, direct statements
+          pass"
+        done: true
+      - description: "TestClicheRules (~3 tests): 'low-hanging fruit' flagged as SUGGESTION, 'deep dive' flagged, clean alternative
+          text passes"
+        done: true
+      - description: "TestIsExampleLine (~5 tests): lines starting with cross emoji return True, '| cross_emoji' table cells
+          return True, blockquote examples with cross emoji return True, lines under 'Don't' section headings return True,
+          normal content lines return False"
+        done: true
+      - description: "TestHasInlineIgnore (~7 tests): same-line directive suppresses category, previous-line directive suppresses
+          category, 'all' keyword suppresses any category, multiple comma-separated categories work, case-insensitive matching,
+          wrong category does not suppress, line_idx=0 edge case (no previous line to check)"
+        done: true
+      - description: "TestGetContext (~3 tests): short lines returned as-is, long lines truncated with ellipsis, match at
+          start/end of line handled correctly"
+        done: true
+      - description: "TestFileExceptions (~4 tests): dialect-translation.md excepted from restricted_vendor, blog glob patterns
+          match correctly, non-matching files get no exceptions, _get_file_exceptions returns set of category strings"
+        done: true
+      - description: "TestShouldSkipFile (~3 tests): files under docs/_build skipped, files under docs/_tags skipped, normal
+          docs/ files not skipped"
+        done: true
+      - description: "TestValidateFile (~5 tests): end-to-end with tmp_path file containing violations, category filtering
+          (only check specific categories), file-level exceptions applied when repo_root provided, file that can't be read
+          returns empty list, clean file returns empty list"
+        done: true
+      - description: "TestValidateContent (~4 tests): end-to-end scanning tmp_path with glob patterns, files_checked and files_with_violations
+          counts correct, skipped files not counted, default patterns used when none specified"
+        done: true
+      - description: "TestCheckContentForRelease (~5 tests): returns True when no violations, returns False when ERROR violations
+          present, auto_continue=True returns True despite violations, errors_only=True suppresses warning/suggestion display,
+          prints summary to stdout (capture with capsys)"
+        done: true
 
-    - title: "Phase 3: Size Safety Checks (~23 tests)"
-      description: |
-        Test check_release_size() and ReleaseSizeViolation from benchbox/release/workflow.py.
-        All tests use tmp_path for filesystem operations -- no real release directories needed.
-      items:
-        - description: "Create tests/unit/test_release_size_check.py"
-          done: true
-          subtasks:
-            - description: "TestReleaseSizeViolation (~3 tests): __str__ format includes path, size_mb, and reason; size_mb calculation correct (bytes / 1024^2); constructor stores path, size_bytes, reason correctly"
-              done: true
-            - description: "TestCheckReleaseSize (~20 tests): clean release passes (no violations, total_size_mb returned); oversized individual file detected; exact-at-limit boundary (file_size == limit passes, limit+1 fails); total size violation detected; each forbidden pattern detected (*.dat, *.tbl, *.csv, *.parquet, *.db, *.duckdb -- 6 tests); ALLOWED_DATA_PATHS exemption (file under benchbox/data/coffeeshop/ not flagged); custom max_file_size_mb and max_total_size_mb parameters honored; .git/ directory excluded from size calculations; empty release directory passes; nested forbidden files detected (deep/path/data.dat); multiple violations returned in single check; check_forbidden_patterns=False disables pattern checks; total violation inserted at index 0 of violations list; returns 3-tuple of (bool, list, float)"
-              done: true
+  - title: "Phase 3: Size Safety Checks (~23 tests)"
+    description: |
+      Test check_release_size() and ReleaseSizeViolation from benchbox/release/workflow.py.
+      All tests use tmp_path for filesystem operations -- no real release directories needed.
+    items:
+    - description: "Create tests/unit/test_release_size_check.py"
+      done: true
+      subtasks:
+      - description: "TestReleaseSizeViolation (~3 tests): __str__ format includes path, size_mb, and reason; size_mb calculation
+          correct (bytes / 1024^2); constructor stores path, size_bytes, reason correctly"
+        done: true
+      - description: "TestCheckReleaseSize (~20 tests): clean release passes (no violations, total_size_mb returned); oversized
+          individual file detected; exact-at-limit boundary (file_size == limit passes, limit+1 fails); total size violation
+          detected; each forbidden pattern detected (*.dat, *.tbl, *.csv, *.parquet, *.db, *.duckdb -- 6 tests); ALLOWED_DATA_PATHS
+          exemption (file under benchbox/data/coffeeshop/ not flagged); custom max_file_size_mb and max_total_size_mb parameters
+          honored; .git/ directory excluded from size calculations; empty release directory passes; nested forbidden files
+          detected (deep/path/data.dat); multiple violations returned in single check; check_forbidden_patterns=False disables
+          pattern checks; total violation inserted at index 0 of violations list; returns 3-tuple of (bool, list, float)"
+        done: true
 
-    - title: "Phase 4: Release Script Functions (~51 tests)"
-      description: |
-        Test functions imported from scripts/automate_release.py, scripts/build_release.py,
-        scripts/verify_release.py, and scripts/finalize_release.py. Requires adding scripts/
-        to sys.path via conftest fixture. All subprocess calls mocked -- no real git, uv, or builds.
-      items:
-        - description: "Add conftest fixture for scripts/ path if not already present (sys.path insertion)"
-          done: true
+  - title: "Phase 4: Release Script Functions (~51 tests)"
+    description: |
+      Test functions imported from scripts/automate_release.py, scripts/build_release.py,
+      scripts/verify_release.py, and scripts/finalize_release.py. Requires adding scripts/
+      to sys.path via conftest fixture. All subprocess calls mocked -- no real git, uv, or builds.
+    items:
+    - description: "Add conftest fixture for scripts/ path if not already present (sys.path insertion)"
+      done: true
 
-        - description: "TestParseTimestamp from automate_release.py (~4 tests)"
-          done: true
-          subtasks:
-            - description: "test_git_format_with_timezone: '2026-01-16 13:00:00 -0500' parses correctly, returns (unix_ts, iso_fmt, git_fmt)"
-              done: true
-            - description: "test_without_timezone_assumes_utc: '2026-01-16 13:00:00' treated as UTC"
-              done: true
-            - description: "test_invalid_format_raises_valueerror: 'not-a-date' raises ValueError with descriptive message"
-              done: true
-            - description: "test_format_consistency: all three return values represent the same moment in time"
-              done: true
+    - description: "TestParseTimestamp from automate_release.py (~4 tests)"
+      done: true
+      subtasks:
+      - description: "test_git_format_with_timezone: '2026-01-16 13:00:00 -0500' parses correctly, returns (unix_ts, iso_fmt,
+          git_fmt)"
+        done: true
+      - description: "test_without_timezone_assumes_utc: '2026-01-16 13:00:00' treated as UTC"
+        done: true
+      - description: "test_invalid_format_raises_valueerror: 'not-a-date' raises ValueError with descriptive message"
+        done: true
+      - description: "test_format_consistency: all three return values represent the same moment in time"
+        done: true
 
-        - description: "TestRunPreFlightChecks from automate_release.py (~6 tests)"
-          done: true
-          subtasks:
-            - description: "test_missing_changelog_returns_false: no CHANGELOG.md in source -> False"
-              done: true
-            - description: "test_changelog_without_version_entry_continues_with_auto: CHANGELOG exists but lacks version entry, auto_continue=True -> True"
-              done: true
-            - description: "test_valid_changelog_passes: CHANGELOG has '## [0.1.0]' entry -> passes check"
-              done: true
-            - description: "test_invalid_version_format_returns_false: version='!@#$' -> False"
-              done: true
-            - description: "test_clean_git_status_passes: mock subprocess.run for git status returning empty stdout"
-              done: true
-            - description: "test_dirty_git_status_continues_with_auto: mock git status with changes, auto_continue=True -> True"
-              done: true
+    - description: "TestRunPreFlightChecks from automate_release.py (~6 tests)"
+      done: true
+      subtasks:
+      - description: "test_missing_changelog_returns_false: no CHANGELOG.md in source -> False"
+        done: true
+      - description: "test_changelog_without_version_entry_continues_with_auto: CHANGELOG exists but lacks version entry,
+          auto_continue=True -> True"
+        done: true
+      - description: "test_valid_changelog_passes: CHANGELOG has '## [0.1.0]' entry -> passes check"
+        done: true
+      - description: "test_invalid_version_format_returns_false: version='!@#$' -> False"
+        done: true
+      - description: "test_clean_git_status_passes: mock subprocess.run for git status returning empty stdout"
+        done: true
+      - description: "test_dirty_git_status_continues_with_auto: mock git status with changes, auto_continue=True -> True"
+        done: true
 
-        - description: "TestRunCiChecks from automate_release.py (~5 tests)"
-          done: true
-          subtasks:
-            - description: "test_all_checks_pass: mock 4 subprocess.run calls all returning rc=0 -> True"
-              done: true
-            - description: "test_lint_failure: first check fails (ruff check) -> False"
-              done: true
-            - description: "test_format_failure: second check fails (ruff format --check) -> False"
-              done: true
-            - description: "test_typecheck_failure: third check fails (ty check) -> False"
-              done: true
-            - description: "test_test_failure: fourth check fails (pytest) -> False"
-              done: true
+    - description: "TestRunCiChecks from automate_release.py (~5 tests)"
+      done: true
+      subtasks:
+      - description: "test_all_checks_pass: mock 4 subprocess.run calls all returning rc=0 -> True"
+        done: true
+      - description: "test_lint_failure: first check fails (ruff check) -> False"
+        done: true
+      - description: "test_format_failure: second check fails (ruff format --check) -> False"
+        done: true
+      - description: "test_typecheck_failure: third check fails (ty check) -> False"
+        done: true
+      - description: "test_test_failure: fourth check fails (pytest) -> False"
+        done: true
 
-        - description: "TestVerifyWheelTimestamps from build_release.py (~4 tests)"
-          done: true
-          subtasks:
-            - description: "test_matching_timestamps_pass: create zip with entries at expected_timestamp -> True"
-              done: true
-            - description: "test_mismatched_timestamps_fail: create zip with entry at wrong timestamp -> False"
-              done: true
-            - description: "test_one_second_tolerance: entry timestamp off by exactly 1 second -> True (within tolerance)"
-              done: true
-            - description: "test_beyond_tolerance_fails: entry timestamp off by 2 seconds -> False"
-              done: true
+    - description: "TestVerifyWheelTimestamps from build_release.py (~4 tests)"
+      done: true
+      subtasks:
+      - description: "test_matching_timestamps_pass: create zip with entries at expected_timestamp -> True"
+        done: true
+      - description: "test_mismatched_timestamps_fail: create zip with entry at wrong timestamp -> False"
+        done: true
+      - description: "test_one_second_tolerance: entry timestamp off by exactly 1 second -> True (within tolerance)"
+        done: true
+      - description: "test_beyond_tolerance_fails: entry timestamp off by 2 seconds -> False"
+        done: true
 
-        - description: "TestCalculateSha256 from build_release.py (~3 tests)"
-          done: true
-          subtasks:
-            - description: "test_known_hash: file with known content produces expected SHA256 hex digest"
-              done: true
-            - description: "test_empty_file: empty file produces SHA256 of empty bytes (e3b0c44298fc1c149...)"
-              done: true
-            - description: "test_large_file_chunking: file larger than 8192 bytes hashes correctly (verifies chunked reading)"
-              done: true
+    - description: "TestCalculateSha256 from build_release.py (~3 tests)"
+      done: true
+      subtasks:
+      - description: "test_known_hash: file with known content produces expected SHA256 hex digest"
+        done: true
+      - description: "test_empty_file: empty file produces SHA256 of empty bytes (e3b0c44298fc1c149...)"
+        done: true
+      - description: "test_large_file_chunking: file larger than 8192 bytes hashes correctly (verifies chunked reading)"
+        done: true
 
-        - description: "TestVerifyWheelFingerprint from verify_release.py (~3 tests)"
-          done: true
-          subtasks:
-            - description: "test_matching_fingerprint: create wheel zip with benchbox/ .py files, compute fingerprint, verify_wheel_fingerprint returns True"
-              done: true
-            - description: "test_mismatched_fingerprint: same wheel but wrong expected string -> False"
-              done: true
-            - description: "test_missing_benchbox_dir: wheel zip without benchbox/ directory -> False"
-              done: true
+    - description: "TestVerifyWheelFingerprint from verify_release.py (~3 tests)"
+      done: true
+      subtasks:
+      - description: "test_matching_fingerprint: create wheel zip with benchbox/ .py files, compute fingerprint, verify_wheel_fingerprint
+          returns True"
+        done: true
+      - description: "test_mismatched_fingerprint: same wheel but wrong expected string -> False"
+        done: true
+      - description: "test_missing_benchbox_dir: wheel zip without benchbox/ directory -> False"
+        done: true
 
-        - description: "TestGitCommitWithTimestamp from finalize_release.py (~3 tests)"
-          done: true
-          subtasks:
-            - description: "test_success_sets_env_vars: mock subprocess.run, verify GIT_AUTHOR_DATE and GIT_COMMITTER_DATE set in env, returns True"
-              done: true
-            - description: "test_failure_returns_false: mock subprocess.run returning rc=1 -> False"
-              done: true
-            - description: "test_commit_message_passed: verify 'git commit -m <message>' called with correct message"
-              done: true
+    - description: "TestGitCommitWithTimestamp from finalize_release.py (~3 tests)"
+      done: true
+      subtasks:
+      - description: "test_success_sets_env_vars: mock subprocess.run, verify GIT_AUTHOR_DATE and GIT_COMMITTER_DATE set in
+          env, returns True"
+        done: true
+      - description: "test_failure_returns_false: mock subprocess.run returning rc=1 -> False"
+        done: true
+      - description: "test_commit_message_passed: verify 'git commit -m <message>' called with correct message"
+        done: true
 
-        - description: "TestGitTagWithTimestamp from finalize_release.py (~5 tests)"
-          done: true
-          subtasks:
-            - description: "test_success_creates_tag: mock git tag -l returning empty (no existing), git tag -a succeeds -> True"
-              done: true
-            - description: "test_existing_tag_without_force_returns_false: mock git tag -l returning tag name, force=False -> False"
-              done: true
-            - description: "test_existing_tag_with_force_deletes_and_recreates: mock git tag -l returning tag, force=True, verify git tag -d then git tag -a called -> True"
-              done: true
-            - description: "test_tag_failure_returns_false: mock git tag -a returning rc=1 -> False"
-              done: true
-            - description: "test_env_var_propagation: verify GIT_COMMITTER_DATE set in subprocess env"
-              done: true
+    - description: "TestGitTagWithTimestamp from finalize_release.py (~5 tests)"
+      done: true
+      subtasks:
+      - description: "test_success_creates_tag: mock git tag -l returning empty (no existing), git tag -a succeeds -> True"
+        done: true
+      - description: "test_existing_tag_without_force_returns_false: mock git tag -l returning tag name, force=False -> False"
+        done: true
+      - description: "test_existing_tag_with_force_deletes_and_recreates: mock git tag -l returning tag, force=True, verify
+          git tag -d then git tag -a called -> True"
+        done: true
+      - description: "test_tag_failure_returns_false: mock git tag -a returning rc=1 -> False"
+        done: true
+      - description: "test_env_var_propagation: verify GIT_COMMITTER_DATE set in subprocess env"
+        done: true
 
-        - description: "TestVerifyGitStatus from finalize_release.py (~4 tests)"
-          done: true
-          subtasks:
-            - description: "test_no_git_dir_returns_false: tmp_path without .git directory -> False"
-              done: true
-            - description: "test_staged_changes_detected: mock git add -A then git diff --cached --quiet returning rc=1 (has changes) -> True"
-              done: true
-            - description: "test_clean_repo_returns_false: mock git diff --cached --quiet returning rc=0 (clean) -> False"
-              done: true
-            - description: "test_stages_before_diff: verify git add -A called before git diff --cached --quiet (ordering)"
-              done: true
+    - description: "TestVerifyGitStatus from finalize_release.py (~4 tests)"
+      done: true
+      subtasks:
+      - description: "test_no_git_dir_returns_false: tmp_path without .git directory -> False"
+        done: true
+      - description: "test_staged_changes_detected: mock git add -A then git diff --cached --quiet returning rc=1 (has changes)
+          -> True"
+        done: true
+      - description: "test_clean_repo_returns_false: mock git diff --cached --quiet returning rc=0 (clean) -> False"
+        done: true
+      - description: "test_stages_before_diff: verify git add -A called before git diff --cached --quiet (ordering)"
+        done: true
 
-        - description: "TestArchiveReleaseArtifacts from finalize_release.py (~4 tests)"
-          done: true
-          subtasks:
-            - description: "test_creates_archive_directory: archive_dir = archive_base/v{version} created with parents"
-              done: true
-            - description: "test_copies_wheel_and_sdist: both files present in archive directory after call"
-              done: true
-            - description: "test_manifest_content: MANIFEST.txt contains version, wheel name, sdist name, sizes, shasum instructions"
-              done: true
-            - description: "test_returns_archive_path: returned Path matches archive_base/v{version}"
-              done: true
+    - description: "TestArchiveReleaseArtifacts from finalize_release.py (~4 tests)"
+      done: true
+      subtasks:
+      - description: "test_creates_archive_directory: archive_dir = archive_base/v{version} created with parents"
+        done: true
+      - description: "test_copies_wheel_and_sdist: both files present in archive directory after call"
+        done: true
+      - description: "test_manifest_content: MANIFEST.txt contains version, wheel name, sdist name, sizes, shasum instructions"
+        done: true
+      - description: "test_returns_archive_path: returned Path matches archive_base/v{version}"
+        done: true
 
-        - description: "TestVerifySourceFingerprint from finalize_release.py (~5 tests)"
-          done: true
-          subtasks:
-            - description: "test_matching_fingerprint_passes: write expected fingerprint to dist/.source_fingerprint, create matching benchbox/ tree -> True"
-              done: true
-            - description: "test_mismatched_fingerprint_fails: write wrong fingerprint to dist/.source_fingerprint -> False"
-              done: true
-            - description: "test_missing_fingerprint_file_fails: no dist/.source_fingerprint file -> False"
-              done: true
-            - description: "test_skip_flag_returns_true: skip=True -> True regardless of file state"
-              done: true
-            - description: "test_reads_and_strips_fingerprint: fingerprint file with trailing newline handled correctly"
-              done: true
+    - description: "TestVerifySourceFingerprint from finalize_release.py (~5 tests)"
+      done: true
+      subtasks:
+      - description: "test_matching_fingerprint_passes: write expected fingerprint to dist/.source_fingerprint, create matching
+          benchbox/ tree -> True"
+        done: true
+      - description: "test_mismatched_fingerprint_fails: write wrong fingerprint to dist/.source_fingerprint -> False"
+        done: true
+      - description: "test_missing_fingerprint_file_fails: no dist/.source_fingerprint file -> False"
+        done: true
+      - description: "test_skip_flag_returns_true: skip=True -> True regardless of file state"
+        done: true
+      - description: "test_reads_and_strips_fingerprint: fingerprint file with trailing newline handled correctly"
+        done: true
 
 must_preserve:
-  - "test_release_infrastructure.py continues passing unchanged"
-  - "test_release_sync.py continues passing unchanged"
-  - "No modifications to production code in benchbox/release/ or scripts/"
-  - "All existing tests in tests/ continue passing"
+- "test_release_infrastructure.py continues passing unchanged"
+- "test_release_sync.py continues passing unchanged"
+- "No modifications to production code in benchbox/release/ or scripts/"
+- "All existing tests in tests/ continue passing"
 
 approach: |
   Follow existing patterns from test_release_sync.py: class-based grouping, tmp_path fixture for
@@ -332,62 +373,71 @@ approach: |
   - test_release_scripts.py: import parse_timestamp, run_pre_flight_checks, run_ci_checks from automate_release; calculate_sha256, verify_wheel_timestamps from build_release; verify_wheel_fingerprint from verify_release; git_commit_with_timestamp, git_tag_with_timestamp, verify_git_status, archive_release_artifacts, verify_source_fingerprint from finalize_release
 
 anti_patterns:
-  - "DO NOT run real 'uv build' in unit tests — because builds take 10+ seconds and require full toolchain — use zipfile.ZipFile to create fake wheel archives instead"
-  - "DO NOT modify any production code to make it more testable — because these are public interfaces that should be tested as-is — test the interfaces as they exist"
-  - "DO NOT create integration tests that require git repos or network — because these are unit tests that must run fast and offline — mock subprocess.run for all git operations"
-  - "DO NOT use @pytest.mark.slow — because all these tests should complete in <30s total — use tmp_path and mocks to keep everything fast"
-  - "DO NOT import scripts using importlib or exec() hacks — because scripts already use sys.path.insert for their own imports — mirror that pattern with a simple sys.path.insert in the test file"
+- "DO NOT run real 'uv build' in unit tests — because builds take 10+ seconds and require full toolchain — use zipfile.ZipFile
+  to create fake wheel archives instead"
+- "DO NOT modify any production code to make it more testable — because these are public interfaces that should be tested
+  as-is — test the interfaces as they exist"
+- "DO NOT create integration tests that require git repos or network — because these are unit tests that must run fast and
+  offline — mock subprocess.run for all git operations"
+- "DO NOT use @pytest.mark.slow — because all these tests should complete in <30s total — use tmp_path and mocks to keep everything
+  fast"
+- "DO NOT import scripts using importlib or exec() hacks — because scripts already use sys.path.insert for their own imports
+  — mirror that pattern with a simple sys.path.insert in the test file"
 
 verification:
-  - description: "All new release tests pass"
-    command: "uv run -- python -m pytest tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py -v"
-    expected_output: "all tests pass, 0 failures"
-  - description: "All new tests are marked fast"
-    command: "uv run -- python -m pytest tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py -v -m fast"
-    expected_output: "same number of tests as without -m fast filter"
-  - description: "Coverage improvement on release modules"
-    command: "uv run -- python -m pytest tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py -v -p pytest_cov --cov=benchbox.release --cov-report=term-missing"
-    expected_output: "significant coverage increase for benchbox/release/workflow.py and benchbox/release/content_validation.py"
-  - description: "Existing release tests still pass"
-    command: "uv run -- python -m pytest tests/unit/test_release_infrastructure.py tests/unit/test_release_sync.py -v"
-    expected_output: "all tests pass, 0 failures"
-  - description: "No lint errors"
-    command: "uv run ruff check tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py"
-    expected_output: "All checks passed"
+- description: "All new release tests pass"
+  command: "uv run -- python -m pytest tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py
+    tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py -v"
+  expected_output: "all tests pass, 0 failures"
+- description: "All new tests are marked fast"
+  command: "uv run -- python -m pytest tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py
+    tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py -v -m fast"
+  expected_output: "same number of tests as without -m fast filter"
+- description: "Coverage improvement on release modules"
+  command: "uv run -- python -m pytest tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py
+    tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py -v -p pytest_cov --cov=benchbox.release --cov-report=term-missing"
+  expected_output: "significant coverage increase for benchbox/release/workflow.py and benchbox/release/content_validation.py"
+- description: "Existing release tests still pass"
+  command: "uv run -- python -m pytest tests/unit/test_release_infrastructure.py tests/unit/test_release_sync.py -v"
+  expected_output: "all tests pass, 0 failures"
+- description: "No lint errors"
+  command: "uv run ruff check tests/unit/test_release_fingerprint.py tests/unit/test_release_timestamps.py tests/unit/test_content_validation.py
+    tests/unit/test_release_size_check.py tests/unit/test_release_scripts.py"
+  expected_output: "All checks passed"
 
 scope_limit:
   only_modify:
-    - "tests/unit/test_release_fingerprint.py"
-    - "tests/unit/test_release_timestamps.py"
-    - "tests/unit/test_content_validation.py"
-    - "tests/unit/test_release_size_check.py"
-    - "tests/unit/test_release_scripts.py"
-    - "tests/unit/conftest.py"
+  - "tests/unit/test_release_fingerprint.py"
+  - "tests/unit/test_release_timestamps.py"
+  - "tests/unit/test_content_validation.py"
+  - "tests/unit/test_release_size_check.py"
+  - "tests/unit/test_release_scripts.py"
+  - "tests/unit/conftest.py"
   do_not_modify:
-    - "benchbox/release/workflow.py"
-    - "benchbox/release/content_validation.py"
-    - "scripts/automate_release.py"
-    - "scripts/build_release.py"
-    - "scripts/verify_release.py"
-    - "scripts/finalize_release.py"
-    - "tests/unit/test_release_infrastructure.py"
-    - "tests/unit/test_release_sync.py"
+  - "benchbox/release/workflow.py"
+  - "benchbox/release/content_validation.py"
+  - "scripts/automate_release.py"
+  - "scripts/build_release.py"
+  - "scripts/verify_release.py"
+  - "scripts/finalize_release.py"
+  - "tests/unit/test_release_infrastructure.py"
+  - "tests/unit/test_release_sync.py"
 
 files_affected:
   added:
-    - "tests/unit/test_release_fingerprint.py"
-    - "tests/unit/test_release_timestamps.py"
-    - "tests/unit/test_content_validation.py"
-    - "tests/unit/test_release_size_check.py"
-    - "tests/unit/test_release_scripts.py"
+  - "tests/unit/test_release_fingerprint.py"
+  - "tests/unit/test_release_timestamps.py"
+  - "tests/unit/test_content_validation.py"
+  - "tests/unit/test_release_size_check.py"
+  - "tests/unit/test_release_scripts.py"
   modified: []
 
 dependencies:
   blocks: []
   blocked_by: []
   related:
-    - "test_release_infrastructure.py"
-    - "test_release_sync.py"
+  - "test_release_infrastructure.py"
+  - "test_release_sync.py"
 
 impact:
   business_value: |
@@ -429,18 +479,18 @@ context_sections:
 
 metadata:
   tags:
-    - testing
-    - release
-    - fingerprinting
-    - content-validation
-    - reproducible-builds
+  - testing
+  - release
+  - fingerprinting
+  - content-validation
+  - reproducible-builds
   estimated_effort: "3-4 days"
   created_date: "2026-02-06"
 
 success_metrics:
-  - "All ~160 test cases pass on first CI run"
-  - "benchbox/release/workflow.py coverage for fingerprint/timestamp/size functions >90%"
-  - "benchbox/release/content_validation.py coverage >80%"
-  - "Script function coverage for tested functions >80%"
-  - "Total test runtime for all 5 new files <30 seconds"
-  - "Zero modifications to production code"
+- "All ~160 test cases pass on first CI run"
+- "benchbox/release/workflow.py coverage for fingerprint/timestamp/size functions >90%"
+- "benchbox/release/content_validation.py coverage >80%"
+- "Script function coverage for tested functions >80%"
+- "Total test runtime for all 5 new files <30 seconds"
+- "Zero modifications to production code"

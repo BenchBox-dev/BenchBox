@@ -1,9 +1,10 @@
+id: prepare-project-for-publication
 title: Prepare Project for Publication
 worktree: release-readiness
 category: Project Lifecycle Management
 priority: High
 status: Completed
-completed_date: "2025-11-27"
+completed_date: '2025-11-27'
 description: Create a clean version of this project for first-time public release
 impact: Prepares project for first-time public distribution with clean history and sanitized content
 tasks:
@@ -29,17 +30,24 @@ tasks:
   done: true
   notes: init_git=True stages all files; commit message left to user
 sections:
-  - name: Implementation Summary
-    content: |
-      Already implemented via:
-      - benchbox/release/workflow.py: prepare_public_release() function
-      - scripts/prepare_release.py: CLI script for running the release preparation
-      - tests/unit/release/test_workflow.py: Test coverage for release workflow
+  Implementation Summary: 'Already implemented via:
 
-      Usage: python scripts/prepare_release.py ../project-public --version 1.0.0 --init-git
+    - benchbox/release/workflow.py: prepare_public_release() function
 
-      Features:
-      - Copies only ALLOWED_ROOT_FILES (benchbox, tests, docs, README, LICENSE, etc.)
-      - Normalizes timestamps to Saturday midnight UTC for reproducibility
-      - Writes standard .gitignore
-      - Optional git initialization and staging
+    - scripts/prepare_release.py: CLI script for running the release preparation
+
+    - tests/unit/release/test_workflow.py: Test coverage for release workflow
+
+
+    Usage: python scripts/prepare_release.py ../project-public --version 1.0.0 --init-git
+
+
+    Features:
+
+    - Copies only ALLOWED_ROOT_FILES (benchbox, tests, docs, README, LICENSE, etc.)
+
+    - Normalizes timestamps to Saturday midnight UTC for reproducibility
+
+    - Writes standard .gitignore
+
+    - Optional git initialization and staging'

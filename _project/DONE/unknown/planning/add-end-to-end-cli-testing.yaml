@@ -1,0 +1,31 @@
+id: add-end-to-end-cli-testing
+title: ✅ Add End-to-End CLI Testing
+category: Project Lifecycle Management
+sections:
+  Notes: '- "**Priority**: High"
+
+    - "**Status**: Completed ✅"
+
+    - "**Description**: Added subprocess-driven smoke coverage to verify the CLI works when invoked as an actual module, complementing
+    the existing Click runner unit tests."
+
+    - "**Highlights**:"
+
+    - "**Files Affected**:"
+
+    - "**Tests**:"'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Priority**: High"
+
+  - "**Status**: Completed ✅"
+
+  - "**Description**: Added subprocess-driven smoke coverage to verify the CLI works when invoked as an actual module, complementing
+  the existing Click runner unit tests."
+
+  - "**Highlights**:"
+
+  - "**Files Affected**:"
+
+  - "**Tests**:"'

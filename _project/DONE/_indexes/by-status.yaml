@@ -1,77 +1,22 @@
-generated_at: '2026-02-09T08:10:11.630635'
-total_items: 426
+generated_at: '2026-02-09T08:39:29.720819'
+total_items: 437
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: add-time-series-benchmark-suite-tsbs-implementation
       file: DONE/benchmark-expansion/active/add-time-series-benchmark-suite-tsbs-implementation.yaml
       title: Add Time Series Benchmark Suite (TSBS) Implementation
       priority: Medium
       category: Core Functionality
+    - id: compare-command-ux-improvements
+      file: DONE/ux-improvements/active/compare-command-ux-improvements.yaml
+      title: Compare Command UX Improvements
+      priority: High
+      category: Usability
   Not Started:
-    count: 140
+    count: 43
     items:
-    - id: cli-test-coverage-enhancement-to-80
-      file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
-      title: '"CLI Test Coverage Enhancement to 80%"'
-      priority: Medium
-      category: Testing and Quality Assurance
-    - id: cli-detect-and-skip-unneeded-data-generation-2
-      file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
-      title: '"CLI: Detect and Skip Unneeded Data Generation ✅"'
-      priority: Medium
-      category: Core Functionality
-    - id: complete-tpc-di-implementation-phase-1-core-schema-completion
-      file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
-      title: '"Complete TPC-DI Implementation - Phase 1: Core Schema Completion ✅"'
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: complete-tpc-di-implementation-phase-2-query-suite-development
-      file: DONE/unknown/planning/complete-tpc-di-implementation-phase-2-query-suite-development.yaml
-      title: '"Complete TPC-DI Implementation - Phase 2: Query Suite Development"'
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: complete-tpc-di-implementation-phase-3-etl-pipeline-enhancement
-      file: DONE/unknown/planning/complete-tpc-di-implementation-phase-3-etl-pipeline-enhancement.yaml
-      title: '"Complete TPC-DI Implementation - Phase 3: ETL Pipeline Enhancement ✅"'
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: complete-tpc-di-implementation-phase-4-validation-and-testing-completed
-      file: DONE/unknown/planning/complete-tpc-di-implementation-phase-4-validation-and-testing-completed.yaml
-      title: '"Complete TPC-DI Implementation - Phase 4: Validation and Testing ✅ COMPLETED"'
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: improve-core-test-coverage-to-80-benchbox-core
-      file: DONE/unknown/planning/improve-core-test-coverage-to-80-benchbox-core.yaml
-      title: '"Improve Core Test Coverage to 80% (benchbox/core) ✅"'
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: tpc-ds-dry-run-execute-real-test-sql-capture-power-throughput-maintenance
-      file: DONE/unknown/planning/tpc-ds-dry-run-execute-real-test-sql-capture-power-throughput-maintenance.yaml
-      title: '"TPC-DS Dry Run: Execute Real Test SQL Capture (Power/Throughput/Maintenance) ✅"'
-      priority: Medium
-      category: Core Functionality
-    - id: technical-debt-refactoring-completed
-      file: DONE/unknown/planning/technical-debt-refactoring-completed.yaml
-      title: '"Technical Debt & Refactoring - COMPLETED ✅"'
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: version-management-consistency-2
-      file: DONE/unknown/planning/version-management-consistency-2.yaml
-      title: '"Version Management & Consistency"'
-      priority: Medium
-      category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: add-global-quiet-mode-quiet-q-to-suppress-all-output
-      file: DONE/unknown/planning/add-global-quiet-mode-quiet-q-to-suppress-all-output.yaml
-      title: '"✅ Add Global Quiet Mode (`--quiet`/`-q`) to Suppress All Output"'
-      priority: Medium
-      category: Project Lifecycle Management
-    - id: unify-results-models-single-benchmarkresults
-      file: DONE/unknown/planning/unify-results-models-single-benchmarkresults.yaml
-      title: '"✅ Unify Results Models: Single `BenchmarkResults`"'
-      priority: Medium
-      category: Project Lifecycle Management
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
       title: AI/ML Primitives Benchmark - SQL-Based AI Functions
@@ -142,11 +87,6 @@ statuses:
       title: Add --verbose/-v option to interactive wizard
       priority: Low
       category: User Experience
-    - id: add-coffee-shop-benchmark-implementation
-      file: DONE/unknown/planning/add-coffee-shop-benchmark-implementation.yaml
-      title: Add Coffee Shop Benchmark Implementation
-      priority: Medium
-      category: Core Functionality
     - id: pyspark-sql-tests
       file: DONE/dataframe-expansion/planning/pyspark-sql-tests.yaml
       title: Add comprehensive tests for PySpark SQL adapter
@@ -157,86 +97,16 @@ statuses:
       title: Add open table format selection to CLI interactive mode
       priority: Medium
       category: User Experience
-    - id: auto-compile-tpc-binary-tools-completed
-      file: DONE/unknown/planning/auto-compile-tpc-binary-tools-completed.yaml
-      title: Auto-Compile TPC Binary Tools ✅ COMPLETED
-      priority: Medium
-      category: Core Functionality
     - id: benchbox-mcp-server-implementation
       file: DONE/mcp-server-integration/planning/benchbox-mcp-server-implementation.yaml
       title: BenchBox MCP Server for AI Agent Integration
       priority: High
       category: Supporting Infrastructure
-    - id: cli-data-only-and-load-only-execution-options
-      file: DONE/unknown/planning/cli-data-only-and-load-only-execution-options.yaml
-      title: CLI Data-Only and Load-Only Execution Options
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: cli-guided-run-enhancements-completed
-      file: DONE/unknown/planning/cli-guided-run-enhancements-completed.yaml
-      title: CLI Guided Run Enhancements ✅ COMPLETED
-      priority: Medium
-      category: New Feature Requests
-    - id: cli-verbose-logging-mode-completed
-      file: DONE/unknown/planning/cli-verbose-logging-mode-completed.yaml
-      title: CLI Verbose Logging Mode ✅ COMPLETED
-      priority: Medium
-      category: Code Quality and Documentation
-    - id: circular-import-issues-completed
-      file: DONE/unknown/planning/circular-import-issues-completed.yaml
-      title: Circular Import Issues ✅ COMPLETED
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: comprehensive-platform-adapter-testing-completed
-      file: DONE/unknown/planning/comprehensive-platform-adapter-testing-completed.yaml
-      title: Comprehensive Platform Adapter Testing ✅ COMPLETED
-      priority: Medium
-      category: Testing and Quality Assurance
-    - id: compressed-data-generation-gaps-all-benchmarks
-      file: DONE/unknown/planning/compressed-data-generation-gaps-all-benchmarks.yaml
-      title: Compressed Data Generation Gaps (all benchmarks) ✅
-      priority: Medium
-      category: Data Quality and Compatibility Issues
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
-      title: Compressed Data Generation ✅ COMPLETED
-      priority: Medium
-      category: Performance and Efficiency
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
-      title: Compressed Data Generation ✅ COMPLETED
-      priority: Medium
-      category: Performance and Efficiency
-    - id: concurrent-queries-configuration-completed
-      file: DONE/unknown/planning/concurrent-queries-configuration-completed.yaml
-      title: Concurrent Queries Configuration ✅ COMPLETED
-      priority: Medium
-      category: New Feature Requests
-    - id: connection-parameter-conflicts-in-tpc-test-methods
-      file: DONE/unknown/planning/connection-parameter-conflicts-in-tpc-test-methods.yaml
-      title: Connection Parameter Conflicts in TPC Test Methods
-      priority: Medium
-      category: Bug Fixes
-    - id: copyright-and-license-declaration-updates-completed
-      file: DONE/unknown/planning/copyright-and-license-declaration-updates-completed.yaml
-      title: Copyright and License Declaration Updates ✅ COMPLETED
-      priority: Medium
-      category: Legal and Licensing
     - id: create-comprehensive-dataframe-documentation
       file: DONE/dataframe-docs/planning/create-comprehensive-dataframe-documentation.yaml
       title: Create Comprehensive DataFrame Documentation
       priority: High
       category: Documentation
-    - id: create-tuning-configuration-variants-for-benchmark-examples-completed
-      file: DONE/unknown/planning/create-tuning-configuration-variants-for-benchmark-examples-completed.yaml
-      title: Create Tuning Configuration Variants for Benchmark Examples ✅ COMPLETED
-      priority: Medium
-      category: Project Lifecycle Management
-    - id: create-unified-multi-platform-benchmark-runner-completed
-      file: DONE/unknown/planning/create-unified-multi-platform-benchmark-runner-completed.yaml
-      title: Create Unified Multi-Platform Benchmark Runner - COMPLETED ✅
-      priority: Medium
-      category: Data Quality and Compatibility Issues
     - id: dataframe-dependency-resolution-and-optional-groups-strategy
       file: DONE/dataframe-phase0-deps/planning/dataframe-dependency-resolution-and-optional-groups-strategy.yaml
       title: DataFrame Dependency Resolution and Optional Groups Strategy
@@ -257,81 +127,11 @@ statuses:
       title: DataFusion DataFrame Adapter Implementation
       priority: Medium
       category: Platform Enhancement
-    - id: database-reuse-optimization-for-primitives-and-tpchavoc-benchmarks
-      file: DONE/unknown/planning/database-reuse-optimization-for-primitives-and-tpchavoc-benchmarks.yaml
-      title: Database Reuse Optimization for Primitives and TPCHavoc Benchmarks
-      priority: Medium
-      category: Project Lifecycle Management
-    - id: database-tuning-configuration-completed
-      file: DONE/unknown/planning/database-tuning-configuration-completed.yaml
-      title: Database Tuning Configuration ✅ COMPLETED
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: database-validation-and-enhanced-results-completed
-      file: DONE/unknown/planning/database-validation-and-enhanced-results-completed.yaml
-      title: Database Validation and Enhanced Results ✅ COMPLETED
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: databricks-example-modernization-completed
-      file: DONE/unknown/planning/databricks-example-modernization-completed.yaml
-      title: Databricks Example Modernization ✅ COMPLETED
-      priority: Medium
-      category: Platform Support and Deployment
-    - id: distinct-database-naming-based-on-configuration-characteristics
-      file: DONE/unknown/planning/distinct-database-naming-based-on-configuration-characteristics.yaml
-      title: Distinct Database Naming Based on Configuration Characteristics
-      priority: Medium
-      category: Project Lifecycle Management
     - id: pyspark-sql-documentation
       file: DONE/dataframe-expansion/planning/pyspark-sql-documentation.yaml
       title: Document PySpark SQL mode usage
       priority: Medium
       category: Documentation
-    - id: dry-run-feature-completed
-      file: DONE/unknown/planning/dry-run-feature-completed.yaml
-      title: Dry Run Feature ✅ COMPLETED
-      priority: Medium
-      category: New Feature Requests
-    - id: duckdb-example-modernization-completed
-      file: DONE/unknown/planning/duckdb-example-modernization-completed.yaml
-      title: DuckDB Example Modernization ✅ COMPLETED
-      priority: Medium
-      category: Platform Support and Deployment
-    - id: duckdb-tpc-ds-and-tpc-h-example-updates-for-enhanced-tuning-completed
-      file: DONE/unknown/planning/duckdb-tpc-ds-and-tpc-h-example-updates-for-enhanced-tuning-completed.yaml
-      title: DuckDB TPC-DS and TPC-H Example Updates for Enhanced Tuning ✅ COMPLETED
-      priority: Medium
-      category: Platform Support and Deployment
-    - id: enable-fractional-scale-factor-support
-      file: DONE/unknown/planning/enable-fractional-scale-factor-support.yaml
-      title: Enable Fractional Scale Factor Support
-      priority: Medium
-      category: Data Quality and Compatibility Issues
-    - id: enable-ssb-clickhouse-embedded-platform-support
-      file: DONE/unknown/planning/enable-ssb-clickhouse-embedded-platform-support.yaml
-      title: Enable SSB ClickHouse Embedded Platform Support
-      priority: Medium
-      category: Data Quality and Compatibility Issues
-    - id: enhanced-cli-preflight-data-validation-for-tpc-ds-generation-completed
-      file: DONE/unknown/planning/enhanced-cli-preflight-data-validation-for-tpc-ds-generation-completed.yaml
-      title: Enhanced CLI Preflight Data Validation for TPC-DS Generation - COMPLETED ✅
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: example-modernization-completed
-      file: DONE/unknown/planning/example-modernization-completed.yaml
-      title: Example Modernization ✅ COMPLETED
-      priority: Medium
-      category: New Feature Requests
-    - id: example-tuning-configuration-integration-completed
-      file: DONE/unknown/planning/example-tuning-configuration-integration-completed.yaml
-      title: Example Tuning Configuration Integration ✅ COMPLETED
-      priority: Medium
-      category: New Feature Requests
-    - id: examples-code-duplication-consolidation
-      file: DONE/unknown/planning/examples-code-duplication-consolidation.yaml
-      title: Examples Code Duplication Consolidation
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: expand-plan-fingerprint-verification
       file: DONE/query-plan-remediation/planning/expand-plan-fingerprint-verification.yaml
       title: Expand query plan fingerprint coverage and verification
@@ -342,41 +142,6 @@ statuses:
       title: Extract SparkSessionManager for shared PySpark session management
       priority: High
       category: Platform Expansion
-    - id: fix-cli-benchmarks-module-critical-issues
-      file: DONE/unknown/planning/fix-cli-benchmarks-module-critical-issues.yaml
-      title: Fix CLI Benchmarks Module Critical Issues
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: fix-cli-orchestrator-module-critical-issues
-      file: DONE/unknown/planning/fix-cli-orchestrator-module-critical-issues.yaml
-      title: Fix CLI Orchestrator Module Critical Issues
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: fix-cli-power-throughput-test-execution-and-tuning-configuration-issues
-      file: DONE/unknown/planning/fix-cli-power-throughput-test-execution-and-tuning-configuration-issues.yaml
-      title: Fix CLI Power/Throughput Test Execution and Tuning Configuration Issues
-      priority: Medium
-      category: Core Functionality
-    - id: fix-clickhouse-platform-issues
-      file: DONE/unknown/planning/fix-clickhouse-platform-issues.yaml
-      title: Fix ClickHouse Platform Issues
-      priority: Medium
-      category: Project Lifecycle Management
-    - id: fix-tpc-power-throughput-maintenance-test-implementation-tpc-h-and-tpc-ds
-      file: DONE/unknown/planning/fix-tpc-power-throughput-maintenance-test-implementation-tpc-h-and-tpc-ds.yaml
-      title: Fix TPC Power/Throughput/Maintenance Test Implementation (TPC-H and TPC-DS) ✅
-      priority: Medium
-      category: Core Functionality
-    - id: fix-tpc-ds-cli-file-format-inconsistency-issue
-      file: DONE/unknown/planning/fix-tpc-ds-cli-file-format-inconsistency-issue.yaml
-      title: Fix TPC-DS CLI File Format Inconsistency Issue ✅
-      priority: Medium
-      category: Core Functionality
-    - id: fix-tpc-ds-test-mode-cli-dry-run-output-to-show-actual-execution-plans
-      file: DONE/unknown/planning/fix-tpc-ds-test-mode-cli-dry-run-output-to-show-actual-execution-plans.yaml
-      title: Fix TPC-DS Test Mode CLI Dry Run Output to Show Actual Execution Plans ✅
-      priority: Medium
-      category: Core Functionality
     - id: gpu-acceleration-benchmarking-rapids-cudf-integration
       file: DONE/ai-ml-gpu/planning/gpu-acceleration-benchmarking-rapids-cudf-integration.yaml
       title: GPU Acceleration Benchmarking & RAPIDS cuDF Integration
@@ -407,16 +172,6 @@ statuses:
       title: Implement schema creation with SQLGlot translation for PySpark
       priority: High
       category: Platform Expansion
-    - id: improve-benchmark-execution-reliability
-      file: DONE/unknown/planning/improve-benchmark-execution-reliability.yaml
-      title: Improve Benchmark Execution Reliability
-      priority: Medium
-      category: Project Lifecycle Management
-    - id: integration-test-suite-cleanup-remove-placeholder-and-failing-tests
-      file: DONE/unknown/planning/integration-test-suite-cleanup-remove-placeholder-and-failing-tests.yaml
-      title: Integration Test Suite Cleanup - Remove Placeholder and Failing Tests
-      priority: High
-      category: Testing and Quality Assurance
     - id: duckdb-text-plan-reliability
       file: DONE/query-plan-remediation/planning/duckdb-text-plan-reliability.yaml
       title: Make DuckDB text plan parsing reliable or fail fast
@@ -432,21 +187,6 @@ statuses:
       title: Metadata Primitives Complexity Enhancements
       priority: High
       category: Benchmark Development
-    - id: minimize-emoji-usage-completed
-      file: DONE/unknown/planning/minimize-emoji-usage-completed.yaml
-      title: Minimize Emoji Usage ✅ COMPLETED
-      priority: Medium
-      category: Code Quality and Documentation
-    - id: notimplementederror-completions-completed
-      file: DONE/unknown/planning/notimplementederror-completions-completed.yaml
-      title: NotImplementedError Completions ✅ COMPLETED
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: optimize-benchmark-results-json-output-format
-      file: DONE/unknown/planning/optimize-benchmark-results-json-output-format.yaml
-      title: Optimize Benchmark Results JSON Output Format
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: pt-02-tuning-config-enhancements
       file: DONE/physical-tuning/planning/pt-02-tuning-config-enhancements.yaml
       title: 'PT-02: Tuning Configuration Schema Enhancements'
@@ -487,231 +227,11 @@ statuses:
       title: 'PT-09: BigQuery Physical Tuning DDL Generator Enhancement'
       priority: Medium
       category: Platform Expansion
-    - id: platform-adapter-abstract-method-implementation-completed
-      file: DONE/unknown/planning/platform-adapter-abstract-method-implementation-completed.yaml
-      title: Platform Adapter Abstract Method Implementation ✅ COMPLETED
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: platform-adapter-tuning-implementation-completed
-      file: DONE/unknown/planning/platform-adapter-tuning-implementation-completed.yaml
-      title: Platform Adapter Tuning Implementation ✅ COMPLETED
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: platform-adapter-and-core-module-code-consolidation
-      file: DONE/unknown/planning/platform-adapter-and-core-module-code-consolidation.yaml
-      title: Platform Adapter and Core Module Code Consolidation
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: platform-documentation-and-extension-guide-completed
-      file: DONE/unknown/planning/platform-documentation-and-extension-guide-completed.yaml
-      title: Platform Documentation and Extension Guide ✅ COMPLETED
-      priority: Medium
-      category: Code Quality and Documentation
-    - id: power-run-iterations-configuration-completed
-      file: DONE/unknown/planning/power-run-iterations-configuration-completed.yaml
-      title: Power Run Iterations Configuration ✅ COMPLETED
-      priority: Medium
-      category: New Feature Requests
-    - id: pre-compile-tpc-binaries-for-multiple-platforms-completed
-      file: DONE/unknown/planning/pre-compile-tpc-binaries-for-multiple-platforms-completed.yaml
-      title: Pre-Compile TPC Binaries for Multiple Platforms ✅ COMPLETED
-      priority: Medium
-      category: Core Functionality
-    - id: refactor-validation-logic-from-cli-to-core-module-completed
-      file: DONE/unknown/planning/refactor-validation-logic-from-cli-to-core-module-completed.yaml
-      title: Refactor Validation Logic from CLI to Core Module - COMPLETED ✅
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: refactor-and-simplify-tpc-compilation-infrastructure-completed
-      file: DONE/unknown/planning/refactor-and-simplify-tpc-compilation-infrastructure-completed.yaml
-      title: Refactor and Simplify TPC Compilation Infrastructure ✅ COMPLETED
-      priority: Medium
-      category: Core Functionality
     - id: pyspark-sql-registry-integration
       file: DONE/dataframe-expansion/planning/pyspark-sql-registry-integration.yaml
       title: Register PySpark SQL mode in platform registry
       priority: High
       category: Platform Expansion
-    - id: remove-excessive-adjective-adverb-usage
-      file: DONE/unknown/planning/remove-excessive-adjective-adverb-usage.yaml
-      title: Remove Excessive Adjective/Adverb Usage
-      priority: Medium
-      category: Code Quality and Documentation
-    - id: remove-tpc-di-streaming-code-and-delegate-to-databases-completed
-      file: DONE/unknown/planning/remove-tpc-di-streaming-code-and-delegate-to-databases-completed.yaml
-      title: Remove TPC-DI Streaming Code and Delegate to Databases ✅ COMPLETED
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: remove-tpc-h-parallel-file-merging-anti-pattern
-      file: DONE/unknown/planning/remove-tpc-h-parallel-file-merging-anti-pattern.yaml
-      title: Remove TPC-H Parallel File Merging Anti-Pattern
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: restrict-primary-foreign-key-configuration-to-tuning-yaml-only
-      file: DONE/unknown/planning/restrict-primary-foreign-key-configuration-to-tuning-yaml-only.yaml
-      title: Restrict Primary/Foreign Key Configuration to tuning.yaml Only
-      priority: Medium
-      category: Project Lifecycle Management
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
-      title: Simple Cloud Storage Path Support ✅ COMPLETED
-      priority: Medium
-      category: Platform Support and Deployment
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
-      title: Simple Cloud Storage Path Support ✅ COMPLETED
-      priority: Medium
-      category: Platform Support and Deployment
-    - id: smart-data-generation-completed
-      file: DONE/unknown/planning/smart-data-generation-completed.yaml
-      title: Smart Data Generation ✅ COMPLETED
-      priority: Medium
-      category: Performance and Efficiency
-    - id: standardize-benchmark-constraint-parameter-apis
-      file: DONE/unknown/planning/standardize-benchmark-constraint-parameter-apis.yaml
-      title: Standardize Benchmark Constraint Parameter APIs
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: standardize-connection-interfaces-across-all-benchmarks
-      file: DONE/unknown/planning/standardize-connection-interfaces-across-all-benchmarks.yaml
-      title: Standardize Connection Interfaces Across All Benchmarks
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com
-      file: DONE/unknown/planning/standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com.yaml
-      title: Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED
-      priority: Medium
-      category: Core Functionality
-    - id: switch-tpc-ds-base-dialect-from-ansi-to-netezza-2
-      file: DONE/unknown/planning/switch-tpc-ds-base-dialect-from-ansi-to-netezza-2.yaml
-      title: Switch TPC-DS Base Dialect from ANSI to Netezza ✅
-      priority: Medium
-      category: Core Functionality
-    - id: switch-tpc-ds-base-dialect-from-ansi-to-netezza
-      file: DONE/unknown/planning/switch-tpc-ds-base-dialect-from-ansi-to-netezza.yaml
-      title: Switch TPC-DS Base Dialect from ANSI to Netezza ✅                                                                 │
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: tpc-specification-compliance-issues-completed
-      file: DONE/unknown/planning/tpc-specification-compliance-issues-completed.yaml
-      title: TPC Specification Compliance Issues ✅ COMPLETED
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: tpc-ds-stream-management-implementation
-      file: DONE/unknown/planning/tpc-ds-stream-management-implementation.yaml
-      title: TPC-DS Stream Management Implementation ✅
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: tpc-ds-streaming-data-generation-compression
-      file: DONE/unknown/planning/tpc-ds-streaming-data-generation-compression.yaml
-      title: TPC-DS Streaming Data Generation Compression ✅
-      priority: Medium
-      category: Performance and Efficiency
-    - id: tpc-h-stream-processing-implementation
-      file: DONE/unknown/planning/tpc-h-stream-processing-implementation.yaml
-      title: TPC-H Stream Processing Implementation ✅
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: table-tuning-interface-completed
-      file: DONE/unknown/planning/table-tuning-interface-completed.yaml
-      title: Table Tuning Interface ✅ COMPLETED
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: test-suite-reliability-completed
-      file: DONE/unknown/planning/test-suite-reliability-completed.yaml
-      title: Test Suite Reliability ✅ COMPLETED
-      priority: Medium
-      category: Testing and Quality Assurance
-    - id: unified-tuning-configuration-system-completed
-      file: DONE/unknown/planning/unified-tuning-configuration-system-completed.yaml
-      title: Unified Tuning Configuration System ✅ COMPLETED
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: add-end-to-end-cli-testing
-      file: DONE/unknown/planning/add-end-to-end-cli-testing.yaml
-      title: ✅ Add End-to-End CLI Testing
-      priority: Medium
-      category: Project Lifecycle Management
-    - id: add-platform-info-to-benchmark-results
-      file: DONE/unknown/planning/add-platform-info-to-benchmark-results.yaml
-      title: ✅ Add platform_info to Benchmark Results
-      priority: Medium
-      category: Core Functionality
-    - id: address-outstanding-todos
-      file: DONE/unknown/planning/address-outstanding-todos.yaml
-      title: ✅ Address Outstanding TODOs
-      priority: Medium
-      category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: cli-platform-adapter-management-feature
-      file: DONE/unknown/planning/cli-platform-adapter-management-feature.yaml
-      title: ✅ CLI Platform Adapter Management Feature
-      priority: Medium
-      category: '"Technical Debt & Refactoring"'
-    - id: clickbench-empty-string-vs-null-constraint-issue-completed
-      file: DONE/unknown/planning/clickbench-empty-string-vs-null-constraint-issue-completed.yaml
-      title: ✅ ClickBench Empty String vs NULL Constraint Issue (COMPLETED)
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: document-cli-comprehensively
-      file: DONE/unknown/planning/document-cli-comprehensively.yaml
-      title: ✅ Document CLI Comprehensively
-      priority: Medium
-      category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: implement-clickhouse-embedded-mode-support-via-chdb
-      file: DONE/unknown/planning/implement-clickhouse-embedded-mode-support-via-chdb.yaml
-      title: ✅ Implement ClickHouse Embedded Mode Support via chDB
-      priority: Medium
-      category: Core Functionality
-    - id: implement-core-verbosity-and-quiet-modes-v-vv-and-q
-      file: DONE/unknown/planning/implement-core-verbosity-and-quiet-modes-v-vv-and-q.yaml
-      title: ✅ Implement Core Verbosity and Quiet Modes (-v/-vv and -q)
-      priority: Medium
-      category: Project Lifecycle Management
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
-      title: ✅ Implement or Remove Incomplete CLI Commands
-      priority: Medium
-      category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
-      title: ✅ Implement or Remove Incomplete CLI Commands
-      priority: Medium
-      category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: improve-cli-design
-      file: DONE/unknown/planning/improve-cli-design.yaml
-      title: ✅ Improve CLI Design
-      priority: Medium
-      category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: library-performance-testing
-      file: DONE/unknown/planning/library-performance-testing.yaml
-      title: ✅ Library Performance Testing
-      priority: Medium
-      category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: refactor-enhancedbenchmarkresults-to-core-remove-cli-platform-coupling
-      file: DONE/unknown/planning/refactor-enhancedbenchmarkresults-to-core-remove-cli-platform-coupling.yaml
-      title: ✅ Refactor EnhancedBenchmarkResults to Core (remove CLI/platform coupling)
-      priority: Medium
-      category: Project Lifecycle Management
-    - id: refactor-validation-logic-from-cli-to-core-module
-      file: DONE/unknown/planning/refactor-validation-logic-from-cli-to-core-module.yaml
-      title: ✅ Refactor Validation Logic from CLI to Core Module
-      priority: Medium
-      category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: refactor-unified-runner-to-use-shared-verbosity-no-bare-prints
-      file: DONE/unknown/planning/refactor-unified-runner-to-use-shared-verbosity-no-bare-prints.yaml
-      title: ✅ Refactor unified_runner to Use Shared Verbosity (no bare prints)
-      priority: Medium
-      category: Project Lifecycle Management
-    - id: roll-out-core-verbosity-quiet-across-all-benchmarks-v-vv-q
-      file: DONE/unknown/planning/roll-out-core-verbosity-quiet-across-all-benchmarks-v-vv-q.yaml
-      title: ✅ Roll Out Core Verbosity/Quiet Across All Benchmarks (-v/-vv/-q)
-      priority: Medium
-      category: Project Lifecycle Management
-    - id: sql-query-generation-consistency-tpc-h-tpc-ds
-      file: DONE/unknown/planning/sql-query-generation-consistency-tpc-h-tpc-ds.yaml
-      title: ✅ SQL Query Generation Consistency (TPC-H/TPC-DS)
-      priority: Medium
-      category: Project Lifecycle Management
   Identified:
     count: 2
     items:
@@ -726,8 +246,63 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 282
+    count: 390
     items:
+    - id: cli-test-coverage-enhancement-to-80
+      file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
+      title: '"CLI Test Coverage Enhancement to 80%"'
+      priority: Medium
+      category: Testing and Quality Assurance
+    - id: cli-detect-and-skip-unneeded-data-generation-2
+      file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
+      title: '"CLI: Detect and Skip Unneeded Data Generation ✅"'
+      priority: Medium
+      category: Core Functionality
+    - id: complete-tpc-di-implementation-phase-1-core-schema-completion
+      file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
+      title: '"Complete TPC-DI Implementation - Phase 1: Core Schema Completion ✅"'
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: complete-tpc-di-implementation-phase-2-query-suite-development
+      file: DONE/unknown/planning/complete-tpc-di-implementation-phase-2-query-suite-development.yaml
+      title: '"Complete TPC-DI Implementation - Phase 2: Query Suite Development"'
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: complete-tpc-di-implementation-phase-3-etl-pipeline-enhancement
+      file: DONE/unknown/planning/complete-tpc-di-implementation-phase-3-etl-pipeline-enhancement.yaml
+      title: '"Complete TPC-DI Implementation - Phase 3: ETL Pipeline Enhancement ✅"'
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: complete-tpc-di-implementation-phase-4-validation-and-testing-completed
+      file: DONE/unknown/planning/complete-tpc-di-implementation-phase-4-validation-and-testing-completed.yaml
+      title: '"Complete TPC-DI Implementation - Phase 4: Validation and Testing ✅ COMPLETED"'
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: improve-core-test-coverage-to-80-benchbox-core
+      file: DONE/unknown/planning/improve-core-test-coverage-to-80-benchbox-core.yaml
+      title: '"Improve Core Test Coverage to 80% (benchbox/core) ✅"'
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
+    - id: tpc-ds-dry-run-execute-real-test-sql-capture-power-throughput-maintenance
+      file: DONE/unknown/planning/tpc-ds-dry-run-execute-real-test-sql-capture-power-throughput-maintenance.yaml
+      title: '"TPC-DS Dry Run: Execute Real Test SQL Capture (Power/Throughput/Maintenance) ✅"'
+      priority: Medium
+      category: Core Functionality
+    - id: technical-debt-refactoring-completed
+      file: DONE/unknown/planning/technical-debt-refactoring-completed.yaml
+      title: '"Technical Debt & Refactoring - COMPLETED ✅"'
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
+    - id: version-management-consistency-2
+      file: DONE/unknown/planning/version-management-consistency-2.yaml
+      title: '"Version Management & Consistency"'
+      priority: Medium
+      category: Pre-Release High Priority Tasks (COMPLETED)
+    - id: add-global-quiet-mode-quiet-q-to-suppress-all-output
+      file: DONE/unknown/planning/add-global-quiet-mode-quiet-q-to-suppress-all-output.yaml
+      title: '"✅ Add Global Quiet Mode (`--quiet`/`-q`) to Suppress All Output"'
+      priority: Medium
+      category: Project Lifecycle Management
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
       title: '"✅ CLI: Detect and Skip Unneeded Data Generation"'
@@ -763,6 +338,11 @@ statuses:
       title: '"✅ Standardize Primitives ↔ TPC-H Data Sharing & Manifest Reuse"'
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: unify-results-models-single-benchmarkresults
+      file: DONE/unknown/planning/unify-results-models-single-benchmarkresults.yaml
+      title: '"✅ Unify Results Models: Single `BenchmarkResults`"'
+      priority: Medium
+      category: Project Lifecycle Management
     - id: version-management-consistency
       file: DONE/unknown/completed/version-management-consistency.yaml
       title: '"✅ Version Management & Consistency"'
@@ -793,6 +373,11 @@ statuses:
       title: Add Azure Synapse Adapter
       priority: Medium
       category: Uncategorized
+    - id: add-coffee-shop-benchmark-implementation
+      file: DONE/unknown/planning/add-coffee-shop-benchmark-implementation.yaml
+      title: Add Coffee Shop Benchmark Implementation
+      priority: Medium
+      category: Core Functionality
     - id: datavault-benchmark-implementation
       file: DONE/benchmark-expansion/planning/datavault-benchmark-implementation.yaml
       title: Add Data Vault Benchmark Implementation
@@ -811,6 +396,11 @@ statuses:
     - id: ducklake-open-table-format
       file: DONE/platform-expansion/planning/ducklake-open-table-format.yaml
       title: Add DuckLake Open Table Format Support
+      priority: Medium-High
+      category: Platform Expansion
+    - id: fireducks-dataframe-adapter
+      file: DONE/dataframe-expansion/active/fireducks-dataframe-adapter.yaml
+      title: Add FireDucks DataFrame platform support
       priority: Medium-High
       category: Platform Expansion
     - id: add-firebolt-platform-adapter
@@ -884,12 +474,12 @@ statuses:
       title: Add numbered list selection to platform setup wizard
       priority: Medium-High
       category: User Experience
-    - id: test-stdout-datagen
+    - id: tpcds-stdout-fix-test-stdout-datagen
       file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
       title: Add regression tests for TPC-DS stdout data generation
       priority: High
       category: Testing and Quality Assurance
-    - id: test-stdout-datagen
+    - id: tpch-stdout-fix-test-stdout-datagen
       file: DONE/tpch-stdout-fix/planning/test-stdout-datagen.yaml
       title: Add regression tests for TPC-H stdout data generation
       priority: High
@@ -939,6 +529,11 @@ statuses:
       title: 'Athena: Convert text tables to Parquet using CTAS for query performance'
       priority: Medium-High
       category: Platform Expansion
+    - id: auto-compile-tpc-binary-tools-completed
+      file: DONE/unknown/planning/auto-compile-tpc-binary-tools-completed.yaml
+      title: Auto-Compile TPC Binary Tools ✅ COMPLETED
+      priority: Medium
+      category: Core Functionality
     - id: automated-data-publishing-pipeline
       file: DONE/infrastructure-publishing/planning/automated-data-publishing-pipeline.yaml
       title: Automated Data Publishing Pipeline
@@ -969,6 +564,16 @@ statuses:
       title: Bundle TPC-H/TPC-DS query templates inside package for wheel distribution
       priority: Critical
       category: Core Functionality
+    - id: cli-data-only-and-load-only-execution-options
+      file: DONE/unknown/planning/cli-data-only-and-load-only-execution-options.yaml
+      title: CLI Data-Only and Load-Only Execution Options
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
+    - id: cli-guided-run-enhancements-completed
+      file: DONE/unknown/planning/cli-guided-run-enhancements-completed.yaml
+      title: CLI Guided Run Enhancements ✅ COMPLETED
+      priority: Medium
+      category: New Feature Requests
     - id: cli-help-examples-expansion
       file: DONE/docs-experience/planning/cli-help-examples-expansion.yaml
       title: CLI Help Examples Expansion
@@ -979,6 +584,11 @@ statuses:
       title: CLI Help Examples for Missing Platforms
       priority: High
       category: Documentation and User Experience
+    - id: cli-verbose-logging-mode-completed
+      file: DONE/unknown/planning/cli-verbose-logging-mode-completed.yaml
+      title: CLI Verbose Logging Mode ✅ COMPLETED
+      priority: Medium
+      category: Code Quality and Documentation
     - id: canonicalize-result-schema
       file: DONE/release-readiness/completed/canonicalize-result-schema.yaml
       title: Canonicalize Result Schema
@@ -989,6 +599,11 @@ statuses:
       title: Centralize File Format and Compression Extension Detection
       priority: Medium-High
       category: Core Functionality
+    - id: circular-import-issues-completed
+      file: DONE/unknown/planning/circular-import-issues-completed.yaml
+      title: Circular Import Issues ✅ COMPLETED
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: cloud-platform-error-context
       file: DONE/observability-quality/planning/cloud-platform-error-context.yaml
       title: Cloud Platform Error Message Context
@@ -1029,16 +644,46 @@ statuses:
       title: Comprehensive Documentation Quality Audit
       priority: High
       category: Documentation
+    - id: comprehensive-platform-adapter-testing-completed
+      file: DONE/unknown/planning/comprehensive-platform-adapter-testing-completed.yaml
+      title: Comprehensive Platform Adapter Testing ✅ COMPLETED
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: comprehensive-test-quality-audit
       file: DONE/test-quality-review/active/comprehensive-test-quality-audit.yaml
       title: 'Comprehensive Test Quality Audit: Ensure Meaningful and Distinct Test Coverage'
       priority: High
       category: Testing and Quality Assurance
+    - id: compressed-data-generation-gaps-all-benchmarks
+      file: DONE/unknown/planning/compressed-data-generation-gaps-all-benchmarks.yaml
+      title: Compressed Data Generation Gaps (all benchmarks) ✅
+      priority: Medium
+      category: Data Quality and Compatibility Issues
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+      title: Compressed Data Generation ✅ COMPLETED
+      priority: Medium
+      category: Performance and Efficiency
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+      title: Compressed Data Generation ✅ COMPLETED
+      priority: Medium
+      category: Performance and Efficiency
     - id: concurrency-testing-framework
       file: DONE/enterprise-ops-concurrency/planning/concurrency-testing-framework.yaml
       title: Concurrency Testing Framework
       priority: Medium
       category: Enterprise Operations
+    - id: concurrent-queries-configuration-completed
+      file: DONE/unknown/planning/concurrent-queries-configuration-completed.yaml
+      title: Concurrent Queries Configuration ✅ COMPLETED
+      priority: Medium
+      category: New Feature Requests
+    - id: connection-parameter-conflicts-in-tpc-test-methods
+      file: DONE/unknown/planning/connection-parameter-conflicts-in-tpc-test-methods.yaml
+      title: Connection Parameter Conflicts in TPC Test Methods
+      priority: Medium
+      category: Bug Fixes
     - id: consolidate-result-normalization
       file: DONE/core-functionality/active/consolidate-result-normalization.yaml
       title: Consolidate Duplicated Result JSON Normalization Logic
@@ -1069,11 +714,26 @@ statuses:
       title: Consolidate tuning commands under unified `tuning` group
       priority: Medium
       category: Core Functionality
+    - id: copyright-and-license-declaration-updates-completed
+      file: DONE/unknown/planning/copyright-and-license-declaration-updates-completed.yaml
+      title: Copyright and License Declaration Updates ✅ COMPLETED
+      priority: Medium
+      category: Legal and Licensing
     - id: cost-optimization-engine-automated-recommendations
       file: DONE/cost-intelligence-optimizer/planning/cost-optimization-engine-automated-recommendations.yaml
       title: Cost Optimization Engine - Automated Recommendations
       priority: High
       category: Cost Intelligence
+    - id: create-tuning-configuration-variants-for-benchmark-examples-completed
+      file: DONE/unknown/planning/create-tuning-configuration-variants-for-benchmark-examples-completed.yaml
+      title: Create Tuning Configuration Variants for Benchmark Examples ✅ COMPLETED
+      priority: Medium
+      category: Project Lifecycle Management
+    - id: create-unified-multi-platform-benchmark-runner-completed
+      file: DONE/unknown/planning/create-unified-multi-platform-benchmark-runner-completed.yaml
+      title: Create Unified Multi-Platform Benchmark Runner - COMPLETED ✅
+      priority: Medium
+      category: Data Quality and Compatibility Issues
     - id: timescaledb-first-class-platform
       file: DONE/platform-expansion/active/timescaledb-first-class-platform.yaml
       title: Create first-class TimescaleDB platform adapter
@@ -1124,11 +784,31 @@ statuses:
       title: DataFrame Support Release Preparation
       priority: High
       category: Project Lifecycle Management
+    - id: database-reuse-optimization-for-primitives-and-tpchavoc-benchmarks
+      file: DONE/unknown/planning/database-reuse-optimization-for-primitives-and-tpchavoc-benchmarks.yaml
+      title: Database Reuse Optimization for Primitives and TPCHavoc Benchmarks
+      priority: Medium
+      category: Project Lifecycle Management
+    - id: database-tuning-configuration-completed
+      file: DONE/unknown/planning/database-tuning-configuration-completed.yaml
+      title: Database Tuning Configuration ✅ COMPLETED
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
+    - id: database-validation-and-enhanced-results-completed
+      file: DONE/unknown/planning/database-validation-and-enhanced-results-completed.yaml
+      title: Database Validation and Enhanced Results ✅ COMPLETED
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
     - id: databricks-dataframe-mode
       file: DONE/platform-expansion/active/databricks-dataframe-mode.yaml
       title: Databricks DataFrame Mode - CRITICAL PRIORITY
       priority: Critical
       category: Platform Expansion
+    - id: databricks-example-modernization-completed
+      file: DONE/unknown/planning/databricks-example-modernization-completed.yaml
+      title: Databricks Example Modernization ✅ COMPLETED
+      priority: Medium
+      category: Platform Support and Deployment
     - id: dataframe-write-primitives-model
       file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
       title: Define DataFrame Execution Model for Write Primitives
@@ -1149,6 +829,11 @@ statuses:
       title: Display equivalent CLI command before benchmark execution
       priority: Medium
       category: User Experience
+    - id: distinct-database-naming-based-on-configuration-characteristics
+      file: DONE/unknown/planning/distinct-database-naming-based-on-configuration-characteristics.yaml
+      title: Distinct Database Naming Based on Configuration Characteristics
+      priority: Medium
+      category: Project Lifecycle Management
     - id: document-stdout-patches
       file: DONE/tpcds-docs/document-stdout-patches.yaml
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
@@ -1159,6 +844,21 @@ statuses:
       title: Drop Plotly dependency and HTML chart rendering — go ASCII-only
       priority: High
       category: Core Functionality
+    - id: dry-run-feature-completed
+      file: DONE/unknown/planning/dry-run-feature-completed.yaml
+      title: Dry Run Feature ✅ COMPLETED
+      priority: Medium
+      category: New Feature Requests
+    - id: duckdb-example-modernization-completed
+      file: DONE/unknown/planning/duckdb-example-modernization-completed.yaml
+      title: DuckDB Example Modernization ✅ COMPLETED
+      priority: Medium
+      category: Platform Support and Deployment
+    - id: duckdb-tpc-ds-and-tpc-h-example-updates-for-enhanced-tuning-completed
+      file: DONE/unknown/planning/duckdb-tpc-ds-and-tpc-h-example-updates-for-enhanced-tuning-completed.yaml
+      title: DuckDB TPC-DS and TPC-H Example Updates for Enhanced Tuning ✅ COMPLETED
+      priority: Medium
+      category: Platform Support and Deployment
     - id: e2e-cli-test-suite
       file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
       title: 'E2E CLI Test Suite: Complete Platform Coverage'
@@ -1174,16 +874,31 @@ statuses:
       title: Embed Full Tuning Config in Result Output
       priority: Medium-High
       category: Core Functionality
+    - id: enable-fractional-scale-factor-support
+      file: DONE/unknown/planning/enable-fractional-scale-factor-support.yaml
+      title: Enable Fractional Scale Factor Support
+      priority: Medium
+      category: Data Quality and Compatibility Issues
+    - id: enable-ssb-clickhouse-embedded-platform-support
+      file: DONE/unknown/planning/enable-ssb-clickhouse-embedded-platform-support.yaml
+      title: Enable SSB ClickHouse Embedded Platform Support
+      priority: Medium
+      category: Data Quality and Compatibility Issues
     - id: acl-benchmark-enhancement
       file: DONE/metadata-primitives/phase-2-acl/acl-benchmark-enhancement.yaml
       title: Enhance Metadata Primitives with Access Control (ACL) Performance Testing
-      priority: medium
+      priority: Medium
       category: Uncategorized
     - id: enhance-ascii-charting
       file: DONE/core-functionality/planning/enhance-ascii-charting.yaml
       title: Enhance and extend ASCII charting with new chart types and comparison visualizations
       priority: Medium-High
       category: Core Functionality
+    - id: enhanced-cli-preflight-data-validation-for-tpc-ds-generation-completed
+      file: DONE/unknown/planning/enhanced-cli-preflight-data-validation-for-tpc-ds-generation-completed.yaml
+      title: Enhanced CLI Preflight Data Validation for TPC-DS Generation - COMPLETED ✅
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
     - id: enhanced-resource-monitoring-profiling
       file: DONE/infrastructure-monitoring/planning/enhanced-resource-monitoring-profiling.yaml
       title: Enhanced Resource Monitoring & Profiling
@@ -1215,11 +930,26 @@ statuses:
       title: Evaluate DataFrame Scope for TPC-Havoc
       priority: Medium
       category: Core Functionality
+    - id: example-modernization-completed
+      file: DONE/unknown/planning/example-modernization-completed.yaml
+      title: Example Modernization ✅ COMPLETED
+      priority: Medium
+      category: New Feature Requests
     - id: cloud-platform-example-scripts
       file: DONE/docs-experience/planning/cloud-platform-example-scripts.yaml
       title: Example Scripts for Cloud Platforms
       priority: Medium
       category: Documentation and User Experience
+    - id: example-tuning-configuration-integration-completed
+      file: DONE/unknown/planning/example-tuning-configuration-integration-completed.yaml
+      title: Example Tuning Configuration Integration ✅ COMPLETED
+      priority: Medium
+      category: New Feature Requests
+    - id: examples-code-duplication-consolidation
+      file: DONE/unknown/planning/examples-code-duplication-consolidation.yaml
+      title: Examples Code Duplication Consolidation
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: expand-mcp-tool-surface
       file: DONE/mcp-integration/active/expand-mcp-tool-surface.yaml
       title: Expand MCP tool surface area to match CLI capabilities
@@ -1245,6 +975,26 @@ statuses:
       title: Firebolt Platform Documentation
       priority: High
       category: Documentation and User Experience
+    - id: fix-cli-benchmarks-module-critical-issues
+      file: DONE/unknown/planning/fix-cli-benchmarks-module-critical-issues.yaml
+      title: Fix CLI Benchmarks Module Critical Issues
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: fix-cli-orchestrator-module-critical-issues
+      file: DONE/unknown/planning/fix-cli-orchestrator-module-critical-issues.yaml
+      title: Fix CLI Orchestrator Module Critical Issues
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: fix-cli-power-throughput-test-execution-and-tuning-configuration-issues
+      file: DONE/unknown/planning/fix-cli-power-throughput-test-execution-and-tuning-configuration-issues.yaml
+      title: Fix CLI Power/Throughput Test Execution and Tuning Configuration Issues
+      priority: Medium
+      category: Core Functionality
+    - id: fix-clickhouse-platform-issues
+      file: DONE/unknown/planning/fix-clickhouse-platform-issues.yaml
+      title: Fix ClickHouse Platform Issues
+      priority: Medium
+      category: Project Lifecycle Management
     - id: dask-platform-compatibility
       file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml
       title: Fix Dask DataFrame Platform Compatibility
@@ -1275,6 +1025,21 @@ statuses:
       title: Fix SQL injection vulnerabilities in TimescaleDB adapter
       priority: Critical
       category: Security and Compliance
+    - id: fix-tpc-power-throughput-maintenance-test-implementation-tpc-h-and-tpc-ds
+      file: DONE/unknown/planning/fix-tpc-power-throughput-maintenance-test-implementation-tpc-h-and-tpc-ds.yaml
+      title: Fix TPC Power/Throughput/Maintenance Test Implementation (TPC-H and TPC-DS) ✅
+      priority: Medium
+      category: Core Functionality
+    - id: fix-tpc-ds-cli-file-format-inconsistency-issue
+      file: DONE/unknown/planning/fix-tpc-ds-cli-file-format-inconsistency-issue.yaml
+      title: Fix TPC-DS CLI File Format Inconsistency Issue ✅
+      priority: Medium
+      category: Core Functionality
+    - id: fix-tpc-ds-test-mode-cli-dry-run-output-to-show-actual-execution-plans
+      file: DONE/unknown/planning/fix-tpc-ds-test-mode-cli-dry-run-output-to-show-actual-execution-plans.yaml
+      title: Fix TPC-DS Test Mode CLI Dry Run Output to Show Actual Execution Plans ✅
+      priority: Medium
+      category: Core Functionality
     - id: fix-tpch-reference-seed-and-parameter-parity
       file: DONE/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
       title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
@@ -1395,6 +1160,11 @@ statuses:
       title: Implement TPC-H Queries for Pandas Family
       priority: Critical
       category: Core Functionality
+    - id: improve-benchmark-execution-reliability
+      file: DONE/unknown/planning/improve-benchmark-execution-reliability.yaml
+      title: Improve Benchmark Execution Reliability
+      priority: Medium
+      category: Project Lifecycle Management
     - id: compare-interactive-file-selection
       file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
       title: Improve interactive file selection in compare command
@@ -1425,7 +1195,7 @@ statuses:
       title: Integrate Read Primitives DataFrame Mode and Metadata
       priority: Medium
       category: Core Functionality
-    - id: integrate-stdout-datagen
+    - id: tpch-stdout-fix-integrate-stdout-datagen
       file: DONE/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
       title: Integrate TPC-H stdout datagen with compression and format pipelines
       priority: High
@@ -1435,11 +1205,16 @@ statuses:
       title: Integrate Write Primitives DataFrame Mode with Runner and Registry
       priority: Medium-High
       category: Core Functionality
-    - id: integrate-stdout-datagen
+    - id: tpcds-stdout-fix-integrate-stdout-datagen
       file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
       title: Integrate stdout datagen with compression and format pipelines
       priority: High
       category: Core Functionality
+    - id: integration-test-suite-cleanup-remove-placeholder-and-failing-tests
+      file: DONE/unknown/planning/integration-test-suite-cleanup-remove-placeholder-and-failing-tests.yaml
+      title: Integration Test Suite Cleanup - Remove Placeholder and Failing Tests
+      priority: High
+      category: Testing and Quality Assurance
     - id: logging-standardization
       file: DONE/observability-quality/active/logging-standardization.yaml
       title: Logging Standardization
@@ -1470,6 +1245,11 @@ statuses:
       title: Migrate ClickHouse/Firebolt to Deployment Registry
       priority: Medium-High
       category: Core Functionality
+    - id: minimize-emoji-usage-completed
+      file: DONE/unknown/planning/minimize-emoji-usage-completed.yaml
+      title: Minimize Emoji Usage ✅ COMPLETED
+      priority: Medium
+      category: Code Quality and Documentation
     - id: multi-region-performance-testing
       file: DONE/enterprise-ops-multi-region/planning/multi-region-performance-testing.yaml
       title: Multi-Region Performance Testing
@@ -1490,6 +1270,11 @@ statuses:
       title: Natural Language to SQL Testing Framework
       priority: Medium
       category: AI/ML Capabilities
+    - id: notimplementederror-completions-completed
+      file: DONE/unknown/planning/notimplementederror-completions-completed.yaml
+      title: NotImplementedError Completions ✅ COMPLETED
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: open-file-and-table-format-support
       file: DONE/benchmark-expansion/active/open-file-and-table-format-support.yaml
       title: Open File and Table Format Support
@@ -1500,6 +1285,11 @@ statuses:
       title: Open Table Format Smoke Tests
       priority: Medium
       category: Testing and Quality Assurance
+    - id: optimize-benchmark-results-json-output-format
+      file: DONE/unknown/planning/optimize-benchmark-results-json-output-format.yaml
+      title: Optimize Benchmark Results JSON Output Format
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: pt-01-ddl-generator-protocol
       file: DONE/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml
       title: 'PT-01: DDL Generator Protocol and Base Implementation'
@@ -1538,13 +1328,28 @@ statuses:
     - id: phase3-manifest-v2-spec
       file: DONE/table-formats/implementation/phase3-manifest-v2-spec.yaml
       title: 'Phase 3.1: Manifest v2 Implementation Specification'
-      priority: critical
+      priority: Critical
       category: Uncategorized
     - id: dataframe-tpcds-obt-adaptation
       file: DONE/dataframe-benchmarks/active/dataframe-tpcds-obt-adaptation.yaml
       title: Plan DataFrame Adaptation for TPC-DS-OBT
       priority: Medium-High
       category: Core Functionality
+    - id: platform-adapter-abstract-method-implementation-completed
+      file: DONE/unknown/planning/platform-adapter-abstract-method-implementation-completed.yaml
+      title: Platform Adapter Abstract Method Implementation ✅ COMPLETED
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: platform-adapter-tuning-implementation-completed
+      file: DONE/unknown/planning/platform-adapter-tuning-implementation-completed.yaml
+      title: Platform Adapter Tuning Implementation ✅ COMPLETED
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
+    - id: platform-adapter-and-core-module-code-consolidation
+      file: DONE/unknown/planning/platform-adapter-and-core-module-code-consolidation.yaml
+      title: Platform Adapter and Core Module Code Consolidation
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: phase-1-connection-network
       file: DONE/platform-config-audit/completed/phase-1-connection-network.yaml
       title: 'Platform Config Audit: Connection/Network Settings'
@@ -1590,6 +1395,11 @@ statuses:
       title: Platform Documentation Completion
       priority: High
       category: Documentation and User Experience
+    - id: platform-documentation-and-extension-guide-completed
+      file: DONE/unknown/planning/platform-documentation-and-extension-guide-completed.yaml
+      title: Platform Documentation and Extension Guide ✅ COMPLETED
+      priority: Medium
+      category: Code Quality and Documentation
     - id: platform-troubleshooting-guide
       file: DONE/docs-experience/planning/platform-troubleshooting-guide.yaml
       title: Platform Troubleshooting Guide
@@ -1614,6 +1424,16 @@ statuses:
       file: DONE/platform-expansion/active/postgresql-code-quality-fixes.yaml
       title: PostgreSQL adapter code quality fixes from code review
       priority: High
+      category: Core Functionality
+    - id: power-run-iterations-configuration-completed
+      file: DONE/unknown/planning/power-run-iterations-configuration-completed.yaml
+      title: Power Run Iterations Configuration ✅ COMPLETED
+      priority: Medium
+      category: New Feature Requests
+    - id: pre-compile-tpc-binaries-for-multiple-platforms-completed
+      file: DONE/unknown/planning/pre-compile-tpc-binaries-for-multiple-platforms-completed.yaml
+      title: Pre-Compile TPC Binaries for Multiple Platforms ✅ COMPLETED
+      priority: Medium
       category: Core Functionality
     - id: prepare-project-for-publication
       file: DONE/release-readiness/prepare-project-for-publication.yaml
@@ -1660,11 +1480,61 @@ statuses:
       title: Query Plan Documentation & Testing
       priority: Medium
       category: Documentation
+    - id: query-plan-parser-framework
+      file: DONE/query-plan-parsers/planning/query-plan-parser-framework.yaml
+      title: Query Plan Parser Framework
+      priority: High
+      category: Core Functionality
     - id: query-plan-platform-adapter-integration
       file: DONE/query-plan-adapters/planning/query-plan-platform-adapter-integration.yaml
       title: Query Plan Platform Adapter Integration
       priority: High
       category: Core Functionality
+    - id: phase-1-critical-bug-fixes
+      file: DONE/query-plan-remediation/phase-1-critical-bug-fixes.yaml
+      title: 'Query Plan Remediation - Phase 1: Critical Bug Fixes'
+      priority: Critical
+      category: Bug Fixes
+    - id: phase-2-performance-observability
+      file: DONE/query-plan-remediation/phase-2-performance-observability.yaml
+      title: 'Query Plan Remediation - Phase 2: Performance & Observability'
+      priority: Critical
+      category: Performance
+    - id: phase-3-robustness-validation
+      file: DONE/query-plan-remediation/phase-3-robustness-validation.yaml
+      title: 'Query Plan Remediation - Phase 3: Robustness & Validation'
+      priority: High
+      category: Quality & Reliability
+    - id: phase-4-platform-coverage
+      file: DONE/query-plan-remediation/phase-4-platform-coverage.yaml
+      title: 'Query Plan Remediation - Phase 4: Platform Coverage Expansion'
+      priority: High
+      category: Feature Completion
+    - id: phase-5-testing-infrastructure
+      file: DONE/query-plan-remediation/phase-5-testing-infrastructure.yaml
+      title: 'Query Plan Remediation - Phase 5: Testing Infrastructure'
+      priority: High
+      category: Testing & Quality
+    - id: phase-6-manifest-v2-integration
+      file: DONE/query-plan-remediation/phase-6-manifest-v2-integration.yaml
+      title: 'Query Plan Remediation - Phase 6: Manifest v2 Integration'
+      priority: Medium
+      category: Feature Completion
+    - id: phase-7-parser-resilience
+      file: DONE/query-plan-remediation/phase-7-parser-resilience.yaml
+      title: 'Query Plan Remediation - Phase 7: Parser Resilience'
+      priority: Medium
+      category: Reliability
+    - id: phase-8-documentation-usability
+      file: DONE/query-plan-remediation/phase-8-documentation-usability.yaml
+      title: 'Query Plan Remediation - Phase 8: Documentation & Usability'
+      priority: Medium
+      category: Documentation
+    - id: phase-9-advanced-features
+      file: DONE/query-plan-remediation/phase-9-advanced-features.yaml
+      title: 'Query Plan Remediation - Phase 9: Advanced Features'
+      priority: Low
+      category: Enhancement
     - id: quick-start-tutorials
       file: DONE/docs-experience/completed/quick-start-tutorials.yaml
       title: Quick-Start Tutorials
@@ -1690,11 +1560,26 @@ statuses:
       title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
       priority: High
       category: Core Functionality
+    - id: refactor-validation-logic-from-cli-to-core-module-completed
+      file: DONE/unknown/planning/refactor-validation-logic-from-cli-to-core-module-completed.yaml
+      title: Refactor Validation Logic from CLI to Core Module - COMPLETED ✅
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
+    - id: refactor-and-simplify-tpc-compilation-infrastructure-completed
+      file: DONE/unknown/planning/refactor-and-simplify-tpc-compilation-infrastructure-completed.yaml
+      title: Refactor and Simplify TPC Compilation Infrastructure ✅ COMPLETED
+      priority: Medium
+      category: Core Functionality
     - id: refactor-core-dependencies-to-optional
       file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
       title: Refactor platform-specific packages from core to optional dependencies
       priority: High
       category: Core Functionality
+    - id: remove-excessive-adjective-adverb-usage
+      file: DONE/unknown/planning/remove-excessive-adjective-adverb-usage.yaml
+      title: Remove Excessive Adjective/Adverb Usage
+      priority: Medium
+      category: Code Quality and Documentation
     - id: remove-polars-sql-mode
       file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml
       title: Remove Polars SQL mode support - DataFrame only
@@ -1705,11 +1590,26 @@ statuses:
       title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
       priority: High
       category: Core Functionality
+    - id: remove-tpc-di-streaming-code-and-delegate-to-databases-completed
+      file: DONE/unknown/planning/remove-tpc-di-streaming-code-and-delegate-to-databases-completed.yaml
+      title: Remove TPC-DI Streaming Code and Delegate to Databases ✅ COMPLETED
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: remove-tpc-h-parallel-file-merging-anti-pattern
+      file: DONE/unknown/planning/remove-tpc-h-parallel-file-merging-anti-pattern.yaml
+      title: Remove TPC-H Parallel File Merging Anti-Pattern
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: resource-management
       file: DONE/runtime-ops/completed/resource-management.yaml
       title: Resource Management
       priority: Medium
       category: Monitoring and Operations
+    - id: restrict-primary-foreign-key-configuration-to-tuning-yaml-only
+      file: DONE/unknown/planning/restrict-primary-foreign-key-configuration-to-tuning-yaml-only.yaml
+      title: Restrict Primary/Foreign Key Configuration to tuning.yaml Only
+      priority: Medium
+      category: Project Lifecycle Management
     - id: comparison-matrix-restructure
       file: DONE/docs-experience/active/comparison-matrix-restructure.yaml
       title: Restructure Platform Comparison Matrix with Grouped Categories
@@ -1755,11 +1655,26 @@ statuses:
       title: Security Audit
       priority: Medium
       category: Pre-Release Medium Priority Tasks (Nice-to-Have)
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+      title: Simple Cloud Storage Path Support ✅ COMPLETED
+      priority: Medium
+      category: Platform Support and Deployment
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+      title: Simple Cloud Storage Path Support ✅ COMPLETED
+      priority: Medium
+      category: Platform Support and Deployment
     - id: slim-release-distributions
       file: DONE/release-readiness/planning/slim-release-distributions.yaml
       title: Slim Release Distributions
       priority: Medium
       category: Project Lifecycle Management
+    - id: smart-data-generation-completed
+      file: DONE/unknown/planning/smart-data-generation-completed.yaml
+      title: Smart Data Generation ✅ COMPLETED
+      priority: Medium
+      category: Performance and Efficiency
     - id: snowpark-connect-platform
       file: DONE/platform-expansion/planning/snowpark-connect-platform.yaml
       title: Snowpark Connect for Spark Platform
@@ -1770,25 +1685,80 @@ statuses:
       title: Stabilize Full Test Suite Failures
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: standardize-benchmark-constraint-parameter-apis
+      file: DONE/unknown/planning/standardize-benchmark-constraint-parameter-apis.yaml
+      title: Standardize Benchmark Constraint Parameter APIs
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: standardize-connection-interfaces-across-all-benchmarks
+      file: DONE/unknown/planning/standardize-connection-interfaces-across-all-benchmarks.yaml
+      title: Standardize Connection Interfaces Across All Benchmarks
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com
+      file: DONE/unknown/planning/standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com.yaml
+      title: Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED
+      priority: Medium
+      category: Core Functionality
+    - id: switch-tpc-ds-base-dialect-from-ansi-to-netezza-2
+      file: DONE/unknown/planning/switch-tpc-ds-base-dialect-from-ansi-to-netezza-2.yaml
+      title: Switch TPC-DS Base Dialect from ANSI to Netezza ✅
+      priority: Medium
+      category: Core Functionality
+    - id: switch-tpc-ds-base-dialect-from-ansi-to-netezza
+      file: DONE/unknown/planning/switch-tpc-ds-base-dialect-from-ansi-to-netezza.yaml
+      title: Switch TPC-DS Base Dialect from ANSI to Netezza ✅ │
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
     - id: tco-calculator-cost-forecasting
       file: DONE/cost-intelligence-tco/completed/tco-calculator-cost-forecasting.yaml
       title: TCO Calculator & Cost Forecasting
       priority: High
       category: Cost Intelligence
+    - id: tpc-specification-compliance-issues-completed
+      file: DONE/unknown/planning/tpc-specification-compliance-issues-completed.yaml
+      title: TPC Specification Compliance Issues ✅ COMPLETED
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: tpcds-pyspark-compatibility
       file: DONE/dataframe-expansion/active/tpcds-pyspark-compatibility.yaml
       title: TPC-DS PySpark Compatibility - Add missing UnifiedExpr methods and context functions
       priority: High
       category: Platform Expansion
+    - id: tpc-ds-stream-management-implementation
+      file: DONE/unknown/planning/tpc-ds-stream-management-implementation.yaml
+      title: TPC-DS Stream Management Implementation ✅
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: tpc-ds-streaming-data-generation-compression
+      file: DONE/unknown/planning/tpc-ds-streaming-data-generation-compression.yaml
+      title: TPC-DS Streaming Data Generation Compression ✅
+      priority: Medium
+      category: Performance and Efficiency
+    - id: tpc-h-stream-processing-implementation
+      file: DONE/unknown/planning/tpc-h-stream-processing-implementation.yaml
+      title: TPC-H Stream Processing Implementation ✅
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: tpc-havoc-query-variant-system-implementation
       file: DONE/benchmark-expansion/completed/tpc-havoc-query-variant-system-implementation.yaml
       title: TPC-Havoc Query Variant System Implementation
       priority: Low
       category: Code Quality and Technical Debt
+    - id: table-tuning-interface-completed
+      file: DONE/unknown/planning/table-tuning-interface-completed.yaml
+      title: Table Tuning Interface ✅ COMPLETED
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
     - id: coverage-improvement
       file: DONE/observability-quality/active/coverage-improvement.yaml
       title: Test Infrastructure & Coverage Improvement
       priority: High
+      category: Testing and Quality Assurance
+    - id: test-suite-reliability-completed
+      file: DONE/unknown/planning/test-suite-reliability-completed.yaml
+      title: Test Suite Reliability ✅ COMPLETED
+      priority: Medium
       category: Testing and Quality Assurance
     - id: trim-viz-deps-plotly-only
       file: DONE/main/active/trim-viz-deps-plotly-only.yaml
@@ -1805,6 +1775,11 @@ statuses:
       title: Unified Platform Comparison CLI
       priority: Medium
       category: Performance and Efficiency
+    - id: unified-tuning-configuration-system-completed
+      file: DONE/unknown/planning/unified-tuning-configuration-system-completed.yaml
+      title: Unified Tuning Configuration System ✅ COMPLETED
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
     - id: unify-platform-registration-systems
       file: DONE/architecture-cleanup/unify-platform-registration-systems.yaml
       title: Unify Platform Registration Systems
@@ -1823,18 +1798,33 @@ statuses:
     - id: compare-command-unification
       file: DONE/ux-improvements/active/compare-command-unification.yaml
       title: Unify compare and compare-plans commands
-      priority: P2
+      priority: Medium
       category: ux-improvements
     - id: visualization-framework-chart-generation-results-display
       file: DONE/content-enablement-viz/planning/visualization-framework-chart-generation-results-display.yaml
       title: Visualization Framework - Chart Generation & Results Display
       priority: Critical
       category: Marketing Content Enablement
+    - id: add-end-to-end-cli-testing
+      file: DONE/unknown/planning/add-end-to-end-cli-testing.yaml
+      title: ✅ Add End-to-End CLI Testing
+      priority: Medium
+      category: Project Lifecycle Management
     - id: add-lightweight-example-smoke-tests
       file: DONE/unknown/completed/add-lightweight-example-smoke-tests.yaml
       title: ✅ Add Lightweight Example Smoke Tests
       priority: Medium
       category: Testing and Quality Assurance
+    - id: add-platform-info-to-benchmark-results
+      file: DONE/unknown/planning/add-platform-info-to-benchmark-results.yaml
+      title: ✅ Add platform_info to Benchmark Results
+      priority: Medium
+      category: Core Functionality
+    - id: address-outstanding-todos
+      file: DONE/unknown/planning/address-outstanding-todos.yaml
+      title: ✅ Address Outstanding TODOs
+      priority: Medium
+      category: Pre-Release High Priority Tasks (COMPLETED)
     - id: adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage
       file: DONE/unknown/completed/adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage.yaml
       title: ✅ Adversarial Review - Cost Framework Enhancement (Warnings, Metadata, Timing, Storage)
@@ -1860,6 +1850,11 @@ statuses:
       title: ✅ CLI Parameter Consistency with Unified Runner
       priority: Medium
       category: Core Architecture
+    - id: cli-platform-adapter-management-feature
+      file: DONE/unknown/planning/cli-platform-adapter-management-feature.yaml
+      title: ✅ CLI Platform Adapter Management Feature
+      priority: Medium
+      category: '"Technical Debt & Refactoring"'
     - id: canonicalize-result-schema-2
       file: DONE/unknown/completed/canonicalize-result-schema-2.yaml
       title: ✅ Canonicalize Result Schema
@@ -1875,6 +1870,11 @@ statuses:
       title: ✅ Clarify Optional Dependency Installation
       priority: Medium
       category: Documentation and Developer Experience
+    - id: clickbench-empty-string-vs-null-constraint-issue-completed
+      file: DONE/unknown/planning/clickbench-empty-string-vs-null-constraint-issue-completed.yaml
+      title: ✅ ClickBench Empty String vs NULL Constraint Issue (COMPLETED)
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: cloud-platform-benchmarking-notebooks
       file: DONE/unknown/completed/cloud-platform-benchmarking-notebooks.yaml
       title: ✅ Cloud Platform Benchmarking Notebooks
@@ -1910,6 +1910,11 @@ statuses:
       title: ✅ Database Management Boundaries
       priority: Medium
       category: Project Lifecycle Management
+    - id: document-cli-comprehensively
+      file: DONE/unknown/planning/document-cli-comprehensively.yaml
+      title: ✅ Document CLI Comprehensively
+      priority: Medium
+      category: Pre-Release High Priority Tasks (COMPLETED)
     - id: documentation-structure-reorganization
       file: DONE/unknown/completed/documentation-structure-reorganization.yaml
       title: ✅ Documentation Structure Reorganization
@@ -1960,15 +1965,45 @@ statuses:
       title: ✅ Implement CLI Progress Tracking and Execution Reporting
       priority: Medium
       category: User Experience and CLI Enhancement
+    - id: implement-clickhouse-embedded-mode-support-via-chdb
+      file: DONE/unknown/planning/implement-clickhouse-embedded-mode-support-via-chdb.yaml
+      title: ✅ Implement ClickHouse Embedded Mode Support via chDB
+      priority: Medium
+      category: Core Functionality
+    - id: implement-core-verbosity-and-quiet-modes-v-vv-and-q
+      file: DONE/unknown/planning/implement-core-verbosity-and-quiet-modes-v-vv-and-q.yaml
+      title: ✅ Implement Core Verbosity and Quiet Modes (-v/-vv and -q)
+      priority: Medium
+      category: Project Lifecycle Management
     - id: implement-standalone-export-command
       file: DONE/unknown/completed/implement-standalone-export-command.yaml
       title: ✅ Implement Standalone Export Command
       priority: Medium
       category: User Experience and CLI Enhancement
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+      title: ✅ Implement or Remove Incomplete CLI Commands
+      priority: Medium
+      category: Pre-Release High Priority Tasks (COMPLETED)
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+      title: ✅ Implement or Remove Incomplete CLI Commands
+      priority: Medium
+      category: Pre-Release High Priority Tasks (COMPLETED)
+    - id: improve-cli-design
+      file: DONE/unknown/planning/improve-cli-design.yaml
+      title: ✅ Improve CLI Design
+      priority: Medium
+      category: Pre-Release High Priority Tasks (COMPLETED)
     - id: improve-installation-instructions
       file: DONE/unknown/completed/improve-installation-instructions.yaml
       title: ✅ Improve Installation Instructions
       priority: High
+      category: Pre-Release High Priority Tasks (COMPLETED)
+    - id: library-performance-testing
+      file: DONE/unknown/planning/library-performance-testing.yaml
+      title: ✅ Library Performance Testing
+      priority: Medium
       category: Pre-Release High Priority Tasks (COMPLETED)
     - id: make-benchmark-query-tests-hermetic
       file: DONE/unknown/completed/make-benchmark-query-tests-hermetic.yaml
@@ -2020,6 +2055,21 @@ statuses:
       title: ✅ Redshift TPC-H Validation Fixes - Critical Bug Repairs
       priority: Critical
       category: Platform Adapters and Database Integrations
+    - id: refactor-enhancedbenchmarkresults-to-core-remove-cli-platform-coupling
+      file: DONE/unknown/planning/refactor-enhancedbenchmarkresults-to-core-remove-cli-platform-coupling.yaml
+      title: ✅ Refactor EnhancedBenchmarkResults to Core (remove CLI/platform coupling)
+      priority: Medium
+      category: Project Lifecycle Management
+    - id: refactor-validation-logic-from-cli-to-core-module
+      file: DONE/unknown/planning/refactor-validation-logic-from-cli-to-core-module.yaml
+      title: ✅ Refactor Validation Logic from CLI to Core Module
+      priority: Medium
+      category: Pre-Release High Priority Tasks (COMPLETED)
+    - id: refactor-unified-runner-to-use-shared-verbosity-no-bare-prints
+      file: DONE/unknown/planning/refactor-unified-runner-to-use-shared-verbosity-no-bare-prints.yaml
+      title: ✅ Refactor unified_runner to Use Shared Verbosity (no bare prints)
+      priority: Medium
+      category: Project Lifecycle Management
     - id: register-platform-management-cli-commands
       file: DONE/unknown/completed/register-platform-management-cli-commands.yaml
       title: ✅ Register Platform Management CLI Commands
@@ -2050,6 +2100,16 @@ statuses:
       title: ✅ Result Object Migration (BenchmarkResult → BenchmarkResults)
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: roll-out-core-verbosity-quiet-across-all-benchmarks-v-vv-q
+      file: DONE/unknown/planning/roll-out-core-verbosity-quiet-across-all-benchmarks-v-vv-q.yaml
+      title: ✅ Roll Out Core Verbosity/Quiet Across All Benchmarks (-v/-vv/-q)
+      priority: Medium
+      category: Project Lifecycle Management
+    - id: sql-query-generation-consistency-tpc-h-tpc-ds
+      file: DONE/unknown/planning/sql-query-generation-consistency-tpc-h-tpc-ds.yaml
+      title: ✅ SQL Query Generation Consistency (TPC-H/TPC-DS)
+      priority: Medium
+      category: Project Lifecycle Management
     - id: sqlglot-dialect-translation-code-review-implementation
       file: DONE/unknown/completed/sqlglot-dialect-translation-code-review-implementation.yaml
       title: ✅ SQLGlot Dialect Translation Code Review Implementation

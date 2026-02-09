@@ -1,0 +1,249 @@
+# Physical Tuning #05: PostgreSQL & TimescaleDB DDL Generators
+#
+# PostgreSQL is the foundation for TimescaleDB - implement together.
+
+id: pt-05-postgresql-timescaledb-ddl
+title: "PT-05: PostgreSQL & TimescaleDB Physical Tuning DDL Generators"
+worktree: "physical-tuning"
+priority: "High"
+status: "Not Started"
+category: "Platform Expansion"
+
+description: |
+  Implement DDL generation for PostgreSQL and TimescaleDB (which extends PostgreSQL)
+  with support for their native partitioning, clustering, and time-series features.
+
+  ## PostgreSQL Physical Tuning Features
+
+  ### Declarative Partitioning (10+)
+  PostgreSQL supports three partitioning strategies:
+  - **RANGE**: Partition by value ranges (dates, numeric)
+  - **LIST**: Partition by discrete values
+  - **HASH**: Partition by hash of column(s)
+
+  ### CLUSTER Command
+  Physically reorders table data according to an index:
+  ```sql
+  CREATE INDEX idx ON table (col1, col2);
+  CLUSTER table USING idx;
+  ```
+  Note: This is a one-time operation, not maintained on inserts.
+
+  ### No Distribution
+  PostgreSQL is single-node - distribution tuning not applicable.
+
+  ## TimescaleDB Extensions
+
+  ### Hypertables
+  Time-partitioned tables optimized for time-series:
+  ```sql
+  SELECT create_hypertable('table', 'time_column');
+  ```
+
+  ### Chunk Intervals
+  Control partition (chunk) size:
+  ```sql
+  SELECT create_hypertable('table', 'time_column',
+      chunk_time_interval => INTERVAL '1 day');
+  ```
+
+  ### Compression
+  TimescaleDB native compression:
+  ```sql
+  ALTER TABLE table SET (timescaledb.compress);
+  SELECT add_compression_policy('table', INTERVAL '7 days');
+  ```
+
+  ## Current Gap
+
+  PostgreSQL adapter has no DDL tuning support. TimescaleDB adapter (if exists)
+  likewise has no tuning integration.
+
+context_sections:
+  "PostgreSQL DDL Syntax": |
+    ```sql
+    -- Range partitioned table (by date)
+    CREATE TABLE orders (
+        o_orderkey BIGINT NOT NULL,
+        o_custkey BIGINT NOT NULL,
+        o_orderdate DATE NOT NULL,
+        o_totalprice DECIMAL(15,2),
+        o_orderpriority VARCHAR(15)
+    ) PARTITION BY RANGE (o_orderdate);
+
+    -- Create partitions
+    CREATE TABLE orders_2023 PARTITION OF orders
+        FOR VALUES FROM ('2023-01-01') TO ('2024-01-01');
+    CREATE TABLE orders_2024 PARTITION OF orders
+        FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
+
+    -- Hash partitioned table
+    CREATE TABLE lineitem (
+        l_orderkey BIGINT NOT NULL,
+        l_linenumber INTEGER NOT NULL,
+        ...
+    ) PARTITION BY HASH (l_orderkey);
+
+    -- Create hash partitions (4 partitions)
+    CREATE TABLE lineitem_p0 PARTITION OF lineitem
+        FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+    CREATE TABLE lineitem_p1 PARTITION OF lineitem
+        FOR VALUES WITH (MODULUS 4, REMAINDER 1);
+    -- ... etc
+
+    -- CLUSTER for physical reordering
+    CREATE INDEX orders_date_idx ON orders (o_orderdate);
+    CLUSTER orders USING orders_date_idx;
+    ```
+
+  "TimescaleDB DDL Syntax": |
+    ```sql
+    -- Create regular table first
+    CREATE TABLE metrics (
+        time TIMESTAMPTZ NOT NULL,
+        device_id INTEGER NOT NULL,
+        temperature DOUBLE PRECISION,
+        humidity DOUBLE PRECISION
+    );
+
+    -- Convert to hypertable with daily chunks
+    SELECT create_hypertable('metrics', 'time',
+        chunk_time_interval => INTERVAL '1 day'
+    );
+
+    -- Add space partitioning (optional)
+    SELECT create_hypertable('metrics', 'time',
+        partitioning_column => 'device_id',
+        number_partitions => 4,
+        chunk_time_interval => INTERVAL '1 day'
+    );
+
+    -- Enable compression
+    ALTER TABLE metrics SET (
+        timescaledb.compress,
+        timescaledb.compress_segmentby = 'device_id',
+        timescaledb.compress_orderby = 'time DESC'
+    );
+
+    -- Add compression policy (compress chunks older than 7 days)
+    SELECT add_compression_policy('metrics', INTERVAL '7 days');
+    ```
+
+tasks:
+  phases:
+  - phase: "Phase 1: PostgreSQLDDLGenerator Implementation"
+    done: false
+    items:
+    - summary: "Create benchbox/core/tuning/generators/postgresql.py"
+      done: false
+      subtasks:
+      - summary: "Implement PARTITION BY RANGE clause generation"
+        done: false
+      - summary: "Implement PARTITION BY LIST clause generation"
+        done: false
+      - summary: "Implement PARTITION BY HASH clause generation"
+        done: false
+    - summary: "Implement partition child table generation"
+      done: false
+      subtasks:
+      - summary: "Generate date range partitions from granularity"
+        done: false
+      - summary: "Generate hash partitions from bucket_count"
+        done: false
+    - summary: "Implement CLUSTER command generation"
+      done: false
+
+  - phase: "Phase 2: TimescaleDBDDLGenerator Implementation"
+    done: false
+    items:
+    - summary: "Create benchbox/core/tuning/generators/timescaledb.py"
+      done: false
+      subtasks:
+      - summary: "Extend PostgreSQLDDLGenerator"
+        done: false
+      - summary: "Implement create_hypertable() call generation"
+        done: false
+      - summary: "Support chunk_time_interval configuration"
+        done: false
+    - summary: "Add compression configuration support"
+      done: false
+      subtasks:
+      - summary: "Generate compress settings"
+        done: false
+      - summary: "Generate compression policy"
+        done: false
+
+  - phase: "Phase 3: Integration with Adapters"
+    done: false
+    items:
+    - summary: "Inject PostgreSQLDDLGenerator into PostgreSQLAdapter"
+      done: false
+    - summary: "Create TimescaleDBAdapter if not exists"
+      done: false
+    - summary: "Wire tuning_config to DDL generation"
+      done: false
+
+  - phase: "Phase 4: Testing"
+    done: false
+    items:
+    - summary: "Unit tests for PostgreSQLDDLGenerator"
+      done: false
+      subtasks:
+      - summary: "Test PARTITION BY clause generation"
+        done: false
+      - summary: "Test partition child table generation"
+        done: false
+      - summary: "Test CLUSTER command"
+        done: false
+    - summary: "Unit tests for TimescaleDBDDLGenerator"
+      done: false
+      subtasks:
+      - summary: "Test hypertable creation"
+        done: false
+      - summary: "Test chunk interval configuration"
+        done: false
+      - summary: "Test compression settings"
+        done: false
+    - summary: "Integration tests with Docker containers"
+      done: false
+
+files_affected:
+  added:
+  - "benchbox/core/tuning/generators/postgresql.py"
+  - "benchbox/core/tuning/generators/timescaledb.py"
+  - "examples/tunings/postgresql/tpch_tuned.yaml"
+  - "examples/tunings/timescaledb/tsbs_devops_tuned.yaml"
+  - "tests/unit/core/tuning/generators/test_postgresql_ddl.py"
+  - "tests/unit/core/tuning/generators/test_timescaledb_ddl.py"
+  modified:
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/timescaledb.py"
+
+technical_requirements:
+  constraints:
+  - "Must support PostgreSQL 10+ for declarative partitioning"
+  - "TimescaleDB generator must work with community and licensed editions"
+  - "Partition child tables must be auto-generated from config"
+  dependencies:
+  - "PostgreSQL 10+ for PARTITION BY"
+  - "TimescaleDB 2.0+ for compression"
+
+success_metrics:
+- "Partitioned tables created with correct child partitions"
+- "TimescaleDB hypertables created with specified chunk intervals"
+- "CLUSTER command physically reorders data"
+
+dependencies:
+  blocked_by:
+  - "_project/TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml"
+
+metadata:
+  owners:
+  - "joe"
+  tags:
+  - "tuning"
+  - "postgresql"
+  - "timescaledb"
+  - "ddl-generation"
+  estimated_effort: "Medium-Large"
+  created_date: "2026-01-03"

@@ -1,3 +1,4 @@
+id: databricks-dataframe-mode
 title: "Databricks DataFrame Mode - CRITICAL PRIORITY"
 worktree: platform-expansion
 priority: Critical
@@ -36,53 +37,53 @@ description: |
 
 tasks:
   phases:
-    - phase: "Phase 1: Implementation"
+  - phase: "Phase 1: Implementation"
+    done: true
+    items:
+    - summary: "Create DatabricksDataFrameAdapter class extending DatabricksAdapter"
       done: true
-      items:
-        - summary: "Create DatabricksDataFrameAdapter class extending DatabricksAdapter"
-          done: true
-          subtasks:
-            - summary: "Implement execute_query() to handle DataFrame expressions"
-              done: true
-            - summary: "Override load_data() to use df.write.saveAsTable()"
-              done: true
-            - summary: "Add DataFrame expression building capabilities"
-              done: true
-        - summary: "Update platform registry with mode_support for DataFrame"
-          done: true
-        - summary: "Register databricks-df in adapter factory"
-          done: true
+      subtasks:
+      - summary: "Implement execute_query() to handle DataFrame expressions"
+        done: true
+      - summary: "Override load_data() to use df.write.saveAsTable()"
+        done: true
+      - summary: "Add DataFrame expression building capabilities"
+        done: true
+    - summary: "Update platform registry with mode_support for DataFrame"
+      done: true
+    - summary: "Register databricks-df in adapter factory"
+      done: true
 
-    - phase: "Phase 2: Testing"
+  - phase: "Phase 2: Testing"
+    done: true
+    items:
+    - summary: "Create unit tests with mocked Databricks API"
       done: true
-      items:
-        - summary: "Create unit tests with mocked Databricks API"
-          done: true
-        - summary: "Add smoke test (SF=0.01, Q1 only)"
-          done: false
-          note: "Skipped - requires live Databricks cluster, covered by unit tests"
-        - summary: "Verify 85%+ test coverage"
-          done: true
-          note: "21 unit tests passing"
+    - summary: "Add smoke test (SF=0.01, Q1 only)"
+      done: false
+      note: "Skipped - requires live Databricks cluster, covered by unit tests"
+    - summary: "Verify 85%+ test coverage"
+      done: true
+      note: "21 unit tests passing"
 
-    - phase: "Phase 3: Documentation"
+  - phase: "Phase 3: Documentation"
+    done: true
+    items:
+    - summary: "Create example script: examples/getting_started/cloud/databricks_df_tpch.py"
       done: true
-      items:
-        - summary: "Create example script: examples/getting_started/cloud/databricks_df_tpch.py"
-          done: true
-        - summary: "Write documentation: docs/platforms/databricks_dataframe.md"
-          done: false
-          note: "Deferred - docs structure still evolving"
-        - summary: "Update platform index page"
-          done: false
-          note: "Deferred - platform automatically visible in CLI"
+    - summary: "Write documentation: docs/platforms/databricks_dataframe.md"
+      done: false
+      note: "Deferred - docs structure still evolving"
+    - summary: "Update platform index page"
+      done: false
+      note: "Deferred - platform automatically visible in CLI"
 
 metadata:
   tags:
-    - cloud-spark
-    - databricks
-    - dataframe
-    - critical-priority
+  - cloud-spark
+  - databricks
+  - dataframe
+  - critical-priority
   estimated_effort: 1 week
   created_date: "2025-12-24"
 
@@ -97,18 +98,18 @@ impact:
 
 files_affected:
   modified:
-    - benchbox/core/platform_registry.py
-    - benchbox/platforms/databricks/__init__.py
+  - benchbox/core/platform_registry.py
+  - benchbox/platforms/databricks/__init__.py
   added:
-    - benchbox/platforms/databricks/dataframe_adapter.py
-    - tests/unit/platforms/databricks/test_databricks_df_adapter.py
-    - examples/getting_started/cloud/databricks_df_tpch.py
-    - docs/platforms/databricks_dataframe.md
+  - benchbox/platforms/databricks/dataframe_adapter.py
+  - tests/unit/platforms/databricks/test_databricks_df_adapter.py
+  - examples/getting_started/cloud/databricks_df_tpch.py
+  - docs/platforms/databricks_dataframe.md
 
 success_metrics:
-  - "DatabricksDataFrameAdapter runs TPC-H SF=0.01 power test (all 22 queries)"
-  - "Unit test coverage > 85%"
-  - "Documentation published and accessible"
+- "DatabricksDataFrameAdapter runs TPC-H SF=0.01 power test (all 22 queries)"
+- "Unit test coverage > 85%"
+- "Documentation published and accessible"
 
 context_sections:
   "Technical Context": |

@@ -1,0 +1,399 @@
+id: ai-ml-primitives-benchmark
+title: AI/ML Primitives Benchmark - SQL-Based AI Functions
+worktree: benchmark-expansion
+category: Benchmark Development
+priority: Medium-High
+status: Not Started
+description: 'Create a new AI/ML Primitives benchmark to test cross-platform SQL-based AI/ML
+
+  functions. This benchmark covers built-in AI functions that execute within the
+
+  data warehouse, NOT external ML frameworks or vector search (covered separately).
+
+
+  Focus areas:
+
+  - LLM/Generative AI functions (Snowflake Cortex, BigQuery ML, Databricks AI)
+
+  - Sentiment analysis, text classification, summarization
+
+  - Entity extraction, translation
+
+  - SQL-invokable ML predictions (not model training)
+
+
+  This differs from the existing Vector Search benchmark which focuses on
+
+  embedding storage and similarity search. This benchmark tests AI function
+
+  invocation performance and output quality consistency.
+
+  '
+context_sections:
+- name: Platform Support Matrix
+  summary: '| Feature | Snowflake | BigQuery | Databricks | ClickHouse |
+
+    |---------|-----------|----------|------------|------------|
+
+    | **Text Generation** | ✅ COMPLETE() | ✅ ML.GENERATE_TEXT | ✅ ai_query() | ❌ |
+
+    | **Summarization** | ✅ SUMMARIZE() | ✅ ML.GENERATE_TEXT | ✅ ai_summarize() | ❌ |
+
+    | **Sentiment Analysis** | ✅ SENTIMENT() | ✅ ML.UNDERSTAND_TEXT | ✅ ai_analyze_sentiment() | ❌ |
+
+    | **Translation** | ✅ TRANSLATE() | ✅ ML.TRANSLATE | ✅ ai_translate() | ❌ |
+
+    | **Entity Extraction** | ✅ EXTRACT_ANSWER() | ✅ ML.UNDERSTAND_TEXT | ✅ ai_extract() | ❌ |
+
+    | **Classification** | ✅ CLASSIFY_TEXT() | ✅ ML.PREDICT | ✅ ai_classify() | ❌ |
+
+    | **Embedding Generation** | ✅ EMBED_TEXT_768() | ✅ ML.GENERATE_EMBEDDING | ✅ ai_embed() | ❌ |
+
+    | **SQL-based Prediction** | ✅ ML functions | ✅ ML.PREDICT | ✅ MLflow | ❌ |
+
+
+    Note: DuckDB has no built-in AI functions (requires external extensions)
+
+    Note: ClickHouse has no built-in AI functions
+
+    '
+- name: Function Categories
+  summary: '1. **Generative AI** - Text completion, question answering
+
+    2. **NLP Analysis** - Sentiment, entity extraction, classification
+
+    3. **Text Transformation** - Summarization, translation
+
+    4. **Embedding Generation** - Vector embeddings for text
+
+    5. **ML Prediction** - Invoking pre-trained models via SQL
+
+    '
+- name: Design Considerations
+  summary: '- **Cost Awareness**: AI functions often have per-token or per-call costs
+
+    - **Rate Limiting**: Platforms may throttle AI function calls
+
+    - **Non-Determinism**: LLM outputs vary; cannot validate exact results
+
+    - **Latency Focus**: Measure response time, not output correctness
+
+    - **Batch vs Single**: Test both single-row and batch processing
+
+    - **Model Selection**: Some platforms allow model choice (gpt-4, claude, etc.)
+
+    - **DRY RUN mode**: Critical - must support cost estimation without execution
+
+    '
+- name: Snowflake Cortex Functions
+  summary: 'Available functions (as of 2025):
+
+    - SNOWFLAKE.CORTEX.COMPLETE(model, prompt) - Text generation
+
+    - SNOWFLAKE.CORTEX.SUMMARIZE(text) - Text summarization
+
+    - SNOWFLAKE.CORTEX.SENTIMENT(text) - Sentiment score (-1 to 1)
+
+    - SNOWFLAKE.CORTEX.TRANSLATE(text, from_lang, to_lang) - Translation
+
+    - SNOWFLAKE.CORTEX.EXTRACT_ANSWER(text, question) - Q&A extraction
+
+    - SNOWFLAKE.CORTEX.CLASSIFY_TEXT(text, categories) - Classification
+
+    - SNOWFLAKE.CORTEX.EMBED_TEXT_768(text) - 768-dim embeddings
+
+    - SNOWFLAKE.CORTEX.EMBED_TEXT_1024(text) - 1024-dim embeddings
+
+
+    Models: snowflake-arctic, llama3-8b, llama3-70b, mistral-large, etc.
+
+    '
+- name: BigQuery ML Functions
+  summary: 'Available functions:
+
+    - ML.GENERATE_TEXT(model, prompt_col) - Using Vertex AI models
+
+    - ML.UNDERSTAND_TEXT(model, text_col, [''sentiment'', ''entities'']) - NLU
+
+    - ML.TRANSLATE(model, text_col, target_lang) - Translation
+
+    - ML.GENERATE_EMBEDDING(model, text_col) - Embeddings
+
+    - ML.PREDICT(model, input_table) - General prediction
+
+
+    Requires: Connection to Vertex AI, model deployment
+
+    Models: gemini-pro, palm-2, text-bison, etc.
+
+    '
+- name: Databricks AI Functions
+  summary: 'Available functions (Unity Catalog AI Functions):
+
+    - ai_query(endpoint, prompt) - General AI endpoint query
+
+    - ai_summarize(text) - Summarization
+
+    - ai_analyze_sentiment(text) - Sentiment analysis
+
+    - ai_translate(text, target_lang) - Translation
+
+    - ai_extract(text, labels) - Entity extraction
+
+    - ai_classify(text, labels) - Classification
+
+    - ai_fix_grammar(text) - Grammar correction
+
+    - ai_generate(prompt) - Text generation
+
+
+    Requires: Foundation Model APIs or external model serving
+
+    '
+tasks:
+- phase: 'Phase 1: Architecture Design'
+  items:
+  - summary: Design AI primitives benchmark architecture
+    done: false
+    details: '- Define AIQuery dataclass with cost estimation fields
+
+      - Design for non-deterministic output (no result validation)
+
+      - Include dry_run support for cost estimation
+
+      - Handle rate limiting and retry logic
+
+      - Support both single-row and batch execution modes
+
+      '
+  - summary: Create catalog YAML schema for AI queries
+    done: false
+    details: '- id, category, sql fields
+
+      - variants dict for platform-specific syntax
+
+      - skip_on list for unsupported platforms
+
+      - cost_estimate field: tokens/call estimate
+
+      - batch_size field: recommended batch size
+
+      - model field: default model to use (can be overridden)
+
+      '
+  - summary: Design cost estimation and budget controls
+    done: false
+    details: '- Estimate cost before execution
+
+      - Implement --max-ai-cost flag for budget limits
+
+      - Track actual vs estimated costs
+
+      - Warning/abort thresholds
+
+      '
+- phase: 'Phase 2: Core Implementation'
+  items:
+  - summary: Create benchbox/core/ai_primitives/ module structure
+    done: false
+    details: '- __init__.py
+
+      - catalog/__init__.py
+
+      - catalog/loader.py (AICatalogLoader)
+
+      - catalog/queries.yaml (AI query definitions)
+
+      - benchmark.py (AIPrimitivesBenchmark class)
+
+      - cost.py (cost estimation utilities)
+
+      '
+  - summary: Implement AICatalog loader
+    done: false
+    details: '- Parse AI-specific fields (cost_estimate, model, batch_size)
+
+      - Validate platform support
+
+      - Handle model selection overrides
+
+      '
+  - summary: Implement AIPrimitivesBenchmark class
+    done: false
+    details: '- Inherit from BaseBenchmark pattern
+
+      - Execute with rate limiting
+
+      - No result validation (non-deterministic)
+
+      - Capture timing and token counts
+
+      - Support dry_run mode (no actual AI calls)
+
+      '
+  - summary: Implement cost estimation module
+    done: false
+    details: '- Estimate tokens from text length
+
+      - Platform-specific pricing tables
+
+      - Budget tracking and alerts
+
+      '
+- phase: 'Phase 3: Query Catalog Development'
+  items:
+  - summary: Implement Generative AI queries (4+ queries)
+    done: false
+    details: "- ai_complete_simple: Basic text completion with short prompt\n- ai_complete_context: Completion with TPC-H\
+      \ data context\n- ai_question_answer: Answer question about data\n- ai_sql_generation: Generate SQL from natural language\n\
+      \nExample (Snowflake):\n```sql\nSELECT\n    c_custkey,\n    SNOWFLAKE.CORTEX.COMPLETE(\n        'llama3-8b',\n     \
+      \   'Summarize this customer profile: ' || c_comment\n    ) as profile_summary\nFROM customer\nWHERE c_nationkey = 1\n\
+      LIMIT 10;\n```\n"
+  - summary: Implement NLP Analysis queries (5+ queries)
+    done: false
+    details: "- ai_sentiment_single: Sentiment of single text\n- ai_sentiment_batch: Sentiment of multiple rows\n- ai_classify_priority:\
+      \ Classify order priority from comments\n- ai_classify_segment: Classify customer segment\n- ai_entity_extraction: Extract\
+      \ entities from part descriptions\n\nExample (Snowflake):\n```sql\nSELECT\n    c_custkey,\n    c_comment,\n    SNOWFLAKE.CORTEX.SENTIMENT(c_comment)\
+      \ as sentiment_score\nFROM customer\nWHERE c_mktsegment = 'BUILDING'\nLIMIT 100;\n```\n"
+  - summary: Implement Text Transformation queries (4+ queries)
+    done: false
+    details: "- ai_summarize_short: Summarize short text\n- ai_summarize_long: Summarize longer text (part descriptions)\n\
+      - ai_translate_comment: Translate customer comment\n- ai_grammar_fix: Fix grammar in comments (Databricks)\n\nExample\
+      \ (Snowflake):\n```sql\nSELECT\n    p_partkey,\n    p_comment,\n    SNOWFLAKE.CORTEX.SUMMARIZE(p_comment) as summary\n\
+      FROM part\nWHERE LENGTH(p_comment) > 100\nLIMIT 50;\n```\n"
+  - summary: Implement Embedding Generation queries (3+ queries)
+    done: false
+    details: "- ai_embed_single: Generate embedding for single text\n- ai_embed_batch: Batch embedding generation\n- ai_embed_dimensions:\
+      \ Different dimension outputs (768, 1024)\n\nExample (Snowflake):\n```sql\nSELECT\n    c_custkey,\n    SNOWFLAKE.CORTEX.EMBED_TEXT_768(c_comment)\
+      \ as embedding\nFROM customer\nWHERE c_nationkey = 1\nLIMIT 10;\n```\n"
+- phase: 'Phase 4: Platform Variants'
+  items:
+  - summary: Add Snowflake Cortex variants
+    done: false
+    details: '- SNOWFLAKE.CORTEX.* function syntax
+
+      - Model selection: llama3-8b, mistral-large, etc.
+
+      - Handle Cortex-specific error codes
+
+      - Region availability checks
+
+      '
+  - summary: Add BigQuery ML variants
+    done: false
+    details: '- ML.GENERATE_TEXT, ML.UNDERSTAND_TEXT syntax
+
+      - Requires Vertex AI connection setup
+
+      - Model reference format: `project.dataset.model`
+
+      - Handle quota and billing errors
+
+      '
+  - summary: Add Databricks AI variants
+    done: false
+    details: '- ai_query(), ai_summarize(), etc. syntax
+
+      - Model serving endpoint configuration
+
+      - Unity Catalog AI function setup
+
+      - Handle serving endpoint availability
+
+      '
+  - summary: Handle unsupported platforms
+    done: false
+    details: '- DuckDB: skip_on all AI queries
+
+      - ClickHouse: skip_on all AI queries
+
+      - Clear error messages about AI availability
+
+      '
+- phase: 'Phase 5: Testing and Safety'
+  items:
+  - summary: Create unit tests for AI catalog loader
+    done: false
+    details: '- Test YAML parsing with AI-specific fields
+
+      - Test cost estimation logic
+
+      - Test variant resolution
+
+      - Mock AI function calls for testing
+
+      '
+  - summary: Implement dry_run mode
+    done: false
+    details: '- Return cost estimates without execution
+
+      - Validate SQL syntax without AI calls
+
+      - Show estimated token counts
+
+      - Critical for cost control
+
+      '
+  - summary: Create integration tests with cost guards
+    done: false
+    details: '- Hard cost limit for CI ($1 max)
+
+      - Test with minimal data (1-10 rows)
+
+      - Mock responses for CI environment
+
+      - Manual integration test instructions
+
+      '
+  - summary: Add benchmark to CLI with safety flags
+    done: false
+    details: '- benchbox run --benchmark ai-primitives
+
+      - --max-ai-cost flag for budget limit
+
+      - --ai-dry-run flag for cost estimation only
+
+      - --ai-model override flag
+
+      - Confirmation prompt for high-cost runs
+
+      '
+files_affected:
+  modified:
+  - benchbox/core/ai_primitives/__init__.py
+  - benchbox/core/ai_primitives/catalog/__init__.py
+  - benchbox/core/ai_primitives/catalog/loader.py
+  - benchbox/core/ai_primitives/catalog/queries.yaml
+  - benchbox/core/ai_primitives/benchmark.py
+  - benchbox/core/ai_primitives/cost.py
+  - tests/unit/core/ai_primitives/
+  - tests/integration/test_ai_primitives_snowflake.py
+  - benchbox/core/__init__.py (register benchmark)
+  - benchbox/cli/commands/run.py (add AI flags)
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - primitives
+  - benchmark
+  - ai
+  - ml
+  - llm
+  - cortex
+  estimated_effort: 3-4 weeks
+  dependencies:
+  - Read Primitives benchmark (reference implementation)
+  - Platform credentials for AI services
+  related_todos:
+  - ai-ml-vector-search/planning/vector-search-benchmark-support.yaml (separate - embeddings storage/search)
+  notes: '- AI functions have real costs - implement strict budget controls
+
+    - Non-deterministic outputs - cannot validate correctness
+
+    - Rate limiting varies by platform - implement backoff
+
+    - Consider separate "ai-primitives-lite" for CI with minimal calls
+
+    '

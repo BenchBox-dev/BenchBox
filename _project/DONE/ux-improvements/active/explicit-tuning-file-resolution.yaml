@@ -1,0 +1,168 @@
+id: explicit-tuning-file-resolution
+title: "Make tuning file resolution explicit and transparent in CLI"
+worktree: "ux-improvements"
+priority: "Medium-High"
+status: "Completed"
+completed_date: "2026-01-16"
+category: "Core Functionality"
+description: |
+  The current CLI handling of `--tuning` argument uses implicit logic that can confuse users.
+  When users specify `--tuning tuned`, the system silently attempts to load a template from
+  `examples/tunings/{platform}/{benchmark}_tuned.yaml`. If not found, it falls back to basic
+  constraints without warning. Users have no visibility into which tuning file was loaded
+  or what settings are being applied.
+
+  Key issues identified:
+  1. Silent template loading - users don't know what template is used
+  2. Implicit fallback chain - silent fallback to basic config if template missing
+  3. No discovery mechanism - users must manually find tuning files
+  4. Path resolution ambiguity - custom paths resolved from cwd only
+  5. Error messaging - invalid path treated same as invalid keyword
+  6. "auto" mode unclear - documentation doesn't explain how it differs from "tuned"
+
+  This TODO addresses making tuning file resolution explicit and transparent so users
+  always know exactly what tuning configuration is being applied and where it came from.
+
+tasks:
+  phases:
+  - phase: "Phase 1: Improve Transparency and Logging"
+    done: true
+    items:
+    - summary: "Add verbose logging showing which tuning file is being loaded"
+      done: true
+      subtasks:
+      - summary: "Log template path when using --tuning tuned"
+        done: true
+      - summary: "Log explicit message when falling back to basic config"
+        done: true
+      - summary: "Show warning when expected template not found"
+        done: true
+    - summary: "Add --tuning show command to display resolved tuning config"
+      done: true
+
+  - phase: "Phase 2: Improve Discovery and Documentation"
+    done: true
+    items:
+    - summary: "Add --tuning list to show available tuning templates for platform/benchmark"
+      done: true
+    - summary: "Improve error messages to distinguish invalid keyword vs file not found"
+      done: true
+    - summary: "Add help text explaining template discovery logic"
+      done: true
+    - summary: "Document the difference between 'tuned' and 'auto' modes"
+      done: true
+
+  - phase: "Phase 3: Explicit Path Resolution"
+    done: true
+    items:
+    - summary: "Add BENCHBOX_TUNING_PATH environment variable for custom search paths"
+      done: true
+    - summary: "Support relative paths from project root (not just cwd)"
+      done: true
+    - summary: "Add config file option to set default tuning template"
+      done: true
+
+  - phase: "Phase 4: Testing and Validation"
+    done: true
+    items:
+    - summary: "Add tests for verbose tuning logging output"
+      done: true
+    - summary: "Add tests for --tuning list and --tuning show"
+      done: true
+    - summary: "Add integration tests for path resolution scenarios"
+      done: true
+
+completion_summary: |
+  Implemented transparent tuning file resolution system with full user visibility.
+
+  Key deliverables:
+  - New `benchbox/cli/tuning_resolver.py` module with TuningMode, TuningSource enums
+  - `resolve_tuning()` function provides full transparency metadata
+  - `benchbox tuning list` command to discover available templates
+  - `benchbox tuning show` command to preview resolved configuration
+  - BENCHBOX_TUNING_PATH environment variable for custom search paths
+  - Improved error messages distinguishing invalid keywords from missing files
+  - Config file support for default tuning template (tuning.default_config_file)
+  - 31 unit tests covering all functionality
+  - Updated help documentation with tuning discovery examples
+
+metadata:
+  tags:
+  - cli
+  - ux
+  - tuning
+  - transparency
+  - configuration
+  estimated_effort: "3-5 days"
+  created_date: "2026-01-16"
+
+impact:
+  business_value: |
+    Improves user confidence and reduces confusion when running benchmarks.
+    Users will understand exactly what tuning configuration is applied, leading
+    to more reproducible and trustworthy benchmark results.
+  user_impact: |
+    Users currently have no visibility into which tuning file is loaded when using
+    `--tuning tuned`. This can lead to unexpected results and difficulty debugging
+    why benchmarks behave differently across runs or environments.
+  technical_debt: |
+    The current implicit logic is spread across run.py (lines 739-768, 804-859)
+    and config.py (lines 641-675). Refactoring to explicit resolution will
+    consolidate this logic and make it more maintainable.
+
+files_affected:
+  modified:
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/cli/config.py"
+  - "benchbox/cli/help.py"
+  - "docs/usage/cli-quick-start.md"
+  added:
+  - "tests/unit/cli/test_tuning_resolution.py"
+
+context_sections:
+  "Current Behavior Analysis": |
+    The CLI argument parsing at `benchbox/cli/commands/run.py:739-768` handles four cases:
+    - `tuned` - Enable optimizations, trigger template discovery
+    - `notuning` - Disable all optimizations (baseline)
+    - `auto` - Smart defaults based on system profile
+    - PATH - Path to custom YAML config
+
+    Template auto-discovery at `benchbox/cli/commands/run.py:804-859`:
+    - Constructs path: `examples/tunings/{platform}/{benchmark}_tuned.yaml`
+    - If exists: silently loads it
+    - If not found: prompts user (interactive) or uses basic config (non-interactive)
+
+    Key locations:
+    - CLI argument definition: run.py:252-256
+    - Tuning value parsing: run.py:739-768
+    - Template auto-discovery: run.py:804-859
+    - File loading: config.py:641-675
+    - Help text: help.py:234-238
+
+  "User Experience Problems": |
+    1. Silent template loading: User specifies `--tuning tuned` but doesn't see
+       which template is loaded or know it exists
+
+    2. Implicit fallback: If template missing, silently falls back to basic config
+       without warning - user may think they're using optimized config
+
+    3. No discovery: Users must manually find tuning files in examples/tunings/
+
+    4. Path ambiguity: Custom paths resolved from cwd; no search paths or defaults
+
+    5. Error confusion: Invalid path treated as invalid keyword - same error message
+
+    6. Mode confusion: "auto" behavior not clearly documented vs "tuned"
+
+success_metrics:
+- "Users can see exactly which tuning file is loaded in CLI output"
+- "Users receive warning when expected tuning template is not found"
+- "--tuning list shows all available templates for current platform/benchmark"
+- "--tuning show displays resolved configuration before execution"
+- "Error messages distinguish between invalid keywords and missing files"
+- "Documentation clearly explains tuned vs auto modes"
+
+open_questions:
+- "Should --tuning list require platform/benchmark args or show all?"
+- "Should verbose tuning info be default or require --verbose flag?"
+- "Should we deprecate implicit template loading in favor of explicit paths?"

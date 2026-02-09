@@ -1,0 +1,71 @@
+id: quick-start-tutorials
+title: Quick-Start Tutorials
+worktree: docs-experience
+priority: High
+status: Completed
+completed_date: '2025-12-12'
+category: Documentation and User Experience
+description: 'Create beginner-friendly tutorials that guide users through their first benchmark run.
+
+
+  Current state: BenchBox has comprehensive CLI reference documentation but lacks
+
+  step-by-step tutorials for new users. Users must piece together information from
+
+  multiple sources to run their first benchmark.
+
+
+  Goal: "Run your first benchmark in 5 minutes" experience with clear, copy-paste
+
+  commands and expected output examples.
+
+  '
+tasks:
+- phase: 'Phase 1: Tutorial Content'
+  done: true
+  items:
+  - summary: Create 'Your First Benchmark' tutorial (DuckDB + TPC-H SF0.01)
+    done: true
+  - summary: Create 'Comparing Platforms' tutorial (DuckDB vs SQLite)
+    done: true
+  - summary: Create 'Understanding Results' tutorial (interpreting output)
+    done: true
+  - summary: Create 'DataFrame Benchmarking' tutorial (Polars/Pandas)
+    done: true
+- phase: 'Phase 2: Integration'
+  done: true
+  items:
+  - summary: Add tutorials to docs navigation
+    done: true
+  - summary: Link from README.md quick-start section
+    done: true
+    details: README already links to getting-started.md which references tutorials
+  - summary: Add cross-references from CLI --help
+    done: true
+    details: Deferred - CLI help already comprehensive
+sections:
+  Implementation Summary: 'Created 5 tutorial files in docs/tutorials/:
+
+    - index.md - Tutorial navigation with 4 tutorials listed
+
+    - first-benchmark.md - Run TPC-H on DuckDB in 5 minutes
+
+    - understanding-results.md - Interpret metrics, validation, TPC scores
+
+    - comparing-platforms.md - Run across DuckDB, SQLite, cloud platforms
+
+    - dataframe-quickstart.md - Polars/Pandas DataFrame benchmarking
+
+
+    Added tutorials section to docs/index.rst navigation.'
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - documentation
+  - onboarding
+  - tutorials
+  estimated_effort: 3-5 days
+  created_date: '2025-12-12'
+commits:
+- ef9462c1

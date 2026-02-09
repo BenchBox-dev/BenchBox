@@ -1,3 +1,4 @@
+id: comprehensive-test-quality-audit
 title: "Comprehensive Test Quality Audit: Ensure Meaningful and Distinct Test Coverage"
 worktree: test-quality-review
 priority: High
@@ -29,100 +30,100 @@ category: Testing and Quality Assurance
 
 tasks:
   phases:
-    - phase: "Phase 1: Test Suite Inventory and Classification"
+  - phase: "Phase 1: Test Suite Inventory and Classification"
+    done: true
+    notes: |
+      Generated comprehensive inventory. Found 5,309 tests across 353 files.
+      Initial anti-pattern estimates were overestimated - most flagged patterns are valid.
+    items:
+    - summary: "Generate comprehensive test inventory with metrics"
       done: true
-      notes: |
-        Generated comprehensive inventory. Found 5,309 tests across 353 files.
-        Initial anti-pattern estimates were overestimated - most flagged patterns are valid.
-      items:
-        - summary: "Generate comprehensive test inventory with metrics"
-          done: true
-        - summary: "Create test purpose classification matrix"
-          done: true
-
-    - phase: "Phase 2: Unit Test Review (tests/unit/)"
+    - summary: "Create test purpose classification matrix"
       done: true
-      notes: |
-        Reviewed query_plans parsers (highest concentration of 'is not None' assertions).
-        Finding: parse_explain_output() returns Optional[QueryPlanDAG], making guards valid.
-        Reviewed platform adapters - same pattern with get_parser(), detect_error_type().
-        Reviewed circular imports test - FIXED 19 tautological assertions.
-      items:
-        - summary: "Review query_plans parser tests"
-          done: true
-        - summary: "Review platform adapter tests"
-          done: true
-        - summary: "Review circular imports test"
-          done: true
 
-    - phase: "Phase 3: Integration Test Review"
+  - phase: "Phase 2: Unit Test Review (tests/unit/)"
+    done: true
+    notes: |
+      Reviewed query_plans parsers (highest concentration of 'is not None' assertions).
+      Finding: parse_explain_output() returns Optional[QueryPlanDAG], making guards valid.
+      Reviewed platform adapters - same pattern with get_parser(), detect_error_type().
+      Reviewed circular imports test - FIXED 19 tautological assertions.
+    items:
+    - summary: "Review query_plans parser tests"
       done: true
-      notes: |
-        Integration tests follow same patterns as unit tests.
-        No additional anti-patterns found beyond those already addressed.
-      items:
-        - summary: "Review integration test patterns"
-          done: true
-
-    - phase: "Phase 4: Validation and Performance Test Review"
+    - summary: "Review platform adapter tests"
       done: true
-      notes: |
-        Validation tests appropriately test TPC binary wrapper behavior.
-        Performance tests are meaningful for regression detection.
-      items:
-        - summary: "Review validation and performance tests"
-          done: true
-
-    - phase: "Phase 5: Root-Level Test Review"
+    - summary: "Review circular imports test"
       done: true
-      notes: |
-        Root-level tests are properly marked (integration vs unit).
-        tests/test_base.py and tests/unit/test_base_advanced.py are complementary, not duplicates.
-        No consolidation needed.
-      items:
-        - summary: "Check for duplicates with integration tests"
-          done: true
 
-    - phase: "Phase 6: Test Consolidation and Cleanup"
+  - phase: "Phase 3: Integration Test Review"
+    done: true
+    notes: |
+      Integration tests follow same patterns as unit tests.
+      No additional anti-patterns found beyond those already addressed.
+    items:
+    - summary: "Review integration test patterns"
       done: true
-      notes: |
-        ACTUAL CLEANUP PERFORMED:
-        - test_circular_imports.py: Removed 19 tautological 'is not None' assertions
-        - test_datavault_schema.py: Replaced 4 enum count tests with structural validation
-        - test_datavault_validation.py: Replaced count test with coverage validation
-        - test_nyctaxi_queries.py: Replaced exact count with non-empty check
-        - test_tsbs_devops_queries.py: Replaced exact count with non-empty check
-        - test_read_primitives_core.py: Replaced count with exact TPC-H table set validation
-        - test_tpcdi_phase1.py: Consolidated 3 overlapping tests into 1
 
-        Net result: -1 test function, -22 lines of code, 168 tests still passing.
-      items:
-        - summary: "Remove trivial tests"
-          done: true
-        - summary: "Consolidate overlapping tests"
-          done: true
-
-    - phase: "Phase 7: Establish Test Quality Guidelines"
+  - phase: "Phase 4: Validation and Performance Test Review"
+    done: true
+    notes: |
+      Validation tests appropriately test TPC binary wrapper behavior.
+      Performance tests are meaningful for regression detection.
+    items:
+    - summary: "Review validation and performance tests"
       done: true
-      notes: |
-        Created docs/development/test-quality-guidelines.md with:
-        - Anti-patterns to avoid (enum counts, tautological assertions, over-specification)
-        - Valid uses of 'is not None' (when function returns Optional)
-        - Good test characteristics
-        - Naming conventions
-      items:
-        - summary: "Document test quality standards"
-          done: true
-        - summary: "Define anti-patterns with examples"
-          done: true
+
+  - phase: "Phase 5: Root-Level Test Review"
+    done: true
+    notes: |
+      Root-level tests are properly marked (integration vs unit).
+      tests/test_base.py and tests/unit/test_base_advanced.py are complementary, not duplicates.
+      No consolidation needed.
+    items:
+    - summary: "Check for duplicates with integration tests"
+      done: true
+
+  - phase: "Phase 6: Test Consolidation and Cleanup"
+    done: true
+    notes: |
+      ACTUAL CLEANUP PERFORMED:
+      - test_circular_imports.py: Removed 19 tautological 'is not None' assertions
+      - test_datavault_schema.py: Replaced 4 enum count tests with structural validation
+      - test_datavault_validation.py: Replaced count test with coverage validation
+      - test_nyctaxi_queries.py: Replaced exact count with non-empty check
+      - test_tsbs_devops_queries.py: Replaced exact count with non-empty check
+      - test_read_primitives_core.py: Replaced count with exact TPC-H table set validation
+      - test_tpcdi_phase1.py: Consolidated 3 overlapping tests into 1
+
+      Net result: -1 test function, -22 lines of code, 168 tests still passing.
+    items:
+    - summary: "Remove trivial tests"
+      done: true
+    - summary: "Consolidate overlapping tests"
+      done: true
+
+  - phase: "Phase 7: Establish Test Quality Guidelines"
+    done: true
+    notes: |
+      Created docs/development/test-quality-guidelines.md with:
+      - Anti-patterns to avoid (enum counts, tautological assertions, over-specification)
+      - Valid uses of 'is not None' (when function returns Optional)
+      - Good test characteristics
+      - Naming conventions
+    items:
+    - summary: "Document test quality standards"
+      done: true
+    - summary: "Define anti-patterns with examples"
+      done: true
 
 metadata:
   tags:
-    - testing
-    - quality
-    - audit
-    - test-cleanup
-    - maintainability
+  - testing
+  - quality
+  - audit
+  - test-cleanup
+  - maintainability
   estimated_effort: Large
   actual_effort: Medium
   created_date: "2026-01-09"
@@ -159,19 +160,19 @@ impact:
     Minimal technical debt found - test suite quality was better than expected.
 
 success_metrics:
-  - "Every modified test has documented purpose: ACHIEVED"
-  - "No tests asserting enum counts: ACHIEVED (removed 10)"
-  - "Test quality guidelines documented: ACHIEVED"
-  - "CI time maintained: ACHIEVED (no significant change)"
+- "Every modified test has documented purpose: ACHIEVED"
+- "No tests asserting enum counts: ACHIEVED (removed 10)"
+- "Test quality guidelines documented: ACHIEVED"
+- "CI time maintained: ACHIEVED (no significant change)"
 
 files_affected:
   modified:
-    - tests/unit/test_circular_imports.py
-    - tests/unit/core/datavault/test_datavault_schema.py
-    - tests/unit/core/datavault/test_datavault_validation.py
-    - tests/unit/core/nyctaxi/test_nyctaxi_queries.py
-    - tests/unit/core/tsbs_devops/test_tsbs_devops_queries.py
-    - tests/unit/benchmarks/test_read_primitives_core.py
-    - tests/unit/test_tpcdi_phase1.py
+  - tests/unit/test_circular_imports.py
+  - tests/unit/core/datavault/test_datavault_schema.py
+  - tests/unit/core/datavault/test_datavault_validation.py
+  - tests/unit/core/nyctaxi/test_nyctaxi_queries.py
+  - tests/unit/core/tsbs_devops/test_tsbs_devops_queries.py
+  - tests/unit/benchmarks/test_read_primitives_core.py
+  - tests/unit/test_tpcdi_phase1.py
   added:
-    - docs/development/test-quality-guidelines.md
+  - docs/development/test-quality-guidelines.md

@@ -1,3 +1,4 @@
+id: result-export-format-documentation
 title: Result Export Format Documentation
 worktree: docs-experience
 priority: Medium
@@ -15,35 +16,35 @@ description: |
   - Schema versioning and compatibility
 
 tasks:
-  - phase: "Phase 1: Schema Documentation"
+- phase: "Phase 1: Schema Documentation"
+  done: true
+  items:
+  - summary: "Document JSON result schema v1.0 structure"
     done: true
-    items:
-      - summary: "Document JSON result schema v1.0 structure"
-        done: true
-      - summary: "Document all fields with types and descriptions"
-        done: true
-      - summary: "Provide annotated example output"
-        done: true
-  - phase: "Phase 2: Export Guide"
+  - summary: "Document all fields with types and descriptions"
     done: true
-    items:
-      - summary: "Document 'benchbox export' command options"
-        done: true
-      - summary: "Document output formats (JSON, CSV, Parquet)"
-        done: true
-        notes: "Documented JSON, CSV, HTML; Parquet is not a primary export format"
-      - summary: "Document filtering and aggregation options"
-        done: true
-        notes: "Covered in Python loading examples"
-  - phase: "Phase 3: Integration Examples"
+  - summary: "Provide annotated example output"
     done: true
-    items:
-      - summary: "Example: Loading results into Pandas"
-        done: true
-      - summary: "Example: Creating charts with matplotlib"
-        done: true
-      - summary: "Example: Comparing results across runs"
-        done: true
+- phase: "Phase 2: Export Guide"
+  done: true
+  items:
+  - summary: "Document 'benchbox export' command options"
+    done: true
+  - summary: "Document output formats (JSON, CSV, Parquet)"
+    done: true
+    notes: "Documented JSON, CSV, HTML; Parquet is not a primary export format"
+  - summary: "Document filtering and aggregation options"
+    done: true
+    notes: "Covered in Python loading examples"
+- phase: "Phase 3: Integration Examples"
+  done: true
+  items:
+  - summary: "Example: Loading results into Pandas"
+    done: true
+  - summary: "Example: Creating charts with matplotlib"
+    done: true
+  - summary: "Example: Comparing results across runs"
+    done: true
 
 completion_notes: |
   Created docs/reference/result-formats.md with comprehensive coverage:
@@ -77,12 +78,12 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - documentation
-    - results
-    - export
-    - schema
+  - documentation
+  - results
+  - export
+  - schema
   estimated_effort: 1-2 days
   created_date: "2025-12-12"
 
@@ -95,6 +96,6 @@ impact:
     Clear schema documentation prevents integration errors.
 
 success_metrics:
-  - "Complete JSON schema documentation with examples"
-  - "Working code examples for Pandas integration"
-  - "Export command fully documented with all options"
+- "Complete JSON schema documentation with examples"
+- "Working code examples for Pandas integration"
+- "Export command fully documented with all options"

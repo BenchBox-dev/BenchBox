@@ -1,0 +1,73 @@
+id: aws-athena-platform-adapter
+title: AWS Athena Platform Adapter
+worktree: platform-expansion-athena
+category: Platform Expansion
+priority: High
+status: Completed
+description: |
+  Implement AWS Athena adapter for serverless query-on-S3 benchmarking.
+  Athena is managed Trino on AWS, the most common serverless query engine.
+
+completion:
+  date: '2025-11-28'
+  commits:
+  - aa6af8cc: "feat: add AWS Athena platform adapter for serverless S3 analytics"
+  implementation_notes: |
+    Implemented comprehensive Athena platform adapter at benchbox/platforms/athena.py with:
+
+    Core Features:
+    - Serverless query execution via pyathena driver
+    - S3 data staging and Glue Data Catalog integration
+    - External table creation with STORED AS PARQUET/ORC/JSON/CSV
+    - Workgroup-based resource management
+
+    AWS Integration:
+    - boto3 for S3 operations and Glue catalog management
+    - Support for AWS profiles, access keys, and IAM roles
+    - Region configuration
+    - SSL/encryption support
+
+    Cost Tracking:
+    - Data scanned tracking per query
+    - Cost calculation at $5/TB (Athena pricing)
+    - Cumulative cost summary with average per query
+    - Cost included in query results
+
+    CLI Arguments:
+    - --region (AWS region)
+    - --workgroup (Athena workgroup)
+    - --database (Glue catalog database)
+    - --s3-output-location (query results location)
+    - --s3-staging-dir (data staging location)
+    - --aws-profile (AWS credentials profile)
+
+    Data Loading:
+    - Upload data files to S3
+    - Create external tables pointing to S3 locations
+    - Support for TPC benchmark file formats
+
+    Platform Registration:
+    - Added to platforms/__init__.py
+    - Registered in dependency groups (athena, cloud, all)
+    - Platform requirements documentation
+
+    Tests: 14 comprehensive unit tests covering:
+    - Adapter initialization
+    - Config parsing
+    - Cost tracking
+    - Platform info
+    - External table conversion
+    - Tuning support
+
+  phases_completed:
+  - Phase 1: Adapter Development (pyathena integration, connection handling)
+  - Phase 2: S3 Integration (data loading, external tables)
+  - Phase 3: Cost Tracking (data scanned, cost calculation)
+
+  phases_remaining:
+  - Phase 4: Athena-Specific Optimizations (partition projection, workgroup settings)
+
+  note: |
+    Core Athena adapter is production-ready for SQL-based benchmarking.
+    Partition projection and advanced optimizations can be added separately.
+    The adapter uses Trino SQL syntax which Athena supports natively.

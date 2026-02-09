@@ -2,6 +2,7 @@
 #
 # Location: _project/TODO/platform-expansion/active/influxdb-timeseries-platform.yaml
 
+id: influxdb-timeseries-platform
 title: "Add InfluxDB Platform Support for Time Series Benchmarking"
 worktree: "platform-expansion"
 priority: "Medium-High"
@@ -114,127 +115,127 @@ context_sections:
 
 tasks:
   phases:
-    - phase: "Phase 1: Research and Design"
+  - phase: "Phase 1: Research and Design"
+    done: true
+    items:
+    - summary: "Evaluate InfluxDB 3.x Python clients for BenchBox integration"
       done: true
-      items:
-        - summary: "Evaluate InfluxDB 3.x Python clients for BenchBox integration"
-          done: true
-          subtasks:
-            - summary: "Test influxdb3-python client connection and query patterns"
-              done: true
-            - summary: "Test flightsql-dbapi DB-API 2.0 compliance"
-              done: true
-            - summary: "Determine optimal client for DatabaseConnection wrapper"
-              done: true
-        - summary: "Design adapter architecture following existing patterns"
-          done: true
-          subtasks:
-            - summary: "Study ClickHouse adapter modular design (mixins pattern)"
-              done: true
-            - summary: "Map InfluxDB-specific requirements (buckets, orgs, tokens)"
-              done: true
-            - summary: "Plan Line Protocol integration for data loading"
-              done: true
+      subtasks:
+      - summary: "Test influxdb3-python client connection and query patterns"
+        done: true
+      - summary: "Test flightsql-dbapi DB-API 2.0 compliance"
+        done: true
+      - summary: "Determine optimal client for DatabaseConnection wrapper"
+        done: true
+    - summary: "Design adapter architecture following existing patterns"
+      done: true
+      subtasks:
+      - summary: "Study ClickHouse adapter modular design (mixins pattern)"
+        done: true
+      - summary: "Map InfluxDB-specific requirements (buckets, orgs, tokens)"
+        done: true
+      - summary: "Plan Line Protocol integration for data loading"
+        done: true
 
-    - phase: "Phase 2: Core Implementation"
+  - phase: "Phase 2: Core Implementation"
+    done: true
+    items:
+    - summary: "Create InfluxDB adapter module structure"
       done: true
-      items:
-        - summary: "Create InfluxDB adapter module structure"
-          done: true
-          subtasks:
-            - summary: "Create benchbox/platforms/influxdb/ directory"
-              done: true
-            - summary: "Implement adapter.py with InfluxDBAdapter class"
-              done: true
-            - summary: "Add client.py for FlightSQL/influxdb3-python connection"
-              done: true
-        - summary: "Implement connection and authentication"
-          done: true
-          subtasks:
-            - summary: "Support token-based authentication"
-              done: true
-            - summary: "Handle org/bucket/database configuration"
-              done: true
-            - summary: "Add connection health checks"
-              done: true
-        - summary: "Implement schema and data loading"
-          done: true
-          subtasks:
-            - summary: "Add InfluxDB dialect to TSBS schema generation"
-              done: true
-            - summary: "Implement Line Protocol data loading for TSBS tables"
-              done: true
-            - summary: "Handle measurement/tag/field mapping"
-              done: true
-        - summary: "Implement query execution"
-          done: true
-          subtasks:
-            - summary: "Execute SQL queries via FlightSQL"
-              done: true
-            - summary: "Handle Arrow result conversion"
-              done: true
-            - summary: "Add timing/metrics collection"
-              done: true
+      subtasks:
+      - summary: "Create benchbox/platforms/influxdb/ directory"
+        done: true
+      - summary: "Implement adapter.py with InfluxDBAdapter class"
+        done: true
+      - summary: "Add client.py for FlightSQL/influxdb3-python connection"
+        done: true
+    - summary: "Implement connection and authentication"
+      done: true
+      subtasks:
+      - summary: "Support token-based authentication"
+        done: true
+      - summary: "Handle org/bucket/database configuration"
+        done: true
+      - summary: "Add connection health checks"
+        done: true
+    - summary: "Implement schema and data loading"
+      done: true
+      subtasks:
+      - summary: "Add InfluxDB dialect to TSBS schema generation"
+        done: true
+      - summary: "Implement Line Protocol data loading for TSBS tables"
+        done: true
+      - summary: "Handle measurement/tag/field mapping"
+        done: true
+    - summary: "Implement query execution"
+      done: true
+      subtasks:
+      - summary: "Execute SQL queries via FlightSQL"
+        done: true
+      - summary: "Handle Arrow result conversion"
+        done: true
+      - summary: "Add timing/metrics collection"
+        done: true
 
-    - phase: "Phase 3: TSBS DevOps Integration"
+  - phase: "Phase 3: TSBS DevOps Integration"
+    done: true
+    items:
+    - summary: "Add InfluxDB-specific TSBS query optimizations"
       done: true
-      items:
-        - summary: "Add InfluxDB-specific TSBS query optimizations"
-          done: true
-          subtasks:
-            - summary: "Optimize time range filtering for InfluxDB"
-              done: true  # Queries already have proper time range predicates
-            - summary: "Add InfluxDB-specific aggregation patterns"
-              done: true  # DataFusion supports standard SQL aggregations
-            - summary: "Test all 18 TSBS DevOps queries"
-              done: true  # Queries use DataFusion-compatible SQL
-        - summary: "Add InfluxDB dialect to schema.py"
-          done: true
-          subtasks:
-            - summary: "Map SQL types to InfluxDB types"
-              done: true
-            - summary: "Handle timestamp precision (nanoseconds)"
-              done: true
+      subtasks:
+      - summary: "Optimize time range filtering for InfluxDB"
+        done: true        # Queries already have proper time range predicates
+      - summary: "Add InfluxDB-specific aggregation patterns"
+        done: true        # DataFusion supports standard SQL aggregations
+      - summary: "Test all 18 TSBS DevOps queries"
+        done: true        # Queries use DataFusion-compatible SQL
+    - summary: "Add InfluxDB dialect to schema.py"
+      done: true
+      subtasks:
+      - summary: "Map SQL types to InfluxDB types"
+        done: true
+      - summary: "Handle timestamp precision (nanoseconds)"
+        done: true
 
-    - phase: "Phase 4: Testing and Documentation"
+  - phase: "Phase 4: Testing and Documentation"
+    done: true
+    items:
+    - summary: "Create unit tests for InfluxDB adapter"
       done: true
-      items:
-        - summary: "Create unit tests for InfluxDB adapter"
-          done: true
-          subtasks:
-            - summary: "Test connection handling"
-              done: true
-            - summary: "Test query execution and result parsing"
-              done: true
-            - summary: "Test error handling scenarios"
-              done: true
-        - summary: "Create integration tests"
-          done: true
-          subtasks:
-            - summary: "Stubbed integration smoke tests (7 tests)"
-              done: true
-            - summary: "Platform adapter workflow verification"
-              done: true
-        - summary: "Create documentation"
-          done: true
-          subtasks:
-            - summary: "Add InfluxDB platform documentation page"
-              done: true
-            - summary: "Add InfluxDB examples to getting_started/"
-              done: true
-            - summary: "Update TSBS DevOps docs with InfluxDB examples"
-              done: true
+      subtasks:
+      - summary: "Test connection handling"
+        done: true
+      - summary: "Test query execution and result parsing"
+        done: true
+      - summary: "Test error handling scenarios"
+        done: true
+    - summary: "Create integration tests"
+      done: true
+      subtasks:
+      - summary: "Stubbed integration smoke tests (7 tests)"
+        done: true
+      - summary: "Platform adapter workflow verification"
+        done: true
+    - summary: "Create documentation"
+      done: true
+      subtasks:
+      - summary: "Add InfluxDB platform documentation page"
+        done: true
+      - summary: "Add InfluxDB examples to getting_started/"
+        done: true
+      - summary: "Update TSBS DevOps docs with InfluxDB examples"
+        done: true
 
 technical_requirements:
   constraints:
-    - "Must use FlightSQL/SQL for queries (not deprecated Flux)"
-    - "Support InfluxDB 3.x (not 1.x/2.x which use different protocols)"
-    - "Handle InfluxDB's leading-edge optimization for benchmarking"
-    - "Nanosecond timestamp precision for time series accuracy"
+  - "Must use FlightSQL/SQL for queries (not deprecated Flux)"
+  - "Support InfluxDB 3.x (not 1.x/2.x which use different protocols)"
+  - "Handle InfluxDB's leading-edge optimization for benchmarking"
+  - "Nanosecond timestamp precision for time series accuracy"
   dependencies:
-    - "influxdb3-python or flightsql-dbapi Python client"
-    - "pyarrow for Arrow data handling"
-    - "Docker for integration testing"
+  - "influxdb3-python or flightsql-dbapi Python client"
+  - "pyarrow for Arrow data handling"
+  - "Docker for integration testing"
   compatibility: |
     - InfluxDB 3 Core (open source): Primary target
     - InfluxDB 3 Enterprise: Should work via same FlightSQL API
@@ -243,23 +244,23 @@ technical_requirements:
 
 files_affected:
   added:
-    - "benchbox/platforms/influxdb/__init__.py"
-    - "benchbox/platforms/influxdb/adapter.py"
-    - "benchbox/platforms/influxdb/client.py"
-    - "benchbox/platforms/influxdb/metadata.py"
-    - "benchbox/platforms/influxdb/setup.py"
-    - "benchbox/platforms/influxdb/_dependencies.py"
-    - "tests/unit/platforms/test_influxdb_adapter.py"
-    - "tests/integration/platforms/test_influxdb_smoke.py"
-    - "docs/platforms/influxdb.md"
-    - "examples/getting_started/influxdb_tsbs.py"
+  - "benchbox/platforms/influxdb/__init__.py"
+  - "benchbox/platforms/influxdb/adapter.py"
+  - "benchbox/platforms/influxdb/client.py"
+  - "benchbox/platforms/influxdb/metadata.py"
+  - "benchbox/platforms/influxdb/setup.py"
+  - "benchbox/platforms/influxdb/_dependencies.py"
+  - "tests/unit/platforms/test_influxdb_adapter.py"
+  - "tests/integration/platforms/test_influxdb_smoke.py"
+  - "docs/platforms/influxdb.md"
+  - "examples/getting_started/influxdb_tsbs.py"
   modified:
-    - "benchbox/platforms/__init__.py"
-    - "benchbox/core/platform_registry.py"
-    - "benchbox/core/tsbs_devops/schema.py"
-    - "benchbox/utils/dependencies.py"
-    - "pyproject.toml"
-    - "docs/benchmarks/tsbs-devops.md"
+  - "benchbox/platforms/__init__.py"
+  - "benchbox/core/platform_registry.py"
+  - "benchbox/core/tsbs_devops/schema.py"
+  - "benchbox/utils/dependencies.py"
+  - "pyproject.toml"
+  - "docs/benchmarks/tsbs-devops.md"
 
 impact:
   business_value: |
@@ -280,30 +281,30 @@ impact:
     No legacy protocol support (1.x/2.x) needed since targeting 3.x only.
 
 success_metrics:
-  - "InfluxDB adapter passes all unit tests"
-  - "TSBS DevOps benchmark runs successfully on InfluxDB 3 Core"
-  - "All 18 TSBS DevOps queries execute correctly"
-  - "Performance results comparable to reference TSBS benchmarks"
-  - "Documentation complete with working examples"
+- "InfluxDB adapter passes all unit tests"
+- "TSBS DevOps benchmark runs successfully on InfluxDB 3 Core"
+- "All 18 TSBS DevOps queries execute correctly"
+- "Performance results comparable to reference TSBS benchmarks"
+- "Documentation complete with working examples"
 
 open_questions:
-  - "Should we support InfluxDB Line Protocol for writes alongside SQL reads?"
-  - "Do we need InfluxQL support for users migrating from InfluxDB 2.x?"
-  - "Should we add an 'influxdb-cloud' mode vs 'influxdb-core' mode?"
-  - "How to handle InfluxDB's bucket/org/database terminology mapping?"
+- "Should we support InfluxDB Line Protocol for writes alongside SQL reads?"
+- "Do we need InfluxQL support for users migrating from InfluxDB 2.x?"
+- "Should we add an 'influxdb-cloud' mode vs 'influxdb-core' mode?"
+- "How to handle InfluxDB's bucket/org/database terminology mapping?"
 
 dependencies:
   related:
-    - "_project/TODO/benchmark-expansion/planning/tsbs-iot-benchmark.yaml"
+  - "_project/TODO/benchmark-expansion/planning/tsbs-iot-benchmark.yaml"
 
 metadata:
   owners:
-    - "joe"
+  - "joe"
   tags:
-    - "influxdb"
-    - "time-series"
-    - "tsbs"
-    - "flightsql"
-    - "platform-adapter"
+  - "influxdb"
+  - "time-series"
+  - "tsbs"
+  - "flightsql"
+  - "platform-adapter"
   estimated_effort: "Medium"
   created_date: "2025-12-21"

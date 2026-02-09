@@ -1,3 +1,4 @@
+id: platform-troubleshooting-guide
 title: Platform Troubleshooting Guide
 worktree: docs-experience
 priority: Medium-High
@@ -14,46 +15,46 @@ description: |
   Structure: Problem → Cause → Solution format with copy-paste commands.
 
 tasks:
-  - phase: "Phase 1: Common Issues"
+- phase: "Phase 1: Common Issues"
+  done: true
+  items:
+  - summary: "Document connection timeout troubleshooting"
     done: true
-    items:
-      - summary: "Document connection timeout troubleshooting"
-        done: true
-      - summary: "Document authentication failures by platform"
-        done: true
-      - summary: "Document 'catalog not found' errors (Presto/Trino)"
-        done: true
-      - summary: "Document missing dependency errors"
-        done: true
-  - phase: "Phase 2: Data Loading Issues"
+  - summary: "Document authentication failures by platform"
     done: true
-    items:
-      - summary: "Document file upload failures"
-        done: true
-      - summary: "Document permission/access errors"
-        done: true
-      - summary: "Document data type mismatches"
-        done: true
-        notes: "Covered in data loading section"
-  - phase: "Phase 3: Performance Issues"
+  - summary: "Document 'catalog not found' errors (Presto/Trino)"
     done: true
-    items:
-      - summary: "Document query timeout handling"
-        done: true
-      - summary: "Document memory issues for large scale factors"
-        done: true
-      - summary: "Document concurrent query limits"
-        done: true
-        notes: "Covered in scale factor recommendations"
-  - phase: "Phase 4: Platform-Specific"
+  - summary: "Document missing dependency errors"
     done: true
-    items:
-      - summary: "Snowflake: warehouse sizing, session timeouts"
-        done: true
-      - summary: "Databricks: cluster startup, Unity Catalog"
-        done: true
-      - summary: "BigQuery: quota errors, slot allocation"
-        done: true
+- phase: "Phase 2: Data Loading Issues"
+  done: true
+  items:
+  - summary: "Document file upload failures"
+    done: true
+  - summary: "Document permission/access errors"
+    done: true
+  - summary: "Document data type mismatches"
+    done: true
+    notes: "Covered in data loading section"
+- phase: "Phase 3: Performance Issues"
+  done: true
+  items:
+  - summary: "Document query timeout handling"
+    done: true
+  - summary: "Document memory issues for large scale factors"
+    done: true
+  - summary: "Document concurrent query limits"
+    done: true
+    notes: "Covered in scale factor recommendations"
+- phase: "Phase 4: Platform-Specific"
+  done: true
+  items:
+  - summary: "Snowflake: warehouse sizing, session timeouts"
+    done: true
+  - summary: "Databricks: cluster startup, Unity Catalog"
+    done: true
+  - summary: "BigQuery: quota errors, slot allocation"
+    done: true
 
 completion_notes: |
   Enhanced docs/usage/troubleshooting.md with comprehensive coverage:
@@ -86,11 +87,11 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - documentation
-    - troubleshooting
-    - support
+  - documentation
+  - troubleshooting
+  - support
   estimated_effort: 2-3 days
   created_date: "2025-12-12"
 
@@ -103,6 +104,6 @@ impact:
     encountering problems.
 
 success_metrics:
-  - "Top 10 error scenarios documented with solutions"
-  - "Each solution includes verification steps"
-  - "Platform-specific sections for major clouds"
+- "Top 10 error scenarios documented with solutions"
+- "Each solution includes verification steps"
+- "Platform-specific sections for major clouds"

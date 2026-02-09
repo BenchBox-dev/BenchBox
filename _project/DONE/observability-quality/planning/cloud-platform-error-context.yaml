@@ -1,3 +1,4 @@
+id: cloud-platform-error-context
 title: Cloud Platform Error Message Context
 worktree: observability-quality
 priority: Medium
@@ -22,48 +23,48 @@ description: |
   - Databricks (cluster state, token expiry)
 
 tasks:
-  - phase: "Error Context Helpers"
+- phase: "Error Context Helpers"
+  done: true
+  items:
+  - summary: "Create reusable error context wrapper"
     done: true
-    items:
-      - summary: "Create reusable error context wrapper"
-        done: true
-      - summary: "Define common error categories (auth, network, quota, config)"
-        done: true
-  - phase: "BigQuery Improvements"
+  - summary: "Define common error categories (auth, network, quota, config)"
     done: true
-    items:
-      - summary: "Add quota exhaustion detection and message"
-        done: true
-      - summary: "Add service account permission hints"
-        done: true
-  - phase: "Redshift Improvements"
+- phase: "BigQuery Improvements"
+  done: true
+  items:
+  - summary: "Add quota exhaustion detection and message"
     done: true
-    items:
-      - summary: "Add cluster state check suggestion"
-        done: true
-      - summary: "Add security group troubleshooting"
-        done: true
-  - phase: "Snowflake Improvements"
+  - summary: "Add service account permission hints"
     done: true
-    items:
-      - summary: "Add warehouse auto-suspend detection"
-        done: true
-      - summary: "Add role permission suggestions"
-        done: true
-  - phase: "Databricks Improvements"
+- phase: "Redshift Improvements"
+  done: true
+  items:
+  - summary: "Add cluster state check suggestion"
     done: true
-    items:
-      - summary: "Add cluster startup state handling"
-        done: true
-      - summary: "Add token expiry detection"
-        done: true
-  - phase: "Testing"
+  - summary: "Add security group troubleshooting"
     done: true
-    items:
-      - summary: "Add error context tests"
-        done: true
-      - summary: "Verify message quality"
-        done: true
+- phase: "Snowflake Improvements"
+  done: true
+  items:
+  - summary: "Add warehouse auto-suspend detection"
+    done: true
+  - summary: "Add role permission suggestions"
+    done: true
+- phase: "Databricks Improvements"
+  done: true
+  items:
+  - summary: "Add cluster startup state handling"
+    done: true
+  - summary: "Add token expiry detection"
+    done: true
+- phase: "Testing"
+  done: true
+  items:
+  - summary: "Add error context tests"
+    done: true
+  - summary: "Verify message quality"
+    done: true
 
 completion_notes: |
   Created benchbox/platforms/cloud_error_context.py with comprehensive
@@ -128,15 +129,15 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - error-handling
-    - user-experience
-    - cloud
-    - bigquery
-    - redshift
-    - snowflake
-    - databricks
+  - error-handling
+  - user-experience
+  - cloud
+  - bigquery
+  - redshift
+  - snowflake
+  - databricks
   estimated_effort: 4-6 hours
   created_date: "2025-12-13"
 
@@ -149,12 +150,12 @@ impact:
     No need to search external docs for common errors.
 
 success_metrics:
-  - Common cloud errors have actionable suggestions
-  - Error messages include next steps
-  - Tests verify error context quality (36 tests)
+- Common cloud errors have actionable suggestions
+- Error messages include next steps
+- Tests verify error context quality (36 tests)
 
 files_created:
-  - benchbox/platforms/cloud_error_context.py (407 lines)
-  - tests/unit/platforms/test_cloud_error_context.py (448 lines)
+- benchbox/platforms/cloud_error_context.py (407 lines)
+- tests/unit/platforms/test_cloud_error_context.py (448 lines)
 
 reference_pattern: benchbox/cli/exceptions.py

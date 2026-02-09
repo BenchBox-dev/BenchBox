@@ -1,0 +1,56 @@
+id: nyc-taxi-olap-benchmark-core-implementation
+title: NYC Taxi OLAP Benchmark (Core Implementation)
+worktree: benchmark-expansion
+category: '"Technical Debt & Refactoring"'
+priority: High
+status: Completed
+description: Implement NYC Taxi benchmark using real-world NYC taxi trip data for OLAP analytics, providing authentic multi-dimensional
+  workloads with temporal and basic geospatial dimensions
+impact: Adds realistic transportation analytics benchmark using authentic data patterns, provides multi-dimensional OLAP workloads
+  (temporal, basic geographic, financial), enables performance comparison against industry-standard datasets, complements
+  existing synthetic benchmarks with real-world data complexity
+tasks:
+- phase: '"Phase 1: Core Infrastructure (Week 1-2)"'
+  done: true
+  items:
+  - summary: '"Create `benchbox/core/nyctaxi/` directory structure following BenchBox patterns"'
+  - summary: '"Implement `schema.py` with core trip table and taxi zones dimension table definitions"'
+  - summary: '"Create `benchmark.py` inheriting from `BaseBenchmark` with scale factor support"'
+  - summary: '"Implement `downloader.py` for TLC data acquisition with resumable downloads and validation"'
+  - summary: Add scale factor sampling (0.01 to 100.0) for datasets from 11MB to 111GB (300K to 3B trips, 7 hours to full
+      dataset)
+  - summary: '"Create basic test framework in `tests/unit/test_nyctaxi.py`"'
+- phase: '"Phase 2: Data Processing Pipeline (Week 3-4)"'
+  done: true
+  items:
+  - summary: '"Implement `generator.py` for CSV/Parquet processing and data cleaning"'
+  - summary: Add support for multiple TLC data formats and schema evolution over time
+  - summary: Create data validation, outlier filtering, and quality reporting
+  - summary: Support compressed data handling (gzip) with efficient processing
+  - summary: Implement database integration for DuckDB, ClickHouse, PostgreSQL with optimized loading
+  - summary: Add tuning configurations and indexing strategies for each platform
+- phase: '"Phase 3: Query Suite Development (Week 5-6)"'
+  done: true
+  items:
+  - '"summary: \\"Create `queries.py` with 25 representative OLAP queries adapted from existing benchmarks:\\""'
+files_affected:
+  modified:
+  - 'change_type: New; details: "Complete `benchbox/core/nyctaxi/` implementation"'
+  - 'change_type: New; details: "`benchbox/nyctaxi.py` top-level convenience class"'
+  - 'change_type: New; details: Example scripts and platform-specific tuning configurations'
+  - 'change_type: Modified; details: CLI benchmark registration, platform adapter integration'
+  - 'change_type: New; details: Comprehensive test suite and validation framework'
+  added: []
+  removed: []
+additional_lists:
+  Query Sources:
+  - Todd Schneider's nyc-taxi-data repository (PostgreSQL/ClickHouse analytics)
+  - ClickHouse official documentation queries
+  - DuckDB taxi dataset benchmarks
+  - Mark Litwintschik's database performance analyses
+  - Additional custom queries for comprehensive OLAP coverage
+extra_fields:
+  Data Source: '"NYC Taxi & Limousine Commission (TLC) trip records - real transportation data from 2009-present (3+ billion
+    trips, 111GB compressed)"'
+  Technical Approach: Download and process real TLC data rather than synthetic generation, with deterministic sampling for
+    reproducible scale factors and comprehensive data validation

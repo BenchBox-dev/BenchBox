@@ -1,0 +1,61 @@
+id: interactive-wizard-capture-plans
+title: "Add --capture-plans option to interactive wizard"
+worktree: ux-improvements
+priority: Medium
+status: Not Started
+description: |
+  The CLI supports `--capture-plans` for capturing query execution plans during
+  benchmark runs (3-8% overhead). This is useful for:
+  1. Query performance analysis
+  2. Optimizer behavior debugging
+  3. Understanding execution patterns
+  4. Identifying optimization opportunities
+
+  Supported platforms: DuckDB, PostgreSQL, DataFusion
+
+category: User Experience
+
+tasks:
+  phases:
+  - phase: "Phase 1: Implementation"
+    done: false
+    items:
+    - summary: "Check if platform supports plan capture"
+      done: false
+    - summary: "Add plan capture option for supported platforms"
+      done: false
+    - summary: "Warn about performance overhead"
+      done: false
+
+  - phase: "Phase 2: Testing"
+    done: false
+    items:
+    - summary: "Test plan capture with DuckDB"
+      done: false
+    - summary: "Verify plans are saved correctly"
+      done: false
+
+metadata:
+  tags:
+  - cli
+  - ux
+  - interactive
+  - query-plans
+  estimated_effort: "Small"
+  created_date: "2025-12-21"
+
+impact:
+  user_impact: |
+    Enables query analysis:
+    - Capture execution plans for debugging
+    - Analyze optimizer decisions
+    - Compare plans across runs
+
+files_affected:
+  modified:
+  - "benchbox/cli/commands/run.py"
+
+success_metrics:
+- "Plan capture available for supported platforms"
+- "Overhead warning displayed"
+- "Plans captured correctly"

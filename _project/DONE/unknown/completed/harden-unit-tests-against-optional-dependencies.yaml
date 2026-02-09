@@ -1,0 +1,70 @@
+id: harden-unit-tests-against-optional-dependencies
+title: ✅ Harden Unit Tests Against Optional Dependencies
+category: Test Infrastructure
+status: Completed
+priority: Medium
+impact: Keeps the unit suite green even when optional backends like duckdb and pandas are not installed.
+sections:
+  Summary: Added stubs and skip guards so optional dependency gaps no longer break local test runs.
+  Completed Tasks: '- ✅ DuckDB adapter stubs
+
+    - ✅ Pandas-aware skips'
+  Testing: '"- \"`uv run -- python -m pytest tests/unit/test_clickbench_csv_loading.py`\"
+
+    - \"`uv run -- python -m pytest tests/unit/test_cli_dryrun_real_execution.py`\"
+
+    - \"`uv run -- python -m pytest tests/unit/platforms/test_platform_info.py`\"
+
+    - \"`uv run -- python -m pytest` (numerous expected functional failures remain due to missing benchmark binaries; imports
+    now succeed)\"
+
+    "'
+  Files Affected: '- tests/conftest.py
+
+    - tests/unit/test_clickbench_csv_loading.py
+
+    - tests/unit/test_cli_dryrun_real_execution.py
+
+    - tests/unit/platforms/test_platform_info.py
+
+    - tests/unit/test_standardized_benchmark_apis.py
+
+    - tests/unit/core/test_verbosity_rollout.py
+
+    - tests/unit/examples/test_unified_runner.py
+
+    - tests/unit/examples/test_unified_runner_export_core.py
+
+    - tests/unit/test_error_handling.py
+
+    - tests/unit/test_tpcdi_phase1.py
+
+    - tests/unit/test_tpcdi_phase2_queries.py
+
+    - tests/unit/tpcdi/test_config_simplified.py
+
+    - tests/unit/tpcdi/test_data_cleaners_simplified.py
+
+    - tests/unit/tpcdi/test_file_parsers_simplified.py
+
+    - tests/unit/tpcdi/test_phase3_etl_enhanced.py
+
+    - tests/unit/tpcdi/test_specification_validator.py
+
+    - tests/test_tpcdi.py
+
+    - tests/performance/test_tpcdi_scalability.py
+
+    - tests/integration/test_cloud_storage_integration.py
+
+    - tests/integration/test_tpcdi_full_benchmark.py
+
+    - tests/integration/test_tpcdi_end_to_end.py
+
+    - tests/integration/test_phase4_validation_integration.py
+
+    - tests/integration/test_tpcdi_phase3_benchmark.py
+
+    - tests/examples/test_unified_runner_smoke.py'
+worktree: unknown
+description: Added stubs and skip guards so optional dependency gaps no longer break local test runs.

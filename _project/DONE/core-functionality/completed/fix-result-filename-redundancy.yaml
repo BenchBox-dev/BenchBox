@@ -1,0 +1,79 @@
+id: fix-result-filename-redundancy
+title: "Fix inconsistent result filename generation - remove redundant elements"
+worktree: core-functionality
+priority: Medium
+status: Completed
+description: |
+  Result filenames contain redundant and inconsistent elements that make them
+  unnecessarily long and confusing:
+
+  1. **Double benchmark name**: `tpc_h_benchmark_sf001_..._tpc-h_benchmark_1768439424.json`
+     - `tpc_h_benchmark` in the benchmark component
+     - `tpc-h_benchmark` in the execution_id component
+
+  2. **Double "df"**: `tpcds_sf1_datafusion-df_..._df_tpcds_1768423101.json`
+     - `-df` in platform name (`datafusion-df`)
+     - `df_` prefix in execution_id (`df_tpcds_...`)
+
+  The filename template is: `{benchmark}_{sf}_{platform}_{timestamp}_{execution_id}.json`
+
+  The execution_id redundantly includes the benchmark name and df prefix:
+  - SQL runner: `{benchmark_name}_{timestamp}`
+  - DataFrame runner: `df_{benchmark_name}_{timestamp}`
+
+  Solution: Simplify execution_id to be just a unique 8-character hex UUID since
+  benchmark name and platform are already in the filename.
+
+category: Core Functionality
+
+tasks:
+  phases:
+  - phase: "Phase 1: Simplify execution_id generation"
+    done: true
+    items:
+    - summary: "Update dataframe_runner.py to use UUID for execution_id"
+      done: true
+    - summary: "Update orchestrator.py to use UUID for execution_id"
+      done: true
+    - summary: "Update execution.py to use UUID for execution_id"
+      done: true
+
+  - phase: "Phase 2: Verification"
+    done: true
+    items:
+    - summary: "Run SQL benchmark and verify filename format"
+      done: true
+    - summary: "Run DataFrame benchmark and verify filename format"
+      done: true
+    - summary: "Verify execution_id is still unique and usable for result lookup"
+      done: true
+
+metadata:
+  tags:
+  - results
+  - filenames
+  - cleanup
+  - ux
+  estimated_effort: "1-2 hours"
+  created_date: "2026-01-14"
+
+impact:
+  business_value: |
+    Cleaner, more consistent result filenames improve usability and make it
+    easier to identify and manage benchmark results.
+  user_impact: |
+    Users see shorter, cleaner filenames without confusing redundant elements.
+    Easier to identify results at a glance.
+  technical_debt: |
+    Removes inconsistency between SQL and DataFrame execution_id formats.
+
+files_affected:
+  modified:
+  - "benchbox/core/runner/dataframe_runner.py"
+  - "benchbox/cli/orchestrator.py"
+  - "benchbox/cli/execution.py"
+
+success_metrics:
+- "Result filenames no longer contain duplicate benchmark name"
+- "Result filenames no longer contain duplicate 'df' for DataFrame platforms"
+- "Filename format: {benchmark}_{sf}_{platform}_{timestamp}_{8-char-uuid}.json"

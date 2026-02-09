@@ -1,0 +1,395 @@
+id: phase-5-testing-infrastructure
+title: 'Query Plan Remediation - Phase 5: Testing Infrastructure'
+worktree: query-plan-remediation
+category: Testing & Quality
+priority: High
+status: Completed
+description: 'Build comprehensive testing infrastructure for query plan capture, including
+
+  integration tests across platforms, performance regression tests, edge case
+
+  coverage, and concurrency tests for throughput phase.
+
+
+  **Current Gap**: No integration tests, minimal edge case coverage, no
+
+  performance tests, no concurrency validation.
+
+
+  **Target**: ≥80% test coverage with integration, performance, and stress tests.
+
+  '
+context_sections:
+- name: Current Test Coverage
+  summary: 'Existing tests (good unit test coverage):
+
+    - test_query_plan_models.py: 941 lines (unit)
+
+    - test_query_plan_serialization.py: 453 lines (unit)
+
+    - test_comparison.py: 419 lines (unit)
+
+    - test_visualization.py: 319 lines (unit)
+
+    - test_duckdb_parser.py: 361 lines (DuckDB only)
+
+
+    Missing tests:
+
+    - No integration tests (end-to-end capture in benchmark)
+
+    - No cross-platform tests
+
+    - No performance/overhead tests
+
+    - No concurrency tests (throughput phase)
+
+    - No edge cases (huge plans, malformed data)
+
+    '
+- name: Integration Test Requirements
+  summary: 'Need tests that verify plan capture works end-to-end:
+
+    - Run actual benchmark with --capture-plans
+
+    - Verify plans present in results JSON
+
+    - Test all supported platforms
+
+    - Test failure modes and recovery
+
+    - Verify results exportable and loadable
+
+    '
+- name: Performance Test Requirements
+  summary: 'Need tests that measure and validate overhead:
+
+    - Benchmark query with/without plan capture
+
+    - Assert overhead within acceptable bounds (<10%)
+
+    - Test impact on simple queries (worst case)
+
+    - Test impact on complex queries (typical case)
+
+    - Detect performance regressions
+
+    '
+- name: Concurrency Test Requirements
+  summary: 'Throughput phase runs queries in parallel (4+ streams). Need to verify:
+
+    - Parsers are thread-safe
+
+    - No race conditions in capture
+
+    - All streams capture correctly
+
+    - No corruption of shared state (operator ID counter)
+
+    '
+- name: Edge Case Requirements
+  summary: 'Need tests for unusual but valid scenarios:
+
+    - Very large plans (1000+ operators)
+
+    - Recursive CTEs
+
+    - UNION/INTERSECT/EXCEPT with many branches
+
+    - Special characters in identifiers
+
+    - Extremely long table names
+
+    - Circular reference protection
+
+    '
+impact: 'HIGH - Without comprehensive testing, bugs will reach production and undermine
+
+  trust in the feature. Integration tests catch issues that unit tests miss.
+
+  Performance tests prevent regressions that would invalidate benchmark results.
+
+
+  - Integration tests validate real-world usage
+
+  - Performance tests ensure acceptable overhead
+
+  - Edge case tests prevent crashes on unusual queries
+
+  - Concurrency tests prevent race conditions
+
+  '
+research_value: 'Demonstrates testing strategy for instrumentation features in performance-
+
+  critical tools. Shows importance of testing at multiple levels.
+
+  '
+tasks:
+- phase: 'Task 5.1: Integration Tests for Plan Capture'
+  description: End-to-end tests with actual benchmark execution
+  items:
+  - summary: Create integration test base class
+    done: false
+    details: "File: tests/integration/test_plan_capture_base.py\n\nclass PlanCaptureIntegrationTestBase:\n    \"\"\"Base class\
+      \ for plan capture integration tests.\"\"\"\n\n    def run_benchmark_with_plans(self, platform, benchmark,\n       \
+      \                         scale, **kwargs):\n        \"\"\"Run benchmark with plan capture enabled.\"\"\"\n        config\
+      \ = BenchmarkConfig(\n            platform=platform,\n            benchmark=benchmark,\n            scale_factor=scale,\n\
+      \            capture_plans=True,\n            **kwargs\n        )\n        results = run_benchmark(config)\n       \
+      \ return results\n\n    def assert_plans_captured(self, results, expected_count):\n        \"\"\"Assert expected number\
+      \ of plans captured.\"\"\"\n        assert results.query_plans_captured == expected_count\n\n    def assert_plan_valid(self,\
+      \ plan):\n        \"\"\"Assert plan structure is valid.\"\"\"\n        assert plan is not None\n        assert plan.logical_root\
+      \ is not None\n        assert plan.plan_fingerprint is not None\n"
+  - summary: Create DuckDB integration test
+    done: false
+    details: "File: tests/integration/test_plan_capture_duckdb.py\n\n@pytest.mark.integration\n@pytest.mark.duckdb\nclass\
+      \ TestDuckDBPlanCapture(PlanCaptureIntegrationTestBase):\n\n    def test_ssb_with_plan_capture(self, tmp_path):\n  \
+      \      \"\"\"Run SSB with plan capture, verify all plans captured.\"\"\"\n        results = self.run_benchmark_with_plans(\n\
+      \            platform=\"duckdb\",\n            benchmark=\"ssb\",\n            scale=0.01,\n            output_dir=tmp_path\n\
+      \        )\n\n        # SSB has 13 queries\n        assert results.query_plans_captured == 13\n\n        # Verify each\
+      \ execution has plan\n        for execution in results.query_executions:\n            self.assert_plan_valid(execution.query_plan)\n\
+      \n    def test_plan_capture_with_sampling(self, tmp_path):\n        \"\"\"Test sampling reduces number of plans captured.\"\
+      \"\"\n        results = self.run_benchmark_with_plans(\n            platform=\"duckdb\",\n            benchmark=\"ssb\"\
+      ,\n            scale=0.01,\n            plan_sampling_rate=0.5,\n            output_dir=tmp_path\n        )\n\n    \
+      \    # Should capture roughly 50% (statistical test)\n        expected = 13 * 0.5\n        assert abs(results.query_plans_captured\
+      \ - expected) < 3\n\n    def test_plan_capture_failure_handling(self, tmp_path, monkeypatch):\n        \"\"\"Test that\
+      \ parser failure doesn't break benchmark.\"\"\"\n        # Mock parser to raise exception\n        def mock_parse(*args,\
+      \ **kwargs):\n            raise ValueError(\"Mock parse error\")\n\n        monkeypatch.setattr(\n            \"benchbox.parsers.duckdb_parser.DuckDBQueryPlanParser._parse_impl\"\
+      ,\n            mock_parse\n        )\n\n        results = self.run_benchmark_with_plans(\n            platform=\"duckdb\"\
+      ,\n            benchmark=\"ssb\",\n            scale=0.01,\n            skip_malformed_plans=True,\n            output_dir=tmp_path\n\
+      \        )\n\n        # Benchmark should complete despite parse failures\n        assert results.query_executions_completed\
+      \ > 0\n        assert results.plan_capture_failures == 13\n"
+  - summary: Create PostgreSQL integration test
+    done: false
+    details: "File: tests/integration/test_plan_capture_postgresql.py\n\n@pytest.mark.integration\n@pytest.mark.postgresql\n\
+      @pytest.mark.skipif(not has_postgresql(), reason=\"PostgreSQL not available\")\nclass TestPostgreSQLPlanCapture(PlanCaptureIntegrationTestBase):\n\
+      \    # Similar tests for PostgreSQL\n"
+  - summary: Create cross-platform integration test
+    done: false
+    details: "File: tests/integration/test_plan_capture_cross_platform.py\n\n@pytest.mark.integration\n@pytest.mark.slow\n\
+      class TestCrossPlatformPlanCapture:\n\n    def test_same_query_different_platforms(self, tmp_path):\n        \"\"\"\
+      Capture plan for same query on multiple platforms.\"\"\"\n        query = \"SELECT * FROM lineitem WHERE l_quantity\
+      \ > 10\"\n\n        plans = {}\n        for platform in [\"duckdb\", \"postgresql\"]:\n            results = run_query_with_plan_capture(\n\
+      \                platform=platform,\n                query=query\n            )\n            plans[platform] = results.query_plan\n\
+      \n        # Verify all platforms captured plans\n        assert all(p is not None for p in plans.values())\n\n     \
+      \   # Verify plans have same logical structure (fingerprints similar)\n        # (may differ in details but core structure\
+      \ should match)\n"
+  - summary: Create results export/import integration test
+    done: false
+    details: "File: tests/integration/test_plan_results_roundtrip.py\n\ndef test_results_with_plans_export_import(tmp_path):\n\
+      \    \"\"\"Test that results with plans can be exported and loaded.\"\"\"\n    # Run benchmark with plans\n    results\
+      \ = run_benchmark_with_plans(...)\n\n    # Export to JSON\n    output_file = tmp_path / \"results.json\"\n    export_results(results,\
+      \ output_file)\n\n    # Load back\n    loaded = load_results(output_file)\n\n    # Verify plans preserved\n    assert\
+      \ loaded.query_plans_captured == results.query_plans_captured\n    for orig, loaded in zip(results.query_executions,\n\
+      \                           loaded.query_executions):\n        if orig.query_plan:\n            assert loaded.query_plan\
+      \ is not None\n            assert (loaded.query_plan.plan_fingerprint ==\n                   orig.query_plan.plan_fingerprint)\n"
+  - summary: Create external storage integration test
+    done: false
+    details: "File: tests/integration/test_external_plan_storage.py\n\ndef test_external_storage_file_creation(tmp_path):\n\
+      \    \"\"\"Test that external storage creates plan files.\"\"\"\n    results = run_benchmark_with_plans(\n        platform=\"\
+      duckdb\",\n        benchmark=\"ssb\",\n        scale=0.01,\n        plan_storage=\"external\",\n        output_dir=tmp_path\n\
+      \    )\n\n    # Verify plan files created\n    plans_dir = tmp_path / \"plans\"\n    assert plans_dir.exists()\n\n \
+      \   plan_files = list(plans_dir.glob(\"*.plan.json\"))\n    assert len(plan_files) == results.query_plans_captured\n\
+      \n    # Verify results JSON is smaller\n    results_file = tmp_path / \"results.json\"\n    inline_size = results_file.stat().st_size\n\
+      \n    # Compare to inline (rough heuristic)\n    assert inline_size < (results.query_plans_captured * 10000)\n"
+- phase: 'Task 5.2: Performance Regression Tests'
+  description: Measure and validate plan capture overhead
+  items:
+  - summary: Create performance test framework
+    done: false
+    details: "File: tests/performance/perf_test_base.py\n\nclass PerformanceTestBase:\n    def measure_query_time(self, platform,\
+      \ query, iterations=10):\n        \"\"\"Measure query execution time without plan capture.\"\"\"\n        times = []\n\
+      \        for _ in range(iterations):\n            start = time.perf_counter()\n            execute_query(platform, query)\n\
+      \            times.append(time.perf_counter() - start)\n        return statistics.mean(times), statistics.stdev(times)\n\
+      \n    def measure_query_time_with_plans(self, platform, query,\n                                     iterations=10):\n\
+      \        \"\"\"Measure query execution time WITH plan capture.\"\"\"\n        # Similar to above but with capture_plans=True\n\
+      \n    def assert_overhead_acceptable(self, baseline_time, capture_time,\n                                  max_overhead_pct=10):\n\
+      \        \"\"\"Assert overhead is within acceptable range.\"\"\"\n        overhead_pct = ((capture_time - baseline_time)\
+      \ / baseline_time) * 100\n        assert overhead_pct < max_overhead_pct, (\n            f\"Plan capture overhead {overhead_pct:.1f}%\
+      \ exceeds \"\n            f\"maximum {max_overhead_pct}%\"\n        )\n"
+  - summary: Create overhead measurement test
+    done: false
+    details: "File: tests/performance/test_plan_capture_overhead.py\n\n@pytest.mark.performance\n@pytest.mark.slow\nclass\
+      \ TestPlanCaptureOverhead(PerformanceTestBase):\n\n    def test_simple_query_overhead(self):\n        \"\"\"Test overhead\
+      \ on simple queries (worst case).\"\"\"\n        query = \"SELECT 1\"\n\n        baseline, _ = self.measure_query_time(\"\
+      duckdb\", query)\n        with_capture, _ = self.measure_query_time_with_plans(\"duckdb\", query)\n\n        # For simple\
+      \ queries, overhead may be higher percentage\n        # but absolute time should be small (<5ms)\n        overhead_ms\
+      \ = (with_capture - baseline) * 1000\n        assert overhead_ms < 5, f\"Overhead {overhead_ms:.2f}ms too high\"\n\n\
+      \    def test_complex_query_overhead(self):\n        \"\"\"Test overhead on complex queries (typical case).\"\"\"\n\
+      \        query = \"\"\"\n            SELECT l_returnflag, l_linestatus,\n                   sum(l_quantity) as sum_qty\n\
+      \            FROM lineitem\n            WHERE l_shipdate <= date '1998-09-02'\n            GROUP BY l_returnflag, l_linestatus\n\
+      \            ORDER BY l_returnflag, l_linestatus\n        \"\"\"\n\n        baseline, _ = self.measure_query_time(\"\
+      duckdb\", query)\n        with_capture, _ = self.measure_query_time_with_plans(\"duckdb\", query)\n\n        self.assert_overhead_acceptable(baseline,\
+      \ with_capture,\n                                       max_overhead_pct=10)\n\n    def test_tpch_overhead(self):\n\
+      \        \"\"\"Test overhead on full TPC-H benchmark.\"\"\"\n        # Run full TPC-H with and without plans\n     \
+      \   baseline_results = run_benchmark(\n            platform=\"duckdb\",\n            benchmark=\"tpch\",\n         \
+      \   scale=0.1,\n            capture_plans=False\n        )\n\n        capture_results = run_benchmark(\n           \
+      \ platform=\"duckdb\",\n            benchmark=\"tpch\",\n            scale=0.1,\n            capture_plans=True\n  \
+      \      )\n\n        baseline_time = sum(e.execution_time_ms for e in baseline_results.query_executions)\n        capture_time\
+      \ = sum(e.execution_time_ms for e in capture_results.query_executions)\n\n        self.assert_overhead_acceptable(baseline_time,\
+      \ capture_time,\n                                       max_overhead_pct=10)\n"
+  - summary: Create parser performance test
+    done: false
+    details: "File: tests/performance/test_parser_performance.py\n\n@pytest.mark.performance\nclass TestParserPerformance:\n\
+      \n    def test_parse_time_for_large_plan(self):\n        \"\"\"Test parsing time for large plans (100+ operators).\"\
+      \"\"\n        # Create or load fixture with large EXPLAIN output\n        large_explain = load_fixture(\"large_plan.txt\"\
+      )\n\n        parser = DuckDBQueryPlanParser()\n\n        start = time.perf_counter()\n        plan = parser.parse_explain_output(\"\
+      test\", large_explain)\n        parse_time_ms = (time.perf_counter() - start) * 1000\n\n        # Parsing should be\
+      \ fast (<20ms even for large plans)\n        assert parse_time_ms < 20, f\"Parse time {parse_time_ms:.2f}ms too slow\"\
+      \n\n    def test_comparison_performance(self):\n        \"\"\"Test comparison time for large plans.\"\"\"\n        plan1\
+      \ = create_large_plan(num_operators=200)\n        plan2 = create_large_plan(num_operators=200)\n\n        start = time.perf_counter()\n\
+      \        comparison = compare_query_plans(plan1, plan2)\n        compare_time_ms = (time.perf_counter() - start) * 1000\n\
+      \n        # Comparison should be fast (<50ms for 200 operators)\n        assert compare_time_ms < 50\n"
+  - summary: Add performance benchmarking script
+    done: false
+    details: 'File: scripts/benchmark_plan_capture.py
+
+
+      Script to run performance benchmarks and generate report:
+
+      - Measure overhead for different query types
+
+      - Test across platforms
+
+      - Generate CSV with results
+
+      - Create visualizations
+
+
+      Usage: python scripts/benchmark_plan_capture.py --output report.html
+
+      '
+- phase: 'Task 5.3: Edge Case Tests'
+  description: Test unusual but valid scenarios
+  items:
+  - summary: Create edge case test suite
+    done: false
+    details: "File: tests/unit/test_plan_edge_cases.py\n\n@pytest.mark.unit\nclass TestPlanEdgeCases:\n    \"\"\"Test unusual\
+      \ but valid query plan scenarios.\"\"\"\n"
+  - summary: Test very large plans
+    done: false
+    details: "def test_parse_plan_with_1000_operators():\n    \"\"\"Test parsing plan with 1000+ operators.\"\"\"\n    # Create\
+      \ synthetic EXPLAIN output with deep nesting\n    explain_output = create_deep_plan_explain(depth=1000)\n\n    parser\
+      \ = DuckDBQueryPlanParser()\n    plan = parser.parse_explain_output(\"test\", explain_output)\n\n    assert len(collect_all_operators(plan.logical_root))\
+      \ >= 1000\n\ndef test_serialize_large_plan():\n    \"\"\"Test serialization of large plan.\"\"\"\n    plan = create_large_plan(num_operators=1000)\n\
+      \n    # Should not exceed depth limit\n    plan_dict = plan.to_dict(max_depth=100)\n    assert plan_dict is not None\n"
+  - summary: Test recursive CTEs
+    done: false
+    details: "def test_recursive_cte_plan():\n    \"\"\"Test plan for recursive CTE.\"\"\"\n    query = \"\"\"\n        WITH\
+      \ RECURSIVE cte AS (\n            SELECT 1 as n\n            UNION ALL\n            SELECT n + 1 FROM cte WHERE n <\
+      \ 10\n        )\n        SELECT * FROM cte\n    \"\"\"\n\n    plan = capture_plan_for_query(\"duckdb\", query)\n\n \
+      \   # Verify CTE represented in plan\n    assert plan is not None\n    # Should not have cycles (even though query is\
+      \ recursive)\n    validate_no_cycles(plan.logical_root)\n"
+  - summary: Test UNION with many branches
+    done: false
+    details: "def test_union_with_20_branches():\n    \"\"\"Test plan for UNION with 20 SELECT statements.\"\"\"\n    selects\
+      \ = [f\"SELECT {i} as n\" for i in range(20)]\n    query = \" UNION ALL \".join(selects)\n\n    plan = capture_plan_for_query(\"\
+      duckdb\", query)\n\n    # Verify all branches captured\n    assert count_union_branches(plan.logical_root) == 20\n"
+  - summary: Test special characters in identifiers
+    done: false
+    details: "def test_plan_with_special_characters():\n    \"\"\"Test plan with special characters in table/column names.\"\
+      \"\"\n    query = '''\n        SELECT \"col with spaces\", \"col-with-dashes\", \"col_with_émoji\"\n        FROM \"\
+      table with spaces\"\n        WHERE \"col with spaces\" > 10\n    '''\n\n    plan = capture_plan_for_query(\"duckdb\"\
+      , query)\n\n    # Verify special characters preserved\n    assert plan is not None\n    # Check table name in scan operator\n\
+      \    scan = find_scan_operator(plan.logical_root)\n    assert scan.table_name == \"table with spaces\"\n"
+  - summary: Test extremely long identifiers
+    done: false
+    details: "def test_plan_with_long_table_name():\n    \"\"\"Test plan with 1000 character table name.\"\"\"\n    long_name\
+      \ = \"t\" * 1000\n    query = f\"SELECT * FROM {long_name}\"\n\n    plan = capture_plan_for_query(\"duckdb\", query)\n\
+      \n    # Verify long name handled\n    assert plan is not None\n    scan = find_scan_operator(plan.logical_root)\n  \
+      \  assert scan.table_name == long_name\n"
+  - summary: Test circular reference protection
+    done: false
+    details: "def test_serialization_circular_reference_protection():\n    \"\"\"Test that circular references don't cause\
+      \ infinite loop.\"\"\"\n    # Manually create invalid plan with cycle (shouldn't happen in practice)\n    root = LogicalOperator(operator_type=\"\
+      Scan\", ...)\n    child = LogicalOperator(operator_type=\"Filter\", ...)\n    root.children = [child]\n    child.children\
+      \ = [root]  # CYCLE!\n\n    plan = QueryPlanDAG(logical_root=root, ...)\n\n    # Serialization should detect cycle and\
+      \ raise error\n    with pytest.raises(SerializationError, match=\"cycle\"):\n        plan.to_dict()\n"
+- phase: 'Task 5.4: Concurrency Tests'
+  description: Test plan capture in parallel execution (throughput phase)
+  items:
+  - summary: Create concurrency test base
+    done: false
+    details: "File: tests/integration/test_plan_capture_concurrency.py\n\n@pytest.mark.integration\n@pytest.mark.concurrency\n\
+      class TestPlanCaptureConcurrency:\n    \"\"\"Test plan capture with concurrent query execution.\"\"\"\n"
+  - summary: Test throughput phase with plan capture
+    done: false
+    details: "def test_throughput_with_plan_capture():\n    \"\"\"Run throughput phase with plan capture enabled.\"\"\"\n\
+      \    results = run_benchmark_with_plans(\n        platform=\"duckdb\",\n        benchmark=\"ssb\",\n        scale=0.1,\n\
+      \        phases=[\"throughput\"],\n        num_streams=4\n    )\n\n    # Verify all streams captured plans\n    # Each\
+      \ query should have 4 executions (1 per stream)\n    executions_per_query = {}\n    for execution in results.query_executions:\n\
+      \        executions_per_query.setdefault(execution.query_id, []).append(execution)\n\n    for query_id, executions in\
+      \ executions_per_query.items():\n        assert len(executions) == 4\n        # Verify each has plan\n        for execution\
+      \ in executions:\n            assert execution.query_plan is not None\n"
+  - summary: Test parser thread safety
+    done: false
+    details: "def test_parser_thread_safety():\n    \"\"\"Test that parser can handle concurrent parse calls.\"\"\"\n    parser\
+      \ = DuckDBQueryPlanParser()\n    explain_output = load_fixture(\"sample_explain.txt\")\n\n    def parse_in_thread():\n\
+      \        return parser.parse_explain_output(\n            f\"query_{threading.get_ident()}\",\n            explain_output\n\
+      \        )\n\n    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:\n        futures = [executor.submit(parse_in_thread)\
+      \ for _ in range(10)]\n        plans = [f.result() for f in futures]\n\n    # Verify all parses succeeded\n    assert\
+      \ all(p is not None for p in plans)\n\n    # Verify operator IDs are unique per plan (not shared state)\n    id_sets\
+      \ = [collect_operator_ids(p.logical_root) for p in plans]\n    for ids in id_sets:\n        # Each plan should have\
+      \ low IDs (1, 2, 3, ...)\n        assert min(ids) == 1\n"
+  - summary: Test race conditions in capture state
+    done: false
+    details: "def test_no_race_conditions_in_capture_counters():\n    \"\"\"Test that concurrent captures don't corrupt counters.\"\
+      \"\"\n    # Run benchmark with multiple streams\n    results = run_benchmark_with_plans(\n        platform=\"duckdb\"\
+      ,\n        benchmark=\"ssb\",\n        scale=0.01,\n        phases=[\"throughput\"],\n        num_streams=4\n    )\n\
+      \n    # Verify counters are accurate\n    expected_captures = len(results.query_executions)\n    actual_captures = results.query_plans_captured\n\
+      \    actual_failures = results.plan_capture_failures\n\n    assert actual_captures + actual_failures == expected_captures\n"
+technical_requirements:
+- category: Test Coverage
+  items:
+  - Overall coverage ≥80% for query plan code
+  - Integration tests for all supported platforms
+  - Performance tests establish baseline and prevent regressions
+  - Edge cases cover unusual but valid inputs
+- category: Test Organization
+  items:
+  - Unit tests in tests/unit/
+  - Integration tests in tests/integration/
+  - Performance tests in tests/performance/
+  - Appropriate pytest markers (integration, performance, slow, platform names)
+- category: Performance Validation
+  items:
+  - Overhead tests assert <10% for typical queries
+  - Parser performance <20ms for large plans
+  - Comparison performance <50ms for 200 operators
+- category: Concurrency Validation
+  items:
+  - Thread safety verified with concurrent test
+  - No shared state corruption
+  - All parallel streams capture correctly
+files_affected:
+  modified:
+  - tests/integration/test_plan_capture_base.py
+  - tests/integration/test_plan_capture_duckdb.py
+  - tests/integration/test_plan_capture_postgresql.py
+  - tests/integration/test_plan_capture_cross_platform.py
+  - tests/integration/test_plan_results_roundtrip.py
+  - tests/integration/test_external_plan_storage.py
+  - tests/integration/test_plan_capture_concurrency.py
+  - tests/performance/perf_test_base.py
+  - tests/performance/test_plan_capture_overhead.py
+  - tests/performance/test_parser_performance.py
+  - tests/unit/test_plan_edge_cases.py
+  - scripts/benchmark_plan_capture.py
+  - tests/fixtures/large_plan.txt
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - query-plan
+  - testing
+  - integration
+  - performance
+  - p1
+  dependencies:
+  - phase-1-critical-bug-fixes.yaml
+  - phase-2-performance-observability.yaml
+  - phase-3-robustness-validation.yaml
+  - phase-4-platform-coverage.yaml
+  estimated_effort: 1.5-2 weeks
+  lines_of_code: ~1500 LOC (integration + performance + edge case tests)

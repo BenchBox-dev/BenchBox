@@ -1,3 +1,4 @@
+id: query-latency-histogram
 title: "Query Latency Histogram Visualization"
 worktree: main
 priority: Medium
@@ -52,125 +53,125 @@ context_sections:
 
 tasks:
   phases:
-    - phase: "Phase 1: Data Model and Interface"
+  - phase: "Phase 1: Data Model and Interface"
+    done: true
+    items:
+    - summary: "Define QueryLatencyDatum type for query latency data"
       done: true
-      items:
-        - summary: "Define QueryLatencyDatum type for query latency data"
-          done: true
-          notes: "Added to benchbox/core/visualization/charts.py"
-          subtasks:
-            - summary: "Add QueryLatencyDatum dataclass to charts.py"
-              done: true
-            - summary: "Include query_id, latency_ms, platform fields"
-              done: true
-            - summary: "Support optional error bars (error field)"
-              done: true
-        - summary: "Design chart interface for multi-chart output"
-          done: true
-          subtasks:
-            - summary: "Add figures() method returning list of Plotly figures"
-              done: true
-            - summary: "Add max_queries_per_chart option (default: 33)"
-              done: true
+      notes: "Added to benchbox/core/visualization/charts.py"
+      subtasks:
+      - summary: "Add QueryLatencyDatum dataclass to charts.py"
+        done: true
+      - summary: "Include query_id, latency_ms, platform fields"
+        done: true
+      - summary: "Support optional error bars (error field)"
+        done: true
+    - summary: "Design chart interface for multi-chart output"
+      done: true
+      subtasks:
+      - summary: "Add figures() method returning list of Plotly figures"
+        done: true
+      - summary: "Add max_queries_per_chart option (default: 33)"
+        done: true
 
-    - phase: "Phase 2: Plotly Implementation"
+  - phase: "Phase 2: Plotly Implementation"
+    done: true
+    items:
+    - summary: "Implement QueryLatencyHistogram class (Plotly)"
       done: true
-      items:
-        - summary: "Implement QueryLatencyHistogram class (Plotly)"
-          done: true
-          notes: "Added to benchbox/core/visualization/charts.py"
-          subtasks:
-            - summary: "Vertical bar layout with query IDs on x-axis"
-              done: true
-            - summary: "Latency values on y-axis with appropriate units"
-              done: true
-            - summary: "Color coding by performance (is_best/is_worst)"
-              done: true
-            - summary: "Mean line overlay for reference"
-              done: true
-        - summary: "Implement chart splitting for large query sets"
-          done: true
-          subtasks:
-            - summary: "Split logic when queries > max_queries_per_chart"
-              done: true
-            - summary: "Generate separate figures with range labels"
-              done: true
-            - summary: "Maintain consistent y-axis scale across charts"
-              done: true
-        - summary: "Natural query ID sorting (Q1, Q2, Q10 not Q1, Q10, Q2)"
-          done: true
-        - summary: "Multi-platform grouped bar support"
-          done: true
+      notes: "Added to benchbox/core/visualization/charts.py"
+      subtasks:
+      - summary: "Vertical bar layout with query IDs on x-axis"
+        done: true
+      - summary: "Latency values on y-axis with appropriate units"
+        done: true
+      - summary: "Color coding by performance (is_best/is_worst)"
+        done: true
+      - summary: "Mean line overlay for reference"
+        done: true
+    - summary: "Implement chart splitting for large query sets"
+      done: true
+      subtasks:
+      - summary: "Split logic when queries > max_queries_per_chart"
+        done: true
+      - summary: "Generate separate figures with range labels"
+        done: true
+      - summary: "Maintain consistent y-axis scale across charts"
+        done: true
+    - summary: "Natural query ID sorting (Q1, Q2, Q10 not Q1, Q10, Q2)"
+      done: true
+    - summary: "Multi-platform grouped bar support"
+      done: true
 
-    - phase: "Phase 3: ASCII Implementation"
+  - phase: "Phase 3: ASCII Implementation"
+    done: true
+    items:
+    - summary: "Implement ASCIIQueryHistogram class"
       done: true
-      items:
-        - summary: "Implement ASCIIQueryHistogram class"
-          done: true
-          notes: "Added to benchbox/core/visualization/ascii/histogram.py"
-          subtasks:
-            - summary: "Vertical bar rendering using Unicode blocks"
-              done: true
-            - summary: "Query ID labels below bars"
-              done: true
-            - summary: "Y-axis scale with latency values"
-              done: true
-            - summary: "Color coding for best/worst queries"
-              done: true
-        - summary: "Handle width constraints (40-120 chars)"
-          done: true
-          subtasks:
-            - summary: "Calculate optimal bar width based on query count"
-              done: true
-            - summary: "Truncate or abbreviate labels as needed"
-              done: true
-        - summary: "Multi-chart output for large query sets"
-          done: true
-          subtasks:
-            - summary: "Clear chart separators with range labels"
-              done: true
-            - summary: "Consistent formatting across charts"
-              done: true
-        - summary: "Unit tests for ASCII histogram"
-          done: true
-          notes: "17 tests added to test_ascii_charts.py"
+      notes: "Added to benchbox/core/visualization/ascii/histogram.py"
+      subtasks:
+      - summary: "Vertical bar rendering using Unicode blocks"
+        done: true
+      - summary: "Query ID labels below bars"
+        done: true
+      - summary: "Y-axis scale with latency values"
+        done: true
+      - summary: "Color coding for best/worst queries"
+        done: true
+    - summary: "Handle width constraints (40-120 chars)"
+      done: true
+      subtasks:
+      - summary: "Calculate optimal bar width based on query count"
+        done: true
+      - summary: "Truncate or abbreviate labels as needed"
+        done: true
+    - summary: "Multi-chart output for large query sets"
+      done: true
+      subtasks:
+      - summary: "Clear chart separators with range labels"
+        done: true
+      - summary: "Consistent formatting across charts"
+        done: true
+    - summary: "Unit tests for ASCII histogram"
+      done: true
+      notes: "17 tests added to test_ascii_charts.py"
 
-    - phase: "Phase 4: CLI and MCP Integration"
+  - phase: "Phase 4: CLI and MCP Integration"
+    done: true
+    items:
+    - summary: "Add 'query_histogram' to chart type options"
       done: true
-      items:
-        - summary: "Add 'query_histogram' to chart type options"
-          done: true
-          subtasks:
-            - summary: "Update CLI visualize command"
-              done: true
-            - summary: "Update MCP generate_chart tool"
-              done: true
-            - summary: "Update suggest_charts recommendations"
-              done: true
-        - summary: "Add to CHART_TYPE_DESCRIPTIONS"
-          done: true
-        - summary: "Update test expectations"
-          done: true
+      subtasks:
+      - summary: "Update CLI visualize command"
+        done: true
+      - summary: "Update MCP generate_chart tool"
+        done: true
+      - summary: "Update suggest_charts recommendations"
+        done: true
+    - summary: "Add to CHART_TYPE_DESCRIPTIONS"
+      done: true
+    - summary: "Update test expectations"
+      done: true
 
-    - phase: "Phase 5: Documentation"
+  - phase: "Phase 5: Documentation"
+    done: true
+    items:
+    - summary: "Add histogram examples to CLI help"
       done: true
-      items:
-        - summary: "Add histogram examples to CLI help"
-          done: true
-          notes: "Added to docs/visualization/cli-reference.md with ASCII and HTML examples"
-        - summary: "Update visualization documentation"
-          done: true
-          notes: "Added to chart-types.md (full section) and overview.md (taxonomy)"
-        - summary: "Add sample output screenshots"
-          done: true
-          notes: "Added ASCII example in chart-types.md; PNG screenshots deferred (require actual benchmark runs)"
+      notes: "Added to docs/visualization/cli-reference.md with ASCII and HTML examples"
+    - summary: "Update visualization documentation"
+      done: true
+      notes: "Added to chart-types.md (full section) and overview.md (taxonomy)"
+    - summary: "Add sample output screenshots"
+      done: true
+      notes: "Added ASCII example in chart-types.md; PNG screenshots deferred (require actual benchmark runs)"
 
 metadata:
   tags:
-    - visualization
-    - ascii-chart
-    - histogram
-    - query-analysis
+  - visualization
+  - ascii-chart
+  - histogram
+  - query-analysis
   estimated_effort: "3-5 days"
   created_date: "2025-02-05"
 
@@ -186,46 +187,46 @@ impact:
 
 files_affected:
   modified:
-    - "benchbox/core/visualization/charts.py"
-    - "benchbox/core/visualization/ascii/__init__.py"
-    - "benchbox/cli/commands/visualize.py"
-    - "benchbox/mcp/tools/visualization.py"
-    - "tests/unit/visualization/ascii/test_ascii_charts.py"
-    - "tests/unit/mcp/test_visualization_tools.py"
-    - "docs/visualization/chart-types.md"
-    - "docs/visualization/cli-reference.md"
-    - "docs/visualization/overview.md"
+  - "benchbox/core/visualization/charts.py"
+  - "benchbox/core/visualization/ascii/__init__.py"
+  - "benchbox/cli/commands/visualize.py"
+  - "benchbox/mcp/tools/visualization.py"
+  - "tests/unit/visualization/ascii/test_ascii_charts.py"
+  - "tests/unit/mcp/test_visualization_tools.py"
+  - "docs/visualization/chart-types.md"
+  - "docs/visualization/cli-reference.md"
+  - "docs/visualization/overview.md"
   added:
-    - "benchbox/core/visualization/ascii/histogram.py"
+  - "benchbox/core/visualization/ascii/histogram.py"
   removed: []
 
 dependencies:
   related:
-    - "_project/TODO/main/active/ascii-chart-visualizations.yaml"
+  - "_project/TODO/main/active/ascii-chart-visualizations.yaml"
   blocked_by: []
   blocks: []
 
 technical_requirements:
   constraints:
-    - "Must split charts when queries > 33 to maintain readability"
-    - "ASCII version must work in 80-column terminals"
-    - "Y-axis scale must be consistent across split charts"
-    - "Must handle TPC-DS (99 queries) and ClickBench (43 queries)"
+  - "Must split charts when queries > 33 to maintain readability"
+  - "ASCII version must work in 80-column terminals"
+  - "Y-axis scale must be consistent across split charts"
+  - "Must handle TPC-DS (99 queries) and ClickBench (43 queries)"
   dependencies:
-    - "Existing visualization infrastructure"
-    - "ASCII chart base classes (already implemented)"
+  - "Existing visualization infrastructure"
+  - "ASCII chart base classes (already implemented)"
 
 success_metrics:
-  - "Single-platform histogram renders correctly for TPC-H (22 queries)"
-  - "Multi-platform histogram shows grouped bars"
-  - "TPC-DS (99 queries) automatically splits into 3 charts"
-  - "ASCII version readable in 80-column terminal"
-  - "Chart splitting maintains consistent y-axis scale"
+- "Single-platform histogram renders correctly for TPC-H (22 queries)"
+- "Multi-platform histogram shows grouped bars"
+- "TPC-DS (99 queries) automatically splits into 3 charts"
+- "ASCII version readable in 80-column terminal"
+- "Chart splitting maintains consistent y-axis scale"
 
 open_questions:
-  - "Should sorting default to query ID order or latency-ranked?" # Default: query_id
-  - "For multi-platform, use grouped bars or separate charts?" # Implemented: grouped bars
-  - "Should we include median/mean reference lines?" # Implemented: mean line
+- "Should sorting default to query ID order or latency-ranked?"   # Default: query_id
+- "For multi-platform, use grouped bars or separate charts?"   # Implemented: grouped bars
+- "Should we include median/mean reference lines?"   # Implemented: mean line
 
 commits:
-  - "2448e586"
+- "2448e586"

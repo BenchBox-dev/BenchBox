@@ -1,3 +1,4 @@
+id: firebolt-mode-validation
 title: Firebolt Core/Cloud Mode Validation
 worktree: platform-expansion
 priority: Medium
@@ -11,46 +12,46 @@ description: |
   - Cloud: Managed service with client_id/client_secret
 
 tasks:
-  - phase: "Mode Detection"
+- phase: "Mode Detection"
+  done: true
+  items:
+  - summary: "Improve mode auto-detection logic"
     done: true
-    items:
-      - summary: "Improve mode auto-detection logic"
-        done: true
-      - summary: "Add explicit mode parameter option"
-        done: true
-      - summary: "Log which mode is being used"
-        done: true
-  - phase: "Core Mode Validation"
+  - summary: "Add explicit mode parameter option"
     done: true
-    items:
-      - summary: "Check if Docker is running on port 3473"
-        done: true
-        note: "Handled via connection test - clear error on failure"
-      - summary: "Provide Docker startup command in error"
-        done: true
-      - summary: "Validate database exists"
-        done: true
-        note: "Handled via check_server_database_exists()"
-  - phase: "Cloud Mode Validation"
+  - summary: "Log which mode is being used"
     done: true
-    items:
-      - summary: "Validate client_id format"
-        done: true
-        note: "SDK validates during authentication"
-      - summary: "Validate client_secret presence"
-        done: true
-      - summary: "Validate account name format"
-        done: true
-      - summary: "Check engine availability"
-        done: true
-        note: "Handled via connection test"
-  - phase: "Testing"
+- phase: "Core Mode Validation"
+  done: true
+  items:
+  - summary: "Check if Docker is running on port 3473"
     done: true
-    items:
-      - summary: "Add mode detection tests"
-        done: true
-      - summary: "Add validation error message tests"
-        done: true
+    note: "Handled via connection test - clear error on failure"
+  - summary: "Provide Docker startup command in error"
+    done: true
+  - summary: "Validate database exists"
+    done: true
+    note: "Handled via check_server_database_exists()"
+- phase: "Cloud Mode Validation"
+  done: true
+  items:
+  - summary: "Validate client_id format"
+    done: true
+    note: "SDK validates during authentication"
+  - summary: "Validate client_secret presence"
+    done: true
+  - summary: "Validate account name format"
+    done: true
+  - summary: "Check engine availability"
+    done: true
+    note: "Handled via connection test"
+- phase: "Testing"
+  done: true
+  items:
+  - summary: "Add mode detection tests"
+    done: true
+  - summary: "Add validation error message tests"
+    done: true
 
 completion_notes: |
   Already implemented - Firebolt adapter already has comprehensive validation.
@@ -87,12 +88,12 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - firebolt
-    - validation
-    - error-messages
-    - user-experience
+  - firebolt
+  - validation
+  - error-messages
+  - user-experience
   estimated_effort: 3-4 hours (already implemented)
   created_date: "2025-12-13"
 
@@ -105,11 +106,11 @@ impact:
     Clear guidance for Docker setup or Cloud credentials.
 
 success_metrics:
-  - "Mode is clearly logged at startup - DONE"
-  - "Core mode checks Docker availability - DONE (via connection test)"
-  - "Cloud mode validates all credentials - DONE"
-  - "Error messages include mode-specific fix instructions - DONE"
+- "Mode is clearly logged at startup - DONE"
+- "Core mode checks Docker availability - DONE (via connection test)"
+- "Cloud mode validates all credentials - DONE"
+- "Error messages include mode-specific fix instructions - DONE"
 
 files_verified:
-  - benchbox/platforms/firebolt.py
-  - tests/unit/platforms/test_firebolt_adapter.py
+- benchbox/platforms/firebolt.py
+- tests/unit/platforms/test_firebolt_adapter.py

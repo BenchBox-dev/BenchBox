@@ -1,0 +1,380 @@
+id: phase-3-robustness-validation
+title: 'Query Plan Remediation - Phase 3: Robustness & Validation'
+worktree: query-plan-remediation
+category: Quality & Reliability
+priority: High
+status: Completed
+description: 'Add comprehensive validation and error handling to ensure query plan data
+
+  integrity and robustness against malformed inputs. Implement validation at
+
+  multiple layers: post-parse, pre-serialization, and post-deserialization.
+
+
+  **Problems Addressed**:
+
+  - No validation of parsed plan tree structure (could have cycles, orphans)
+
+  - Fingerprints become stale after tree mutations (not validated)
+
+  - Parser errors lack context (no line numbers, sample data)
+
+  - Malformed plans cause silent failures or cryptic errors
+
+  '
+context_sections:
+- name: Lack of Plan Tree Validation
+  summary: 'After parsing EXPLAIN output, there''s no validation that the resulting
+
+    operator tree is well-formed. Possible issues:
+
+    - Cycles in tree (A → B → C → A)
+
+    - Orphaned nodes (operators with no parent path to root)
+
+    - Duplicate operator IDs
+
+    - Missing required fields
+
+
+    These structural issues would cause comparison/serialization failures
+
+    downstream with confusing error messages.
+
+
+    Location: No validation exists currently
+
+    '
+- name: Stale Fingerprints After Mutation
+  summary: "QueryPlanDAG computes fingerprint in __post_init__, but dataclasses are\nmutable. If someone modifies the logical\
+    \ tree after creation, the\nfingerprint becomes incorrect:\n\n  plan = QueryPlanDAG(...)  # Fingerprint computed\n  plan.logical_root.children.append(new_op)\
+    \  # Tree modified\n  # Fingerprint now incorrect!\n\nNo method to verify or refresh fingerprint.\n\nLocation: benchbox/core/results/query_plan_models.py\n"
+- name: Poor Parser Error Context
+  summary: 'When parsing fails, errors like "No operators found" or "Invalid format"
+
+    don''t include:
+
+    - Which line of EXPLAIN output failed
+
+    - Sample of the problematic text
+
+    - Platform version information
+
+    - Whether format has changed from expected
+
+
+    Makes debugging parser issues very difficult.
+
+
+    Location: benchbox/parsers/*.py
+
+    '
+- name: Malformed Plan Handling
+  summary: 'No graceful handling of malformed plans:
+
+    - Parser may return partially-constructed plan
+
+    - Serialization might fail mid-way
+
+    - Comparison could crash on unexpected structure
+
+
+    Need consistent error handling across pipeline.
+
+    '
+impact: 'HIGH - Without validation, data integrity issues can propagate through the
+
+  system, causing confusing failures far from the root cause. Parser errors are
+
+  difficult to debug without context.
+
+
+  - Validation catches issues early with clear error messages
+
+  - Fingerprint verification ensures comparison reliability
+
+  - Rich error context enables faster debugging
+
+  - Graceful degradation maintains benchmark stability
+
+  '
+research_value: 'Demonstrates defense-in-depth validation strategy for complex structured data.
+
+  Shows importance of error context in debugging data pipeline issues.
+
+  '
+tasks:
+- phase: 'Task 3.1: Add Plan Tree Validation'
+  description: Validate structural integrity of parsed operator trees
+  items:
+  - summary: Create PlanValidationError exception class
+    done: false
+    details: "File: benchbox/core/errors.py\n\n@dataclass\nclass PlanValidationError(Exception):\n    query_id: str\n    validation_errors:\
+      \ list[str]\n    plan_structure: str  # Brief description of tree\n\n    def __str__(self):\n        errors = \"\\n\
+      \  - \".join(self.validation_errors)\n        return (f\"Plan validation failed for {self.query_id}:\\n\"\n        \
+      \        f\"  - {errors}\\n\"\n                f\"Structure: {self.plan_structure}\")\n"
+  - summary: Implement validate_plan_tree() method
+    done: false
+    details: "File: benchbox/core/results/query_plan_models.py\n\ndef validate_plan_tree(root: LogicalOperator) -> list[str]:\n\
+      \    \"\"\"Validate tree structure, return list of errors.\"\"\"\n    errors = []\n    visited: set[int] = set()\n \
+      \   operator_ids: set[str] = set()\n\n    def validate_node(node: LogicalOperator, path: list[str]):\n        # Check\
+      \ for cycles\n        node_id = id(node)\n        if node_id in visited:\n            errors.append(f\"Cycle detected\
+      \ at {node.operator_id}\")\n            return\n        visited.add(node_id)\n\n        # Check for duplicate operator\
+      \ IDs\n        if node.operator_id in operator_ids:\n            errors.append(f\"Duplicate operator_id: {node.operator_id}\"\
+      )\n        operator_ids.add(node.operator_id)\n\n        # Check required fields\n        if not node.operator_type:\n\
+      \            errors.append(f\"Missing operator_type for {node.operator_id}\")\n\n        # Recursively validate children\n\
+      \        for child in node.children:\n            validate_node(child, path + [node.operator_id])\n\n    validate_node(root,\
+      \ [])\n    return errors\n"
+  - summary: Add validate_root_is_root() check
+    done: false
+    details: "Ensure root operator has properties consistent with being a root:\n- For most queries: root should be Project,\
+      \ Sort, or Limit\n- Root shouldn't be Scan or Filter (incomplete plan)\n\ndef validate_root_is_root(root: LogicalOperator)\
+      \ -> list[str]:\n    errors = []\n    if root.operator_type in [\"Scan\", \"Filter\"]:\n        errors.append(\n   \
+      \         f\"Root operator is {root.operator_type}, \"\n            \"which is unusual. Plan may be incomplete.\"\n\
+      \        )\n    return errors\n"
+  - summary: Call validation after parsing
+    done: false
+    details: "File: benchbox/parsers/base.py\n\ndef parse_explain_output(self, query_id, explain_output):\n    plan = self._parse_impl(query_id,\
+      \ explain_output)\n\n    # Validate parsed plan\n    validation_errors = validate_plan_tree(plan.logical_root)\n   \
+      \ if validation_errors:\n        raise PlanValidationError(\n            query_id=query_id,\n            validation_errors=validation_errors,\n\
+      \            plan_structure=self._describe_tree(plan.logical_root)\n        )\n\n    return plan\n"
+  - summary: Add optional strict validation mode
+    done: false
+    details: 'Add config flag: validation_mode = "strict" | "lenient"
+
+
+      Strict: Raise exception on any validation error
+
+      Lenient: Log warnings but return plan anyway
+
+
+      Default: lenient (for backward compatibility)
+
+      '
+  - summary: Create comprehensive validation tests
+    done: false
+    details: 'File: tests/unit/core/results/test_plan_validation.py
+
+
+      Test cases:
+
+      - Valid tree passes validation
+
+      - Cycle detected and reported
+
+      - Duplicate IDs detected
+
+      - Missing required fields detected
+
+      - Root is leaf operator (warning)
+
+      - Empty tree (error)
+
+      - Single operator tree (valid)
+
+      '
+- phase: 'Task 3.2: Implement Fingerprint Integrity Checks'
+  description: Verify fingerprints remain valid and provide refresh mechanism
+  items:
+  - summary: Add verify_fingerprint() method
+    done: false
+    details: "File: benchbox/core/results/query_plan_models.py\n\n@dataclass\nclass QueryPlanDAG:\n    # ... existing fields\
+      \ ...\n\n    def verify_fingerprint(self) -> bool:\n        \"\"\"Check if stored fingerprint matches current tree structure.\"\
+      \"\"\n        current = self.compute_plan_fingerprint(self.logical_root)\n        return current == self.plan_fingerprint\n\
+      \n    def refresh_fingerprint(self) -> None:\n        \"\"\"Recompute fingerprint based on current tree structure.\"\
+      \"\"\n        self.plan_fingerprint = self.compute_plan_fingerprint(\n            self.logical_root\n        )\n"
+  - summary: Call verify_fingerprint() in from_dict()
+    done: false
+    details: "When deserializing plan from JSON:\n\n@classmethod\ndef from_dict(cls, data: dict) -> \"QueryPlanDAG\":\n  \
+      \  plan = cls(...)\n    if not plan.verify_fingerprint():\n        raise IntegrityError(\n            f\"Fingerprint\
+      \ mismatch for {plan.query_id}. \"\n            \"Plan may have been corrupted or modified.\"\n        )\n    return\
+      \ plan\n"
+  - summary: Add --skip-fingerprint-verification flag
+    done: false
+    details: "For performance-critical loading, allow skipping verification:\n\nFile: benchbox/cli/commands/compare.py\n\n\
+      @click.option(\"--skip-fingerprint-verification\",\n             is_flag=True,\n             help=\"Skip fingerprint\
+      \ verification on load (faster)\")\n"
+  - summary: Emit warning if plan modified after creation
+    done: false
+    details: "If code ever modifies plan tree (not recommended), emit warning:\n\nif hasattr(plan, '_modified'):\n    logger.warning(\n\
+      \        \"Plan for %s was modified after creation. \"\n        \"Fingerprint may be stale. Call refresh_fingerprint().\"\
+      ,\n        plan.query_id\n    )\n"
+  - summary: Add tests for fingerprint verification
+    done: false
+    details: 'File: tests/unit/core/results/test_fingerprint_integrity.py
+
+
+      - Test: Unmodified plan passes verification
+
+      - Test: Modified plan fails verification
+
+      - Test: refresh_fingerprint() updates correctly
+
+      - Test: Deserialization with bad fingerprint raises error
+
+      - Test: Skip verification flag works
+
+      '
+- phase: 'Task 3.3: Improve Parser Error Context'
+  description: Add rich context to parser errors for easier debugging
+  items:
+  - summary: Create PlanParseError exception class
+    done: false
+    details: "File: benchbox/core/errors.py\n\n@dataclass\nclass PlanParseError(Exception):\n    query_id: str\n    platform:\
+      \ str\n    error_message: str\n    line_number: int | None = None\n    explain_sample: str | None = None  # First 500\
+      \ chars\n    platform_version: str | None = None\n\n    def __str__(self):\n        msg = [f\"Failed to parse query\
+      \ plan for {self.query_id} \"\n              f\"({self.platform}): {self.error_message}\"]\n\n        if self.line_number:\n\
+      \            msg.append(f\"  At line: {self.line_number}\")\n\n        if self.explain_sample:\n            msg.append(f\"\
+      \  EXPLAIN output sample:\\n{self.explain_sample}\")\n\n        if self.platform_version:\n            msg.append(f\"\
+      \  Platform version: {self.platform_version}\")\n\n        return \"\\n\".join(msg)\n"
+  - summary: Add line tracking to parser state
+    done: false
+    details: "File: benchbox/parsers/base.py\n\nclass QueryPlanParser:\n    def __init__(self, ...):\n        self.current_line_number\
+      \ = 0\n\n    def _parse_line(self, line: str):\n        self.current_line_number += 1\n        try:\n            # ...\
+      \ parse line\n        except Exception as e:\n            raise PlanParseError(\n                query_id=self.current_query_id,\n\
+      \                platform=self.platform_name,\n                error_message=str(e),\n                line_number=self.current_line_number,\n\
+      \                explain_sample=self._get_explain_sample()\n            )\n"
+  - summary: Capture EXPLAIN output sample on error
+    done: false
+    details: "def _get_explain_sample(self) -> str:\n    \"\"\"Get first 500 chars of EXPLAIN output for context.\"\"\"\n\
+      \    if not hasattr(self, '_explain_output'):\n        return \"\"\n    return self._explain_output[:500] + \"...\"\
+      \ if len(self._explain_output) > 500 else self._explain_output\n"
+  - summary: Detect and report platform version
+    done: false
+    details: "File: benchbox/platforms/base/adapter.py\n\ndef get_platform_version(self, connection) -> str:\n    \"\"\"Get\
+      \ platform version string for error context.\"\"\"\n    # Override in subclasses\n    return \"unknown\"\n\n# DuckDB:\n\
+      def get_platform_version(self, connection):\n    return connection.execute(\"SELECT version()\").fetchone()[0]\n\nInclude\
+      \ in PlanParseError for debugging version-specific issues.\n"
+  - summary: Add format change detection
+    done: false
+    details: "If parser fails, check if format looks different from expected:\n\ndef _detect_format_change(self, explain_output:\
+      \ str) -> bool:\n    \"\"\"Check if EXPLAIN format has changed.\"\"\"\n    expected_markers = [\"┌\", \"│\", \"QUERY\
+      \ PLAN\"]\n    found = any(marker in explain_output for marker in expected_markers)\n    if not found:\n        logger.warning(\n\
+      \            \"EXPLAIN output format may have changed. \"\n            \"Expected markers not found.\"\n        )\n\
+      \    return not found\n"
+  - summary: Update all parsers to use rich errors
+    done: false
+    details: 'Files:
+
+      - benchbox/parsers/duckdb_parser.py
+
+      - benchbox/parsers/sqlite_parser.py (if exists)
+
+      - Future parsers
+
+
+      Wrap parse failures with PlanParseError including full context.
+
+      '
+  - summary: Add tests for error context
+    done: false
+    details: 'File: tests/parsers/test_parse_error_context.py
+
+
+      - Test: Parse error includes line number
+
+      - Test: Parse error includes EXPLAIN sample
+
+      - Test: Parse error includes platform version
+
+      - Test: Format change detected and logged
+
+      '
+- phase: 'Task 3.4: Handle Malformed Plans Gracefully'
+  description: Consistent error handling across plan capture pipeline
+  items:
+  - summary: Add --skip-malformed-plans CLI flag
+    done: false
+    details: "File: benchbox/cli/run.py\n\n@click.option(\"--skip-malformed-plans\", is_flag=True, default=True,\n       \
+      \      help=\"Continue benchmark if plan capture/parse fails \"\n                  \"(default: True)\")\n\nWhen True:\
+      \ Log warning, continue benchmark, plan = None\nWhen False: Raise exception, halt benchmark\n"
+  - summary: Implement graceful error handling in adapter
+    done: false
+    details: "File: benchbox/platforms/base/adapter.py\n\ndef capture_query_plan(self, connection, query, query_id):\n   \
+      \ try:\n        # ... capture and parse\n    except PlanParseError as e:\n        if self.config.skip_malformed_plans:\n\
+      \            logger.warning(\"Skipping malformed plan: %s\", e)\n            self.results.plan_capture_failures += 1\n\
+      \            return None, 0.0\n        else:\n            raise  # Halt benchmark\n\n    except PlanValidationError\
+      \ as e:\n        if self.config.skip_malformed_plans:\n            logger.warning(\"Skipping invalid plan: %s\", e)\n\
+      \            self.results.plan_capture_failures += 1\n            return None, 0.0\n        else:\n            raise\n"
+  - summary: Track error types in results
+    done: false
+    details: "File: benchbox/core/results/models.py\n\n@dataclass\nclass BenchmarkResults:\n    # ... existing fields ...\n\
+      \    plan_parse_errors: int = 0\n    plan_validation_errors: int = 0\n    plan_serialization_errors: int = 0\n\nIncrement\
+      \ appropriate counter on each error type.\n"
+  - summary: Add error summary at end of run
+    done: false
+    details: "After benchmark completes:\n\nlogger.info(\n    \"Query plans captured: %d/%d successful, %d failed \"\n   \
+      \ \"(parse: %d, validation: %d, serialization: %d)\",\n    self.results.query_plans_captured,\n    total_queries,\n\
+      \    self.results.plan_capture_failures,\n    self.results.plan_parse_errors,\n    self.results.plan_validation_errors,\n\
+      \    self.results.plan_serialization_errors\n)\n"
+  - summary: Implement safe serialization wrapper
+    done: false
+    details: "File: benchbox/core/results/query_plan_models.py\n\ndef safe_to_dict(self, max_depth=50) -> dict[str, Any] |\
+      \ None:\n    \"\"\"Serialize with error handling.\"\"\"\n    try:\n        return self.to_dict(max_depth=max_depth)\n\
+      \    except Exception as e:\n        logger.error(\"Failed to serialize plan for %s: %s\",\n                   self.query_id,\
+      \ e)\n        return None\n\nUse in results export to prevent single bad plan from breaking export.\n"
+  - summary: Add tests for graceful degradation
+    done: false
+    details: 'File: tests/integration/test_malformed_plan_handling.py
+
+
+      - Test: Malformed EXPLAIN → warning logged, benchmark continues
+
+      - Test: --skip-malformed-plans=False → exception raised
+
+      - Test: Multiple failures tracked correctly
+
+      - Test: Error summary includes all error types
+
+      - Test: Serialization error doesn''t break results export
+
+      '
+technical_requirements:
+- category: Validation
+  items:
+  - Validation detects: cycles, orphans, duplicates, missing fields
+  - Validation runs post-parse before returning plan
+  - Validation mode configurable (strict vs lenient)
+- category: Error Handling
+  items:
+  - All parse errors include: line number, sample, version
+  - Error messages are user-friendly and actionable
+  - Graceful degradation is the default behavior
+- category: Integrity
+  items:
+  - Fingerprint verification on deserialization (optional skip)
+  - Fingerprint refresh available for modified plans
+  - Serialization errors don't corrupt results
+- category: Testing
+  items:
+  - Unit tests for all validation checks
+  - Integration tests for error handling paths
+  - Stress tests with malformed inputs
+files_affected:
+  modified:
+  - benchbox/core/results/query_plan_models.py
+  - benchbox/parsers/base.py
+  - benchbox/parsers/duckdb_parser.py
+  - benchbox/platforms/base/adapter.py
+  - benchbox/core/results/models.py
+  - benchbox/cli/run.py
+  - benchbox/core/errors.py (if not exists, or add to existing)
+  - tests/unit/core/results/test_plan_validation.py
+  - tests/unit/core/results/test_fingerprint_integrity.py
+  - tests/parsers/test_parse_error_context.py
+  - tests/integration/test_malformed_plan_handling.py
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - query-plan
+  - validation
+  - robustness
+  - error-handling
+  - p1
+  dependencies:
+  - phase-1-critical-bug-fixes.yaml (error infrastructure)
+  estimated_effort: 5-6 days
+  lines_of_code: ~500 LOC (validation + error handling + tests)

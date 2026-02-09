@@ -1,0 +1,176 @@
+id: dataframe-backwards-compatibility-and-mode-coexistence
+title: DataFrame Backwards Compatibility and Mode Coexistence
+worktree: dataframe-phase0-compat
+category: Core Functionality
+priority: Critical
+status: Completed
+completed_date: '2025-12-02'
+description: 'Ensure DataFrame mode coexists with existing SQL mode. Define interaction
+
+  between modes, migration path, and CLI interface for mode selection.
+
+  '
+implementation_summary: 'Implemented clean mode separation via platform naming convention:
+
+
+  Mode Detection:
+
+  - Platform names ending with -df use DataFrame mode
+
+  - polars-df, pandas-df → DataFrame execution
+
+  - All other platforms → SQL execution
+
+  - is_dataframe_execution() and get_execution_mode() helpers
+
+
+  DataFrame Runner (benchbox/core/runner/dataframe_runner.py):
+
+  - run_dataframe_benchmark() handles complete DataFrame lifecycle
+
+  - DataFramePhases for load/execute phase control
+
+  - DataFrameRunOptions for memory warnings, caching, format preferences
+
+  - Pre-execution memory check and scale factor validation
+
+  - Data loading via DataFrameDataLoader
+
+  - Query execution via platform adapters
+
+
+  Orchestrator Routing (benchbox/cli/orchestrator.py):
+
+  - Automatic routing based on platform type
+
+  - DataFrame platforms → run_dataframe_benchmark()
+
+  - SQL platforms → run_benchmark_lifecycle()
+
+  - No --mode flag needed - mode determined by platform name
+
+
+  Result Schema Compatibility:
+
+  - Both modes produce BenchmarkResults
+
+  - execution_metadata["execution_mode"] = "sql" | "dataframe"
+
+  - execution_metadata["dataframe_platform"] for DataFrame runs
+
+  - All existing result fields populated for both modes
+
+
+  Note: Since project is not yet released, simplified approach used:
+
+  - No --mode flag (platform suffix is mode selector)
+
+  - No migration documentation needed
+
+  - No deprecation policy needed
+
+  '
+tasks:
+- phase: 'Phase 0.15: CLI Mode Selection'
+  items:
+  - summary: Add --mode flag to benchbox CLI
+    done: false
+    note: 'Simplified: mode determined by platform suffix (-df)
+
+      No explicit --mode flag needed
+
+      '
+  - summary: Implement mode validation per platform
+    done: true
+    details: 'is_dataframe_execution() checks for -df suffix
+
+      get_execution_mode() returns "sql" or "dataframe"
+
+      '
+  - summary: Update platform registry with mode support
+    done: true
+    details: 'DataFrame platforms registered separately (polars-df, pandas-df)
+
+      is_dataframe_platform() function in platforms/__init__.py
+
+      '
+- phase: 'Phase 0.16: Result Schema Compatibility'
+  items:
+  - summary: Ensure BenchmarkResults compatible across modes
+    done: true
+    details: 'Both SQL and DataFrame modes return BenchmarkResults
+
+      Same schema version and field types
+
+      DataFrame-specific info in execution_metadata dict
+
+      '
+  - summary: Update result exporters to handle both modes
+    done: true
+    details: 'No changes needed - both return standard BenchmarkResults
+
+      '
+  - summary: Add mode indicator to result metadata
+    done: true
+    details: 'execution_metadata["execution_mode"] = "sql" | "dataframe"
+
+      execution_metadata["dataframe_platform"] = platform name
+
+      execution_metadata["adapter_info"] = platform info dict
+
+      '
+- phase: 'Phase 0.17: Dual-Mode Platform Support'
+  items:
+  - summary: Design pattern for platforms supporting both modes
+    done: true
+    details: 'Platform naming convention provides separation:
+
+      - polars: SQL mode adapter (if exists)
+
+      - polars-df: DataFrame mode adapter
+
+      Separate adapter classes for each mode
+
+      '
+  - summary: Add comparison utility for SQL vs DataFrame results
+    done: false
+    note: 'Deferred - can use existing result comparison when needed
+
+      '
+- phase: 'Phase 0.18: Migration Documentation'
+  items:
+  - summary: Create SQL to DataFrame migration guide
+    done: false
+    note: 'Deferred - project not yet released
+
+      Will document when feature is stable
+
+      '
+  - summary: Document default behavior changes (if any)
+    done: true
+    details: 'No changes - SQL remains default for existing platforms
+
+      '
+  - summary: Create deprecation policy (if needed)
+    done: true
+    details: 'No deprecations - both modes fully supported
+
+      Project not yet released so no backwards compat issues
+
+      '
+files_affected:
+  modified:
+  - benchbox/core/runner/dataframe_runner.py
+  - tests/unit/core/runner/test_dataframe_runner.py
+  - benchbox/cli/orchestrator.py
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - dataframe
+  - compatibility
+  - phase0
+  estimated_effort: 2-3 days
+  actual_effort: Core implementation complete, docs deferred

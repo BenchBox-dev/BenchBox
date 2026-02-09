@@ -1,0 +1,114 @@
+id: fabric-spark-platform
+title: "Microsoft Fabric Spark Platform"
+worktree: platform-expansion
+priority: Medium-High
+status: Completed
+category: Platform Expansion
+completed_date: "2025-12-24"
+
+description: |
+  Add Microsoft Fabric Spark platform adapter. Fabric is Microsoft's SaaS unified
+  analytics platform replacing Azure Synapse for new deployments. Uses OneLake
+  for storage and Livy API for Spark session management.
+
+  Implementation uses Azure Entra ID for authentication and OneLake (ADLS Gen2)
+  for data staging.
+
+tasks:
+  phases:
+  - phase: "Phase 1: Adapter Implementation"
+    done: true
+    items:
+    - summary: "Create benchbox/platforms/azure/__init__.py"
+      done: true
+    - summary: "Create FabricSparkAdapter class"
+      done: true
+      subtasks:
+      - summary: "Implement create_connection() with Fabric REST API + Livy"
+        done: true
+      - summary: "Implement Entra ID authentication (DefaultAzureCredential)"
+        done: true
+      - summary: "Implement create_schema() with Fabric Lakehouse"
+        done: true
+      - summary: "Implement load_data() with OneLake upload"
+        done: true
+      - summary: "Implement execute_query() with Livy statements"
+        done: true
+    - summary: "Support SQL and DataFrame execution modes"
+      done: true
+    - summary: "Register in platform_registry.py"
+      done: true
+
+  - phase: "Phase 2: Configuration"
+    done: true
+    items:
+    - summary: "Add CLI arguments (workspace_id, lakehouse_id, tenant_id, etc.)"
+      done: true
+    - summary: "Add fabric-spark dependency group to dependencies.py"
+      done: true
+
+  - phase: "Phase 3: Testing"
+    done: true
+    items:
+    - summary: "Create unit tests with mocked Fabric API"
+      done: true
+      note: "20 unit tests covering initialization, connection, data loading, tuning, CLI, registry"
+
+  - phase: "Phase 4: Documentation"
+    done: true
+    items:
+    - summary: "Create examples/getting_started/cloud/fabric_spark_tpch.py"
+      done: true
+    - summary: "Write docs/platforms/fabric-spark.md"
+      done: true
+    - summary: "Document Entra ID authentication methods"
+      done: true
+
+metadata:
+  tags:
+  - cloud-spark
+  - azure
+  - fabric
+  - saas
+  estimated_effort: 2 weeks
+  actual_effort: "1 day (leveraging cloud-spark shared infrastructure)"
+  created_date: "2025-12-24"
+
+impact:
+  business_value: |
+    Microsoft Fabric is the future of Azure analytics (replacing Synapse for new
+    deployments). Adding support positions BenchBox for the Microsoft ecosystem.
+
+files_affected:
+  modified:
+  - benchbox/core/platform_registry.py
+  - benchbox/utils/dependencies.py
+  added:
+  - benchbox/platforms/azure/__init__.py
+  - benchbox/platforms/azure/fabric_spark_adapter.py
+  - tests/unit/platforms/azure/__init__.py
+  - tests/unit/platforms/azure/test_fabric_spark_adapter.py
+  - examples/getting_started/cloud/fabric_spark_tpch.py
+  - docs/platforms/fabric-spark.md
+
+implementation_notes: |
+  Implemented using the cloud-spark shared infrastructure:
+  - CloudSparkStaging.from_uri() for OneLake data uploads
+  - SparkConfigOptimizer.for_tpch() for benchmark-specific Spark configs
+  - Livy REST API for session and statement management
+
+  Key adapter features:
+  - DefaultAzureCredential for flexible authentication
+  - Token refresh with 5-minute buffer
+  - Session lifecycle management (create/verify/close)
+  - Statement polling with configurable timeout
+  - LivySessionState and LivyStatementState constants
+
+success_metrics:
+- "20 unit tests passing with full coverage of adapter functionality"
+- "Documentation complete with authentication guide"
+- "Example script with dry-run support"
+
+dependencies:
+  blocked_by:
+  - _project/DONE/platform-expansion/planning/cloud-spark-shared-infrastructure.yaml

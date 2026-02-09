@@ -1,53 +1,74 @@
+id: implement-expression-family-base-adapter-and-dialects
 title: Implement Expression Family Base Adapter and Dialects
 worktree: dataframe-expression-family
 category: Core Functionality
 priority: Critical
-status: "Completed"
+status: Completed
 completed_date: '2025-12-02'
-description: |
-  Implement ExpressionFamilyAdapter base class and dialect translation layer
+description: 'Implement ExpressionFamilyAdapter base class and dialect translation layer
+
   for expression-based libraries (Polars, PySpark, DataFusion). Single query
+
   implementation with 3 dialect translators.
 
+  '
 context_sections:
 - name: Family Members
-  summary: |
-    Polars (reference, pl.col), PySpark (F.col, camelCase), DataFusion
+  summary: 'Polars (reference, pl.col), PySpark (F.col, camelCase), DataFusion
+
     (col, aggregate syntax). Share 85-90% conceptual API.
+
+    '
 - name: Dialect Differences
-  summary: |
-    Namespace (pl vs F vs bare), method naming (group_by vs groupBy),
+  summary: 'Namespace (pl vs F vs bare), method naming (group_by vs groupBy),
+
     aggregation syntax (list vs args). Cosmetic differences only.
 
-impact: |
-  HIGH - Single implementation + 3 dialects serves 3 platforms. Enables modern
+    '
+impact: 'HIGH - Single implementation + 3 dialects serves 3 platforms. Enables modern
+
   lazy evaluation benchmarking across Rust and JVM backends.
 
-implementation_summary: |
-  Completed Phases 3.1 and 3.2:
+  '
+implementation_summary: 'Completed Phases 3.1 and 3.2:
+
   - ExpressionFamilyAdapter base class with abstract methods
+
   - ExpressionFamilyContext for table access and expression helpers
+
   - PolarsDataFrameAdapter concrete implementation
+
   - Full data loading (CSV, Parquet, TBL formats)
+
   - Query execution with timing and row count validation
+
   - Platform availability detection
 
+
   Not yet implemented:
+
   - PySpark adapter (Phase 3.3)
+
   - DataFusion DataFrame adapter (Phase 3.4)
+
   - Formal dialect translation layer
 
+  '
 tasks:
 - phase: 'Phase 3.1: Base Adapter Class'
   description: Abstract base for expression-based platforms
   items:
   - summary: Create ExpressionFamilyAdapter in benchbox/platforms/dataframe/expression_family.py
     done: true
-    details: |
-      Implemented with abstract methods: col(), lit(), date_sub(), date_add(),
+    details: 'Implemented with abstract methods: col(), lit(), date_sub(), date_add(),
+
       cast_date(), read_csv(), read_parquet(), collect(), get_row_count()
+
       Concrete methods: execute_query(), create_context(), load_table(),
+
       load_tables_from_data_source()
+
+      '
   - summary: Design dialect abstraction layer
     done: false
     note: Direct implementation in adapters; formal dialect layer deferred
@@ -58,9 +79,11 @@ tasks:
   items:
   - summary: Create PolarsAdapter in benchbox/platforms/dataframe/polars.py
     done: true
-    details: |
-      PolarsDataFrameAdapter implements all expression family methods
+    details: 'PolarsDataFrameAdapter implements all expression family methods
+
       using Polars LazyFrame API. Full support for TPC-H queries.
+
+      '
   - summary: Add CLI registration for Polars dataframe mode
     done: true
     details: Registered as 'polars-df' platform with streaming/rechunk options
@@ -88,17 +111,14 @@ tasks:
     done: false
   - summary: Create tests with SQL comparison
     done: false
-
 files_affected:
-- change_type: New
-  paths:
+  modified:
   - benchbox/platforms/dataframe/expression_family.py
   - benchbox/platforms/dataframe/polars_df.py
-- change_type: New
-  paths:
   - tests/unit/platforms/dataframe/test_expression_family.py
   - tests/unit/platforms/dataframe/test_polars_df.py
-
+  added: []
+  removed: []
 metadata:
   owners:
   - '@benchbox-maintainers'

@@ -1,8 +1,9 @@
+id: implement-pandas-family-base-adapter
 title: Implement Pandas Family Base Adapter
 worktree: dataframe-pandas-family
 category: Core Functionality
 priority: Critical
-status: "Completed"
+status: Completed
 description: 'Implement PandasFamilyAdapter base class that provides shared functionality
 
   for all Pandas-like libraries (Pandas, Modin, cuDF, Vaex, Dask). This single
@@ -69,16 +70,16 @@ tasks:
     done: true
   - summary: Add dry-run mode support
     done: false
-    notes: "Deferred - will be implemented with CLI integration"
+    notes: Deferred - will be implemented with CLI integration
   - summary: Create unit tests (tests/dataframe/test_pandas_family_adapter.py)
     done: true
-    notes: "Created in tests/unit/platforms/dataframe/"
+    notes: Created in tests/unit/platforms/dataframe/
 - phase: 'Phase 2.2: Pandas Reference Implementation'
   description: Concrete Pandas adapter as reference
   items:
   - summary: Create PandasAdapter in benchbox/platforms/dataframe/pandas.py
     done: true
-    notes: "Implemented as PandasDataFrameAdapter in pandas_df.py"
+    notes: Implemented as PandasDataFrameAdapter in pandas_df.py
     details: '- Inherits from PandasFamilyAdapter
 
       - Implements read_csv using pd.read_csv
@@ -92,10 +93,10 @@ tasks:
       '
   - summary: Add CLI registration for Pandas dataframe mode
     done: false
-    notes: "Deferred - will be implemented with CLI integration"
+    notes: Deferred - will be implemented with CLI integration
   - summary: Create comprehensive tests (tests/dataframe/test_pandas_adapter.py)
     done: true
-    notes: "Created as test_pandas_df.py with 43 tests"
+    notes: Created as test_pandas_df.py with 43 tests
     details: '- Test CSV loading
 
       - Test Parquet loading
@@ -108,15 +109,14 @@ tasks:
 
       '
 files_affected:
-- change_type: New
-  paths:
+  modified:
   - benchbox/platforms/dataframe/__init__.py
   - benchbox/platforms/dataframe/pandas_family.py
   - benchbox/platforms/dataframe/pandas.py
-- change_type: New
-  paths:
   - tests/dataframe/test_pandas_family_adapter.py
   - tests/dataframe/test_pandas_adapter.py
+  added: []
+  removed: []
 metadata:
   owners:
   - '@benchbox-maintainers'

@@ -1,3 +1,4 @@
+id: fix-tpch-reference-seed-and-parameter-parity
 title: "Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity"
 worktree: "core-functionality"
 priority: "High"
@@ -34,55 +35,60 @@ category: "Core Functionality"
 
 tasks:
   phases:
-    - phase: "Phase 1: Determine correct reference seed"
+  - phase: "Phase 1: Determine correct reference seed"
+    done: true
+    items:
+    - summary: "Verify which seed the SF=1 answer files were generated with by running qgen with candidate seeds and comparing
+        output row counts against answer files"
       done: true
-      items:
-        - summary: "Verify which seed the SF=1 answer files were generated with by running qgen with candidate seeds and comparing output row counts against answer files"
-          done: true
-        - summary: "Fix TPCH_SF1_REFERENCE_SEED so the octal literal, decimal comment, and answer files all agree"
-          done: true
-        - summary: "Document the reference seed provenance in a code comment (which TPC-H spec version, how it was determined)"
-          done: true
+    - summary: "Fix TPCH_SF1_REFERENCE_SEED so the octal literal, decimal comment, and answer files all agree"
+      done: true
+    - summary: "Document the reference seed provenance in a code comment (which TPC-H spec version, how it was determined)"
+      done: true
 
-    - phase: "Phase 2: Restore seed default behavior"
+  - phase: "Phase 2: Restore seed default behavior"
+    done: true
+    items:
+    - summary: "Decide policy: should no-seed default to reference_seed (exact validation) or seed=1 (DF parameter parity)?
+        Document the decision."
       done: true
-      items:
-        - summary: "Decide policy: should no-seed default to reference_seed (exact validation) or seed=1 (DF parameter parity)? Document the decision."
-          done: true
-          subtasks:
-            - summary: "Option A: Keep reference_seed auto-select, update TPCH_PARAMS in dataframe_queries.py to match reference seed parameters"
-              done: false
-            - summary: "Option B: Restore seed=1 default, only use reference_seed when --validation=exact is explicitly requested"
-              done: false
-        - summary: "Implement chosen option and ensure both SQL and DF modes produce matching row counts for all 22 queries at SF=1"
-          done: true
+      subtasks:
+      - summary: "Option A: Keep reference_seed auto-select, update TPCH_PARAMS in dataframe_queries.py to match reference
+          seed parameters"
+        done: false
+      - summary: "Option B: Restore seed=1 default, only use reference_seed when --validation=exact is explicitly requested"
+        done: false
+    - summary: "Implement chosen option and ensure both SQL and DF modes produce matching row counts for all 22 queries at
+        SF=1"
+      done: true
 
-    - phase: "Phase 3: Parameterize DataFrame queries"
+  - phase: "Phase 3: Parameterize DataFrame queries"
+    done: true
+    items:
+    - summary: "Make TPCH_PARAMS in dataframe_queries.py derivable from seed rather than hardcoded, or at minimum validate
+        that hardcoded values match the default seed"
       done: true
-      items:
-        - summary: "Make TPCH_PARAMS in dataframe_queries.py derivable from seed rather than hardcoded, or at minimum validate that hardcoded values match the default seed"
-          done: true
-        - summary: "Add a startup assertion or test that compares TPCH_PARAMS values against qgen output for the default seed"
-          done: true
+    - summary: "Add a startup assertion or test that compares TPCH_PARAMS values against qgen output for the default seed"
+      done: true
 
-    - phase: "Phase 4: Testing and validation"
+  - phase: "Phase 4: Testing and validation"
+    done: true
+    items:
+    - summary: "Run both modes at SF=1 and confirm geometric mean ratio is within 1.0-1.5x (not 3.3x)"
       done: true
-      items:
-        - summary: "Run both modes at SF=1 and confirm geometric mean ratio is within 1.0-1.5x (not 3.3x)"
-          done: true
-        - summary: "Confirm all 22 queries pass validation in both modes with 0 row-count mismatches"
-          done: true
-        - summary: "Add unit test asserting TPCH_SF1_REFERENCE_SEED decimal comment matches actual value"
-          done: true
+    - summary: "Confirm all 22 queries pass validation in both modes with 0 row-count mismatches"
+      done: true
+    - summary: "Add unit test asserting TPCH_SF1_REFERENCE_SEED decimal comment matches actual value"
+      done: true
 
 metadata:
   owners:
-    - "joe"
+  - "joe"
   tags:
-    - "tpch"
-    - "correctness"
-    - "seed"
-    - "validation"
+  - "tpch"
+  - "correctness"
+  - "seed"
+  - "validation"
   estimated_effort: "1-2 days"
   created_date: "2026-02-06"
 
@@ -98,18 +104,18 @@ impact:
 
 files_affected:
   modified:
-    - "benchbox/core/tpch/benchmark.py"
-    - "benchbox/core/tpch/dataframe_queries.py"
-    - "benchbox/platforms/base/adapter.py"
-    - "benchbox/core/tpch/power_test.py"
+  - "benchbox/core/tpch/benchmark.py"
+  - "benchbox/core/tpch/dataframe_queries.py"
+  - "benchbox/platforms/base/adapter.py"
+  - "benchbox/core/tpch/power_test.py"
   added:
-    - "tests/unit/test_reference_seed.py"
+  - "tests/unit/test_reference_seed.py"
 
 must_preserve:
-  - "TPCHPowerTest.__init__() seed auto-selection logic for exact validation when user explicitly passes --validation=exact"
-  - "get_reference_seed() returns correct seed for SF=1.0 that matches answer files"
-  - "DataFrame queries produce correct row counts matching TPC-H answer files at SF=1"
-  - "SQL queries with default seed produce identical row counts to DataFrame queries for all 22 TPC-H queries"
+- "TPCHPowerTest.__init__() seed auto-selection logic for exact validation when user explicitly passes --validation=exact"
+- "get_reference_seed() returns correct seed for SF=1.0 that matches answer files"
+- "DataFrame queries produce correct row counts matching TPC-H answer files at SF=1"
+- "SQL queries with default seed produce identical row counts to DataFrame queries for all 22 TPC-H queries"
 
 approach: |
   Start by determining the correct reference seed empirically:
@@ -129,36 +135,39 @@ approach: |
   rather than hardcoded, but that can be a follow-up.
 
 anti_patterns:
-  - "DO NOT change TPCH_PARAMS values without verifying against qgen output — because the parameters are interdependent and arbitrary changes will produce wrong row counts — regenerate from qgen instead"
-  - "DO NOT remove the reference_seed concept entirely — because exact validation against answer files requires a specific seed — keep it available but don't make it the default"
-  - "DO NOT add seed parameter threading to DataFrame query functions — because that would require reimplementing qgen's parameter substitution in Python — keep DataFrame params as a static dict derived from qgen output"
+- "DO NOT change TPCH_PARAMS values without verifying against qgen output — because the parameters are interdependent and
+  arbitrary changes will produce wrong row counts — regenerate from qgen instead"
+- "DO NOT remove the reference_seed concept entirely — because exact validation against answer files requires a specific seed
+  — keep it available but don't make it the default"
+- "DO NOT add seed parameter threading to DataFrame query functions — because that would require reimplementing qgen's parameter
+  substitution in Python — keep DataFrame params as a static dict derived from qgen output"
 
 verification:
-  - description: "Reference seed constant matches its comment"
-    command: "uv run -- python -c \"from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED; print(TPCH_SF1_REFERENCE_SEED)\""
-    expected_output: "Value matches the decimal comment in the source code"
-  - description: "SQL and DataFrame modes produce matching row counts at SF=0.01"
-    command: "uv run -- python -m pytest tests/ -k 'tpch' -v --timeout=60"
-    expected_output: "All TPC-H tests pass"
-  - description: "Existing platform tests still pass"
-    command: "uv run -- python -m pytest tests/unit/platforms/ -v"
-    expected_output: "All tests pass, 0 failures"
+- description: "Reference seed constant matches its comment"
+  command: "uv run -- python -c \"from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED; print(TPCH_SF1_REFERENCE_SEED)\""
+  expected_output: "Value matches the decimal comment in the source code"
+- description: "SQL and DataFrame modes produce matching row counts at SF=0.01"
+  command: "uv run -- python -m pytest tests/ -k 'tpch' -v --timeout=60"
+  expected_output: "All TPC-H tests pass"
+- description: "Existing platform tests still pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v"
+  expected_output: "All tests pass, 0 failures"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/tpch/benchmark.py"
-    - "benchbox/core/tpch/dataframe_queries.py"
-    - "benchbox/platforms/base/adapter.py"
-    - "benchbox/core/tpch/power_test.py"
-    - "tests/unit/test_reference_seed.py"
+  - "benchbox/core/tpch/benchmark.py"
+  - "benchbox/core/tpch/dataframe_queries.py"
+  - "benchbox/platforms/base/adapter.py"
+  - "benchbox/core/tpch/power_test.py"
+  - "tests/unit/test_reference_seed.py"
   do_not_modify:
-    - "benchbox/platforms/dataframe/expression_family.py"
-    - "benchbox/platforms/dataframe/benchmark_mixin.py"
-    - "benchbox/cli/"
+  - "benchbox/platforms/dataframe/expression_family.py"
+  - "benchbox/platforms/dataframe/benchmark_mixin.py"
+  - "benchbox/cli/"
 
 commits:
-  - "dbf159bd"
-  - "44d280c0"
+- "dbf159bd"
+- "44d280c0"
 
 context_sections:
   "Root Cause Analysis": |
@@ -181,7 +190,7 @@ context_sections:
     TPC-H queries at SF=1.
 
 success_metrics:
-  - "SQL and DF modes at SF=1 produce identical row counts for all 22 TPC-H queries"
-  - "Geometric mean ratio between modes is within 1.0-1.5x (not 3.3x)"
-  - "TPCH_SF1_REFERENCE_SEED octal literal and decimal comment agree"
-  - "Unit test exists that asserts seed constant self-consistency"
+- "SQL and DF modes at SF=1 produce identical row counts for all 22 TPC-H queries"
+- "Geometric mean ratio between modes is within 1.0-1.5x (not 3.3x)"
+- "TPCH_SF1_REFERENCE_SEED octal literal and decimal comment agree"
+- "Unit test exists that asserts seed constant self-consistency"

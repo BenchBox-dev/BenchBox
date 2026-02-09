@@ -1,13 +1,14 @@
+id: open-file-and-table-format-support
 title: Open File and Table Format Support
 worktree: benchmark-expansion
 category: Performance and Efficiency
 priority: Medium
 status: "Completed"
-description: Add support for data generation directly to open file formats (Parquet) and open table formats (Delta Lake, Iceberg)
-  with benchmarks running against these formats on supporting platforms
-impact: Enables realistic benchmarking against modern data lake architectures, supports cloud-native data formats, enables
-  performance comparison across different storage formats, and aligns with industry trends toward open table formats for analytics
-  workloads
+description: Add support for data generation directly to open file formats (Parquet) and open table formats (Delta Lake,
+  Iceberg) with benchmarks running against these formats on supporting platforms
+impact: Enables realistic benchmarking against modern data lake architectures, supports cloud-native data formats,
+  enables performance comparison across different storage formats, and aligns with industry trends toward open table
+  formats for analytics workloads
 tasks:
 - phase: Add Parquet data generation support with configurable compression (snappy, gzip, lz4) and partitioning
   done: true
@@ -27,7 +28,8 @@ tasks:
 - phase: Add benchmark execution against open table formats using platform-specific connectors
   done: true
   notes: "DataLoader with FileFormatHandler abstraction, platform-specific handlers in data_loading.py"
-- phase: Add format-specific optimization configuration (Parquet column ordering, Delta optimization, Iceberg compaction)
+- phase: Add format-specific optimization configuration (Parquet column ordering, Delta optimization, Iceberg
+    compaction)
   done: true
   notes: "ConversionOptions supports row_group_size, compression algorithms; platform handlers support native optimizations"
 - phase: Create CLI options for format selection (--convert-format, --conversion-compression, --conversion-partition)

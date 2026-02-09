@@ -1,3 +1,4 @@
+id: platform-documentation-completion
 title: Platform Documentation Completion
 worktree: docs-experience
 priority: High
@@ -19,58 +20,58 @@ description: |
   - Troubleshooting tips
 
 tasks:
-  - phase: "Phase 1: Audit"
+- phase: "Phase 1: Audit"
+  done: true
+  items:
+  - summary: "Create documentation coverage matrix (platform vs sections)"
     done: true
-    items:
-      - summary: "Create documentation coverage matrix (platform vs sections)"
-        done: true
-      - summary: "Identify platforms with incomplete documentation"
-        done: true
-      - summary: "Prioritize by platform popularity/usage"
-        done: true
-  - phase: "Phase 2: Core Platforms"
+  - summary: "Identify platforms with incomplete documentation"
     done: true
-    items:
-      - summary: "Complete Snowflake documentation"
-        done: true
-      - summary: "Complete Databricks documentation"
-        done: true
-      - summary: "Complete BigQuery documentation"
-        done: true
-      - summary: "Complete Redshift documentation"
-        done: true
-  - phase: "Phase 3: Secondary Platforms"
+  - summary: "Prioritize by platform popularity/usage"
     done: true
-    notes: "These platforms already had existing documentation (Athena, Azure, Firebolt)"
-    items:
-      - summary: "Complete ClickHouse documentation"
-        done: true
-        notes: "clickhouse-local-mode.md exists; full ClickHouse can be added later"
-      - summary: "Complete Athena documentation"
-        done: true
-      - summary: "Complete Azure Synapse documentation"
-        done: true
-      - summary: "Complete Firebolt documentation"
-        done: true
-  - phase: "Phase 4: DataFrame Platforms"
+- phase: "Phase 2: Core Platforms"
+  done: true
+  items:
+  - summary: "Complete Snowflake documentation"
     done: true
-    notes: "DataFrame platforms already had documentation from earlier work"
-    items:
-      - summary: "Complete Polars DataFrame documentation"
-        done: true
-      - summary: "Complete Pandas DataFrame documentation"
-        done: true
-      - summary: "Complete PySpark DataFrame documentation"
-        done: true
-      - summary: "Complete cuDF documentation"
-        done: true
-  - phase: "Phase 5: Local Platforms"
+  - summary: "Complete Databricks documentation"
     done: true
-    items:
-      - summary: "Complete DuckDB documentation"
-        done: true
-      - summary: "Complete SQLite documentation"
-        done: true
+  - summary: "Complete BigQuery documentation"
+    done: true
+  - summary: "Complete Redshift documentation"
+    done: true
+- phase: "Phase 3: Secondary Platforms"
+  done: true
+  notes: "These platforms already had existing documentation (Athena, Azure, Firebolt)"
+  items:
+  - summary: "Complete ClickHouse documentation"
+    done: true
+    notes: "clickhouse-local-mode.md exists; full ClickHouse can be added later"
+  - summary: "Complete Athena documentation"
+    done: true
+  - summary: "Complete Azure Synapse documentation"
+    done: true
+  - summary: "Complete Firebolt documentation"
+    done: true
+- phase: "Phase 4: DataFrame Platforms"
+  done: true
+  notes: "DataFrame platforms already had documentation from earlier work"
+  items:
+  - summary: "Complete Polars DataFrame documentation"
+    done: true
+  - summary: "Complete Pandas DataFrame documentation"
+    done: true
+  - summary: "Complete PySpark DataFrame documentation"
+    done: true
+  - summary: "Complete cuDF documentation"
+    done: true
+- phase: "Phase 5: Local Platforms"
+  done: true
+  items:
+  - summary: "Complete DuckDB documentation"
+    done: true
+  - summary: "Complete SQLite documentation"
+    done: true
 
 completion_notes: |
   Created comprehensive documentation for 6 previously undocumented platforms:
@@ -97,10 +98,10 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - documentation
-    - platforms
+  - documentation
+  - platforms
   estimated_effort: 2-4 days
   created_date: "2025-12-12"
 
@@ -113,7 +114,7 @@ impact:
     Consistent documentation structure makes switching platforms easier.
 
 success_metrics:
-  - "100% of platforms have prerequisites section"
-  - "100% of platforms have working usage example"
-  - "100% of platforms have authentication guide"
-  - "Documentation coverage matrix shows no gaps"
+- "100% of platforms have prerequisites section"
+- "100% of platforms have working usage example"
+- "100% of platforms have authentication guide"
+- "Documentation coverage matrix shows no gaps"

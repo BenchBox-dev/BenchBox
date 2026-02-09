@@ -1,3 +1,4 @@
+id: fix-type-checking-errors
 title: "Fix type checking errors ignored in ty config"
 worktree: main
 priority: Medium-High
@@ -17,66 +18,66 @@ description: |
 
 tasks:
   phases:
-    - phase: "Phase 1: Audit and Categorize Errors"
+  - phase: "Phase 1: Audit and Categorize Errors"
+    done: true
+    items:
+    - summary: "Run ty check with each rule enabled individually to get accurate counts"
       done: true
-      items:
-        - summary: "Run ty check with each rule enabled individually to get accurate counts"
-          done: true
-        - summary: "Categorize errors by root cause (see analysis below)"
-          done: true
-        - summary: "Identify quick wins vs major refactoring"
-          done: true
-
-    - phase: "Phase 2: Quick Wins - Enable as Errors"
+    - summary: "Categorize errors by root cause (see analysis below)"
       done: true
-      items:
-        - summary: "too-many-positional-arguments (2 errors) - FIXED"
-          done: true
-        - summary: "conflicting-declarations (3 errors) - FIXED"
-          done: true
-        - summary: "invalid-parameter-default (11 errors) - FIXED"
-          done: true
-        - summary: "unresolved-reference (21 errors) - FIXED"
-          done: true
-        - summary: "not-iterable (19 errors) - FIXED"
-          done: true
-
-    - phase: "Phase 3: Remaining Rules Analysis"
+    - summary: "Identify quick wins vs major refactoring"
       done: true
-      items:
-        - summary: "call-non-callable (~700 errors) - ANALYZED: Optional imports, dynamic DataFrame APIs"
-          done: true
-        - summary: "non-subscriptable (~700 errors) - ANALYZED: Dynamic DataFrame APIs, Optional dict access"
-          done: true
-        - summary: "invalid-method-override (143 errors) - ANALYZED: Intentional LSP violations"
-          done: true
-        - summary: "unsupported-operator (184 errors) - ANALYZED: Dict counter patterns"
-          done: true
-        - summary: "invalid-assignment (463 errors) - ANALYZED: Literal type mismatches"
-          done: true
-        - summary: "invalid-argument-type (763 errors) - ANALYZED: Function param mismatches"
-          done: true
-        - summary: "unresolved-attribute (954 errors) - ANALYZED: Missing type stubs, dynamic attrs"
-          done: true
 
-    - phase: "Phase 4: Future - Gradual Type Annotation"
+  - phase: "Phase 2: Quick Wins - Enable as Errors"
+    done: true
+    items:
+    - summary: "too-many-positional-arguments (2 errors) - FIXED"
+      done: true
+    - summary: "conflicting-declarations (3 errors) - FIXED"
+      done: true
+    - summary: "invalid-parameter-default (11 errors) - FIXED"
+      done: true
+    - summary: "unresolved-reference (21 errors) - FIXED"
+      done: true
+    - summary: "not-iterable (19 errors) - FIXED"
+      done: true
+
+  - phase: "Phase 3: Remaining Rules Analysis"
+    done: true
+    items:
+    - summary: "call-non-callable (~700 errors) - ANALYZED: Optional imports, dynamic DataFrame APIs"
+      done: true
+    - summary: "non-subscriptable (~700 errors) - ANALYZED: Dynamic DataFrame APIs, Optional dict access"
+      done: true
+    - summary: "invalid-method-override (143 errors) - ANALYZED: Intentional LSP violations"
+      done: true
+    - summary: "unsupported-operator (184 errors) - ANALYZED: Dict counter patterns"
+      done: true
+    - summary: "invalid-assignment (463 errors) - ANALYZED: Literal type mismatches"
+      done: true
+    - summary: "invalid-argument-type (763 errors) - ANALYZED: Function param mismatches"
+      done: true
+    - summary: "unresolved-attribute (954 errors) - ANALYZED: Missing type stubs, dynamic attrs"
+      done: true
+
+  - phase: "Phase 4: Future - Gradual Type Annotation"
+    done: false
+    items:
+    - summary: "Add TypedDict for benchmark result dictionaries"
       done: false
-      items:
-        - summary: "Add TypedDict for benchmark result dictionaries"
-          done: false
-        - summary: "Add Protocol classes for platform adapters"
-          done: false
-        - summary: "Add return type annotations to public APIs"
-          done: false
-        - summary: "Consider enabling rules incrementally as type coverage improves"
-          done: false
+    - summary: "Add Protocol classes for platform adapters"
+      done: false
+    - summary: "Add return type annotations to public APIs"
+      done: false
+    - summary: "Consider enabling rules incrementally as type coverage improves"
+      done: false
 
 metadata:
   tags:
-    - type-checking
-    - technical-debt
-    - code-quality
-    - ty
+  - type-checking
+  - technical-debt
+  - code-quality
+  - ty
   estimated_effort: Large
   created_date: "2026-01-17"
   last_updated: "2026-01-31"
@@ -175,16 +176,16 @@ impact:
 
 files_affected:
   modified:
-    - pyproject.toml  # ty configuration updated with accurate counts
-    - benchbox/**/*.py  # 56 fixes for 5 enabled rules
+  - pyproject.toml    # ty configuration updated with accurate counts
+  - benchbox/**/*.py    # 56 fixes for 5 enabled rules
 
 success_metrics:
-  - "5 ty rules enabled as errors (ACHIEVED)"
-  - "All new code passes full ty checking"
-  - "Type ignore comments used sparingly (only when necessary)"
-  - "DataFrame adapters remain dynamically typed by design"
+- "5 ty rules enabled as errors (ACHIEVED)"
+- "All new code passes full ty checking"
+- "Type ignore comments used sparingly (only when necessary)"
+- "DataFrame adapters remain dynamically typed by design"
 
 open_questions:
-  - "Should we add TypedDict for benchmark result dictionaries? (Would fix ~200 errors)"
-  - "Should we add Protocol classes for platform adapters? (Future consideration)"
-  - "Is the current trade-off (5 rules enabled, 7 ignored) acceptable? (Recommended yes)"
+- "Should we add TypedDict for benchmark result dictionaries? (Would fix ~200 errors)"
+- "Should we add Protocol classes for platform adapters? (Future consideration)"
+- "Is the current trade-off (5 rules enabled, 7 ignored) acceptable? (Recommended yes)"

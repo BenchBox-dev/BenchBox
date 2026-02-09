@@ -1,3 +1,4 @@
+id: unified-adapter-interface
 title: "Unify SQL and DataFrame Adapter Execution Interfaces"
 worktree: core-functionality
 priority: Medium-High
@@ -73,126 +74,126 @@ context_sections:
 
 tasks:
   phases:
-    - phase: "Phase 1: Add run_benchmark() to DataFrame Adapters"
-      done: true
-      items:
-        - summary: "Add run_benchmark() method signature to ExpressionFamilyAdapter"
-          done: false
-          subtasks:
-            - summary: "Define method signature matching SQL adapter interface"
-              done: false
-            - summary: "Document expected parameters and return type"
-              done: false
-        - summary: "Implement _load_data_phase() method"
-          done: false
-          subtasks:
-            - summary: "Move logic from dataframe_runner._load_dataframe_data()"
-              done: false
-            - summary: "Integrate with existing data loading infrastructure"
-              done: false
-        - summary: "Implement _execute_query_phase() method"
-          done: false
-          subtasks:
-            - summary: "Move logic from dataframe_runner._execute_dataframe_queries()"
-              done: false
-            - summary: "Handle query iteration and timing"
-              done: false
-        - summary: "Implement result construction"
-          done: false
-          subtasks:
-            - summary: "Move logic from run_dataframe_benchmark() lines 177-202"
-              done: false
-            - summary: "Ensure return type matches BenchmarkResults"
-              done: false
+  - phase: "Phase 1: Add run_benchmark() to DataFrame Adapters"
+    done: true
+    items:
+    - summary: "Add run_benchmark() method signature to ExpressionFamilyAdapter"
+      done: false
+      subtasks:
+      - summary: "Define method signature matching SQL adapter interface"
+        done: false
+      - summary: "Document expected parameters and return type"
+        done: false
+    - summary: "Implement _load_data_phase() method"
+      done: false
+      subtasks:
+      - summary: "Move logic from dataframe_runner._load_dataframe_data()"
+        done: false
+      - summary: "Integrate with existing data loading infrastructure"
+        done: false
+    - summary: "Implement _execute_query_phase() method"
+      done: false
+      subtasks:
+      - summary: "Move logic from dataframe_runner._execute_dataframe_queries()"
+        done: false
+      - summary: "Handle query iteration and timing"
+        done: false
+    - summary: "Implement result construction"
+      done: false
+      subtasks:
+      - summary: "Move logic from run_dataframe_benchmark() lines 177-202"
+        done: false
+      - summary: "Ensure return type matches BenchmarkResults"
+        done: false
 
-    - phase: "Phase 2: Remove Orchestrator Branching"
-      done: true
-      items:
-        - summary: "Remove if execution_mode == 'dataframe' branching"
-          done: false
-          subtasks:
-            - summary: "Identify all DataFrame-specific code paths (lines 277-334)"
-              done: false
-            - summary: "Remove DataFramePhases and DataFrameRunOptions handling"
-              done: false
-        - summary: "Use unified run_benchmark_lifecycle() for all platforms"
-          done: false
-          subtasks:
-            - summary: "Update adapter factory calls to work uniformly"
-              done: false
-            - summary: "Verify all configuration options pass through correctly"
-              done: false
+  - phase: "Phase 2: Remove Orchestrator Branching"
+    done: true
+    items:
+    - summary: "Remove if execution_mode == 'dataframe' branching"
+      done: false
+      subtasks:
+      - summary: "Identify all DataFrame-specific code paths (lines 277-334)"
+        done: false
+      - summary: "Remove DataFramePhases and DataFrameRunOptions handling"
+        done: false
+    - summary: "Use unified run_benchmark_lifecycle() for all platforms"
+      done: false
+      subtasks:
+      - summary: "Update adapter factory calls to work uniformly"
+        done: false
+      - summary: "Verify all configuration options pass through correctly"
+        done: false
 
-    - phase: "Phase 3: Remove MCP Branching"
-      done: true
-      items:
-        - summary: "Remove _is_dataframe_platform() helper"
-          done: false
-        - summary: "Remove run_dataframe_benchmark import and call"
-          done: false
-        - summary: "Use single benchmark_instance.run_with_platform(adapter) for all platforms"
-          done: false
-          subtasks:
-            - summary: "Verify MCP tool works for all platform types"
-              done: false
-            - summary: "Update MCP tests accordingly"
-              done: false
+  - phase: "Phase 3: Remove MCP Branching"
+    done: true
+    items:
+    - summary: "Remove _is_dataframe_platform() helper"
+      done: false
+    - summary: "Remove run_dataframe_benchmark import and call"
+      done: false
+    - summary: "Use single benchmark_instance.run_with_platform(adapter) for all platforms"
+      done: false
+      subtasks:
+      - summary: "Verify MCP tool works for all platform types"
+        done: false
+      - summary: "Update MCP tests accordingly"
+        done: false
 
-    - phase: "Phase 4: Testing and Validation"
-      done: true
-      items:
-        - summary: "Add tests for ExpressionFamilyAdapter.run_benchmark()"
-          done: false
-          subtasks:
-            - summary: "Unit tests for each phase method"
-              done: false
-            - summary: "Integration test for full benchmark run"
-              done: false
-        - summary: "Verify DataFrame benchmarks produce identical results"
-          done: false
-          subtasks:
-            - summary: "Compare results before/after refactor"
-              done: false
-            - summary: "Validate query outputs match"
-              done: false
-        - summary: "Run full test suite for both SQL and DataFrame"
-          done: false
-        - summary: "Performance comparison before/after"
-          done: false
-          subtasks:
-            - summary: "Ensure no performance regression"
-              done: false
-            - summary: "Document any timing differences"
-              done: false
+  - phase: "Phase 4: Testing and Validation"
+    done: true
+    items:
+    - summary: "Add tests for ExpressionFamilyAdapter.run_benchmark()"
+      done: false
+      subtasks:
+      - summary: "Unit tests for each phase method"
+        done: false
+      - summary: "Integration test for full benchmark run"
+        done: false
+    - summary: "Verify DataFrame benchmarks produce identical results"
+      done: false
+      subtasks:
+      - summary: "Compare results before/after refactor"
+        done: false
+      - summary: "Validate query outputs match"
+        done: false
+    - summary: "Run full test suite for both SQL and DataFrame"
+      done: false
+    - summary: "Performance comparison before/after"
+      done: false
+      subtasks:
+      - summary: "Ensure no performance regression"
+        done: false
+      - summary: "Document any timing differences"
+        done: false
 
-    - phase: "Phase 5: Cleanup and Documentation"
-      done: true
-      items:
-        - summary: "Deprecate or remove run_dataframe_benchmark() function"
-          done: false
-          subtasks:
-            - summary: "Mark as deprecated with migration path"
-              done: false
-            - summary: "Remove after transition period (or immediately if internal only)"
-              done: false
-        - summary: "Update architecture documentation"
-          done: false
-          subtasks:
-            - summary: "Document unified adapter interface"
-              done: false
-            - summary: "Update AGENTS.md if needed"
-              done: false
+  - phase: "Phase 5: Cleanup and Documentation"
+    done: true
+    items:
+    - summary: "Deprecate or remove run_dataframe_benchmark() function"
+      done: false
+      subtasks:
+      - summary: "Mark as deprecated with migration path"
+        done: false
+      - summary: "Remove after transition period (or immediately if internal only)"
+        done: false
+    - summary: "Update architecture documentation"
+      done: false
+      subtasks:
+      - summary: "Document unified adapter interface"
+        done: false
+      - summary: "Update AGENTS.md if needed"
+        done: false
 
 metadata:
   owners:
-    - joe
+  - joe
   tags:
-    - architecture
-    - refactoring
-    - adapter-pattern
-    - dataframe
-    - design-patterns
-    - liskov-substitution
+  - architecture
+  - refactoring
+  - adapter-pattern
+  - dataframe
+  - design-patterns
+  - liskov-substitution
   estimated_effort: "Medium (2-3 days)"
   created_date: "2026-01-24"
 
@@ -213,46 +214,46 @@ impact:
 
 files_affected:
   modified:
-    - "benchbox/platforms/dataframe/expression_family.py"
-    - "benchbox/platforms/dataframe/pandas_family.py"
-    - "benchbox/core/runner/dataframe_runner.py"
-    - "benchbox/cli/orchestrator.py"
-    - "benchbox/mcp/tools/benchmark.py"
-    - "tests/unit/platforms/dataframe/test_expression_family.py"
+  - "benchbox/platforms/dataframe/expression_family.py"
+  - "benchbox/platforms/dataframe/pandas_family.py"
+  - "benchbox/core/runner/dataframe_runner.py"
+  - "benchbox/cli/orchestrator.py"
+  - "benchbox/mcp/tools/benchmark.py"
+  - "tests/unit/platforms/dataframe/test_expression_family.py"
 
 success_metrics:
-  - "All adapters (SQL and DataFrame) implement run_benchmark()"
-  - "Orchestrator has single execution path (no execution_mode branching)"
-  - "MCP tool has single execution path (no _is_dataframe_platform check)"
-  - "All existing tests pass"
-  - "No performance regression in DataFrame benchmarks"
+- "All adapters (SQL and DataFrame) implement run_benchmark()"
+- "Orchestrator has single execution path (no execution_mode branching)"
+- "MCP tool has single execution path (no _is_dataframe_platform check)"
+- "All existing tests pass"
+- "No performance regression in DataFrame benchmarks"
 
 verification:
   commands:
-    - "uv run -- python -m pytest tests/unit/platforms/dataframe/ -v"
-    - "uv run -- python -m pytest tests/unit/mcp/ -v"
-    - "uv run -- python -m pytest -m fast"
-    - "benchbox run --platform polars-df --benchmark tpch --scale 0.01"
-    - "benchbox run --platform datafusion-df --benchmark tpch --scale 0.01"
+  - "uv run -- python -m pytest tests/unit/platforms/dataframe/ -v"
+  - "uv run -- python -m pytest tests/unit/mcp/ -v"
+  - "uv run -- python -m pytest -m fast"
+  - "benchbox run --platform polars-df --benchmark tpch --scale 0.01"
+  - "benchbox run --platform datafusion-df --benchmark tpch --scale 0.01"
 
 open_questions:
-  - "Should we maintain backwards compatibility with run_dataframe_benchmark() or remove it entirely?"
-  - "What's the right abstraction for phases (SQL has different phases than DataFrame)?"
+- "Should we maintain backwards compatibility with run_dataframe_benchmark() or remove it entirely?"
+- "What's the right abstraction for phases (SQL has different phases than DataFrame)?"
 
 design_decisions:
-  - decision: "Both ExpressionFamilyAdapter and PandasFamilyAdapter need run_benchmark()"
-    rationale: |
-      There are two DataFrame adapter families:
-      - ExpressionFamilyAdapter: Polars, PySpark, DataFusion (lazy evaluation)
-      - PandasFamilyAdapter: Pandas, Modin, cuDF, Dask (eager evaluation)
-      Both must implement run_benchmark() for true polymorphism and LSP compliance.
+- decision: "Both ExpressionFamilyAdapter and PandasFamilyAdapter need run_benchmark()"
+  rationale: |
+    There are two DataFrame adapter families:
+    - ExpressionFamilyAdapter: Polars, PySpark, DataFusion (lazy evaluation)
+    - PandasFamilyAdapter: Pandas, Modin, cuDF, Dask (eager evaluation)
+    Both must implement run_benchmark() for true polymorphism and LSP compliance.
 
 technical_requirements:
   constraints:
-    - "Must not change external API or CLI interface"
-    - "Must produce identical benchmark results"
-    - "No performance regression"
+  - "Must not change external API or CLI interface"
+  - "Must produce identical benchmark results"
+  - "No performance regression"
   dependencies:
-    - "Existing ExpressionFamilyAdapter infrastructure"
-    - "BenchmarkResults type definition"
-    - "Data loading infrastructure"
+  - "Existing ExpressionFamilyAdapter infrastructure"
+  - "BenchmarkResults type definition"
+  - "Data loading infrastructure"

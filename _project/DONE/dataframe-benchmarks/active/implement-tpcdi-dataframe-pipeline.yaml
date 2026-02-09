@@ -1,68 +1,57 @@
-title: "Implement TPC-DI DataFrame Pipeline Execution"
+id: implement-tpcdi-dataframe-pipeline
+title: Implement TPC-DI DataFrame Pipeline Execution
 worktree: dataframe-benchmarks
 priority: High
 status: Completed
-completed_date: "2026-02-07"
-description: |
-  Implement a dedicated DataFrame ETL execution path for TPC-DI based on the
+completed_date: '2026-02-07'
+description: 'Implement a dedicated DataFrame ETL execution path for TPC-DI based on the
+
   approved architecture decision.
 
+
   Scope includes stage orchestration, mutation-safe table lifecycle handling,
+
   and correctness validation for SCD2 and incremental load semantics.
 
+  '
 category: Core Functionality
-
 tasks:
   phases:
-    - phase: "Phase 1: Execution Interfaces"
+  - phase: 'Phase 1: Execution Interfaces'
+    done: true
+    items:
+    - summary: Add TPC-DI DataFrame ETL orchestration interfaces
       done: true
-      items:
-        - summary: "Add TPC-DI DataFrame ETL orchestration interfaces"
-          done: true
-        - summary: "Add platform capability contracts for ETL writes/transactions"
-          done: true
-    - phase: "Phase 2: Pipeline Implementation"
+    - summary: Add platform capability contracts for ETL writes/transactions
       done: true
-      items:
-        - summary: "Implement staged ETL execution flow for DataFrame mode"
-          done: true
-        - summary: "Integrate incremental load and SCD2 handling"
-          done: true
-    - phase: "Phase 3: Validation"
+  - phase: 'Phase 2: Pipeline Implementation'
+    done: true
+    items:
+    - summary: Implement staged ETL execution flow for DataFrame mode
       done: true
-      items:
-        - summary: "Add parity and integrity tests for ETL stages"
-          done: true
-
+    - summary: Integrate incremental load and SCD2 handling
+      done: true
+  - phase: 'Phase 3: Validation'
+    done: true
+    items:
+    - summary: Add parity and integrity tests for ETL stages
+      done: true
 metadata:
   owners:
-    - joe
+  - joe
   tags:
-    - dataframe
-    - tpcdi
-    - etl
+  - dataframe
+  - tpcdi
+  - etl
   estimated_effort: Large
-  created_date: "2026-02-07"
-  last_updated: "2026-02-07T00:00:00"
-
+  created_date: '2026-02-07'
+  last_updated: '2026-02-07T00:00:00'
 sections:
-  "Implementation Summary": |
-    Completed TPC-DI DataFrame pipeline integration through a benchmark-managed
-    ETL execution path with explicit capability contracts.
-
-    Delivered:
-    - DataFrame mode orchestration hooks (`supports_dataframe_mode`,
-      `skip_dataframe_data_loading`, `execute_dataframe_workload`).
-    - Transactional ETL capability contract
-      (`get_dataframe_etl_capabilities`) derived from DataFrame maintenance
-      interfaces.
-    - Contract enforcement with fail-fast reporting via
-      `TDI_TRANSACTIONAL_CONTRACT`.
-    - Explicit backend configuration (`tpcdi_dataframe_backend`,
-      `tpcdi_dataframe_sqlite_path`) with unsupported-backend failure path.
-    - Stage-level DataFrame result reporting for historical, incremental,
-      and SCD processing.
-
-    Validation coverage includes orchestration behavior, query-filter stage
-    selection, capability reporting, transactional contract enforcement, and
-    stage metric parity/integrity assertions.
+  Implementation Summary: "Completed TPC-DI DataFrame pipeline integration through a benchmark-managed\nETL execution path\
+    \ with explicit capability contracts.\n\nDelivered:\n- DataFrame mode orchestration hooks (`supports_dataframe_mode`,\n\
+    \  `skip_dataframe_data_loading`, `execute_dataframe_workload`).\n- Transactional ETL capability contract\n  (`get_dataframe_etl_capabilities`)\
+    \ derived from DataFrame maintenance\n  interfaces.\n- Contract enforcement with fail-fast reporting via\n  `TDI_TRANSACTIONAL_CONTRACT`.\n\
+    - Explicit backend configuration (`tpcdi_dataframe_backend`,\n  `tpcdi_dataframe_sqlite_path`) with unsupported-backend\
+    \ failure path.\n- Stage-level DataFrame result reporting for historical, incremental,\n  and SCD processing.\n\nValidation\
+    \ coverage includes orchestration behavior, query-filter stage\nselection, capability reporting, transactional contract\
+    \ enforcement, and\nstage metric parity/integrity assertions."

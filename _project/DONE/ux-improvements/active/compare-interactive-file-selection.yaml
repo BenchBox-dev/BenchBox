@@ -1,0 +1,134 @@
+id: compare-interactive-file-selection
+title: Improve interactive file selection in compare command
+worktree: ux-improvements
+priority: Medium-High
+status: Completed
+category: Core Functionality
+completed_date: '2025-12-15'
+description: "The `benchbox compare` command's interactive file comparison mode needs significant\nUX improvements. Currently\
+  \ it shows a flat list of JSON files with just paths,\nrequiring users to manually identify which results they want to compare.\n\
+  \nUsers should be able to either:\nA) Specify files directly by path (keep existing behavior)\nB) Interactively filter by\
+  \ benchmark/platform/scale, then select from the 10\n   most recent matching results\n\nThis makes the compare workflow\
+  \ much more intuitive for users with many result\nfiles accumulated over time.\n"
+tasks:
+  phases:
+  - phase: 'Phase 1: Result Discovery Improvements'
+    done: true
+    items:
+    - summary: Create _discover_result_files_with_metadata() function
+      done: true
+      subtasks:
+      - summary: Parse JSON files to extract benchmark/platform/scale metadata
+        done: true
+      - summary: Validate schema_version field to identify valid result files
+        done: true
+      - summary: Extract timestamp for sorting by recency
+        done: true
+      - summary: Return structured list with path, benchmark, platform, scale, timestamp
+        done: true
+    - summary: Replace text-based heuristic filtering with proper JSON parsing
+      done: true
+  - phase: 'Phase 2: Guided Selection Implementation'
+    done: true
+    items:
+    - summary: Add selection mode choice (guided vs direct path)
+      done: true
+    - summary: Implement _guided_file_selection() function
+      done: true
+      subtasks:
+      - summary: Present unique benchmarks from discovered files
+        done: true
+      - summary: Filter platforms based on selected benchmark
+        done: true
+      - summary: Filter scale factors based on benchmark + platform
+        done: true
+      - summary: Show max 10 most recent matching results
+        done: true
+    - summary: Implement _direct_file_selection() for path entry
+      done: true
+  - phase: 'Phase 3: Enhanced Display'
+    done: true
+    items:
+    - summary: Improve results table to show metadata columns
+      done: true
+      subtasks:
+      - summary: Add Benchmark column
+        done: true
+      - summary: Add Platform column
+        done: true
+      - summary: Add Scale column
+        done: true
+      - summary: Add Timestamp column (formatted)
+        done: true
+      - summary: Truncate file paths for readability
+        done: true
+    - summary: Add color coding for different benchmarks/platforms
+      done: true
+  - phase: 'Phase 4: Testing and Documentation'
+    done: true
+    items:
+    - summary: Add unit tests for _discover_result_files_with_metadata()
+      done: true
+    - summary: Add unit tests for _guided_file_selection()
+      done: true
+    - summary: Update CLI help text for compare command
+      done: true
+metadata:
+  tags:
+  - cli
+  - ux
+  - compare
+  - interactive
+  estimated_effort: 1-2 days
+  created_date: '2025-12-15'
+impact:
+  user_impact: 'Users with many benchmark result files can now easily find and compare
+
+    specific runs without manually inspecting file names or paths. The guided
+
+    selection by benchmark/platform/scale dramatically reduces cognitive load.
+
+    '
+  technical_debt: 'Removes fragile text-based file detection heuristic that checked for
+
+    "benchmark" or "results" keywords in file content. New implementation
+
+    properly parses JSON and validates schema version.
+
+    '
+files_affected:
+  modified:
+  - benchbox/cli/commands/compare.py
+  - tests/unit/cli/test_compare_command.py
+context_sections:
+  Current Implementation Issues: 'The _interactive_file_comparison() function (lines 489-595) has these problems:
+
+    1. Weak file discovery: scans dirs with content-based text matching
+
+    2. No metadata display: just shows file paths, no context
+
+    3. No filtering: shows all results, user must manually identify files
+
+    4. Doesn''t leverage existing find_latest_result() or load_result_file()
+
+    '
+  Proposed UX Flow: "Option A: Direct path entry (unchanged)\n  - User types file paths directly\n\nOption B: Guided selection\
+    \ (new)\n  1. Choose benchmark (tpch, tpcds, ssb, etc.)\n  2. Choose platform (filtered to those with results for selected\
+    \ benchmark)\n  3. Choose scale factor (filtered to available for benchmark+platform)\n  4. Select from 10 most recent\
+    \ matching results\n"
+success_metrics:
+- Users can find matching results in 3-4 selections instead of scanning file names
+- Result table shows benchmark, platform, scale, timestamp at a glance
+- File discovery correctly identifies only valid BenchBox result files
+- Max 10 results shown per filtered selection
+sections:
+  Implementation Summary: "Implemented guided file selection for the `benchbox compare` command with:\n\n1. **ResultFileMetadata\
+    \ class**: Structured metadata from result files with\n   properties for formatted_timestamp and short_path display.\n\
+    \n2. **_discover_result_files_with_metadata()**: Scans directories for JSON files,\n   validates schema_version and benchmark\
+    \ sections, extracts metadata, and\n   returns sorted list (newest first).\n\n3. **_guided_file_selection()**: Hierarchical\
+    \ selection by benchmark → platform\n   → scale factor, displaying only 10 most recent matching results.\n\n4. **_direct_file_selection()**:\
+    \ Simple path entry mode for manual file selection.\n\n5. **_display_results_table()**: Rich table display with benchmark,\
+    \ platform,\n   scale, timestamp, and truncated file path columns with color coding.\n\n6. **Unit tests**: 8 new tests\
+    \ for ResultFileMetadata class and discovery function."
+commits:
+- 51f29cb7

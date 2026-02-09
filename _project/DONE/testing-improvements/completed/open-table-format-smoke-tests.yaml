@@ -1,0 +1,136 @@
+id: open-table-format-smoke-tests
+title: Open Table Format Smoke Tests
+worktree: testing-improvements
+category: Testing and Quality Assurance
+priority: Medium
+status: Completed
+description: |
+  Add smoke tests to verify end-to-end functionality for all supported open table formats
+  (Parquet, Delta Lake, Apache Iceberg). While comprehensive unit tests exist for the
+  format converters, there are no integration tests that verify the full pipeline works:
+  data generation → format conversion → platform loading → query execution.
+
+  Current test coverage:
+  - Unit tests: tests/unit/utils/format_converters/ (Parquet, Delta, Iceberg converters)
+  - Missing: Integration tests verifying CLI --convert-format option
+  - Missing: Smoke tests verifying platforms can read converted data
+  - Missing: CI verification that optional dependencies (deltalake, pyiceberg) work
+
+impact:
+  business_value: |
+    Open table formats (Delta Lake, Iceberg) are critical for enterprise data lake
+    architectures. Ensuring these formats work correctly builds trust with users
+    deploying BenchBox against production-like environments.
+  user_impact: |
+    Users can confidently use --convert-format options knowing they've been tested
+    end-to-end, not just at the converter level.
+  technical_debt: |
+    Closes the testing gap identified in the "Open File and Table Format Support"
+    feature completion (2 remaining tasks: examples and documentation).
+
+tasks:
+- phase: "Phase 1: Parquet Format Smoke Tests"
+  done: true
+  notes: "Parquet has no optional dependencies - should always run"
+  items:
+  - summary: "Add DuckDB + Parquet integration test (TPC-H SF=0.01, single table)"
+    done: true
+  - summary: "Verify Parquet compression options (snappy, gzip, zstd) produce valid files"
+    done: true
+  - summary: "Verify partitioned Parquet output can be read as Hive dataset"
+    done: true
+
+- phase: "Phase 2: Delta Lake Format Smoke Tests"
+  done: true
+  notes: "Requires deltalake optional dependency"
+  items:
+  - summary: "Add DuckDB + Delta Lake integration test using delta_scan() extension"
+    done: true
+  - summary: "Verify Delta transaction log is created correctly"
+    done: true
+  - summary: "Add skip marker for missing deltalake dependency with clear message"
+    done: true
+
+- phase: "Phase 3: Apache Iceberg Format Smoke Tests"
+  done: true
+  notes: "Requires pyiceberg optional dependency"
+  items:
+  - summary: "Add Iceberg format conversion smoke test (verify metadata structure)"
+    done: true
+  - summary: "Add skip marker for missing pyiceberg dependency with clear message"
+    done: true
+
+- phase: "Phase 4: CLI Integration Tests"
+  done: true
+  notes: "CLI tests verify help, error handling, and option documentation. Full CLI conversion blocked by get_schema() API
+    mismatch (tracked separately)."
+  items:
+  - summary: "Test CLI help shows all format options"
+    done: true
+  - summary: "Test CLI error handling for missing input/format/manifest"
+    done: true
+  - summary: "Test CLI shows all compression options in help"
+    done: true
+
+files_affected:
+  added:
+  - "tests/integration/test_open_table_formats.py"
+  modified: []
+
+success_metrics:
+- "All three formats (Parquet, Delta, Iceberg) have at least one smoke test"
+- "Tests skip gracefully when optional dependencies are missing"
+- "CI runs Parquet tests on every PR (no optional deps required)"
+- "DuckDB can query data converted to Parquet format"
+
+metadata:
+  created_date: "2025-12-13"
+  completed_date: "2025-12-13"
+  tags:
+  - testing
+  - open-table-formats
+  - parquet
+  - delta
+  - iceberg
+  - integration
+  estimated_effort: Small
+  owners:
+  - "@benchbox-maintainers"
+
+related_work:
+- "_project/DONE/benchmark-expansion/active/open-file-and-table-format-support.yaml"
+
+open_questions:
+- "Should we add pyiceberg/deltalake to CI test matrix as optional dependency group?"
+- "Do we need platform-specific tests (Databricks+Delta, Snowflake+Iceberg) or is DuckDB sufficient for smoke tests?"
+
+implementation_notes: |
+  16 integration tests added in tests/integration/test_open_table_formats.py:
+
+  Phase 1 (Parquet) - 5 tests:
+  - test_parquet_conversion_and_duckdb_query: End-to-end TBL→Parquet→DuckDB
+  - test_parquet_snappy_compression: Snappy compression verification
+  - test_parquet_gzip_compression: Gzip compression verification
+  - test_parquet_zstd_compression: Zstd compression verification
+  - test_parquet_hive_partitioned_duckdb_query: Hive-style partitioning
+
+  Phase 2 (Delta Lake) - 3 tests:
+  - test_delta_conversion_and_structure: Directory/log structure
+  - test_delta_duckdb_query_via_delta_scan: DuckDB delta extension
+  - test_delta_transaction_log_metadata: Transaction log JSON validation
+
+  Phase 3 (Iceberg) - 2 tests:
+  - test_iceberg_conversion_and_structure: Metadata directory
+  - test_iceberg_metadata_structure: Metadata JSON fields
+
+  Phase 4 (CLI) - 6 tests:
+  - test_cli_convert_help: Help text verification
+  - test_cli_convert_missing_input_error: Error handling
+  - test_cli_convert_missing_format_error: Error handling
+  - test_cli_convert_invalid_format_error: Error handling
+  - test_cli_convert_missing_manifest_error: Error handling
+  - test_cli_convert_compression_options_accepted: Options documented
+
+  Note: Full CLI conversion tests blocked by benchmark.get_schema() API
+  inconsistency - TPC-H's get_schema() takes no args but CLI passes table_name.
+  This is tracked as a separate bug to fix.

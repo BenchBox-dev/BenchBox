@@ -1,3 +1,4 @@
+id: postgresql-platform-documentation
 title: PostgreSQL Platform Documentation
 worktree: docs-experience
 priority: Medium
@@ -15,23 +16,23 @@ description: |
   - Common gotchas (connection limits, statement timeouts)
 
 tasks:
-  - phase: "Documentation Creation"
+- phase: "Documentation Creation"
+  done: true
+  items:
+  - summary: "Create docs/platforms/postgresql.md"
     done: true
-    items:
-      - summary: "Create docs/platforms/postgresql.md"
-        done: true
-      - summary: "Document connection string formats"
-        done: true
-      - summary: "Document local server setup requirements"
-        done: true
-      - summary: "Document authentication (password, peer, md5)"
-        done: true
-      - summary: "Add performance configuration tips"
-        done: true
-      - summary: "Add troubleshooting section"
-        done: true
-      - summary: "Update docs/platforms/index.md"
-        done: true
+  - summary: "Document connection string formats"
+    done: true
+  - summary: "Document local server setup requirements"
+    done: true
+  - summary: "Document authentication (password, peer, md5)"
+    done: true
+  - summary: "Add performance configuration tips"
+    done: true
+  - summary: "Add troubleshooting section"
+    done: true
+  - summary: "Update docs/platforms/index.md"
+    done: true
 
 completion_notes: |
   Documentation already existed at docs/platforms/postgresql.md (191 lines).
@@ -50,12 +51,12 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - documentation
-    - postgresql
-    - platform
-    - local
+  - documentation
+  - postgresql
+  - platform
+  - local
   estimated_effort: 3-4 hours
   created_date: "2025-12-13"
 
@@ -68,9 +69,9 @@ impact:
     Performance tuning guidance for realistic results.
 
 success_metrics:
-  - "Complete PostgreSQL guide"
-  - "Connection string examples for common scenarios"
-  - "Performance tuning section with specific settings"
+- "Complete PostgreSQL guide"
+- "Connection string examples for common scenarios"
+- "Performance tuning section with specific settings"
 
 files_modified:
-  - docs/platforms/postgresql.md (existing, comprehensive)
+- docs/platforms/postgresql.md (existing, comprehensive)

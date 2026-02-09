@@ -1,3 +1,4 @@
+id: error-message-polish
 title: Error Message Polish
 worktree: release-readiness
 priority: High
@@ -18,34 +19,34 @@ description: |
   - Data loading errors (file not found, format mismatch)
 
 tasks:
-  - phase: "Phase 1: Audit"
+- phase: "Phase 1: Audit"
+  done: true
+  items:
+  - summary: "Catalog all error paths in platform adapters"
     done: true
-    items:
-      - summary: "Catalog all error paths in platform adapters"
-        done: true
-      - summary: "Identify errors that lack actionable guidance"
-        done: true
-      - summary: "Document common user-reported error scenarios"
-        done: true
-  - phase: "Phase 2: Improvement"
+  - summary: "Identify errors that lack actionable guidance"
     done: true
-    items:
-      - summary: "Add 'did you mean?' suggestions for common typos"
-        done: false
-        notes: "Deferred - lower priority, can be added incrementally"
-      - summary: "Include fix commands in dependency errors"
-        done: true
-      - summary: "Add platform-specific troubleshooting hints"
-        done: true
-      - summary: "Improve connection error messages with checklist"
-        done: true
-  - phase: "Phase 3: Validation"
+  - summary: "Document common user-reported error scenarios"
     done: true
-    items:
-      - summary: "Test error messages with fresh user perspective"
-        done: true
-      - summary: "Ensure consistency in error format across platforms"
-        done: true
+- phase: "Phase 2: Improvement"
+  done: true
+  items:
+  - summary: "Add 'did you mean?' suggestions for common typos"
+    done: false
+    notes: "Deferred - lower priority, can be added incrementally"
+  - summary: "Include fix commands in dependency errors"
+    done: true
+  - summary: "Add platform-specific troubleshooting hints"
+    done: true
+  - summary: "Improve connection error messages with checklist"
+    done: true
+- phase: "Phase 3: Validation"
+  done: true
+  items:
+  - summary: "Test error messages with fresh user perspective"
+    done: true
+  - summary: "Ensure consistency in error format across platforms"
+    done: true
 
 completion_notes: |
   Implemented ConfigurationError with actionable guidance for 7 cloud platforms:
@@ -67,11 +68,11 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - ux
-    - errors
-    - polish
+  - ux
+  - errors
+  - polish
   estimated_effort: 2-3 days
   created_date: "2025-12-12"
 
@@ -84,6 +85,6 @@ impact:
     or asking for help. Faster path to successful benchmark execution.
 
 success_metrics:
-  - "All connection errors include actionable next steps"
-  - "Missing dependency errors include install command"
-  - "Consistent error format: [ERROR] Context: Message. Suggestion."
+- "All connection errors include actionable next steps"
+- "Missing dependency errors include install command"
+- "Consistent error format: [ERROR] Context: Message. Suggestion."

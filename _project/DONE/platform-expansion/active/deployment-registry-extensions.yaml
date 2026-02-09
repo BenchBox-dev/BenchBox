@@ -1,0 +1,146 @@
+id: deployment-registry-extensions
+title: "Platform Deployment Registry Extensions"
+worktree: platform-expansion
+priority: High
+status: Completed
+completion_date: "2026-01-26"
+category: Core Functionality
+description: |
+  Extend the PlatformRegistry to support deployment mode awareness, enabling BenchBox
+  to model platforms with local/remote/managed variants (e.g., DuckDB → MotherDuck,
+  ClickHouse local → ClickHouse Cloud).
+
+  This is the foundational work that enables the deployment dimension architecture,
+  following the successful pattern of the SQL/DataFrame split. The registry will
+  declare deployment capabilities per platform, allowing the factory and CLI to
+  route to appropriate adapters.
+
+context_sections:
+  "Background and Motivation": |
+    BenchBox currently has no way to express relationships between platforms like:
+    - DuckDB (local) → MotherDuck (managed cloud)
+    - ClickHouse (chDB local) → ClickHouse Cloud (managed) → ClickHouse self-hosted
+    - Trino (self-hosted) → Starburst (managed) → Athena (managed)
+
+    Each variant would be a completely separate platform with no inheritance of
+    SQL dialect, benchmark compatibility, or configuration. This makes it difficult
+    to compare local vs cloud performance of the same engine.
+
+  "Technical Context": |
+    The existing SQL/DataFrame split provides the pattern to follow:
+    - PlatformCapability dataclass with supports_sql, supports_dataframe, default_mode
+    - Registry metadata declares capabilities
+    - Factory routes based on mode
+
+    We extend this with deployment awareness:
+    - New DeploymentCapability dataclass
+    - Extended PlatformCapability with deployment_modes dict
+    - Platform family concept for dialect inheritance
+
+tasks:
+  phases:
+  - phase: "Phase 1: Dataclass Design"
+    done: true
+    items:
+    - summary: "Create DeploymentCapability dataclass"
+      done: true
+      subtasks:
+      - summary: "Define mode field: local | self-hosted | managed"
+        done: true
+      - summary: "Add requires_credentials, requires_cloud_storage, requires_network flags"
+        done: true
+      - summary: "Add dependencies list for required packages"
+        done: true
+      - summary: "Add auth_methods list for supported authentication"
+        done: true
+    - summary: "Extend PlatformCapability dataclass"
+      done: true
+      subtasks:
+      - summary: "Add deployment_modes: dict[str, DeploymentCapability]"
+        done: true
+      - summary: "Add default_deployment: str field"
+        done: true
+      - summary: "Add platform_family: Optional[str] field"
+        done: true
+      - summary: "Add inherits_from: Optional[str] field"
+        done: true
+
+  - phase: "Phase 2: Registry Methods"
+    done: true
+    items:
+    - summary: "Implement get_deployment_capability(platform, mode) method"
+      done: true
+    - summary: "Implement get_default_deployment(platform) method"
+      done: true
+    - summary: "Implement get_platform_family(platform) method"
+      done: true
+    - summary: "Implement get_inherited_platform(platform) method"
+      done: true
+    - summary: "Implement requires_cloud_storage_for_deployment(platform, mode) method"
+      done: true
+
+  - phase: "Phase 3: Platform Metadata"
+    done: true
+    items:
+    - summary: "Add deployment metadata for DuckDB (local only)"
+      done: true
+    - summary: "Add deployment metadata for ClickHouse (local=default, server, cloud)"
+      done: true
+    - summary: "Add deployment metadata for Firebolt (core, cloud)"
+      done: true
+    - summary: "Add deployment metadata for Trino (self-hosted)"
+      done: true
+    - summary: "Add deployment metadata for TimescaleDB (self-hosted, cloud)"
+      done: true
+    - summary: "Add deployment metadata for PySpark (local)"
+      done: true
+
+  - phase: "Phase 4: Testing"
+    done: true
+    items:
+    - summary: "Unit tests for DeploymentCapability dataclass"
+      done: true
+    - summary: "Unit tests for extended PlatformCapability"
+      done: true
+    - summary: "Unit tests for all new registry methods"
+      done: true
+    - summary: "Integration tests for deployment resolution"
+      done: true
+
+metadata:
+  tags:
+  - architecture
+  - platform-registry
+  - deployment-modes
+  estimated_effort: "3-4 days"
+  created_date: "2026-01-14"
+
+impact:
+  business_value: |
+    Enables systematic comparison of local vs cloud variants of the same database
+    engine, a key differentiator for BenchBox. Users can benchmark DuckDB locally
+    then compare with MotherDuck cloud with minimal configuration changes.
+  user_impact: |
+    Users gain the ability to select deployment modes via intuitive naming
+    (clickhouse:cloud, firebolt:core) and compare performance across deployment
+    variants with consistent benchmark methodology.
+  technical_debt: |
+    Establishes clean architectural foundation for deployment awareness, avoiding
+    ad-hoc mode handling patterns currently in ClickHouse and Firebolt adapters.
+
+files_affected:
+  modified:
+  - "benchbox/core/platform_registry.py"
+  added: []
+  removed: []
+
+success_metrics:
+- "DeploymentCapability dataclass passes schema validation"
+- "All existing platforms have deployment metadata (at least default mode)"
+- "Registry methods return correct deployment capabilities"
+- "Unit test coverage >= 90% for new code"
+- "No breaking changes to existing platform registration"
+
+open_questions:
+- "Should deployment metadata be required or optional for all platforms?"
+- "How should we handle platforms that don't fit the local/self-hosted/managed model?"

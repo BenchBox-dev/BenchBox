@@ -1,0 +1,76 @@
+id: phase-2-query-behavior
+title: 'Platform Config Audit: Query Behavior Overrides'
+worktree: platform-config-audit
+category: Platform Configuration
+priority: High
+status: Completed
+completed_date: '2025-11-27'
+description: 'Adversarial review of platform-config-audit.md identified forced query behavior
+
+  settings that are NOT documented. These silently change query execution or planning
+
+  without user awareness.
+
+
+  Source: docs/platform-config-audit.md adversarial review (2025-11-26)
+
+  '
+context_sections:
+- name: Snowflake Nondeterministic Error Suppression
+  summary: "Location: benchbox/platforms/snowflake.py:762-767\nForced: ERROR_ON_NONDETERMINISTIC_MERGE=FALSE, ERROR_ON_NONDETERMINISTIC_UPDATE=FALSE\n\
+    Impact: Queries that would error with nondeterministic behavior succeed silently;\n        changes query plan behavior;\
+    \ may produce different results on re-runs\nRecommendation: EXCESS - consider making opt-in; users should know when queries\n\
+    \                have nondeterministic behavior\n"
+- name: Databricks ANALYZE TABLE Post-Load
+  summary: "Location: benchbox/platforms/databricks/adapter.py:1505-1514\nForced: ANALYZE TABLE {table} COMPUTE STATISTICS\
+    \ called after every load\nImpact: Forces table statistics computation; affects query planner; NOT user-controllable\n\
+    Recommendation: EXCESS - consider making opt-in; some users may want fresh loads\n                without statistics overhead\n"
+- name: DataFusion Identifier Normalization
+  summary: "Location: benchbox/platforms/datafusion.py:290-297\nForced: datafusion.sql_parser.enable_ident_normalization='true'\
+    \ (with silent failure)\nImpact: Case sensitivity behavior changes; NOT guaranteed across DataFusion versions;\n     \
+    \   wrapped in try/except so failures are silent\nRecommendation: EXCESS - document the soft-failure behavior; consider\
+    \ warning on failure\n"
+- name: BigQuery dry_run Enforcement
+  summary: 'Location: benchbox/platforms/bigquery.py:1083-1106
+
+    Forced: dry_run=self.dry_run propagated to all query jobs
+
+    Impact: If dry_run flag is set, queries silently skip execution; no warning to user
+
+    Recommendation: EXCESS - add explicit warning/logging when dry_run mode is active
+
+    '
+impact: Query correctness and reproducibility; users may get unexpected results or silent failures
+tasks:
+- phase: Verification
+  done: true
+  items:
+  - summary: Verify line numbers are current in each source file
+  - summary: Confirm configurations are still forced without user override options
+- phase: Analysis
+  done: true
+  items:
+  - summary: 'Snowflake: Determine if TPC-H/DS queries require nondeterministic suppression'
+  - summary: 'Databricks: Measure time cost of forced ANALYZE TABLE on SF0.01'
+  - summary: 'DataFusion: Test behavior with and without identifier normalization'
+  - summary: 'BigQuery: Verify dry_run flag is only set intentionally'
+- phase: Implementation
+  done: true
+  items:
+  - summary: Add user-facing warnings or opt-in flags for each config
+  - summary: Update docs/platform-config-audit.md "Excess Configurations" section
+- phase: Testing
+  done: true
+  items:
+  - summary: 'Snowflake: TPC-H smoke test with nondeterministic errors enabled'
+  - summary: 'Databricks: Load test with/without ANALYZE TABLE'
+  - summary: 'DataFusion: Identifier case sensitivity tests'
+files_affected:
+  modified:
+  - benchbox/platforms/snowflake.py
+  - benchbox/platforms/databricks/adapter.py
+  - benchbox/platforms/datafusion.py
+  - benchbox/platforms/bigquery.py
+  - docs/platform-config-audit.md
+  added: []
+  removed: []

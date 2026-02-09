@@ -1,13 +1,17 @@
+id: query-plan-parser-framework
 title: Query Plan Parser Framework
 worktree: query-plan-parsers
 category: Core Functionality
 priority: High
-status: Partially Completed
-completed_date: "2025-11-23"
-completion_notes: |
-  Base parser framework and DuckDB parser fully implemented and tested.
+status: Completed
+completed_date: '2025-11-23'
+completion_notes: 'Base parser framework and DuckDB parser fully implemented and tested.
+
   SQLite parser implemented. Remaining parsers (PostgreSQL, BigQuery, Snowflake,
+
   DataFusion, ClickHouse, Redshift, Databricks) deferred for incremental implementation.
+
+  '
 description: "Implement platform-specific EXPLAIN output parsers that convert native query \nplans into harmonized QueryPlanDAG\
   \ structure. Includes base parser interface\nand 9 platform-specific implementations.\n\n**Parsing Strategy**:\n- Each platform\
   \ provides EXPLAIN in different format (text trees, JSON, XML)\n- Parse native format → intermediate representation → QueryPlanDAG\n\
@@ -189,8 +193,7 @@ technical_requirements:
   - Real-world plan samples from TPC-H/TPC-DS
   - Coverage >80% for parser logic
 files_affected:
-- change_type: New
-  paths:
+  modified:
   - benchbox/core/results/query_plan_parsers/__init__.py
   - benchbox/core/results/query_plan_parsers/base_parser.py
   - benchbox/core/results/query_plan_parsers/duckdb_parser.py
@@ -202,8 +205,6 @@ files_affected:
   - benchbox/core/results/query_plan_parsers/redshift_parser.py
   - benchbox/core/results/query_plan_parsers/databricks_parser.py
   - benchbox/core/results/query_plan_parsers/snowflake_parser.py
-- change_type: New
-  paths:
   - tests/unit/parsers/test_base_parser.py
   - tests/unit/parsers/test_duckdb_parser.py
   - tests/unit/parsers/test_sqlite_parser.py
@@ -215,6 +216,8 @@ files_affected:
   - tests/unit/parsers/test_databricks_parser.py
   - tests/unit/parsers/test_snowflake_parser.py
   - tests/fixtures/query_plans/
+  added: []
+  removed: []
 metadata:
   owners:
   - '@benchbox-maintainers'

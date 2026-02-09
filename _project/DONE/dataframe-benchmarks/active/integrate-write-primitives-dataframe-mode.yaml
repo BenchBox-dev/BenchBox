@@ -1,58 +1,64 @@
-title: "Integrate Write Primitives DataFrame Mode with Runner and Registry"
+id: integrate-write-primitives-dataframe-mode
+title: Integrate Write Primitives DataFrame Mode with Runner and Registry
 worktree: dataframe-benchmarks
 priority: Medium-High
 status: Completed
-completed_date: "2026-02-07"
-description: |
-  Integrate existing Write Primitives DataFrame operation support with benchmark
+completed_date: '2026-02-07'
+description: 'Integrate existing Write Primitives DataFrame operation support with benchmark
+
   registry metadata and execution pathways.
 
+
   Existing write operation capabilities and managers are implemented, but
+
   benchmark-level discoverability and mode wiring remain inconsistent.
 
+  '
 category: Core Functionality
-
 tasks:
   phases:
-    - phase: "Phase 1: Registry and Discovery"
+  - phase: 'Phase 1: Registry and Discovery'
+    done: true
+    items:
+    - summary: Align benchmark metadata with DataFrame capability
       done: true
-      items:
-        - summary: "Align benchmark metadata with DataFrame capability"
-          done: true
-        - summary: "Ensure CLI and MCP discovery surfaces DataFrame support"
-          done: true
-    - phase: "Phase 2: Execution Wiring"
+    - summary: Ensure CLI and MCP discovery surfaces DataFrame support
       done: true
-      items:
-        - summary: "Wire DataFrame mode operation dispatch in runner pathways"
-          done: true
-        - summary: "Add capability-driven skip/fail-fast reporting"
-          done: true
-    - phase: "Phase 3: Validation"
+  - phase: 'Phase 2: Execution Wiring'
+    done: true
+    items:
+    - summary: Wire DataFrame mode operation dispatch in runner pathways
       done: true
-      items:
-        - summary: "Add integration tests for DataFrame write mode execution"
-          done: true
-
+    - summary: Add capability-driven skip/fail-fast reporting
+      done: true
+  - phase: 'Phase 3: Validation'
+    done: true
+    items:
+    - summary: Add integration tests for DataFrame write mode execution
+      done: true
 metadata:
   owners:
-    - joe
+  - joe
   tags:
-    - dataframe
-    - write-primitives
-    - integration
+  - dataframe
+  - write-primitives
+  - integration
   estimated_effort: Medium
-  created_date: "2026-02-07"
-  last_updated: "2026-02-07T00:00:00"
-
+  created_date: '2026-02-07'
+  last_updated: '2026-02-07T00:00:00'
 sections:
-  "Implementation Summary": |
-    Completed DataFrame integration for Write Primitives across metadata,
+  Implementation Summary: 'Completed DataFrame integration for Write Primitives across metadata,
+
     runner execution, and capability reporting.
 
+
     Implemented benchmark-managed workload dispatch via
+
     `execute_dataframe_workload()` to report platform capabilities, run a
+
     BULK_LOAD smoke operation, and emit explicit SKIPPED entries for
+
     unsupported row-level operations.
 
-    Validation coverage added for metadata flags and workload result shape.
+
+    Validation coverage added for metadata flags and workload result shape.'

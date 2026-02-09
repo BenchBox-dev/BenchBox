@@ -1,0 +1,61 @@
+id: standardize-benchmark-constraint-parameter-apis
+title: Standardize Benchmark Constraint Parameter APIs
+category: Code Quality and Technical Debt
+sections:
+  Notes: '- "**Priority**: High"
+
+    - "**Status**: ✅ Completed"
+
+    - "**Description**: Eliminate legacy constraint parameters from benchmark implementations and enforce unified tuning configuration
+    usage across all benchmarks"
+
+    - "**Context**: Currently benchmarks have inconsistent constraint parameter handling. Some benchmarks still accept old-style
+    constraint parameters that bypass the unified tuning system, creating maintenance burden and potential configuration conflicts."
+
+    - "**Current State Analysis**:"
+
+    - "**Tasks**:"
+
+    - "**Files Affected**:"
+
+    - "**Impact**: ✅ **COMPLETED** - Eliminated configuration inconsistencies, reduced maintenance overhead, ensured all constraint
+    configuration flows through unified tuning system, prevented bypassing of tuning configurations"
+
+    - "**Breaking Change**: ✅ **IMPLEMENTED** - Benchmarks no longer accept direct constraint parameters, must use unified
+    tuning configuration"
+
+    - "**Implementation Summary**: Successfully standardized all 7 core benchmarks (SSB, TPC-H, TPC-DS, TPC-DI, H2O, AMPLab,
+    ClickBench) and 11 top-level classes to use unified `get_create_tables_sql(dialect, tuning_config)` signature. Updated
+    all 7 platform adapters (DuckDB, SQLite, Databricks, ClickHouse, Snowflake, BigQuery, Redshift) to pass tuning configuration
+    instead of individual parameters. Added comprehensive regression test suite with 5 test methods covering API standardization,
+    constraint extraction, and backward compatibility."'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Priority**: High"
+
+  - "**Status**: ✅ Completed"
+
+  - "**Description**: Eliminate legacy constraint parameters from benchmark implementations and enforce unified tuning configuration
+  usage across all benchmarks"
+
+  - "**Context**: Currently benchmarks have inconsistent constraint parameter handling. Some benchmarks still accept old-style
+  constraint parameters that bypass the unified tuning system, creating maintenance burden and potential configuration conflicts."
+
+  - "**Current State Analysis**:"
+
+  - "**Tasks**:"
+
+  - "**Files Affected**:"
+
+  - "**Impact**: ✅ **COMPLETED** - Eliminated configuration inconsistencies, reduced maintenance overhead, ensured all constraint
+  configuration flows through unified tuning system, prevented bypassing of tuning configurations"
+
+  - "**Breaking Change**: ✅ **IMPLEMENTED** - Benchmarks no longer accept direct constraint parameters, must use unified tuning
+  configuration"
+
+  - "**Implementation Summary**: Successfully standardized all 7 core benchmarks (SSB, TPC-H, TPC-DS, TPC-DI, H2O, AMPLab,
+  ClickBench) and 11 top-level classes to use unified `get_create_tables_sql(dialect, tuning_config)` signature. Updated all
+  7 platform adapters (DuckDB, SQLite, Databricks, ClickHouse, Snowflake, BigQuery, Redshift) to pass tuning configuration
+  instead of individual parameters. Added comprehensive regression test suite with 5 test methods covering API standardization,
+  constraint extraction, and backward compatibility."'

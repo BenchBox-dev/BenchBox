@@ -1,3 +1,4 @@
+id: cloud-platform-example-scripts
 title: Example Scripts for Cloud Platforms
 worktree: docs-experience
 priority: Medium
@@ -16,27 +17,27 @@ description: |
   - Result handling
 
 tasks:
-  - phase: "Firebolt Examples"
+- phase: "Firebolt Examples"
+  done: true
+  items:
+  - summary: "Create examples/getting_started/cloud/firebolt_core_tpch.py"
     done: true
-    items:
-      - summary: "Create examples/getting_started/cloud/firebolt_core_tpch.py"
-        done: true
-      - summary: "Create examples/getting_started/cloud/firebolt_cloud_tpch.py"
-        done: true
-  - phase: "Athena Examples"
+  - summary: "Create examples/getting_started/cloud/firebolt_cloud_tpch.py"
     done: true
-    items:
-      - summary: "Create examples/getting_started/cloud/athena_tpch.py"
-        done: true
-      - summary: "Document S3 staging requirements in comments"
-        done: true
-  - phase: "Testing"
+- phase: "Athena Examples"
+  done: true
+  items:
+  - summary: "Create examples/getting_started/cloud/athena_tpch.py"
     done: true
-    items:
-      - summary: "Add tests for new example scripts"
-        done: true
-      - summary: "Verify all 19 example tests pass"
-        done: true
+  - summary: "Document S3 staging requirements in comments"
+    done: true
+- phase: "Testing"
+  done: true
+  items:
+  - summary: "Add tests for new example scripts"
+    done: true
+  - summary: "Verify all 19 example tests pass"
+    done: true
 
 completion_notes: |
   Created 3 new example scripts in examples/getting_started/cloud/:
@@ -80,12 +81,12 @@ completion_notes: |
 
 metadata:
   owners:
-    - "@benchbox-maintainers"
+  - "@benchbox-maintainers"
   tags:
-    - examples
-    - firebolt
-    - athena
-    - cloud
+  - examples
+  - firebolt
+  - athena
+  - cloud
   estimated_effort: 3-4 hours
   created_date: "2025-12-13"
 
@@ -98,14 +99,14 @@ impact:
     Learn by example rather than reading docs.
 
 success_metrics:
-  - "Runnable examples for Firebolt Core, Firebolt Cloud, Athena"
-  - "Examples follow existing code patterns"
-  - "Comments explain platform-specific configuration"
+- "Runnable examples for Firebolt Core, Firebolt Cloud, Athena"
+- "Examples follow existing code patterns"
+- "Comments explain platform-specific configuration"
 
 files_created:
-  - examples/getting_started/cloud/firebolt_core_tpch.py
-  - examples/getting_started/cloud/firebolt_cloud_tpch.py
-  - examples/getting_started/cloud/athena_tpch.py
+- examples/getting_started/cloud/firebolt_core_tpch.py
+- examples/getting_started/cloud/firebolt_cloud_tpch.py
+- examples/getting_started/cloud/athena_tpch.py
 
 files_modified:
-  - tests/examples/test_getting_started_examples.py
+- tests/examples/test_getting_started_examples.py

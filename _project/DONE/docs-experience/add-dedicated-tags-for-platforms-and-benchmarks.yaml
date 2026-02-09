@@ -1,3 +1,4 @@
+id: add-dedicated-tags-for-platforms-and-benchmarks
 title: "Add dedicated tags for all platforms and benchmarks"
 worktree: "docs-experience"
 priority: "Medium"
@@ -14,39 +15,40 @@ description: |
 
 tasks:
   phases:
-    - phase: "Phase 1: Add Platform Tags"
+  - phase: "Phase 1: Add Platform Tags"
+    done: true
+    items:
+    - summary: "Add tags to SQL platform docs (PostgreSQL, DataFusion, Trino, Presto, Firebolt, TimescaleDB, InfluxDB)"
       done: true
-      items:
-        - summary: "Add tags to SQL platform docs (PostgreSQL, DataFusion, Trino, Presto, Firebolt, TimescaleDB, InfluxDB)"
-          done: true
-        - summary: "Add tags to cloud platform docs (Redshift, Athena, AWS Glue, EMR Serverless, GCP Dataproc, Azure Synapse, Microsoft Fabric, Snowpark Connect)"
-          done: true
-        - summary: "Add tags to DataFrame platform docs (PySpark, Dask, Modin, cuDF, DataFusion DF)"
-          done: true
+    - summary: "Add tags to cloud platform docs (Redshift, Athena, AWS Glue, EMR Serverless, GCP Dataproc, Azure Synapse,
+        Microsoft Fabric, Snowpark Connect)"
+      done: true
+    - summary: "Add tags to DataFrame platform docs (PySpark, Dask, Modin, cuDF, DataFusion DF)"
+      done: true
 
-    - phase: "Phase 2: Add Benchmark Tags"
+  - phase: "Phase 2: Add Benchmark Tags"
+    done: true
+    items:
+    - summary: "Add tags to TPC variant benchmarks (TPC-HaVoC, TPC-H Skew)"
       done: true
-      items:
-        - summary: "Add tags to TPC variant benchmarks (TPC-HaVoC, TPC-H Skew)"
-          done: true
-        - summary: "Add tags to custom benchmarks (Join Order, AMPLab, NYC Taxi, CoffeeShop, DataVault, TSBS DevOps)"
-          done: true
-        - summary: "Add tags to primitive benchmarks (Read, Write, Transaction, Metadata, AI Primitives)"
-          done: true
+    - summary: "Add tags to custom benchmarks (Join Order, AMPLab, NYC Taxi, CoffeeShop, DataVault, TSBS DevOps)"
+      done: true
+    - summary: "Add tags to primitive benchmarks (Read, Write, Transaction, Metadata, AI Primitives)"
+      done: true
 
-    - phase: "Phase 3: Update Tag Categories"
+  - phase: "Phase 3: Update Tag Categories"
+    done: true
+    items:
+    - summary: "Update sphinx_tags_fix.py TAG_CATEGORIES to include new platform and benchmark tags"
       done: true
-      items:
-        - summary: "Update sphinx_tags_fix.py TAG_CATEGORIES to include new platform and benchmark tags"
-          done: true
-        - summary: "Rebuild docs and verify tag navigation"
-          done: true
+    - summary: "Rebuild docs and verify tag navigation"
+      done: true
 
 metadata:
   tags:
-    - documentation
-    - sphinx-tags
-    - discoverability
+  - documentation
+  - sphinx-tags
+  - discoverability
   estimated_effort: "2-3 hours"
   created_date: "2026-01-12"
   completed_date: "2026-01-12"
@@ -59,14 +61,14 @@ impact:
 
 files_affected:
   modified:
-    - "docs/platforms/*.md"
-    - "docs/benchmarks/*.md"
-    - "docs/_extensions/sphinx_tags_fix.py"
+  - "docs/platforms/*.md"
+  - "docs/benchmarks/*.md"
+  - "docs/_extensions/sphinx_tags_fix.py"
 
 success_metrics:
-  - "All 27 platforms have dedicated tags"
-  - "All 18 benchmarks have dedicated tags"
-  - "Tag categories in sidebar include new tags"
+- "All 27 platforms have dedicated tags"
+- "All 18 benchmarks have dedicated tags"
+- "Tag categories in sidebar include new tags"
 
 completion_notes: |
   Added dedicated tags to:

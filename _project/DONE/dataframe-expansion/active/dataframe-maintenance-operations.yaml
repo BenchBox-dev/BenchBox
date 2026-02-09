@@ -1,3 +1,4 @@
+id: dataframe-maintenance-operations
 title: "Implement DataFrame Maintenance Operations for TPC-H/TPC-DS"
 worktree: dataframe-expansion
 priority: Medium-High
@@ -48,93 +49,93 @@ context_sections:
 
 tasks:
   phases:
-    - phase: "Phase 1: Short-term Fix (Validation)"
+  - phase: "Phase 1: Short-term Fix (Validation)"
+    done: true
+    items:
+    - summary: "Add validation error when maintenance phase + DataFrame mode combined"
       done: true
-      items:
-        - summary: "Add validation error when maintenance phase + DataFrame mode combined"
-          done: true
-          subtasks:
-            - summary: "Update _extract_queries() in dryrun.py to return error for maintenance+dataframe"
-              done: true
-            - summary: "Update run_dataframe_benchmark() to raise NotImplementedError for maintenance"
-              done: true
-            - summary: "Add user-friendly error message explaining the limitation"
-              done: true
-        - summary: "Add tests for the validation behavior"
-          done: true
+      subtasks:
+      - summary: "Update _extract_queries() in dryrun.py to return error for maintenance+dataframe"
+        done: true
+      - summary: "Update run_dataframe_benchmark() to raise NotImplementedError for maintenance"
+        done: true
+      - summary: "Add user-friendly error message explaining the limitation"
+        done: true
+    - summary: "Add tests for the validation behavior"
+      done: true
 
-    - phase: "Phase 2: Design Unified Maintenance Abstraction"
+  - phase: "Phase 2: Design Unified Maintenance Abstraction"
+    done: true
+    items:
+    - summary: "Design MaintenanceOperationsInterface that works for SQL and DataFrame"
       done: true
-      items:
-        - summary: "Design MaintenanceOperationsInterface that works for SQL and DataFrame"
-          done: true
-          subtasks:
-            - summary: "Define abstract operations: insert_rows, update_rows, delete_rows"
-              done: true
-            - summary: "Define platform capability flags (supports_transactions, supports_merge, etc.)"
-              done: true
-        - summary: "Document which DataFrame platforms support which operations"
-          done: true
-          subtasks:
-            - summary: "Delta Lake capabilities (full ACID)"
-              done: true
-            - summary: "Iceberg capabilities (row-level operations)"
-              done: true
-            - summary: "Polars/Parquet capabilities (file-level operations)"
-              done: true
+      subtasks:
+      - summary: "Define abstract operations: insert_rows, update_rows, delete_rows"
+        done: true
+      - summary: "Define platform capability flags (supports_transactions, supports_merge, etc.)"
+        done: true
+    - summary: "Document which DataFrame platforms support which operations"
+      done: true
+      subtasks:
+      - summary: "Delta Lake capabilities (full ACID)"
+        done: true
+      - summary: "Iceberg capabilities (row-level operations)"
+        done: true
+      - summary: "Polars/Parquet capabilities (file-level operations)"
+        done: true
 
-    - phase: "Phase 3: Implementation"
+  - phase: "Phase 3: Implementation"
+    done: true
+    items:
+    - summary: "Implement get_maintenance_operations_for_platform() factory function"
       done: true
-      items:
-        - summary: "Implement get_maintenance_operations_for_platform() factory function"
-          done: true
-        - summary: "Implement PolarsMaintenanceOperations (file-based insert + partition delete)"
-          done: true
-        - summary: "Implement DeltaLakeMaintenanceOperations (full ACID)"
-          done: true
-        - summary: "Implement IcebergMaintenanceOperations (full ACID)"
-          done: true
+    - summary: "Implement PolarsMaintenanceOperations (file-based insert + partition delete)"
+      done: true
+    - summary: "Implement DeltaLakeMaintenanceOperations (full ACID)"
+      done: true
+    - summary: "Implement IcebergMaintenanceOperations (full ACID)"
+      done: true
 
-    - phase: "Phase 4: Testing and Validation"
+  - phase: "Phase 4: Testing and Validation"
+    done: true
+    items:
+    - summary: "Unit tests for maintenance interface"
       done: true
-      items:
-        - summary: "Unit tests for maintenance interface"
-          done: true
-        - summary: "Unit tests for Polars maintenance operations"
-          done: true
-        - summary: "Unit tests for Delta Lake maintenance operations"
-          done: true
-        - summary: "Unit tests for Iceberg maintenance operations"
-          done: true
-        - summary: "Integration tests with actual DataFrame platforms"
-          done: true
-        - summary: "TPC compliance validation for maintenance metrics"
-          done: true
+    - summary: "Unit tests for Polars maintenance operations"
+      done: true
+    - summary: "Unit tests for Delta Lake maintenance operations"
+      done: true
+    - summary: "Unit tests for Iceberg maintenance operations"
+      done: true
+    - summary: "Integration tests with actual DataFrame platforms"
+      done: true
+    - summary: "TPC compliance validation for maintenance metrics"
+      done: true
 
 metadata:
   tags:
-    - dataframe
-    - maintenance
-    - tpc-compliance
-    - delta-lake
-    - iceberg
+  - dataframe
+  - maintenance
+  - tpc-compliance
+  - delta-lake
+  - iceberg
   estimated_effort: Large
   created_date: "2026-01-25"
 
 files_affected:
   modified:
-    - "benchbox/core/dryrun.py"
-    - "benchbox/core/runner/dataframe_runner.py"
-    - "benchbox/core/dataframe/__init__.py"
+  - "benchbox/core/dryrun.py"
+  - "benchbox/core/runner/dataframe_runner.py"
+  - "benchbox/core/dataframe/__init__.py"
   added:
-    - "benchbox/core/dataframe/maintenance_interface.py"
-    - "benchbox/platforms/dataframe/polars_maintenance.py"
-    - "benchbox/platforms/dataframe/delta_lake_maintenance.py"
-    - "benchbox/platforms/dataframe/iceberg_maintenance.py"
-    - "tests/unit/core/dataframe/test_maintenance_interface.py"
-    - "tests/unit/platforms/dataframe/test_polars_maintenance.py"
-    - "tests/unit/platforms/dataframe/test_delta_lake_maintenance.py"
-    - "tests/unit/platforms/dataframe/test_iceberg_maintenance.py"
+  - "benchbox/core/dataframe/maintenance_interface.py"
+  - "benchbox/platforms/dataframe/polars_maintenance.py"
+  - "benchbox/platforms/dataframe/delta_lake_maintenance.py"
+  - "benchbox/platforms/dataframe/iceberg_maintenance.py"
+  - "tests/unit/core/dataframe/test_maintenance_interface.py"
+  - "tests/unit/platforms/dataframe/test_polars_maintenance.py"
+  - "tests/unit/platforms/dataframe/test_delta_lake_maintenance.py"
+  - "tests/unit/platforms/dataframe/test_iceberg_maintenance.py"
 
 impact:
   business_value: |
@@ -148,10 +149,10 @@ impact:
     reducing code duplication and improving maintainability.
 
 success_metrics:
-  - "Maintenance phase works on at least one DataFrame platform (Delta Lake)" # DONE - Polars, Delta Lake, Iceberg all implemented
-  - "Clear error message when maintenance attempted on unsupported platform" # DONE
-  - "TPC-H RF1/RF2 metrics captured for DataFrame platforms" # Pending integration
-  - "TPC-DS DM1-DM4 metrics captured for DataFrame platforms" # Pending integration
+- "Maintenance phase works on at least one DataFrame platform (Delta Lake)"   # DONE - Polars, Delta Lake, Iceberg all implemented
+- "Clear error message when maintenance attempted on unsupported platform"   # DONE
+- "TPC-H RF1/RF2 metrics captured for DataFrame platforms"   # Pending integration
+- "TPC-DS DM1-DM4 metrics captured for DataFrame platforms"   # Pending integration
 
 implementation_progress:
   phase_1_validation: "COMPLETE - Error handling for maintenance+dataframe"
@@ -161,5 +162,5 @@ implementation_progress:
   overall: "100% complete - All phases finished, ready for DONE migration"
 
 open_questions:
-  - "How to handle platforms that only support file-level operations (no row-level updates)?" # Resolved: Polars uses read-filter-write pattern
-  - "Should maintenance operations be transactional where supported?" # Resolved: Yes, Delta Lake and Iceberg provide full ACID
+- "How to handle platforms that only support file-level operations (no row-level updates)?"   # Resolved: Polars uses read-filter-write pattern
+- "Should maintenance operations be transactional where supported?"   # Resolved: Yes, Delta Lake and Iceberg provide full ACID

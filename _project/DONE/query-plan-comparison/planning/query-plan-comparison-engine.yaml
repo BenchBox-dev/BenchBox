@@ -1,21 +1,32 @@
+id: query-plan-comparison-engine
 title: Query Plan Comparison Engine
 worktree: query-plan-comparison
 category: Core Functionality
 priority: High
 status: Completed
-completed_date: "2025-11-23"
-completion_notes: |
-  Core comparison engine fully implemented and tested. Includes:
+completed_date: '2025-11-23'
+completion_notes: 'Core comparison engine fully implemented and tested. Includes:
+
   - PlanComparison, SimilarityScore, OperatorDiff dataclasses
+
   - QueryPlanComparator with BFS-based tree comparison
+
   - Multi-dimensional similarity scoring (structural, operator, property)
+
   - Property comparison for all operator types
+
   - 14 comprehensive tests (all passing)
+
   - Cross-platform comparison support
 
+
   Advanced features (batch operations, Zhang-Shasha tree edit distance,
+
   cross-run regression detection) deferred for future implementation.
+
   Current implementation provides solid foundation for basic comparison needs.
+
+  '
 description: 'Implement algorithms for comparing query plans across platforms, runs, and
 
   queries. Includes logical plan comparison (tree diff), physical plan comparison,
@@ -181,15 +192,12 @@ technical_requirements:
   - Property-specific comparison logic
   - Order-independent set comparison for filters/aggregations
 files_affected:
-- change_type: New
-  paths:
+  modified:
   - benchbox/core/query_plans/comparison.py (424 LOC)
-- change_type: Modified
-  paths:
   - benchbox/core/results/query_plan_models.py (enhanced fingerprinting)
-- change_type: New
-  paths:
   - tests/unit/core/query_plans/test_comparison.py (14 tests)
+  added: []
+  removed: []
 metadata:
   owners:
   - '@benchbox-maintainers'

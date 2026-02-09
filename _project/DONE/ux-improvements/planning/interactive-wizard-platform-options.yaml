@@ -1,0 +1,111 @@
+id: interactive-wizard-platform-options
+title: "Add --platform-option support to interactive wizard"
+worktree: ux-improvements
+priority: Low
+status: Not Started
+description: |
+  The CLI supports `--platform-option key=value` for platform-specific configuration
+  (connection strings, authentication, cluster settings, etc.). This is currently a
+  hidden advanced option not exposed in the interactive wizard.
+
+  Platform options are used for:
+  - Databricks: cluster_id, catalog, schema, http_path
+  - Snowflake: warehouse, role, account
+  - BigQuery: project_id, dataset, location
+  - Redshift: cluster_identifier, database
+  - ClickHouse: host, port, database
+
+  Exposing these interactively would require platform-specific prompts.
+
+category: User Experience
+
+tasks:
+  phases:
+  - phase: "Phase 1: Design"
+    done: false
+    items:
+    - summary: "Identify required vs optional platform options per platform"
+      done: false
+    - summary: "Design platform-specific prompt flows"
+      done: false
+    - summary: "Consider integration with existing platform setup command"
+      done: false
+
+  - phase: "Phase 2: Implementation"
+    done: false
+    items:
+    - summary: "Create platform option prompts for each cloud platform"
+      done: false
+    - summary: "Validate platform options before execution"
+      done: false
+    - summary: "Support loading defaults from credentials/config files"
+      done: false
+    - summary: "Wire options to PlatformHookRegistry"
+      done: false
+
+  - phase: "Phase 3: Testing"
+    done: false
+    items:
+    - summary: "Test platform options with each cloud platform"
+      done: false
+    - summary: "Test credential file integration"
+      done: false
+
+metadata:
+  tags:
+  - cli
+  - ux
+  - interactive
+  - platform-options
+  - cloud
+  - advanced
+  estimated_effort: "Large"
+  created_date: "2025-12-21"
+
+impact:
+  user_impact: |
+    Enables full cloud platform configuration interactively:
+    - Configure Databricks clusters, catalogs, schemas
+    - Set Snowflake warehouses and roles
+    - Specify BigQuery projects and datasets
+    - Full platform customization without CLI flags
+
+files_affected:
+  modified:
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/cli/database.py"
+  added:
+  - "benchbox/cli/platform_options.py"
+  - "tests/unit/cli/test_platform_options.py"
+
+success_metrics:
+- "Platform options configurable for all cloud platforms"
+- "Required options prompted, optional ones skippable"
+- "Credential file defaults respected"
+- "Invalid options rejected with helpful messages"
+
+context_sections:
+  "Priority Rationale": |
+    Low priority because:
+    - Large implementation effort (platform-specific prompts)
+    - `benchbox platforms setup` already handles credential configuration
+    - Power users comfortable with --platform-option flag
+    - Most options have sensible defaults from credential files
+
+  "Alternative Approaches": |
+    1. Enhance `benchbox platforms setup` to handle all options
+    2. Create per-platform setup wizards (e.g., `benchbox setup databricks`)
+    3. Support config file that stores platform options persistently
+
+  "Current Workaround": |
+    Users can configure via CLI:
+    ```bash
+    benchbox run --platform databricks \
+      --platform-option cluster_id=xxx \
+      --platform-option catalog=main \
+      --benchmark tpch
+    ```
+
+dependencies:
+  related:
+  - "Platform credential configuration in `benchbox platforms setup`"

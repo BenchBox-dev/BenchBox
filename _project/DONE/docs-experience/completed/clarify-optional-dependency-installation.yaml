@@ -1,0 +1,24 @@
+id: clarify-optional-dependency-installation
+title: ✅ Clarify Optional Dependency Installation
+worktree: docs-experience
+category: Documentation and Developer Experience
+status: Completed
+priority: Medium
+impact: Clear extras mapping and richer error guidance make it easy for users to install the right optional dependencies without
+  guesswork.
+sections:
+  Summary: '"Added the `cloudstorage` extra, centralized dependency metadata, refreshed adapter errors, and documented an
+    installation matrix so optional platform installs are predictable."'
+  Completed Tasks: '- Extras mapping
+
+    - Documentation refresh
+
+    - Testing'
+  Testing: '"uv run -- python -m pytest tests/unit/utils/test_dependencies.py
+
+    Full suite (`uv run -- python -m pytest`) still fails upstream with NameError: EOS in tests/unit/tpchavoc/test_benchmark_integration.py;
+    no regressions observed from this change.
+
+    "'
+description: '"Added the `cloudstorage` extra, centralized dependency metadata, refreshed adapter errors, and documented an
+  installation matrix so optional platform installs are predictable."'

@@ -1,79 +1,78 @@
-title: "Plan DataFrame Adaptation for TPC-DS-OBT"
+id: dataframe-tpcds-obt-adaptation
+title: Plan DataFrame Adaptation for TPC-DS-OBT
 worktree: dataframe-benchmarks
 priority: Medium-High
 status: Completed
-completed_date: "2026-02-07"
-description: |
-  Plan DataFrame support for TPC-DS-OBT with explicit OBT-specific adaptation.
+completed_date: '2026-02-07'
+description: 'Plan DataFrame support for TPC-DS-OBT with explicit OBT-specific adaptation.
+
 
   TPC-DS-OBT query set and schema differ materially from normalized TPC-DS.
+
   Existing TPC-DS DataFrame implementations are not directly reusable without
+
   denormalized-schema-specific rewriting.
 
+  '
 category: Core Functionality
-
 tasks:
   phases:
-    - phase: "Phase 1: Query Inventory"
+  - phase: 'Phase 1: Query Inventory'
+    done: true
+    items:
+    - summary: Confirm authoritative OBT query count and categories
       done: true
-      items:
-        - summary: "Confirm authoritative OBT query count and categories"
-          done: true
-        - summary: "Group queries by reusable transformation patterns"
-          done: true
-    - phase: "Phase 2: Adaptation Design"
+    - summary: Group queries by reusable transformation patterns
       done: true
-      items:
-        - summary: "Define single-table implementation patterns for both families"
-          done: true
-        - summary: "Define parameter and validation strategy against SQL results"
-          done: true
-    - phase: "Phase 3: Delivery Plan"
+  - phase: 'Phase 2: Adaptation Design'
+    done: true
+    items:
+    - summary: Define single-table implementation patterns for both families
       done: true
-      items:
-        - summary: "Create phased implementation TODO with realistic batch sizes"
-          done: true
-
+    - summary: Define parameter and validation strategy against SQL results
+      done: true
+  - phase: 'Phase 3: Delivery Plan'
+    done: true
+    items:
+    - summary: Create phased implementation TODO with realistic batch sizes
+      done: true
 metadata:
   owners:
-    - joe
+  - joe
   tags:
-    - dataframe
-    - tpcds-obt
-    - planning
+  - dataframe
+  - tpcds-obt
+  - planning
   estimated_effort: Medium
-  created_date: "2026-02-07"
-  last_updated: "2026-02-07T00:00:00"
-
+  created_date: '2026-02-07'
+  last_updated: '2026-02-07T00:00:00'
 impact:
-  business_value: |
-    Avoids under-scoped implementation estimates and late rework.
-  user_impact: |
-    Improves confidence in OBT correctness and comparability.
+  business_value: 'Avoids under-scoped implementation estimates and late rework.
 
+    '
+  user_impact: 'Improves confidence in OBT correctness and comparability.
+
+    '
 success_metrics:
-  - "Approved adaptation plan with scoped query batches"
-  - "Follow-on implementation TODO created"
-
+- Approved adaptation plan with scoped query batches
+- Follow-on implementation TODO created
 dependencies:
   related:
-    - "_project/TODO/dataframe-benchmarks/planning/implement-tpcds-obt-dataframe-queries.yaml"
-
+  - _project/TODO/dataframe-benchmarks/planning/implement-tpcds-obt-dataframe-queries.yaml
 sections:
-  "Decision Summary": |
-    Decision: TPC-DS-OBT needs dedicated DataFrame implementations; direct reuse
-    of normalized TPC-DS DataFrame queries is not viable.
+  Decision Summary: 'Decision: TPC-DS-OBT needs dedicated DataFrame implementations; direct reuse
 
-  "Current-State Evidence": |
-    `benchbox/core/tpcds_obt/queries.py` documents 89/99 convertible SQL queries,
+    of normalized TPC-DS DataFrame queries is not viable.'
+  Current-State Evidence: '`benchbox/core/tpcds_obt/queries.py` documents 89/99 convertible SQL queries,
+
     including manual rewrites for complex cases. Current benchmark metadata still
-    reports `supports_dataframe: False`.
 
-  "Adaptation Plan": |
-    - Build query families around OBT single-table semantics and channel-aware logic.
+    reports `supports_dataframe: False`.'
+  Adaptation Plan: '- Build query families around OBT single-table semantics and channel-aware logic.
+
     - Reuse expression/pandas helper patterns, but not normalized table joins.
-    - Validate against OBT SQL query manager outputs and parameterized variants.
 
-  "Output": |
-    Created follow-on implementation TODO:
-    `_project/TODO/dataframe-benchmarks/planning/implement-tpcds-obt-dataframe-queries.yaml`.
+    - Validate against OBT SQL query manager outputs and parameterized variants.'
+  Output: 'Created follow-on implementation TODO:
+
+    `_project/TODO/dataframe-benchmarks/planning/implement-tpcds-obt-dataframe-queries.yaml`.'
