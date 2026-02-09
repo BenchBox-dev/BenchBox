@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T16:08:17.156195'
-total_items: 438
+generated_at: '2026-02-09T16:17:11.137445'
+total_items: 439
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4531,6 +4531,23 @@ items:
   - compression
   estimated_effort: Small
   completed_date: '2026-02-07'
+- id: consolidate-trailing-delimiter-handling
+  file: DONE/core-functionality/active/consolidate-trailing-delimiter-handling.yaml
+  title: Consolidate trailing delimiter handling into shared utility
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - refactoring
+  - bug-fix
+  - trailing-delimiter
+  - tpc-data
+  estimated_effort: 2-3 days
+  completed_date: '2026-02-09'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
 - id: dataframe-write-primitives-model
   file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
   title: Define DataFrame Execution Model for Write Primitives

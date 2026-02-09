@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T16:08:17.156451'
+generated_at: '2026-02-09T16:17:11.137653'
 total_categories: 62
 categories:
   '"Bug Fixes & Reliability"':
@@ -358,7 +358,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 111
+    count: 112
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -474,6 +474,11 @@ categories:
       file: DONE/core-functionality/active/consolidate-result-normalization.yaml
       title: Consolidate Duplicated Result JSON Normalization Logic
       priority: Medium
+      status: Completed
+    - id: consolidate-trailing-delimiter-handling
+      file: DONE/core-functionality/active/consolidate-trailing-delimiter-handling.yaml
+      title: Consolidate trailing delimiter handling into shared utility
+      priority: Medium-High
       status: Completed
     - id: consolidate-tuning-commands
       file: DONE/ux-improvements/planning/consolidate-tuning-commands.yaml

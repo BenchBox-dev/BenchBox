@@ -1,14 +1,9 @@
-generated_at: '2026-02-09T16:08:15.000996'
-total_items: 47
+generated_at: '2026-02-09T16:17:10.224559'
+total_items: 46
 statuses:
   In Progress:
-    count: 4
+    count: 3
     items:
-    - id: consolidate-trailing-delimiter-handling
-      file: TODO/core-functionality/active/consolidate-trailing-delimiter-handling.yaml
-      title: Consolidate trailing delimiter handling into shared utility
-      priority: Medium-High
-      category: Core Functionality
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks

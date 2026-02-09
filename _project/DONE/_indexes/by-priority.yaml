@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T16:08:17.156592'
-total_items: 438
+generated_at: '2026-02-09T16:17:11.137774'
+total_items: 439
 priorities:
   Critical:
     count: 31
@@ -909,7 +909,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 37
+    count: 38
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -991,6 +991,11 @@ priorities:
       file: DONE/core-functionality/consolidate-file-format-detection.yaml
       title: Consolidate file format detection to handle compressed and sharded files
       category: Code Quality
+      status: Completed
+    - id: consolidate-trailing-delimiter-handling
+      file: DONE/core-functionality/active/consolidate-trailing-delimiter-handling.yaml
+      title: Consolidate trailing delimiter handling into shared utility
+      category: Core Functionality
       status: Completed
     - id: dataframe-write-primitives-model
       file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T16:08:15.000966'
-total_items: 47
+generated_at: '2026-02-09T16:17:10.224546'
+total_items: 46
 priorities:
   Critical:
     count: 1
@@ -43,7 +43,7 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 9
+    count: 8
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -55,11 +55,6 @@ priorities:
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
       status: Not Started
-    - id: consolidate-trailing-delimiter-handling
-      file: TODO/core-functionality/active/consolidate-trailing-delimiter-handling.yaml
-      title: Consolidate trailing delimiter handling into shared utility
-      category: Core Functionality
-      status: In Progress
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB

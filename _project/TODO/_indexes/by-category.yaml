@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T16:08:15.000933'
+generated_at: '2026-02-09T16:17:10.224528'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -86,13 +86,8 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 6
+    count: 5
     items:
-    - id: consolidate-trailing-delimiter-handling
-      file: TODO/core-functionality/active/consolidate-trailing-delimiter-handling.yaml
-      title: Consolidate trailing delimiter handling into shared utility
-      priority: Medium-High
-      status: In Progress
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
       title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
