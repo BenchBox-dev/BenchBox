@@ -51,7 +51,7 @@ metadata:
   - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-09T08:09:55"
+  last_updated: "2026-02-09T08:24:00"
 
   related:
   - coverage-cli-modules
@@ -546,7 +546,7 @@ work:
     → 50%, ~8 tests)"
   needs:
   - w58
-  status: pending
+  status: done
 - id: w62
   summary: "tests/unit/core/tpch/test_parameter_extractor_coverage.py → core/tpch/parameter_extractor.py (22% → 50%, ~6 tests)"
   needs:
