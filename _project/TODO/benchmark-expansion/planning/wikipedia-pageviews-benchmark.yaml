@@ -1,3 +1,4 @@
+id: wikipedia-pageviews-benchmark
 title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
 worktree: benchmark-expansion
 category: Benchmark Development
@@ -160,141 +161,6 @@ context_sections:
     **Decision:** Focus initial implementation on pageviews only. Clickstream
     and Wikidata integration can be separate TODO items if demand exists.
 
-tasks:
-- phase: "Phase 1: Data Infrastructure"
-  items:
-  - summary: Design data acquisition approach
-    done: false
-    details: |
-      - Implement hourly file downloader from Wikimedia
-      - Support date range specification
-      - Handle gzip decompression
-      - Convert TSV to Parquet for efficiency
-
-  - summary: Create wikipedia module structure
-    done: false
-    details: |
-      - benchbox/core/wikipedia/__init__.py
-      - benchbox/core/wikipedia/schema.py
-      - benchbox/core/wikipedia/downloader.py
-      - benchbox/core/wikipedia/queries.py
-      - benchbox/core/wikipedia/benchmark.py
-
-  - summary: Implement schema definitions
-    done: false
-    details: |
-      - Pageviews table (datehour, wiki, title, views)
-      - Optional: Wiki dimension table (code -> name, type)
-      - Partitioning strategy by date
-
-  - summary: Handle special characters in titles
-    done: false
-    details: |
-      - URL-encoded titles in raw data
-      - Unicode normalization
-      - Special page filtering (Main_Page, etc.)
-
-- phase: "Phase 2: Data Loading"
-  items:
-  - summary: Implement hourly file downloader
-    done: false
-    details: |
-      - Download from dumps.wikimedia.org
-      - Support date range: YYYY-MM-DD to YYYY-MM-DD
-      - Parallel downloads for efficiency
-      - Checksum validation
-
-  - summary: Implement TSV to Parquet conversion
-    done: false
-    details: |
-      - Parse space-separated format
-      - Handle title encoding
-      - Partition by date
-      - Compress with Zstandard
-
-  - summary: Implement platform data loading
-    done: false
-    details: |
-      - DuckDB: Direct Parquet loading
-      - ClickHouse: Native Parquet import
-      - PostgreSQL: COPY from CSV
-      - Snowflake: COPY INTO from stage
-
-- phase: "Phase 3: Query Catalog"
-  items:
-  - summary: Implement trending queries
-    done: false
-    details: |
-      - wiki_top_pages_daily: Top 100 by date
-      - wiki_top_by_language: Top pages per wiki
-      - wiki_trending: Growth vs baseline
-      - wiki_spike_detection: Unusual traffic
-      - wiki_cross_period: Period comparison
-
-  - summary: Implement temporal pattern queries
-    done: false
-    details: |
-      - wiki_page_timeseries: Views over time
-      - wiki_hourly_pattern: By hour of day
-      - wiki_weekly_pattern: By day of week
-      - wiki_seasonal_trend: Monthly trends
-
-  - summary: Implement language analysis queries
-    done: false
-    details: |
-      - wiki_cross_language: Same topic, different wikis
-      - wiki_mobile_ratio: Mobile vs desktop
-      - wiki_language_ranking: Traffic by language
-      - wiki_coverage_gaps: Topics in one language only
-
-  - summary: Implement event correlation queries
-    done: false
-    details: |
-      - wiki_news_impact: Spikes around dates
-      - wiki_cultural_events: Predictable spikes
-      - wiki_related_trending: Co-trending pages
-
-  - summary: Implement high-cardinality queries
-    done: false
-    details: |
-      - wiki_unique_pages: Distinct count per period
-      - wiki_longtail: Distribution analysis
-      - wiki_category_traffic: Aggregation by prefix
-
-- phase: "Phase 4: Benchmark Integration"
-  items:
-  - summary: Implement WikipediaBenchmark class
-    done: false
-    details: |
-      - Inherit from BaseBenchmark
-      - Handle high-cardinality string column
-      - Optimize for time-series patterns
-
-  - summary: Register benchmark with CLI
-    done: false
-    details: |
-      - Add to platform_registry.py
-      - Add to benchbox run --benchmark wikipedia
-
-  - summary: Add platform-specific variants
-    done: false
-    details: |
-      - String comparison/matching differences
-      - Timestamp handling variations
-      - High-cardinality optimization hints
-
-- phase: "Phase 5: Testing and Documentation"
-  items:
-  - summary: Create unit and integration tests
-    done: false
-
-  - summary: Document benchmark usage
-    done: false
-    details: |
-      - Scale factor recommendations
-      - Query catalog reference
-      - Title encoding notes
-
 files_affected:
 - change_type: New
   paths:
@@ -333,27 +199,29 @@ metadata:
     - Clickstream integration is out of scope (documented as future enhancement)
     - Clear timezone effects in traffic patterns
 
+  migration_review_required: true
 must_preserve:
-  - "BaseBenchmark interface contract unchanged"
+- "BaseBenchmark interface contract unchanged"
 
 anti_patterns:
-  - "DO NOT assume ASCII-safe page titles — because Wikipedia titles contain arbitrary Unicode and URL-encoded characters — always decode and handle UTF-8 correctly"
-  - "DO NOT download Wikimedia dumps in unit tests — because hourly files are 50MB+ compressed — use synthetic pageview data"
+- "DO NOT assume ASCII-safe page titles — because Wikipedia titles contain arbitrary Unicode and URL-encoded characters —
+  always decode and handle UTF-8 correctly"
+- "DO NOT download Wikimedia dumps in unit tests — because hourly files are 50MB+ compressed — use synthetic pageview data"
 
 verification:
-  - description: "Wikipedia benchmark module imports"
-    command: "uv run -- python -c \"from benchbox.core.wikipedia_pageviews import WikipediaPageviewsBenchmark; print('OK')\""
-    expected_output: "OK"
-  - description: "Unit tests pass"
-    command: "uv run -- python -m pytest tests/unit/core/wikipedia_pageviews/ -v --tb=short"
-    expected_output: "all tests pass"
+- description: "Wikipedia benchmark module imports"
+  command: "uv run -- python -c \"from benchbox.core.wikipedia_pageviews import WikipediaPageviewsBenchmark; print('OK')\""
+  expected_output: "OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/wikipedia_pageviews/ -v --tb=short"
+  expected_output: "all tests pass"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/wikipedia_pageviews/"
-    - "tests/unit/core/wikipedia_pageviews/"
+  - "benchbox/core/wikipedia_pageviews/"
+  - "tests/unit/core/wikipedia_pageviews/"
   do_not_modify:
-    - "benchbox/core/runner.py"
+  - "benchbox/core/runner.py"
 
 success_metrics:
 - Hourly file download and parsing working
@@ -361,3 +229,81 @@ success_metrics:
 - Scale factors from 0.01 (~10MB) to 100.0 (~100GB) working
 - High-cardinality queries efficient on DuckDB
 - Top-pages queries under 10 seconds for SF=1.0 (~1GB, ~50M rows)
+work:
+- id: w1
+  summary: Design data acquisition approach
+  status: pending
+  notes: "- Implement hourly file downloader from Wikimedia\n- Support date range specification\n- Handle gzip decompression\n\
+    - Convert TSV to Parquet for efficiency\n"
+- id: w2
+  summary: Create wikipedia module structure
+  status: pending
+  notes: "- benchbox/core/wikipedia/__init__.py\n- benchbox/core/wikipedia/schema.py\n- benchbox/core/wikipedia/downloader.py\n\
+    - benchbox/core/wikipedia/queries.py\n- benchbox/core/wikipedia/benchmark.py\n"
+- id: w3
+  summary: Implement schema definitions
+  status: pending
+  notes: "- Pageviews table (datehour, wiki, title, views)\n- Optional: Wiki dimension table (code -> name, type)\n- Partitioning
+    strategy by date\n"
+- id: w4
+  summary: Handle special characters in titles
+  status: pending
+  notes: "- URL-encoded titles in raw data\n- Unicode normalization\n- Special page filtering (Main_Page, etc.)\n"
+- id: w5
+  summary: Implement hourly file downloader
+  status: pending
+  notes: "- Download from dumps.wikimedia.org\n- Support date range: YYYY-MM-DD to YYYY-MM-DD\n- Parallel downloads for efficiency\n\
+    - Checksum validation\n"
+- id: w6
+  summary: Implement TSV to Parquet conversion
+  status: pending
+  notes: "- Parse space-separated format\n- Handle title encoding\n- Partition by date\n- Compress with Zstandard\n"
+- id: w7
+  summary: Implement platform data loading
+  status: pending
+  notes: "- DuckDB: Direct Parquet loading\n- ClickHouse: Native Parquet import\n- PostgreSQL: COPY from CSV\n- Snowflake:
+    COPY INTO from stage\n"
+- id: w8
+  summary: Implement trending queries
+  status: pending
+  notes: "- wiki_top_pages_daily: Top 100 by date\n- wiki_top_by_language: Top pages per wiki\n- wiki_trending: Growth vs
+    baseline\n- wiki_spike_detection: Unusual traffic\n- wiki_cross_period: Period comparison\n"
+- id: w9
+  summary: Implement temporal pattern queries
+  status: pending
+  notes: "- wiki_page_timeseries: Views over time\n- wiki_hourly_pattern: By hour of day\n- wiki_weekly_pattern: By day of
+    week\n- wiki_seasonal_trend: Monthly trends\n"
+- id: w10
+  summary: Implement language analysis queries
+  status: pending
+  notes: "- wiki_cross_language: Same topic, different wikis\n- wiki_mobile_ratio: Mobile vs desktop\n- wiki_language_ranking:
+    Traffic by language\n- wiki_coverage_gaps: Topics in one language only\n"
+- id: w11
+  summary: Implement event correlation queries
+  status: pending
+  notes: "- wiki_news_impact: Spikes around dates\n- wiki_cultural_events: Predictable spikes\n- wiki_related_trending: Co-trending
+    pages\n"
+- id: w12
+  summary: Implement high-cardinality queries
+  status: pending
+  notes: "- wiki_unique_pages: Distinct count per period\n- wiki_longtail: Distribution analysis\n- wiki_category_traffic:
+    Aggregation by prefix\n"
+- id: w13
+  summary: Implement WikipediaBenchmark class
+  status: pending
+  notes: "- Inherit from BaseBenchmark\n- Handle high-cardinality string column\n- Optimize for time-series patterns\n"
+- id: w14
+  summary: Register benchmark with CLI
+  status: pending
+  notes: "- Add to platform_registry.py\n- Add to benchbox run --benchmark wikipedia\n"
+- id: w15
+  summary: Add platform-specific variants
+  status: pending
+  notes: "- String comparison/matching differences\n- Timestamp handling variations\n- High-cardinality optimization hints\n"
+- id: w16
+  summary: Create unit and integration tests
+  status: pending
+- id: w17
+  summary: Document benchmark usage
+  status: pending
+  notes: "- Scale factor recommendations\n- Query catalog reference\n- Title encoding notes\n"

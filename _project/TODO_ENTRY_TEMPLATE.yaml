@@ -10,6 +10,7 @@
 # REQUIRED FIELDS
 # ============================================================================
 
+id: "<filename-slug>"  # Must match filename without .yaml extension
 title: "<Descriptive title of the TODO item>"
 worktree: "<git-branch-or-worktree-name>"  # lowercase-with-hyphens
 priority: "<Critical|High|Medium-High|Medium|Low>"
@@ -27,35 +28,34 @@ description: |
 
 category: "<Core Functionality|Platform Expansion|Testing and Quality Assurance|...>"
 
-# Hierarchical breakdown: entry → phases → tasks → subtasks
-tasks:
-  phases:
-    - phase: "Phase 1: Foundation and Setup"
-      done: false
-      items:
-        - summary: "<Task 1 description>"
-          done: false
-          subtasks:
-            - summary: "<Subtask 1.1 description>"
-              done: false
-            - summary: "<Subtask 1.2 description>"
-              done: false
-        - summary: "<Task 2 description>"
-          done: false
+# Flat work breakdown with dependency edges
+# Each unit should be completable in a single Claude Code session (1-4 hours).
+# Use 'needs' to express ordering; readiness is computed by CLI.
+work:
+  - id: w1
+    summary: "<First work unit — no dependencies>"
+    status: pending
 
-    - phase: "Phase 2: Implementation"
-      done: false
-      items:
-        - summary: "<Task 1 description>"
-          done: false
-        - summary: "<Task 2 description>"
-          done: false
+  - id: w2
+    summary: "<Second work unit — depends on w1>"
+    needs: [w1]
+    status: pending
 
-    - phase: "Phase 3: Testing and Validation"
-      done: false
-      items:
-        - summary: "<Task 1 description>"
-          done: false
+  - id: w3
+    summary: "<Third work unit — depends on w1>"
+    needs: [w1]
+    status: pending
+
+  - id: w4
+    summary: "<Fourth work unit — depends on w2 and w3>"
+    needs: [w2, w3]
+    status: pending
+    notes: "<Optional implementation notes>"
+
+# Items that are known but explicitly out of scope
+deferred:
+  - summary: "<Deferred work item>"
+    reason: "<Why it's deferred>"
 
 metadata:
   owners:
@@ -159,13 +159,11 @@ technical_requirements:
   compatibility: |
     <Compatibility requirements, version constraints, platform support, etc.>
 
-dependencies:
-  blocks:
-    - "<path/to/dependent/item.yaml>"  # Items that this TODO blocks
-  blocked_by:
-    - "<path/to/blocking/item.yaml>"   # Items blocking this TODO
-  related:
-    - "<path/to/related/item.yaml>"    # Related TODO items
+# Inter-item dependencies using stable IDs (not file paths)
+# Only author inbound 'needs'; reverse edges are computed by CLI.
+deps:
+  needs:
+    - "<slug-of-blocking-item>"  # Items that must be done before this one
 
 success_metrics:
   - "<Measurable success criterion 1>"

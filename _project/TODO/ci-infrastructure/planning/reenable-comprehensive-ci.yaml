@@ -1,3 +1,4 @@
+id: reenable-comprehensive-ci
 title: "Re-enable comprehensive CI checks (linkcheck, security, coverage)"
 worktree: ci-infrastructure
 priority: Medium-High
@@ -18,80 +19,19 @@ description: |
 
 category: Testing and Quality Assurance
 
-tasks:
-  phases:
-    - phase: "Phase 1: Fix Linkcheck"
-      done: false
-      items:
-        - summary: "Create linkcheck ignore list for known-flaky URLs"
-          done: false
-          subtasks:
-            - summary: "Add docs/linkcheck_ignore.txt with external URLs to skip"
-              done: false
-            - summary: "Configure sphinx linkcheck_ignore in conf.py"
-              done: false
-        - summary: "Fix or remove genuinely broken links"
-          done: false
-        - summary: "Re-enable linkcheck as blocking (or keep as warning)"
-          done: false
-        - summary: "Add `make docs-linkcheck` for local testing"
-          done: false
-
-    - phase: "Phase 2: Fix Security Audit"
-      done: false
-      items:
-        - summary: "Evaluate security scanning options"
-          done: false
-          subtasks:
-            - summary: "safety vs pip-audit vs GitHub Dependabot"
-              done: false
-            - summary: "Choose tool that minimizes false positives"
-              done: false
-        - summary: "Create security ignore list for false positives"
-          done: false
-        - summary: "Re-enable security job as blocking"
-          done: false
-        - summary: "Add `make security-audit` for local testing"
-          done: false
-
-    - phase: "Phase 3: Fix Docstring Coverage"
-      done: false
-      items:
-        - summary: "Review current coverage threshold (64%)"
-          done: false
-        - summary: "Add docstrings to undocumented public APIs"
-          done: false
-        - summary: "Update threshold to achievable level"
-          done: false
-        - summary: "Configure interrogate ignore patterns for internal modules"
-          done: false
-        - summary: "Re-enable docstring-coverage as blocking"
-          done: false
-
-    - phase: "Phase 4: Fix Example Validation"
-      done: false
-      items:
-        - summary: "Test validate_example_references.py locally"
-          done: false
-        - summary: "Fix any broken example references"
-          done: false
-        - summary: "Test check_example_syntax.py locally"
-          done: false
-        - summary: "Fix any syntax errors in examples"
-          done: false
-        - summary: "Re-enable example-validation as blocking"
-          done: false
-
 metadata:
   owners:
-    - joe
+  - joe
   tags:
-    - ci
-    - quality
-    - documentation
+  - ci
+  - quality
+  - documentation
   estimated_effort: "1-2 days"
   created_date: "2026-01-18"
 
+  related:
+  - fix-ci-critical-issues
+  migration_review_required: true
 impact:
   business_value: |
     Comprehensive quality checks catch issues before they reach users.
@@ -104,38 +44,111 @@ impact:
 
 files_affected:
   modified:
-    - ".github/workflows/docs.yml"
-    - ".github/workflows/test.yml"
-    - "docs/conf.py"
-    - "pyproject.toml"
-    - "Makefile"
+  - ".github/workflows/docs.yml"
+  - ".github/workflows/test.yml"
+  - "docs/conf.py"
+  - "pyproject.toml"
+  - "Makefile"
   added:
-    - "docs/linkcheck_ignore.txt"
-    - ".safety-policy.yml"  # Or equivalent ignore file
+  - "docs/linkcheck_ignore.txt"
+  - ".safety-policy.yml"    # Or equivalent ignore file
 
 open_questions:
-  - "Should TPC-H C-compatible tests be implemented? (Currently broken workflow was removed - separate TODO needed if desired)"
+- "Should TPC-H C-compatible tests be implemented? (Currently broken workflow was removed - separate TODO needed if desired)"
 
 success_metrics:
-  - "All comprehensive checks pass consistently"
-  - "No false positive failures in CI"
-  - "Linkcheck catches real broken links"
-  - "Security audit catches real vulnerabilities"
+- "All comprehensive checks pass consistently"
+- "No false positive failures in CI"
+- "Linkcheck catches real broken links"
+- "Security audit catches real vulnerabilities"
 
 must_preserve:
-  - "Existing passing CI jobs (lint, test-fast, docs-build) remain passing"
-  - "No increase in CI runtime >20%"
-  - "make ci-test continues to work"
+- "Existing passing CI jobs (lint, test-fast, docs-build) remain passing"
+- "No increase in CI runtime >20%"
+- "make ci-test continues to work"
 
 anti_patterns:
-  - "DO NOT make linkcheck blocking on first attempt — because external URLs are flaky — add it as warning first, then promote to blocking after 2 weeks of clean runs"
-  - "DO NOT re-enable all checks simultaneously — because a single failure blocks all PRs — re-enable one at a time with monitoring"
+- "DO NOT make linkcheck blocking on first attempt — because external URLs are flaky — add it as warning first, then promote
+  to blocking after 2 weeks of clean runs"
+- "DO NOT re-enable all checks simultaneously — because a single failure blocks all PRs — re-enable one at a time with monitoring"
 
 verification:
-  - description: "Existing CI checks still pass"
-    command: "make ci-lint && make ci-test"
-    expected_output: "all checks pass"
+- description: "Existing CI checks still pass"
+  command: "make ci-lint && make ci-test"
+  expected_output: "all checks pass"
 
-dependencies:
-  related:
-    - "_project/DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml"
+work:
+- id: w1
+  summary: "Create linkcheck ignore list for known-flaky URLs"
+  status: pending
+- id: w2
+  summary: "Add docs/linkcheck_ignore.txt with external URLs to skip"
+  needs:
+  - w1
+  status: pending
+- id: w3
+  summary: "Configure sphinx linkcheck_ignore in conf.py"
+  needs:
+  - w1
+  status: pending
+- id: w4
+  summary: "Fix or remove genuinely broken links"
+  status: pending
+- id: w5
+  summary: "Re-enable linkcheck as blocking (or keep as warning)"
+  status: pending
+- id: w6
+  summary: "Add `make docs-linkcheck` for local testing"
+  status: pending
+- id: w7
+  summary: "Evaluate security scanning options"
+  status: pending
+- id: w8
+  summary: "safety vs pip-audit vs GitHub Dependabot"
+  needs:
+  - w7
+  status: pending
+- id: w9
+  summary: "Choose tool that minimizes false positives"
+  needs:
+  - w7
+  status: pending
+- id: w10
+  summary: "Create security ignore list for false positives"
+  status: pending
+- id: w11
+  summary: "Re-enable security job as blocking"
+  status: pending
+- id: w12
+  summary: "Add `make security-audit` for local testing"
+  status: pending
+- id: w13
+  summary: "Review current coverage threshold (64%)"
+  status: pending
+- id: w14
+  summary: "Add docstrings to undocumented public APIs"
+  status: pending
+- id: w15
+  summary: "Update threshold to achievable level"
+  status: pending
+- id: w16
+  summary: "Configure interrogate ignore patterns for internal modules"
+  status: pending
+- id: w17
+  summary: "Re-enable docstring-coverage as blocking"
+  status: pending
+- id: w18
+  summary: "Test validate_example_references.py locally"
+  status: pending
+- id: w19
+  summary: "Fix any broken example references"
+  status: pending
+- id: w20
+  summary: "Test check_example_syntax.py locally"
+  status: pending
+- id: w21
+  summary: "Fix any syntax errors in examples"
+  status: pending
+- id: w22
+  summary: "Re-enable example-validation as blocking"
+  status: pending

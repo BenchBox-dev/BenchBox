@@ -1,3 +1,4 @@
+id: arm-graviton-generations-benchmarks
 title: "[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)"
 worktree: blog-content
 priority: Medium
@@ -18,80 +19,20 @@ description: |
 
   Reference draft: _blog/arm-performance/drafts/graviton-generations.md
 
-tasks:
-  phases:
-    - phase: "Phase 1: Graviton 2 Baseline (c6g.16xlarge)"
-      done: false
-      items:
-        - summary: "Launch c6g.16xlarge instance (64 vCPU, 128GB)"
-          done: false
-        - summary: "Run TPC-H SF10"
-          done: false
-          subtasks:
-            - summary: "benchbox run --platform duckdb --benchmark tpch --scale 10"
-              done: false
-            - summary: "Record total time and per-query times"
-              done: false
-        - summary: "Run TPC-DS SF10"
-          done: false
-          subtasks:
-            - summary: "benchbox run --platform duckdb --benchmark tpcds --scale 10"
-              done: false
-        - summary: "Run ClickBench"
-          done: false
-          subtasks:
-            - summary: "benchbox run --platform duckdb --benchmark clickbench"
-              done: false
-        - summary: "Record instance cost and total runtime"
-          done: false
-
-    - phase: "Phase 2: Graviton 3 (c7g.16xlarge)"
-      done: false
-      items:
-        - summary: "Launch c7g.16xlarge instance (64 vCPU, 128GB)"
-          done: false
-        - summary: "Run identical benchmark suite (TPC-H, TPC-DS, ClickBench)"
-          done: false
-        - summary: "Record instance cost and total runtime"
-          done: false
-
-    - phase: "Phase 3: Graviton 4 (c8g.16xlarge)"
-      done: false
-      items:
-        - summary: "Launch c8g.16xlarge instance (64 vCPU, 128GB)"
-          done: false
-        - summary: "Run identical benchmark suite (TPC-H, TPC-DS, ClickBench)"
-          done: false
-        - summary: "Record instance cost and total runtime"
-          done: false
-
-    - phase: "Phase 4: Analysis and Draft Update"
-      done: false
-      items:
-        - summary: "Calculate generation-over-generation improvements"
-          done: false
-        - summary: "Compare with AWS's marketing claims (+25%, +2x, etc.)"
-          done: false
-        - summary: "Identify query patterns where improvements differ"
-          done: false
-        - summary: "Calculate price-performance for each generation"
-          done: false
-        - summary: "Update draft with benchmark results tables"
-          done: false
-        - summary: "Add BenchBox commands for reproducibility"
-          done: false
-
 metadata:
   tags:
-    - arm-performance
-    - graviton
-    - aws
-    - cloud-benchmarking
-    - blog-data
+  - arm-performance
+  - graviton
+  - aws
+  - cloud-benchmarking
+  - blog-data
   estimated_effort: "2-3 hours"
   budget_allocated: "$20-30 estimated AWS costs"
   created_date: "2025-12-15"
 
+  related:
+  - arm-hyperscaler-comparison-benchmarks
+  migration_review_required: true
 impact:
   business_value: |
     Transforms the post from a vendor spec summary (what WikiChip does) into
@@ -103,28 +44,97 @@ impact:
 
 technical_requirements:
   dependencies:
-    - "AWS account with EC2 access"
-    - "Ability to launch c6g, c7g, c8g instance families"
-    - "BenchBox installed on each instance"
+  - "AWS account with EC2 access"
+  - "Ability to launch c6g, c7g, c8g instance families"
+  - "BenchBox installed on each instance"
   constraints:
-    - "Use identical vCPU count (64) for fair comparison"
-    - "Same scale factors across all runs"
-    - "Document instance launch time and region"
+  - "Use identical vCPU count (64) for fair comparison"
+  - "Same scale factors across all runs"
+  - "Document instance launch time and region"
 
 files_affected:
   modified:
-    - "_blog/arm-performance/drafts/graviton-generations.md"
+  - "_blog/arm-performance/drafts/graviton-generations.md"
 
 success_metrics:
-  - "All 9 benchmark runs complete (3 generations × 3 benchmarks)"
-  - "Generation-over-generation improvement percentages calculated"
-  - "Results replace vendor claims in draft"
-  - "BenchBox commands added for reproducibility"
+- "All 9 benchmark runs complete (3 generations × 3 benchmarks)"
+- "Generation-over-generation improvement percentages calculated"
+- "Results replace vendor claims in draft"
+- "BenchBox commands added for reproducibility"
 
 open_questions:
-  - "Should we test SF100 in addition to SF10 for scale factor comparison?"
-  - "Should we include memory-optimized (r7g, r8g) instances for database focus?"
+- "Should we test SF100 in addition to SF10 for scale factor comparison?"
+- "Should we include memory-optimized (r7g, r8g) instances for database focus?"
 
-dependencies:
-  related:
-    - "_project/TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml"
+work:
+- id: w1
+  summary: "Launch c6g.16xlarge instance (64 vCPU, 128GB)"
+  status: pending
+- id: w2
+  summary: "Run TPC-H SF10"
+  status: pending
+- id: w3
+  summary: "benchbox run --platform duckdb --benchmark tpch --scale 10"
+  needs:
+  - w2
+  status: pending
+- id: w4
+  summary: "Record total time and per-query times"
+  needs:
+  - w2
+  status: pending
+- id: w5
+  summary: "Run TPC-DS SF10"
+  status: pending
+- id: w6
+  summary: "benchbox run --platform duckdb --benchmark tpcds --scale 10"
+  needs:
+  - w5
+  status: pending
+- id: w7
+  summary: "Run ClickBench"
+  status: pending
+- id: w8
+  summary: "benchbox run --platform duckdb --benchmark clickbench"
+  needs:
+  - w7
+  status: pending
+- id: w9
+  summary: "Record instance cost and total runtime"
+  status: pending
+- id: w10
+  summary: "Launch c7g.16xlarge instance (64 vCPU, 128GB)"
+  status: pending
+- id: w11
+  summary: "Run identical benchmark suite (TPC-H, TPC-DS, ClickBench)"
+  status: pending
+- id: w12
+  summary: "Record instance cost and total runtime"
+  status: pending
+- id: w13
+  summary: "Launch c8g.16xlarge instance (64 vCPU, 128GB)"
+  status: pending
+- id: w14
+  summary: "Run identical benchmark suite (TPC-H, TPC-DS, ClickBench)"
+  status: pending
+- id: w15
+  summary: "Record instance cost and total runtime"
+  status: pending
+- id: w16
+  summary: "Calculate generation-over-generation improvements"
+  status: pending
+- id: w17
+  summary: "Compare with AWS's marketing claims (+25%, +2x, etc.)"
+  status: pending
+- id: w18
+  summary: "Identify query patterns where improvements differ"
+  status: pending
+- id: w19
+  summary: "Calculate price-performance for each generation"
+  status: pending
+- id: w20
+  summary: "Update draft with benchmark results tables"
+  status: pending
+- id: w21
+  summary: "Add BenchBox commands for reproducibility"
+  status: pending

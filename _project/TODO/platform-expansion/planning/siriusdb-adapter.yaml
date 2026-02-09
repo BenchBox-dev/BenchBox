@@ -1,3 +1,4 @@
+id: siriusdb-adapter
 title: "Add SiriusDB (GPU-Native SQL Engine) Platform Adapter"
 worktree: platform-expansion
 priority: Low
@@ -44,132 +45,134 @@ context_sections:
     - 60x faster than ClickHouse
     - At equivalent hardware rental cost
 
-tasks:
-  phases:
-    - phase: "Phase 1: Research and Setup"
-      done: false
-      items:
-        - summary: "Set up SiriusDB development environment with GPU"
-          done: false
-        - summary: "Test extension loading and GPU initialization"
-          done: false
-        - summary: "Identify supported vs unsupported query patterns"
-          done: false
-        - summary: "Document GPU memory requirements per scale factor"
-          done: false
-
-    - phase: "Phase 2: Adapter Implementation"
-      done: false
-      items:
-        - summary: "Create SiriusDBAdapter extending DuckDBAdapter"
-          done: false
-        - summary: "Add GPU initialization in connection factory"
-          done: false
-        - summary: "Implement GPU buffer size auto-configuration"
-          done: false
-        - summary: "Add CPU fallback detection and logging"
-          done: false
-        - summary: "Support both local extension and container deployment"
-          done: false
-
-    - phase: "Phase 3: Testing and Benchmarking"
-      done: false
-      items:
-        - summary: "Add unit tests (mocked GPU for CI)"
-          done: false
-        - summary: "Run TPC-H validation with GPU acceleration"
-          done: false
-        - summary: "Benchmark GPU vs CPU performance comparison"
-          done: false
-        - summary: "Document GPU memory requirements per SF"
-          done: false
-
-    - phase: "Phase 4: Documentation"
-      done: false
-      items:
-        - summary: "Create platform documentation with GPU setup guide"
-          done: false
-        - summary: "Add AWS GPU instance recommendations"
-          done: false
-        - summary: "Document container deployment option"
-          done: false
-        - summary: "Add performance comparison charts"
-          done: false
-
 metadata:
   tags:
-    - platform
-    - gpu
-    - cuda
-    - duckdb-extension
-    - high-performance
-    - siriusdb
+  - platform
+  - gpu
+  - cuda
+  - duckdb-extension
+  - high-performance
+  - siriusdb
   estimated_effort: Medium
   created_date: "2026-01-26"
 
+  migration_review_required: true
 technical_requirements:
   dependencies:
-    - "duckdb (base engine)"
-    - "sirius.duckdb_extension (GPU acceleration)"
-    - "NVIDIA GPU with CUDA 11.2+"
+  - "duckdb (base engine)"
+  - "sirius.duckdb_extension (GPU acceleration)"
+  - "NVIDIA GPU with CUDA 11.2+"
   constraints:
-    - "Requires NVIDIA GPU (Volta or newer)"
-    - "GPU memory limits data size"
-    - "Linux only (Ubuntu 20.04+)"
+  - "Requires NVIDIA GPU (Volta or newer)"
+  - "GPU memory limits data size"
+  - "Linux only (Ubuntu 20.04+)"
   compatibility: |
     SiriusDB is a DuckDB extension, so SQL compatibility matches DuckDB.
     GPU acceleration transparent - same queries, faster execution.
 
 files_affected:
   added:
-    - "benchbox/platforms/siriusdb.py"
-    - "tests/unit/platforms/test_siriusdb.py"
-    - "docs/platforms/siriusdb.md"
+  - "benchbox/platforms/siriusdb.py"
+  - "tests/unit/platforms/test_siriusdb.py"
+  - "docs/platforms/siriusdb.md"
   modified:
-    - "benchbox/platforms/__init__.py"
-    - "docs/platforms/index.md"
+  - "benchbox/platforms/__init__.py"
+  - "docs/platforms/index.md"
 
 must_preserve:
-  - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-  - "Platform registry autodiscovery continues working for all existing platforms"
-  - "DuckDB adapter behavior unchanged when SiriusDB extension is not loaded"
+- "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+- "Platform registry autodiscovery continues working for all existing platforms"
+- "DuckDB adapter behavior unchanged when SiriusDB extension is not loaded"
 
 anti_patterns:
-  - "DO NOT modify existing adapter files — because SiriusDB is additive — create a new siriusdb.py file"
-  - "DO NOT require GPU for unit tests — because CI has no GPU hardware — mock GPU initialization and test CPU fallback path"
-  - "DO NOT modify benchbox/platforms/duckdb.py — because SiriusDB extends DuckDB via extension loading — inherit from DuckDBAdapter and override only GPU-specific methods"
+- "DO NOT modify existing adapter files — because SiriusDB is additive — create a new siriusdb.py file"
+- "DO NOT require GPU for unit tests — because CI has no GPU hardware — mock GPU initialization and test CPU fallback path"
+- "DO NOT modify benchbox/platforms/duckdb.py — because SiriusDB extends DuckDB via extension loading — inherit from DuckDBAdapter
+  and override only GPU-specific methods"
 
 verification:
-  - description: "New adapter imports correctly"
-    command: "uv run -- python -c \"from benchbox.platforms.siriusdb import SiriusDBAdapter; print('import OK')\""
-    expected_output: "import OK"
-  - description: "Unit tests pass"
-    command: "uv run -- python -m pytest tests/unit/platforms/test_siriusdb.py -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
-  - description: "Existing platform tests unaffected"
-    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
-  - description: "DuckDB adapter unaffected"
-    command: "uv run -- python -m pytest tests/unit/platforms/test_duckdb_adapter.py -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
+- description: "New adapter imports correctly"
+  command: "uv run -- python -c \"from benchbox.platforms.siriusdb import SiriusDBAdapter; print('import OK')\""
+  expected_output: "import OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_siriusdb.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Existing platform tests unaffected"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "DuckDB adapter unaffected"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_duckdb_adapter.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
 
 scope_limit:
   only_modify:
-    - "benchbox/platforms/siriusdb.py"
-    - "tests/unit/platforms/test_siriusdb.py"
+  - "benchbox/platforms/siriusdb.py"
+  - "tests/unit/platforms/test_siriusdb.py"
   do_not_modify:
-    - "benchbox/platforms/duckdb.py"
-    - "benchbox/core/runner.py"
+  - "benchbox/platforms/duckdb.py"
+  - "benchbox/core/runner.py"
 
 success_metrics:
-  - "SiriusDB adapter passes all TPC-H queries with GPU acceleration"
-  - "Achieves >5x speedup over DuckDB at SF 10+"
-  - "Graceful fallback to CPU when GPU unavailable"
-  - "GPU memory auto-configuration works correctly"
-  - "Documentation includes AWS GPU instance guide"
+- "SiriusDB adapter passes all TPC-H queries with GPU acceleration"
+- "Achieves >5x speedup over DuckDB at SF 10+"
+- "Graceful fallback to CPU when GPU unavailable"
+- "GPU memory auto-configuration works correctly"
+- "Documentation includes AWS GPU instance guide"
 
 open_questions:
-  - "What GPU memory is needed per TPC-H scale factor?"
-  - "Which TPC-DS queries benefit most from GPU acceleration?"
-  - "Should we add GPU metrics to result output?"
-  - "How to handle CI testing without GPU hardware?"
+- "What GPU memory is needed per TPC-H scale factor?"
+- "Which TPC-DS queries benefit most from GPU acceleration?"
+- "Should we add GPU metrics to result output?"
+- "How to handle CI testing without GPU hardware?"
+work:
+- id: w1
+  summary: "Set up SiriusDB development environment with GPU"
+  status: pending
+- id: w2
+  summary: "Test extension loading and GPU initialization"
+  status: pending
+- id: w3
+  summary: "Identify supported vs unsupported query patterns"
+  status: pending
+- id: w4
+  summary: "Document GPU memory requirements per scale factor"
+  status: pending
+- id: w5
+  summary: "Create SiriusDBAdapter extending DuckDBAdapter"
+  status: pending
+- id: w6
+  summary: "Add GPU initialization in connection factory"
+  status: pending
+- id: w7
+  summary: "Implement GPU buffer size auto-configuration"
+  status: pending
+- id: w8
+  summary: "Add CPU fallback detection and logging"
+  status: pending
+- id: w9
+  summary: "Support both local extension and container deployment"
+  status: pending
+- id: w10
+  summary: "Add unit tests (mocked GPU for CI)"
+  status: pending
+- id: w11
+  summary: "Run TPC-H validation with GPU acceleration"
+  status: pending
+- id: w12
+  summary: "Benchmark GPU vs CPU performance comparison"
+  status: pending
+- id: w13
+  summary: "Document GPU memory requirements per SF"
+  status: pending
+- id: w14
+  summary: "Create platform documentation with GPU setup guide"
+  status: pending
+- id: w15
+  summary: "Add AWS GPU instance recommendations"
+  status: pending
+- id: w16
+  summary: "Document container deployment option"
+  status: pending
+- id: w17
+  summary: "Add performance comparison charts"
+  status: pending

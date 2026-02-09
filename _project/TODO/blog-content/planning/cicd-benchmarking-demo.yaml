@@ -1,3 +1,4 @@
+id: cicd-benchmarking-demo
 title: "[CI/CD Benchmarking] Add BenchBox regression detection demo"
 worktree: blog-content
 priority: Medium
@@ -17,47 +18,12 @@ description: |
 
   Reference draft: _blog/business-of-analytics/drafts/p3.4-cicd-benchmarking.md
 
-tasks:
-  phases:
-    - phase: "Phase 1: Create Demo Workflow"
-      done: false
-      items:
-        - summary: "Run baseline benchmark"
-          done: false
-          subtasks:
-            - summary: "benchbox run --platform duckdb --benchmark tpch --scale 1 --output baseline"
-              done: false
-        - summary: "Run comparison benchmark"
-          done: false
-          subtasks:
-            - summary: "benchbox run --platform duckdb --benchmark tpch --scale 1 --output current"
-              done: false
-        - summary: "Generate comparison report"
-          done: false
-          subtasks:
-            - summary: "benchbox compare baseline current --threshold 10%"
-              done: false
-            - summary: "Capture output showing query-level differences"
-              done: false
-
-    - phase: "Phase 2: Update Draft"
-      done: false
-      items:
-        - summary: "Add 'Implementing Continuous Benchmarking' section"
-          done: false
-        - summary: "Include shell commands with expected output"
-          done: false
-        - summary: "Show example regression detection (even if simulated)"
-          done: false
-        - summary: "Link to BenchBox documentation for CI integration"
-          done: false
-
 metadata:
   tags:
-    - cicd
-    - business-of-analytics
-    - regression-detection
-    - demo
+  - cicd
+  - business-of-analytics
+  - regression-detection
+  - demo
   estimated_effort: "20-30 minutes"
   created_date: "2025-12-15"
 
@@ -71,14 +37,56 @@ impact:
 
 files_affected:
   modified:
-    - "_blog/business-of-analytics/drafts/p3.4-cicd-benchmarking.md"
+  - "_blog/business-of-analytics/drafts/p3.4-cicd-benchmarking.md"
 
 success_metrics:
-  - "Demo workflow runs successfully"
-  - "Comparison output captured"
-  - "Draft updated with practical example"
-  - "Commands are copy-paste ready"
+- "Demo workflow runs successfully"
+- "Comparison output captured"
+- "Draft updated with practical example"
+- "Commands are copy-paste ready"
 
 open_questions:
-  - "Does benchbox compare command exist, or is this manual diff?"
-  - "Should we simulate a regression for dramatic effect?"
+- "Does benchbox compare command exist, or is this manual diff?"
+- "Should we simulate a regression for dramatic effect?"
+work:
+- id: w1
+  summary: "Run baseline benchmark"
+  status: pending
+- id: w2
+  summary: "benchbox run --platform duckdb --benchmark tpch --scale 1 --output baseline"
+  needs:
+  - w1
+  status: pending
+- id: w3
+  summary: "Run comparison benchmark"
+  status: pending
+- id: w4
+  summary: "benchbox run --platform duckdb --benchmark tpch --scale 1 --output current"
+  needs:
+  - w3
+  status: pending
+- id: w5
+  summary: "Generate comparison report"
+  status: pending
+- id: w6
+  summary: "benchbox compare baseline current --threshold 10%"
+  needs:
+  - w5
+  status: pending
+- id: w7
+  summary: "Capture output showing query-level differences"
+  needs:
+  - w5
+  status: pending
+- id: w8
+  summary: "Add 'Implementing Continuous Benchmarking' section"
+  status: pending
+- id: w9
+  summary: "Include shell commands with expected output"
+  status: pending
+- id: w10
+  summary: "Show example regression detection (even if simulated)"
+  status: pending
+- id: w11
+  summary: "Link to BenchBox documentation for CI integration"
+  status: pending

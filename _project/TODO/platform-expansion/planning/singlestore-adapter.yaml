@@ -1,3 +1,4 @@
+id: singlestore-adapter
 title: "Add SingleStore Platform Adapter"
 worktree: platform-expansion
 priority: Medium
@@ -35,118 +36,121 @@ context_sections:
     3. mysql-connector-python
     4. ODBC driver
 
-tasks:
-  phases:
-    - phase: "Phase 1: Research and Design"
-      done: false
-      items:
-        - summary: "Document SingleStore-specific SQL extensions"
-          done: false
-        - summary: "Research columnstore vs rowstore table selection"
-          done: false
-        - summary: "Identify optimal bulk loading method (LOAD DATA, Pipeline)"
-          done: false
-        - summary: "Document distributed join patterns and shard keys"
-          done: false
-
-    - phase: "Phase 2: Adapter Implementation"
-      done: false
-      items:
-        - summary: "Create SingleStoreAdapter class"
-          done: false
-        - summary: "Implement connection factory with SingleStore SDK"
-          done: false
-        - summary: "Add columnstore table creation for TPC schemas"
-          done: false
-        - summary: "Implement bulk loading via LOAD DATA LOCAL INFILE"
-          done: false
-        - summary: "Add shard key configuration for distributed tables"
-          done: false
-        - summary: "Support both Helios (cloud) and self-managed"
-          done: false
-
-    - phase: "Phase 3: Testing and Documentation"
-      done: false
-      items:
-        - summary: "Add unit tests for SingleStore adapter"
-          done: false
-        - summary: "Run TPC-H/TPC-DS validation at SF 0.01 and 1"
-          done: false
-        - summary: "Benchmark columnstore vs rowstore performance"
-          done: false
-        - summary: "Create platform documentation page"
-          done: false
-        - summary: "Add to platform comparison matrix"
-          done: false
-
 metadata:
   tags:
-    - platform
-    - sql
-    - mysql-compatible
-    - distributed
-    - olap
-    - cloud
-    - singlestore
+  - platform
+  - sql
+  - mysql-compatible
+  - distributed
+  - olap
+  - cloud
+  - singlestore
   estimated_effort: Medium
   created_date: "2026-01-26"
 
 technical_requirements:
   dependencies:
-    - "singlestoredb (official Python SDK)"
+  - "singlestoredb (official Python SDK)"
   compatibility: |
     SingleStore supports MySQL wire protocol with extensions.
     Requires SingleStore-specific DDL for optimal performance (columnstore, shard keys).
 
 files_affected:
   added:
-    - "benchbox/platforms/singlestore.py"
-    - "tests/unit/platforms/test_singlestore.py"
-    - "docs/platforms/singlestore.md"
+  - "benchbox/platforms/singlestore.py"
+  - "tests/unit/platforms/test_singlestore.py"
+  - "docs/platforms/singlestore.md"
   modified:
-    - "benchbox/platforms/__init__.py"
-    - "docs/platforms/index.md"
-    - "docs/platforms/cloud-platforms.md"
+  - "benchbox/platforms/__init__.py"
+  - "docs/platforms/index.md"
+  - "docs/platforms/cloud-platforms.md"
 
 must_preserve:
-  - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-  - "Platform registry autodiscovery continues working for all existing platforms"
-  - "No new required dependencies added to core install (singlestoredb is optional)"
+- "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+- "Platform registry autodiscovery continues working for all existing platforms"
+- "No new required dependencies added to core install (singlestoredb is optional)"
 
 anti_patterns:
-  - "DO NOT modify existing adapter files — because SingleStore is additive — create a new singlestore.py file"
-  - "DO NOT use PyMySQL — because SingleStore's native singlestoredb SDK is significantly faster — use the singlestoredb package"
-  - "DO NOT use rowstore tables for TPC fact tables — because columnstore is dramatically faster for analytical queries — default to columnstore for all benchmark tables"
+- "DO NOT modify existing adapter files — because SingleStore is additive — create a new singlestore.py file"
+- "DO NOT use PyMySQL — because SingleStore's native singlestoredb SDK is significantly faster — use the singlestoredb package"
+- "DO NOT use rowstore tables for TPC fact tables — because columnstore is dramatically faster for analytical queries — default
+  to columnstore for all benchmark tables"
 
 verification:
-  - description: "New adapter imports correctly"
-    command: "uv run -- python -c \"from benchbox.platforms.singlestore import SingleStoreAdapter; print('import OK')\""
-    expected_output: "import OK"
-  - description: "Unit tests pass"
-    command: "uv run -- python -m pytest tests/unit/platforms/test_singlestore.py -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
-  - description: "Existing platform tests unaffected"
-    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
+- description: "New adapter imports correctly"
+  command: "uv run -- python -c \"from benchbox.platforms.singlestore import SingleStoreAdapter; print('import OK')\""
+  expected_output: "import OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_singlestore.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Existing platform tests unaffected"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
 
 scope_limit:
   only_modify:
-    - "benchbox/platforms/singlestore.py"
-    - "benchbox/platforms/credentials/singlestore.py"
-    - "tests/unit/platforms/test_singlestore.py"
+  - "benchbox/platforms/singlestore.py"
+  - "benchbox/platforms/credentials/singlestore.py"
+  - "tests/unit/platforms/test_singlestore.py"
   do_not_modify:
-    - "benchbox/platforms/clickhouse/"
-    - "benchbox/platforms/doris.py"
-    - "benchbox/core/runner.py"
+  - "benchbox/platforms/clickhouse/"
+  - "benchbox/platforms/doris.py"
+  - "benchbox/core/runner.py"
 
 success_metrics:
-  - "SingleStore adapter passes all TPC-H queries at SF 1"
-  - "SingleStore adapter passes all TPC-DS queries at SF 1"
-  - "Columnstore tables used for fact tables"
-  - "Bulk loading achieves >100K rows/sec"
-  - "Documentation covers both Helios and self-managed"
+- "SingleStore adapter passes all TPC-H queries at SF 1"
+- "SingleStore adapter passes all TPC-DS queries at SF 1"
+- "Columnstore tables used for fact tables"
+- "Bulk loading achieves >100K rows/sec"
+- "Documentation covers both Helios and self-managed"
 
 open_questions:
-  - "What shard key strategy works best for TPC schemas?"
-  - "Should we support Pipeline ingestion for streaming scenarios?"
-  - "How to handle Helios vs self-managed connection differences?"
+- "What shard key strategy works best for TPC schemas?"
+- "Should we support Pipeline ingestion for streaming scenarios?"
+- "How to handle Helios vs self-managed connection differences?"
+work:
+- id: w1
+  summary: "Document SingleStore-specific SQL extensions"
+  status: pending
+- id: w2
+  summary: "Research columnstore vs rowstore table selection"
+  status: pending
+- id: w3
+  summary: "Identify optimal bulk loading method (LOAD DATA, Pipeline)"
+  status: pending
+- id: w4
+  summary: "Document distributed join patterns and shard keys"
+  status: pending
+- id: w5
+  summary: "Create SingleStoreAdapter class"
+  status: pending
+- id: w6
+  summary: "Implement connection factory with SingleStore SDK"
+  status: pending
+- id: w7
+  summary: "Add columnstore table creation for TPC schemas"
+  status: pending
+- id: w8
+  summary: "Implement bulk loading via LOAD DATA LOCAL INFILE"
+  status: pending
+- id: w9
+  summary: "Add shard key configuration for distributed tables"
+  status: pending
+- id: w10
+  summary: "Support both Helios (cloud) and self-managed"
+  status: pending
+- id: w11
+  summary: "Add unit tests for SingleStore adapter"
+  status: pending
+- id: w12
+  summary: "Run TPC-H/TPC-DS validation at SF 0.01 and 1"
+  status: pending
+- id: w13
+  summary: "Benchmark columnstore vs rowstore performance"
+  status: pending
+- id: w14
+  summary: "Create platform documentation page"
+  status: pending
+- id: w15
+  summary: "Add to platform comparison matrix"
+  status: pending

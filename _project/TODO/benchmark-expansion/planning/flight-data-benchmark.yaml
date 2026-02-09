@@ -1,3 +1,4 @@
+id: flight-data-benchmark
 title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
 worktree: benchmark-expansion
 category: Benchmark Development
@@ -140,146 +141,6 @@ context_sections:
     - Maintain referential integrity with dimension tables
     - Note: Full dataset (~200M flights) is smaller than SF=100 convention
 
-tasks:
-- phase: "Phase 1: Data Infrastructure"
-  items:
-  - summary: Design data acquisition approach
-    done: false
-    details: |
-      Options:
-      A) Direct BTS download (CSV, requires field selection)
-      B) Kaggle pre-processed datasets
-      C) AWS Open Data bucket
-
-      Recommendation: Kaggle for development, BTS for production
-
-  - summary: Create flightdata module structure
-    done: false
-    details: |
-      - benchbox/core/flightdata/__init__.py
-      - benchbox/core/flightdata/schema.py
-      - benchbox/core/flightdata/downloader.py
-      - benchbox/core/flightdata/queries.py
-      - benchbox/core/flightdata/benchmark.py
-
-  - summary: Implement schema definitions
-    done: false
-    details: |
-      - Flights fact table (30+ columns)
-      - Airlines dimension table
-      - Airports dimension table (with coordinates)
-      - Time dimension (optional, for BI patterns)
-
-  - summary: Create airport and airline reference data
-    done: false
-    details: |
-      - Download OpenFlights airport data
-        Source: https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat
-        Fields: id, name, city, country, IATA, ICAO, lat, lon, altitude, timezone
-      - Map BTS carrier codes to full names
-        Source: https://www.transtats.bts.gov/Download_Lookup.asp?Y11x72=Y_haVdhR_PNeeVRe
-      - Include lat/lon for geographic queries
-
-- phase: "Phase 2: Data Loading"
-  items:
-  - summary: Implement CSV/Parquet downloader
-    done: false
-    details: |
-      - Support BTS field selection for smaller downloads
-      - Handle year/month partitioning
-      - Validate data integrity
-
-  - summary: Implement scale factor subsetting
-    done: false
-    details: |
-      - Time-based selection (most recent N years)
-      - Proportional sampling with reproducible seed
-      - Maintain dimension table completeness
-
-  - summary: Implement platform data loading
-    done: false
-    details: |
-      - DuckDB: Direct CSV/Parquet read
-      - PostgreSQL: COPY from CSV
-      - ClickHouse: INSERT from file
-      - Snowflake: COPY INTO from stage
-
-- phase: "Phase 3: Query Catalog"
-  items:
-  - summary: Implement on-time performance queries
-    done: false
-    details: |
-      - flight_ontime_by_carrier: % on-time by airline
-      - flight_delay_by_airport: Average delay by origin
-      - flight_delay_by_hour: Delay patterns by departure hour
-      - flight_best_routes: Routes with highest on-time %
-      - flight_improvement_trend: On-time % over years
-
-  - summary: Implement delay analysis queries
-    done: false
-    details: |
-      - flight_delay_causes: Breakdown by cause category
-      - flight_cascade_delays: LateAircraftDelay patterns
-      - flight_weather_impact: Weather delay by month
-      - flight_recovery_time: Time to recover from delays
-
-  - summary: Implement route analytics queries
-    done: false
-    details: |
-      - flight_busiest_routes: Top routes by count
-      - flight_route_reliability: Best/worst routes
-      - flight_distance_delay: Correlation analysis
-      - flight_hub_connectivity: Connection patterns
-
-  - summary: Implement temporal pattern queries
-    done: false
-    details: |
-      - flight_day_of_week: Patterns by weekday
-      - flight_seasonal: Monthly/quarterly trends
-      - flight_holiday_impact: Holiday period delays
-      - flight_time_of_day: Hourly congestion
-
-  - summary: Implement carrier comparison queries
-    done: false
-    details: |
-      - flight_carrier_ranking: On-time % ranking
-      - flight_cancellation_rate: By carrier
-      - flight_market_share: By route
-
-- phase: "Phase 4: Benchmark Integration"
-  items:
-  - summary: Implement FlightDataBenchmark class
-    done: false
-    details: |
-      - Inherit from BaseBenchmark
-      - Handle fact + dimension table loading
-      - Implement standard phases
-
-  - summary: Register benchmark with CLI
-    done: false
-    details: |
-      - Add to platform_registry.py
-      - Add to benchbox run --benchmark flightdata
-
-  - summary: Add platform-specific variants
-    done: false
-    details: |
-      - Date/time function differences
-      - String handling for airport codes
-      - Numeric precision for delays
-
-- phase: "Phase 5: Testing and Documentation"
-  items:
-  - summary: Create unit and integration tests
-    done: false
-
-  - summary: Document benchmark usage
-    done: false
-    details: |
-      - Scale factor recommendations
-      - Query catalog reference
-      - Data source attribution
-
 files_affected:
 - change_type: New
   paths:
@@ -320,30 +181,31 @@ metadata:
     - Consider geographic queries with airport coordinates
     - Rich temporal dimension for time-series patterns
 
+  migration_review_required: true
 must_preserve:
-  - "Existing NYC Taxi benchmark interface unchanged"
-  - "BaseBenchmark contract unchanged"
-  - "Platform registry backward compatible"
+- "Existing NYC Taxi benchmark interface unchanged"
+- "BaseBenchmark contract unchanged"
+- "Platform registry backward compatible"
 
 anti_patterns:
-  - "DO NOT hardcode BTS download URLs — because BTS periodically changes endpoints — use configuration-driven URL templates"
-  - "DO NOT download real flight data in unit tests — because files are large and BTS rate-limits — use synthetic test fixtures"
+- "DO NOT hardcode BTS download URLs — because BTS periodically changes endpoints — use configuration-driven URL templates"
+- "DO NOT download real flight data in unit tests — because files are large and BTS rate-limits — use synthetic test fixtures"
 
 verification:
-  - description: "Flight data benchmark module imports"
-    command: "uv run -- python -c \"from benchbox.core.flightdata import FlightDataBenchmark; print('OK')\""
-    expected_output: "OK"
-  - description: "Unit tests pass"
-    command: "uv run -- python -m pytest tests/unit/core/flightdata/ -v --tb=short"
-    expected_output: "all tests pass"
+- description: "Flight data benchmark module imports"
+  command: "uv run -- python -c \"from benchbox.core.flightdata import FlightDataBenchmark; print('OK')\""
+  expected_output: "OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/flightdata/ -v --tb=short"
+  expected_output: "all tests pass"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/flightdata/"
-    - "tests/unit/core/flightdata/"
+  - "benchbox/core/flightdata/"
+  - "tests/unit/core/flightdata/"
   do_not_modify:
-    - "benchbox/core/nyctaxi/"
-    - "benchbox/core/runner.py"
+  - "benchbox/core/nyctaxi/"
+  - "benchbox/core/runner.py"
 
 success_metrics:
 - Data loading for 1987-2024 working
@@ -355,3 +217,84 @@ success_metrics:
 - Route analytics queries under 10 seconds for SF=1.0
 - Temporal pattern queries under 5 seconds for SF=1.0
 - Carrier comparison queries under 10 seconds for SF=1.0
+work:
+- id: w1
+  summary: Design data acquisition approach
+  status: pending
+  notes: "Options:\nA) Direct BTS download (CSV, requires field selection)\nB) Kaggle pre-processed datasets\nC) AWS Open
+    Data bucket\n\nRecommendation: Kaggle for development, BTS for production\n"
+- id: w2
+  summary: Create flightdata module structure
+  status: pending
+  notes: "- benchbox/core/flightdata/__init__.py\n- benchbox/core/flightdata/schema.py\n- benchbox/core/flightdata/downloader.py\n\
+    - benchbox/core/flightdata/queries.py\n- benchbox/core/flightdata/benchmark.py\n"
+- id: w3
+  summary: Implement schema definitions
+  status: pending
+  notes: "- Flights fact table (30+ columns)\n- Airlines dimension table\n- Airports dimension table (with coordinates)\n\
+    - Time dimension (optional, for BI patterns)\n"
+- id: w4
+  summary: Create airport and airline reference data
+  status: pending
+  notes: "- Download OpenFlights airport data\n  Source: https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat\n\
+    \  Fields: id, name, city, country, IATA, ICAO, lat, lon, altitude, timezone\n- Map BTS carrier codes to full names\n\
+    \  Source: https://www.transtats.bts.gov/Download_Lookup.asp?Y11x72=Y_haVdhR_PNeeVRe\n- Include lat/lon for geographic
+    queries\n"
+- id: w5
+  summary: Implement CSV/Parquet downloader
+  status: pending
+  notes: "- Support BTS field selection for smaller downloads\n- Handle year/month partitioning\n- Validate data integrity\n"
+- id: w6
+  summary: Implement scale factor subsetting
+  status: pending
+  notes: "- Time-based selection (most recent N years)\n- Proportional sampling with reproducible seed\n- Maintain dimension
+    table completeness\n"
+- id: w7
+  summary: Implement platform data loading
+  status: pending
+  notes: "- DuckDB: Direct CSV/Parquet read\n- PostgreSQL: COPY from CSV\n- ClickHouse: INSERT from file\n- Snowflake: COPY
+    INTO from stage\n"
+- id: w8
+  summary: Implement on-time performance queries
+  status: pending
+  notes: "- flight_ontime_by_carrier: % on-time by airline\n- flight_delay_by_airport: Average delay by origin\n- flight_delay_by_hour:
+    Delay patterns by departure hour\n- flight_best_routes: Routes with highest on-time %\n- flight_improvement_trend: On-time
+    % over years\n"
+- id: w9
+  summary: Implement delay analysis queries
+  status: pending
+  notes: "- flight_delay_causes: Breakdown by cause category\n- flight_cascade_delays: LateAircraftDelay patterns\n- flight_weather_impact:
+    Weather delay by month\n- flight_recovery_time: Time to recover from delays\n"
+- id: w10
+  summary: Implement route analytics queries
+  status: pending
+  notes: "- flight_busiest_routes: Top routes by count\n- flight_route_reliability: Best/worst routes\n- flight_distance_delay:
+    Correlation analysis\n- flight_hub_connectivity: Connection patterns\n"
+- id: w11
+  summary: Implement temporal pattern queries
+  status: pending
+  notes: "- flight_day_of_week: Patterns by weekday\n- flight_seasonal: Monthly/quarterly trends\n- flight_holiday_impact:
+    Holiday period delays\n- flight_time_of_day: Hourly congestion\n"
+- id: w12
+  summary: Implement carrier comparison queries
+  status: pending
+  notes: "- flight_carrier_ranking: On-time % ranking\n- flight_cancellation_rate: By carrier\n- flight_market_share: By route\n"
+- id: w13
+  summary: Implement FlightDataBenchmark class
+  status: pending
+  notes: "- Inherit from BaseBenchmark\n- Handle fact + dimension table loading\n- Implement standard phases\n"
+- id: w14
+  summary: Register benchmark with CLI
+  status: pending
+  notes: "- Add to platform_registry.py\n- Add to benchbox run --benchmark flightdata\n"
+- id: w15
+  summary: Add platform-specific variants
+  status: pending
+  notes: "- Date/time function differences\n- String handling for airport codes\n- Numeric precision for delays\n"
+- id: w16
+  summary: Create unit and integration tests
+  status: pending
+- id: w17
+  summary: Document benchmark usage
+  status: pending
+  notes: "- Scale factor recommendations\n- Query catalog reference\n- Data source attribution\n"

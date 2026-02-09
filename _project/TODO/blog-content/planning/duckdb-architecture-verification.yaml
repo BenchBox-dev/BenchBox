@@ -1,3 +1,4 @@
+id: duckdb-architecture-verification
 title: "[DuckDB Architecture] Verify 'under 10 seconds' TPC-H claim"
 worktree: blog-content
 priority: Medium
@@ -16,34 +17,6 @@ description: |
   Quick validation run, update the draft with actual measured time.
 
   Reference draft: _blog/platform-deep-dives/drafts/duckdb-architecture.md
-
-tasks:
-  phases:
-  - phase: "Phase 1: Run Benchmark"
-    done: false
-    items:
-    - summary: "Run TPC-H SF10 on local machine"
-      done: false
-      subtasks:
-      - summary: "benchbox run --platform duckdb --benchmark tpch --scale 10"
-        done: false
-      - summary: "Record total time and hardware specs"
-        done: false
-    - summary: "Run 3 times for median"
-      done: false
-
-  - phase: "Phase 2: Update Draft"
-    done: false
-    items:
-    - summary: "Replace '10 seconds' with actual measured time"
-      done: false
-    - summary: "Add hardware context (CPU, RAM, SSD type)"
-      done: false
-    - summary: "Add reproducibility command for readers"
-      done: false
-      subtasks:
-      - summary: "Include: benchbox run --platform duckdb --benchmark tpch --scale 10"
-        done: false
 
 metadata:
   tags:
@@ -64,10 +37,41 @@ impact:
 
 files_affected:
   modified:
-    - "_blog/platform-deep-dives/drafts/duckdb-architecture.md"
+  - "_blog/platform-deep-dives/drafts/duckdb-architecture.md"
 
 success_metrics:
 - "Benchmark completes successfully"
 - "Draft updated with actual time"
 - "Hardware specs documented"
 - "Reproducibility command added"
+work:
+- id: w1
+  summary: "Run TPC-H SF10 on local machine"
+  status: pending
+- id: w2
+  summary: "benchbox run --platform duckdb --benchmark tpch --scale 10"
+  needs:
+  - w1
+  status: pending
+- id: w3
+  summary: "Record total time and hardware specs"
+  needs:
+  - w1
+  status: pending
+- id: w4
+  summary: "Run 3 times for median"
+  status: pending
+- id: w5
+  summary: "Replace '10 seconds' with actual measured time"
+  status: pending
+- id: w6
+  summary: "Add hardware context (CPU, RAM, SSD type)"
+  status: pending
+- id: w7
+  summary: "Add reproducibility command for readers"
+  status: pending
+- id: w8
+  summary: "Include: benchbox run --platform duckdb --benchmark tpch --scale 10"
+  needs:
+  - w7
+  status: pending

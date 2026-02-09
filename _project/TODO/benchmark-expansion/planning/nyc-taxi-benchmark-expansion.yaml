@@ -1,3 +1,4 @@
+id: nyc-taxi-benchmark-expansion
 title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
 worktree: benchmark-expansion
 category: Benchmark Development
@@ -68,88 +69,6 @@ context_sections:
     - Larger combined dataset for stress testing
     - Time-series market dynamics
 
-tasks:
-- phase: "Phase 1: Schema Extension"
-  items:
-  - summary: Design unified schema for all taxi types
-    done: false
-    details: |
-      Options:
-      A) Separate tables per type (yellow_trips, green_trips, fhv_trips, hvfhv_trips)
-      B) Combined table with taxi_type discriminator column
-      C) Common core table + type-specific extension tables
-
-      Considerations:
-      - Yellow/Green have similar schemas - could unify
-      - HVFHV has unique fields (shared_ride, congestion_surcharge)
-      - FHV has sparse schema (no fare breakdown)
-
-  - summary: Update schema.py with new table definitions
-    done: false
-
-  - summary: Add taxi_type enum and handling logic
-    done: false
-
-- phase: "Phase 2: Data Acquisition"
-  items:
-  - summary: Extend downloader.py for Green Taxi data
-    done: false
-    details: |
-      Source: Same TLC site, different endpoint
-      Format: Parquet (same as Yellow)
-      Coverage: 2014-present
-
-  - summary: Add FHV data downloader
-    done: false
-    details: |
-      Source: TLC FHV trip records
-      Schema: Simpler than Yellow/Green
-      Volume: Lower than Yellow
-
-  - summary: Add HVFHV data downloader
-    done: false
-    details: |
-      Source: TLC HVFHV trip records
-      Schema: Includes Uber/Lyft specific fields
-      Volume: Highest volume (25M+ trips/month)
-      Available: February 2019-present
-
-- phase: "Phase 3: Query Expansion"
-  items:
-  - summary: Add cross-type comparison queries
-    done: false
-    details: |
-      - Market share by taxi type over time
-      - Geographic coverage comparison
-      - Price comparison (same routes)
-      - Peak hour patterns by type
-
-  - summary: Add HVFHV-specific queries
-    done: false
-    details: |
-      - Shared ride adoption rate
-      - Surge pricing patterns (via fare analysis)
-      - Congestion surcharge impact
-      - Base dispatch patterns
-
-  - summary: Add Green Taxi specific queries
-    done: false
-    details: |
-      - Borough-specific patterns
-      - Airport pickups from outer boroughs
-      - Comparison to Yellow in overlap zones
-
-- phase: "Phase 4: Testing and Documentation"
-  items:
-  - summary: Update unit tests for new taxi types
-    done: false
-
-  - summary: Add integration tests with multi-type data
-    done: false
-
-  - summary: Update benchmark documentation
-    done: false
-
 files_affected:
 - change_type: Modified
   paths:
@@ -165,32 +84,35 @@ files_affected:
   - tests/integration/test_nyctaxi_combined.py
 
 must_preserve:
-  - "All 25 existing OLAP queries continue passing unchanged"
-  - "All 18 spatial queries continue passing unchanged"
-  - "Existing scale factors 0.01-100 work for Yellow Taxi data"
-  - "benchbox run --platform duckdb --benchmark nyctaxi --scale 0.01 completes with same results"
+- "All 25 existing OLAP queries continue passing unchanged"
+- "All 18 spatial queries continue passing unchanged"
+- "Existing scale factors 0.01-100 work for Yellow Taxi data"
+- "benchbox run --platform duckdb --benchmark nyctaxi --scale 0.01 completes with same results"
 
 anti_patterns:
-  - "DO NOT change the Yellow Taxi schema column names — because 25 OLAP queries depend on current column names — add new taxi type tables/columns alongside existing ones"
-  - "DO NOT merge all taxi types into one table — because FHV has a fundamentally different schema (no fare breakdown) — use separate tables or a discriminated union"
-  - "DO NOT download real TLC data in unit tests — because files are 50MB+ per month and TLC rate-limits — use synthetic test fixtures"
+- "DO NOT change the Yellow Taxi schema column names — because 25 OLAP queries depend on current column names — add new taxi
+  type tables/columns alongside existing ones"
+- "DO NOT merge all taxi types into one table — because FHV has a fundamentally different schema (no fare breakdown) — use
+  separate tables or a discriminated union"
+- "DO NOT download real TLC data in unit tests — because files are 50MB+ per month and TLC rate-limits — use synthetic test
+  fixtures"
 
 verification:
-  - description: "Existing NYC Taxi tests still pass"
-    command: "uv run -- python -m pytest tests/ -k nyctaxi -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
-  - description: "Yellow Taxi benchmark unchanged"
-    command: "uv run -- python -m pytest tests/unit/ -k nyctaxi -v --tb=short"
-    expected_output: "all existing tests pass"
+- description: "Existing NYC Taxi tests still pass"
+  command: "uv run -- python -m pytest tests/ -k nyctaxi -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Yellow Taxi benchmark unchanged"
+  command: "uv run -- python -m pytest tests/unit/ -k nyctaxi -v --tb=short"
+  expected_output: "all existing tests pass"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/nyctaxi/"
-    - "tests/unit/core/nyctaxi/"
-    - "tests/integration/test_nyctaxi_combined.py"
+  - "benchbox/core/nyctaxi/"
+  - "tests/unit/core/nyctaxi/"
+  - "tests/integration/test_nyctaxi_combined.py"
   do_not_modify:
-    - "benchbox/core/tpch/"
-    - "benchbox/cli/"
+  - "benchbox/core/tpch/"
+  - "benchbox/cli/"
 
 success_metrics:
 - All 4 taxi types loadable (Yellow, Green, FHV, HVFHV)
@@ -217,3 +139,53 @@ metadata:
     - Green Taxi has lower volume but different patterns
     - FHV has simplest schema but adds coverage
     - Consider phased rollout: Green first, then HVFHV, then FHV
+work:
+- id: w1
+  summary: Design unified schema for all taxi types
+  status: pending
+  notes: "Options:\nA) Separate tables per type (yellow_trips, green_trips, fhv_trips, hvfhv_trips)\nB) Combined table with
+    taxi_type discriminator column\nC) Common core table + type-specific extension tables\n\nConsiderations:\n- Yellow/Green
+    have similar schemas - could unify\n- HVFHV has unique fields (shared_ride, congestion_surcharge)\n- FHV has sparse schema
+    (no fare breakdown)\n"
+- id: w2
+  summary: Update schema.py with new table definitions
+  status: pending
+- id: w3
+  summary: Add taxi_type enum and handling logic
+  status: pending
+- id: w4
+  summary: Extend downloader.py for Green Taxi data
+  status: pending
+  notes: "Source: Same TLC site, different endpoint\nFormat: Parquet (same as Yellow)\nCoverage: 2014-present\n"
+- id: w5
+  summary: Add FHV data downloader
+  status: pending
+  notes: "Source: TLC FHV trip records\nSchema: Simpler than Yellow/Green\nVolume: Lower than Yellow\n"
+- id: w6
+  summary: Add HVFHV data downloader
+  status: pending
+  notes: "Source: TLC HVFHV trip records\nSchema: Includes Uber/Lyft specific fields\nVolume: Highest volume (25M+ trips/month)\n\
+    Available: February 2019-present\n"
+- id: w7
+  summary: Add cross-type comparison queries
+  status: pending
+  notes: "- Market share by taxi type over time\n- Geographic coverage comparison\n- Price comparison (same routes)\n- Peak
+    hour patterns by type\n"
+- id: w8
+  summary: Add HVFHV-specific queries
+  status: pending
+  notes: "- Shared ride adoption rate\n- Surge pricing patterns (via fare analysis)\n- Congestion surcharge impact\n- Base
+    dispatch patterns\n"
+- id: w9
+  summary: Add Green Taxi specific queries
+  status: pending
+  notes: "- Borough-specific patterns\n- Airport pickups from outer boroughs\n- Comparison to Yellow in overlap zones\n"
+- id: w10
+  summary: Update unit tests for new taxi types
+  status: pending
+- id: w11
+  summary: Add integration tests with multi-type data
+  status: pending
+- id: w12
+  summary: Update benchmark documentation
+  status: pending

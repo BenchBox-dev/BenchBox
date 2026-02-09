@@ -86,13 +86,13 @@ doesn't break references).
 ```yaml
 deps:
   needs: ["fix-dataframe-parameter-parity"]   # I can't start until these are done
-  blocks: ["cloud-platform-comparison"]        # These can't start until I'm done
 ```
 
 - Uses slugs (stable IDs), not file paths
-- Two keys only: `needs` (inbound) and `blocks` (outbound)
+- Single source of truth: store only inbound `needs`
+- Reverse edges (`blocks`) are computed by CLI/index generation, never authored
 - `related` moves to metadata (it's informational, not structural)
-- Both keys are optional lists
+- `needs` is an optional list
 
 Why this matters: `todo_cli.py ready` can now compute which items have
 all `needs` satisfied without parsing prose or resolving file paths.
@@ -139,22 +139,22 @@ Issues:
 work:
   - id: w1
     summary: "Create MotherDuck adapter class with DuckDB inheritance"
-    done: true
+    status: done
 
   - id: w2
     summary: "Implement token-based auth (env var + config file)"
     needs: [w1]
-    done: true
+    status: done
 
   - id: w3
     summary: "Handle md: connection string syntax"
     needs: [w1]
-    done: false
+    status: in_progress
 
   - id: w4
     summary: "Unit tests with mocked connection"
     needs: [w2, w3]
-    done: false
+    status: pending
 
 deferred:
   - summary: "Cloud storage upload loading strategy"
@@ -165,13 +165,13 @@ deferred:
 
 ### Work unit properties
 
-| Field     | Type       | Required | Description                           |
-|-----------|------------|----------|---------------------------------------|
-| `id`      | string     | yes      | Unique within this TODO item (w1-w99) |
-| `summary` | string     | yes      | One-line description of the work      |
-| `needs`   | list[str]  | no       | IDs of work units this depends on     |
-| `done`    | bool       | yes      | Whether this unit is complete         |
-| `notes`   | string     | no       | Implementation notes or context       |
+| Field     | Type       | Required | Description                               |
+|-----------|------------|----------|-------------------------------------------|
+| `id`      | string     | yes      | Unique within this TODO item (w1-w999)    |
+| `summary` | string     | yes      | One-line description of the work          |
+| `needs`   | list[str]  | no       | IDs of work units this depends on         |
+| `status`  | enum       | yes      | `pending` \| `in_progress` \| `blocked` \| `done` |
+| `notes`   | string     | no       | Implementation notes or context           |
 
 ### Deferred items
 
@@ -187,8 +187,9 @@ tokens parsing items they can't act on.
 ### Computable ready queue
 
 A work unit is **ready** when:
-1. `done: false`
-2. All items in `needs` have `done: true` (or `needs` is empty)
+1. `status` is `pending` (or `in_progress` when resuming same unit)
+2. All items in `needs` have `status: done` (or `needs` is empty)
+3. The work graph has no cycles (validated by CLI/schema checks)
 
 This is the Beads `bd ready` concept, applied within a single TODO item.
 No prose parsing. No phase scanning. A simple graph traversal.
@@ -214,14 +215,14 @@ When an agent starts implementing a TODO item:
 1. Read YAML → identify ready work units
 2. Create TodoWrite tasks from ready units
 3. Work through them (one in_progress at a time)
-4. On each completion → update YAML (done: true) + TodoWrite (completed)
-5. Session end → commit YAML changes
+4. On each completion → update YAML (`status: done`) + TodoWrite (completed)
+5. Session end → reconcile status and commit code+YAML together
 ```
 
 ### Example session
 
-Agent picks up `motherduck-platform-adapter`. YAML has `w3` and `w4`
-ready (w1, w2 already done; w4 needs w3 so only w3 is truly ready).
+Agent picks up `motherduck-platform-adapter`. YAML has `w3` ready and
+`w4` blocked (w1, w2 are done; w4 still needs w3).
 
 ```python
 # Agent creates TodoWrite tasks:
@@ -235,7 +236,7 @@ TodoWrite([
 ])
 ```
 
-Agent completes w3, updates YAML (`w3.done: true`), marks w3 completed
+Agent completes w3, updates YAML (`w3.status: done`), marks w3 completed
 in TodoWrite, moves w4 to in_progress. This is the natural rhythm
 agents already follow — the design just makes the layers explicit.
 
@@ -243,11 +244,11 @@ agents already follow — the design just makes the layers explicit.
 
 At session end, the agent must:
 
-1. Update all completed work unit `done` flags in the YAML
+1. Update all completed work unit statuses to `done` in the YAML
 2. If all work units are done → set TODO `status: Completed`,
    add `completed_date`, move to DONE tree
 3. If work remains → leave TODO `status: In Progress`
-4. Commit the YAML changes
+4. Commit code + YAML changes in the same checkpoint commit
 5. Optionally: add new work units discovered during implementation
 
 This is Beads' "land the plane" concept adapted for your system. The
@@ -270,8 +271,13 @@ Across 32 items with dependencies, the field usage is:
 ```yaml
 deps:
   needs: ["fix-dataframe-parameter-parity"]
-  blocks: ["cloud-platform-comparison"]
 ```
+
+Rules:
+- `deps.needs` is canonical and hand-authored
+- `blocks` is derived from reverse lookup at runtime/index time
+- Unknown dependency IDs fail validation
+- Dependency cycles fail validation
 
 ### CLI: `todo_cli.py ready`
 
@@ -319,9 +325,20 @@ Marks a work unit complete and auto-cascades:
 
 ```bash
 $ uv run _project/scripts/todo_cli.py done motherduck-platform-adapter w3
-# Updates w3.done=true in YAML
+# Updates w3.status=done in YAML
 # Reports: w4 is now ready (all deps satisfied)
 # If all work units done: prompts to complete the TODO item
+```
+
+### CLI: `todo_cli.py check-graph`
+
+Validates the global DAG and per-item work graphs:
+
+```bash
+$ uv run _project/scripts/todo_cli.py check-graph
+✅ No TODO dependency cycles
+✅ No work-unit cycles
+✅ No dangling refs (deps.needs / work.needs)
 ```
 
 ---
@@ -342,11 +359,11 @@ work:
   type: array
   items:
     type: object
-    required: [id, summary, done]
+    required: [id, summary, status]
     properties:
       id:
         type: string
-        pattern: "^w[0-9]{1,2}$"
+        pattern: "^w[0-9]{1,3}$"
       summary:
         type: string
         minLength: 5
@@ -355,8 +372,9 @@ work:
         type: array
         items:
           type: string
-      done:
-        type: boolean
+      status:
+        type: string
+        enum: [pending, in_progress, blocked, done]
       notes:
         type: string
 
@@ -380,10 +398,6 @@ deps:
       type: array
       items:
         type: string
-    blocks:
-      type: array
-      items:
-        type: string
   additionalProperties: false
 ```
 
@@ -391,48 +405,76 @@ deps:
 
 - `tasks` field: accepted but deprecated (validator warns)
 - `dependencies` field: accepted but deprecated (validator warns)
-- Migration script converts both to new format
+- `work.done` boolean is accepted during migration and rewritten to `status`
+- Migration scripts convert legacy formats; normal write path emits only new fields
 
 ---
 
 ## Migration
 
-### Automated conversion: `migrate_to_work_units.py`
+### Migration scripts (planned)
 
-For each TODO item with `tasks.phases`:
+Use small, composable scripts instead of one monolith.
 
-1. Flatten phases → items → subtasks into a linear list
-2. Assign IDs: `w1`, `w2`, ..., `wN`
-3. Infer dependencies from phase ordering:
-   - Items in Phase 2 `needs` last item in Phase 1
-   - Subtasks `needs` their parent item
-4. Items with `done: false` and `notes` containing "Deferred" → move to
-   `deferred` list
-5. Write `work` list, remove `tasks` block
-6. Add `id` field from filename slug
+1. `backfill_todo_ids.py`
+- Adds missing top-level `id` from filename slug
+- Verifies `id == slug` and reports mismatches
+- No other mutation
 
-For `dependencies` → `deps`:
+2. `migrate_dependencies_to_deps.py`
+- Converts legacy `dependencies.blocked_by` to `deps.needs`
+- Converts path references to slug IDs
+- Moves informational links (`related`, legacy flat lists) to `metadata.related`
+- Does not write `blocks`
 
-1. `blocked_by` → `deps.needs` (convert paths to slugs)
-2. `blocks` → `deps.blocks` (convert paths to slugs)
-3. `related` → `metadata.related` (informational, not structural)
-4. `dependencies` (flat list) → `metadata.related`
+3. `migrate_tasks_to_work.py`
+- Converts `tasks.phases` into `work[]` with `status`
+- Mapping:
+  - `done: true` -> `status: done`
+  - `done: false` -> `status: pending`
+- Subtasks become first-class work units
+- Parent/subtask edges become explicit via `needs`
+- Phase boundaries are preserved as ordering hints in `notes`; no automatic cross-phase hard dependency injection
+- Marks ambiguous dependency inference with `notes: "MIGRATION_REVIEW_REQUIRED"` for manual follow-up
 
-### Manual review needed
+4. `validate_task_graphs.py`
+- Validates no dangling refs and no cycles in:
+  - item-level `deps.needs`
+  - per-item `work[].needs`
+- Returns non-zero on graph integrity errors
 
-- Phase dependency inference may be too conservative or too loose
-- Some items have complex inter-phase relationships
-- 3 "In Progress" items should be reviewed for accurate work unit status
+5. `migration_report.py`
+- Produces machine-readable summary:
+  - files migrated
+  - files requiring manual review
+  - counts by transformation type
 
-### Rollout plan
+### Rollout plan (low-risk, low-churn)
 
-1. Write migration script
-2. Run on a copy, diff against originals
-3. Review the 3 In Progress items manually
-4. Apply to real files
-5. Update schema, template, CLI, skill definition
-6. Regenerate indexes
-7. Commit as single atomic change
+1. Ship read-path compatibility first
+- CLI/validators read both legacy and new formats
+- Write path still emits legacy format
+
+2. Run migration in dry-run mode
+- Generate patch previews and `migration_report.json`
+- No file writes in this step
+
+3. Apply migration in batches
+- Batch A: `Not Started` + `Identified`
+- Batch B: `Blocked` + `Under Review`
+- Batch C: `In Progress` (manual check required)
+
+4. Run integrity gates after each batch
+- `validate_todo.py --all`
+- `todo_cli.py check-graph`
+- Index regeneration + diff sanity check
+
+5. Flip write path to new format
+- New TODO creation writes `id`, `deps.needs`, `work[].status`
+- Legacy fields still readable but deprecated with warnings
+
+6. Remove legacy write support in a later cleanup release
+- Keep legacy read support for one additional release window
 
 ---
 
@@ -452,11 +494,11 @@ For `dependencies` → `deps`:
    c. Run verification commands
    d. Run: todo_cli.py done <slug> <work-id>
    e. Mark completed in TodoWrite
-   f. Commit code changes
+   f. Continue to next ready unit (same session)
 7. Session end:
    a. If all work done → complete the TODO item, move to DONE
    b. If work remains → ensure YAML reflects current state
-   c. Commit YAML changes
+   c. Commit code + YAML in one checkpoint commit
 ```
 
 ### `list` / `create` / `review` actions
@@ -464,6 +506,37 @@ For `dependencies` → `deps`:
 Largely unchanged. `create` generates items with `work` instead of
 `tasks.phases`. `review` scoring adds a "Work Breakdown" dimension
 (are units well-sized? are dependencies accurate?).
+
+### Skill update plan
+
+Update these skills to prevent process drift:
+
+1. `project-todo-sync`
+- Add checks for `id`, `deps.needs`, and `work[].status`
+- Enforce graph validation before reindex/commit
+
+2. `todo-create`
+- Emit only new fields (`id`, `deps.needs`, `work`, `deferred`)
+- Default work-unit statuses to `pending`
+
+3. `todo-implement`
+- Run `todo_cli.py ready` then `todo_cli.py next <slug>`
+- During implementation, use `todo_cli.py done <slug> <work-id>`
+- End with a single checkpoint commit containing code + TODO updates
+
+4. `todo-complete`
+- Verify all `work[].status == done` before moving item to DONE
+- Reject completion if unresolved dependencies remain
+
+5. `todo-review`
+- Add explicit checks:
+  - no dependency cycles
+  - no dangling references
+  - deferred items include clear reactivation trigger text
+
+6. `todo-cleanup`
+- Add `todo_cli.py check-graph` as required pre-commit gate
+- Fail cleanup if legacy fields are reintroduced in newly modified items
 
 ---
 
@@ -474,7 +547,7 @@ Largely unchanged. `create` generates items with `work` instead of
 | Flat dependency DAG            | Beads     | `work[].needs` within items            |
 | Ready queue (`bd ready`)       | Beads     | `todo_cli.py ready` + `next`           |
 | Stable IDs for cross-refs      | Beads     | `id` field matching filename slug      |
-| Session boundary protocol      | Beads     | "Land the plane" → commit YAML at end  |
+| Session boundary protocol      | Beads     | "Land the plane" → checkpoint commit for code + YAML |
 | Deferred items as separate list| Beads     | `deferred` list outside the work DAG   |
 | Session-scoped execution       | CC Tasks  | TodoWrite maps 1:1 from work units     |
 | Real-time progress display     | CC Tasks  | TodoWrite status line during sessions  |
@@ -494,7 +567,7 @@ Largely unchanged. `create` generates items with `work` instead of
 | MCP server               | Beads  | Adds infrastructure; CLI is sufficient      |
 | Hash-based IDs           | Beads  | Slug-based IDs are human-readable           |
 | `bd compact`             | Beads  | DONE tree already serves this purpose       |
-| `--claim` atomics        | Beads  | Single-agent workflow; no race conditions   |
+| `--claim` atomics        | Beads  | Not required now; use graph validation + git conflict checks, revisit if concurrency increases |
 | Persistent Tasks         | CC     | Session-scoped is correct for this layer    |
 | JSONL export             | Beads  | YAML indexes serve the same role            |
 
@@ -505,7 +578,6 @@ Largely unchanged. `create` generates items with `work` instead of
 ### New index: `by-ready.yaml`
 
 ```yaml
-generated_at: '2026-02-08T...'
 ready_items:
   - id: motherduck-platform-adapter
     priority: High
@@ -523,12 +595,16 @@ ready_items:
 blocked_items:
   - id: implement-dataframe-benchmarks
     priority: Medium
-    blocked_by: ["fix-dataframe-parameter-parity"]
+    blocked_by: ["fix-dataframe-parameter-parity"]  # derived from deps.needs
     reason: "1 unresolved dependency"
 ```
 
 This is the index agents read first. Instead of loading `by-priority`
 and mentally filtering, they get a pre-computed action list.
+
+Design note:
+- `generated_at` is optional and omitted by default to reduce diff churn
+- A `--include-timestamp` flag can opt in when needed for diagnostics
 
 ---
 
@@ -539,7 +615,7 @@ The integrated system keeps your TODO items as the strategic layer
 DAG with a ready queue), and uses Claude Code Tasks as the operational
 layer (real-time session display). No new infrastructure. No new
 databases. Just a flatter internal structure, stable IDs, normalized
-dependencies, and three new CLI commands.
+dependencies, graph integrity checks, and focused CLI commands.
 
 The work breakdown changes from "read a nested tree and figure it out"
 to "run `next <slug>` and get a list." That's the core improvement.

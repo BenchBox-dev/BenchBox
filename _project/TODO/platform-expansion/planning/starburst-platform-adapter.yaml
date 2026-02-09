@@ -1,3 +1,4 @@
+id: starburst-platform-adapter
 title: "Starburst Platform Adapter"
 worktree: platform-expansion
 priority: Medium
@@ -34,87 +35,19 @@ context_sections:
     - Catalog management (managed catalogs in Galaxy)
     - Connection endpoints (cloud hostnames)
 
-tasks:
-  phases:
-    - phase: "Phase 1: Adapter Structure"
-      done: false
-      items:
-        - summary: "Create benchbox/platforms/starburst.py"
-          done: false
-        - summary: "Implement StarburstAdapter class extending PlatformAdapter"
-          done: false
-        - summary: "Set up inheritance from Trino (dialect, capabilities)"
-          done: false
-        - summary: "Register platform in registry with deployment metadata"
-          done: false
-
-    - phase: "Phase 2: Authentication"
-      done: false
-      items:
-        - summary: "Implement OAuth authentication for Galaxy"
-          done: false
-        - summary: "Implement basic auth for Enterprise"
-          done: false
-        - summary: "Add credential setup wizard for Starburst"
-          done: false
-        - summary: "Support environment variables"
-          done: false
-          subtasks:
-            - summary: "STARBURST_HOST"
-              done: false
-            - summary: "STARBURST_TOKEN or STARBURST_PASSWORD"
-              done: false
-
-    - phase: "Phase 3: Connection and Catalog"
-      done: false
-      items:
-        - summary: "Implement Galaxy connection handling"
-          done: false
-        - summary: "Implement catalog selection/creation"
-          done: false
-        - summary: "Handle data loading via connectors"
-          done: false
-          subtasks:
-            - summary: "S3 connector for data files"
-              done: false
-            - summary: "Hive metastore integration"
-              done: false
-        - summary: "Configure query execution settings"
-          done: false
-
-    - phase: "Phase 4: Query Execution"
-      done: false
-      items:
-        - summary: "Inherit query execution from Trino adapter"
-          done: false
-        - summary: "Handle Starburst-specific query features"
-          done: false
-        - summary: "Implement performance metrics collection"
-          done: false
-        - summary: "Handle cloud-specific error scenarios"
-          done: false
-
-    - phase: "Phase 5: Testing"
-      done: false
-      items:
-        - summary: "Unit tests for adapter (mocked connection)"
-          done: false
-        - summary: "Integration tests with Starburst Galaxy (requires account)"
-          done: false
-        - summary: "Test TPC-H benchmark at scale 1"
-          done: false
-        - summary: "Compare results with vanilla Trino"
-          done: false
-
 metadata:
   tags:
-    - platform-adapter
-    - starburst
-    - trino
-    - cloud
+  - platform-adapter
+  - starburst
+  - trino
+  - cloud
   estimated_effort: "3-4 days"
   created_date: "2026-01-14"
 
+  related:
+  - deployment-factory-integration
+  - deployment-config-inheritance
+  migration_review_required: true
 impact:
   business_value: |
     Enables benchmarking of commercial Trino offerings, important for
@@ -125,67 +58,144 @@ impact:
 
 files_affected:
   modified:
-    - "benchbox/core/platform_registry.py"
-    - "benchbox/platforms/__init__.py"
+  - "benchbox/core/platform_registry.py"
+  - "benchbox/platforms/__init__.py"
   added:
-    - "benchbox/platforms/starburst.py"
-    - "benchbox/platforms/credentials/starburst.py"
+  - "benchbox/platforms/starburst.py"
+  - "benchbox/platforms/credentials/starburst.py"
   removed: []
-
-dependencies:
-  related:
-    - "_project/DONE/platform-expansion/active/deployment-factory-integration.yaml"
-    - "_project/DONE/platform-expansion/active/deployment-config-inheritance.yaml"
-
 technical_requirements:
   dependencies:
-    - "trino-python-client (existing)"
+  - "trino-python-client (existing)"
   constraints:
-    - "Requires Starburst Galaxy account for testing"
-    - "OAuth authentication for Galaxy"
+  - "Requires Starburst Galaxy account for testing"
+  - "OAuth authentication for Galaxy"
 
 must_preserve:
-  - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-  - "Platform registry autodiscovery continues working for all existing platforms"
-  - "Existing Trino adapter unchanged"
+- "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+- "Platform registry autodiscovery continues working for all existing platforms"
+- "Existing Trino adapter unchanged"
 
 anti_patterns:
-  - "DO NOT modify existing adapter files — because Starburst is additive — create a new starburst.py file"
-  - "DO NOT duplicate Trino query logic — because Starburst IS Trino with managed features — inherit and only override authentication and catalog handling"
-  - "DO NOT add trino-python-client as a new dependency — because it is already an existing dependency — reuse the existing installation"
+- "DO NOT modify existing adapter files — because Starburst is additive — create a new starburst.py file"
+- "DO NOT duplicate Trino query logic — because Starburst IS Trino with managed features — inherit and only override authentication
+  and catalog handling"
+- "DO NOT add trino-python-client as a new dependency — because it is already an existing dependency — reuse the existing
+  installation"
 
 verification:
-  - description: "New adapter imports correctly"
-    command: "uv run -- python -c \"from benchbox.platforms.starburst import StarburstAdapter; print('import OK')\""
-    expected_output: "import OK"
-  - description: "Unit tests pass"
-    command: "uv run -- python -m pytest tests/unit/platforms/test_starburst.py -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
-  - description: "Existing platform tests unaffected"
-    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
-  - description: "Trino adapter unaffected"
-    command: "uv run -- python -m pytest tests/unit/platforms/test_trino_adapter.py -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
+- description: "New adapter imports correctly"
+  command: "uv run -- python -c \"from benchbox.platforms.starburst import StarburstAdapter; print('import OK')\""
+  expected_output: "import OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_starburst.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Existing platform tests unaffected"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Trino adapter unaffected"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_trino_adapter.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
 
 scope_limit:
   only_modify:
-    - "benchbox/platforms/starburst.py"
-    - "benchbox/platforms/credentials/starburst.py"
-    - "tests/unit/platforms/test_starburst.py"
+  - "benchbox/platforms/starburst.py"
+  - "benchbox/platforms/credentials/starburst.py"
+  - "tests/unit/platforms/test_starburst.py"
   do_not_modify:
-    - "benchbox/platforms/trino.py"
-    - "benchbox/platforms/duckdb.py"
-    - "benchbox/core/runner.py"
+  - "benchbox/platforms/trino.py"
+  - "benchbox/platforms/duckdb.py"
+  - "benchbox/core/runner.py"
 
 success_metrics:
-  - "Starburst adapter passes connection test"
-  - "TPC-H benchmark runs successfully at scale 1"
-  - "Results are comparable with vanilla Trino"
-  - "OAuth authentication works for Galaxy"
-  - "Error messages are actionable"
+- "Starburst adapter passes connection test"
+- "TPC-H benchmark runs successfully at scale 1"
+- "Results are comparable with vanilla Trino"
+- "OAuth authentication works for Galaxy"
+- "Error messages are actionable"
 
 open_questions:
-  - "Should we support both Galaxy (managed) and Enterprise (self-hosted)?"
-  - "How to handle Starburst-specific catalog features?"
-  - "What's the default data loading strategy?"
+- "Should we support both Galaxy (managed) and Enterprise (self-hosted)?"
+- "How to handle Starburst-specific catalog features?"
+- "What's the default data loading strategy?"
+work:
+- id: w1
+  summary: "Create benchbox/platforms/starburst.py"
+  status: pending
+- id: w2
+  summary: "Implement StarburstAdapter class extending PlatformAdapter"
+  status: pending
+- id: w3
+  summary: "Set up inheritance from Trino (dialect, capabilities)"
+  status: pending
+- id: w4
+  summary: "Register platform in registry with deployment metadata"
+  status: pending
+- id: w5
+  summary: "Implement OAuth authentication for Galaxy"
+  status: pending
+- id: w6
+  summary: "Implement basic auth for Enterprise"
+  status: pending
+- id: w7
+  summary: "Add credential setup wizard for Starburst"
+  status: pending
+- id: w8
+  summary: "Support environment variables"
+  status: pending
+- id: w9
+  summary: "STARBURST_HOST"
+  needs:
+  - w8
+  status: pending
+- id: w10
+  summary: "STARBURST_TOKEN or STARBURST_PASSWORD"
+  needs:
+  - w8
+  status: pending
+- id: w11
+  summary: "Implement Galaxy connection handling"
+  status: pending
+- id: w12
+  summary: "Implement catalog selection/creation"
+  status: pending
+- id: w13
+  summary: "Handle data loading via connectors"
+  status: pending
+- id: w14
+  summary: "S3 connector for data files"
+  needs:
+  - w13
+  status: pending
+- id: w15
+  summary: "Hive metastore integration"
+  needs:
+  - w13
+  status: pending
+- id: w16
+  summary: "Configure query execution settings"
+  status: pending
+- id: w17
+  summary: "Inherit query execution from Trino adapter"
+  status: pending
+- id: w18
+  summary: "Handle Starburst-specific query features"
+  status: pending
+- id: w19
+  summary: "Implement performance metrics collection"
+  status: pending
+- id: w20
+  summary: "Handle cloud-specific error scenarios"
+  status: pending
+- id: w21
+  summary: "Unit tests for adapter (mocked connection)"
+  status: pending
+- id: w22
+  summary: "Integration tests with Starburst Galaxy (requires account)"
+  status: pending
+- id: w23
+  summary: "Test TPC-H benchmark at scale 1"
+  status: pending
+- id: w24
+  summary: "Compare results with vanilla Trino"
+  status: pending

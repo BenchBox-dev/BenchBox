@@ -1,3 +1,4 @@
+id: coverage-core-tpcdi
 title: "Improve test coverage for core/tpcdi module to ≥50%"
 worktree: main
 priority: Medium-High
@@ -19,31 +20,11 @@ description: |
   and multi-phase batch orchestration. Tests should focus on the ETL transform
   functions and SCD logic — these are pure functions that are highly testable.
 
-tasks:
-  phases:
-    - phase: "Phase 1: ETL transformations and SCD processor"
-      done: false
-      items:
-        - summary: "Add tests for core/tpcdi/etl/transformations.py (11.9% → 50%)"
-          done: false
-        - summary: "Add tests for core/tpcdi/etl/scd_processor.py (24.2% → 50%)"
-          done: false
-        - summary: "Add tests for core/tpcdi/source_generators.py (10.3% → 50%)"
-          done: false
-
-    - phase: "Phase 2: Batch processor and benchmark runner"
-      done: false
-      items:
-        - summary: "Add tests for core/tpcdi/etl/batch.py (17.3% → 50%)"
-          done: false
-        - summary: "Add tests for core/tpcdi/benchmark.py (36.8% → 50%)"
-          done: false
-
 metadata:
   tags:
-    - testing
-    - coverage
-    - tpcdi
+  - testing
+  - coverage
+  - tpcdi
   estimated_effort: Medium
   created_date: "2026-02-07"
   last_updated: "2026-02-07T09:00:00"
@@ -58,8 +39,8 @@ impact:
     produce silently wrong benchmark results.
 
 must_preserve:
-  - "All existing TPC-DI tests continue to pass"
-  - "No changes to production code"
+- "All existing TPC-DI tests continue to pass"
+- "No changes to production code"
 
 approach: |
   The ETL transformations are mostly pure functions that transform DataFrames
@@ -69,26 +50,44 @@ approach: |
   For batch.py, mock the database connection and test orchestration logic.
 
 anti_patterns:
-  - "DO NOT test with real TPC-DI data files — because they require the dsqgen binary and are 100MB+ at SF=1, making tests slow and environment-dependent — create minimal synthetic fixtures (5-10 rows)"
-  - "DO NOT require dsqgen binary — because it is platform-specific, not available in CI, and segfaults on fractional scale factors — mock data generation calls"
+- "DO NOT test with real TPC-DI data files — because they require the dsqgen binary and are 100MB+ at SF=1, making tests slow
+  and environment-dependent — create minimal synthetic fixtures (5-10 rows)"
+- "DO NOT require dsqgen binary — because it is platform-specific, not available in CI, and segfaults on fractional scale
+  factors — mock data generation calls"
 
 verification:
-  - description: "TPC-DI tests pass and coverage reaches 50%"
-    command: "uv run -- python -m pytest tests/unit/ -k tpcdi -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
+- description: "TPC-DI tests pass and coverage reaches 50%"
+  command: "uv run -- python -m pytest tests/unit/ -k tpcdi -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
 
 success_metrics:
-  - "core/tpcdi package reaches ≥50% line coverage overall"
-  - "Each individual file listed reaches ≥50%"
+- "core/tpcdi package reaches ≥50% line coverage overall"
+- "Each individual file listed reaches ≥50%"
 
 files_affected:
   added:
-    - "tests/unit/benchmarks/test_tpcdi_etl.py"
-    - "tests/unit/benchmarks/test_tpcdi_scd.py"
-    - "tests/unit/benchmarks/test_tpcdi_benchmark.py"
+  - "tests/unit/benchmarks/test_tpcdi_etl.py"
+  - "tests/unit/benchmarks/test_tpcdi_scd.py"
+  - "tests/unit/benchmarks/test_tpcdi_benchmark.py"
 
 scope_limit:
   only_modify:
-    - "tests/unit/benchmarks/"
+  - "tests/unit/benchmarks/"
   do_not_modify:
-    - "benchbox/"
+  - "benchbox/"
+work:
+- id: w1
+  summary: "Add tests for core/tpcdi/etl/transformations.py (11.9% → 50%)"
+  status: pending
+- id: w2
+  summary: "Add tests for core/tpcdi/etl/scd_processor.py (24.2% → 50%)"
+  status: pending
+- id: w3
+  summary: "Add tests for core/tpcdi/source_generators.py (10.3% → 50%)"
+  status: pending
+- id: w4
+  summary: "Add tests for core/tpcdi/etl/batch.py (17.3% → 50%)"
+  status: pending
+- id: w5
+  summary: "Add tests for core/tpcdi/benchmark.py (36.8% → 50%)"
+  status: pending

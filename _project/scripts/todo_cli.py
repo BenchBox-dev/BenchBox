@@ -8,13 +8,19 @@ Usage:
     uv run scripts/todo_cli.py validate [<path>]
     uv run scripts/todo_cli.py reindex
     uv run scripts/todo_cli.py stats
+    uv run scripts/todo_cli.py ready
+    uv run scripts/todo_cli.py next <slug>
+    uv run scripts/todo_cli.py done <slug> <work-id>
+    uv run scripts/todo_cli.py check-graph
     uv run scripts/todo_cli.py cleanup [--dry-run]
 """
+
+from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 
@@ -28,7 +34,7 @@ class TodoCLI:
         self.todo_dir = project_root / "_project" / "TODO"
         self.done_dir = project_root / "_project" / "DONE"
 
-    def load_master_index(self, tree: str = "TODO") -> Dict[str, Any]:
+    def load_master_index(self, tree: str = "TODO") -> dict[str, Any]:
         """Load master index file."""
         index_path = self.project_root / "_project" / tree / "_indexes" / "master.yaml"
 
@@ -42,12 +48,12 @@ class TodoCLI:
 
     def list_items(
         self,
-        priority: Optional[str] = None,
-        status: Optional[str] = None,
-        category: Optional[str] = None,
-        worktree: Optional[str] = None,
+        priority: str | None = None,
+        status: str | None = None,
+        category: str | None = None,
+        worktree: str | None = None,
         tree: str = "TODO",
-        limit: Optional[int] = None,
+        limit: int | None = None,
     ):
         """List TODO/DONE items with optional filters."""
         index = self.load_master_index(tree)
@@ -311,7 +317,7 @@ class TodoCLI:
 
         print(f"{'=' * 100}\n")
 
-    def validate(self, path: Optional[str] = None):
+    def validate(self, path: str | None = None):
         """Validate TODO items using validate_todo.py."""
         validate_script = self.project_root / "_project" / "scripts" / "validate_todo.py"
 
@@ -342,6 +348,421 @@ class TodoCLI:
         result = subprocess.run([sys.executable, str(index_script)])
         sys.exit(result.returncode)
 
+    def _load_all_items(self) -> dict[str, tuple[Path, dict]]:
+        """Load all TODO YAML files. Returns {slug: (file_path, data)}."""
+        items: dict[str, tuple[Path, dict]] = {}
+        for yaml_file in self.todo_dir.rglob("*.yaml"):
+            if "_indexes" in str(yaml_file):
+                continue
+            try:
+                with open(yaml_file) as f:
+                    data = yaml.safe_load(f)
+                if data and isinstance(data, dict):
+                    slug = data.get("id", yaml_file.stem)
+                    items[slug] = (yaml_file, data)
+            except Exception:
+                continue
+        return items
+
+    def _load_done_slugs(self) -> set[str]:
+        """Load slugs of all DONE items."""
+        slugs: set[str] = set()
+        if not self.done_dir.exists():
+            return slugs
+        for yaml_file in self.done_dir.rglob("*.yaml"):
+            if "_indexes" in str(yaml_file):
+                continue
+            try:
+                with open(yaml_file) as f:
+                    data = yaml.safe_load(f)
+                if data and isinstance(data, dict):
+                    slugs.add(data.get("id", yaml_file.stem))
+            except Exception:
+                continue
+        return slugs
+
+    def _get_work_ready_units(self, work: list) -> tuple[list[dict], list[dict], list[dict]]:
+        """Partition work units into (ready, blocked, done).
+
+        A unit is ready if status=='pending' and all needs are done.
+        """
+        done_ids = {u.get("id") for u in work if isinstance(u, dict) and u.get("status") == "done"}
+        ready, blocked, done = [], [], []
+        for u in work:
+            if not isinstance(u, dict):
+                continue
+            status = u.get("status", "pending")
+            if status == "done":
+                done.append(u)
+            elif status in ("pending", "in_progress"):
+                needs = u.get("needs", [])
+                if all(n in done_ids for n in needs):
+                    ready.append(u)
+                else:
+                    blocked.append(u)
+            else:
+                blocked.append(u)
+        return ready, blocked, done
+
+    def _find_item(self, slug: str) -> tuple[Path, dict] | None:
+        """Find a single TODO item by slug."""
+        items = self._load_all_items()
+        if slug in items:
+            return items[slug]
+        # Try matching by filename stem
+        for _s, (path, data) in items.items():
+            if path.stem == slug:
+                return path, data
+        return None
+
+    def ready(self):
+        """Show project-wide ready queue: items with all deps.needs satisfied."""
+        items = self._load_all_items()
+        done_slugs = self._load_done_slugs()
+
+        # Partition items into ready and blocked
+        ready_items: list[tuple[str, dict, int, int]] = []
+        blocked_items: list[tuple[str, dict, list[str]]] = []
+
+        for slug, (_path, data) in sorted(items.items()):
+            status = data.get("status", "Not Started")
+            if status == "Completed":
+                continue
+
+            # Check inter-item deps
+            deps = data.get("deps", {})
+            needs = deps.get("needs", []) if isinstance(deps, dict) else []
+            unsatisfied = [n for n in needs if n not in done_slugs and n in items]
+
+            if unsatisfied:
+                blocked_items.append((slug, data, unsatisfied))
+                continue
+
+            # Count work units
+            work = data.get("work", [])
+            if work and isinstance(work, list):
+                ready_units, blocked_units, _done_units = self._get_work_ready_units(work)
+                total_remaining = len(ready_units) + len(blocked_units)
+                ready_count = len(ready_units)
+            else:
+                ready_count = 1
+                total_remaining = 1
+
+            ready_items.append((slug, data, ready_count, total_remaining))
+
+        # Display
+        priority_order = ["Critical", "High", "Medium-High", "Medium", "Low"]
+
+        print(f"\n{'=' * 80}")
+        print("Ready to work (all dependencies satisfied):")
+        print(f"{'=' * 80}\n")
+
+        if ready_items:
+
+            def sort_key(item: tuple[str, dict, int, int]) -> int:
+                pri = item[1].get("priority", "Medium")
+                return priority_order.index(pri) if pri in priority_order else 99
+
+            for slug, data, ready_count, total_remaining in sorted(ready_items, key=sort_key):
+                priority = data.get("priority", "Medium")
+                status = data.get("status", "Not Started")
+                work_info = f"({ready_count} ready, {total_remaining} remaining)" if total_remaining > 0 else ""
+                status_marker = " [In Progress]" if status == "In Progress" else ""
+                print(f"  {priority:12s}  {slug}{status_marker}  {work_info}")
+        else:
+            print("  (none)")
+
+        if blocked_items:
+            print("\nBlocked:")
+            print("-" * 80)
+            for slug, data, unsatisfied in sorted(blocked_items, key=lambda x: x[0]):
+                priority = data.get("priority", "Medium")
+                deps_str = ", ".join(unsatisfied)
+                print(f"  {priority:12s}  {slug}  <- needs: {deps_str}")
+
+        print()
+
+    def next_units(self, slug: str):
+        """Show ready/blocked/done/deferred work units for a specific item."""
+        result = self._find_item(slug)
+        if result is None:
+            print(f"Item not found: {slug}", file=sys.stderr)
+            sys.exit(1)
+
+        _path, data = result
+        title = data.get("title", "Untitled")
+        priority = data.get("priority", "Medium")
+        status = data.get("status", "Not Started")
+
+        print(f"\n{'=' * 80}")
+        print(f"{slug} ({priority}, {status})")
+        print(f"{'=' * 80}\n")
+        print(f"  {title}\n")
+
+        work = data.get("work", [])
+        if work and isinstance(work, list):
+            ready, blocked, done = self._get_work_ready_units(work)
+
+            in_progress = [u for u in work if isinstance(u, dict) and u.get("status") == "in_progress"]
+
+            if in_progress:
+                print("  In Progress:")
+                for u in in_progress:
+                    uid = u.get("id", "?")
+                    summary = u.get("summary", "")
+                    print(f"    {uid:5s}  {summary}")
+                print()
+
+            if ready:
+                ready_pending = [u for u in ready if u.get("status") == "pending"]
+                if ready_pending:
+                    print("  Ready:")
+                    for u in ready_pending:
+                        uid = u.get("id", "?")
+                        summary = u.get("summary", "")
+                        print(f"    {uid:5s}  {summary}")
+                    print()
+
+            if blocked:
+                print("  Blocked:")
+                done_ids = {u.get("id") for u in done}
+                for u in blocked:
+                    uid = u.get("id", "?")
+                    summary = u.get("summary", "")
+                    needs = u.get("needs", [])
+                    unmet = [n for n in needs if n not in done_ids]
+                    print(f"    {uid:5s}  {summary}  <- needs: {', '.join(unmet)}")
+                print()
+
+            if done:
+                print("  Done:")
+                for u in done:
+                    uid = u.get("id", "?")
+                    summary = u.get("summary", "")
+                    print(f"    {uid:5s}  {summary}")
+                print()
+        else:
+            # Legacy tasks.phases format — graceful fallback
+            tasks = data.get("tasks", {})
+            if isinstance(tasks, dict) and "phases" in tasks:
+                phases = tasks["phases"]
+                for phase in phases:
+                    if not isinstance(phase, dict):
+                        continue
+                    phase_name = phase.get("phase", "Unknown Phase")
+                    phase_done = phase.get("done", False)
+                    icon = "[done]" if phase_done else "[    ]"
+                    print(f"  {icon}  {phase_name}")
+                    for item in phase.get("items", []):
+                        if not isinstance(item, dict):
+                            continue
+                        item_done = item.get("done", False)
+                        item_icon = "[done]" if item_done else "[    ]"
+                        print(f"    {item_icon}  {item.get('summary', '?')}")
+                print()
+                print("  (Legacy tasks.phases format — run migration to convert to work[])")
+                print()
+            else:
+                print("  No work breakdown found.\n")
+
+        # Deferred items
+        deferred = data.get("deferred", [])
+        if deferred and isinstance(deferred, list):
+            print("  Deferred:")
+            for d in deferred:
+                if isinstance(d, dict):
+                    summary = d.get("summary", "?")
+                    reason = d.get("reason", "")
+                    print(f"    -  {summary} ({reason})")
+            print()
+
+    def mark_done(self, slug: str, work_id: str):
+        """Mark a work unit as done and report newly-unblocked units."""
+        result = self._find_item(slug)
+        if result is None:
+            print(f"Item not found: {slug}", file=sys.stderr)
+            sys.exit(1)
+
+        path, data = result
+
+        work = data.get("work", [])
+        if not work or not isinstance(work, list):
+            print(f"Item '{slug}' has no work[] list.", file=sys.stderr)
+            sys.exit(1)
+
+        # Find the target unit
+        target = None
+        for u in work:
+            if isinstance(u, dict) and u.get("id") == work_id:
+                target = u
+                break
+
+        if target is None:
+            print(f"Work unit '{work_id}' not found in '{slug}'.", file=sys.stderr)
+            sys.exit(1)
+
+        if target.get("status") == "done":
+            print(f"Work unit '{work_id}' is already done.")
+            return
+
+        # Use ruamel.yaml for round-trip editing
+        try:
+            from ruamel.yaml import YAML
+
+            ryaml = YAML()
+            ryaml.preserve_quotes = True
+            ryaml.width = 120
+
+            with open(path) as f:
+                doc = ryaml.load(f)
+
+            for u in doc["work"]:
+                if u.get("id") == work_id:
+                    u["status"] = "done"
+                    break
+
+            with open(path, "w") as f:
+                ryaml.dump(doc, f)
+
+        except ImportError:
+            target["status"] = "done"
+            with open(path, "w") as f:
+                yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True, width=120)
+
+        print(f"Marked {slug}/{work_id} as done.")
+
+        # Report newly-unblocked units
+        done_ids = {u.get("id") for u in work if isinstance(u, dict) and u.get("status") == "done"}
+        done_ids.add(work_id)
+
+        newly_ready = []
+        for u in work:
+            if not isinstance(u, dict):
+                continue
+            if u.get("status") != "pending":
+                continue
+            needs = u.get("needs", [])
+            if work_id in needs and all(n in done_ids for n in needs):
+                newly_ready.append(u)
+
+        if newly_ready:
+            print("\nNewly unblocked:")
+            for u in newly_ready:
+                print(f"  {u.get('id', '?'):5s}  {u.get('summary', '')}")
+
+        # Check if all work is done
+        all_done = all(
+            u.get("status") == "done" or u.get("id") == work_id for u in work if isinstance(u, dict)
+        )
+        if all_done:
+            print("\nAll work units are done! Consider completing the TODO item:")
+            print(f"  uv run _project/scripts/todo_cli.py show {path.relative_to(self.project_root)}")
+
+    def check_graph(self):
+        """Validate inter-item DAG and per-item work DAGs."""
+        items = self._load_all_items()
+        done_slugs = self._load_done_slugs()
+        all_known = set(items.keys()) | done_slugs
+
+        errors: list[str] = []
+
+        # 1. Inter-item deps.needs validation
+        adjacency: dict[str, list[str]] = {}
+        for slug, (_path, data) in items.items():
+            deps = data.get("deps", {})
+            if not isinstance(deps, dict):
+                continue
+            needs = deps.get("needs", [])
+            if not isinstance(needs, list):
+                needs = []
+            adjacency[slug] = needs
+            for dep in needs:
+                if dep not in all_known:
+                    errors.append(f"item '{slug}' deps.needs references unknown item '{dep}'")
+
+        # Cycle detection
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color = dict.fromkeys(items, WHITE)
+
+        def dfs_items(node: str, path_list: list[str]) -> None:
+            color[node] = GRAY
+            path_list.append(node)
+            for dep in adjacency.get(node, []):
+                if dep not in color:
+                    continue
+                if color[dep] == GRAY:
+                    cycle_start = path_list.index(dep)
+                    cycle = path_list[cycle_start:] + [dep]
+                    errors.append(f"inter-item cycle: {' -> '.join(cycle)}")
+                elif color[dep] == WHITE:
+                    dfs_items(dep, path_list)
+            path_list.pop()
+            color[node] = BLACK
+
+        for slug in items:
+            if color[slug] == WHITE:
+                dfs_items(slug, [])
+
+        # 2. Per-item work unit DAG validation
+        for slug, (_path, data) in items.items():
+            work = data.get("work")
+            if not work or not isinstance(work, list):
+                continue
+
+            work_ids: set[str] = set()
+            for u in work:
+                if isinstance(u, dict) and "id" in u:
+                    work_ids.add(u["id"])
+
+            work_adj: dict[str, list[str]] = {}
+            for u in work:
+                if not isinstance(u, dict):
+                    continue
+                uid = u.get("id", "?")
+                needs = u.get("needs", [])
+                if not isinstance(needs, list):
+                    needs = []
+                work_adj[uid] = needs
+                for dep in needs:
+                    if dep not in work_ids:
+                        errors.append(f"item '{slug}' work unit '{uid}' references unknown dep '{dep}'")
+
+            # Cycle detection within work units
+            wcolor = dict.fromkeys(work_adj, WHITE)
+
+            def dfs_work(node: str, path_list: list[str]) -> None:
+                wcolor[node] = GRAY
+                path_list.append(node)
+                for dep in work_adj.get(node, []):
+                    if dep not in wcolor:
+                        continue
+                    if wcolor[dep] == GRAY:
+                        cs = path_list.index(dep)
+                        cycle = path_list[cs:] + [dep]
+                        errors.append(f"item '{slug}' work unit cycle: {' -> '.join(cycle)}")
+                    elif wcolor[dep] == WHITE:
+                        dfs_work(dep, path_list)
+                path_list.pop()
+                wcolor[node] = BLACK
+
+            for uid in work_adj:
+                if wcolor[uid] == WHITE:
+                    dfs_work(uid, [])
+
+        # Report
+        if errors:
+            print(f"\nGraph validation found {len(errors)} error(s):\n")
+            for err in errors:
+                print(f"  {err}")
+            print()
+            sys.exit(1)
+        else:
+            print("\nGraph validation passed:")
+            print("  No inter-item dependency cycles")
+            print("  No work-unit cycles")
+            print("  No dangling references")
+            print(f"  {len(items)} items checked\n")
+
     def cleanup(self, dry_run: bool = False):
         """Validate and commit uncommitted TODO/DONE changes.
 
@@ -364,6 +785,7 @@ class TodoCLI:
             "_project/scripts/validate_todo.py",
             "_project/scripts/generate_indexes.py",
             "_project/scripts/migrate_todos.py",
+            "_project/scripts/migrate_todo_format.py",
         ]
 
         # Step 1: Find uncommitted TODO/DONE changes
@@ -515,7 +937,13 @@ class TodoCLI:
         stage_paths = ["_project/TODO/", "_project/DONE/"]
 
         # Add scripts that exist and have changes
-        for script in ["todo_cli.py", "validate_todo.py", "generate_indexes.py", "migrate_todos.py"]:
+        for script in [
+            "todo_cli.py",
+            "validate_todo.py",
+            "generate_indexes.py",
+            "migrate_todos.py",
+            "migrate_todo_format.py",
+        ]:
             script_path = self.project_root / "_project" / "scripts" / script
             if script_path.exists():
                 stage_paths.append(f"_project/scripts/{script}")
@@ -601,6 +1029,21 @@ def main():
     # Reindex command
     subparsers.add_parser("reindex", help="Regenerate index files")
 
+    # Ready command
+    subparsers.add_parser("ready", help="Show project-wide ready queue (items with all deps satisfied)")
+
+    # Next command
+    next_parser = subparsers.add_parser("next", help="Show ready/blocked/done/deferred work units for an item")
+    next_parser.add_argument("slug", help="Item slug (filename without .yaml)")
+
+    # Done command
+    done_parser = subparsers.add_parser("done", help="Mark a work unit as done")
+    done_parser.add_argument("slug", help="Item slug (filename without .yaml)")
+    done_parser.add_argument("work_id", help="Work unit ID (e.g., w1, w2)")
+
+    # Check-graph command
+    subparsers.add_parser("check-graph", help="Validate inter-item DAG and per-item work DAGs")
+
     # Cleanup command
     cleanup_parser = subparsers.add_parser("cleanup", help="Validate and commit uncommitted TODO/DONE changes")
     cleanup_parser.add_argument(
@@ -636,6 +1079,14 @@ def main():
         cli.validate(args.path)
     elif args.command == "reindex":
         cli.reindex()
+    elif args.command == "ready":
+        cli.ready()
+    elif args.command == "next":
+        cli.next_units(args.slug)
+    elif args.command == "done":
+        cli.mark_done(args.slug, args.work_id)
+    elif args.command == "check-graph":
+        cli.check_graph()
     elif args.command == "cleanup":
         cli.cleanup(dry_run=args.dry_run)
 

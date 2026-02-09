@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T07:55:37.278407'
+generated_at: '2026-02-09T08:10:10.509216'
 total_items: 45
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -18,6 +18,9 @@ items:
   owners:
   - joe
   estimated_effort: 2-4 days
+  work_total: 24
+  work_done: 0
+  work_ready: 10
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
   title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
@@ -38,6 +41,9 @@ items:
   - platform
   - open-source
   estimated_effort: Large
+  work_total: 91
+  work_done: 0
+  work_ready: 19
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -55,6 +61,12 @@ items:
   owners:
   - joe
   estimated_effort: Large (4-6 weeks total)
+  work_total: 53
+  work_done: 49
+  work_ready: 4
+  deferred_count: 6
+  needs:
+  - fix-dataframe-parameter-parity-follow-up-findings
 - id: coverage-core-benchmarks
   file: TODO/main/planning/coverage-core-benchmarks.yaml
   title: Improve test coverage for core benchmark modules to ≥50%
@@ -67,6 +79,9 @@ items:
   - coverage
   - core
   estimated_effort: Large
+  work_total: 22
+  work_done: 0
+  work_ready: 22
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
   title: MotherDuck Platform Adapter
@@ -80,6 +95,10 @@ items:
   - duckdb
   - cloud
   estimated_effort: 3-4 days
+  work_total: 21
+  work_done: 21
+  work_ready: 0
+  deferred_count: 4
 - id: coverage-per-module-50-temporary-split
   file: TODO/main/active/coverage-per-module-50-temporary-split.yaml
   title: Raise benchbox/ per-module coverage to >=50% with temporary split
@@ -97,6 +116,9 @@ items:
   - tuning
   - ci
   estimated_effort: Large
+  work_total: 101
+  work_done: 59
+  work_ready: 13
 - id: siriusdb-adapter
   file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
   title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
@@ -112,6 +134,9 @@ items:
   - high-performance
   - siriusdb
   estimated_effort: Medium
+  work_total: 17
+  work_done: 0
+  work_ready: 17
 - id: databend-cloud-olap-platform
   file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
   title: Databend Cloud-Native OLAP Platform Integration
@@ -126,6 +151,9 @@ items:
   - rust
   - object-storage
   estimated_effort: 2-3 days
+  work_total: 22
+  work_done: 0
+  work_ready: 19
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -138,6 +166,9 @@ items:
   - future
   - research-needed
   estimated_effort: 'Research phase: 1-2 weeks per item'
+  work_total: 16
+  work_done: 0
+  work_ready: 4
 - id: geospatial-primitives-benchmark
   file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
   title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
@@ -156,6 +187,9 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 3-4 weeks
+  work_total: 23
+  work_done: 0
+  work_ready: 23
 - id: github-archive-benchmark
   file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
   title: GitHub Archive Benchmark - Developer Activity Analytics Workload
@@ -173,6 +207,9 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 3-4 weeks
+  work_total: 18
+  work_done: 0
+  work_ready: 18
 - id: on-demand-tpc-answer-download
   file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
   title: Implement on-demand download of TPC answer files for validation
@@ -186,6 +223,9 @@ items:
   - wheel
   - user-experience
   estimated_effort: Medium
+  work_total: 14
+  work_done: 0
+  work_ready: 12
 - id: wikipedia-pageviews-benchmark
   file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
   title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
@@ -203,6 +243,9 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks
+  work_total: 17
+  work_done: 0
+  work_ready: 17
 - id: cedardb-adapter
   file: TODO/platform-expansion/planning/cedardb-adapter.yaml
   title: Add CedarDB Platform Adapter
@@ -218,6 +261,9 @@ items:
   - oltp
   - cedardb
   estimated_effort: Medium
+  work_total: 11
+  work_done: 0
+  work_ready: 11
 - id: fabric-lakehouse-sql-platform
   file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
   title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
@@ -235,6 +281,11 @@ items:
   - platform
   - cloud
   estimated_effort: Medium
+  work_total: 47
+  work_done: 0
+  work_ready: 12
+  needs:
+  - fabric-spark-notebooks-platform
 - id: fabric-spark-notebooks-platform
   file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
   title: Add Microsoft Fabric Spark Notebooks platform support
@@ -253,6 +304,9 @@ items:
   - platform
   - cloud
   estimated_effort: Large
+  work_total: 50
+  work_done: 0
+  work_ready: 12
 - id: questdb-timeseries-platform
   file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
   title: Add QuestDB time-series database platform support
@@ -268,6 +322,9 @@ items:
   - postgres-protocol
   - ilp
   estimated_effort: Medium
+  work_total: 40
+  work_done: 0
+  work_ready: 12
 - id: singlestore-adapter
   file: TODO/platform-expansion/planning/singlestore-adapter.yaml
   title: Add SingleStore Platform Adapter
@@ -284,6 +341,9 @@ items:
   - cloud
   - singlestore
   estimated_effort: Medium
+  work_total: 15
+  work_done: 0
+  work_ready: 15
 - id: clickhouse-cloud-deployment
   file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
   title: ClickHouse Cloud Deployment Mode
@@ -297,6 +357,9 @@ items:
   - cloud
   - deployment-modes
   estimated_effort: 2-3 days
+  work_total: 24
+  work_done: 0
+  work_ready: 13
 - id: influxdb-blog-post-edits
   file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
   title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -311,6 +374,9 @@ items:
   - editing
   - platform-deep-dives
   estimated_effort: Low
+  work_total: 20
+  work_done: 0
+  work_ready: 7
 - id: timescaledb-blog-post-edits
   file: TODO/blog-content/planning/timescaledb-blog-post-edits.yaml
   title: Edit TimescaleDB vs PostgreSQL blog post before publication
@@ -325,6 +391,9 @@ items:
   - editing
   - platform-deep-dives
   estimated_effort: Low
+  work_total: 18
+  work_done: 0
+  work_ready: 7
 - id: coverage-ci-enforcement
   file: TODO/main/planning/coverage-ci-enforcement.yaml
   title: Enforce per-module 50% coverage floor in CI
@@ -338,6 +407,15 @@ items:
   - ci
   - enforcement
   estimated_effort: Small
+  work_total: 8
+  work_done: 0
+  work_ready: 5
+  needs:
+  - coverage-core-benchmarks
+  - coverage-core-tpcdi
+  - coverage-cli-modules
+  - coverage-platforms
+  - coverage-core-utilities
 - id: firebolt-cloud-deployment
   file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
   title: Firebolt Cloud Deployment Mode
@@ -351,6 +429,9 @@ items:
   - cloud
   - deployment-modes
   estimated_effort: 2-3 days
+  work_total: 24
+  work_done: 0
+  work_ready: 15
 - id: flight-data-benchmark
   file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
   title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -368,6 +449,9 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks
+  work_total: 17
+  work_done: 0
+  work_ready: 17
 - id: coverage-platforms
   file: TODO/main/planning/coverage-platforms.yaml
   title: Improve test coverage for platform adapter modules to ≥50%
@@ -380,6 +464,9 @@ items:
   - coverage
   - platforms
   estimated_effort: Medium
+  work_total: 16
+  work_done: 0
+  work_ready: 16
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -396,6 +483,9 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks
+  work_total: 12
+  work_done: 0
+  work_ready: 12
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
@@ -412,6 +502,9 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 3-4 weeks
+  work_total: 17
+  work_done: 0
+  work_ready: 17
 - id: starburst-platform-adapter
   file: TODO/platform-expansion/planning/starburst-platform-adapter.yaml
   title: Starburst Platform Adapter
@@ -425,6 +518,9 @@ items:
   - trino
   - cloud
   estimated_effort: 3-4 days
+  work_total: 24
+  work_done: 0
+  work_ready: 20
 - id: timescaledb-cloud-deployment
   file: TODO/platform-expansion/planning/timescaledb-cloud-deployment.yaml
   title: TimescaleDB Cloud Deployment Mode
@@ -438,6 +534,9 @@ items:
   - cloud
   - deployment-modes
   estimated_effort: 2 days
+  work_total: 21
+  work_done: 0
+  work_ready: 13
 - id: arm-graviton-generations-benchmarks
   file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
   title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
@@ -452,6 +551,9 @@ items:
   - cloud-benchmarking
   - blog-data
   estimated_effort: 2-3 hours
+  work_total: 21
+  work_done: 0
+  work_ready: 17
 - id: arm-hyperscaler-comparison-benchmarks
   file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml
   title: '[ARM Series] Run hyperscaler ARM comparison (Graviton 4 vs Cobalt 100 vs Axion)'
@@ -468,6 +570,11 @@ items:
   - cross-cloud
   - blog-data
   estimated_effort: 3-4 hours
+  work_total: 28
+  work_done: 0
+  work_ready: 22
+  needs:
+  - arm-graviton-generations-benchmarks
 - id: cicd-benchmarking-demo
   file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
   title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'
@@ -481,6 +588,9 @@ items:
   - regression-detection
   - demo
   estimated_effort: 20-30 minutes
+  work_total: 11
+  work_done: 0
+  work_ready: 7
 - id: clickhouse-optimizer-analysis-benchmarks
   file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
   title: '[ClickHouse Analysis] Run comparative benchmark suite'
@@ -494,6 +604,9 @@ items:
   - benchmarking
   - blog-data
   estimated_effort: 1-2 hours
+  work_total: 18
+  work_done: 0
+  work_ready: 9
 - id: duckdb-architecture-verification
   file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
   title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
@@ -507,6 +620,9 @@ items:
   - verification
   - quick-task
   estimated_effort: 10-15 minutes
+  work_total: 8
+  work_done: 0
+  work_ready: 5
 - id: duckdb-version-performance-benchmarks
   file: TODO/blog-content/planning/duckdb-version-performance-benchmarks.yaml
   title: '[DuckDB Version Performance] Run multi-version benchmark suite'
@@ -520,6 +636,9 @@ items:
   - blog-data
   - multi-version
   estimated_effort: 3-5 hours
+  work_total: 31
+  work_done: 0
+  work_ready: 25
 - id: snowflake-gen2-comparison-benchmarks
   file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
   title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
@@ -533,6 +652,9 @@ items:
   - gen2-comparison
   - blog-data
   estimated_effort: 2-4 hours
+  work_total: 25
+  work_done: 0
+  work_ready: 16
 - id: tutorial-benchmark-verification
   file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
   title: '[Tutorials] Verify benchmark commands in tutorial posts'
@@ -546,6 +668,9 @@ items:
   - blog-data
   - verification
   estimated_effort: 30-60 minutes
+  work_total: 14
+  work_done: 0
+  work_ready: 7
 - id: apache-doris-olap-platform
   file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
   title: Add Apache Doris MPP OLAP platform support
@@ -566,6 +691,9 @@ items:
   - selectdb
   - cloud
   estimated_effort: Medium
+  work_total: 40
+  work_done: 0
+  work_ready: 12
 - id: starrocks-olap-platform
   file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
   title: Add StarRocks MPP OLAP platform support
@@ -581,6 +709,9 @@ items:
   - platform
   - mysql-protocol
   estimated_effort: Medium
+  work_total: 39
+  work_done: 0
+  work_ready: 12
 - id: ctas-sorted-data-loading
   file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
   title: Implement CTAS-based sorted data loading for DuckDB
@@ -595,6 +726,9 @@ items:
   - zone-maps
   - data-loading
   estimated_effort: Medium
+  work_total: 12
+  work_done: 0
+  work_ready: 10
 - id: coverage-cli-modules
   file: TODO/main/planning/coverage-cli-modules.yaml
   title: Improve test coverage for CLI modules to ≥50%
@@ -607,6 +741,9 @@ items:
   - coverage
   - cli
   estimated_effort: Medium
+  work_total: 14
+  work_done: 0
+  work_ready: 14
 - id: coverage-core-tpcdi
   file: TODO/main/planning/coverage-core-tpcdi.yaml
   title: Improve test coverage for core/tpcdi module to ≥50%
@@ -619,6 +756,9 @@ items:
   - coverage
   - tpcdi
   estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 5
 - id: reenable-comprehensive-ci
   file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
   title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
@@ -633,6 +773,9 @@ items:
   owners:
   - joe
   estimated_effort: 1-2 days
+  work_total: 22
+  work_done: 0
+  work_ready: 18
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -649,6 +792,9 @@ items:
   - z-order
   - performance
   estimated_effort: Large
+  work_total: 15
+  work_done: 0
+  work_ready: 12
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support
@@ -662,3 +808,6 @@ items:
   - ai-ml
   - embeddings
   estimated_effort: 3-4 weeks
+  work_total: 18
+  work_done: 0
+  work_ready: 18

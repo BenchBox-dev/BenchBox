@@ -1,0 +1,216 @@
+# Databend Cloud-Native OLAP Platform Integration
+#
+# Location: _project/TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+# Priority: Low (deferred based on analysis)
+
+id: databend-cloud-olap-platform
+title: "Databend Cloud-Native OLAP Platform Integration"
+worktree: platform-expansion
+priority: Low
+status: Not Started
+description: |
+  Implement Databend (https://github.com/databendlabs/databend) as a supported platform
+  in BenchBox. Databend is a cloud-native, Rust-based data warehouse with Snowflake-
+  compatible SQL, compute/storage separation, and object storage backend.
+
+  **Key Technical Approach:**
+  - Use Snowflake SQLGlot dialect as translation proxy (Databend claims ~100% compatibility)
+  - Leverage `databend-driver` (v0.28.2+) for DB-API 2.0 connectivity
+  - Implement lightweight QueryTransformer for edge cases if needed
+  - Deploy Databend + MinIO via Docker Compose for CI testing
+
+  **Rationale for Low Priority:**
+  Based on comprehensive analysis (Jan 2025), integration was deferred because:
+  1. SQLGlot does NOT support Databend as a native dialect
+  2. Significant platform overlap with ClickHouse, Snowflake, and Firebolt
+  3. Lower enterprise adoption compared to alternatives
+  4. Medium-high integration complexity due to custom translation layer
+
+  **Conditions for Prioritization:**
+  - SQLGlot adds native Databend dialect support
+  - User demand accumulates (3+ explicit requests)
+  - Databend Cloud enterprise adoption grows
+  - TPC-certified benchmark results published
+
+category: Platform Expansion
+
+metadata:
+  tags:
+  - cloud-native
+  - olap
+  - snowflake-compatible
+  - rust
+  - object-storage
+  estimated_effort: "2-3 days"
+  created_date: "2025-01-07"
+
+  migration_review_required: true
+impact:
+  business_value: |
+    Expands BenchBox platform coverage to include emerging cloud-native OLAP
+    options. Databend targets Snowflake migration scenarios, which could be
+    valuable for cost comparison benchmarking.
+  user_impact: |
+    Users evaluating Databend as a Snowflake alternative would gain access
+    to standardized TPC benchmarking capabilities.
+  technical_debt: |
+    Using Snowflake dialect as a proxy may require ongoing maintenance as
+    Databend evolves. Custom QueryTransformer adds complexity compared to
+    native SQLGlot support.
+
+files_affected:
+  added:
+  - "benchbox/platforms/databend/__init__.py"
+  - "benchbox/platforms/databend/adapter.py"
+  - "benchbox/platforms/databend/client.py"
+  - "benchbox/platforms/databend/query_transformer.py"
+  - "tests/unit/platforms/test_databend_adapter.py"
+  - "tests/integration/platforms/test_databend_smoke.py"
+  - "docs/platforms/databend.md"
+  - "examples/getting_started/cloud/databend_tpch.py"
+  modified:
+  - "pyproject.toml"
+  - "benchbox/utils/dependencies.py"
+
+context_sections:
+  "Background and Motivation": |
+    Databend is a cloud-native, open-source data warehouse built in Rust with
+    complete compute/storage separation. It stores data in Parquet format on
+    object storage (S3, Azure Blob, GCS) and claims near-100% Snowflake SQL
+    compatibility.
+
+    The platform was evaluated in January 2026 and deferred due to:
+    - No native SQLGlot dialect support (critical for BenchBox's SQL translation)
+    - Overlap with existing platforms (ClickHouse, Snowflake, Firebolt)
+    - Lower enterprise adoption
+
+  "Technical Context": |
+    **Architecture:**
+    - Rust-based query engine with vectorized execution
+    - Parquet-native storage with MVCC
+    - Compute/storage separation on object storage
+    - Horizontal scaling via query clusters
+
+    **Python Connectivity:**
+    - `databend-driver` (v0.28.2+) - DB-API 2.0 compliant
+    - SQLAlchemy support via `databend-sqlalchemy`
+    - Connection DSN: databend://user:pass@host:port/database
+
+    **SQL Translation Strategy:**
+    Since SQLGlot lacks Databend dialect, use Snowflake as translation target.
+    Databend claims ~100% Snowflake compatibility, so this should work for
+    most queries. Edge cases may require custom QueryTransformer.
+
+  "Research Findings": |
+    **SQLGlot Status (Jan 2025):**
+    Databend explicitly NOT supported. Apache Superset's dialect map shows
+    `# "databend": ???` indicating no corresponding dialect.
+
+    **TPC Benchmarks:**
+    Databend publishes internal TPC-H/TPC-DS benchmarks showing competitive
+    performance vs Snowflake (~60% cost reduction claimed), but these are
+    not official TPC-certified results.
+
+    **GitHub Activity:**
+    9.1k stars, 844 forks, 212 contributors. Active development with
+    1,700+ releases. Growing but smaller community than ClickHouse (38k stars).
+
+technical_requirements:
+  constraints:
+  - "SQLGlot does not support Databend dialect - must use Snowflake proxy"
+  - "CI testing requires object storage (MinIO) + Databend cluster"
+  - "Query compatibility must be verified manually for TPC suites"
+  dependencies:
+  - "databend-driver>=0.28.0"
+  - "databend-sqlalchemy (optional, for SQLAlchemy users)"
+  - "MinIO for local object storage testing"
+  compatibility: |
+    Python 3.7+
+    Databend Cloud or self-hosted Databend
+    Object storage backend required (S3, GCS, Azure Blob, MinIO)
+
+open_questions:
+- "Will Snowflake dialect translation work for all TPC queries?"
+- "What edge cases require custom QueryTransformer?"
+- "Should we support both Databend Cloud and self-hosted equally?"
+- "Is there user demand that would justify prioritization?"
+
+success_metrics:
+- "All 22 TPC-H queries execute successfully"
+- "All 99 TPC-DS queries execute successfully"
+- "Unit test coverage >= 80%"
+- "Integration smoke tests pass in CI"
+- "Documentation covers both cloud and self-hosted deployment"
+work:
+- id: w1
+  summary: "Create databend/ platform module structure"
+  status: pending
+- id: w2
+  summary: "Implement base DatabendAdapter class"
+  needs:
+  - w1
+  status: pending
+- id: w3
+  summary: "Implement connection handling with databend-driver"
+  needs:
+  - w1
+  status: pending
+- id: w4
+  summary: "Configure Snowflake dialect as translation proxy"
+  needs:
+  - w1
+  status: pending
+- id: w5
+  summary: "Implement CLI argument registration"
+  status: pending
+- id: w6
+  summary: "Add databend dependency group to pyproject.toml"
+  status: pending
+- id: w7
+  summary: "Implement schema creation with Snowflake SQL translation"
+  status: pending
+- id: w8
+  summary: "Implement data loading (COPY INTO from S3/staged files)"
+  status: pending
+- id: w9
+  summary: "Implement query execution with result handling"
+  status: pending
+- id: w10
+  summary: "Add query plan capture support (EXPLAIN)"
+  status: pending
+- id: w11
+  summary: "Implement tuning support (clustering keys, partitioning)"
+  status: pending
+- id: w12
+  summary: "Test all 22 TPC-H queries for compatibility"
+  status: pending
+- id: w13
+  summary: "Test all 99 TPC-DS queries for compatibility"
+  status: pending
+- id: w14
+  summary: "Implement QueryTransformer for edge cases if needed"
+  status: pending
+- id: w15
+  summary: "Document any query modifications required"
+  status: pending
+- id: w16
+  summary: "Create unit tests (test_databend_adapter.py)"
+  status: pending
+- id: w17
+  summary: "Create Docker Compose for Databend + MinIO"
+  status: pending
+- id: w18
+  summary: "Add integration smoke tests"
+  status: pending
+- id: w19
+  summary: "Add CI workflow for Databend testing"
+  status: pending
+- id: w20
+  summary: "Create platform documentation (docs/platforms/databend.md)"
+  status: pending
+- id: w21
+  summary: "Add example script (examples/getting_started/cloud/)"
+  status: pending
+- id: w22
+  summary: "Update platform comparison matrix"
+  status: pending

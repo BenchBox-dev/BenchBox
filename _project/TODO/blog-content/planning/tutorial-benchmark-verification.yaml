@@ -1,3 +1,4 @@
+id: tutorial-benchmark-verification
 title: "[Tutorials] Verify benchmark commands in tutorial posts"
 worktree: blog-content
 priority: Medium
@@ -15,64 +16,17 @@ description: |
 
   Reference drafts: _blog/tutorials/drafts/
 
-tasks:
-  phases:
-    - phase: "Phase 1: Read Primitives Verification"
-      done: false
-      items:
-        - summary: "Run Read Primitives on DuckDB"
-          done: false
-          subtasks:
-            - summary: "benchbox run --platform duckdb --benchmark primitives --scale 0.1"
-              done: false
-            - summary: "Verify all 136 queries execute"
-              done: false
-        - summary: "Run Read Primitives on SQLite (comparison)"
-          done: false
-          subtasks:
-            - summary: "benchbox run --platform sqlite --benchmark primitives --scale 0.1"
-              done: false
-            - summary: "Note any skipped queries (feature support)"
-              done: false
-
-    - phase: "Phase 2: TPC-Havoc Verification"
-      done: false
-      items:
-        - summary: "Run TPC-Havoc on DuckDB"
-          done: false
-          subtasks:
-            - summary: "benchbox run --platform duckdb --benchmark tpchavoc --scale 0.1"
-              done: false
-            - summary: "Verify all 220 query variants execute"
-              done: false
-            - summary: "Document any variant result mismatches"
-              done: false
-
-    - phase: "Phase 3: Write Primitives Verification (if available)"
-      done: false
-      items:
-        - summary: "Check if write-primitives benchmark is implemented"
-          done: false
-        - summary: "Run Write Primitives if available"
-          done: false
-
-    - phase: "Phase 4: Update Tutorials"
-      done: false
-      items:
-        - summary: "Update platform patterns table in read-primitives-introduction.md"
-          done: false
-        - summary: "Update variant timing examples in tpchavoc-introduction.md"
-          done: false
-
 metadata:
   tags:
-    - tutorials
-    - benchmarking
-    - blog-data
-    - verification
+  - tutorials
+  - benchmarking
+  - blog-data
+  - verification
   estimated_effort: "30-60 minutes"
   created_date: "2025-12-15"
 
+  related:
+  - oxbow-tier1-benchmark-runs
 impact:
   business_value: |
     Ensures tutorial posts accurately reflect BenchBox capabilities and
@@ -83,16 +37,70 @@ impact:
 
 files_affected:
   modified:
-    - "_blog/tutorials/drafts/read-primitives-introduction.md"
-    - "_blog/tutorials/drafts/tpchavoc-introduction.md"
-    - "_blog/tutorials/drafts/write-primitives-introduction.md"
+  - "_blog/tutorials/drafts/read-primitives-introduction.md"
+  - "_blog/tutorials/drafts/tpchavoc-introduction.md"
+  - "_blog/tutorials/drafts/write-primitives-introduction.md"
 
 success_metrics:
-  - "Read Primitives runs successfully with documented commands"
-  - "TPC-Havoc runs successfully with documented commands"
-  - "Platform comparison tables have real data"
-  - "All code examples verified working"
+- "Read Primitives runs successfully with documented commands"
+- "TPC-Havoc runs successfully with documented commands"
+- "Platform comparison tables have real data"
+- "All code examples verified working"
 
-dependencies:
-  related:
-    - "_project/TODO/blog-content/planning/oxbow-tier1-benchmark-runs.yaml"
+work:
+- id: w1
+  summary: "Run Read Primitives on DuckDB"
+  status: pending
+- id: w2
+  summary: "benchbox run --platform duckdb --benchmark primitives --scale 0.1"
+  needs:
+  - w1
+  status: pending
+- id: w3
+  summary: "Verify all 136 queries execute"
+  needs:
+  - w1
+  status: pending
+- id: w4
+  summary: "Run Read Primitives on SQLite (comparison)"
+  status: pending
+- id: w5
+  summary: "benchbox run --platform sqlite --benchmark primitives --scale 0.1"
+  needs:
+  - w4
+  status: pending
+- id: w6
+  summary: "Note any skipped queries (feature support)"
+  needs:
+  - w4
+  status: pending
+- id: w7
+  summary: "Run TPC-Havoc on DuckDB"
+  status: pending
+- id: w8
+  summary: "benchbox run --platform duckdb --benchmark tpchavoc --scale 0.1"
+  needs:
+  - w7
+  status: pending
+- id: w9
+  summary: "Verify all 220 query variants execute"
+  needs:
+  - w7
+  status: pending
+- id: w10
+  summary: "Document any variant result mismatches"
+  needs:
+  - w7
+  status: pending
+- id: w11
+  summary: "Check if write-primitives benchmark is implemented"
+  status: pending
+- id: w12
+  summary: "Run Write Primitives if available"
+  status: pending
+- id: w13
+  summary: "Update platform patterns table in read-primitives-introduction.md"
+  status: pending
+- id: w14
+  summary: "Update variant timing examples in tpchavoc-introduction.md"
+  status: pending

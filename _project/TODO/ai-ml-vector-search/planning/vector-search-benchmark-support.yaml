@@ -1,3 +1,4 @@
+id: vector-search-benchmark-support
 title: "Vector Search Benchmark Support"
 worktree: ai-ml-vector-search
 priority: Medium-High
@@ -18,74 +19,17 @@ description: |
   Use the ANN-Benchmarks methodology as a reference standard for measuring
   recall@k vs queries-per-second tradeoffs.
 
-tasks:
-  phases:
-    - phase: "Phase 1: Research and Design"
-      done: false
-      items:
-        - summary: "Survey existing vector benchmarks (ANN-Benchmarks, VectorDBBench)"
-          done: false
-        - summary: "Define benchmark dataset (SIFT-128, GloVe-200, or synthetic)"
-          done: false
-        - summary: "Define metrics: recall@k, QPS, latency p50/p95/p99, index build time"
-          done: false
-        - summary: "Audit platform vector support (index types, distance functions per platform)"
-          done: false
-
-    - phase: "Phase 2: Data Generation and Schema"
-      done: false
-      items:
-        - summary: "Implement vector data generator (synthetic embeddings at configurable dimensions)"
-          done: false
-        - summary: "Define schema: vectors table + metadata table for filtered search"
-          done: false
-        - summary: "Support scale factors: SF=0.01 (10K vectors) to SF=100 (10M vectors)"
-          done: false
-
-    - phase: "Phase 3: Query Implementation"
-      done: false
-      items:
-        - summary: "Implement kNN exact search queries per platform dialect"
-          done: false
-        - summary: "Implement ANN search with platform-specific index syntax"
-          done: false
-        - summary: "Implement filtered vector search (WHERE metadata + ORDER BY distance)"
-          done: false
-        - summary: "Implement recall@k measurement against exact search ground truth"
-          done: false
-
-    - phase: "Phase 4: Platform Adapters"
-      done: false
-      items:
-        - summary: "PostgreSQL pgvector: CREATE INDEX USING hnsw, <=> operator"
-          done: false
-        - summary: "DuckDB vss: LOAD vss, array_distance functions"
-          done: false
-        - summary: "ClickHouse: annoy/usearch indexes, cosineDistance"
-          done: false
-        - summary: "Snowflake: VECTOR type, VECTOR_COSINE_SIMILARITY"
-          done: false
-
-    - phase: "Phase 5: Testing and Validation"
-      done: false
-      items:
-        - summary: "Unit tests for vector data generation and query construction"
-          done: false
-        - summary: "Integration test with DuckDB vss at SF=0.01"
-          done: false
-        - summary: "Validate recall@k measurement against known ANN-Benchmarks results"
-          done: false
-
 metadata:
   tags:
-    - benchmark
-    - vector-search
-    - ai-ml
-    - embeddings
+  - benchmark
+  - vector-search
+  - ai-ml
+  - embeddings
   estimated_effort: "3-4 weeks"
   created_date: "2026-02-07"
   last_updated: "2026-02-07T10:00:00"
 
+  migration_review_required: true
 impact:
   business_value: |
     Vector search is the fastest-growing OLAP feature, driven by RAG applications.
@@ -98,9 +42,9 @@ impact:
     New benchmark module — no existing debt. Clean-slate implementation.
 
 must_preserve:
-  - "All existing benchmark modules unaffected"
-  - "BaseBenchmark interface contract unchanged"
-  - "Platform registry backward compatible"
+- "All existing benchmark modules unaffected"
+- "BaseBenchmark interface contract unchanged"
+- "Platform registry backward compatible"
 
 approach: |
   Follow the pattern established by h2odb and amplab benchmarks (small, focused
@@ -110,36 +54,94 @@ approach: |
   default distance function (most common in RAG applications).
 
 anti_patterns:
-  - "DO NOT use real ML model embeddings for benchmark data — because model inference adds uncontrolled variability — use synthetic vectors with known statistical properties"
-  - "DO NOT require vector database extensions to be pre-installed — because platforms may not have them — detect availability and skip gracefully with actionable error messages"
-  - "DO NOT benchmark index build time in the power run — because index creation is a one-time cost — measure it separately in the load phase"
+- "DO NOT use real ML model embeddings for benchmark data — because model inference adds uncontrolled variability — use synthetic
+  vectors with known statistical properties"
+- "DO NOT require vector database extensions to be pre-installed — because platforms may not have them — detect availability
+  and skip gracefully with actionable error messages"
+- "DO NOT benchmark index build time in the power run — because index creation is a one-time cost — measure it separately
+  in the load phase"
 
 verification:
-  - description: "Vector benchmark module imports"
-    command: "uv run -- python -c \"from benchbox.core.vector_search import VectorSearchBenchmark; print('OK')\""
-    expected_output: "OK"
-  - description: "Unit tests pass"
-    command: "uv run -- python -m pytest tests/unit/core/vector_search/ -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
+- description: "Vector benchmark module imports"
+  command: "uv run -- python -c \"from benchbox.core.vector_search import VectorSearchBenchmark; print('OK')\""
+  expected_output: "OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/vector_search/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
 
 files_affected:
   added:
-    - "benchbox/core/vector_search/__init__.py"
-    - "benchbox/core/vector_search/benchmark.py"
-    - "benchbox/core/vector_search/generator.py"
-    - "benchbox/core/vector_search/queries.py"
-    - "benchbox/core/vector_search/schema.py"
-    - "tests/unit/core/vector_search/test_vector_benchmark.py"
+  - "benchbox/core/vector_search/__init__.py"
+  - "benchbox/core/vector_search/benchmark.py"
+  - "benchbox/core/vector_search/generator.py"
+  - "benchbox/core/vector_search/queries.py"
+  - "benchbox/core/vector_search/schema.py"
+  - "tests/unit/core/vector_search/test_vector_benchmark.py"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/vector_search/"
-    - "tests/unit/core/vector_search/"
+  - "benchbox/core/vector_search/"
+  - "tests/unit/core/vector_search/"
   do_not_modify:
-    - "benchbox/core/tpch/"
-    - "benchbox/platforms/"
+  - "benchbox/core/tpch/"
+  - "benchbox/platforms/"
 
 open_questions:
-  - "Which embedding dimensions to support? 128 (SIFT), 200 (GloVe), 768 (BERT), 1536 (OpenAI)?"
-  - "Should we include a pre-built dataset option (download SIFT/GloVe) or only synthetic?"
-  - "How to handle platforms that don't support ANN indexes (exact search only)?"
+- "Which embedding dimensions to support? 128 (SIFT), 200 (GloVe), 768 (BERT), 1536 (OpenAI)?"
+- "Should we include a pre-built dataset option (download SIFT/GloVe) or only synthetic?"
+- "How to handle platforms that don't support ANN indexes (exact search only)?"
+work:
+- id: w1
+  summary: "Survey existing vector benchmarks (ANN-Benchmarks, VectorDBBench)"
+  status: pending
+- id: w2
+  summary: "Define benchmark dataset (SIFT-128, GloVe-200, or synthetic)"
+  status: pending
+- id: w3
+  summary: "Define metrics: recall@k, QPS, latency p50/p95/p99, index build time"
+  status: pending
+- id: w4
+  summary: "Audit platform vector support (index types, distance functions per platform)"
+  status: pending
+- id: w5
+  summary: "Implement vector data generator (synthetic embeddings at configurable dimensions)"
+  status: pending
+- id: w6
+  summary: "Define schema: vectors table + metadata table for filtered search"
+  status: pending
+- id: w7
+  summary: "Support scale factors: SF=0.01 (10K vectors) to SF=100 (10M vectors)"
+  status: pending
+- id: w8
+  summary: "Implement kNN exact search queries per platform dialect"
+  status: pending
+- id: w9
+  summary: "Implement ANN search with platform-specific index syntax"
+  status: pending
+- id: w10
+  summary: "Implement filtered vector search (WHERE metadata + ORDER BY distance)"
+  status: pending
+- id: w11
+  summary: "Implement recall@k measurement against exact search ground truth"
+  status: pending
+- id: w12
+  summary: "PostgreSQL pgvector: CREATE INDEX USING hnsw, <=> operator"
+  status: pending
+- id: w13
+  summary: "DuckDB vss: LOAD vss, array_distance functions"
+  status: pending
+- id: w14
+  summary: "ClickHouse: annoy/usearch indexes, cosineDistance"
+  status: pending
+- id: w15
+  summary: "Snowflake: VECTOR type, VECTOR_COSINE_SIMILARITY"
+  status: pending
+- id: w16
+  summary: "Unit tests for vector data generation and query construction"
+  status: pending
+- id: w17
+  summary: "Integration test with DuckDB vss at SF=0.01"
+  status: pending
+- id: w18
+  summary: "Validate recall@k measurement against known ANN-Benchmarks results"
+  status: pending

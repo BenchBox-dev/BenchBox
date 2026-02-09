@@ -2,6 +2,7 @@
 #
 # Location: _project/TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
 
+id: on-demand-tpc-answer-download
 title: "Implement on-demand download of TPC answer files for validation"
 worktree: core-functionality
 priority: Low
@@ -27,59 +28,12 @@ description: |
   - Users see single INFO message: "Validation will be skipped"
   - This TODO is enhancement, not critical fix
 
-tasks:
-  phases:
-    - phase: "Phase 1: Infrastructure"
-      done: false
-      items:
-        - summary: "Design cache directory structure (~/.cache/benchbox/answers/)"
-          done: false
-        - summary: "Implement download manager with retry logic and checksums"
-          done: false
-        - summary: "Add configuration for answer file source URL (GitHub releases or CDN)"
-          done: false
-
-    - phase: "Phase 2: Integration"
-      done: false
-      items:
-        - summary: "Update loader.py to check cache before raising FileNotFoundError"
-          done: false
-          subtasks:
-            - summary: "Check ~/.cache/benchbox/answers/tpch/ for TPC-H answers"
-              done: false
-            - summary: "Check ~/.cache/benchbox/answers/tpcds/ for TPC-DS answers"
-              done: false
-        - summary: "Trigger download when cache miss and validation enabled"
-          done: false
-        - summary: "Add CLI option to pre-download answers (benchbox download-answers)"
-          done: false
-
-    - phase: "Phase 3: Release Infrastructure"
-      done: false
-      items:
-        - summary: "Package answer files as GitHub release asset"
-          done: false
-        - summary: "Add checksum verification for downloaded files"
-          done: false
-        - summary: "Document download behavior in user guide"
-          done: false
-
-    - phase: "Phase 4: Testing"
-      done: false
-      items:
-        - summary: "Unit tests for download manager"
-          done: false
-        - summary: "Integration test: fresh install → validation triggers download"
-          done: false
-        - summary: "Test offline mode (cache hit, no network)"
-          done: false
-
 metadata:
   tags:
-    - validation
-    - packaging
-    - wheel
-    - user-experience
+  - validation
+  - packaging
+  - wheel
+  - user-experience
   estimated_effort: Medium
   created_date: "2025-01-26"
 
@@ -93,11 +47,11 @@ impact:
 
 files_affected:
   modified:
-    - benchbox/core/expected_results/loader.py
-    - benchbox/core/expected_results/registry.py
+  - benchbox/core/expected_results/loader.py
+  - benchbox/core/expected_results/registry.py
   added:
-    - benchbox/core/expected_results/download.py
-    - benchbox/cli/commands/download_answers.py
+  - benchbox/core/expected_results/download.py
+  - benchbox/cli/commands/download_answers.py
 
 context_sections:
   "Background and Motivation": |
@@ -127,29 +81,78 @@ context_sections:
     - Cons: Requires network, adds complexity
 
 must_preserve:
-  - "Existing FileNotFoundError caching for answer sets (commit be3843c9) continues working for offline/no-download scenarios"
-  - "sdist installations continue working without network access"
+- "Existing FileNotFoundError caching for answer sets (commit be3843c9) continues working for offline/no-download scenarios"
+- "sdist installations continue working without network access"
 
 anti_patterns:
-  - "DO NOT make downloads mandatory — because corporate firewalls and air-gapped environments exist — always fall back to current skip behavior when download fails"
-  - "DO NOT store downloaded answers in the package directory — because it may be read-only — use a user-writable cache directory (XDG_CACHE_HOME or ~/.cache/benchbox/)"
+- "DO NOT make downloads mandatory — because corporate firewalls and air-gapped environments exist — always fall back to current
+  skip behavior when download fails"
+- "DO NOT store downloaded answers in the package directory — because it may be read-only — use a user-writable cache directory
+  (XDG_CACHE_HOME or ~/.cache/benchbox/)"
 
 verification:
-  - description: "Validation tests still pass"
-    command: "uv run -- python -m pytest tests/ -k validation -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
-  - description: "Offline mode works (no network required)"
-    command: "uv run -- python -c \"from benchbox.core.expected_results.loader import AnswerLoader; print('OK')\""
-    expected_output: "OK"
+- description: "Validation tests still pass"
+  command: "uv run -- python -m pytest tests/ -k validation -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Offline mode works (no network required)"
+  command: "uv run -- python -c \"from benchbox.core.expected_results.loader import AnswerLoader; print('OK')\""
+  expected_output: "OK"
 
 open_questions:
-  - "Should download be automatic or require explicit opt-in?"
-  - "What CDN/hosting to use for answer files?"
-  - "How to handle corporate firewalls that block downloads?"
-  - "Should there be a --no-download flag to disable this behavior?"
+- "Should download be automatic or require explicit opt-in?"
+- "What CDN/hosting to use for answer files?"
+- "How to handle corporate firewalls that block downloads?"
+- "Should there be a --no-download flag to disable this behavior?"
 
 success_metrics:
-  - "Wheel size remains under 8 MB"
-  - "Validation works from wheel install with internet access"
-  - "Cache hit performance is <10ms overhead"
-  - "Download failure degrades gracefully (same as current behavior)"
+- "Wheel size remains under 8 MB"
+- "Validation works from wheel install with internet access"
+- "Cache hit performance is <10ms overhead"
+- "Download failure degrades gracefully (same as current behavior)"
+work:
+- id: w1
+  summary: "Design cache directory structure (~/.cache/benchbox/answers/)"
+  status: pending
+- id: w2
+  summary: "Implement download manager with retry logic and checksums"
+  status: pending
+- id: w3
+  summary: "Add configuration for answer file source URL (GitHub releases or CDN)"
+  status: pending
+- id: w4
+  summary: "Update loader.py to check cache before raising FileNotFoundError"
+  status: pending
+- id: w5
+  summary: "Check ~/.cache/benchbox/answers/tpch/ for TPC-H answers"
+  needs:
+  - w4
+  status: pending
+- id: w6
+  summary: "Check ~/.cache/benchbox/answers/tpcds/ for TPC-DS answers"
+  needs:
+  - w4
+  status: pending
+- id: w7
+  summary: "Trigger download when cache miss and validation enabled"
+  status: pending
+- id: w8
+  summary: "Add CLI option to pre-download answers (benchbox download-answers)"
+  status: pending
+- id: w9
+  summary: "Package answer files as GitHub release asset"
+  status: pending
+- id: w10
+  summary: "Add checksum verification for downloaded files"
+  status: pending
+- id: w11
+  summary: "Document download behavior in user guide"
+  status: pending
+- id: w12
+  summary: "Unit tests for download manager"
+  status: pending
+- id: w13
+  summary: "Integration test: fresh install → validation triggers download"
+  status: pending
+- id: w14
+  summary: "Test offline mode (cache hit, no network)"
+  status: pending

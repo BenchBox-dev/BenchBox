@@ -1,3 +1,4 @@
+id: coverage-cli-modules
 title: "Improve test coverage for CLI modules to ≥50%"
 worktree: main
 priority: Medium-High
@@ -27,53 +28,11 @@ description: |
   need minimal effort. The zero-coverage modules (tuning.py, onboarding.py)
   need foundational test suites.
 
-tasks:
-  phases:
-    - phase: "Phase 1: Quick wins — modules near 50%"
-      done: false
-      items:
-        - summary: "Add tests for cli/commands/run.py (49.8% → 50%)"
-          done: false
-        - summary: "Add tests for cli/config.py (47.6% → 50%)"
-          done: false
-        - summary: "Add tests for cli/output.py (49.0% → 50%)"
-          done: false
-        - summary: "Add tests for cli/composite_params.py (46.4% → 50%)"
-          done: false
-        - summary: "Add tests for cli/system.py (43.3% → 50%)"
-          done: false
-
-    - phase: "Phase 2: Zero-coverage modules"
-      done: false
-      items:
-        - summary: "Add tests for cli/tuning.py (0% → 50%)"
-          done: false
-        - summary: "Add tests for cli/onboarding.py (0% → 50%)"
-          done: false
-
-    - phase: "Phase 3: Compare commands and remaining CLI"
-      done: false
-      items:
-        - summary: "Add tests for cli/commands/compare.py (30.2% → 50%)"
-          done: false
-        - summary: "Add tests for cli/commands/shell.py (30.0% → 50%)"
-          done: false
-        - summary: "Add tests for cli/commands/compare_plans.py (11.6% → 50%)"
-          done: false
-        - summary: "Add tests for cli/commands/compare_dataframes.py (12.7% → 50%)"
-          done: false
-        - summary: "Add tests for cli/exceptions.py (36.9% → 50%)"
-          done: false
-        - summary: "Add tests for cli/preferences.py (19.2% → 50%)"
-          done: false
-        - summary: "Add tests for cli/presentation/system.py (16.7% → 50%)"
-          done: false
-
 metadata:
   tags:
-    - testing
-    - coverage
-    - cli
+  - testing
+  - coverage
+  - cli
   estimated_effort: Medium
   created_date: "2026-02-07"
   last_updated: "2026-02-07T09:00:00"
@@ -87,9 +46,9 @@ impact:
     can be completed in a few hours.
 
 must_preserve:
-  - "All existing CLI tests continue to pass"
-  - "CLI --help output remains unchanged"
-  - "No changes to production code"
+- "All existing CLI tests continue to pass"
+- "CLI --help output remains unchanged"
+- "No changes to production code"
 
 approach: |
   Follow existing patterns in tests/unit/cli/. Most CLI modules can be tested
@@ -99,28 +58,73 @@ approach: |
   user input and filesystem operations.
 
 anti_patterns:
-  - "DO NOT launch actual benchmark runs in CLI tests — because benchmark runs take 30+ seconds and require platform credentials — mock the runner with unittest.mock.patch"
-  - "DO NOT test by parsing CLI stdout strings — because stdout format changes would cause false failures — test return values, exit codes, and side effects instead"
+- "DO NOT launch actual benchmark runs in CLI tests — because benchmark runs take 30+ seconds and require platform credentials
+  — mock the runner with unittest.mock.patch"
+- "DO NOT test by parsing CLI stdout strings — because stdout format changes would cause false failures — test return values,
+  exit codes, and side effects instead"
 
 verification:
-  - description: "All CLI tests pass"
-    command: "uv run -- python -m pytest tests/unit/cli/ -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
+- description: "All CLI tests pass"
+  command: "uv run -- python -m pytest tests/unit/cli/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
 
 success_metrics:
-  - "Every cli/* file listed above reaches ≥50% line coverage"
-  - "Zero test failures introduced"
+- "Every cli/* file listed above reaches ≥50% line coverage"
+- "Zero test failures introduced"
 
 files_affected:
   added:
-    - "tests/unit/cli/test_tuning_coverage.py"
-    - "tests/unit/cli/test_onboarding.py"
-    - "tests/unit/cli/test_compare_plans.py"
-    - "tests/unit/cli/test_compare_dataframes.py"
-    - "tests/unit/cli/commands/test_shell.py"
+  - "tests/unit/cli/test_tuning_coverage.py"
+  - "tests/unit/cli/test_onboarding.py"
+  - "tests/unit/cli/test_compare_plans.py"
+  - "tests/unit/cli/test_compare_dataframes.py"
+  - "tests/unit/cli/commands/test_shell.py"
 
 scope_limit:
   only_modify:
-    - "tests/unit/cli/"
+  - "tests/unit/cli/"
   do_not_modify:
-    - "benchbox/"
+  - "benchbox/"
+work:
+- id: w1
+  summary: "Add tests for cli/commands/run.py (49.8% → 50%)"
+  status: pending
+- id: w2
+  summary: "Add tests for cli/config.py (47.6% → 50%)"
+  status: pending
+- id: w3
+  summary: "Add tests for cli/output.py (49.0% → 50%)"
+  status: pending
+- id: w4
+  summary: "Add tests for cli/composite_params.py (46.4% → 50%)"
+  status: pending
+- id: w5
+  summary: "Add tests for cli/system.py (43.3% → 50%)"
+  status: pending
+- id: w6
+  summary: "Add tests for cli/tuning.py (0% → 50%)"
+  status: pending
+- id: w7
+  summary: "Add tests for cli/onboarding.py (0% → 50%)"
+  status: pending
+- id: w8
+  summary: "Add tests for cli/commands/compare.py (30.2% → 50%)"
+  status: pending
+- id: w9
+  summary: "Add tests for cli/commands/shell.py (30.0% → 50%)"
+  status: pending
+- id: w10
+  summary: "Add tests for cli/commands/compare_plans.py (11.6% → 50%)"
+  status: pending
+- id: w11
+  summary: "Add tests for cli/commands/compare_dataframes.py (12.7% → 50%)"
+  status: pending
+- id: w12
+  summary: "Add tests for cli/exceptions.py (36.9% → 50%)"
+  status: pending
+- id: w13
+  summary: "Add tests for cli/preferences.py (19.2% → 50%)"
+  status: pending
+- id: w14
+  summary: "Add tests for cli/presentation/system.py (16.7% → 50%)"
+  status: pending

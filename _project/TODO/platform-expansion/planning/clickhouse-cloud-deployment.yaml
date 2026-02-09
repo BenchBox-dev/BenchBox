@@ -1,3 +1,4 @@
+id: clickhouse-cloud-deployment
 title: "ClickHouse Cloud Deployment Mode"
 worktree: platform-expansion
 priority: Medium
@@ -30,85 +31,18 @@ context_sections:
     - Cloud storage for data loading
     - Result caching behavior
 
-tasks:
-  phases:
-    - phase: "Phase 1: Registry and Configuration"
-      done: false
-      items:
-        - summary: "Add 'cloud' deployment mode to ClickHouse registry metadata"
-          done: false
-          subtasks:
-            - summary: "Set requires_credentials=True"
-              done: false
-            - summary: "Set requires_cloud_storage=True"
-              done: false
-            - summary: "Define auth_methods=['api_key', 'oauth']"
-              done: false
-        - summary: "Add cloud-specific configuration options"
-          done: false
-          subtasks:
-            - summary: "Cloud endpoint URL"
-              done: false
-            - summary: "Organization/service ID"
-              done: false
-            - summary: "API key or OAuth token"
-              done: false
-
-    - phase: "Phase 2: Authentication"
-      done: false
-      items:
-        - summary: "Implement API key authentication"
-          done: false
-        - summary: "Implement OAuth token authentication"
-          done: false
-        - summary: "Add credential setup wizard for ClickHouse Cloud"
-          done: false
-        - summary: "Support environment variables"
-          done: false
-          subtasks:
-            - summary: "CLICKHOUSE_CLOUD_ENDPOINT"
-              done: false
-            - summary: "CLICKHOUSE_CLOUD_API_KEY"
-              done: false
-
-    - phase: "Phase 3: Connection and Data Loading"
-      done: false
-      items:
-        - summary: "Implement cloud endpoint connection"
-          done: false
-        - summary: "Implement cloud storage upload for data loading"
-          done: false
-          subtasks:
-            - summary: "Support S3 staging"
-              done: false
-            - summary: "Support GCS staging"
-              done: false
-            - summary: "Implement COPY FROM for cloud data"
-              done: false
-        - summary: "Configure result caching behavior"
-          done: false
-
-    - phase: "Phase 4: Testing"
-      done: false
-      items:
-        - summary: "Unit tests for cloud authentication"
-          done: false
-        - summary: "Integration tests with ClickHouse Cloud (requires account)"
-          done: false
-        - summary: "Test TPC-H benchmark at scale 0.1"
-          done: false
-        - summary: "Compare results with self-hosted ClickHouse"
-          done: false
-
 metadata:
   tags:
-    - platform-adapter
-    - clickhouse
-    - cloud
-    - deployment-modes
+  - platform-adapter
+  - clickhouse
+  - cloud
+  - deployment-modes
   estimated_effort: "2-3 days"
   created_date: "2026-01-14"
 
+  related:
+  - migrate-clickhouse-firebolt-deployment
+  migration_review_required: true
 impact:
   business_value: |
     Enables comparison of self-hosted vs managed ClickHouse, helping users
@@ -119,59 +53,152 @@ impact:
 
 files_affected:
   modified:
-    - "benchbox/platforms/clickhouse/adapter.py"
-    - "benchbox/core/platform_registry.py"
+  - "benchbox/platforms/clickhouse/adapter.py"
+  - "benchbox/core/platform_registry.py"
   added:
-    - "benchbox/platforms/credentials/clickhouse_cloud.py"
+  - "benchbox/platforms/credentials/clickhouse_cloud.py"
   removed: []
-
-dependencies:
-  related:
-    - "_project/DONE/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml"
-
 technical_requirements:
   dependencies:
-    - "clickhouse-driver (existing)"
+  - "clickhouse-driver (existing)"
   constraints:
-    - "Requires ClickHouse Cloud account for testing"
-    - "Cloud storage (S3/GCS) required for data loading"
+  - "Requires ClickHouse Cloud account for testing"
+  - "Cloud storage (S3/GCS) required for data loading"
 
 must_preserve:
-  - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-  - "Platform registry autodiscovery continues working for all existing platforms"
-  - "Existing clickhouse:server and chdb modes unchanged"
-  - "Existing ClickHouse unit and integration tests continue to pass"
+- "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+- "Platform registry autodiscovery continues working for all existing platforms"
+- "Existing clickhouse:server and chdb modes unchanged"
+- "Existing ClickHouse unit and integration tests continue to pass"
 
 anti_patterns:
-  - "DO NOT break existing ClickHouse self-hosted modes (server, chdb) — because self-hosted users must not be affected — add cloud mode as a new code path alongside existing modes"
-  - "DO NOT refactor existing ClickHouse connection logic — because server and chdb modes are stable — add cloud authentication as an additional branch"
-  - "DO NOT require cloud credentials for non-cloud modes — because self-hosted users should not need cloud configuration — gate cloud config behind deployment mode checks"
+- "DO NOT break existing ClickHouse self-hosted modes (server, chdb) — because self-hosted users must not be affected — add
+  cloud mode as a new code path alongside existing modes"
+- "DO NOT refactor existing ClickHouse connection logic — because server and chdb modes are stable — add cloud authentication
+  as an additional branch"
+- "DO NOT require cloud credentials for non-cloud modes — because self-hosted users should not need cloud configuration —
+  gate cloud config behind deployment mode checks"
 
 verification:
-  - description: "Cloud module imports correctly"
-    command: "uv run -- python -c \"from benchbox.platforms.credentials.clickhouse_cloud import *; print('import OK')\""
-    expected_output: "import OK"
-  - description: "ClickHouse adapter unit tests pass"
-    command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
-  - description: "Existing platform tests unaffected"
-    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
+- description: "Cloud module imports correctly"
+  command: "uv run -- python -c \"from benchbox.platforms.credentials.clickhouse_cloud import *; print('import OK')\""
+  expected_output: "import OK"
+- description: "ClickHouse adapter unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Existing platform tests unaffected"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
 
 scope_limit:
   only_modify:
-    - "benchbox/platforms/clickhouse/"
-    - "benchbox/platforms/credentials/clickhouse_cloud.py"
-    - "benchbox/core/platform_registry.py"
-    - "tests/unit/platforms/test_clickhouse_adapter.py"
+  - "benchbox/platforms/clickhouse/"
+  - "benchbox/platforms/credentials/clickhouse_cloud.py"
+  - "benchbox/core/platform_registry.py"
+  - "tests/unit/platforms/test_clickhouse_adapter.py"
   do_not_modify:
-    - "benchbox/platforms/duckdb.py"
-    - "benchbox/platforms/firebolt.py"
-    - "benchbox/core/runner.py"
+  - "benchbox/platforms/duckdb.py"
+  - "benchbox/platforms/firebolt.py"
+  - "benchbox/core/runner.py"
 
 success_metrics:
-  - "clickhouse:cloud connects successfully"
-  - "Data loading via cloud storage works"
-  - "TPC-H benchmark runs at scale 0.1"
-  - "Results comparable with self-hosted ClickHouse"
-  - "Authentication works via API key and OAuth"
+- "clickhouse:cloud connects successfully"
+- "Data loading via cloud storage works"
+- "TPC-H benchmark runs at scale 0.1"
+- "Results comparable with self-hosted ClickHouse"
+- "Authentication works via API key and OAuth"
+work:
+- id: w1
+  summary: "Add 'cloud' deployment mode to ClickHouse registry metadata"
+  status: pending
+- id: w2
+  summary: "Set requires_credentials=True"
+  needs:
+  - w1
+  status: pending
+- id: w3
+  summary: "Set requires_cloud_storage=True"
+  needs:
+  - w1
+  status: pending
+- id: w4
+  summary: "Define auth_methods=['api_key', 'oauth']"
+  needs:
+  - w1
+  status: pending
+- id: w5
+  summary: "Add cloud-specific configuration options"
+  status: pending
+- id: w6
+  summary: "Cloud endpoint URL"
+  needs:
+  - w5
+  status: pending
+- id: w7
+  summary: "Organization/service ID"
+  needs:
+  - w5
+  status: pending
+- id: w8
+  summary: "API key or OAuth token"
+  needs:
+  - w5
+  status: pending
+- id: w9
+  summary: "Implement API key authentication"
+  status: pending
+- id: w10
+  summary: "Implement OAuth token authentication"
+  status: pending
+- id: w11
+  summary: "Add credential setup wizard for ClickHouse Cloud"
+  status: pending
+- id: w12
+  summary: "Support environment variables"
+  status: pending
+- id: w13
+  summary: "CLICKHOUSE_CLOUD_ENDPOINT"
+  needs:
+  - w12
+  status: pending
+- id: w14
+  summary: "CLICKHOUSE_CLOUD_API_KEY"
+  needs:
+  - w12
+  status: pending
+- id: w15
+  summary: "Implement cloud endpoint connection"
+  status: pending
+- id: w16
+  summary: "Implement cloud storage upload for data loading"
+  status: pending
+- id: w17
+  summary: "Support S3 staging"
+  needs:
+  - w16
+  status: pending
+- id: w18
+  summary: "Support GCS staging"
+  needs:
+  - w16
+  status: pending
+- id: w19
+  summary: "Implement COPY FROM for cloud data"
+  needs:
+  - w16
+  status: pending
+- id: w20
+  summary: "Configure result caching behavior"
+  status: pending
+- id: w21
+  summary: "Unit tests for cloud authentication"
+  status: pending
+- id: w22
+  summary: "Integration tests with ClickHouse Cloud (requires account)"
+  status: pending
+- id: w23
+  summary: "Test TPC-H benchmark at scale 0.1"
+  status: pending
+- id: w24
+  summary: "Compare results with self-hosted ClickHouse"
+  status: pending

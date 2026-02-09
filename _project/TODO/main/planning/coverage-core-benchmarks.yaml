@@ -1,3 +1,4 @@
+id: coverage-core-benchmarks
 title: "Improve test coverage for core benchmark modules to ≥50%"
 worktree: main
 priority: High
@@ -27,73 +28,16 @@ description: |
   are large auto-generated-style modules; test a representative subset rather
   than aiming for full coverage on those.
 
-tasks:
-  phases:
-    - phase: "Phase 1: TPC-H and TPC-DS core (highest impact)"
-      done: false
-      items:
-        - summary: "Add tests for core/tpch/reporting.py (0% → 50%)"
-          done: false
-        - summary: "Add tests for core/tpch/maintenance_test.py (12.8% → 50%)"
-          done: false
-        - summary: "Add tests for core/tpch/parameter_extractor.py (23.9% → 50%)"
-          done: false
-        - summary: "Add tests for core/tpcds/reporting.py (0% → 50%)"
-          done: false
-        - summary: "Add tests for core/tpcds/maintenance_test.py (20.6% → 50%)"
-          done: false
-        - summary: "Add tests for core/tpcds/throughput_test.py (23.8% → 50%)"
-          done: false
-        - summary: "Add tests for core/tpcds/benchmark/runner.py (32.7% → 50%)"
-          done: false
-
-    - phase: "Phase 2: SSB, ClickBench, AMPLab, NYC Taxi, H2O benchmarks"
-      done: false
-      items:
-        - summary: "Add tests for core/ssb/benchmark.py (19.8% → 50%)"
-          done: false
-        - summary: "Add tests for core/ssb/generator.py (45.0% → 50%)"
-          done: false
-        - summary: "Add tests for core/clickbench/benchmark.py (25.8% → 50%)"
-          done: false
-        - summary: "Add tests for core/amplab/benchmark.py (18.4% → 50%)"
-          done: false
-        - summary: "Add tests for core/amplab/generator.py (29.1% → 50%)"
-          done: false
-        - summary: "Add tests for core/nyctaxi/benchmark.py (19.4% → 50%)"
-          done: false
-        - summary: "Add tests for core/nyctaxi/downloader.py (20.5% → 50%)"
-          done: false
-        - summary: "Add tests for core/h2odb/benchmark.py (28.8% → 50%)"
-          done: false
-
-    - phase: "Phase 3: Primitives and remaining benchmarks"
-      done: false
-      items:
-        - summary: "Add tests for core/read_primitives/dataframe_queries.py (16.5% → 50%)"
-          done: false
-        - summary: "Add tests for core/transaction_primitives/generator.py (12.9% → 50%)"
-          done: false
-        - summary: "Add tests for core/transaction_primitives/benchmark.py (24.5% → 50%)"
-          done: false
-        - summary: "Add tests for core/metadata_primitives/generator.py (8.0% → 50%)"
-          done: false
-        - summary: "Add tests for core/metadata_primitives/benchmark.py (40.6% → 50%)"
-          done: false
-        - summary: "Add tests for core/datavault/dataframe_queries/queries.py (6.7% → 50%)"
-          done: false
-        - summary: "Add tests for core/joinorder/generator.py (20.1% → 50%)"
-          done: false
-
 metadata:
   tags:
-    - testing
-    - coverage
-    - core
+  - testing
+  - coverage
+  - core
   estimated_effort: Large
   created_date: "2026-02-07"
   last_updated: "2026-02-07T09:00:00"
 
+  migration_review_required: true
 impact:
   business_value: |
     Core benchmark modules are the primary value proposition of BenchBox.
@@ -104,8 +48,8 @@ impact:
     all modules establishes a baseline for CI enforcement.
 
 must_preserve:
-  - "All existing tests continue to pass"
-  - "No changes to production code — tests only"
+- "All existing tests continue to pass"
+- "No changes to production code — tests only"
 
 approach: |
   Follow existing test patterns in tests/unit/benchmarks/ (e.g., test_tpch_core.py,
@@ -115,39 +59,110 @@ approach: |
   benchmark) rather than exhaustive coverage.
 
 anti_patterns:
-  - "DO NOT modify production code to improve coverage — because the goal is to verify existing behavior, not refactor — write tests for code as-is"
-  - "DO NOT test auto-generated SQL strings character-by-character — because SQL formatting changes would cause false failures — test query structure, table references, and parameters instead"
-  - "DO NOT create integration tests requiring live databases — because CI has no database servers and tests must run in <1s — use mocks and in-memory fixtures"
+- "DO NOT modify production code to improve coverage — because the goal is to verify existing behavior, not refactor — write
+  tests for code as-is"
+- "DO NOT test auto-generated SQL strings character-by-character — because SQL formatting changes would cause false failures
+  — test query structure, table references, and parameters instead"
+- "DO NOT create integration tests requiring live databases — because CI has no database servers and tests must run in <1s
+  — use mocks and in-memory fixtures"
 
 verification:
-  - description: "All new tests pass"
-    command: "uv run -- python -m pytest tests/unit/ -v --tb=short -m fast"
-    expected_output: "all tests pass, 0 failures"
-  - description: "Coverage for each targeted module reaches ≥50%"
-    command: "uv run -- python -m pytest -c pytest-ci.ini -p pytest_cov --cov=benchbox/core --cov-report=term-missing -m fast -q"
-    expected_output: "all listed modules show ≥50% coverage"
+- description: "All new tests pass"
+  command: "uv run -- python -m pytest tests/unit/ -v --tb=short -m fast"
+  expected_output: "all tests pass, 0 failures"
+- description: "Coverage for each targeted module reaches ≥50%"
+  command: "uv run -- python -m pytest -c pytest-ci.ini -p pytest_cov --cov=benchbox/core --cov-report=term-missing -m fast
+    -q"
+  expected_output: "all listed modules show ≥50% coverage"
 
 success_metrics:
-  - "Every core/* package listed above reaches ≥50% line coverage"
-  - "Zero test failures introduced"
-  - "All new tests marked @pytest.mark.fast and complete in <1s each"
+- "Every core/* package listed above reaches ≥50% line coverage"
+- "Zero test failures introduced"
+- "All new tests marked @pytest.mark.fast and complete in <1s each"
 
 files_affected:
   added:
-    - "tests/unit/benchmarks/test_tpch_reporting.py"
-    - "tests/unit/benchmarks/test_tpcds_reporting.py"
-    - "tests/unit/benchmarks/test_ssb_benchmark.py"
-    - "tests/unit/benchmarks/test_clickbench_benchmark.py"
-    - "tests/unit/benchmarks/test_amplab_benchmark.py"
-    - "tests/unit/benchmarks/test_nyctaxi_benchmark.py"
-    - "tests/unit/benchmarks/test_h2odb_benchmark.py"
-    - "tests/unit/benchmarks/test_primitives_coverage.py"
-    - "tests/unit/benchmarks/test_datavault_queries.py"
-    - "tests/unit/benchmarks/test_joinorder_generator.py"
+  - "tests/unit/benchmarks/test_tpch_reporting.py"
+  - "tests/unit/benchmarks/test_tpcds_reporting.py"
+  - "tests/unit/benchmarks/test_ssb_benchmark.py"
+  - "tests/unit/benchmarks/test_clickbench_benchmark.py"
+  - "tests/unit/benchmarks/test_amplab_benchmark.py"
+  - "tests/unit/benchmarks/test_nyctaxi_benchmark.py"
+  - "tests/unit/benchmarks/test_h2odb_benchmark.py"
+  - "tests/unit/benchmarks/test_primitives_coverage.py"
+  - "tests/unit/benchmarks/test_datavault_queries.py"
+  - "tests/unit/benchmarks/test_joinorder_generator.py"
 
 scope_limit:
   only_modify:
-    - "tests/unit/benchmarks/"
+  - "tests/unit/benchmarks/"
   do_not_modify:
-    - "benchbox/"
-    - "tests/integration/"
+  - "benchbox/"
+  - "tests/integration/"
+work:
+- id: w1
+  summary: "Add tests for core/tpch/reporting.py (0% → 50%)"
+  status: pending
+- id: w2
+  summary: "Add tests for core/tpch/maintenance_test.py (12.8% → 50%)"
+  status: pending
+- id: w3
+  summary: "Add tests for core/tpch/parameter_extractor.py (23.9% → 50%)"
+  status: pending
+- id: w4
+  summary: "Add tests for core/tpcds/reporting.py (0% → 50%)"
+  status: pending
+- id: w5
+  summary: "Add tests for core/tpcds/maintenance_test.py (20.6% → 50%)"
+  status: pending
+- id: w6
+  summary: "Add tests for core/tpcds/throughput_test.py (23.8% → 50%)"
+  status: pending
+- id: w7
+  summary: "Add tests for core/tpcds/benchmark/runner.py (32.7% → 50%)"
+  status: pending
+- id: w8
+  summary: "Add tests for core/ssb/benchmark.py (19.8% → 50%)"
+  status: pending
+- id: w9
+  summary: "Add tests for core/ssb/generator.py (45.0% → 50%)"
+  status: pending
+- id: w10
+  summary: "Add tests for core/clickbench/benchmark.py (25.8% → 50%)"
+  status: pending
+- id: w11
+  summary: "Add tests for core/amplab/benchmark.py (18.4% → 50%)"
+  status: pending
+- id: w12
+  summary: "Add tests for core/amplab/generator.py (29.1% → 50%)"
+  status: pending
+- id: w13
+  summary: "Add tests for core/nyctaxi/benchmark.py (19.4% → 50%)"
+  status: pending
+- id: w14
+  summary: "Add tests for core/nyctaxi/downloader.py (20.5% → 50%)"
+  status: pending
+- id: w15
+  summary: "Add tests for core/h2odb/benchmark.py (28.8% → 50%)"
+  status: pending
+- id: w16
+  summary: "Add tests for core/read_primitives/dataframe_queries.py (16.5% → 50%)"
+  status: pending
+- id: w17
+  summary: "Add tests for core/transaction_primitives/generator.py (12.9% → 50%)"
+  status: pending
+- id: w18
+  summary: "Add tests for core/transaction_primitives/benchmark.py (24.5% → 50%)"
+  status: pending
+- id: w19
+  summary: "Add tests for core/metadata_primitives/generator.py (8.0% → 50%)"
+  status: pending
+- id: w20
+  summary: "Add tests for core/metadata_primitives/benchmark.py (40.6% → 50%)"
+  status: pending
+- id: w21
+  summary: "Add tests for core/datavault/dataframe_queries/queries.py (6.7% → 50%)"
+  status: pending
+- id: w22
+  summary: "Add tests for core/joinorder/generator.py (20.1% → 50%)"
+  status: pending

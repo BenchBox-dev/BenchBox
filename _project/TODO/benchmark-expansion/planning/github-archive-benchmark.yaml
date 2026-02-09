@@ -1,3 +1,4 @@
+id: github-archive-benchmark
 title: GitHub Archive Benchmark - Developer Activity Analytics Workload
 worktree: benchmark-expansion
 category: Benchmark Development
@@ -166,161 +167,6 @@ context_sections:
     - Hourly files allow fine-grained control
     - Post-2015 data only (Events API format)
 
-tasks:
-- phase: "Phase 1: Data Infrastructure"
-  items:
-  - summary: Design data acquisition approach
-    done: false
-    details: |
-      - Implement hourly file downloader from gharchive.org
-      - Support date range specification
-      - Handle gzip decompression
-      - Convert NDJSON to Parquet for efficiency
-
-  - summary: Create gharchive module structure
-    done: false
-    details: |
-      - benchbox/core/gharchive/__init__.py
-      - benchbox/core/gharchive/schema.py
-      - benchbox/core/gharchive/downloader.py
-      - benchbox/core/gharchive/queries.py
-      - benchbox/core/gharchive/benchmark.py
-
-  - summary: Implement schema definitions
-    done: false
-    details: |
-      - Events table with JSON payload column
-      - OR flattened table with sparse columns per event type
-      - Consider ClickHouse approach (flattened for performance)
-
-  - summary: Design payload extraction strategy
-    done: false
-    details: |
-      Options:
-      A) Keep payload as JSON, extract at query time
-      B) Pre-extract common fields into separate columns
-      C) Create separate tables per event type
-
-      Trade-offs: A is flexible but slower, B/C are faster but more complex
-
-  - summary: Handle 2015 schema change (Timeline API → Events API)
-    done: false
-    details: |
-      GitHub Archive changed schema in March 2015:
-      - Pre-2015: Timeline API format (different event structure)
-      - Post-2015: Events API format (current structure)
-
-      Options:
-      A) Only support post-2015 data (simpler, recommended for MVP)
-      B) Create schema adapter for pre-2015 events
-      C) Document limitation and allow future extension
-
-      Recommendation: Option A for initial implementation, document
-      pre-2015 as out-of-scope with future enhancement path
-
-- phase: "Phase 2: Data Loading"
-  items:
-  - summary: Implement hourly file downloader
-    done: false
-    details: |
-      - Download from gharchive.org
-      - Support date range: YYYY-MM-DD to YYYY-MM-DD
-      - Parallel downloads for efficiency
-      - Resume capability for large ranges
-
-  - summary: Implement NDJSON to Parquet conversion
-    done: false
-    details: |
-      - Parse nested JSON structures
-      - Flatten actor and repo structures
-      - Handle payload as JSON column or extract
-      - Partition by date for efficient queries
-
-  - summary: Implement platform data loading
-    done: false
-    details: |
-      - DuckDB: read_json_auto or Parquet
-      - ClickHouse: JSONEachRow format
-      - PostgreSQL: JSONB column for payload
-      - Snowflake: VARIANT type for payload
-
-- phase: "Phase 3: Query Catalog"
-  items:
-  - summary: Implement repository trend queries
-    done: false
-    details: |
-      - gh_trending_repos: Stars gained in period
-      - gh_top_starred: All-time most starred
-      - gh_fastest_growing: Growth rate ranking
-      - gh_fork_rate: Fork to star ratio
-      - gh_language_popularity: Events by language
-
-  - summary: Implement developer activity queries
-    done: false
-    details: |
-      - gh_top_contributors: By push count
-      - gh_active_developers: Unique actors per repo
-      - gh_collaboration: Co-contributor patterns
-      - gh_developer_retention: Return rate analysis
-
-  - summary: Implement language ecosystem queries
-    done: false
-    details: |
-      - gh_language_trends: Popularity over time
-      - gh_framework_adoption: Library/framework events
-      - gh_ecosystem_health: Activity distribution
-      - gh_language_migration: Developer transitions
-
-  - summary: Implement project health queries
-    done: false
-    details: |
-      - gh_pr_merge_rate: PRs merged vs opened
-      - gh_issue_response: Time to first comment
-      - gh_release_frequency: Releases per month
-      - gh_community_engagement: Stars, forks, comments
-
-  - summary: Implement time-series queries
-    done: false
-    details: |
-      - gh_hourly_activity: Events by hour
-      - gh_weekly_patterns: Day-of-week distribution
-      - gh_event_distribution: Type breakdown over time
-      - gh_growth_trends: YoY comparison
-
-- phase: "Phase 4: Benchmark Integration"
-  items:
-  - summary: Implement GitHubArchiveBenchmark class
-    done: false
-    details: |
-      - Inherit from BaseBenchmark
-      - Handle JSON/semi-structured data
-      - Implement standard phases
-
-  - summary: Register benchmark with CLI
-    done: false
-    details: |
-      - Add to platform_registry.py
-      - Add to benchbox run --benchmark gharchive
-
-  - summary: Add platform-specific variants
-    done: false
-    details: |
-      - JSON extraction syntax differences
-      - Timestamp handling variations
-      - String pattern matching for repo names
-
-- phase: "Phase 5: Testing and Documentation"
-  items:
-  - summary: Create unit and integration tests
-    done: false
-
-  - summary: Document benchmark usage
-    done: false
-    details: |
-      - Scale factor recommendations
-      - Query catalog reference
-      - JSON handling patterns
-
 files_affected:
 - change_type: New
   paths:
@@ -361,29 +207,32 @@ metadata:
     - Schema changed in March 2015 (Timeline API -> Events API)
     - Initial implementation targets post-2015 data only (Events API format)
 
+  migration_review_required: true
 must_preserve:
-  - "Existing ClickBench JSON handling patterns unchanged"
-  - "BaseBenchmark interface contract unchanged"
+- "Existing ClickBench JSON handling patterns unchanged"
+- "BaseBenchmark interface contract unchanged"
 
 anti_patterns:
-  - "DO NOT implement pre-2015 Timeline API format — because the schema is incompatible with post-2015 and adds complexity with no benefit — document as out-of-scope"
-  - "DO NOT download from gharchive.org in unit tests — because the service rate-limits and files are 50MB+ per hour — use synthetic test fixtures"
+- "DO NOT implement pre-2015 Timeline API format — because the schema is incompatible with post-2015 and adds complexity with
+  no benefit — document as out-of-scope"
+- "DO NOT download from gharchive.org in unit tests — because the service rate-limits and files are 50MB+ per hour — use synthetic
+  test fixtures"
 
 verification:
-  - description: "GitHub Archive benchmark module imports"
-    command: "uv run -- python -c \"from benchbox.core.github_archive import GitHubArchiveBenchmark; print('OK')\""
-    expected_output: "OK"
-  - description: "Unit tests pass"
-    command: "uv run -- python -m pytest tests/unit/core/github_archive/ -v --tb=short"
-    expected_output: "all tests pass"
+- description: "GitHub Archive benchmark module imports"
+  command: "uv run -- python -c \"from benchbox.core.github_archive import GitHubArchiveBenchmark; print('OK')\""
+  expected_output: "OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/github_archive/ -v --tb=short"
+  expected_output: "all tests pass"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/github_archive/"
-    - "tests/unit/core/github_archive/"
+  - "benchbox/core/github_archive/"
+  - "tests/unit/core/github_archive/"
   do_not_modify:
-    - "benchbox/core/clickbench/"
-    - "benchbox/core/runner.py"
+  - "benchbox/core/clickbench/"
+  - "benchbox/core/runner.py"
 
 success_metrics:
 - Hourly file download and parsing working
@@ -391,3 +240,90 @@ success_metrics:
 - Scale factors from 0.01 (~10MB) to 100.0 (~100GB) working
 - JSON payload extraction efficient on DuckDB
 - Trend queries under 30 seconds for SF=1.0 (~1GB, ~15M events)
+work:
+- id: w1
+  summary: Design data acquisition approach
+  status: pending
+  notes: "- Implement hourly file downloader from gharchive.org\n- Support date range specification\n- Handle gzip decompression\n\
+    - Convert NDJSON to Parquet for efficiency\n"
+- id: w2
+  summary: Create gharchive module structure
+  status: pending
+  notes: "- benchbox/core/gharchive/__init__.py\n- benchbox/core/gharchive/schema.py\n- benchbox/core/gharchive/downloader.py\n\
+    - benchbox/core/gharchive/queries.py\n- benchbox/core/gharchive/benchmark.py\n"
+- id: w3
+  summary: Implement schema definitions
+  status: pending
+  notes: "- Events table with JSON payload column\n- OR flattened table with sparse columns per event type\n- Consider ClickHouse
+    approach (flattened for performance)\n"
+- id: w4
+  summary: Design payload extraction strategy
+  status: pending
+  notes: "Options:\nA) Keep payload as JSON, extract at query time\nB) Pre-extract common fields into separate columns\nC)
+    Create separate tables per event type\n\nTrade-offs: A is flexible but slower, B/C are faster but more complex\n"
+- id: w5
+  summary: Handle 2015 schema change (Timeline API → Events API)
+  status: pending
+  notes: "GitHub Archive changed schema in March 2015:\n- Pre-2015: Timeline API format (different event structure)\n- Post-2015:
+    Events API format (current structure)\n\nOptions:\nA) Only support post-2015 data (simpler, recommended for MVP)\nB) Create
+    schema adapter for pre-2015 events\nC) Document limitation and allow future extension\n\nRecommendation: Option A for
+    initial implementation, document\npre-2015 as out-of-scope with future enhancement path\n"
+- id: w6
+  summary: Implement hourly file downloader
+  status: pending
+  notes: "- Download from gharchive.org\n- Support date range: YYYY-MM-DD to YYYY-MM-DD\n- Parallel downloads for efficiency\n\
+    - Resume capability for large ranges\n"
+- id: w7
+  summary: Implement NDJSON to Parquet conversion
+  status: pending
+  notes: "- Parse nested JSON structures\n- Flatten actor and repo structures\n- Handle payload as JSON column or extract\n\
+    - Partition by date for efficient queries\n"
+- id: w8
+  summary: Implement platform data loading
+  status: pending
+  notes: "- DuckDB: read_json_auto or Parquet\n- ClickHouse: JSONEachRow format\n- PostgreSQL: JSONB column for payload\n\
+    - Snowflake: VARIANT type for payload\n"
+- id: w9
+  summary: Implement repository trend queries
+  status: pending
+  notes: "- gh_trending_repos: Stars gained in period\n- gh_top_starred: All-time most starred\n- gh_fastest_growing: Growth
+    rate ranking\n- gh_fork_rate: Fork to star ratio\n- gh_language_popularity: Events by language\n"
+- id: w10
+  summary: Implement developer activity queries
+  status: pending
+  notes: "- gh_top_contributors: By push count\n- gh_active_developers: Unique actors per repo\n- gh_collaboration: Co-contributor
+    patterns\n- gh_developer_retention: Return rate analysis\n"
+- id: w11
+  summary: Implement language ecosystem queries
+  status: pending
+  notes: "- gh_language_trends: Popularity over time\n- gh_framework_adoption: Library/framework events\n- gh_ecosystem_health:
+    Activity distribution\n- gh_language_migration: Developer transitions\n"
+- id: w12
+  summary: Implement project health queries
+  status: pending
+  notes: "- gh_pr_merge_rate: PRs merged vs opened\n- gh_issue_response: Time to first comment\n- gh_release_frequency: Releases
+    per month\n- gh_community_engagement: Stars, forks, comments\n"
+- id: w13
+  summary: Implement time-series queries
+  status: pending
+  notes: "- gh_hourly_activity: Events by hour\n- gh_weekly_patterns: Day-of-week distribution\n- gh_event_distribution: Type
+    breakdown over time\n- gh_growth_trends: YoY comparison\n"
+- id: w14
+  summary: Implement GitHubArchiveBenchmark class
+  status: pending
+  notes: "- Inherit from BaseBenchmark\n- Handle JSON/semi-structured data\n- Implement standard phases\n"
+- id: w15
+  summary: Register benchmark with CLI
+  status: pending
+  notes: "- Add to platform_registry.py\n- Add to benchbox run --benchmark gharchive\n"
+- id: w16
+  summary: Add platform-specific variants
+  status: pending
+  notes: "- JSON extraction syntax differences\n- Timestamp handling variations\n- String pattern matching for repo names\n"
+- id: w17
+  summary: Create unit and integration tests
+  status: pending
+- id: w18
+  summary: Document benchmark usage
+  status: pending
+  notes: "- Scale factor recommendations\n- Query catalog reference\n- JSON handling patterns\n"

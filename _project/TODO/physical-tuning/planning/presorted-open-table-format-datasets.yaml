@@ -2,6 +2,7 @@
 #
 # Location: _project/TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
 
+id: presorted-open-table-format-datasets
 title: "Support creation of pre-sorted / pre-clustered datasets in open table formats"
 worktree: physical-tuning
 priority: Medium-High
@@ -28,67 +29,20 @@ description: |
 
 category: Core Functionality
 
-tasks:
-  phases:
-    - phase: "Phase 1: Parquet Sorted Export"
-      done: false
-      items:
-        - summary: "Add sorted Parquet export to data generator"
-          done: false
-          subtasks:
-            - summary: "Support single-column sorting (e.g., by date)"
-              done: false
-            - summary: "Support multi-column sorting with order specification"
-              done: false
-            - summary: "Configure row group size for zone map granularity"
-              done: false
-        - summary: "Integrate with tuning config for sort column specification"
-          done: false
-        - summary: "Add CLI option: --data-format parquet-sorted"
-          done: false
-
-    - phase: "Phase 2: Multi-Dimensional Clustering"
-      done: false
-      items:
-        - summary: "Implement Z-order encoding for Parquet"
-          done: false
-        - summary: "Implement Hilbert curve encoding option"
-          done: false
-        - summary: "Support cluster-by columns in tuning config"
-          done: false
-
-    - phase: "Phase 3: Delta Lake and Iceberg Support"
-      done: false
-      items:
-        - summary: "Generate sorted Delta Lake tables with OPTIMIZE"
-          done: false
-        - summary: "Generate Iceberg tables with sort orders"
-          done: false
-        - summary: "Support partition-aware sorting"
-          done: false
-
-    - phase: "Phase 4: Testing and Documentation"
-      done: false
-      items:
-        - summary: "Unit tests for sorted data generation"
-          done: false
-        - summary: "Integration tests verifying sortedness metrics"
-          done: false
-        - summary: "Documentation: data organization strategies guide"
-          done: false
-
 metadata:
   tags:
-    - data-generation
-    - parquet
-    - delta-lake
-    - iceberg
-    - zone-maps
-    - z-order
-    - performance
+  - data-generation
+  - parquet
+  - delta-lake
+  - iceberg
+  - zone-maps
+  - z-order
+  - performance
   estimated_effort: "Large"
   created_date: "2026-01-07"
 
+  related:
+  - ctas-sorted-data-loading
 impact:
   business_value: |
     Enables systematic benchmarking of data organization strategies across
@@ -106,14 +60,14 @@ impact:
 
 files_affected:
   modified:
-    - "benchbox/core/tpch/generator.py"
-    - "benchbox/core/tpcds/generator.py"
-    - "benchbox/cli/run.py"
+  - "benchbox/core/tpch/generator.py"
+  - "benchbox/core/tpcds/generator.py"
+  - "benchbox/cli/run.py"
   added:
-    - "benchbox/core/data_organization/__init__.py"
-    - "benchbox/core/data_organization/sorting.py"
-    - "benchbox/core/data_organization/clustering.py"
-    - "docs/guides/data-organization-strategies.md"
+  - "benchbox/core/data_organization/__init__.py"
+  - "benchbox/core/data_organization/sorting.py"
+  - "benchbox/core/data_organization/clustering.py"
+  - "docs/guides/data-organization-strategies.md"
 
 context_sections:
   "Background and Motivation": |
@@ -145,30 +99,30 @@ context_sections:
 
 technical_requirements:
   dependencies:
-    - "pyarrow (Parquet writing)"
-    - "delta-rs (optional: Delta Lake)"
-    - "pyiceberg (optional: Iceberg)"
+  - "pyarrow (Parquet writing)"
+  - "delta-rs (optional: Delta Lake)"
+  - "pyiceberg (optional: Iceberg)"
   constraints:
-    - "Must preserve data correctness (same rows, just reordered)"
-    - "Should support all TPC benchmarks, not just TPC-H"
-    - "Row group size must be configurable for zone map experiments"
+  - "Must preserve data correctness (same rows, just reordered)"
+  - "Should support all TPC benchmarks, not just TPC-H"
+  - "Row group size must be configurable for zone map experiments"
 
 success_metrics:
-  - "Can generate TPC-H Parquet files sorted by l_shipdate"
-  - "Sortedness metrics confirm expected data organization"
-  - "Z-order and Hilbert options produce correct interleaved ordering"
-  - "Generated files load correctly into target platforms"
-  - "Performance delta matches expectations from research"
+- "Can generate TPC-H Parquet files sorted by l_shipdate"
+- "Sortedness metrics confirm expected data organization"
+- "Z-order and Hilbert options produce correct interleaved ordering"
+- "Generated files load correctly into target platforms"
+- "Performance delta matches expectations from research"
 
 open_questions:
-  - "Should sorting happen during generation or as post-processing?"
-  - "How to handle very large scale factors (memory constraints)?"
-  - "Should we support platform-specific formats (DuckDB native)?"
+- "Should sorting happen during generation or as post-processing?"
+- "How to handle very large scale factors (memory constraints)?"
+- "Should we support platform-specific formats (DuckDB native)?"
 
 must_preserve:
-  - "Existing TPC-H data generation produces identical output when sorting is not requested"
-  - "benchbox run --platform duckdb --benchmark tpch --scale 0.01 completes with same row counts"
-  - "No regression in data generation time for default (unsorted) path"
+- "Existing TPC-H data generation produces identical output when sorting is not requested"
+- "benchbox run --platform duckdb --benchmark tpch --scale 0.01 completes with same row counts"
+- "No regression in data generation time for default (unsorted) path"
 
 approach: |
   Post-process generated TBL/CSV files rather than modifying dbgen output.
@@ -178,28 +132,79 @@ approach: |
   Delta/Iceberg deferred to Phase 3.
 
 anti_patterns:
-  - "DO NOT modify dbgen binary output format — because TPC compliance requires unmodified dbgen output — sort as a post-processing step only"
-  - "DO NOT sort in-memory for SF>=10 — because lineitem at SF=10 is 6GB+ and will OOM — use PyArrow's chunked/streaming sort"
-  - "DO NOT make sorting the default — because unsorted data is needed for baseline benchmarks — require explicit opt-in via --data-format or tuning config"
+- "DO NOT modify dbgen binary output format — because TPC compliance requires unmodified dbgen output — sort as a post-processing
+  step only"
+- "DO NOT sort in-memory for SF>=10 — because lineitem at SF=10 is 6GB+ and will OOM — use PyArrow's chunked/streaming sort"
+- "DO NOT make sorting the default — because unsorted data is needed for baseline benchmarks — require explicit opt-in via
+  --data-format or tuning config"
 
 verification:
-  - description: "Existing data generation tests pass"
-    command: "uv run -- python -m pytest tests/ -k 'generator or datagen' -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
-  - description: "Sorted output is actually sorted"
-    command: "uv run -- python -m pytest tests/ -k 'sorted or presorted' -v --tb=short"
-    expected_output: "all tests pass"
+- description: "Existing data generation tests pass"
+  command: "uv run -- python -m pytest tests/ -k 'generator or datagen' -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Sorted output is actually sorted"
+  command: "uv run -- python -m pytest tests/ -k 'sorted or presorted' -v --tb=short"
+  expected_output: "all tests pass"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/data_organization/"
-    - "benchbox/core/tpch/generator.py"
-    - "benchbox/core/tpcds/generator.py"
-    - "tests/"
+  - "benchbox/core/data_organization/"
+  - "benchbox/core/tpch/generator.py"
+  - "benchbox/core/tpcds/generator.py"
+  - "tests/"
   do_not_modify:
-    - "benchbox/cli/commands/run.py"
-    - "benchbox/core/runner.py"
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/core/runner.py"
 
-dependencies:
-  related:
-    - "_project/TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml"
+work:
+- id: w1
+  summary: "Add sorted Parquet export to data generator"
+  status: pending
+- id: w2
+  summary: "Support single-column sorting (e.g., by date)"
+  needs:
+  - w1
+  status: pending
+- id: w3
+  summary: "Support multi-column sorting with order specification"
+  needs:
+  - w1
+  status: pending
+- id: w4
+  summary: "Configure row group size for zone map granularity"
+  needs:
+  - w1
+  status: pending
+- id: w5
+  summary: "Integrate with tuning config for sort column specification"
+  status: pending
+- id: w6
+  summary: "Add CLI option: --data-format parquet-sorted"
+  status: pending
+- id: w7
+  summary: "Implement Z-order encoding for Parquet"
+  status: pending
+- id: w8
+  summary: "Implement Hilbert curve encoding option"
+  status: pending
+- id: w9
+  summary: "Support cluster-by columns in tuning config"
+  status: pending
+- id: w10
+  summary: "Generate sorted Delta Lake tables with OPTIMIZE"
+  status: pending
+- id: w11
+  summary: "Generate Iceberg tables with sort orders"
+  status: pending
+- id: w12
+  summary: "Support partition-aware sorting"
+  status: pending
+- id: w13
+  summary: "Unit tests for sorted data generation"
+  status: pending
+- id: w14
+  summary: "Integration tests verifying sortedness metrics"
+  status: pending
+- id: w15
+  summary: "Documentation: data organization strategies guide"
+  status: pending

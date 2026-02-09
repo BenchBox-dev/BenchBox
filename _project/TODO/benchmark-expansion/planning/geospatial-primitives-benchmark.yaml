@@ -1,3 +1,4 @@
+id: geospatial-primitives-benchmark
 title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
 worktree: benchmark-expansion
 category: Benchmark Development
@@ -87,278 +88,6 @@ context_sections:
     - **Performance Focus**: Spatial indexing significantly affects performance
     - **Skip unsupported**: ClickHouse skips all geo queries (H3 only separate)
 
-tasks:
-- phase: "Phase 1: Architecture Design"
-  items:
-  - summary: Design geospatial primitives benchmark architecture
-    done: false
-    details: |
-      - Define GeoQuery dataclass (similar to PrimitiveQuery)
-      - Determine data generation strategy (synthetic vs derived)
-      - Design for cross-platform coordinate system handling
-      - Plan extension loading (DuckDB spatial)
-
-  - summary: Create catalog YAML schema for geospatial queries
-    done: false
-    details: |
-      - id, category, sql fields
-      - variants dict for platform-specific syntax (ST_GEOGPOINT vs ST_POINT)
-      - skip_on list for unsupported platforms (clickhouse)
-      - requires_extension field for DuckDB spatial loading
-      - coordinate_system field (default: WGS84)
-
-  - summary: Design test data generation
-    done: false
-    details: |
-      Option A: Add geo columns to TPC-H staging tables
-      - Add customer_location GEOGRAPHY to customer
-      - Add supplier_location GEOGRAPHY to supplier
-      - Generate random points within nation bounding boxes
-
-      Option B: Separate geo test tables
-      - geo_points: id, location GEOGRAPHY, category
-      - geo_polygons: id, shape GEOGRAPHY, name
-      - geo_lines: id, path GEOGRAPHY, length_km
-
-- phase: "Phase 2: Core Implementation"
-  items:
-  - summary: Create benchbox/core/geo_primitives/ module structure
-    done: false
-    details: |
-      - __init__.py
-      - catalog/__init__.py
-      - catalog/loader.py (GeoCatalogLoader)
-      - catalog/queries.yaml (geospatial query definitions)
-      - benchmark.py (GeoPrimitivesBenchmark class)
-      - generator.py (geospatial data generation)
-      - schema.py (test table definitions)
-
-  - summary: Implement GeoCatalog loader
-    done: false
-    details: |
-      - Parse geo-specific fields (requires_extension, coordinate_system)
-      - Handle extension loading for DuckDB
-      - Validate coordinate system specifications
-
-  - summary: Implement geospatial data generator
-    done: false
-    details: |
-      - Generate random points within bounding boxes
-      - Create test polygons (nations, regions)
-      - Generate test lines (shipping routes)
-      - Support different scale factors
-
-  - summary: Implement GeoPrimitivesBenchmark class
-    done: false
-    details: |
-      - Inherit from BaseBenchmark pattern
-      - Handle extension loading (DuckDB)
-      - Setup: create and populate geo test tables
-      - Execute geo queries with timing capture
-      - Teardown: drop geo test tables
-
-- phase: "Phase 3: Query Catalog Development"
-  items:
-  - summary: Implement Point Operations queries (5+ queries)
-    done: false
-    details: |
-      - geo_point_create: Create points from lat/lng
-      - geo_point_extract_x: Extract longitude
-      - geo_point_extract_y: Extract latitude
-      - geo_point_from_wkt: Parse from WKT string
-      - geo_point_to_wkt: Convert to WKT string
-
-      Example (Snowflake):
-      ```sql
-      SELECT
-          c_custkey,
-          ST_POINT(-122.4194, 37.7749) as sf_location,
-          ST_X(customer_location) as cust_lng,
-          ST_Y(customer_location) as cust_lat
-      FROM customer_geo
-      LIMIT 100;
-      ```
-
-  - summary: Implement Distance & Proximity queries (6+ queries)
-    done: false
-    details: |
-      - geo_distance_points: Distance between two points
-      - geo_distance_point_polygon: Distance to polygon boundary
-      - geo_dwithin_radius: Points within radius
-      - geo_nearest_neighbor: Find N nearest points
-      - geo_distance_matrix: Pairwise distances (small set)
-      - geo_shipping_distance: Distance between supplier and customer
-
-      Example (Snowflake):
-      ```sql
-      SELECT
-          s.s_suppkey,
-          c.c_custkey,
-          ST_DISTANCE(s.supplier_location, c.customer_location) / 1000 as distance_km
-      FROM supplier_geo s
-      CROSS JOIN customer_geo c
-      WHERE c.c_nationkey = s.s_nationkey
-      LIMIT 1000;
-      ```
-
-  - summary: Implement Spatial Predicates queries (6+ queries)
-    done: false
-    details: |
-      - geo_contains_point: Point within polygon
-      - geo_intersects_polygons: Polygon overlap
-      - geo_within_region: Points within region polygon
-      - geo_covers_area: Polygon covers another
-      - geo_touches_boundary: Geometries touch
-      - geo_disjoint_check: Geometries don't intersect
-
-      Example (Snowflake):
-      ```sql
-      SELECT
-          c.c_custkey,
-          n.n_name
-      FROM customer_geo c
-      JOIN nation_geo n
-          ON ST_CONTAINS(n.nation_polygon, c.customer_location)
-      LIMIT 100;
-      ```
-
-  - summary: Implement Geometry Transformation queries (5+ queries)
-    done: false
-    details: |
-      - geo_buffer_point: Create buffer around point
-      - geo_simplify_polygon: Simplify complex polygon
-      - geo_centroid: Calculate centroid
-      - geo_envelope: Bounding box
-      - geo_convexhull: Convex hull of points
-
-      Example (Snowflake):
-      ```sql
-      SELECT
-          n_nationkey,
-          ST_CENTROID(nation_polygon) as nation_center,
-          ST_AREA(nation_polygon) / 1e6 as area_sq_km
-      FROM nation_geo;
-      ```
-
-  - summary: Implement Spatial Aggregation queries (4+ queries)
-    done: false
-    details: |
-      - geo_union_regions: Union of multiple polygons
-      - geo_collect_points: Collect points into multipoint
-      - geo_convexhull_customers: Convex hull of customer locations
-      - geo_extent_suppliers: Bounding box of all suppliers
-
-      Example (BigQuery):
-      ```sql
-      SELECT
-          c_mktsegment,
-          ST_UNION_AGG(customer_location) as segment_coverage,
-          COUNT(*) as customer_count
-      FROM customer_geo
-      GROUP BY c_mktsegment;
-      ```
-
-  - summary: Implement Area & Length queries (4+ queries)
-    done: false
-    details: |
-      - geo_area_nation: Area of nation polygons
-      - geo_length_route: Length of shipping route
-      - geo_perimeter_region: Perimeter of region
-      - geo_area_buffer: Area of buffered point
-
-  - summary: Implement H3 Indexing queries (4+ queries)
-    done: false
-    details: |
-      - geo_h3_index: Convert point to H3 cell
-      - geo_h3_boundary: Get H3 cell boundary
-      - geo_h3_neighbors: Get neighboring cells
-      - geo_h3_aggregation: Aggregate by H3 cell
-
-      Note: H3 has broader support (including ClickHouse)
-
-      Example (Snowflake):
-      ```sql
-      SELECT
-          c_custkey,
-          H3_LATLNG_TO_CELL(ST_Y(customer_location), ST_X(customer_location), 7) as h3_cell
-      FROM customer_geo
-      LIMIT 100;
-      ```
-
-- phase: "Phase 4: Platform Variants"
-  items:
-  - summary: Add Snowflake geospatial variants
-    done: false
-    details: |
-      - Standard ST_* function syntax
-      - GEOGRAPHY and GEOMETRY both supported
-      - H3 functions built-in
-      - Spatial indexing automatic
-
-  - summary: Add BigQuery geospatial variants
-    done: false
-    details: |
-      - ST_GEOGPOINT instead of ST_POINT
-      - GEOGRAPHY only (no GEOMETRY)
-      - ST_UNION_AGG for aggregation
-      - BQ-specific function naming
-
-  - summary: Add DuckDB spatial variants
-    done: false
-    details: |
-      - Requires LOAD spatial; at session start
-      - ST_Point (case-sensitive)
-      - Full GEOMETRY and GEOGRAPHY support
-      - GEOS-based implementation
-
-  - summary: Add Databricks geospatial variants
-    done: false
-    details: |
-      - H3 built-in via h3-java
-      - ST_* functions via Apache Sedona
-      - May require library imports
-      - Unity Catalog spatial types
-
-  - summary: Handle unsupported platforms
-    done: false
-    details: |
-      - ClickHouse: skip_on for all ST_* queries
-      - ClickHouse: H3 queries work (separate category)
-      - Clear documentation on geo support
-
-- phase: "Phase 5: Testing and Documentation"
-  items:
-  - summary: Create unit tests for geo catalog loader
-    done: false
-    details: |
-      - Test YAML parsing with geo-specific fields
-      - Test extension loading logic
-      - Test variant resolution
-      - Test skip_on filtering
-
-  - summary: Create integration tests with DuckDB
-    done: false
-    details: |
-      - Test data generation
-      - Test extension loading
-      - Execute all geo queries
-      - Validate geometry outputs (WKT comparison)
-
-  - summary: Add benchmark to CLI and runner
-    done: false
-    details: |
-      - Register geo-primitives benchmark
-      - Add to benchbox run --benchmark geo-primitives
-      - Handle extension loading in platform setup
-
-  - summary: Document geospatial primitives benchmark
-    done: false
-    details: |
-      - Document platform support matrix
-      - Explain data generation approach
-      - Provide coordinate system guidance
-      - Document H3 vs ST_* coverage
-
 files_affected:
 - change_type: New
   paths:
@@ -400,26 +129,160 @@ metadata:
     - DuckDB requires extension loading at session start
     - Consider separate H3-only benchmark for broader platform support
 
+  migration_review_required: true
 must_preserve:
-  - "BaseBenchmark interface contract unchanged"
-  - "Existing spatial query support in NYC Taxi benchmark unaffected"
+- "BaseBenchmark interface contract unchanged"
+- "Existing spatial query support in NYC Taxi benchmark unaffected"
 
 anti_patterns:
-  - "DO NOT add DuckDB-specific extension loading to BaseBenchmark — because it breaks other platforms — handle spatial extension loading in the DuckDB platform adapter"
-  - "DO NOT require PostGIS for unit tests — because CI has no PostgreSQL server — mock spatial operations"
+- "DO NOT add DuckDB-specific extension loading to BaseBenchmark — because it breaks other platforms — handle spatial extension
+  loading in the DuckDB platform adapter"
+- "DO NOT require PostGIS for unit tests — because CI has no PostgreSQL server — mock spatial operations"
 
 verification:
-  - description: "Geospatial primitives module imports"
-    command: "uv run -- python -c \"from benchbox.core.geo_primitives import GeoPrimitivesBenchmark; print('OK')\""
-    expected_output: "OK"
-  - description: "Unit tests pass"
-    command: "uv run -- python -m pytest tests/unit/core/geo_primitives/ -v --tb=short"
-    expected_output: "all tests pass"
+- description: "Geospatial primitives module imports"
+  command: "uv run -- python -c \"from benchbox.core.geo_primitives import GeoPrimitivesBenchmark; print('OK')\""
+  expected_output: "OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/geo_primitives/ -v --tb=short"
+  expected_output: "all tests pass"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/geo_primitives/"
-    - "tests/unit/core/geo_primitives/"
+  - "benchbox/core/geo_primitives/"
+  - "tests/unit/core/geo_primitives/"
   do_not_modify:
-    - "benchbox/core/nyctaxi/spatial.py"
-    - "benchbox/core/runner.py"
+  - "benchbox/core/nyctaxi/spatial.py"
+  - "benchbox/core/runner.py"
+work:
+- id: w1
+  summary: Design geospatial primitives benchmark architecture
+  status: pending
+  notes: "- Define GeoQuery dataclass (similar to PrimitiveQuery)\n- Determine data generation strategy (synthetic vs derived)\n\
+    - Design for cross-platform coordinate system handling\n- Plan extension loading (DuckDB spatial)\n"
+- id: w2
+  summary: Create catalog YAML schema for geospatial queries
+  status: pending
+  notes: "- id, category, sql fields\n- variants dict for platform-specific syntax (ST_GEOGPOINT vs ST_POINT)\n- skip_on list
+    for unsupported platforms (clickhouse)\n- requires_extension field for DuckDB spatial loading\n- coordinate_system field
+    (default: WGS84)\n"
+- id: w3
+  summary: Design test data generation
+  status: pending
+  notes: "Option A: Add geo columns to TPC-H staging tables\n- Add customer_location GEOGRAPHY to customer\n- Add supplier_location
+    GEOGRAPHY to supplier\n- Generate random points within nation bounding boxes\n\nOption B: Separate geo test tables\n-
+    geo_points: id, location GEOGRAPHY, category\n- geo_polygons: id, shape GEOGRAPHY, name\n- geo_lines: id, path GEOGRAPHY,
+    length_km\n"
+- id: w4
+  summary: Create benchbox/core/geo_primitives/ module structure
+  status: pending
+  notes: "- __init__.py\n- catalog/__init__.py\n- catalog/loader.py (GeoCatalogLoader)\n- catalog/queries.yaml (geospatial
+    query definitions)\n- benchmark.py (GeoPrimitivesBenchmark class)\n- generator.py (geospatial data generation)\n- schema.py
+    (test table definitions)\n"
+- id: w5
+  summary: Implement GeoCatalog loader
+  status: pending
+  notes: "- Parse geo-specific fields (requires_extension, coordinate_system)\n- Handle extension loading for DuckDB\n- Validate
+    coordinate system specifications\n"
+- id: w6
+  summary: Implement geospatial data generator
+  status: pending
+  notes: "- Generate random points within bounding boxes\n- Create test polygons (nations, regions)\n- Generate test lines
+    (shipping routes)\n- Support different scale factors\n"
+- id: w7
+  summary: Implement GeoPrimitivesBenchmark class
+  status: pending
+  notes: "- Inherit from BaseBenchmark pattern\n- Handle extension loading (DuckDB)\n- Setup: create and populate geo test
+    tables\n- Execute geo queries with timing capture\n- Teardown: drop geo test tables\n"
+- id: w8
+  summary: Implement Point Operations queries (5+ queries)
+  status: pending
+  notes: "- geo_point_create: Create points from lat/lng\n- geo_point_extract_x: Extract longitude\n- geo_point_extract_y:
+    Extract latitude\n- geo_point_from_wkt: Parse from WKT string\n- geo_point_to_wkt: Convert to WKT string\n\nExample (Snowflake):\n\
+    ```sql\nSELECT\n    c_custkey,\n    ST_POINT(-122.4194, 37.7749) as sf_location,\n    ST_X(customer_location) as cust_lng,\n\
+    \    ST_Y(customer_location) as cust_lat\nFROM customer_geo\nLIMIT 100;\n```\n"
+- id: w9
+  summary: Implement Distance & Proximity queries (6+ queries)
+  status: pending
+  notes: "- geo_distance_points: Distance between two points\n- geo_distance_point_polygon: Distance to polygon boundary\n\
+    - geo_dwithin_radius: Points within radius\n- geo_nearest_neighbor: Find N nearest points\n- geo_distance_matrix: Pairwise
+    distances (small set)\n- geo_shipping_distance: Distance between supplier and customer\n\nExample (Snowflake):\n```sql\n\
+    SELECT\n    s.s_suppkey,\n    c.c_custkey,\n    ST_DISTANCE(s.supplier_location, c.customer_location) / 1000 as distance_km\n\
+    FROM supplier_geo s\nCROSS JOIN customer_geo c\nWHERE c.c_nationkey = s.s_nationkey\nLIMIT 1000;\n```\n"
+- id: w10
+  summary: Implement Spatial Predicates queries (6+ queries)
+  status: pending
+  notes: "- geo_contains_point: Point within polygon\n- geo_intersects_polygons: Polygon overlap\n- geo_within_region: Points
+    within region polygon\n- geo_covers_area: Polygon covers another\n- geo_touches_boundary: Geometries touch\n- geo_disjoint_check:
+    Geometries don't intersect\n\nExample (Snowflake):\n```sql\nSELECT\n    c.c_custkey,\n    n.n_name\nFROM customer_geo
+    c\nJOIN nation_geo n\n    ON ST_CONTAINS(n.nation_polygon, c.customer_location)\nLIMIT 100;\n```\n"
+- id: w11
+  summary: Implement Geometry Transformation queries (5+ queries)
+  status: pending
+  notes: "- geo_buffer_point: Create buffer around point\n- geo_simplify_polygon: Simplify complex polygon\n- geo_centroid:
+    Calculate centroid\n- geo_envelope: Bounding box\n- geo_convexhull: Convex hull of points\n\nExample (Snowflake):\n```sql\n\
+    SELECT\n    n_nationkey,\n    ST_CENTROID(nation_polygon) as nation_center,\n    ST_AREA(nation_polygon) / 1e6 as area_sq_km\n\
+    FROM nation_geo;\n```\n"
+- id: w12
+  summary: Implement Spatial Aggregation queries (4+ queries)
+  status: pending
+  notes: "- geo_union_regions: Union of multiple polygons\n- geo_collect_points: Collect points into multipoint\n- geo_convexhull_customers:
+    Convex hull of customer locations\n- geo_extent_suppliers: Bounding box of all suppliers\n\nExample (BigQuery):\n```sql\n\
+    SELECT\n    c_mktsegment,\n    ST_UNION_AGG(customer_location) as segment_coverage,\n    COUNT(*) as customer_count\n\
+    FROM customer_geo\nGROUP BY c_mktsegment;\n```\n"
+- id: w13
+  summary: Implement Area & Length queries (4+ queries)
+  status: pending
+  notes: "- geo_area_nation: Area of nation polygons\n- geo_length_route: Length of shipping route\n- geo_perimeter_region:
+    Perimeter of region\n- geo_area_buffer: Area of buffered point\n"
+- id: w14
+  summary: Implement H3 Indexing queries (4+ queries)
+  status: pending
+  notes: "- geo_h3_index: Convert point to H3 cell\n- geo_h3_boundary: Get H3 cell boundary\n- geo_h3_neighbors: Get neighboring
+    cells\n- geo_h3_aggregation: Aggregate by H3 cell\n\nNote: H3 has broader support (including ClickHouse)\n\nExample (Snowflake):\n\
+    ```sql\nSELECT\n    c_custkey,\n    H3_LATLNG_TO_CELL(ST_Y(customer_location), ST_X(customer_location), 7) as h3_cell\n\
+    FROM customer_geo\nLIMIT 100;\n```\n"
+- id: w15
+  summary: Add Snowflake geospatial variants
+  status: pending
+  notes: "- Standard ST_* function syntax\n- GEOGRAPHY and GEOMETRY both supported\n- H3 functions built-in\n- Spatial indexing
+    automatic\n"
+- id: w16
+  summary: Add BigQuery geospatial variants
+  status: pending
+  notes: "- ST_GEOGPOINT instead of ST_POINT\n- GEOGRAPHY only (no GEOMETRY)\n- ST_UNION_AGG for aggregation\n- BQ-specific
+    function naming\n"
+- id: w17
+  summary: Add DuckDB spatial variants
+  status: pending
+  notes: "- Requires LOAD spatial; at session start\n- ST_Point (case-sensitive)\n- Full GEOMETRY and GEOGRAPHY support\n\
+    - GEOS-based implementation\n"
+- id: w18
+  summary: Add Databricks geospatial variants
+  status: pending
+  notes: "- H3 built-in via h3-java\n- ST_* functions via Apache Sedona\n- May require library imports\n- Unity Catalog spatial
+    types\n"
+- id: w19
+  summary: Handle unsupported platforms
+  status: pending
+  notes: "- ClickHouse: skip_on for all ST_* queries\n- ClickHouse: H3 queries work (separate category)\n- Clear documentation
+    on geo support\n"
+- id: w20
+  summary: Create unit tests for geo catalog loader
+  status: pending
+  notes: "- Test YAML parsing with geo-specific fields\n- Test extension loading logic\n- Test variant resolution\n- Test
+    skip_on filtering\n"
+- id: w21
+  summary: Create integration tests with DuckDB
+  status: pending
+  notes: "- Test data generation\n- Test extension loading\n- Execute all geo queries\n- Validate geometry outputs (WKT comparison)\n"
+- id: w22
+  summary: Add benchmark to CLI and runner
+  status: pending
+  notes: "- Register geo-primitives benchmark\n- Add to benchbox run --benchmark geo-primitives\n- Handle extension loading
+    in platform setup\n"
+- id: w23
+  summary: Document geospatial primitives benchmark
+  status: pending
+  notes: "- Document platform support matrix\n- Explain data generation approach\n- Provide coordinate system guidance\n-
+    Document H3 vs ST_* coverage\n"
