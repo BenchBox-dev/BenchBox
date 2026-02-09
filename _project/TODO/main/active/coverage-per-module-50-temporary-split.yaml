@@ -595,7 +595,7 @@ work:
   status: done
 - id: w71
   summary: "Batch 5A: Zero-coverage CLI modules (2 files, ~12 tests)"
-  status: pending
+  status: done
 - id: w72
   summary: "tests/unit/cli/test_tuning_wizard.py → cli/tuning.py (0% → 50%, ~6 tests)"
   needs:
@@ -605,7 +605,7 @@ work:
   summary: "tests/unit/cli/test_onboarding_coverage.py → cli/onboarding.py (0% → 50%, ~6 tests)"
   needs:
   - w71
-  status: pending
+  status: done
 - id: w74
   summary: "Batch 5B: Low-coverage CLI commands (6 files, ~32 tests)"
   status: pending
