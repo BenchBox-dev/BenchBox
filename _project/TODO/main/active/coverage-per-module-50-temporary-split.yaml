@@ -624,7 +624,7 @@ work:
   summary: "tests/unit/cli/commands/test_df_tuning_coverage.py → cli/commands/df_tuning.py (11% → 50%, ~5 tests)"
   needs:
   - w74
-  status: pending
+  status: done
 - id: w78
   summary: "tests/unit/cli/commands/test_export_coverage.py → cli/commands/export.py (13% → 50%, ~5 tests)"
   needs:
