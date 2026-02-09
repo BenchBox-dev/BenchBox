@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T09:38:08.990180'
-total_items: 437
+generated_at: '2026-02-09T16:08:17.156709'
+total_items: 438
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 390
+    count: 391
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1780,6 +1780,11 @@ statuses:
       title: Unified Tuning Configuration System ✅ COMPLETED
       priority: Medium
       category: '"Technical Debt & Refactoring"'
+    - id: unify-dataframe-sql-default-storage-location
+      file: DONE/core-functionality/active/unify-dataframe-sql-default-storage-location.yaml
+      title: Unify DataFrame and SQL default storage locations to project-local benchmark_runs/
+      priority: High
+      category: Core Functionality
     - id: unify-platform-registration-systems
       file: DONE/architecture-cleanup/unify-platform-registration-systems.yaml
       title: Unify Platform Registration Systems

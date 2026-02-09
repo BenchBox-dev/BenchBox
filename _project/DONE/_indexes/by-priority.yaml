@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T09:38:08.990076'
-total_items: 437
+generated_at: '2026-02-09T16:08:17.156592'
+total_items: 438
 priorities:
   Critical:
     count: 31
@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 148
+    count: 149
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -717,6 +717,11 @@ priorities:
       file: DONE/platform-expansion-trino/completed/trino-platform-adapter.yaml
       title: Trino Platform Adapter
       category: Platform Expansion
+      status: Completed
+    - id: unify-dataframe-sql-default-storage-location
+      file: DONE/core-functionality/active/unify-dataframe-sql-default-storage-location.yaml
+      title: Unify DataFrame and SQL default storage locations to project-local benchmark_runs/
+      category: Core Functionality
       status: Completed
     - id: unify-platform-registration-systems
       file: DONE/architecture-cleanup/unify-platform-registration-systems.yaml

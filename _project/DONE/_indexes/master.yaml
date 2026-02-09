@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T09:38:08.989719'
-total_items: 437
+generated_at: '2026-02-09T16:08:17.156195'
+total_items: 438
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1904,6 +1904,26 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 2 weeks (1.0 FTE)
   completed_date: '2025-11-28'
+- id: unify-dataframe-sql-default-storage-location
+  file: DONE/core-functionality/active/unify-dataframe-sql-default-storage-location.yaml
+  title: Unify DataFrame and SQL default storage locations to project-local benchmark_runs/
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - dataframe
+  - storage
+  - consistency
+  - developer-experience
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+  completed_date: '2026-02-09'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  deferred_count: 3
 - id: unify-platform-registration-systems
   file: DONE/architecture-cleanup/unify-platform-registration-systems.yaml
   title: Unify Platform Registration Systems

@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T09:38:07.652604'
-total_items: 46
+generated_at: '2026-02-09T16:08:15.000851'
+total_items: 47
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -117,8 +117,8 @@ items:
   - ci
   estimated_effort: Large
   work_total: 101
-  work_done: 72
-  work_ready: 11
+  work_done: 99
+  work_ready: 2
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -722,6 +722,22 @@ items:
   work_total: 39
   work_done: 0
   work_ready: 12
+- id: consolidate-trailing-delimiter-handling
+  file: TODO/core-functionality/active/consolidate-trailing-delimiter-handling.yaml
+  title: Consolidate trailing delimiter handling into shared utility
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: In Progress
+  tags:
+  - refactoring
+  - bug-fix
+  - trailing-delimiter
+  - tpc-data
+  estimated_effort: 2-3 days
+  work_total: 8
+  work_done: 6
+  work_ready: 1
 - id: ctas-sorted-data-loading
   file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
   title: Implement CTAS-based sorted data loading for DuckDB

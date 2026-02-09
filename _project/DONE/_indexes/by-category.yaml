@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T09:38:08.989949'
+generated_at: '2026-02-09T16:08:17.156451'
 total_categories: 62
 categories:
   '"Bug Fixes & Reliability"':
@@ -358,7 +358,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 110
+    count: 111
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -890,6 +890,11 @@ categories:
       file: DONE/main/active/trim-viz-deps-plotly-only.yaml
       title: Trim visualization dependencies to Plotly-only (remove Kaleido, Pandas, Pillow)
       priority: Medium
+      status: Completed
+    - id: unify-dataframe-sql-default-storage-location
+      file: DONE/core-functionality/active/unify-dataframe-sql-default-storage-location.yaml
+      title: Unify DataFrame and SQL default storage locations to project-local benchmark_runs/
+      priority: High
       status: Completed
     - id: unified-adapter-interface
       file: DONE/core-functionality/planning/unified-adapter-interface.yaml

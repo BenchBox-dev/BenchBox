@@ -1,0 +1,203 @@
+id: unify-dataframe-sql-default-storage-location
+title: "Unify DataFrame and SQL default storage locations to project-local benchmark_runs/"
+worktree: "core-functionality"
+priority: "High"
+status: "Completed"
+completed_date: "2026-02-09"
+description: |
+  DataFrame and SQL benchmarks use inconsistent default storage locations:
+
+  - SQL: `./benchmark_runs/datagen/{benchmark}_{sf}` (project-local, CWD-relative)
+  - DataFrame: `~/.benchbox/dataframe-data/{benchmark}/sf_{N}/{format}/` (user home, global)
+
+  This creates a confusing asymmetry where raw source data lives locally but
+  format conversions cache globally. Both should default to project-local under
+  `benchmark_runs/` so that all benchmark artifacts live together and are easy
+  to find, inspect, and clean up.
+
+  The core fix is a one-line constant change:
+
+      # Before (data_loader.py:63):
+      DEFAULT_CACHE_DIR = Path.home() / ".benchbox" / "dataframe-data"
+
+      # After:
+      DEFAULT_CACHE_DIR = Path.cwd() / "benchmark_runs" / "dataframe-data"
+
+  Plus wiring through runner construction, DirectoryManager, and test updates.
+
+category: "Core Functionality"
+
+metadata:
+  owners:
+  - "joe"
+  tags:
+  - "dataframe"
+  - "storage"
+  - "consistency"
+  - "developer-experience"
+  estimated_effort: "1-2 days"
+  created_date: "2026-02-09"
+
+impact:
+  business_value: |
+    Eliminates user confusion about where benchmark data lives. Currently SQL
+    users see everything under benchmark_runs/ while DataFrame users must know
+    to look in ~/.benchbox/. Unifying defaults makes the tool predictable and
+    makes cleanup a single `rm -rf benchmark_runs/` operation.
+  technical_debt: |
+    The split happened organically when DataFrame support was added. The global
+    cache was convenient during development but creates an asymmetry that should
+    not ship as the long-term default.
+
+files_affected:
+  modified:
+  - "benchbox/core/dataframe/data_loader.py"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/platforms/dataframe/benchmark_mixin.py"
+  - "benchbox/cli/config.py"
+  - "tests/unit/core/dataframe/test_data_loader.py"
+  added:
+  - "benchbox/utils/path_utils.py"
+  - "tests/unit/core/dataframe/test_storage_location_parity.py"
+
+must_preserve:
+- "SQL data paths remain exactly as-is: Path.cwd() / 'benchmark_runs' / 'datagen' / ... (benchbox/base.py unchanged)"
+- "BENCHBOX_CACHE_DIR environment variable continues to override the default cache directory"
+- "DataFrameDataLoader public API (constructor signature, load_data return type) unchanged"
+- "Internal cache directory structure below the root (benchmark/sf_N/format/) unchanged"
+- "Manifest file format and content unchanged"
+- "Existing runs with data in ~/.benchbox/dataframe-data/ continue to work if BENCHBOX_CACHE_DIR points there"
+
+approach: |
+  Minimal-surface-area change in strict dependency order:
+
+  1) Change the DEFAULT_CACHE_DIR constant — this is the one-line core fix.
+  2) Update DataCache docstring to reflect the new default.
+  3) Add a path helper to path_utils.py for consistency with existing helpers.
+  4) Wire BENCHBOX_CACHE_DIR through DataFrameRunOptions.cache_dir in runner.py
+     so the runner explicitly sets the cache directory rather than relying on
+     the module-level default.
+  5) Register dataframe-data/ in DirectoryManager so it is created alongside
+     datagen/, results/, and databases/.
+  6) Update existing test assertions to expect the new path.
+  7) Add a parity test that asserts SQL and DataFrame defaults share the same
+     benchmark_runs/ root.
+  8) Full verification: fast suite, smoke run, confirm output appears locally.
+
+anti_patterns:
+- "DO NOT move SQL paths to a global location — because the current CWD-relative SQL default is correct and predictable
+  — the fix is bringing DataFrame in line with SQL, not the reverse"
+- "DO NOT remove or disable caching — because DataFrame format conversions (CSV->Parquet etc.) are expensive
+  — only the default location changes, caching behavior is preserved"
+- "DO NOT auto-migrate existing ~/.benchbox/dataframe-data/ — because users may have multiple projects sharing that cache
+  — migration is deferred and should be opt-in if ever implemented"
+- "DO NOT change the internal cache directory structure (benchmark/sf_N/format/) — because this is an implementation detail
+  that works correctly — only the root prefix changes"
+
+verification:
+- description: "TODO schema validation passes for this new item"
+  command: "uv run _project/scripts/validate_todo.py _project/TODO/core-functionality/active/unify-dataframe-sql-default-storage-location.yaml"
+  expected_output: "is valid"
+- description: "No dependency cycles in TODO graph"
+  command: "uv run _project/scripts/todo_cli.py check-graph"
+  expected_output: "No cycles detected"
+- description: "Existing data_loader tests pass (baseline before changes)"
+  command: "uv run -- python -m pytest tests/unit/core/dataframe/test_data_loader.py -v"
+  expected_output: "All tests pass"
+- description: "Fast smoke suite remains green after storage location changes"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "Fast marker tests pass with no regressions"
+- description: "DataFrame smoke run produces output under benchmark_runs/"
+  command: "uv run -- python -m benchbox run --platform polars-df --benchmark tpch --scale 0.01 --phases load,power --queries Q1 --non-interactive"
+  expected_output: "Run completes and data appears under benchmark_runs/dataframe-data/"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/dataframe/data_loader.py"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/platforms/dataframe/benchmark_mixin.py"
+  - "benchbox/cli/config.py"
+  - "benchbox/utils/path_utils.py"
+  - "tests/unit/core/dataframe/test_data_loader.py"
+  - "tests/unit/core/dataframe/test_storage_location_parity.py"
+  do_not_modify:
+  - "benchbox/base.py"
+  - "benchbox/core/dataframe/context.py"
+  - "benchbox/core/dataframe/query.py"
+  - "benchbox/core/dataframe/capabilities.py"
+  - "benchbox/core/tpch/"
+  - "benchbox/core/tpcds/"
+
+context_sections:
+  "Asymmetry in Code": |
+    | Component | Path | Code Location |
+    |-----------|------|---------------|
+    | SQL data dir | `Path.cwd() / "benchmark_runs" / "datagen"` | `benchbox/base.py:62-66` |
+    | DataFrame cache | `Path.home() / ".benchbox" / "dataframe-data"` | `benchbox/core/dataframe/data_loader.py:63` |
+    | DataCache init | Falls through to `DEFAULT_CACHE_DIR` when no env/param | `data_loader.py:479` |
+    | Runner construction | `DataFrameRunOptions()` with `cache_dir` never set | `runner.py:611,714` |
+    | DirectoryManager | Manages `datagen/`, `results/`, `databases/` but not `dataframe-data/` | `cli/config.py:849-865` |
+
+  "Definition of Done": |
+    - DEFAULT_CACHE_DIR points to `Path.cwd() / "benchmark_runs" / "dataframe-data"`
+    - Runner explicitly passes cache_dir through DataFrameRunOptions
+    - DirectoryManager creates dataframe-data/ alongside other benchmark_runs/ subdirs
+    - All existing tests updated and passing
+    - New parity test asserts SQL and DataFrame share benchmark_runs/ root
+    - Smoke run confirms data appears project-locally
+
+deferred:
+- summary: "CLI --global-cache flag to opt into ~/.benchbox/ location"
+  reason: "Not needed for initial fix; can be added later if users request it"
+- summary: "Auto-migration of existing ~/.benchbox/dataframe-data/ contents"
+  reason: "Users may share global cache across projects; migration should be explicit and opt-in"
+- summary: "Unify cache subdirectory naming between SQL (datagen/) and DataFrame (dataframe-data/)"
+  reason: "Different naming serves different purposes; unifying names is a separate cosmetic concern"
+
+success_metrics:
+- "DEFAULT_CACHE_DIR resolves under benchmark_runs/ not ~/.benchbox/"
+- "DataFrame smoke run at SF=0.01 produces data under ./benchmark_runs/dataframe-data/"
+- "SQL paths remain unchanged (base.py not modified)"
+- "BENCHBOX_CACHE_DIR override still works for both implicit and explicit cache_dir"
+- "Parity test proves SQL and DataFrame defaults share the same root"
+
+work:
+- id: w1
+  summary: "Change DEFAULT_CACHE_DIR from Path.home() / '.benchbox' / 'dataframe-data' to Path.cwd() / 'benchmark_runs' / 'dataframe-data'"
+  status: done
+- id: w2
+  summary: "Update DataCache class docstring to document the new default location and BENCHBOX_CACHE_DIR override"
+  needs:
+  - w1
+  status: done
+- id: w3
+  summary: "Add get_benchmark_runs_dataframe_path() helper to benchbox/utils/path_utils.py"
+  status: done
+- id: w4
+  summary: "Wire BENCHBOX_CACHE_DIR through DataFrameRunOptions.cache_dir in runner.py and benchmark_mixin.py"
+  needs:
+  - w1
+  status: done
+- id: w5
+  summary: "Add 'dataframe-data/' to DirectoryManager._ensure_directories() in cli/config.py"
+  needs:
+  - w1
+  status: done
+- id: w6
+  summary: "Update existing test_data_loader.py test assertions to expect the new default path"
+  needs:
+  - w1
+  status: done
+  notes: "No test changes needed — existing tests use explicit cache_dir or mocks, none assert the old ~/.benchbox default"
+- id: w7
+  summary: "Add test_storage_location_parity.py asserting SQL and DataFrame defaults share benchmark_runs/ root"
+  needs:
+  - w6
+  status: done
+- id: w8
+  summary: "Full verification gate: fast suite, smoke run, confirm project-local output under benchmark_runs/"
+  needs:
+  - w6
+  - w7
+  status: done
+  notes: "92 relevant tests pass (57 data_loader + 8 parity + 25 dataframe_runner + 2 extras). 3 pre-existing failures in modin/dask/cudf tests are unrelated (trailing delimiter refactor in unstaged changes)."
