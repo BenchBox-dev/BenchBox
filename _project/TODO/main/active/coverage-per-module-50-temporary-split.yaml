@@ -608,7 +608,7 @@ work:
   status: done
 - id: w74
   summary: "Batch 5B: Low-coverage CLI commands (6 files, ~32 tests)"
-  status: pending
+  status: done
 - id: w75
   summary: "tests/unit/cli/commands/test_compare_plans_coverage.py → cli/commands/compare_plans.py (8% → 50%, ~5 tests)"
   needs:
@@ -629,7 +629,7 @@ work:
   summary: "tests/unit/cli/commands/test_export_coverage.py → cli/commands/export.py (13% → 50%, ~5 tests)"
   needs:
   - w74
-  status: pending
+  status: done
 - id: w79
   summary: "tests/unit/cli/test_preferences_coverage.py → cli/preferences.py (15% → 50%, ~7 tests)"
   needs:
@@ -639,7 +639,7 @@ work:
   summary: "tests/unit/cli/commands/test_plan_history_coverage.py → cli/commands/plan_history.py (19% → 50%, ~5 tests)"
   needs:
   - w74
-  status: pending
+  status: done
 - id: w81
   summary: "Batch 5C: Medium-coverage CLI (7 files, ~33 tests)"
   status: pending
