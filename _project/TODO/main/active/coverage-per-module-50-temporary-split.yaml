@@ -155,18 +155,18 @@ tasks:
             - summary: "tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py → core/transaction_primitives/dataframe_operations.py (38% → 50%, ~6 tests)"
               done: true
         - summary: "Batch 3D: Platform adapters (5 files, ~24 tests)"
-          done: false
+          done: true
           subtasks:
             - summary: "tests/unit/platforms/test_motherduck_coverage.py → platforms/motherduck.py (32% → 50%, ~5 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/test_influxdb_adapter_coverage.py → platforms/influxdb/adapter.py (31% → 50%, ~5 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/test_clickhouse_metadata_coverage.py → platforms/clickhouse/metadata.py (31% → 50%, ~4 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/aws/test_emr_serverless_coverage.py → platforms/aws/emr_serverless_adapter.py (38% → 50%, ~5 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/dataframe/test_iceberg_maintenance_coverage.py → platforms/dataframe/iceberg_maintenance.py (38% → 50%, ~5 tests)"
-              done: false
+              done: true
         - summary: "Batch 3E: DataFrame adapters and remaining credentials (3 files, ~20 tests)"
           done: false
           subtasks:
@@ -323,7 +323,7 @@ metadata:
     - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-08T23:30:00"
+  last_updated: "2026-02-09T00:30:00"
 
 impact:
   business_value: |
