@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T08:10:10.509280'
-total_items: 45
+generated_at: '2026-02-09T09:00:55.693621'
+total_items: 46
 statuses:
   In Progress:
     count: 3
@@ -20,7 +20,7 @@ statuses:
       priority: High
       category: Testing and Quality Assurance
   Not Started:
-    count: 42
+    count: 43
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -66,6 +66,11 @@ statuses:
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
       priority: Medium-High
+      category: Platform Expansion
+    - id: bodo-dataframe-platform
+      file: TODO/platform-expansion/planning/bodo-dataframe-platform.yaml
+      title: Bodo DataFrame Platform Adapter
+      priority: Medium
       category: Platform Expansion
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml

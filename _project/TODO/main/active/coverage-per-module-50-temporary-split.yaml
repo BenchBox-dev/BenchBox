@@ -51,7 +51,7 @@ metadata:
   - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-09T08:38:25"
+  last_updated: "2026-02-09T09:00:43"
 
   related:
   - coverage-cli-modules
@@ -535,7 +535,7 @@ work:
     ~10 tests)"
   needs:
   - w58
-  status: pending
+  status: done
 - id: w60
   summary: "tests/unit/core/tpch/test_dataframe_queries_coverage.py → core/tpch/dataframe_queries.py (12% → 50%, ~10 tests)"
   needs:
@@ -564,7 +564,7 @@ work:
   summary: "tests/unit/core/tpch_skew/test_skew_generator_coverage.py → core/tpch_skew/generator.py (17% → 50%, ~7 tests)"
   needs:
   - w64
-  status: pending
+  status: done
 - id: w66
   summary: "tests/unit/core/tpcds/test_parameter_extractor_coverage.py → core/tpcds/parameter_extractor.py (15% → 50%, ~4
     tests)"

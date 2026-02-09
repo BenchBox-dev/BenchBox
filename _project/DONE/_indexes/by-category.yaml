@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T08:39:29.720609'
+generated_at: '2026-02-09T09:00:56.544885'
 total_categories: 62
 categories:
   '"Bug Fixes & Reliability"':
@@ -1400,7 +1400,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 41
+    count: 42
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1605,6 +1605,11 @@ categories:
     - id: trino-platform-adapter
       file: DONE/platform-expansion-trino/completed/trino-platform-adapter.yaml
       title: Trino Platform Adapter
+      priority: High
+      status: Completed
+    - id: fireducks-integration-gaps
+      file: DONE/dataframe-expansion/planning/fireducks-integration-gaps.yaml
+      title: Wire FireDucks into adapter factory, CLI routing, and platform registry
       priority: High
       status: Completed
   Platform Polish:
