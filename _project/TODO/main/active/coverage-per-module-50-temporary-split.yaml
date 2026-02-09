@@ -647,12 +647,12 @@ work:
   summary: "tests/unit/cli/commands/test_datagen_coverage.py → cli/commands/datagen.py (22% → 50%, ~5 tests)"
   needs:
   - w81
-  status: pending
+  status: done
 - id: w83
   summary: "tests/unit/cli/commands/test_show_plan_coverage.py → cli/commands/show_plan.py (24% → 50%, ~4 tests)"
   needs:
   - w81
-  status: pending
+  status: done
 - id: w84
   summary: "tests/unit/cli/commands/test_compare_coverage.py → cli/commands/compare.py (28% → 50%, ~5 tests)"
   needs:
@@ -672,7 +672,7 @@ work:
   summary: "tests/unit/cli/test_system_coverage.py → cli/system.py (36% → 50%, ~4 tests)"
   needs:
   - w81
-  status: pending
+  status: done
 - id: w88
   summary: "tests/unit/cli/test_composite_params_coverage.py → cli/composite_params.py (39% → 50%, ~5 tests)"
   needs:
