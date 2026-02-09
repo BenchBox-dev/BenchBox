@@ -51,7 +51,7 @@ metadata:
   - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-09T09:14:06"
+  last_updated: "2026-02-09T09:22:11"
 
   related:
   - coverage-cli-modules
@@ -576,7 +576,7 @@ work:
     → 50%, ~7 tests)"
   needs:
   - w64
-  status: pending
+  status: done
 - id: w68
   summary: "tests/unit/platforms/dataframe/test_cudf_df_coverage.py → platforms/dataframe/cudf_df.py (24% → 50%, ~5 tests)"
   needs:
