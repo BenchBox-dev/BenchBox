@@ -51,7 +51,7 @@ metadata:
   - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-09T09:04:22"
+  last_updated: "2026-02-09T09:14:06"
 
   related:
   - coverage-cli-modules
@@ -559,7 +559,7 @@ work:
   status: done
 - id: w64
   summary: "Batch 4B: More large modules (6 files, ~35 tests)"
-  status: pending
+  status: done
 - id: w65
   summary: "tests/unit/core/tpch_skew/test_skew_generator_coverage.py → core/tpch_skew/generator.py (17% → 50%, ~7 tests)"
   needs:
@@ -581,18 +581,18 @@ work:
   summary: "tests/unit/platforms/dataframe/test_cudf_df_coverage.py → platforms/dataframe/cudf_df.py (24% → 50%, ~5 tests)"
   needs:
   - w64
-  status: pending
+  status: done
 - id: w69
   summary: "tests/unit/platforms/dataframe/test_dask_df_coverage.py → platforms/dataframe/dask_df.py (20% → 50%, ~6 tests)"
   needs:
   - w64
-  status: pending
+  status: done
 - id: w70
   summary: "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py → platforms/databricks/dataframe_adapter.py
     (18% → 50%, ~6 tests)"
   needs:
   - w64
-  status: pending
+  status: done
 - id: w71
   summary: "Batch 5A: Zero-coverage CLI modules (2 files, ~12 tests)"
   status: pending
