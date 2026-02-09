@@ -600,7 +600,7 @@ work:
   summary: "tests/unit/cli/test_tuning_wizard.py → cli/tuning.py (0% → 50%, ~6 tests)"
   needs:
   - w71
-  status: pending
+  status: done
 - id: w73
   summary: "tests/unit/cli/test_onboarding_coverage.py → cli/onboarding.py (0% → 50%, ~6 tests)"
   needs:
