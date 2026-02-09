@@ -657,12 +657,12 @@ work:
   summary: "tests/unit/cli/commands/test_compare_coverage.py → cli/commands/compare.py (28% → 50%, ~5 tests)"
   needs:
   - w81
-  status: pending
+  status: done
 - id: w85
   summary: "tests/unit/cli/commands/test_shell_coverage.py → cli/commands/shell.py (30% → 50%, ~5 tests)"
   needs:
   - w81
-  status: pending
+  status: done
 - id: w86
   summary: "tests/unit/cli/commands/test_run_official_coverage.py → cli/commands/run_official.py (33% → 50%, ~5 tests)"
   needs:
