@@ -23,7 +23,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from ruamel.yaml import YAML
+import yaml
 
 
 class TodoFormatMigrator:
@@ -40,10 +40,6 @@ class TodoFormatMigrator:
         self.todo_dir = project_root / "_project" / "TODO"
         self.done_dir = project_root / "_project" / "DONE"
         self.apply = apply
-        self.ryaml = YAML()
-        self.ryaml.preserve_quotes = True
-        self.ryaml.width = 120
-        self.ryaml.best_map_representer = True
         self.stats = {
             "ids_added": 0,
             "ids_skipped": 0,
@@ -67,16 +63,31 @@ class TodoFormatMigrator:
             files.append(yaml_file)
         return files
 
-    def _load_yaml(self, path: Path) -> dict:
-        """Load YAML with ruamel for round-trip editing."""
-        with open(path) as f:
-            return self.ryaml.load(f)
+    def _find_done_files(self) -> list[Path]:
+        """Find all DONE YAML files (excluding indexes)."""
+        files = []
+        if not self.done_dir.exists():
+            return files
+        for yaml_file in sorted(self.done_dir.rglob("*.yaml")):
+            if "_indexes" in str(yaml_file):
+                continue
+            files.append(yaml_file)
+        return files
+
+    def _load_yaml(self, path: Path) -> dict | None:
+        """Load YAML file."""
+        try:
+            with open(path) as f:
+                return yaml.safe_load(f)
+        except Exception as e:
+            print(f"  WARN: failed to parse {path.relative_to(self.project_root)}: {e}")
+            return None
 
     def _save_yaml(self, path: Path, doc: dict) -> None:
-        """Save YAML preserving formatting."""
+        """Save YAML file."""
         if self.apply:
             with open(path, "w") as f:
-                self.ryaml.dump(doc, f)
+                yaml.safe_dump(doc, f, default_flow_style=False, sort_keys=False, allow_unicode=True, width=120)
 
     def _path_to_slug(self, file_path: str) -> str:
         """Convert a file path reference to a slug ID."""
@@ -85,19 +96,25 @@ class TodoFormatMigrator:
         return path.stem
 
     def backfill_ids(self) -> None:
-        """Add id: <filename-stem> to each TODO item."""
+        """Add id: <filename-stem> to each TODO and DONE item."""
         print("\n--- backfill-ids ---")
-        files = self._find_todo_files()
+        files = self._find_todo_files() + self._find_done_files()
+        stem_counts: dict[str, int] = {}
+        for path in files:
+            stem_counts[path.stem] = stem_counts.get(path.stem, 0) + 1
+        used_ids: set[str] = set()
 
         for path in files:
             doc = self._load_yaml(path)
             if doc is None:
                 continue
 
-            slug = path.stem
+            base_slug = path.stem
+            slug = base_slug
             existing_id = doc.get("id")
 
             if existing_id is not None:
+                used_ids.add(existing_id)
                 if existing_id != slug:
                     print(f"  MISMATCH: {path.name} has id='{existing_id}', expected '{slug}'")
                     self.stats["ids_mismatch"] += 1
@@ -105,16 +122,28 @@ class TodoFormatMigrator:
                     self.stats["ids_skipped"] += 1
                 continue
 
+            # DONE filenames may collide across worktrees; make deterministic unique IDs.
+            if stem_counts.get(base_slug, 0) > 1 and self.done_dir in path.parents:
+                worktree = doc.get("worktree")
+                if isinstance(worktree, str) and worktree.strip():
+                    slug = f"{worktree.strip()}-{base_slug}"
+                else:
+                    slug = f"{path.parent.name}-{base_slug}"
+
+            candidate = slug
+            suffix = 2
+            while candidate in used_ids:
+                candidate = f"{slug}-{suffix}"
+                suffix += 1
+            slug = candidate
+            used_ids.add(slug)
+
             # Insert id as the first field
-            # ruamel.yaml CommentedMap supports insert
-            if hasattr(doc, "insert"):
-                doc.insert(0, "id", slug)
-            else:
-                doc["id"] = slug
+            doc["id"] = slug
 
             self.stats["ids_added"] += 1
             action = "WRITE" if self.apply else "PREVIEW"
-            print(f"  {action}: {path.name} <- id: {slug}")
+            print(f"  {action}: {path.relative_to(self.project_root)} <- id: {slug}")
             self._save_yaml(path, doc)
 
         print(f"  Added: {self.stats['ids_added']}, Skipped: {self.stats['ids_skipped']}, "
@@ -170,7 +199,16 @@ class TodoFormatMigrator:
                 if related_slugs:
                     if "metadata" not in doc:
                         doc["metadata"] = {}
-                    doc["metadata"]["related"] = related_slugs
+                    existing_related = doc["metadata"].get("related", [])
+                    merged: list[str] = []
+                    if isinstance(existing_related, list):
+                        for ref in existing_related:
+                            if isinstance(ref, str) and ref.strip() and ref not in merged:
+                                merged.append(ref)
+                    for ref in related_slugs:
+                        if ref not in merged:
+                            merged.append(ref)
+                    doc["metadata"]["related"] = merged
 
             # Preserve 'note' from dependencies if present
             note = dependencies.get("note")
@@ -392,24 +430,42 @@ class TodoFormatMigrator:
 
         # Load all items
         items: dict[str, dict] = {}
+        todo_id_sources: dict[str, Path] = {}
         for path in self._find_todo_files():
             doc = self._load_yaml(path)
             if doc and isinstance(doc, dict):
                 slug = doc.get("id", path.stem)
+                if slug in todo_id_sources:
+                    errors.append(
+                        f"duplicate TODO id '{slug}' in '{todo_id_sources[slug].relative_to(self.project_root)}' "
+                        f"and '{path.relative_to(self.project_root)}'"
+                    )
+                    continue
+                todo_id_sources[slug] = path
                 items[slug] = doc
 
         # Load DONE slugs
         done_slugs: set[str] = set()
-        if self.done_dir.exists():
-            for yaml_file in self.done_dir.rglob("*.yaml"):
-                if "_indexes" in str(yaml_file):
-                    continue
-                try:
-                    doc = self._load_yaml(yaml_file)
-                    if doc and isinstance(doc, dict):
-                        done_slugs.add(doc.get("id", yaml_file.stem))
-                except Exception:
-                    continue
+        done_id_sources: dict[str, Path] = {}
+        for yaml_file in self._find_done_files():
+            try:
+                doc = self._load_yaml(yaml_file)
+                if doc and isinstance(doc, dict):
+                    slug = doc.get("id", yaml_file.stem)
+                    if slug in done_id_sources:
+                        errors.append(
+                            f"duplicate DONE id '{slug}' in '{done_id_sources[slug].relative_to(self.project_root)}' "
+                            f"and '{yaml_file.relative_to(self.project_root)}'"
+                        )
+                        continue
+                    done_id_sources[slug] = yaml_file
+                    done_slugs.add(slug)
+            except Exception:
+                continue
+
+        overlap = set(items.keys()) & done_slugs
+        for slug in sorted(overlap):
+            errors.append(f"duplicate id across TODO and DONE: '{slug}'")
 
         all_known = set(items.keys()) | done_slugs
 
@@ -504,8 +560,10 @@ class TodoFormatMigrator:
     def report(self) -> None:
         """Report migration status across all items."""
         print("\n--- report ---")
-        files = self._find_todo_files()
-        self.stats["files_total"] = len(files)
+        todo_files = self._find_todo_files()
+        done_files = self._find_done_files()
+        files = todo_files
+        self.stats["files_total"] = len(todo_files) + len(done_files)
 
         has_id = 0
         has_deps = 0
@@ -514,6 +572,9 @@ class TodoFormatMigrator:
         has_legacy_deps = 0
         has_deferred = 0
         review_required = 0
+        done_with_id = 0
+        duplicate_ids = 0
+        seen_ids: dict[str, Path] = {}
 
         for path in files:
             doc = self._load_yaml(path)
@@ -535,16 +596,43 @@ class TodoFormatMigrator:
             if isinstance(doc.get("metadata"), dict) and doc["metadata"].get("migration_review_required"):
                 review_required += 1
 
-        print(f"  Total files:       {len(files)}")
+        for path in done_files:
+            doc = self._load_yaml(path)
+            if doc is None:
+                continue
+            if "id" in doc:
+                done_with_id += 1
+
+        for path in todo_files + done_files:
+            doc = self._load_yaml(path)
+            if not doc or not isinstance(doc, dict):
+                continue
+            slug = doc.get("id", path.stem)
+            if slug in seen_ids:
+                duplicate_ids += 1
+            else:
+                seen_ids[slug] = path
+
+        print(f"  Total files (TODO+DONE): {self.stats['files_total']}")
+        print(f"  TODO files:         {len(todo_files)}")
+        print(f"  DONE files:         {len(done_files)}")
         print(f"  With id:           {has_id}")
+        print(f"  DONE with id:      {done_with_id}")
         print(f"  With deps:         {has_deps}")
         print(f"  With work[]:       {has_work}")
         print(f"  With deferred:     {has_deferred}")
         print(f"  Legacy tasks:      {has_legacy_tasks}")
         print(f"  Legacy deps:       {has_legacy_deps}")
         print(f"  Review required:   {review_required}")
+        print(f"  Duplicate IDs:     {duplicate_ids}")
 
-        fully_migrated = has_id == len(files) and has_legacy_tasks == 0 and has_legacy_deps == 0
+        fully_migrated = (
+            has_id == len(todo_files)
+            and done_with_id == len(done_files)
+            and has_legacy_tasks == 0
+            and has_legacy_deps == 0
+            and duplicate_ids == 0
+        )
         print(f"\n  Migration {'COMPLETE' if fully_migrated else 'INCOMPLETE'}")
 
     def run_all(self) -> None:

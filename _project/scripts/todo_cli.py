@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -359,7 +360,15 @@ class TodoCLI:
                     data = yaml.safe_load(f)
                 if data and isinstance(data, dict):
                     slug = data.get("id", yaml_file.stem)
+                    if slug in items:
+                        existing_path = items[slug][0]
+                        raise ValueError(
+                            f"Duplicate TODO id '{slug}' in '{existing_path.relative_to(self.project_root)}' "
+                            f"and '{yaml_file.relative_to(self.project_root)}'"
+                        )
                     items[slug] = (yaml_file, data)
+            except ValueError:
+                raise
             except Exception:
                 continue
         return items
@@ -376,10 +385,29 @@ class TodoCLI:
                 with open(yaml_file) as f:
                     data = yaml.safe_load(f)
                 if data and isinstance(data, dict):
-                    slugs.add(data.get("id", yaml_file.stem))
+                    slug = data.get("id", yaml_file.stem)
+                    if slug in slugs:
+                        raise ValueError(
+                            f"Duplicate DONE id '{slug}' found in '{yaml_file.relative_to(self.project_root)}'"
+                        )
+                    slugs.add(slug)
+            except ValueError:
+                raise
             except Exception:
                 continue
         return slugs
+
+    def _load_graph_context(self) -> tuple[dict[str, tuple[Path, dict]], set[str]]:
+        """Load TODO and DONE IDs and enforce global uniqueness."""
+        items = self._load_all_items()
+        done_slugs = self._load_done_slugs()
+        overlap = set(items.keys()) & done_slugs
+        if overlap:
+            sample = sorted(overlap)[0]
+            raise ValueError(
+                f"Duplicate id across TODO and DONE: '{sample}'. IDs must be globally unique across both trees."
+            )
+        return items, done_slugs
 
     def _get_work_ready_units(self, work: list) -> tuple[list[dict], list[dict], list[dict]]:
         """Partition work units into (ready, blocked, done).
@@ -406,7 +434,11 @@ class TodoCLI:
 
     def _find_item(self, slug: str) -> tuple[Path, dict] | None:
         """Find a single TODO item by slug."""
-        items = self._load_all_items()
+        try:
+            items = self._load_all_items()
+        except ValueError as e:
+            print(f"❌ {e}", file=sys.stderr)
+            sys.exit(1)
         if slug in items:
             return items[slug]
         # Try matching by filename stem
@@ -417,8 +449,11 @@ class TodoCLI:
 
     def ready(self):
         """Show project-wide ready queue: items with all deps.needs satisfied."""
-        items = self._load_all_items()
-        done_slugs = self._load_done_slugs()
+        try:
+            items, done_slugs = self._load_graph_context()
+        except ValueError as e:
+            print(f"❌ {e}", file=sys.stderr)
+            sys.exit(1)
 
         # Partition items into ready and blocked
         ready_items: list[tuple[str, dict, int, int]] = []
@@ -432,7 +467,7 @@ class TodoCLI:
             # Check inter-item deps
             deps = data.get("deps", {})
             needs = deps.get("needs", []) if isinstance(deps, dict) else []
-            unsatisfied = [n for n in needs if n not in done_slugs and n in items]
+            unsatisfied = [n for n in needs if n not in done_slugs]
 
             if unsatisfied:
                 blocked_items.append((slug, data, unsatisfied))
@@ -576,7 +611,7 @@ class TodoCLI:
                     print(f"    -  {summary} ({reason})")
             print()
 
-    def mark_done(self, slug: str, work_id: str):
+    def mark_done(self, slug: str, work_id: str, force: bool = False):
         """Mark a work unit as done and report newly-unblocked units."""
         result = self._find_item(slug)
         if result is None:
@@ -605,29 +640,39 @@ class TodoCLI:
             print(f"Work unit '{work_id}' is already done.")
             return
 
-        # Use ruamel.yaml for round-trip editing
-        try:
-            from ruamel.yaml import YAML
+        done_ids = {u.get("id") for u in work if isinstance(u, dict) and u.get("status") == "done"}
+        needs = target.get("needs", [])
+        if not isinstance(needs, list):
+            needs = []
+        unmet = [n for n in needs if n not in done_ids]
+        if unmet and not force:
+            print(
+                f"Cannot mark '{work_id}' done: unmet dependencies: {', '.join(unmet)}.\n"
+                "Re-run with --force to bypass readiness checks for manual correction workflows.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if unmet and force:
+            print(f"⚠️  Forcing completion of '{work_id}' with unmet dependencies: {', '.join(unmet)}")
 
-            ryaml = YAML()
-            ryaml.preserve_quotes = True
-            ryaml.width = 120
+        # Regex replacement to preserve file formatting (no YAML round-trip)
+        with open(path) as f:
+            content = f.read()
 
-            with open(path) as f:
-                doc = ryaml.load(f)
+        # Match the work unit's id line followed by its status line
+        pattern = re.compile(
+            rf"^([ \t]*-\s*id:\s*{re.escape(work_id)}\s*\n"
+            rf"(?:[ \t]+\w[^\n]*\n)*?"  # optional intermediate fields
+            rf"[ \t]+status:\s*)(?:pending|in_progress)(.*)$",
+            re.MULTILINE,
+        )
+        new_content, count = pattern.subn(r"\g<1>done\2", content)
+        if count == 0:
+            print(f"Failed to update {work_id} status in {path} (pattern not matched).", file=sys.stderr)
+            sys.exit(1)
 
-            for u in doc["work"]:
-                if u.get("id") == work_id:
-                    u["status"] = "done"
-                    break
-
-            with open(path, "w") as f:
-                ryaml.dump(doc, f)
-
-        except ImportError:
-            target["status"] = "done"
-            with open(path, "w") as f:
-                yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True, width=120)
+        with open(path, "w") as f:
+            f.write(new_content)
 
         print(f"Marked {slug}/{work_id} as done.")
 
@@ -660,8 +705,13 @@ class TodoCLI:
 
     def check_graph(self):
         """Validate inter-item DAG and per-item work DAGs."""
-        items = self._load_all_items()
-        done_slugs = self._load_done_slugs()
+        try:
+            items, done_slugs = self._load_graph_context()
+        except ValueError as e:
+            print("\nGraph validation found 1 error(s):\n")
+            print(f"  {e}")
+            print()
+            sys.exit(1)
         all_known = set(items.keys()) | done_slugs
 
         errors: list[str] = []
@@ -866,8 +916,25 @@ class TodoCLI:
             print("   No TODO items to validate (only index/meta/script files)")
         print()
 
-        # Step 3: Regenerate indexes
-        print("Step 3: Regenerating indexes...")
+        # Step 3: Validate graph integrity
+        print("Step 3: Validating dependency graphs...")
+        graph_check = subprocess.run(
+            [sys.executable, str(self.project_root / "_project" / "scripts" / "todo_cli.py"), "check-graph"],
+            capture_output=True,
+            text=True,
+        )
+        if graph_check.returncode != 0:
+            print("❌ Graph validation failed:")
+            if graph_check.stdout.strip():
+                print(graph_check.stdout.strip())
+            if graph_check.stderr.strip():
+                print(graph_check.stderr.strip(), file=sys.stderr)
+            sys.exit(1)
+        print("   ✅ Graph validation passed")
+        print()
+
+        # Step 4: Regenerate indexes
+        print("Step 4: Regenerating indexes...")
         index_script = self.project_root / "_project" / "scripts" / "generate_indexes.py"
         result = subprocess.run(
             [sys.executable, str(index_script)],
@@ -880,8 +947,8 @@ class TodoCLI:
         print("   ✅ Indexes regenerated")
         print()
 
-        # Step 4: Get fresh status after index regeneration for accurate counts
-        print("Step 4: Analyzing changes to commit...")
+        # Step 5: Get fresh status after index regeneration for accurate counts
+        print("Step 5: Analyzing changes to commit...")
         result = subprocess.run(
             ["git", "-C", str(self.project_root), "status", "--porcelain"] + todo_paths,
             capture_output=True,
@@ -921,16 +988,16 @@ class TodoCLI:
             print(f"   Scripts: {scripts_changed} file(s)")
         print()
 
-        # Step 5: Stage and commit
+        # Step 6: Stage and commit
         if dry_run:
-            print("Step 5: [DRY RUN] Would commit the following:")
+            print("Step 6: [DRY RUN] Would commit the following:")
             for line in final_lines:
                 print(f"   {line}")
             print()
             print("✅ Dry run complete. Run without --dry-run to commit.\n")
             return
 
-        print("Step 5: Staging and committing changes...")
+        print("Step 6: Staging and committing changes...")
 
         # Stage all TODO/DONE directories and scripts
         # Use explicit paths to ensure everything is captured
@@ -1040,6 +1107,11 @@ def main():
     done_parser = subparsers.add_parser("done", help="Mark a work unit as done")
     done_parser.add_argument("slug", help="Item slug (filename without .yaml)")
     done_parser.add_argument("work_id", help="Work unit ID (e.g., w1, w2)")
+    done_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Bypass dependency readiness checks (manual correction only)",
+    )
 
     # Check-graph command
     subparsers.add_parser("check-graph", help="Validate inter-item DAG and per-item work DAGs")
@@ -1084,7 +1156,7 @@ def main():
     elif args.command == "next":
         cli.next_units(args.slug)
     elif args.command == "done":
-        cli.mark_done(args.slug, args.work_id)
+        cli.mark_done(args.slug, args.work_id, force=args.force)
     elif args.command == "check-graph":
         cli.check_graph()
     elif args.command == "cleanup":
