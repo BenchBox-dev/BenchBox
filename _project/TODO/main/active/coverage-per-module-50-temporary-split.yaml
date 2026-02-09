@@ -529,7 +529,7 @@ work:
   status: done
 - id: w58
   summary: "Batch 4A: Largest core modules (5 files, ~40 tests)"
-  status: pending
+  status: done
 - id: w59
   summary: "tests/unit/platforms/dataframe/test_unified_frame_coverage.py → platforms/dataframe/unified_frame.py (35% → 50%,
     ~10 tests)"
@@ -711,7 +711,7 @@ work:
   status: pending
 - id: w96
   summary: "Keep ETL tests unit-heavy with mocked pipeline and deterministic fixtures"
-  status: pending
+  status: done
 - id: w97
   summary: "Re-run full coverage report and identify any modules still below 50%"
   status: done
