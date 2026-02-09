@@ -119,7 +119,7 @@ tasks:
               done: true
 
     - phase: "Phase 3: Medium effort — tuning, credentials, TPC runners, adapters (20 files, ~95 tests)"
-      done: false
+      done: true
       items:
         - summary: "Batch 3A: Tuning subsystem (5 files, ~32 tests)"
           done: true
@@ -168,14 +168,14 @@ tasks:
             - summary: "tests/unit/platforms/dataframe/test_iceberg_maintenance_coverage.py → platforms/dataframe/iceberg_maintenance.py (38% → 50%, ~5 tests)"
               done: true
         - summary: "Batch 3E: DataFrame adapters and remaining credentials (3 files, ~20 tests)"
-          done: false
+          done: true
           subtasks:
             - summary: "tests/unit/platforms/dataframe/test_expression_family_coverage.py → platforms/dataframe/expression_family.py (35% → 50%, ~6 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/dataframe/test_modin_df_coverage.py → platforms/dataframe/modin_df.py (27% → 50%, ~5 tests)"
-              done: false
+              done: true
             - summary: "tests/unit/platforms/credentials/test_redshift_coverage.py → platforms/credentials/redshift.py (24% → 50%, ~9 tests)"
-              done: false
+              done: true
 
     - phase: "Phase 4: High effort — large modules (11 files, ~72 tests)"
       done: false
@@ -323,7 +323,7 @@ metadata:
     - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-09T00:30:00"
+  last_updated: "2026-02-09T01:10:00"
 
 impact:
   business_value: |
