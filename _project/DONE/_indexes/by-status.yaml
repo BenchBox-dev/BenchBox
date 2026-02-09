@@ -1,5 +1,5 @@
-generated_at: '2026-02-08T15:40:45.943670'
-total_items: 426
+generated_at: '2026-02-07T18:29:16.855240'
+total_items: 410
 statuses:
   In Progress:
     count: 1
@@ -197,13 +197,13 @@ statuses:
       title: Compressed Data Generation Gaps (all benchmarks) ✅
       priority: Medium
       category: Data Quality and Compatibility Issues
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       category: Performance and Efficiency
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       category: Performance and Efficiency
@@ -552,13 +552,13 @@ statuses:
       title: Restrict Primary/Foreign Key Configuration to tuning.yaml Only
       priority: Medium
       category: Project Lifecycle Management
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
@@ -667,13 +667,13 @@ statuses:
       title: ✅ Implement Core Verbosity and Quiet Modes (-v/-vv and -q)
       priority: Medium
       category: Project Lifecycle Management
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       category: Pre-Release High Priority Tasks (COMPLETED)
@@ -726,7 +726,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 282
+    count: 212
     items:
     - id: cli-detect-and-skip-unneeded-data-generation
       file: DONE/unknown/completed/cli-detect-and-skip-unneeded-data-generation.yaml
@@ -783,11 +783,6 @@ statuses:
       title: AWS Glue Managed Spark Platform
       priority: High
       category: Platform Expansion
-    - id: hudi-support-parity
-      file: DONE/table-format-parity/hudi-support-parity.yaml
-      title: Add Apache Hudi Support on Par with Delta Lake and Iceberg
-      priority: Medium-High
-      category: Core Functionality
     - id: add-azure-synapse-adapter
       file: DONE/platform-expansion/planning/add-azure-synapse-adapter.yaml
       title: Add Azure Synapse Adapter
@@ -818,11 +813,6 @@ statuses:
       title: Add Firebolt Platform Adapter (Core + Cloud)
       priority: Medium
       category: Platform Expansion
-    - id: influxdb-timeseries-platform
-      file: DONE/platform-expansion/active/influxdb-timeseries-platform.yaml
-      title: Add InfluxDB Platform Support for Time Series Benchmarking
-      priority: Medium-High
-      category: Platform Expansion
     - id: onehouse-quanton-platform
       file: DONE/platform-expansion/planning/onehouse-quanton-platform.yaml
       title: Add Onehouse Quanton platform support for managed Spark benchmarking
@@ -838,16 +828,6 @@ statuses:
       title: Add PrestoDB Platform Adapter
       priority: Medium
       category: Platform Expansion
-    - id: tpcds-obt-benchmark-implementation
-      file: DONE/benchmark-expansion/planning/tpcds-obt-benchmark-implementation.yaml
-      title: Add TPC-DS-OBT (One Big Table) Benchmark Implementation
-      priority: Medium
-      category: Core Functionality
-    - id: add-tpc-h-skew-benchmark-implementation
-      file: DONE/benchmark-expansion/completed/add-tpc-h-skew-benchmark-implementation.yaml
-      title: Add TPC-H Skew Benchmark Implementation
-      priority: Medium
-      category: Core Functionality
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
       title: Add blog to BenchBox site using ABlog Sphinx extension
@@ -869,11 +849,6 @@ statuses:
       title: Add cost tracking for local/self-hosted platforms
       priority: Low
       category: Platform Expansion
-    - id: add-dedicated-tags-for-platforms-and-benchmarks
-      file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
-      title: Add dedicated tags for all platforms and benchmarks
-      priority: Medium
-      category: Documentation
     - id: interactive-wizard-execution-style-selection
       file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml
       title: Add execution style selection step to interactive wizard
@@ -909,11 +884,6 @@ statuses:
       title: Advanced Cost Analysis Framework - Multi-Region & Pricing Models
       priority: High
       category: Cost Intelligence
-    - id: athena-spark-platform
-      file: DONE/platform-expansion/planning/athena-spark-platform.yaml
-      title: Amazon Athena for Apache Spark Platform
-      priority: Medium
-      category: Platform Expansion
     - id: emr-serverless-platform
       file: DONE/platform-expansion/planning/emr-serverless-platform.yaml
       title: Amazon EMR Serverless Platform
@@ -924,36 +894,11 @@ statuses:
       title: Apache Spark Platform Adapter
       priority: High
       category: Platform Expansion
-    - id: dataframe-read-primitives-architecture
-      file: DONE/dataframe-benchmarks/active/dataframe-read-primitives-architecture.yaml
-      title: Assess DataFrame Architecture for Read Primitives Integration
-      priority: Medium
-      category: Core Functionality
-    - id: athena-configuration-validation
-      file: DONE/platform-expansion/planning/athena-configuration-validation.yaml
-      title: Athena Configuration Validation
-      priority: Medium
-      category: Platform Polish
     - id: athena-parquet-optimization
       file: DONE/platform-expansion/active/athena-parquet-optimization.yaml
       title: 'Athena: Convert text tables to Parquet using CTAS for query performance'
       priority: Medium-High
       category: Platform Expansion
-    - id: automated-data-publishing-pipeline
-      file: DONE/infrastructure-publishing/planning/automated-data-publishing-pipeline.yaml
-      title: Automated Data Publishing Pipeline
-      priority: Medium
-      category: Supporting Infrastructure
-    - id: synapse-spark-platform
-      file: DONE/platform-expansion/planning/synapse-spark-platform.yaml
-      title: Azure Synapse Spark Platform
-      priority: Medium
-      category: Platform Expansion
-    - id: azure-fabric-platform-documentation
-      file: DONE/docs-experience/planning/azure-fabric-platform-documentation.yaml
-      title: Azure Synapse and Fabric Warehouse Documentation
-      priority: Medium
-      category: Documentation and User Experience
     - id: bidirectional-repo-sync-v2
       file: DONE/release-sync/active/bidirectional-repo-sync-v2.yaml
       title: Bidirectional Repository Sync (Redesigned)
@@ -974,11 +919,6 @@ statuses:
       title: CLI Help Examples Expansion
       priority: Medium
       category: Documentation and User Experience
-    - id: cli-help-examples-missing-platforms
-      file: DONE/docs-experience/planning/cli-help-examples-missing-platforms.yaml
-      title: CLI Help Examples for Missing Platforms
-      priority: High
-      category: Documentation and User Experience
     - id: canonicalize-result-schema
       file: DONE/release-readiness/completed/canonicalize-result-schema.yaml
       title: Canonicalize Result Schema
@@ -989,25 +929,10 @@ statuses:
       title: Centralize File Format and Compression Extension Detection
       priority: Medium-High
       category: Core Functionality
-    - id: cloud-platform-error-context
-      file: DONE/observability-quality/planning/cloud-platform-error-context.yaml
-      title: Cloud Platform Error Message Context
-      priority: Medium
-      category: Platform Polish
-    - id: cloud-spark-adapter-consolidation
-      file: DONE/platform-expansion/active/cloud-spark-adapter-consolidation.yaml
-      title: Cloud Spark Adapter Consolidation - Extract Common Patterns
-      priority: Medium-High
-      category: Core Functionality
     - id: cloud-spark-dependency-groups
       file: DONE/platform-expansion/active/cloud-spark-dependency-groups.yaml
       title: Cloud Spark Dependency Groups in pyproject.toml
       priority: Medium-High
-      category: Core Functionality
-    - id: cloud-spark-shared-infrastructure
-      file: DONE/platform-expansion/planning/cloud-spark-shared-infrastructure.yaml
-      title: Cloud Spark Shared Infrastructure
-      priority: Critical
       category: Core Functionality
     - id: comparison-engine-multi-platform-result-analysis
       file: DONE/content-enablement-comparison/completed/comparison-engine-multi-platform-result-analysis.yaml
@@ -1029,11 +954,6 @@ statuses:
       title: Comprehensive Documentation Quality Audit
       priority: High
       category: Documentation
-    - id: comprehensive-test-quality-audit
-      file: DONE/test-quality-review/active/comprehensive-test-quality-audit.yaml
-      title: 'Comprehensive Test Quality Audit: Ensure Meaningful and Distinct Test Coverage'
-      priority: High
-      category: Testing and Quality Assurance
     - id: concurrency-testing-framework
       file: DONE/enterprise-ops-concurrency/planning/concurrency-testing-framework.yaml
       title: Concurrency Testing Framework
@@ -1044,26 +964,6 @@ statuses:
       title: Consolidate Duplicated Result JSON Normalization Logic
       priority: Medium
       category: Core Functionality
-    - id: consolidate-tpc-delimiter-detection
-      file: DONE/core-functionality/consolidate-tpc-delimiter-detection.yaml
-      title: Consolidate TPC delimiter detection to use get_delimiter_for_file()
-      priority: Low
-      category: Code Quality
-    - id: consolidate-benchmark-name-detection
-      file: DONE/core-functionality/active/consolidate-benchmark-name-detection.yaml
-      title: Consolidate benchmark name detection to use normalize_benchmark_id()
-      priority: Low
-      category: Code Quality
-    - id: consolidate-file-format-detection
-      file: DONE/core-functionality/consolidate-file-format-detection.yaml
-      title: Consolidate file format detection to handle compressed and sharded files
-      priority: Medium-High
-      category: Code Quality
-    - id: run-official-command-consolidation
-      file: DONE/ux-improvements/active/run-official-command-consolidation.yaml
-      title: Consolidate run-official into run --official flag
-      priority: Low
-      category: ux-improvements
     - id: consolidate-tuning-commands
       file: DONE/ux-improvements/planning/consolidate-tuning-commands.yaml
       title: Consolidate tuning commands under unified `tuning` group
@@ -1079,11 +979,6 @@ statuses:
       title: Create first-class TimescaleDB platform adapter
       priority: High
       category: Platform Expansion
-    - id: metrics-command-group
-      file: DONE/ux-improvements/active/metrics-command-group.yaml
-      title: Create metrics command group and consolidate calculate-qphh
-      priority: Low
-      category: ux-improvements
     - id: curate-release-branch-and-changelog
       file: DONE/release-readiness/curate-release-branch-and-changelog.yaml
       title: Curate Release Branch and Changelog
@@ -1114,31 +1009,11 @@ statuses:
       title: DataFrame Performance Optimization and Analysis
       priority: Medium
       category: Performance and Efficiency
-    - id: dataframe-platform-examples
-      file: DONE/docs-experience/planning/dataframe-platform-examples.yaml
-      title: DataFrame Platform Example Scripts
-      priority: Medium
-      category: Documentation and User Experience
     - id: dataframe-support-release-preparation
       file: DONE/dataframe-release/completed/dataframe-support-release-preparation.yaml
       title: DataFrame Support Release Preparation
       priority: High
       category: Project Lifecycle Management
-    - id: databricks-dataframe-mode
-      file: DONE/platform-expansion/active/databricks-dataframe-mode.yaml
-      title: Databricks DataFrame Mode - CRITICAL PRIORITY
-      priority: Critical
-      category: Platform Expansion
-    - id: dataframe-write-primitives-model
-      file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
-      title: Define DataFrame Execution Model for Write Primitives
-      priority: Medium-High
-      category: Core Functionality
-    - id: dataframe-tpcdi-architecture
-      file: DONE/dataframe-benchmarks/active/dataframe-tpcdi-architecture.yaml
-      title: Design DataFrame Architecture for TPC-DI ETL Workload
-      priority: High
-      category: Core Functionality
     - id: design-and-implement-core-dataframe-abstractions
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
       title: Design and Implement Core DataFrame Abstractions
@@ -1174,11 +1049,6 @@ statuses:
       title: Embed Full Tuning Config in Result Output
       priority: Medium-High
       category: Core Functionality
-    - id: acl-benchmark-enhancement
-      file: DONE/metadata-primitives/phase-2-acl/acl-benchmark-enhancement.yaml
-      title: Enhance Metadata Primitives with Access Control (ACL) Performance Testing
-      priority: medium
-      category: Uncategorized
     - id: enhance-ascii-charting
       file: DONE/core-functionality/planning/enhance-ascii-charting.yaml
       title: Enhance and extend ASCII charting with new chart types and comparison visualizations
@@ -1200,56 +1070,11 @@ statuses:
       title: Ensure local equivalents exist for all CI workflow steps
       priority: High
       category: Testing and Quality Assurance
-    - id: error-message-polish
-      file: DONE/release-readiness/planning/error-message-polish.yaml
-      title: Error Message Polish
-      priority: High
-      category: User Experience
-    - id: dataframe-joinorder-feasibility
-      file: DONE/dataframe-benchmarks/active/dataframe-joinorder-feasibility.yaml
-      title: Evaluate DataFrame Relevance for JoinOrder Benchmark
-      priority: Medium
-      category: Core Functionality
-    - id: dataframe-tpchavoc-feasibility
-      file: DONE/dataframe-benchmarks/active/dataframe-tpchavoc-feasibility.yaml
-      title: Evaluate DataFrame Scope for TPC-Havoc
-      priority: Medium
-      category: Core Functionality
-    - id: cloud-platform-example-scripts
-      file: DONE/docs-experience/planning/cloud-platform-example-scripts.yaml
-      title: Example Scripts for Cloud Platforms
-      priority: Medium
-      category: Documentation and User Experience
-    - id: expand-mcp-tool-surface
-      file: DONE/mcp-integration/active/expand-mcp-tool-surface.yaml
-      title: Expand MCP tool surface area to match CLI capabilities
-      priority: High
-      category: Core Functionality
-    - id: tpcds-obt-query-expansion
-      file: DONE/benchmark-expansion/implementation/tpcds-obt-query-expansion.yaml
-      title: Expand TPC-DS OBT Query Coverage to 93 Queries
-      priority: High
-      category: Core Functionality
     - id: finalize-monitoring-module-scope
       file: DONE/observability-quality/completed/finalize-monitoring-module-scope.yaml
       title: Finalize Monitoring Module Scope
       priority: Medium
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
-    - id: firebolt-mode-validation
-      file: DONE/platform-expansion/planning/firebolt-mode-validation.yaml
-      title: Firebolt Core/Cloud Mode Validation
-      priority: Medium
-      category: Platform Polish
-    - id: firebolt-platform-documentation
-      file: DONE/docs-experience/planning/firebolt-platform-documentation.yaml
-      title: Firebolt Platform Documentation
-      priority: High
-      category: Documentation and User Experience
-    - id: dask-platform-compatibility
-      file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml
-      title: Fix Dask DataFrame Platform Compatibility
-      priority: High
-      category: Platform Expansion
     - id: fix-datafusion-dataframe-regression
       file: DONE/main/active/fix-datafusion-dataframe-regression.yaml
       title: 'Fix DataFusion DataFrame regression: .tbl loading, data prep, and fail-fast'
@@ -1258,11 +1083,6 @@ statuses:
     - id: fix-mcp-stdout-corruption
       file: DONE/mcp-integration/active/fix-mcp-stdout-corruption.yaml
       title: Fix MCP server stdout corruption from ResultExporter
-      priority: High
-      category: Core Functionality
-    - id: fix-pyspark-dataframe-write-operations
-      file: DONE/main/active/fix-pyspark-dataframe-write-operations.yaml
-      title: Fix PySpark DataFrame Write Operations
       priority: High
       category: Core Functionality
     - id: pyspark-unified-expr-methods
@@ -1295,41 +1115,16 @@ statuses:
       title: Fix type checking errors - Quick Wins (4 rules enabled)
       priority: Medium
       category: Testing and Quality Assurance
-    - id: fix-type-checking-errors
-      file: DONE/main/active/fix-type-checking-errors.yaml
-      title: Fix type checking errors ignored in ty config
-      priority: Medium-High
-      category: Testing and Quality Assurance
-    - id: format-converter-remaining-work
-      file: DONE/table-formats/completed/format-converter-remaining-work.yaml
-      title: Format Converter Integration - Remaining Work (Phases 3-6)
-      priority: High
-      category: Uncategorized
     - id: gcp-dataproc-platform
       file: DONE/platform-expansion/planning/gcp-dataproc-platform.yaml
       title: GCP Dataproc Managed Spark Platform
       priority: High
-      category: Platform Expansion
-    - id: dataproc-serverless-platform
-      file: DONE/platform-expansion/planning/dataproc-serverless-platform.yaml
-      title: GCP Dataproc Serverless Platform
-      priority: Medium
       category: Platform Expansion
     - id: guard-tpc-ds-fractional-scale-defaults
       file: DONE/benchmark-expansion/planning/guard-tpc-ds-fractional-scale-defaults.yaml
       title: Guard TPC-DS Fractional Scale Defaults
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
-    - id: dataframe-maintenance-operations
-      file: DONE/dataframe-expansion/active/dataframe-maintenance-operations.yaml
-      title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
-      priority: Medium-High
-      category: Core Functionality
-    - id: implement-dataframe-result-validation-framework
-      file: DONE/dataframe-validation/completed/implement-dataframe-result-validation-framework.yaml
-      title: Implement DataFrame Result Validation Framework
-      priority: High
-      category: Testing and Quality Assurance
     - id: dataframe-ai-primitives
       file: DONE/dataframe-benchmarks/completed/dataframe-ai-primitives.yaml
       title: Implement DataFrame Version of AI Primitives Benchmark
@@ -1350,21 +1145,6 @@ statuses:
       title: Implement DataFrame Version of Transaction Primitives Benchmark
       priority: Medium
       category: Core Functionality
-    - id: dataframe-write-primitives
-      file: DONE/dataframe-expansion/active/dataframe-write-primitives.yaml
-      title: Implement DataFrame Version of Write Primitives Benchmark
-      priority: High
-      category: Core Functionality
-    - id: implement-expression-family-base-adapter-and-dialects
-      file: DONE/dataframe-expression-family/completed/implement-expression-family-base-adapter-and-dialects.yaml
-      title: Implement Expression Family Base Adapter and Dialects
-      priority: Critical
-      category: Core Functionality
-    - id: implement-pandas-family-base-adapter
-      file: DONE/dataframe-pandas-family/planning/implement-pandas-family-base-adapter.yaml
-      title: Implement Pandas Family Base Adapter
-      priority: Critical
-      category: Core Functionality
     - id: implement-pandas-family-platform-adapters
       file: DONE/dataframe-pandas-platforms/completed/implement-pandas-family-platform-adapters.yaml
       title: Implement Pandas Family Platform Adapters
@@ -1375,24 +1155,9 @@ statuses:
       title: Implement Physical Tuning DDL Generation Across All Platforms
       priority: Medium-High
       category: Core Functionality
-    - id: implement-tpcdi-dataframe-pipeline
-      file: DONE/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
-      title: Implement TPC-DI DataFrame Pipeline Execution
-      priority: High
-      category: Core Functionality
-    - id: implement-tpcds-obt-dataframe-queries
-      file: DONE/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
-      title: Implement TPC-DS-OBT DataFrame Query Families
-      priority: Medium-High
-      category: Core Functionality
     - id: implement-tpc-h-queries-for-expression-family
       file: DONE/dataframe-tpch-expression/completed/implement-tpc-h-queries-for-expression-family.yaml
       title: Implement TPC-H Queries for Expression Family
-      priority: Critical
-      category: Core Functionality
-    - id: implement-tpc-h-queries-for-pandas-family
-      file: DONE/dataframe-tpch-pandas/completed/implement-tpc-h-queries-for-pandas-family.yaml
-      title: Implement TPC-H Queries for Pandas Family
       priority: Critical
       category: Core Functionality
     - id: compare-interactive-file-selection
@@ -1400,11 +1165,6 @@ statuses:
       title: Improve interactive file selection in compare command
       priority: Medium-High
       category: Core Functionality
-    - id: coverage-core-utilities
-      file: DONE/main/active/coverage-core-utilities.yaml
-      title: Improve test coverage for core utility and standalone modules to ≥50%
-      priority: Medium-High
-      category: Testing and Quality Assurance
     - id: include-tpc-metrics-in-result-outputs
       file: DONE/main/active/include-tpc-metrics-in-result-outputs.yaml
       title: Include TPC Metrics (Power@Size, Throughput@Size, QphH/QphDS@Size) in All Result Outputs
@@ -1415,25 +1175,10 @@ statuses:
       title: Input Validation and SQL Safety
       priority: Medium
       category: Security and Reliability
-    - id: integrate-dataframe-mode-into-cli
-      file: DONE/dataframe-cli/completed/integrate-dataframe-mode-into-cli.yaml
-      title: Integrate DataFrame Mode into CLI
-      priority: High
-      category: Core Functionality
-    - id: integrate-read-primitives-dataframe-mode
-      file: DONE/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
-      title: Integrate Read Primitives DataFrame Mode and Metadata
-      priority: Medium
-      category: Core Functionality
     - id: integrate-stdout-datagen
       file: DONE/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
       title: Integrate TPC-H stdout datagen with compression and format pipelines
       priority: High
-      category: Core Functionality
-    - id: integrate-write-primitives-dataframe-mode
-      file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml
-      title: Integrate Write Primitives DataFrame Mode with Runner and Registry
-      priority: Medium-High
       category: Core Functionality
     - id: integrate-stdout-datagen
       file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
@@ -1455,11 +1200,6 @@ statuses:
       title: Make tuning file resolution explicit and transparent in CLI
       priority: Medium-High
       category: Core Functionality
-    - id: fabric-adapter-architecture
-      file: DONE/fabric-platform/planning/fabric-adapter-architecture.yaml
-      title: Microsoft Fabric Data Warehouse Adapter Architecture
-      priority: High
-      category: platform-adapter
     - id: fabric-spark-platform
       file: DONE/platform-expansion/planning/fabric-spark-platform.yaml
       title: Microsoft Fabric Spark Platform
@@ -1490,11 +1230,6 @@ statuses:
       title: Natural Language to SQL Testing Framework
       priority: Medium
       category: AI/ML Capabilities
-    - id: open-file-and-table-format-support
-      file: DONE/benchmark-expansion/active/open-file-and-table-format-support.yaml
-      title: Open File and Table Format Support
-      priority: Medium
-      category: Performance and Efficiency
     - id: open-table-format-smoke-tests
       file: DONE/testing-improvements/completed/open-table-format-smoke-tests.yaml
       title: Open Table Format Smoke Tests
@@ -1505,21 +1240,6 @@ statuses:
       title: 'PT-01: DDL Generator Protocol and Base Implementation'
       priority: Critical
       category: Core Functionality
-    - id: pt-10-dataframe-physical-tuning
-      file: DONE/physical-tuning/planning/pt-10-dataframe-physical-tuning.yaml
-      title: 'PT-10: DataFrame Platform Physical Tuning (Write-Time Layout)'
-      priority: Medium
-      category: Core Functionality
-    - id: pt-11-integration-testing-dryrun
-      file: DONE/physical-tuning/planning/pt-11-integration-testing-dryrun.yaml
-      title: 'PT-11: Physical Tuning Integration, Testing & Dry-Run Enhancement'
-      priority: Medium
-      category: Testing and Quality Assurance
-    - id: pt-12-remaining-platforms-ddl
-      file: DONE/physical-tuning/planning/pt-12-remaining-platforms-ddl.yaml
-      title: 'PT-12: Remaining Platforms Physical Tuning DDL Generator Enhancement'
-      priority: Medium
-      category: Platform Expansion
     - id: patch-tpcds-source-stdout
       file: DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml
       title: Patch TPC-DS source to fix stdout data generation
@@ -1535,16 +1255,6 @@ statuses:
       title: Performance Regression Detection System
       priority: Medium
       category: Enterprise Operations
-    - id: phase3-manifest-v2-spec
-      file: DONE/table-formats/implementation/phase3-manifest-v2-spec.yaml
-      title: 'Phase 3.1: Manifest v2 Implementation Specification'
-      priority: critical
-      category: Uncategorized
-    - id: dataframe-tpcds-obt-adaptation
-      file: DONE/dataframe-benchmarks/active/dataframe-tpcds-obt-adaptation.yaml
-      title: Plan DataFrame Adaptation for TPC-DS-OBT
-      priority: Medium-High
-      category: Core Functionality
     - id: phase-1-connection-network
       file: DONE/platform-config-audit/completed/phase-1-connection-network.yaml
       title: 'Platform Config Audit: Connection/Network Settings'
@@ -1585,16 +1295,6 @@ statuses:
       title: Platform Deployment Registry Extensions
       priority: High
       category: Core Functionality
-    - id: platform-documentation-completion
-      file: DONE/docs-experience/planning/platform-documentation-completion.yaml
-      title: Platform Documentation Completion
-      priority: High
-      category: Documentation and User Experience
-    - id: platform-troubleshooting-guide
-      file: DONE/docs-experience/planning/platform-troubleshooting-guide.yaml
-      title: Platform Troubleshooting Guide
-      priority: Medium-High
-      category: Documentation and User Experience
     - id: polars-platform-adapter
       file: DONE/platform-expansion-polars/completed/polars-platform-adapter.yaml
       title: Polars Platform Adapter
@@ -1605,11 +1305,6 @@ statuses:
       title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
       priority: Medium-High
       category: Core Functionality
-    - id: postgresql-platform-documentation
-      file: DONE/docs-experience/planning/postgresql-platform-documentation.yaml
-      title: PostgreSQL Platform Documentation
-      priority: Medium
-      category: Documentation and User Experience
     - id: postgresql-code-quality-fixes
       file: DONE/platform-expansion/active/postgresql-code-quality-fixes.yaml
       title: PostgreSQL adapter code quality fixes from code review
@@ -1620,11 +1315,6 @@ statuses:
       title: Prepare Project for Publication
       priority: High
       category: Project Lifecycle Management
-    - id: presto-trino-platform-documentation
-      file: DONE/docs-experience/planning/presto-trino-platform-documentation.yaml
-      title: Presto and Trino Platform Documentation
-      priority: High
-      category: Documentation and User Experience
     - id: postgresql-first-class-platform
       file: DONE/platform-expansion/active/postgresql-first-class-platform.yaml
       title: Promote PostgreSQL to first-class platform status
@@ -1700,11 +1390,6 @@ statuses:
       title: Remove Polars SQL mode support - DataFrame only
       priority: Medium-High
       category: Platform Expansion
-    - id: remove-sql-coupling-from-tpcdi-dataframe-mode
-      file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
-      title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
-      priority: High
-      category: Core Functionality
     - id: resource-management
       file: DONE/runtime-ops/completed/resource-management.yaml
       title: Resource Management
@@ -1715,11 +1400,6 @@ statuses:
       title: Restructure Platform Comparison Matrix with Grouped Categories
       priority: High
       category: Documentation
-    - id: result-export-format-documentation
-      file: DONE/docs-experience/planning/result-export-format-documentation.yaml
-      title: Result Export Format Documentation
-      priority: Medium
-      category: Documentation and User Experience
     - id: result-object-migration-benchmarkresult-benchmarkresults
       file: DONE/result-object-migration/completed/result-object-migration-benchmarkresult-benchmarkresults.yaml
       title: Result Object Migration (BenchmarkResult → BenchmarkResults)
@@ -1760,11 +1440,6 @@ statuses:
       title: Slim Release Distributions
       priority: Medium
       category: Project Lifecycle Management
-    - id: snowpark-connect-platform
-      file: DONE/platform-expansion/planning/snowpark-connect-platform.yaml
-      title: Snowpark Connect for Spark Platform
-      priority: Medium-High
-      category: Platform Expansion
     - id: stabilize-full-test-suite-failures
       file: DONE/testing-improvements/completed/stabilize-full-test-suite-failures.yaml
       title: Stabilize Full Test Suite Failures
@@ -1785,11 +1460,6 @@ statuses:
       title: TPC-Havoc Query Variant System Implementation
       priority: Low
       category: Code Quality and Technical Debt
-    - id: coverage-improvement
-      file: DONE/observability-quality/active/coverage-improvement.yaml
-      title: Test Infrastructure & Coverage Improvement
-      priority: High
-      category: Testing and Quality Assurance
     - id: trim-viz-deps-plotly-only
       file: DONE/main/active/trim-viz-deps-plotly-only.yaml
       title: Trim visualization dependencies to Plotly-only (remove Kaleido, Pandas, Pillow)
@@ -1810,26 +1480,6 @@ statuses:
       title: Unify Platform Registration Systems
       priority: High
       category: Code Quality and Technical Debt
-    - id: unified-adapter-interface
-      file: DONE/core-functionality/planning/unified-adapter-interface.yaml
-      title: Unify SQL and DataFrame Adapter Execution Interfaces
-      priority: Medium-High
-      category: Core Functionality
-    - id: unify-tpcdi-sql-dataframe-execution-contract
-      file: DONE/dataframe-benchmarks/active/unify-tpcdi-sql-dataframe-execution-contract.yaml
-      title: Unify TPC-DI SQL/DataFrame Execution Contract and ETL Path
-      priority: Critical
-      category: Core Functionality
-    - id: compare-command-unification
-      file: DONE/ux-improvements/active/compare-command-unification.yaml
-      title: Unify compare and compare-plans commands
-      priority: P2
-      category: ux-improvements
-    - id: visualization-framework-chart-generation-results-display
-      file: DONE/content-enablement-viz/planning/visualization-framework-chart-generation-results-display.yaml
-      title: Visualization Framework - Chart Generation & Results Display
-      priority: Critical
-      category: Marketing Content Enablement
     - id: add-lightweight-example-smoke-tests
       file: DONE/unknown/completed/add-lightweight-example-smoke-tests.yaml
       title: ✅ Add Lightweight Example Smoke Tests

@@ -1,0 +1,291 @@
+title: "Add FireDucks DataFrame platform support"
+worktree: dataframe-expansion
+priority: Medium-High
+status: Completed
+completed_date: "2026-02-08"
+description: |
+  Implement a FireDucks DataFrame adapter for BenchBox, enabling TPC-H benchmark
+  execution using the FireDucks library. FireDucks is a compiler-accelerated
+  DataFrame library developed by NEC that provides 100% Pandas API compatibility
+  with significant performance improvements (20x+ speedup over vanilla Pandas).
+
+  FireDucks belongs to the Pandas family since it is a drop-in Pandas replacement
+  using the same API: string-based column access (df['column']), boolean indexing,
+  dict-based aggregation, etc. The only change required is the import statement:
+  `import fireducks.pandas as pd` instead of `import pandas as pd`.
+
+  Current State:
+  - BenchBox has PandasFamilyAdapter base class with Pandas, Modin, cuDF, Dask members
+  - PandasDataFrameAdapter is the reference implementation
+  - ModinDataFrameAdapter is a good template for "drop-in replacement" adapters
+  - TPC-H queries have pandas_impl implementations that should work unmodified
+
+  Value Proposition:
+  - 20x+ speedup over vanilla Pandas via compiler optimization
+  - Zero learning curve - 100% Pandas API compatible
+  - Lazy execution under the hood with automatic optimization
+  - Multithreaded execution for parallel performance
+  - BSD 3-Clause license (permissive, compatible with BenchBox MIT)
+  - Active development by NEC (released v1.4.4, Dec 2025)
+  - Growing community adoption for data analysis workloads
+
+  Reference: https://fireducks-dev.github.io/docs/user-guide/01-intro/
+
+category: Platform Expansion
+
+tasks:
+  phases:
+    - phase: "Phase 1: Core Adapter Implementation"
+      done: true
+      items:
+        - summary: "Create FireDucksDataFrameAdapter class extending PandasFamilyAdapter"
+          done: true
+          subtasks:
+            - summary: "Create benchbox/platforms/dataframe/fireducks_df.py"
+              done: true
+            - summary: "Implement try/except import pattern for fireducks.pandas"
+              done: true
+            - summary: "Set FIREDUCKS_AVAILABLE flag for optional dependency handling"
+              done: true
+        - summary: "Implement data loading methods (read_csv, read_parquet)"
+          done: true
+          subtasks:
+            - summary: "Implement read_csv with TPC .tbl file handling (trailing delimiter)"
+              done: true
+            - summary: "Implement read_parquet with dtype_backend support"
+              done: true
+        - summary: "Implement core DataFrame operations"
+          done: true
+          subtasks:
+            - summary: "Implement to_datetime, timedelta_days, concat, get_row_count"
+              done: true
+            - summary: "Implement merge, groupby_agg, filter_rows, sort_values"
+              done: true
+            - summary: "Implement select_columns, with_column, _get_first_row"
+              done: true
+        - summary: "Implement platform_name property returning 'FireDucks'"
+          done: true
+        - summary: "Implement _apply_tuning for FireDucks-specific settings"
+          done: true
+
+    - phase: "Phase 2: Registration and Integration"
+      done: true
+      items:
+        - summary: "Register adapter in benchbox/platforms/dataframe/__init__.py"
+          done: true
+          subtasks:
+            - summary: "Add try/except import for FireDucksDataFrameAdapter"
+              done: true
+            - summary: "Add FIREDUCKS_AVAILABLE to exports"
+              done: true
+            - summary: "Add to __all__ list"
+              done: true
+        - summary: "Add platform info to platform_checker.py DATAFRAME_PLATFORMS registry"
+          done: true
+          subtasks:
+            - summary: "Register as Pandas family with import_name='fireducks'"
+              done: true
+            - summary: "Set appropriate min_version constraint"
+              done: true
+        - summary: "Update pyproject.toml with optional dependency"
+          done: true
+          subtasks:
+            - summary: "Add dataframe-fireducks extra: fireducks>=1.0.0"
+              done: true
+            - summary: "Add to dataframe-all extra group if it exists"
+              done: true
+
+    - phase: "Phase 3: Testing"
+      done: true
+      items:
+        - summary: "Create unit tests for FireDucksDataFrameAdapter"
+          done: true
+          subtasks:
+            - summary: "Test adapter initialization and import handling"
+              done: true
+            - summary: "Test read_csv with standard CSV and TPC .tbl files"
+              done: true
+            - summary: "Test read_parquet"
+              done: true
+            - summary: "Test DataFrame operations (merge, groupby_agg, filter, sort)"
+              done: true
+            - summary: "Test platform_name and platform_info"
+              done: true
+        - summary: "Create integration tests with TPC-H queries"
+          done: true
+          subtasks:
+            - summary: "Test TPC-H SF=0.01 data loading"
+              done: true
+            - summary: "Test TPC-H Q1 (aggregation heavy)"
+              done: true
+            - summary: "Test TPC-H Q6 (filter + aggregate)"
+              done: true
+            - summary: "Verify row counts match expected results"
+              done: true
+        - summary: "Run existing Pandas family test suite to verify compatibility"
+          done: true
+
+    - phase: "Phase 4: Documentation and Examples"
+      done: true
+      items:
+        - summary: "Add FireDucks to DataFrame platform comparison documentation"
+          done: true
+        - summary: "Create tuning profile example (examples/tunings/dataframe/fireducks_default.yaml)"
+          done: true
+
+metadata:
+  tags:
+    - dataframe
+    - fireducks
+    - pandas-family
+    - compiler-accelerated
+    - drop-in-replacement
+    - tpc-h
+  estimated_effort: "3-5 days"
+  created_date: "2026-02-08"
+
+impact:
+  business_value: |
+    FireDucks represents the emerging category of compiler-accelerated DataFrame
+    libraries. Supporting it expands BenchBox's coverage of the Pandas-compatible
+    ecosystem and provides users a way to benchmark high-performance Pandas
+    alternatives with zero code changes to their queries.
+  user_impact: |
+    Users can compare FireDucks performance against vanilla Pandas, Modin, and
+    other Pandas-family libraries using identical TPC-H workloads. This enables
+    data-driven decisions about DataFrame library selection.
+  technical_debt: |
+    Clean implementation following established PandasFamilyAdapter patterns.
+    Since FireDucks is API-compatible with Pandas, the adapter should be
+    straightforward with minimal custom logic.
+
+files_affected:
+  added:
+    - benchbox/platforms/dataframe/fireducks_df.py
+    - tests/unit/platforms/dataframe/test_fireducks_df.py
+    - tests/integration/dataframe/test_fireducks_tpch.py
+    - examples/tunings/dataframe/fireducks_default.yaml
+  modified:
+    - benchbox/platforms/dataframe/__init__.py
+    - benchbox/platforms/dataframe/platform_checker.py
+    - pyproject.toml
+
+must_preserve:
+  - "PandasDataFrameAdapter and all existing Pandas-family adapters continue to work unchanged"
+  - "PandasFamilyAdapter base class is not modified"
+  - "Existing TPC-H pandas_impl query implementations work without modification"
+  - "benchbox run --platform pandas-df still works correctly"
+
+approach: |
+  Follow the ModinDataFrameAdapter pattern in benchbox/platforms/dataframe/modin_df.py
+  as the closest reference - Modin is also a Pandas drop-in replacement extending
+  PandasFamilyAdapter. The key difference is the import: use `import fireducks.pandas as fpd`
+  instead of `import modin.pandas as mpd`.
+
+  FireDucks uses lazy execution internally with automatic materialization, so most
+  Pandas operations should work transparently. However, test for edge cases where
+  lazy evaluation might cause unexpected behavior (e.g., timing of side effects,
+  error reporting). If materialization control is needed, FireDucks provides
+  `fireducks.pandas.materialize()` to force eager evaluation.
+
+  Start with Phase 1 (core adapter), then registration (Phase 2), then testing
+  (Phase 3). Keep the adapter minimal - leverage Pandas API compatibility rather
+  than adding FireDucks-specific features.
+
+anti_patterns:
+  - "DO NOT modify PandasFamilyAdapter base class to accommodate FireDucks - because it would risk breaking other Pandas-family adapters - extend and override in fireducks_df.py instead"
+  - "DO NOT add FireDucks-specific query implementations - because FireDucks is Pandas API compatible - reuse existing pandas_impl queries"
+  - "DO NOT import fireducks at module level without try/except - because it is an optional dependency - follow the FIREDUCKS_AVAILABLE pattern from other adapters"
+
+verification:
+  - description: "All existing DataFrame platform tests still pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/ -v --ignore=tests/unit/platforms/dataframe/test_fireducks_df.py"
+    expected_output: "Exit code 0, all tests pass with 0 failures"
+  - description: "FireDucks adapter unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/test_fireducks_df.py -v"
+    expected_output: "Exit code 0 with all tests passed, or all tests skipped if fireducks not installed"
+  - description: "Lint checks pass"
+    command: "uv run ruff check benchbox/platforms/dataframe/fireducks_df.py"
+    expected_output: "Exit code 0, no output (clean lint)"
+  - description: "Platform appears in platform checker"
+    command: "uv run -- python -c \"from benchbox.platforms.dataframe.platform_checker import DATAFRAME_PLATFORMS; print('fireducks' in DATAFRAME_PLATFORMS)\""
+    expected_output: "Prints 'True' to stdout"
+
+scope_limit:
+  only_modify:
+    - benchbox/platforms/dataframe/fireducks_df.py
+    - benchbox/platforms/dataframe/__init__.py
+    - benchbox/platforms/dataframe/platform_checker.py
+    - pyproject.toml
+    - tests/unit/platforms/dataframe/test_fireducks_df.py
+    - tests/integration/dataframe/test_fireducks_tpch.py
+    - examples/tunings/dataframe/fireducks_default.yaml
+  do_not_modify:
+    - benchbox/platforms/dataframe/pandas_family.py
+    - benchbox/platforms/dataframe/pandas_df.py
+    - benchbox/platforms/dataframe/modin_df.py
+    - benchbox/core/dataframe/protocols.py
+    - benchbox/core/dataframe/context.py
+    - benchbox/core/dataframe/benchmark_suite.py
+    - benchbox/core/dataframe/tuning/types.py
+
+technical_requirements:
+  constraints:
+    - "FireDucks is a Pandas-family adapter (not Expression-family)"
+    - "Must use try/except import pattern for optional dependency"
+    - "FireDucks uses lazy execution internally - test for materialization edge cases"
+    - "Linux-only: FireDucks currently only supports Linux (no macOS/Windows)"
+  dependencies:
+    - "fireducks>=1.0.0 (BSD 3-Clause license)"
+  compatibility: |
+    - Python 3.10+
+    - FireDucks 1.0.0+ (latest: 1.4.4 as of Dec 2025)
+    - Linux only (no macOS/Windows support currently)
+    - Pandas 2.0+ (FireDucks targets modern Pandas API)
+
+dependencies:
+  related:
+    - _project/DONE/dataframe-expansion/planning/datafusion-dataframe-adapter.yaml
+
+success_metrics:
+  - "FireDucks adapter passes all unit tests"
+  - "TPC-H SF=0.01 completes successfully with correct row counts"
+  - "Performance comparison shows measurable speedup vs vanilla Pandas"
+  - "Platform appears in platform checker and CLI help"
+  - "All existing Pandas-family tests continue to pass"
+
+open_questions:
+  - "Does FireDucks' lazy execution cause any issues with BenchBox's timing/profiling mechanisms?"
+  - "Should we expose FireDucks compiler options (optimization level, thread count) as tuning parameters?"
+  - "Is fireducks.pandas.materialize() needed for accurate benchmark timing?"
+  - "What is the minimum FireDucks version that supports all required Pandas operations?"
+
+context_sections:
+  "FireDucks Architecture": |
+    FireDucks is a compiler-accelerated DataFrame library that converts Python
+    DataFrame operations to an optimized intermediate representation (IR) for
+    execution. Key architectural features:
+    - Lazy evaluation: Operations build a computation graph, executed only when
+      results are needed (similar to Spark/Dask but transparent to users)
+    - Compiler optimization: IR is optimized by a custom compiler before execution
+    - Multithreading: Automatic parallel execution across available cores
+    - Pandas API compatibility: `import fireducks.pandas as pd` is all that's needed
+
+  "Integration Pattern": |
+    FireDucks integration follows the same pattern as Modin:
+    1. Import: `import fireducks.pandas as fpd` (instead of `import pandas as pd`)
+    2. All Pandas operations work identically: fpd.read_csv(), fpd.DataFrame(), etc.
+    3. Results are Pandas-compatible DataFrames
+    4. No API changes needed in query implementations
+
+    The adapter should be thin - mostly delegating to fireducks.pandas with the
+    same method implementations as PandasDataFrameAdapter, differing only in the
+    import source and platform_name.
+
+  "Performance Characteristics": |
+    - 20x+ speedup over vanilla Pandas (documented benchmarks)
+    - Compiler-optimized execution with automatic query optimization
+    - Multithreaded by default (leverages all available cores)
+    - Lazy evaluation reduces unnecessary intermediate computations
+    - Memory-efficient through compiler-level optimization
+    - Best performance on larger datasets where compiler overhead is amortized

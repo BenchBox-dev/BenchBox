@@ -1,5 +1,5 @@
-generated_at: '2026-02-08T15:40:45.943243'
-total_items: 426
+generated_at: '2026-02-07T18:29:16.854373'
+total_items: 410
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -38,7 +38,7 @@ items:
   worktree: platform-expansion
   category: Core Functionality
   priority: Critical
-  status: Completed
+  status: Complete
   tags:
   - cloud-spark
   - infrastructure
@@ -146,7 +146,7 @@ items:
   worktree: platform-expansion
   category: Platform Expansion
   priority: Critical
-  status: Completed
+  status: Complete
   tags:
   - cloud-spark
   - databricks
@@ -206,7 +206,7 @@ items:
   worktree: dataframe-expression-family
   category: Core Functionality
   priority: Critical
-  status: Completed
+  status: Partially Complete
   tags:
   - dataframe
   - expression
@@ -223,7 +223,7 @@ items:
   worktree: dataframe-pandas-family
   category: Core Functionality
   priority: Critical
-  status: Completed
+  status: Complete
   tags:
   - dataframe
   - pandas
@@ -253,7 +253,7 @@ items:
   worktree: dataframe-tpch-pandas
   category: Core Functionality
   priority: Critical
-  status: Completed
+  status: Partially Complete
   tags:
   - dataframe
   - tpch
@@ -293,7 +293,7 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 1 week
-  completed_date: '2025-11-23'
+  completed_date: 2025-11-23
 - id: ranking-aggregation-system-platform-leaderboards-trends
   file: DONE/content-enablement-ranking/completed/ranking-aggregation-system-platform-leaderboards-trends.yaml
   title: Ranking & Aggregation System - Platform Leaderboards & Trends
@@ -301,29 +301,13 @@ items:
   category: Marketing Content Enablement
   priority: Critical
   status: Completed
-- id: unify-tpcdi-sql-dataframe-execution-contract
-  file: DONE/dataframe-benchmarks/active/unify-tpcdi-sql-dataframe-execution-contract.yaml
-  title: Unify TPC-DI SQL/DataFrame Execution Contract and ETL Path
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Critical
-  status: Completed
-  tags:
-  - tpcdi
-  - dataframe
-  - sql-parity
-  - execution-contract
-  owners:
-  - joe
-  estimated_effort: Large
-  completed_date: '2026-02-07'
 - id: visualization-framework-chart-generation-results-display
   file: DONE/content-enablement-viz/planning/visualization-framework-chart-generation-results-display.yaml
   title: Visualization Framework - Chart Generation & Results Display
   worktree: content-enablement-viz
   category: Marketing Content Enablement
   priority: Critical
-  status: Completed
+  status: Complete
   tags:
   - tier-0
   - foundational
@@ -647,7 +631,7 @@ items:
   worktree: docs-experience
   category: Documentation and User Experience
   priority: High
-  status: Completed
+  status: Done
   tags:
   - cli
   - documentation
@@ -685,7 +669,7 @@ items:
   worktree: test-quality-review
   category: Testing and Quality Assurance
   priority: High
-  status: Completed
+  status: Complete
   tags:
   - testing
   - quality
@@ -763,22 +747,6 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks
-- id: dataframe-tpcdi-architecture
-  file: DONE/dataframe-benchmarks/active/dataframe-tpcdi-architecture.yaml
-  title: Design DataFrame Architecture for TPC-DI ETL Workload
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: High
-  status: Completed
-  tags:
-  - dataframe
-  - tpcdi
-  - architecture
-  - etl
-  owners:
-  - joe
-  estimated_effort: Medium
-  completed_date: '2026-02-07'
 - id: document-stdout-patches
   file: DONE/tpcds-docs/document-stdout-patches.yaml
   title: Document TPC-DS stdout patches and credit tpcds-kit origin
@@ -878,7 +846,7 @@ items:
   worktree: release-readiness
   category: User Experience
   priority: High
-  status: Completed
+  status: Done
   tags:
   - ux
   - errors
@@ -892,7 +860,7 @@ items:
   worktree: mcp-integration
   category: Core Functionality
   priority: High
-  status: Completed
+  status: Complete
   tags:
   - mcp
   - api-surface
@@ -905,7 +873,7 @@ items:
   worktree: benchmark-expansion
   category: Core Functionality
   priority: High
-  status: Completed
+  status: Complete
 - id: expand-plan-fingerprint-verification
   file: DONE/query-plan-remediation/planning/expand-plan-fingerprint-verification.yaml
   title: Expand query plan fingerprint coverage and verification
@@ -940,7 +908,7 @@ items:
   worktree: docs-experience
   category: Documentation and User Experience
   priority: High
-  status: Completed
+  status: Done
   tags:
   - documentation
   - firebolt
@@ -954,7 +922,7 @@ items:
   worktree: dataframe-expansion
   category: Platform Expansion
   priority: High
-  status: Completed
+  status: Complete
   tags:
   - dask
   - dataframe
@@ -999,7 +967,7 @@ items:
   worktree: main
   category: Core Functionality
   priority: High
-  status: Completed
+  status: Complete
   tags:
   - dataframe
   - pyspark
@@ -1039,13 +1007,6 @@ items:
   - joe
   estimated_effort: 1-2 days
   completed_date: '2026-02-06'
-- id: format-converter-remaining-work
-  file: DONE/table-formats/completed/format-converter-remaining-work.yaml
-  title: Format Converter Integration - Remaining Work (Phases 3-6)
-  worktree: table-formats
-  category: Uncategorized
-  priority: High
-  status: Completed
 - id: gcp-dataproc-platform
   file: DONE/platform-expansion/planning/gcp-dataproc-platform.yaml
   title: GCP Dataproc Managed Spark Platform
@@ -1067,7 +1028,7 @@ items:
   category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   priority: High
   status: Completed
-  completed_date: '2025-11-27'
+  completed_date: 2025-11-27
 - id: harden-operator-type-handling
   file: DONE/query-plan-remediation/planning/harden-operator-type-handling.yaml
   title: Harden plan comparison and visualization for unknown operator types
@@ -1087,7 +1048,7 @@ items:
   worktree: dataframe-validation
   category: Testing and Quality Assurance
   priority: High
-  status: Completed
+  status: Partially Complete
   tags:
   - dataframe
   - validation
@@ -1116,7 +1077,7 @@ items:
   worktree: dataframe-expansion
   category: Core Functionality
   priority: High
-  status: Completed
+  status: Complete
   tags:
   - dataframe
   - write-primitives
@@ -1172,21 +1133,6 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Large
-- id: implement-tpcdi-dataframe-pipeline
-  file: DONE/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
-  title: Implement TPC-DI DataFrame Pipeline Execution
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: High
-  status: Completed
-  tags:
-  - dataframe
-  - tpcdi
-  - etl
-  owners:
-  - joe
-  estimated_effort: Large
-  completed_date: '2026-02-07'
 - id: implement-tpc-ds-queries-for-both-families
   file: DONE/dataframe-tpcds/planning/implement-tpc-ds-queries-for-both-families.yaml
   title: Implement TPC-DS Queries for Both Families
@@ -1239,7 +1185,7 @@ items:
   worktree: dataframe-cli
   category: Core Functionality
   priority: High
-  status: Completed
+  status: Partially Complete
   tags:
   - dataframe
   - cli
@@ -1317,13 +1263,6 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 3-4 weeks
-- id: fabric-adapter-architecture
-  file: DONE/fabric-platform/planning/fabric-adapter-architecture.yaml
-  title: Microsoft Fabric Data Warehouse Adapter Architecture
-  worktree: fabric-platform
-  category: platform-adapter
-  priority: High
-  status: Completed
 - id: nyc-taxi-olap-benchmark-core-implementation
   file: DONE/benchmark-expansion/active/nyc-taxi-olap-benchmark-core-implementation.yaml
   title: NYC Taxi OLAP Benchmark (Core Implementation)
@@ -1463,7 +1402,7 @@ items:
   worktree: docs-experience
   category: Documentation and User Experience
   priority: High
-  status: Completed
+  status: Done
   tags:
   - documentation
   - platforms
@@ -1498,14 +1437,14 @@ items:
   category: Project Lifecycle Management
   priority: High
   status: Completed
-  completed_date: '2025-11-27'
+  completed_date: 2025-11-27
 - id: presto-trino-platform-documentation
   file: DONE/docs-experience/planning/presto-trino-platform-documentation.yaml
   title: Presto and Trino Platform Documentation
   worktree: docs-experience
   category: Documentation and User Experience
   priority: High
-  status: Completed
+  status: Done
   tags:
   - documentation
   - presto
@@ -1543,7 +1482,7 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 1 week
-  completed_date: '2025-11-23'
+  completed_date: 2025-11-23
 - id: query-plan-comparison-engine
   file: DONE/query-plan-comparison/planning/query-plan-comparison-engine.yaml
   title: Query Plan Comparison Engine
@@ -1558,7 +1497,7 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 1-2 weeks (complex algorithms)
-  completed_date: '2025-11-23'
+  completed_date: 2025-11-23
 - id: query-plan-parser-framework
   file: DONE/query-plan-parsers/planning/query-plan-parser-framework.yaml
   title: Query Plan Parser Framework
@@ -1573,7 +1512,7 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks (parsers can be implemented in parallel)
-  completed_date: '2025-11-23'
+  completed_date: 2025-11-23
 - id: query-plan-platform-adapter-integration
   file: DONE/query-plan-adapters/planning/query-plan-platform-adapter-integration.yaml
   title: Query Plan Platform Adapter Integration
@@ -1588,7 +1527,7 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 1 week
-  completed_date: '2025-11-23'
+  completed_date: 2025-11-23
 - id: quick-start-tutorials
   file: DONE/docs-experience/completed/quick-start-tutorials.yaml
   title: Quick-Start Tutorials
@@ -1674,23 +1613,6 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Small
-- id: remove-sql-coupling-from-tpcdi-dataframe-mode
-  file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
-  title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: High
-  status: Completed
-  tags:
-  - tpcdi
-  - dataframe
-  - etl
-  - architecture
-  - sql-decoupling
-  - maintenance-operations
-  owners:
-  - joe
-  estimated_effort: 3-5 days
 - id: comparison-matrix-restructure
   file: DONE/docs-experience/active/comparison-matrix-restructure.yaml
   title: Restructure Platform Comparison Matrix with Grouped Categories
@@ -1740,7 +1662,7 @@ items:
   category: Security and Reliability
   priority: High
   status: Completed
-  completed_date: '2025-11-27'
+  completed_date: 2025-11-27
 - id: stabilize-full-test-suite-failures
   file: DONE/testing-improvements/completed/stabilize-full-test-suite-failures.yaml
   title: Stabilize Full Test Suite Failures
@@ -1788,7 +1710,7 @@ items:
   worktree: observability-quality
   category: Testing and Quality Assurance
   priority: High
-  status: Completed
+  status: Complete
 - id: trino-platform-adapter
   file: DONE/platform-expansion-trino/completed/trino-platform-adapter.yaml
   title: Trino Platform Adapter
@@ -1812,7 +1734,7 @@ items:
   category: Code Quality and Technical Debt
   priority: High
   status: Completed
-  completed_date: '2025-12-08'
+  completed_date: 2025-12-08
 - id: adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage
   file: DONE/unknown/completed/adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage.yaml
   title: ✅ Adversarial Review - Cost Framework Enhancement (Warnings, Metadata, Timing, Storage)
@@ -2115,7 +2037,7 @@ items:
   worktree: core-functionality
   category: Code Quality
   priority: Low
-  status: Completed
+  status: Done
   tags:
   - code-quality
   - refactoring
@@ -2128,7 +2050,7 @@ items:
   worktree: core-functionality
   category: Code Quality
   priority: Low
-  status: Completed
+  status: Complete
   tags:
   - code-quality
   - refactoring
@@ -2142,14 +2064,14 @@ items:
   worktree: ux-improvements
   category: ux-improvements
   priority: Low
-  status: Completed
+  status: Complete
 - id: metrics-command-group
   file: DONE/ux-improvements/active/metrics-command-group.yaml
   title: Create metrics command group and consolidate calculate-qphh
   worktree: ux-improvements
   category: ux-improvements
   priority: Low
-  status: Completed
+  status: Complete
 - id: fix-tpc-ds-optional-dependency-example-test
   file: DONE/testing-improvements/completed/fix-tpc-ds-optional-dependency-example-test.yaml
   title: Fix TPC-DS Optional Dependency Example Test
@@ -2408,7 +2330,7 @@ items:
   category: Project Lifecycle Management
   priority: Medium
   status: Completed
-  completed_date: '2025-11-28'
+  completed_date: 2025-11-28
 - id: add-firebolt-platform-adapter
   file: DONE/platform-expansion-firebolt/planning/add-firebolt-platform-adapter.yaml
   title: Add Firebolt Platform Adapter (Core + Cloud)
@@ -2462,14 +2384,14 @@ items:
   worktree: benchmark-expansion
   category: Core Functionality
   priority: Medium
-  status: Completed
+  status: Done
 - id: add-tpc-h-skew-benchmark-implementation
   file: DONE/benchmark-expansion/completed/add-tpc-h-skew-benchmark-implementation.yaml
   title: Add TPC-H Skew Benchmark Implementation
   worktree: benchmark-expansion
   category: Core Functionality
   priority: Medium
-  status: Completed
+  status: Complete
 - id: add-time-series-benchmark-suite-tsbs-implementation
   file: DONE/benchmark-expansion/active/add-time-series-benchmark-suite-tsbs-implementation.yaml
   title: Add Time Series Benchmark Suite (TSBS) Implementation
@@ -2497,7 +2419,7 @@ items:
   worktree: docs-experience
   category: Documentation
   priority: Medium
-  status: Completed
+  status: Done
   tags:
   - documentation
   - sphinx-tags
@@ -2541,35 +2463,20 @@ items:
   worktree: platform-expansion
   category: Platform Expansion
   priority: Medium
-  status: Completed
+  status: Complete
   tags:
   - cloud-spark
   - aws
   - athena-spark
   - interactive
   estimated_effort: 1.5 weeks
-- id: dataframe-read-primitives-architecture
-  file: DONE/dataframe-benchmarks/active/dataframe-read-primitives-architecture.yaml
-  title: Assess DataFrame Architecture for Read Primitives Integration
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium
-  status: Completed
-  tags:
-  - dataframe
-  - read-primitives
-  - planning
-  owners:
-  - joe
-  estimated_effort: Medium
-  completed_date: '2026-02-07'
 - id: athena-configuration-validation
   file: DONE/platform-expansion/planning/athena-configuration-validation.yaml
   title: Athena Configuration Validation
   worktree: platform-expansion
   category: Platform Polish
   priority: Medium
-  status: Completed
+  status: Done
   tags:
   - athena
   - validation
@@ -2591,7 +2498,7 @@ items:
   worktree: infrastructure-publishing
   category: Supporting Infrastructure
   priority: Medium
-  status: Completed
+  status: Done
   estimated_effort: 1 week (0.5 FTE)
 - id: synapse-spark-platform
   file: DONE/platform-expansion/planning/synapse-spark-platform.yaml
@@ -2599,7 +2506,7 @@ items:
   worktree: platform-expansion
   category: Platform Expansion
   priority: Medium
-  status: Completed
+  status: Complete
   tags:
   - cloud-spark
   - azure
@@ -2612,7 +2519,7 @@ items:
   worktree: docs-experience
   category: Documentation and User Experience
   priority: Medium
-  status: Completed
+  status: Done
   tags:
   - documentation
   - azure
@@ -2670,7 +2577,7 @@ items:
   worktree: observability-quality
   category: Platform Polish
   priority: Medium
-  status: Completed
+  status: Done
   tags:
   - error-handling
   - user-experience
@@ -2714,15 +2621,15 @@ items:
   category: Data Quality and Compatibility Issues
   priority: Medium
   status: Not Started
-- id: compressed-data-generation-completed
-  file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+- id: compressed-data-generation-completed-2
+  file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
   title: Compressed Data Generation ✅ COMPLETED
   worktree: unknown
   category: Performance and Efficiency
   priority: Medium
   status: Not Started
-- id: compressed-data-generation-completed-2
-  file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+- id: compressed-data-generation-completed
+  file: DONE/unknown/planning/compressed-data-generation-completed.yaml
   title: Compressed Data Generation ✅ COMPLETED
   worktree: unknown
   category: Performance and Efficiency
@@ -2807,7 +2714,7 @@ items:
   category: Project Lifecycle Management
   priority: Medium
   status: Completed
-  completed_date: '2025-11-28'
+  completed_date: 2025-11-28
 - id: cross-platform-benchmark-suite
   file: DONE/dataframe-performance/planning/cross-platform-benchmark-suite.yaml
   title: DataFrame Cross-Platform Benchmark Suite
@@ -2836,22 +2743,6 @@ items:
   - optimization
   owners:
   - '@benchbox-maintainers'
-- id: dataframe-platform-examples
-  file: DONE/docs-experience/planning/dataframe-platform-examples.yaml
-  title: DataFrame Platform Example Scripts
-  worktree: docs-experience
-  category: Documentation and User Experience
-  priority: Medium
-  status: Completed
-  tags:
-  - examples
-  - dataframe
-  - polars
-  - cudf
-  - gpu
-  owners:
-  - '@benchbox-maintainers'
-  estimated_effort: 2-3 hours
 - id: datafusion-dataframe-adapter
   file: DONE/dataframe-expansion/planning/datafusion-dataframe-adapter.yaml
   title: DataFusion DataFrame Adapter Implementation
@@ -2984,36 +2875,6 @@ items:
   priority: Medium
   status: Completed
   estimated_effort: 2 weeks (0.5 FTE)
-- id: dataframe-joinorder-feasibility
-  file: DONE/dataframe-benchmarks/active/dataframe-joinorder-feasibility.yaml
-  title: Evaluate DataFrame Relevance for JoinOrder Benchmark
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium
-  status: Completed
-  tags:
-  - dataframe
-  - joinorder
-  - feasibility
-  owners:
-  - joe
-  estimated_effort: Small
-  completed_date: '2026-02-07'
-- id: dataframe-tpchavoc-feasibility
-  file: DONE/dataframe-benchmarks/active/dataframe-tpchavoc-feasibility.yaml
-  title: Evaluate DataFrame Scope for TPC-Havoc
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium
-  status: Completed
-  tags:
-  - dataframe
-  - tpchavoc
-  - feasibility
-  owners:
-  - joe
-  estimated_effort: Small
-  completed_date: '2026-02-07'
 - id: example-modernization-completed
   file: DONE/unknown/planning/example-modernization-completed.yaml
   title: Example Modernization ✅ COMPLETED
@@ -3027,7 +2888,7 @@ items:
   worktree: docs-experience
   category: Documentation and User Experience
   priority: Medium
-  status: Completed
+  status: Done
   tags:
   - examples
   - firebolt
@@ -3057,21 +2918,6 @@ items:
   category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   priority: Medium
   status: Completed
-- id: firebolt-mode-validation
-  file: DONE/platform-expansion/planning/firebolt-mode-validation.yaml
-  title: Firebolt Core/Cloud Mode Validation
-  worktree: platform-expansion
-  category: Platform Polish
-  priority: Medium
-  status: Completed
-  tags:
-  - firebolt
-  - validation
-  - error-messages
-  - user-experience
-  owners:
-  - '@benchbox-maintainers'
-  estimated_effort: 3-4 hours (already implemented)
 - id: fix-cli-benchmarks-module-critical-issues
   file: DONE/unknown/planning/fix-cli-benchmarks-module-critical-issues.yaml
   title: Fix CLI Benchmarks Module Critical Issues
@@ -3154,7 +3000,7 @@ items:
   worktree: platform-expansion
   category: Platform Expansion
   priority: Medium
-  status: Completed
+  status: Complete
   tags:
   - cloud-spark
   - gcp
@@ -3233,21 +3079,6 @@ items:
   category: Security and Reliability
   priority: Medium
   status: Completed
-- id: integrate-read-primitives-dataframe-mode
-  file: DONE/dataframe-benchmarks/active/integrate-read-primitives-dataframe-mode.yaml
-  title: Integrate Read Primitives DataFrame Mode and Metadata
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium
-  status: Completed
-  tags:
-  - dataframe
-  - read-primitives
-  - integration
-  owners:
-  - joe
-  estimated_effort: Medium
-  completed_date: '2026-02-07'
 - id: logging-standardization
   file: DONE/observability-quality/active/logging-standardization.yaml
   title: Logging Standardization
@@ -3255,7 +3086,7 @@ items:
   category: Monitoring and Operations
   priority: Medium
   status: Completed
-  completed_date: '2025-11-28'
+  completed_date: 2025-11-28
 - id: duckdb-text-plan-reliability
   file: DONE/query-plan-remediation/planning/duckdb-text-plan-reliability.yaml
   title: Make DuckDB text plan parsing reliable or fail fast
@@ -3306,7 +3137,7 @@ items:
   category: '"Technical Debt & Refactoring"'
   priority: Medium
   status: Completed
-  completed_date: '2025-12-01'
+  completed_date: 2025-12-01
 - id: natural-language-to-sql-testing-framework
   file: DONE/ai-ml-nl2sql/completed/natural-language-to-sql-testing-framework.yaml
   title: Natural Language to SQL Testing Framework
@@ -3328,7 +3159,7 @@ items:
   worktree: benchmark-expansion
   category: Performance and Efficiency
   priority: Medium
-  status: Completed
+  status: Complete
 - id: open-table-format-smoke-tests
   file: DONE/testing-improvements/completed/open-table-format-smoke-tests.yaml
   title: Open Table Format Smoke Tests
@@ -3408,7 +3239,7 @@ items:
   worktree: physical-tuning
   category: Core Functionality
   priority: Medium
-  status: Completed
+  status: Done
   tags:
   - tuning
   - dataframe
@@ -3423,7 +3254,7 @@ items:
   worktree: physical-tuning
   category: Testing and Quality Assurance
   priority: Medium
-  status: Completed
+  status: Done
   tags:
   - tuning
   - integration
@@ -3439,7 +3270,7 @@ items:
   worktree: physical-tuning
   category: Platform Expansion
   priority: Medium
-  status: Completed
+  status: Done
   tags:
   - tuning
   - clickhouse
@@ -3520,7 +3351,7 @@ items:
   worktree: docs-experience
   category: Documentation and User Experience
   priority: Medium
-  status: Completed
+  status: Done
   tags:
   - documentation
   - postgresql
@@ -3587,7 +3418,7 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 1 week
-  completed_date: '2025-11-23'
+  completed_date: 2025-11-23
 - id: refactor-validation-logic-from-cli-to-core-module-completed
   file: DONE/unknown/planning/refactor-validation-logic-from-cli-to-core-module-completed.yaml
   title: Refactor Validation Logic from CLI to Core Module - COMPLETED ✅
@@ -3644,7 +3475,7 @@ items:
   worktree: docs-experience
   category: Documentation and User Experience
   priority: Medium
-  status: Completed
+  status: Done
   tags:
   - documentation
   - results
@@ -3668,16 +3499,16 @@ items:
   category: Pre-Release Medium Priority Tasks (Nice-to-Have)
   priority: Medium
   status: Completed
-  completed_date: '2025-11-27'
-- id: simple-cloud-storage-path-support-completed
-  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+  completed_date: 2025-11-27
+- id: simple-cloud-storage-path-support-completed-2
+  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
   title: Simple Cloud Storage Path Support ✅ COMPLETED
   worktree: unknown
   category: Platform Support and Deployment
   priority: Medium
   status: Not Started
-- id: simple-cloud-storage-path-support-completed-2
-  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+- id: simple-cloud-storage-path-support-completed
+  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
   title: Simple Cloud Storage Path Support ✅ COMPLETED
   worktree: unknown
   category: Platform Support and Deployment
@@ -3690,7 +3521,7 @@ items:
   category: Project Lifecycle Management
   priority: Medium
   status: Completed
-  completed_date: '2025-11-28'
+  completed_date: 2025-11-28
 - id: smart-data-generation-completed
   file: DONE/unknown/planning/smart-data-generation-completed.yaml
   title: Smart Data Generation ✅ COMPLETED
@@ -3941,15 +3772,15 @@ items:
   category: User Experience and CLI Enhancement
   priority: Medium
   status: Completed
-- id: implement-or-remove-incomplete-cli-commands
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+- id: implement-or-remove-incomplete-cli-commands-2
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)
   priority: Medium
   status: Not Started
-- id: implement-or-remove-incomplete-cli-commands-2
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+- id: implement-or-remove-incomplete-cli-commands
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)
@@ -4113,7 +3944,7 @@ items:
   worktree: table-format-parity
   category: Core Functionality
   priority: Medium-High
-  status: Completed
+  status: Complete
   tags:
   - table-formats
   - hudi
@@ -4143,7 +3974,7 @@ items:
   worktree: platform-expansion
   category: Platform Expansion
   priority: Medium-High
-  status: Completed
+  status: Complete
   tags:
   - influxdb
   - time-series
@@ -4278,7 +4109,7 @@ items:
   worktree: platform-expansion
   category: Core Functionality
   priority: Medium-High
-  status: Completed
+  status: Complete
   tags:
   - refactoring
   - cloud-spark
@@ -4298,36 +4129,6 @@ items:
   - pyproject
   - documentation
   estimated_effort: Small
-- id: consolidate-file-format-detection
-  file: DONE/core-functionality/consolidate-file-format-detection.yaml
-  title: Consolidate file format detection to handle compressed and sharded files
-  worktree: core-functionality
-  category: Code Quality
-  priority: Medium-High
-  status: Completed
-  tags:
-  - code-quality
-  - refactoring
-  - dry-principle
-  - file-format
-  - compression
-  estimated_effort: Small
-  completed_date: '2026-02-07'
-- id: dataframe-write-primitives-model
-  file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
-  title: Define DataFrame Execution Model for Write Primitives
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium-High
-  status: Completed
-  tags:
-  - dataframe
-  - write-primitives
-  - architecture
-  owners:
-  - joe
-  estimated_effort: Medium
-  completed_date: '2026-02-07'
 - id: embed-tuning-config-in-results
   file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
   title: Embed Full Tuning Config in Result Output
@@ -4362,7 +4163,7 @@ items:
   worktree: main
   category: Testing and Quality Assurance
   priority: Medium-High
-  status: Completed
+  status: Complete
   tags:
   - type-checking
   - technical-debt
@@ -4375,7 +4176,7 @@ items:
   worktree: dataframe-expansion
   category: Core Functionality
   priority: Medium-High
-  status: Completed
+  status: Complete
   tags:
   - dataframe
   - maintenance
@@ -4399,21 +4200,6 @@ items:
   - joe
   estimated_effort: Large
   completed_date: '2026-01-04'
-- id: implement-tpcds-obt-dataframe-queries
-  file: DONE/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
-  title: Implement TPC-DS-OBT DataFrame Query Families
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium-High
-  status: Completed
-  tags:
-  - dataframe
-  - tpcds-obt
-  - implementation
-  owners:
-  - joe
-  estimated_effort: Large
-  completed_date: '2026-02-07'
 - id: compare-interactive-file-selection
   file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
   title: Improve interactive file selection in compare command
@@ -4428,35 +4214,6 @@ items:
   - interactive
   estimated_effort: 1-2 days
   completed_date: '2025-12-15'
-- id: coverage-core-utilities
-  file: DONE/main/active/coverage-core-utilities.yaml
-  title: Improve test coverage for core utility and standalone modules to ≥50%
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: Medium-High
-  status: Completed
-  tags:
-  - testing
-  - coverage
-  - utilities
-  - quick-wins
-  estimated_effort: Small
-  completed_date: '2026-02-07'
-- id: integrate-write-primitives-dataframe-mode
-  file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml
-  title: Integrate Write Primitives DataFrame Mode with Runner and Registry
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium-High
-  status: Completed
-  tags:
-  - dataframe
-  - write-primitives
-  - integration
-  owners:
-  - joe
-  estimated_effort: Medium
-  completed_date: '2026-02-07'
 - id: explicit-tuning-file-resolution
   file: DONE/ux-improvements/active/explicit-tuning-file-resolution.yaml
   title: Make tuning file resolution explicit and transparent in CLI
@@ -4516,21 +4273,6 @@ items:
   owners:
   - joe
   estimated_effort: Large
-- id: dataframe-tpcds-obt-adaptation
-  file: DONE/dataframe-benchmarks/active/dataframe-tpcds-obt-adaptation.yaml
-  title: Plan DataFrame Adaptation for TPC-DS-OBT
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: Medium-High
-  status: Completed
-  tags:
-  - dataframe
-  - tpcds-obt
-  - planning
-  owners:
-  - joe
-  estimated_effort: Medium
-  completed_date: '2026-02-07'
 - id: deployment-cli-integration
   file: DONE/platform-expansion/active/deployment-cli-integration.yaml
   title: Platform Deployment CLI Integration
@@ -4549,7 +4291,7 @@ items:
   worktree: docs-experience
   category: Documentation and User Experience
   priority: Medium-High
-  status: Completed
+  status: Done
   tags:
   - documentation
   - troubleshooting
@@ -4592,7 +4334,7 @@ items:
   worktree: platform-expansion
   category: Platform Expansion
   priority: Medium-High
-  status: Completed
+  status: Complete
   tags:
   - cloud-spark
   - snowflake
@@ -4605,7 +4347,7 @@ items:
   worktree: core-functionality
   category: Core Functionality
   priority: Medium-High
-  status: Completed
+  status: Complete
   tags:
   - architecture
   - refactoring
@@ -4622,19 +4364,33 @@ items:
   worktree: unknown
   category: ux-improvements
   priority: P2
-  status: Completed
-  completed_date: '2025-12-14'
+  status: completed
+  completed_date: 2025-12-14
 - id: phase3-manifest-v2-spec
   file: DONE/table-formats/implementation/phase3-manifest-v2-spec.yaml
   title: 'Phase 3.1: Manifest v2 Implementation Specification'
   worktree: table-formats
   category: Uncategorized
   priority: critical
-  status: Completed
+  status: Open
+- id: format-converter-remaining-work
+  file: DONE/table-formats/completed/format-converter-remaining-work.yaml
+  title: Format Converter Integration - Remaining Work (Phases 3-6)
+  worktree: table-formats
+  category: Uncategorized
+  priority: high
+  status: Open
+- id: fabric-adapter-architecture
+  file: DONE/fabric-platform/planning/fabric-adapter-architecture.yaml
+  title: Microsoft Fabric Data Warehouse Adapter Architecture
+  worktree: fabric-platform
+  category: platform-adapter
+  priority: high
+  status: in-progress
 - id: acl-benchmark-enhancement
   file: DONE/metadata-primitives/phase-2-acl/acl-benchmark-enhancement.yaml
   title: Enhance Metadata Primitives with Access Control (ACL) Performance Testing
   worktree: unknown
   category: Uncategorized
   priority: medium
-  status: Completed
+  status: done
