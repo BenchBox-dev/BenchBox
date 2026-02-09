@@ -680,7 +680,7 @@ work:
   status: done
 - id: w89
   summary: "Batch 5D: Near-50% CLI modules (5 files, ~21 tests)"
-  status: pending
+  status: done
 - id: w90
   summary: "tests/unit/cli/test_config_coverage.py → cli/config.py (41% → 50%, ~5 tests)"
   needs:
@@ -695,17 +695,17 @@ work:
   summary: "tests/unit/cli/commands/test_tuning_group_coverage.py → cli/commands/tuning_group.py (40% → 50%, ~4 tests)"
   needs:
   - w89
-  status: pending
+  status: done
 - id: w93
   summary: "tests/unit/cli/commands/test_tuning_cmd_coverage.py → cli/commands/tuning.py (46% → 50%, ~2 tests)"
   needs:
   - w89
-  status: pending
+  status: done
 - id: w94
   summary: "tests/unit/cli/presentation/test_system_presentation_coverage.py → cli/presentation/system.py (6% → 50%, ~5 tests)"
   needs:
   - w89
-  status: pending
+  status: done
 - id: w95
   summary: "Raise non-deferred TPC-DI modules under 50%: benchmark/generator/queries/loader/schema/validation/metrics/config/etl.py/etl/validation.py"
   status: pending
