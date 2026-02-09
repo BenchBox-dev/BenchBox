@@ -51,7 +51,7 @@ metadata:
   - ci
   estimated_effort: Large
   created_date: "2026-02-08"
-  last_updated: "2026-02-09T08:24:00"
+  last_updated: "2026-02-09T08:38:25"
 
   related:
   - coverage-cli-modules
@@ -540,7 +540,7 @@ work:
   summary: "tests/unit/core/tpch/test_dataframe_queries_coverage.py → core/tpch/dataframe_queries.py (12% → 50%, ~10 tests)"
   needs:
   - w58
-  status: pending
+  status: done
 - id: w61
   summary: "tests/unit/core/transaction_primitives/test_generator_coverage.py → core/transaction_primitives/generator.py (11%
     → 50%, ~8 tests)"
