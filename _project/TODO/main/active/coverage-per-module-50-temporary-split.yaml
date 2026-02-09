@@ -708,7 +708,7 @@ work:
   status: done
 - id: w95
   summary: "Raise non-deferred TPC-DI modules under 50%: benchmark/generator/queries/loader/schema/validation/metrics/config/etl.py/etl/validation.py"
-  status: pending
+  status: done
 - id: w96
   summary: "Keep ETL tests unit-heavy with mocked pipeline and deterministic fixtures"
   status: done
