@@ -714,7 +714,7 @@ work:
   status: pending
 - id: w97
   summary: "Re-run full coverage report and identify any modules still below 50%"
-  status: pending
+  status: done
 - id: w98
   summary: "Add targeted tests for remaining gaps discovered after phases 2-6"
   status: pending
