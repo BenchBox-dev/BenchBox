@@ -634,7 +634,7 @@ work:
   summary: "tests/unit/cli/test_preferences_coverage.py → cli/preferences.py (15% → 50%, ~7 tests)"
   needs:
   - w74
-  status: pending
+  status: done
 - id: w80
   summary: "tests/unit/cli/commands/test_plan_history_coverage.py → cli/commands/plan_history.py (19% → 50%, ~5 tests)"
   needs:
