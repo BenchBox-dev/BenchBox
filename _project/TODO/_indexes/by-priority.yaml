@@ -1,5 +1,5 @@
-generated_at: '2026-02-10T09:46:17.212827'
-total_items: 46
+generated_at: '2026-02-10T18:40:45.050290'
+total_items: 45
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 6
+    count: 5
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -31,11 +31,6 @@ priorities:
       file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
       category: Platform Expansion
-      status: In Progress
-    - id: coverage-per-module-50-remaining-wave-2026-02-10
-      file: TODO/main/active/coverage-per-module-50-remaining-wave-2026-02-10.yaml
-      title: Raise remaining sub-50% files to >=50% coverage (wave 2026-02-10)
-      category: Testing and Quality Assurance
       status: In Progress
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml

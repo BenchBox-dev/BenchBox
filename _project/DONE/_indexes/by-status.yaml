@@ -1,5 +1,5 @@
-generated_at: '2026-02-10T09:46:20.030934'
-total_items: 444
+generated_at: '2026-02-10T18:40:45.946255'
+total_items: 445
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 397
+    count: 398
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1563,6 +1563,11 @@ statuses:
     - id: coverage-below-50-modules-wave-plan
       file: DONE/main/active/coverage-below-50-modules-wave-plan.yaml
       title: Raise remaining benchbox modules below 50% to >=50% coverage
+      priority: High
+      category: Testing and Quality Assurance
+    - id: coverage-per-module-50-remaining-wave-2026-02-10
+      file: DONE/main/active/coverage-per-module-50-remaining-wave-2026-02-10.yaml
+      title: Raise remaining sub-50% files to >=50% coverage (wave 2026-02-10)
       priority: High
       category: Testing and Quality Assurance
     - id: ranking-aggregation-system-platform-leaderboards-trends

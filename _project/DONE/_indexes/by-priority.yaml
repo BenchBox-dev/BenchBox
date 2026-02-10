@@ -1,5 +1,5 @@
-generated_at: '2026-02-10T09:46:20.030824'
-total_items: 444
+generated_at: '2026-02-10T18:40:45.946158'
+total_items: 445
 priorities:
   Critical:
     count: 31
@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 152
+    count: 153
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -651,6 +651,11 @@ priorities:
     - id: coverage-below-50-modules-wave-plan
       file: DONE/main/active/coverage-below-50-modules-wave-plan.yaml
       title: Raise remaining benchbox modules below 50% to >=50% coverage
+      category: Testing and Quality Assurance
+      status: Completed
+    - id: coverage-per-module-50-remaining-wave-2026-02-10
+      file: DONE/main/active/coverage-per-module-50-remaining-wave-2026-02-10.yaml
+      title: Raise remaining sub-50% files to >=50% coverage (wave 2026-02-10)
       category: Testing and Quality Assurance
       status: Completed
     - id: rebuild-tpcds-binaries

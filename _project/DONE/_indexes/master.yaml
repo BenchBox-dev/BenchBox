@@ -1,5 +1,5 @@
-generated_at: '2026-02-10T09:46:20.029555'
-total_items: 444
+generated_at: '2026-02-10T18:40:45.945836'
+total_items: 445
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1763,6 +1763,22 @@ items:
   work_done: 14
   work_ready: 0
   deferred_count: 1
+- id: coverage-per-module-50-remaining-wave-2026-02-10
+  file: DONE/main/active/coverage-per-module-50-remaining-wave-2026-02-10.yaml
+  title: Raise remaining sub-50% files to >=50% coverage (wave 2026-02-10)
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - coverage
+  - per-file-threshold
+  estimated_effort: Large
+  completed_date: '2026-02-10'
+  work_total: 12
+  work_done: 12
+  work_ready: 0
 - id: rebuild-tpcds-binaries
   file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
   title: Rebuild TPC-DS binaries with stdout fix for all platforms
