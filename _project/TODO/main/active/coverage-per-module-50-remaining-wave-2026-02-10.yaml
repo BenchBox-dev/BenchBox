@@ -208,7 +208,7 @@ work:
 - id: w4
   summary: "Cover TPC-DI generator dimension/fact modules to >=50%"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Files:
     - benchbox/core/tpcdi/generator/dimensions.py
