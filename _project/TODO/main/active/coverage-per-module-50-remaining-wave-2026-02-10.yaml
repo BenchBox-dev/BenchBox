@@ -188,7 +188,7 @@ work:
 - id: w3
   summary: "Cover TPC-DI ETL and orchestration modules to >=50%"
   needs: [w1]
-  status: in_progress
+  status: done
   notes: |
     Files:
     - benchbox/core/tpcdi/worker_pool_examples.py
