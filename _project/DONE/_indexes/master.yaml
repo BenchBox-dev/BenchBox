@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T18:45:10.783688'
-total_items: 440
+generated_at: '2026-02-09T19:15:40.180506'
+total_items: 442
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1091,6 +1091,23 @@ items:
   - joe
   estimated_effort: 1-2 days
   completed_date: '2026-02-06'
+- id: fix-sharded-dataframe-parquet-bypass
+  file: DONE/main/active/fix-sharded-dataframe-parquet-bypass.yaml
+  title: Fix sharded DataFrame Parquet bypass causing Polars date-string failures
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - dataframe
+  - polars
+  - parquet
+  - regression
+  estimated_effort: Medium
+  completed_date: '2026-02-10'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: format-converter-remaining-work
   file: DONE/table-formats/completed/format-converter-remaining-work.yaml
   title: Format Converter Integration - Remaining Work (Phases 3-6)
@@ -1723,6 +1740,29 @@ items:
   work_total: 101
   work_done: 101
   work_ready: 0
+- id: coverage-below-50-modules-wave-plan
+  file: DONE/main/active/coverage-below-50-modules-wave-plan.yaml
+  title: Raise remaining benchbox modules below 50% to >=50% coverage
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - coverage
+  - testing
+  - quality
+  - cli
+  - core
+  - platforms
+  - tpcdi
+  - tpcds
+  - tpch
+  estimated_effort: Large
+  completed_date: '2026-02-10'
+  work_total: 14
+  work_done: 14
+  work_ready: 0
+  deferred_count: 1
 - id: rebuild-tpcds-binaries
   file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
   title: Rebuild TPC-DS binaries with stdout fix for all platforms

@@ -1,4 +1,4 @@
-generated_at: '2026-02-09T18:45:10.783866'
+generated_at: '2026-02-09T19:15:40.180711'
 total_categories: 62
 categories:
   '"Bug Fixes & Reliability"':
@@ -358,7 +358,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 112
+    count: 113
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -620,6 +620,11 @@ categories:
       file: DONE/core-functionality/completed/fix-result-filename-redundancy.yaml
       title: Fix inconsistent result filename generation - remove redundant elements
       priority: Medium
+      status: Completed
+    - id: fix-sharded-dataframe-parquet-bypass
+      file: DONE/main/active/fix-sharded-dataframe-parquet-bypass.yaml
+      title: Fix sharded DataFrame Parquet bypass causing Polars date-string failures
+      priority: High
       status: Completed
     - id: harden-operator-type-handling
       file: DONE/query-plan-remediation/planning/harden-operator-type-handling.yaml
@@ -2113,7 +2118,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 22
+    count: 23
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2204,6 +2209,11 @@ categories:
     - id: coverage-per-module-50-temporary-split
       file: DONE/main/active/coverage-per-module-50-temporary-split.yaml
       title: Raise benchbox/ per-module coverage to >=50% with temporary split
+      priority: High
+      status: Completed
+    - id: coverage-below-50-modules-wave-plan
+      file: DONE/main/active/coverage-below-50-modules-wave-plan.yaml
+      title: Raise remaining benchbox modules below 50% to >=50% coverage
       priority: High
       status: Completed
     - id: coverage-improvement

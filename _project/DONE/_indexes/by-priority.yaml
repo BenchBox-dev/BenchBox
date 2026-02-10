@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T18:45:10.783970'
-total_items: 440
+generated_at: '2026-02-09T19:15:40.180831'
+total_items: 442
 priorities:
   Critical:
     count: 31
@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 150
+    count: 152
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -408,6 +408,11 @@ priorities:
       title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
       category: Core Functionality
       status: Completed
+    - id: fix-sharded-dataframe-parquet-bypass
+      file: DONE/main/active/fix-sharded-dataframe-parquet-bypass.yaml
+      title: Fix sharded DataFrame Parquet bypass causing Polars date-string failures
+      category: Core Functionality
+      status: Completed
     - id: format-converter-remaining-work
       file: DONE/table-formats/completed/format-converter-remaining-work.yaml
       title: Format Converter Integration - Remaining Work (Phases 3-6)
@@ -641,6 +646,11 @@ priorities:
     - id: coverage-per-module-50-temporary-split
       file: DONE/main/active/coverage-per-module-50-temporary-split.yaml
       title: Raise benchbox/ per-module coverage to >=50% with temporary split
+      category: Testing and Quality Assurance
+      status: Completed
+    - id: coverage-below-50-modules-wave-plan
+      file: DONE/main/active/coverage-below-50-modules-wave-plan.yaml
+      title: Raise remaining benchbox modules below 50% to >=50% coverage
       category: Testing and Quality Assurance
       status: Completed
     - id: rebuild-tpcds-binaries
