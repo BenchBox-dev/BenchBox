@@ -217,7 +217,7 @@ work:
 - id: w5
   summary: "Cover TPC-DS and TPC-H reporting and execution modules to >=50%"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Files:
     - benchbox/core/tpcds/reporting.py
@@ -232,7 +232,7 @@ work:
 - id: w6
   summary: "Cover benchmark orchestrator modules for remaining suites to >=50%"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Files:
     - benchbox/core/amplab/benchmark.py
@@ -251,7 +251,7 @@ work:
 - id: w7
   summary: "Cover dataframe query modules with representative assertions to >=50%"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Files:
     - benchbox/core/tpcds/dataframe_queries/queries.py
@@ -264,6 +264,14 @@ work:
     - benchbox/core/read_primitives/dataframe_queries.py
     - benchbox/core/ai_primitives/dataframe_operations.py
     - benchbox/core/metadata_primitives/dataframe_operations.py
+    Covered via PolarsDataFrameAdapter-backed context for AMPLab (8 expression +
+    2 pandas), SSB (13), CoffeeShop (11, 3 xfail due to production bugs).
+    AI primitives: enums, capabilities, results, manager, pure functions
+    (classify, extract_entities, cosine/euclidean/top_k).
+    Metadata primitives: enums, capabilities, presets, results, manager,
+    schema introspection execution.
+    Large modules (TPC-DS, read_primitives, NYC Taxi, ClickBench, Data Vault)
+    deferred to w11 gap-closing.
 
 - id: w8
   summary: "Cover concurrency, joinorder, and utility modules to >=50%"
