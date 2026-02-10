@@ -79,7 +79,7 @@ metadata:
   - per-file-threshold
   estimated_effort: Large
   created_date: "2026-02-10"
-  last_updated: "2026-02-10T09:08:00"
+  last_updated: "2026-02-10T10:35:00"
 
 impact:
   business_value: |
@@ -188,7 +188,7 @@ work:
 - id: w3
   summary: "Cover TPC-DI ETL and orchestration modules to >=50%"
   needs: [w1]
-  status: pending
+  status: in_progress
   notes: |
     Files:
     - benchbox/core/tpcdi/worker_pool_examples.py
@@ -197,6 +197,13 @@ work:
     - benchbox/core/tpcdi/etl/pipeline.py
     - benchbox/core/tpcdi/etl/batch.py
     - benchbox/core/tpcdi/etl/scd_processor.py
+    Progress snapshot (2026-02-10):
+    - worker_pool_examples.py: 90.5% (complete for target)
+    - source_generators.py: 84.0% (complete for target)
+    - pipeline.py: 65.4% (complete for target)
+    - transformations.py: 11.8% (remaining)
+    - batch.py: 17.1% (remaining)
+    - scd_processor.py: 24.2% (remaining)
 
 - id: w4
   summary: "Cover TPC-DI generator dimension/fact modules to >=50%"
