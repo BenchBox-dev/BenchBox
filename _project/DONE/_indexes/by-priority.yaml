@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T19:15:40.180831'
-total_items: 442
+generated_at: '2026-02-10T09:46:20.030824'
+total_items: 444
 priorities:
   Critical:
     count: 31
@@ -1118,7 +1118,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 208
+    count: 210
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1299,6 +1299,11 @@ priorities:
       file: DONE/docs-experience/active/add-sphinx-tags.yaml
       title: Add sphinx-tags to BenchBox Documentation
       category: Documentation
+      status: Completed
+    - id: summary-box-system-environment-info
+      file: DONE/main/active/summary-box-system-environment-info.yaml
+      title: Add system environment details to the right side of the run summary box
+      category: Visualization
       status: Completed
     - id: athena-spark-platform
       file: DONE/platform-expansion/planning/athena-spark-platform.yaml
@@ -1924,6 +1929,11 @@ priorities:
       file: DONE/unknown/planning/switch-tpc-ds-base-dialect-from-ansi-to-netezza.yaml
       title: Switch TPC-DS Base Dialect from ANSI to Netezza ✅ │
       category: '"Technical Debt & Refactoring"'
+      status: Completed
+    - id: horizontal-histogram-for-long-query-names
+      file: DONE/main/active/horizontal-histogram-for-long-query-names.yaml
+      title: Switch post-run histogram to horizontal bars when query names are long
+      category: Visualization
       status: Completed
     - id: tpc-specification-compliance-issues-completed
       file: DONE/unknown/planning/tpc-specification-compliance-issues-completed.yaml

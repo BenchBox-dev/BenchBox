@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T19:15:40.180506'
-total_items: 442
+generated_at: '2026-02-10T09:46:20.029555'
+total_items: 444
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2731,6 +2731,22 @@ items:
   - joe
   estimated_effort: Medium
   completed_date: '2025-01-09'
+- id: summary-box-system-environment-info
+  file: DONE/main/active/summary-box-system-environment-info.yaml
+  title: Add system environment details to the right side of the run summary box
+  worktree: main
+  category: Visualization
+  priority: Medium
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - ux
+  estimated_effort: Small
+  completed_date: '2026-02-10'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: athena-spark-platform
   file: DONE/platform-expansion/planning/athena-spark-platform.yaml
   title: Amazon Athena for Apache Spark Platform
@@ -4003,6 +4019,22 @@ items:
   category: '"Technical Debt & Refactoring"'
   priority: Medium
   status: Completed
+- id: horizontal-histogram-for-long-query-names
+  file: DONE/main/active/horizontal-histogram-for-long-query-names.yaml
+  title: Switch post-run histogram to horizontal bars when query names are long
+  worktree: main
+  category: Visualization
+  priority: Medium
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - ux
+  estimated_effort: Small
+  completed_date: '2026-02-10'
+  work_total: 2
+  work_done: 2
+  work_ready: 0
 - id: tpc-specification-compliance-issues-completed
   file: DONE/unknown/planning/tpc-specification-compliance-issues-completed.yaml
   title: TPC Specification Compliance Issues ✅ COMPLETED

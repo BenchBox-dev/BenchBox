@@ -1,5 +1,5 @@
-generated_at: '2026-02-09T19:15:40.180711'
-total_categories: 62
+generated_at: '2026-02-10T09:46:20.030683'
+total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -2372,6 +2372,19 @@ categories:
       file: DONE/unknown/completed/register-platform-management-cli-commands.yaml
       title: ✅ Register Platform Management CLI Commands
       priority: Low
+      status: Completed
+  Visualization:
+    count: 2
+    items:
+    - id: summary-box-system-environment-info
+      file: DONE/main/active/summary-box-system-environment-info.yaml
+      title: Add system environment details to the right side of the run summary box
+      priority: Medium
+      status: Completed
+    - id: horizontal-histogram-for-long-query-names
+      file: DONE/main/active/horizontal-histogram-for-long-query-names.yaml
+      title: Switch post-run histogram to horizontal bars when query names are long
+      priority: Medium
       status: Completed
   platform-adapter:
     count: 1

@@ -1,0 +1,128 @@
+id: fix-sharded-dataframe-parquet-bypass
+title: "Fix sharded DataFrame Parquet bypass causing Polars date-string failures"
+worktree: main
+priority: High
+status: Completed
+category: Core Functionality
+description: |
+  DataFrame benchmarks with sharded source paths (list-valued benchmark.tables)
+  are bypassing DataFrameDataLoader.prepare_benchmark_data() in
+  benchmark_mixin.py. This causes adapters (notably Polars) to load raw
+  CSV/TBL shards instead of converted Parquet and leaves date columns typed
+  as strings.
+
+  Resulting failures include date comparison errors and year extraction errors
+  in TPCH queries (e.g., Q6/Q9/Q14/Q20). The defect was introduced when
+  sharded-path handling changed the Parquet prep guard to skip preparation
+  whenever benchmark.tables contains list values.
+
+metadata:
+  tags:
+  - dataframe
+  - polars
+  - parquet
+  - regression
+  estimated_effort: Medium
+  created_date: "2026-02-09"
+  last_updated: "2026-02-10T19:06:30"
+
+impact:
+  business_value: |
+    Restores correctness and expected performance for DataFrame mode on
+    production-size TPCH/TPCDS runs where sharded inputs are common.
+  user_impact: |
+    Users running DataFrame mode with Polars/Pandas adapters will no longer
+    see date-type query failures caused by string-typed temporal columns.
+  technical_debt: |
+    Aligns duplicated DataFrame load paths and removes fragile guard logic that
+    silently changed format behavior based on input path shape.
+
+must_preserve:
+- "prefer_parquet=false continues to load source CSV/TBL files without conversion"
+- "DataFrame adapters keep load_table(ctx, table_name, file_paths, column_names) contract unchanged"
+- "Existing DataFrame benchmark result schema and phase reporting remain unchanged"
+
+approach: |
+  Update the shared DataFrame mixin load path to always attempt
+  prepare_benchmark_data() when prefer_parquet is enabled, regardless of
+  sharded list paths. Remove the sharded-list bypass guard and normalize
+  returned paths before load_table calls.
+
+  Enforce fail-fast behavior if Parquet prep fails in prefer_parquet mode to
+  prevent silent CSV fallback. Introduce a cache version bump in data_loader so
+  stale pre-fix conversion artifacts are not reused. Keep
+  core/runner/dataframe_runner.py semantics aligned with the mixin path.
+
+anti_patterns:
+- "DO NOT keep list-path-specific bypass guards for Parquet prep — because they reintroduce CSV scans on common sharded datasets
+  — always route prefer_parquet flows through prepare_benchmark_data()"
+- "DO NOT silently warn-and-fallback to CSV when Parquet prep raises — because this hides correctness defects and leads to
+  date-type regressions — fail fast with DataLoadingError"
+- "DO NOT invalidate caches via ad-hoc rm logic in runtime code — because it is brittle and environment-dependent — use explicit
+  cache/manifest versioning"
+
+verification:
+- description: "Unit coverage for mixin + loader + runner passes with new sharded-prep behavior"
+  command: "uv run -- python -m pytest tests/unit/platforms/dataframe/test_benchmark_mixin.py tests/unit/core/dataframe/test_data_loader.py
+    tests/unit/core/runner/test_dataframe_runner.py -v"
+  expected_output: "all selected tests pass with 0 failures"
+- description: "Polars load-only path uses prepared Parquet rather than tbl/csv source scans"
+  command: "uv run benchbox run --platform polars --benchmark tpch --scale 1 --compression zstd:3 --mode dataframe --phases
+    load --non-interactive -vv"
+  expected_output: "Data loading logs indicate parquet-prepared paths; no fallback-only tbl/csv load path for sharded tables"
+
+files_affected:
+  modified:
+  - "benchbox/platforms/dataframe/benchmark_mixin.py"
+  - "benchbox/core/dataframe/data_loader.py"
+  - "benchbox/core/runner/dataframe_runner.py"
+  - "tests/unit/platforms/dataframe/test_benchmark_mixin.py"
+  - "tests/unit/core/dataframe/test_data_loader.py"
+  - "tests/unit/core/runner/test_dataframe_runner.py"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/dataframe/benchmark_mixin.py"
+  - "benchbox/core/dataframe/data_loader.py"
+  - "benchbox/core/runner/dataframe_runner.py"
+  - "tests/unit/platforms/dataframe/test_benchmark_mixin.py"
+  - "tests/unit/core/dataframe/test_data_loader.py"
+  - "tests/unit/core/runner/test_dataframe_runner.py"
+  do_not_modify:
+  - "benchbox/cli/"
+  - "benchbox/core/tpch/"
+
+success_metrics:
+- "Sharded TPCH/TPCDS DataFrame runs with prefer_parquet=true no longer bypass conversion"
+- "Date-type failures caused by CSV/TBL string inference are eliminated in Polars DataFrame runs"
+- "Regression tests assert sharded inputs invoke prepare_benchmark_data() and fail-fast policy"
+
+work:
+- id: w1
+  summary: "Refactor BenchmarkExecutionMixin load path to always run Parquet prep when prefer_parquet=true"
+  status: done
+- id: w2
+  summary: "Remove sharded-list bypass guard and normalize prepared path outputs before load_table()"
+  needs: [w1]
+  status: done
+- id: w3
+  summary: "Implement fail-fast DataLoadingError behavior for Parquet prep exceptions"
+  needs: [w1]
+  status: done
+- id: w4
+  summary: "Add DataFrame cache version bump/invalidation strategy in data_loader"
+  needs: [w1]
+  status: done
+- id: w5
+  summary: "Align core dataframe_runner load semantics with shared mixin behavior"
+  needs: [w2, w3]
+  status: done
+- id: w6
+  summary: "Add/adjust unit tests for sharded prep, fail-fast behavior, and cache-version behavior"
+  needs: [w2, w3, w4, w5]
+  status: done
+- id: w7
+  summary: "Run verification commands and confirm Polars load path no longer defaults to CSV/TBL shards"
+  needs: [w6]
+  status: done
+completed_date: "2026-02-10"
