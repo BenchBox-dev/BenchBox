@@ -1,4 +1,4 @@
-generated_at: '2026-02-11T09:04:37.334493'
+generated_at: '2026-02-11T09:05:54.443650'
 total_items: 44
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -684,9 +684,9 @@ items:
   - platform
   - mysql-protocol
   estimated_effort: Medium
-  work_total: 39
+  work_total: 16
   work_done: 0
-  work_ready: 12
+  work_ready: 1
 - id: ctas-sorted-data-loading
   file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
   title: Implement CTAS-based sorted data loading for DuckDB
