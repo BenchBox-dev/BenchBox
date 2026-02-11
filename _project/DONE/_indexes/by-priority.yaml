@@ -1,5 +1,5 @@
-generated_at: '2026-02-10T18:40:45.946158'
-total_items: 445
+generated_at: '2026-02-11T08:28:44.155387'
+total_items: 446
 priorities:
   Critical:
     count: 31
@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 153
+    count: 154
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -478,6 +478,11 @@ priorities:
       title: Implement schema creation with SQLGlot translation for PySpark
       category: Platform Expansion
       status: Not Started
+    - id: coverage-core-benchmarks
+      file: DONE/main/active/coverage-core-benchmarks.yaml
+      title: Improve test coverage for core benchmark modules to ≥50%
+      category: Testing and Quality Assurance
+      status: Completed
     - id: include-tpc-metrics-in-result-outputs
       file: DONE/main/active/include-tpc-metrics-in-result-outputs.yaml
       title: Include TPC Metrics (Power@Size, Throughput@Size, QphH/QphDS@Size) in All Result Outputs

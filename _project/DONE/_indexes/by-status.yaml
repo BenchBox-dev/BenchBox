@@ -1,5 +1,5 @@
-generated_at: '2026-02-10T18:40:45.946255'
-total_items: 445
+generated_at: '2026-02-11T08:28:44.155495'
+total_items: 446
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 398
+    count: 399
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1185,6 +1185,11 @@ statuses:
       title: Improve interactive file selection in compare command
       priority: Medium-High
       category: Core Functionality
+    - id: coverage-core-benchmarks
+      file: DONE/main/active/coverage-core-benchmarks.yaml
+      title: Improve test coverage for core benchmark modules to ≥50%
+      priority: High
+      category: Testing and Quality Assurance
     - id: coverage-core-utilities
       file: DONE/main/active/coverage-core-utilities.yaml
       title: Improve test coverage for core utility and standalone modules to ≥50%

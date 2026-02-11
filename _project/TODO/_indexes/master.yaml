@@ -1,4 +1,4 @@
-generated_at: '2026-02-10T18:40:45.050241'
+generated_at: '2026-02-11T08:28:43.259154'
 total_items: 45
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -67,21 +67,6 @@ items:
   deferred_count: 6
   needs:
   - fix-dataframe-parameter-parity-follow-up-findings
-- id: coverage-core-benchmarks
-  file: TODO/main/planning/coverage-core-benchmarks.yaml
-  title: Improve test coverage for core benchmark modules to ≥50%
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: High
-  status: Not Started
-  tags:
-  - testing
-  - coverage
-  - core
-  estimated_effort: Large
-  work_total: 22
-  work_done: 0
-  work_ready: 22
 - id: motherduck-platform-adapter
   file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
   title: MotherDuck Platform Adapter
@@ -109,6 +94,23 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
+- id: fix-datafusion-read-write-primitives-parity
+  file: TODO/main/planning/fix-datafusion-read-write-primitives-parity.yaml
+  title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - datafusion
+  - read-primitives
+  - write-primitives
+  - parity
+  - concurrency
+  estimated_effort: Medium
+  work_total: 7
+  work_done: 0
+  work_ready: 3
 - id: siriusdb-adapter
   file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
   title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
