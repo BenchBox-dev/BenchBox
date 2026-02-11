@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T08:28:44.155100'
-total_items: 446
+generated_at: '2026-02-11T09:04:38.233529'
+total_items: 447
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1882,6 +1882,24 @@ items:
   owners:
   - joe
   estimated_effort: 3-5 days
+- id: fix-datafusion-read-write-primitives-parity
+  file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml
+  title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - datafusion
+  - read-primitives
+  - write-primitives
+  - parity
+  - concurrency
+  estimated_effort: Medium
+  completed_date: '2026-02-11'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: comparison-matrix-restructure
   file: DONE/docs-experience/active/comparison-matrix-restructure.yaml
   title: Restructure Platform Comparison Matrix with Grouped Categories

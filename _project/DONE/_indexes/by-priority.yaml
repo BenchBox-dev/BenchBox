@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T08:28:44.155387'
-total_items: 446
+generated_at: '2026-02-11T09:04:38.233902'
+total_items: 447
 priorities:
   Critical:
     count: 31
@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 154
+    count: 155
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -691,6 +691,11 @@ priorities:
     - id: remove-sql-coupling-from-tpcdi-dataframe-mode
       file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
       title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
+      category: Core Functionality
+      status: Completed
+    - id: fix-datafusion-read-write-primitives-parity
+      file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml
+      title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
       category: Core Functionality
       status: Completed
     - id: comparison-matrix-restructure

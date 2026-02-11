@@ -1,4 +1,4 @@
-generated_at: '2026-02-11T08:28:44.155284'
+generated_at: '2026-02-11T09:04:38.233767'
 total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
@@ -358,7 +358,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 113
+    count: 114
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -879,6 +879,11 @@ categories:
     - id: remove-sql-coupling-from-tpcdi-dataframe-mode
       file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
       title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
+      priority: High
+      status: Completed
+    - id: fix-datafusion-read-write-primitives-parity
+      file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml
+      title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
       priority: High
       status: Completed
     - id: result-schema-v2-redesign

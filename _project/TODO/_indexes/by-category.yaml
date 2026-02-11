@@ -1,4 +1,4 @@
-generated_at: '2026-02-11T08:28:43.259193'
+generated_at: '2026-02-11T09:04:37.334525'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -86,7 +86,7 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 6
+    count: 5
     items:
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -107,11 +107,6 @@ categories:
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
-      status: Not Started
-    - id: fix-datafusion-read-write-primitives-parity
-      file: TODO/main/planning/fix-datafusion-read-write-primitives-parity.yaml
-      title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
-      priority: High
       status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T08:28:43.259154'
-total_items: 45
+generated_at: '2026-02-11T09:04:37.334493'
+total_items: 44
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -94,23 +94,6 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
-- id: fix-datafusion-read-write-primitives-parity
-  file: TODO/main/planning/fix-datafusion-read-write-primitives-parity.yaml
-  title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - datafusion
-  - read-primitives
-  - write-primitives
-  - parity
-  - concurrency
-  estimated_effort: Medium
-  work_total: 7
-  work_done: 0
-  work_ready: 3
 - id: siriusdb-adapter
   file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
   title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter

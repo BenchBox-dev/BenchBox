@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T08:28:44.155495'
-total_items: 446
+generated_at: '2026-02-11T09:04:38.234013'
+total_items: 447
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 399
+    count: 400
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1640,6 +1640,11 @@ statuses:
       title: Resource Management
       priority: Medium
       category: Monitoring and Operations
+    - id: fix-datafusion-read-write-primitives-parity
+      file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml
+      title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
+      priority: High
+      category: Core Functionality
     - id: restrict-primary-foreign-key-configuration-to-tuning-yaml-only
       file: DONE/unknown/planning/restrict-primary-foreign-key-configuration-to-tuning-yaml-only.yaml
       title: Restrict Primary/Foreign Key Configuration to tuning.yaml Only

@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T08:28:43.259231'
-total_items: 45
+generated_at: '2026-02-11T09:04:37.334549'
+total_items: 44
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 43
+    count: 42
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -157,11 +157,6 @@ statuses:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: Medium-High
       category: Testing and Quality Assurance
-    - id: fix-datafusion-read-write-primitives-parity
-      file: TODO/main/planning/fix-datafusion-read-write-primitives-parity.yaml
-      title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
-      priority: High
-      category: Core Functionality
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

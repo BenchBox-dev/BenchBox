@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T08:28:43.259210'
-total_items: 45
+generated_at: '2026-02-11T09:04:37.334538'
+total_items: 44
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 5
+    count: 4
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -31,11 +31,6 @@ priorities:
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
-      status: Not Started
-    - id: fix-datafusion-read-write-primitives-parity
-      file: TODO/main/planning/fix-datafusion-read-write-primitives-parity.yaml
-      title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
-      category: Core Functionality
       status: Not Started
   Medium-High:
     count: 8
