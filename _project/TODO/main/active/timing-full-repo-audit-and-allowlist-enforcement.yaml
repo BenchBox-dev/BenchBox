@@ -151,7 +151,7 @@ work:
   - w2
   - w3
   - w4
-  status: pending
+  status: done
 - id: w6
   summary: "Document policy and add contributor guidance for allowed vs forbidden timing patterns"
   needs:
