@@ -112,7 +112,7 @@ work:
   status: done
 - id: w2
   summary: "Migrate DataFrame pandas-family execute paths to monotonic timing and canonical key"
-  status: pending
+  status: done
 - id: w3
   summary: "Align benchmark mixin summary code to canonical execution_time_seconds"
   needs:
