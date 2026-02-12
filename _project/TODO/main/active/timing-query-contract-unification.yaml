@@ -137,4 +137,4 @@ work:
   summary: "Add and update unit tests covering canonical runtime timing contract"
   needs:
   - w6
-  status: pending
+  status: done
