@@ -131,7 +131,7 @@ work:
   summary: "Migrate resource profiler rate elapsed calculations to monotonic deltas"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w6
   summary: "Migrate MCP benchmark elapsed calculations from wall-clock deltas to monotonic helpers"
   needs:
