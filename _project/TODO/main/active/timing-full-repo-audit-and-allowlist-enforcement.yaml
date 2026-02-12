@@ -139,7 +139,7 @@ work:
   summary: "Migrate remaining elapsed/timeout callsites in benchbox/ to centralized monotonic helpers"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w4
   summary: "Migrate remaining elapsed/timeout callsites in tests/ and scripts/ with tolerance updates where needed"
   needs:
