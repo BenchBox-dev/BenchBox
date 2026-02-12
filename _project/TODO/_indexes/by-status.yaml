@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:27:35.688176'
-total_items: 48
+generated_at: '2026-02-11T20:49:28.701592'
+total_items: 47
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 46
+    count: 45
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -192,11 +192,6 @@ statuses:
       title: TimescaleDB Cloud Deployment Mode
       priority: Medium
       category: Platform Expansion
-    - id: timing-query-contract-unification
-      file: TODO/main/planning/timing-query-contract-unification.yaml
-      title: Unify runtime query timing contract to execution_time_seconds
-      priority: High
-      category: Core Functionality
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support

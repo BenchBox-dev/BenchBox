@@ -1,4 +1,4 @@
-generated_at: '2026-02-11T20:27:35.688146'
+generated_at: '2026-02-11T20:49:28.701565'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -104,7 +104,7 @@ categories:
       priority: Medium-High
       status: Not Started
   Core Functionality:
-    count: 6
+    count: 5
     items:
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -130,11 +130,6 @@ categories:
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
       priority: Medium-High
-      status: Not Started
-    - id: timing-query-contract-unification
-      file: TODO/main/planning/timing-query-contract-unification.yaml
-      title: Unify runtime query timing contract to execution_time_seconds
-      priority: High
       status: Not Started
   Documentation:
     count: 2

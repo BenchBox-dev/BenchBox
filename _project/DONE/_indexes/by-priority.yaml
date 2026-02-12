@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:27:36.622927'
-total_items: 448
+generated_at: '2026-02-11T20:49:29.618426'
+total_items: 449
 priorities:
   Critical:
     count: 31
@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 156
+    count: 157
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -762,6 +762,11 @@ priorities:
       file: DONE/architecture-cleanup/unify-platform-registration-systems.yaml
       title: Unify Platform Registration Systems
       category: Code Quality and Technical Debt
+      status: Completed
+    - id: timing-query-contract-unification
+      file: DONE/main/active/timing-query-contract-unification.yaml
+      title: Unify runtime query timing contract to execution_time_seconds
+      category: Core Functionality
       status: Completed
     - id: adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage
       file: DONE/unknown/completed/adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage.yaml

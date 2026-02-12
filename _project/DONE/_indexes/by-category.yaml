@@ -1,4 +1,4 @@
-generated_at: '2026-02-11T20:27:36.622806'
+generated_at: '2026-02-11T20:49:29.618302'
 total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
@@ -358,7 +358,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 115
+    count: 116
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -925,6 +925,11 @@ categories:
       file: DONE/dataframe-benchmarks/active/unify-tpcdi-sql-dataframe-execution-contract.yaml
       title: Unify TPC-DI SQL/DataFrame Execution Contract and ETL Path
       priority: Critical
+      status: Completed
+    - id: timing-query-contract-unification
+      file: DONE/main/active/timing-query-contract-unification.yaml
+      title: Unify runtime query timing contract to execution_time_seconds
+      priority: High
       status: Completed
     - id: add-platform-info-to-benchmark-results
       file: DONE/unknown/planning/add-platform-info-to-benchmark-results.yaml

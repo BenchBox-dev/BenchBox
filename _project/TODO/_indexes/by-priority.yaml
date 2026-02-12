@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:27:35.688163'
-total_items: 48
+generated_at: '2026-02-11T20:49:28.701580'
+total_items: 47
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 5
+    count: 4
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -31,11 +31,6 @@ priorities:
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
-      status: Not Started
-    - id: timing-query-contract-unification
-      file: TODO/main/planning/timing-query-contract-unification.yaml
-      title: Unify runtime query timing contract to execution_time_seconds
-      category: Core Functionality
       status: Not Started
   Medium-High:
     count: 10

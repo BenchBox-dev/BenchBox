@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:27:36.623024'
-total_items: 448
+generated_at: '2026-02-11T20:49:29.618535'
+total_items: 449
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 401
+    count: 402
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1855,6 +1855,11 @@ statuses:
       title: Unify compare and compare-plans commands
       priority: Medium
       category: ux-improvements
+    - id: timing-query-contract-unification
+      file: DONE/main/active/timing-query-contract-unification.yaml
+      title: Unify runtime query timing contract to execution_time_seconds
+      priority: High
+      category: Core Functionality
     - id: visualization-framework-chart-generation-results-display
       file: DONE/content-enablement-viz/planning/visualization-framework-chart-generation-results-display.yaml
       title: Visualization Framework - Chart Generation & Results Display

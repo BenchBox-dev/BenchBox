@@ -2,7 +2,7 @@ id: timing-query-contract-unification
 title: "Unify runtime query timing contract to execution_time_seconds"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Core Functionality
 description: |
   Standardize runtime query timing outputs to one canonical key,
@@ -31,6 +31,7 @@ metadata:
   - normalization
   estimated_effort: 2-4 days
   created_date: '2026-02-12'
+  completed_date: '2026-02-12'
 
 impact:
   business_value: |
