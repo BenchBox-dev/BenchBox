@@ -1,0 +1,165 @@
+id: timing-full-repo-audit-and-allowlist-enforcement
+title: "Perform full-repo timing audit/migration with wall-clock allowlist enforcement"
+worktree: main
+priority: Medium-High
+status: In Progress
+category: Code Quality and Technical Debt
+description: |
+  Execute the maximum-scope timing consolidation across the entire repository,
+  extending beyond runtime code into test utilities, scripts, and support
+  modules.
+
+  This umbrella item performs a complete audit and migration pass for elapsed
+  and timeout timing logic, while preserving intentionally valid wall-clock
+  timestamp usage through an explicit, enforced allowlist.
+
+  This phase is intentionally placed after runtime migration and guardrail
+  cleanup so the canonical methodology and contracts are already stable before
+  repo-wide normalization.
+
+deps:
+  needs:
+  - timing-guardrails-and-legacy-cleanup
+
+metadata:
+  owners:
+  - joe
+  tags:
+  - timing
+  - full-repo
+  - audit
+  - allowlist
+  - governance
+  estimated_effort: 5-8 days
+  created_date: '2026-02-12'
+
+impact:
+  business_value: |
+    Delivers organization-wide consistency for timing behavior, reducing false
+    signals in benchmarks/tests and preventing future drift across code layers.
+  technical_debt: |
+    Removes remaining fragmented timing implementations and codifies a clear
+    policy boundary between elapsed timing and event timestamp semantics.
+
+files_affected:
+  modified:
+  - benchbox/
+  - tests/
+  - scripts/
+  - docs/
+  - _project/scripts/
+
+must_preserve:
+- "Wall-clock timestamps remain available where required for auditability and human event logs"
+- "Existing benchmark result schemas remain valid and backward-compatible at documented boundaries"
+- "No test behavior is altered except timing methodology and tolerance adjustments needed for monotonic migration"
+- "CI and local developer workflows remain non-interactive and deterministic"
+
+approach: |
+  Run the migration as a governed audit with explicit policy artifacts:
+  1) inventory all timing call sites in runtime, tests, utilities, scripts;
+  2) classify each usage as elapsed/timeout vs event timestamp;
+  3) migrate elapsed/timeout to centralized monotonic helpers;
+  4) retain and document approved wall-clock usages via allowlist;
+  5) enforce policy with automated checks and CI validation.
+
+  Keep changes reviewable by batching per top-level area (benchbox, tests,
+  scripts) and update tests/tolerances where clock source changes affect
+  precision/resolution assumptions.
+
+anti_patterns:
+- "DO NOT blindly replace every time.time() usage — because some are valid event timestamps — classify before migrating"
+- "DO NOT encode allowlist as tribal knowledge — because policy will regress — persist machine-readable allowlist in-repo"
+- "DO NOT weaken checks by broad path exemptions — because that hides regressions — use narrow, justified allowlist entries"
+- "DO NOT alter unrelated business logic while touching timing calls — because this is a governance migration — isolate timing-only
+  diffs"
+
+verification:
+- description: "Full-repo timing audit report generated and reviewed"
+  command: "uv run -- python _project/scripts/timing_audit.py --report"
+  expected_output: "Report enumerates all callsites, classifications, and unresolved violations"
+- description: "Policy check passes with only allowlisted wall-clock usages"
+  command: "uv run -- python _project/scripts/timing_policy_check.py --strict"
+  expected_output: "No non-allowlisted wall-clock elapsed/timeout usage"
+- description: "Fast and unit suites pass after full migration"
+  command: "uv run -- python -m pytest -m 'fast or unit' -q"
+  expected_output: "Selected suites pass"
+- description: "Project CI quality gate remains green"
+  command: "make ci-test"
+  expected_output: "CI test suite passes"
+
+scope_limit:
+  only_modify:
+  - benchbox/
+  - tests/
+  - scripts/
+  - docs/
+  - _project/scripts/
+
+success_metrics:
+- "All non-allowlisted elapsed/timeout wall-clock arithmetic is removed repo-wide"
+- "Machine-readable allowlist is present, documented, and CI-enforced"
+- "Repo-wide timing policy docs include allowed/forbidden examples and rationale"
+- "No unresolved timing-policy violations remain in strict check"
+
+context_sections:
+  "Allowlisted Wall-Clock Usage Categories": |
+    The following categories are explicitly allowed to keep wall-clock semantics:
+
+    1) Event/audit timestamps
+       - datetime.now(timezone.utc).isoformat() or equivalent metadata stamps
+       - run start/end timestamps intended for humans or external systems
+
+    2) Filesystem and OS metadata interactions
+       - stat().st_mtime and conversions for reporting/sorting file recency
+       - process/system boot/create timestamps derived from OS-provided epoch values
+
+    3) External API contract fields requiring wall-clock timestamps
+       - payloads that must send absolute datetimes to cloud/services/log sinks
+
+    4) Test fixtures that intentionally model real clock time
+       - tests asserting timestamp serialization/parsing behavior
+
+    Non-allowlisted categories:
+    - elapsed duration measurement
+    - timeout/retry windows
+    - throughput/rate denominator timing
+    - benchmark query/phase execution timing
+
+work:
+- id: w1
+  summary: "Implement full-repo timing inventory tool and classify callsites by timing intent"
+  status: done
+- id: w2
+  summary: "Define machine-readable allowlist format and seed it with approved wall-clock categories"
+  needs:
+  - w1
+  status: done
+- id: w3
+  summary: "Migrate remaining elapsed/timeout callsites in benchbox/ to centralized monotonic helpers"
+  needs:
+  - w1
+  status: pending
+- id: w4
+  summary: "Migrate remaining elapsed/timeout callsites in tests/ and scripts/ with tolerance updates where needed"
+  needs:
+  - w1
+  status: pending
+- id: w5
+  summary: "Implement strict timing policy checker that enforces allowlist exceptions"
+  needs:
+  - w2
+  - w3
+  - w4
+  status: pending
+- id: w6
+  summary: "Document policy and add contributor guidance for allowed vs forbidden timing patterns"
+  needs:
+  - w2
+  status: done
+- id: w7
+  summary: "Run repo-wide validation (policy check plus fast/unit/ci tests) and resolve remaining violations"
+  needs:
+  - w5
+  - w6
+  status: pending

@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:49:29.618535'
-total_items: 449
+generated_at: '2026-02-11T21:44:06.879424'
+total_items: 451
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 402
+    count: 404
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -894,6 +894,11 @@ statuses:
       title: Enable SSB ClickHouse Embedded Platform Support
       priority: Medium
       category: Data Quality and Compatibility Issues
+    - id: timing-guardrails-and-legacy-cleanup
+      file: DONE/main/active/timing-guardrails-and-legacy-cleanup.yaml
+      title: Enforce timing guardrails and remove legacy timing compatibility paths
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: acl-benchmark-enhancement
       file: DONE/metadata-primitives/phase-2-acl/acl-benchmark-enhancement.yaml
       title: Enhance Metadata Primitives with Access Control (ACL) Performance Testing
@@ -1270,6 +1275,11 @@ statuses:
       title: Migrate ClickHouse/Firebolt to Deployment Registry
       priority: Medium-High
       category: Core Functionality
+    - id: timing-runtime-wide-monotonic-migration
+      file: DONE/main/active/timing-runtime-wide-monotonic-migration.yaml
+      title: Migrate runtime elapsed and timeout timing to centralized monotonic clock
+      priority: Medium-High
+      category: Code Quality and Technical Debt
     - id: minimize-emoji-usage-completed
       file: DONE/unknown/planning/minimize-emoji-usage-completed.yaml
       title: Minimize Emoji Usage ✅ COMPLETED

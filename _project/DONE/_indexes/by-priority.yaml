@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:49:29.618426'
-total_items: 449
+generated_at: '2026-02-11T21:44:06.879327'
+total_items: 451
 priorities:
   Critical:
     count: 31
@@ -949,7 +949,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 38
+    count: 39
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1102,6 +1102,11 @@ priorities:
       title: Migrate ClickHouse/Firebolt to Deployment Registry
       category: Core Functionality
       status: Completed
+    - id: timing-runtime-wide-monotonic-migration
+      file: DONE/main/active/timing-runtime-wide-monotonic-migration.yaml
+      title: Migrate runtime elapsed and timeout timing to centralized monotonic clock
+      category: Code Quality and Technical Debt
+      status: Completed
     - id: pt-06-trino-presto-athena-ddl
       file: DONE/physical-tuning/planning/pt-06-trino-presto-athena-ddl.yaml
       title: 'PT-06: Trino, Presto & Athena Physical Tuning DDL Generators'
@@ -1143,7 +1148,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 210
+    count: 211
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1549,6 +1554,11 @@ priorities:
       file: DONE/unknown/planning/enable-ssb-clickhouse-embedded-platform-support.yaml
       title: Enable SSB ClickHouse Embedded Platform Support
       category: Data Quality and Compatibility Issues
+      status: Completed
+    - id: timing-guardrails-and-legacy-cleanup
+      file: DONE/main/active/timing-guardrails-and-legacy-cleanup.yaml
+      title: Enforce timing guardrails and remove legacy timing compatibility paths
+      category: Code Quality and Technical Debt
       status: Completed
     - id: acl-benchmark-enhancement
       file: DONE/metadata-primitives/phase-2-acl/acl-benchmark-enhancement.yaml

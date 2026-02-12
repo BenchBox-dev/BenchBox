@@ -1,4 +1,4 @@
-generated_at: '2026-02-11T20:49:29.618302'
+generated_at: '2026-02-11T21:44:06.879220'
 total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
@@ -202,7 +202,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 26
+    count: 28
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -229,6 +229,11 @@ categories:
       title: Circular Import Issues ✅ COMPLETED
       priority: Medium
       status: Completed
+    - id: timing-guardrails-and-legacy-cleanup
+      file: DONE/main/active/timing-guardrails-and-legacy-cleanup.yaml
+      title: Enforce timing guardrails and remove legacy timing compatibility paths
+      priority: Medium
+      status: Completed
     - id: examples-code-duplication-consolidation
       file: DONE/unknown/planning/examples-code-duplication-consolidation.yaml
       title: Examples Code Duplication Consolidation
@@ -243,6 +248,11 @@ categories:
       file: DONE/unknown/planning/fix-cli-orchestrator-module-critical-issues.yaml
       title: Fix CLI Orchestrator Module Critical Issues
       priority: Medium
+      status: Completed
+    - id: timing-runtime-wide-monotonic-migration
+      file: DONE/main/active/timing-runtime-wide-monotonic-migration.yaml
+      title: Migrate runtime elapsed and timeout timing to centralized monotonic clock
+      priority: Medium-High
       status: Completed
     - id: notimplementederror-completions-completed
       file: DONE/unknown/planning/notimplementederror-completions-completed.yaml

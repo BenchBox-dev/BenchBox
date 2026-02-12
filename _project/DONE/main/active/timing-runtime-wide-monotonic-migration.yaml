@@ -2,7 +2,7 @@ id: timing-runtime-wide-monotonic-migration
 title: "Migrate runtime elapsed and timeout timing to centralized monotonic clock"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
 category: Code Quality and Technical Debt
 description: |
   Complete runtime-wide migration from wall-clock elapsed arithmetic to
@@ -27,6 +27,7 @@ metadata:
   - refactor
   estimated_effort: 4-6 days
   created_date: '2026-02-12'
+  completed_date: '2026-02-12'
 
 impact:
   business_value: |
@@ -108,37 +109,37 @@ work:
   summary: "Migrate platform base adapter elapsed/timeout logic to centralized monotonic helpers"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Migrate platform base data-loading elapsed/timeout logic to centralized monotonic helpers"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w4
   summary: "Migrate core runner lifecycle elapsed/timeout logic to centralized monotonic helpers"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w5
   summary: "Migrate benchbox/base.py benchmark duration arithmetic to centralized monotonic helpers"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w6
   summary: "Migrate core validation elapsed logic in benchbox/core/validation/data.py to centralized monotonic helpers"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w7
   summary: "Migrate TPC-DI benchmark and ETL elapsed/timeout hotspots to centralized monotonic helpers"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w8
   summary: "Migrate multiregion orchestrator elapsed timing to centralized monotonic helpers"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w9
   summary: "Add regression tests for timeout behavior under wall-clock perturbation scenarios"
   needs:
@@ -149,9 +150,9 @@ work:
   - w6
   - w7
   - w8
-  status: pending
+  status: done
 - id: w10
   summary: "Run targeted platform/core suites and document timing parity outcomes"
   needs:
   - w9
-  status: pending
+  status: done

@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:49:29.618101'
-total_items: 449
+generated_at: '2026-02-11T21:44:06.879031'
+total_items: 451
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3291,6 +3291,26 @@ items:
   category: Data Quality and Compatibility Issues
   priority: Medium
   status: Completed
+- id: timing-guardrails-and-legacy-cleanup
+  file: DONE/main/active/timing-guardrails-and-legacy-cleanup.yaml
+  title: Enforce timing guardrails and remove legacy timing compatibility paths
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - timing
+  - guardrails
+  - cleanup
+  - lint
+  owners:
+  - joe
+  estimated_effort: 2-3 days
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - timing-runtime-wide-monotonic-migration
 - id: acl-benchmark-enhancement
   file: DONE/metadata-primitives/phase-2-acl/acl-benchmark-enhancement.yaml
   title: Enhance Metadata Primitives with Access Control (ACL) Performance Testing
@@ -4915,6 +4935,26 @@ items:
   - firebolt
   - deployment-modes
   estimated_effort: 2-3 days
+- id: timing-runtime-wide-monotonic-migration
+  file: DONE/main/active/timing-runtime-wide-monotonic-migration.yaml
+  title: Migrate runtime elapsed and timeout timing to centralized monotonic clock
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: Completed
+  tags:
+  - timing
+  - runtime
+  - monotonic
+  - refactor
+  owners:
+  - joe
+  estimated_effort: 4-6 days
+  work_total: 10
+  work_done: 10
+  work_ready: 0
+  needs:
+  - timing-query-contract-unification
 - id: pt-06-trino-presto-athena-ddl
   file: DONE/physical-tuning/planning/pt-06-trino-presto-athena-ddl.yaml
   title: 'PT-06: Trino, Presto & Athena Physical Tuning DDL Generators'

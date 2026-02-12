@@ -1,4 +1,4 @@
-generated_at: '2026-02-11T20:49:28.701565'
+generated_at: '2026-02-11T21:44:05.994890'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -86,23 +86,13 @@ categories:
       priority: Medium
       status: Not Started
   Code Quality and Technical Debt:
-    count: 3
+    count: 1
     items:
-    - id: timing-guardrails-and-legacy-cleanup
-      file: TODO/main/planning/timing-guardrails-and-legacy-cleanup.yaml
-      title: Enforce timing guardrails and remove legacy timing compatibility paths
-      priority: Medium
-      status: Not Started
-    - id: timing-runtime-wide-monotonic-migration
-      file: TODO/main/planning/timing-runtime-wide-monotonic-migration.yaml
-      title: Migrate runtime elapsed and timeout timing to centralized monotonic clock
-      priority: Medium-High
-      status: Not Started
     - id: timing-full-repo-audit-and-allowlist-enforcement
-      file: TODO/main/planning/timing-full-repo-audit-and-allowlist-enforcement.yaml
+      file: TODO/main/active/timing-full-repo-audit-and-allowlist-enforcement.yaml
       title: Perform full-repo timing audit/migration with wall-clock allowlist enforcement
       priority: Medium-High
-      status: Not Started
+      status: In Progress
   Core Functionality:
     count: 5
     items:
