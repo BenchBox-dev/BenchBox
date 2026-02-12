@@ -65,7 +65,14 @@ def main() -> int:
         f
         for f in findings
         if f.symbol in {"time.time", "datetime.now"}
-        and f.classification in {"elapsed_or_timeout_wall_clock", "wall_clock_unknown"}
+        and f.classification == "elapsed_or_timeout_wall_clock"
+    ]
+
+    unknown_wall_clock = [
+        f
+        for f in findings
+        if f.symbol in {"time.time", "datetime.now"}
+        and f.classification == "wall_clock_unknown"
     ]
 
     violations = []
@@ -79,6 +86,7 @@ def main() -> int:
     print(f"Timing policy candidates: {len(candidate_violations)}")
     print(f"Allowlisted: {allowed}")
     print(f"Violations: {len(violations)}")
+    print(f"Unknown (informational): {len(unknown_wall_clock)}")
     for finding in violations[:200]:
         print(f"{finding.path}:{finding.line} [{finding.symbol}] {finding.text}")
     if len(violations) > 200:

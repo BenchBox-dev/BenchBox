@@ -1,8 +1,8 @@
-generated_at: '2026-02-12T10:56:02.802453'
-total_items: 45
+generated_at: '2026-02-12T16:31:20.052000'
+total_items: 44
 statuses:
   In Progress:
-    count: 3
+    count: 2
     items:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
@@ -14,11 +14,6 @@ statuses:
       title: MotherDuck Platform Adapter
       priority: High
       category: Platform Expansion
-    - id: timing-full-repo-audit-and-allowlist-enforcement
-      file: TODO/main/active/timing-full-repo-audit-and-allowlist-enforcement.yaml
-      title: Perform full-repo timing audit/migration with wall-clock allowlist enforcement
-      priority: Medium-High
-      category: Code Quality and Technical Debt
   Not Started:
     count: 42
     items:

@@ -1,4 +1,4 @@
-generated_at: '2026-02-12T10:56:03.691819'
+generated_at: '2026-02-12T16:31:21.014285'
 total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
@@ -202,7 +202,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 28
+    count: 29
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -263,6 +263,11 @@ categories:
       file: DONE/unknown/planning/optimize-benchmark-results-json-output-format.yaml
       title: Optimize Benchmark Results JSON Output Format
       priority: Medium
+      status: Completed
+    - id: timing-full-repo-audit-and-allowlist-enforcement
+      file: DONE/main/active/timing-full-repo-audit-and-allowlist-enforcement.yaml
+      title: Perform full-repo timing audit/migration with wall-clock allowlist enforcement
+      priority: Medium-High
       status: Completed
     - id: platform-adapter-abstract-method-implementation-completed
       file: DONE/unknown/planning/platform-adapter-abstract-method-implementation-completed.yaml

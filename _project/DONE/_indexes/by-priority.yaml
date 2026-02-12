@@ -1,5 +1,5 @@
-generated_at: '2026-02-12T10:56:03.691925'
-total_items: 452
+generated_at: '2026-02-12T16:31:21.014407'
+total_items: 453
 priorities:
   Critical:
     count: 31
@@ -954,7 +954,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 39
+    count: 40
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1117,6 +1117,11 @@ priorities:
       title: 'PT-06: Trino, Presto & Athena Physical Tuning DDL Generators'
       category: Platform Expansion
       status: Not Started
+    - id: timing-full-repo-audit-and-allowlist-enforcement
+      file: DONE/main/active/timing-full-repo-audit-and-allowlist-enforcement.yaml
+      title: Perform full-repo timing audit/migration with wall-clock allowlist enforcement
+      category: Code Quality and Technical Debt
+      status: Completed
     - id: dataframe-tpcds-obt-adaptation
       file: DONE/dataframe-benchmarks/active/dataframe-tpcds-obt-adaptation.yaml
       title: Plan DataFrame Adaptation for TPC-DS-OBT

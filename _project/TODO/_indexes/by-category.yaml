@@ -1,5 +1,5 @@
-generated_at: '2026-02-12T10:56:02.802427'
-total_categories: 9
+generated_at: '2026-02-12T16:31:20.051968'
+total_categories: 8
 categories:
   AI/ML Capabilities:
     count: 1
@@ -85,14 +85,6 @@ categories:
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
       status: Not Started
-  Code Quality and Technical Debt:
-    count: 1
-    items:
-    - id: timing-full-repo-audit-and-allowlist-enforcement
-      file: TODO/main/active/timing-full-repo-audit-and-allowlist-enforcement.yaml
-      title: Perform full-repo timing audit/migration with wall-clock allowlist enforcement
-      priority: Medium-High
-      status: In Progress
   Core Functionality:
     count: 5
     items:

@@ -1,5 +1,5 @@
-generated_at: '2026-02-12T10:56:03.691638'
-total_items: 452
+generated_at: '2026-02-12T16:31:21.014075'
+total_items: 453
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4992,6 +4992,27 @@ items:
   owners:
   - joe
   estimated_effort: Large
+- id: timing-full-repo-audit-and-allowlist-enforcement
+  file: DONE/main/active/timing-full-repo-audit-and-allowlist-enforcement.yaml
+  title: Perform full-repo timing audit/migration with wall-clock allowlist enforcement
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: Completed
+  tags:
+  - timing
+  - full-repo
+  - audit
+  - allowlist
+  - governance
+  owners:
+  - joe
+  estimated_effort: 5-8 days
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  needs:
+  - timing-guardrails-and-legacy-cleanup
 - id: dataframe-tpcds-obt-adaptation
   file: DONE/dataframe-benchmarks/active/dataframe-tpcds-obt-adaptation.yaml
   title: Plan DataFrame Adaptation for TPC-DS-OBT

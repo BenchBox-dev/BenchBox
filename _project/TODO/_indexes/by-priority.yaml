@@ -1,5 +1,5 @@
-generated_at: '2026-02-12T10:56:02.802441'
-total_items: 45
+generated_at: '2026-02-12T16:31:20.051986'
+total_items: 44
 priorities:
   Critical:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 9
+    count: 8
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -60,11 +60,6 @@ priorities:
       title: Improve test coverage for core/tpcdi module to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
-    - id: timing-full-repo-audit-and-allowlist-enforcement
-      file: TODO/main/active/timing-full-repo-audit-and-allowlist-enforcement.yaml
-      title: Perform full-repo timing audit/migration with wall-clock allowlist enforcement
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
