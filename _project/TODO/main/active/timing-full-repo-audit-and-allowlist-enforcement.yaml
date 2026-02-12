@@ -144,7 +144,7 @@ work:
   summary: "Migrate remaining elapsed/timeout callsites in tests/ and scripts/ with tolerance updates where needed"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w5
   summary: "Implement strict timing policy checker that enforces allowlist exceptions"
   needs:
