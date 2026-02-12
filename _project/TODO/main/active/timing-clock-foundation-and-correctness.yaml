@@ -116,7 +116,7 @@ work:
   summary: "Add stopwatch/context manager helpers and unit tests for elapsed semantics"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Fix QueryTiming timestamp bug by separating wall-clock start from monotonic elapsed"
   needs:
