@@ -132,7 +132,7 @@ work:
   summary: "Update query normalizer/schema/exporter to use canonical key as primary source"
   needs:
   - w5
-  status: pending
+  status: done
 - id: w7
   summary: "Add and update unit tests covering canonical runtime timing contract"
   needs:
