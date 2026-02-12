@@ -127,7 +127,7 @@ work:
   needs:
   - w3
   - w4
-  status: pending
+  status: done
 - id: w6
   summary: "Update query normalizer/schema/exporter to use canonical key as primary source"
   needs:
