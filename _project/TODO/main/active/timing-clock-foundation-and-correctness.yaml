@@ -121,7 +121,7 @@ work:
   summary: "Fix QueryTiming timestamp bug by separating wall-clock start from monotonic elapsed"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w4
   summary: "Migrate high-risk timeout loops to monotonic elapsed logic"
   needs:
