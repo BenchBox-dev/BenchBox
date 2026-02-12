@@ -89,14 +89,11 @@ def main() -> int:
         "--roots",
         nargs="+",
         default=[
-            "benchbox/base.py",
-            "benchbox/platforms/base",
-            "benchbox/core/validation",
-            "benchbox/core/results",
+            "benchbox",
             "scripts",
             "_project/scripts",
         ],
-        help="Directories to scan",
+        help="Directories to scan (default: full benchbox tree)",
     )
     parser.add_argument("--report", action="store_true", help="Emit human-readable report")
     parser.add_argument("--json", action="store_true", help="Emit JSON report")
