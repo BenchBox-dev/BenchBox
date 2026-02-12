@@ -118,7 +118,7 @@ work:
   needs:
   - w1
   - w2
-  status: pending
+  status: done
 - id: w4
   summary: "Normalize base adapter query failure result timing field naming to canonical contract"
   status: done
