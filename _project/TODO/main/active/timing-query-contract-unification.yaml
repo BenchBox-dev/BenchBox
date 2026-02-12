@@ -121,7 +121,7 @@ work:
   status: pending
 - id: w4
   summary: "Normalize base adapter query failure result timing field naming to canonical contract"
-  status: pending
+  status: done
 - id: w5
   summary: "Enforce execution_time_seconds float validation in schema boundaries"
   needs:
