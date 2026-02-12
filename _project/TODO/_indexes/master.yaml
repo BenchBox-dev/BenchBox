@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:13:14.412855'
-total_items: 49
+generated_at: '2026-02-11T20:27:35.688100'
+total_items: 48
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -44,25 +44,6 @@ items:
   work_total: 91
   work_done: 0
   work_ready: 19
-- id: timing-clock-foundation-and-correctness
-  file: TODO/main/planning/timing-clock-foundation-and-correctness.yaml
-  title: Establish centralized clock module and fix timing correctness bugs
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - timing
-  - monotonic
-  - perf-counter
-  - correctness
-  - technical-debt
-  owners:
-  - joe
-  estimated_effort: 2-3 days
-  work_total: 7
-  work_done: 0
-  work_ready: 1
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks

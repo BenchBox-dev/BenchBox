@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:13:18.400010'
-total_items: 447
+generated_at: '2026-02-11T20:27:36.622597'
+total_items: 448
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -938,6 +938,25 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 days
+- id: timing-clock-foundation-and-correctness
+  file: DONE/main/active/timing-clock-foundation-and-correctness.yaml
+  title: Establish centralized clock module and fix timing correctness bugs
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - timing
+  - monotonic
+  - perf-counter
+  - correctness
+  - technical-debt
+  owners:
+  - joe
+  estimated_effort: 2-3 days
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: expand-mcp-tool-surface
   file: DONE/mcp-integration/active/expand-mcp-tool-surface.yaml
   title: Expand MCP tool surface area to match CLI capabilities

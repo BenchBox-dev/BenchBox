@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:13:14.412998'
-total_items: 49
+generated_at: '2026-02-11T20:27:35.688176'
+total_items: 48
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 47
+    count: 46
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -92,11 +92,6 @@ statuses:
       title: Enforce timing guardrails and remove legacy timing compatibility paths
       priority: Medium
       category: Code Quality and Technical Debt
-    - id: timing-clock-foundation-and-correctness
-      file: TODO/main/planning/timing-clock-foundation-and-correctness.yaml
-      title: Establish centralized clock module and fix timing correctness bugs
-      priority: High
-      category: Core Functionality
     - id: firebolt-cloud-deployment
       file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode

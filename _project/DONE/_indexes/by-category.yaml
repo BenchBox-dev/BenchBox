@@ -1,4 +1,4 @@
-generated_at: '2026-02-11T20:13:18.404679'
+generated_at: '2026-02-11T20:27:36.622806'
 total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
@@ -358,7 +358,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 114
+    count: 115
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -544,6 +544,11 @@ categories:
       file: DONE/core-functionality/active/dataframe-parameter-substitution-parity.yaml
       title: Ensure DataFrame variants use identical parameter substitution and ordering permutations as SQL variants for
         TPC-H and TPC-DS
+      priority: High
+      status: Completed
+    - id: timing-clock-foundation-and-correctness
+      file: DONE/main/active/timing-clock-foundation-and-correctness.yaml
+      title: Establish centralized clock module and fix timing correctness bugs
       priority: High
       status: Completed
     - id: dataframe-joinorder-feasibility

@@ -1,4 +1,4 @@
-generated_at: '2026-02-11T20:13:14.412959'
+generated_at: '2026-02-11T20:27:35.688146'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -104,13 +104,8 @@ categories:
       priority: Medium-High
       status: Not Started
   Core Functionality:
-    count: 7
+    count: 6
     items:
-    - id: timing-clock-foundation-and-correctness
-      file: TODO/main/planning/timing-clock-foundation-and-correctness.yaml
-      title: Establish centralized clock module and fix timing correctness bugs
-      priority: High
-      status: Not Started
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
       title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)

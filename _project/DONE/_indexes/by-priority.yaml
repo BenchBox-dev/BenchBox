@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:13:18.406092'
-total_items: 447
+generated_at: '2026-02-11T20:27:36.622927'
+total_items: 448
 priorities:
   Critical:
     count: 31
@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 155
+    count: 156
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -352,6 +352,11 @@ priorities:
       file: DONE/release-readiness/planning/error-message-polish.yaml
       title: Error Message Polish
       category: User Experience
+      status: Completed
+    - id: timing-clock-foundation-and-correctness
+      file: DONE/main/active/timing-clock-foundation-and-correctness.yaml
+      title: Establish centralized clock module and fix timing correctness bugs
+      category: Core Functionality
       status: Completed
     - id: expand-mcp-tool-surface
       file: DONE/mcp-integration/active/expand-mcp-tool-surface.yaml

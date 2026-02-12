@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T20:13:14.412983'
-total_items: 49
+generated_at: '2026-02-11T20:27:35.688163'
+total_items: 48
 priorities:
   Critical:
     count: 1
@@ -10,17 +10,12 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 6
+    count: 5
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
-      status: Not Started
-    - id: timing-clock-foundation-and-correctness
-      file: TODO/main/planning/timing-clock-foundation-and-correctness.yaml
-      title: Establish centralized clock module and fix timing correctness bugs
-      category: Core Functionality
       status: Not Started
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
