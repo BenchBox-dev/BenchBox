@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T09:05:54.443706'
-total_items: 44
+generated_at: '2026-02-11T20:13:14.412998'
+total_items: 49
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 42
+    count: 47
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -87,6 +87,16 @@ statuses:
       title: Enforce per-module 50% coverage floor in CI
       priority: Medium
       category: Testing and Quality Assurance
+    - id: timing-guardrails-and-legacy-cleanup
+      file: TODO/main/planning/timing-guardrails-and-legacy-cleanup.yaml
+      title: Enforce timing guardrails and remove legacy timing compatibility paths
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: timing-clock-foundation-and-correctness
+      file: TODO/main/planning/timing-clock-foundation-and-correctness.yaml
+      title: Establish centralized clock module and fix timing correctness bugs
+      priority: High
+      category: Core Functionality
     - id: firebolt-cloud-deployment
       file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode
@@ -142,11 +152,21 @@ statuses:
       title: Improve test coverage for platform adapter modules to ≥50%
       priority: Medium
       category: Testing and Quality Assurance
+    - id: timing-runtime-wide-monotonic-migration
+      file: TODO/main/planning/timing-runtime-wide-monotonic-migration.yaml
+      title: Migrate runtime elapsed and timeout timing to centralized monotonic clock
+      priority: Medium-High
+      category: Code Quality and Technical Debt
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       priority: Medium
       category: Benchmark Development
+    - id: timing-full-repo-audit-and-allowlist-enforcement
+      file: TODO/main/planning/timing-full-repo-audit-and-allowlist-enforcement.yaml
+      title: Perform full-repo timing audit/migration with wall-clock allowlist enforcement
+      priority: Medium-High
+      category: Code Quality and Technical Debt
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
@@ -177,6 +197,11 @@ statuses:
       title: TimescaleDB Cloud Deployment Mode
       priority: Medium
       category: Platform Expansion
+    - id: timing-query-contract-unification
+      file: TODO/main/planning/timing-query-contract-unification.yaml
+      title: Unify runtime query timing contract to execution_time_seconds
+      priority: High
+      category: Core Functionality
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support

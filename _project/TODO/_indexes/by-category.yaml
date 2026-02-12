@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T09:05:54.443681'
-total_categories: 8
+generated_at: '2026-02-11T20:13:14.412959'
+total_categories: 9
 categories:
   AI/ML Capabilities:
     count: 1
@@ -85,9 +85,32 @@ categories:
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
       status: Not Started
-  Core Functionality:
-    count: 5
+  Code Quality and Technical Debt:
+    count: 3
     items:
+    - id: timing-guardrails-and-legacy-cleanup
+      file: TODO/main/planning/timing-guardrails-and-legacy-cleanup.yaml
+      title: Enforce timing guardrails and remove legacy timing compatibility paths
+      priority: Medium
+      status: Not Started
+    - id: timing-runtime-wide-monotonic-migration
+      file: TODO/main/planning/timing-runtime-wide-monotonic-migration.yaml
+      title: Migrate runtime elapsed and timeout timing to centralized monotonic clock
+      priority: Medium-High
+      status: Not Started
+    - id: timing-full-repo-audit-and-allowlist-enforcement
+      file: TODO/main/planning/timing-full-repo-audit-and-allowlist-enforcement.yaml
+      title: Perform full-repo timing audit/migration with wall-clock allowlist enforcement
+      priority: Medium-High
+      status: Not Started
+  Core Functionality:
+    count: 7
+    items:
+    - id: timing-clock-foundation-and-correctness
+      file: TODO/main/planning/timing-clock-foundation-and-correctness.yaml
+      title: Establish centralized clock module and fix timing correctness bugs
+      priority: High
+      status: Not Started
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
       title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
@@ -112,6 +135,11 @@ categories:
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
       priority: Medium-High
+      status: Not Started
+    - id: timing-query-contract-unification
+      file: TODO/main/planning/timing-query-contract-unification.yaml
+      title: Unify runtime query timing contract to execution_time_seconds
+      priority: High
       status: Not Started
   Documentation:
     count: 2

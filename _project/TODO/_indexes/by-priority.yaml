@@ -1,5 +1,5 @@
-generated_at: '2026-02-11T09:05:54.443695'
-total_items: 44
+generated_at: '2026-02-11T20:13:14.412983'
+total_items: 49
 priorities:
   Critical:
     count: 1
@@ -10,12 +10,17 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 4
+    count: 6
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
+      status: Not Started
+    - id: timing-clock-foundation-and-correctness
+      file: TODO/main/planning/timing-clock-foundation-and-correctness.yaml
+      title: Establish centralized clock module and fix timing correctness bugs
+      category: Core Functionality
       status: Not Started
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
@@ -32,8 +37,13 @@ priorities:
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
       status: Not Started
+    - id: timing-query-contract-unification
+      file: TODO/main/planning/timing-query-contract-unification.yaml
+      title: Unify runtime query timing contract to execution_time_seconds
+      category: Core Functionality
+      status: Not Started
   Medium-High:
-    count: 8
+    count: 10
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -60,6 +70,16 @@ priorities:
       title: Improve test coverage for core/tpcdi module to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
+    - id: timing-runtime-wide-monotonic-migration
+      file: TODO/main/planning/timing-runtime-wide-monotonic-migration.yaml
+      title: Migrate runtime elapsed and timeout timing to centralized monotonic clock
+      category: Code Quality and Technical Debt
+      status: Not Started
+    - id: timing-full-repo-audit-and-allowlist-enforcement
+      file: TODO/main/planning/timing-full-repo-audit-and-allowlist-enforcement.yaml
+      title: Perform full-repo timing audit/migration with wall-clock allowlist enforcement
+      category: Code Quality and Technical Debt
+      status: Not Started
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
@@ -76,7 +96,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 24
+    count: 25
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -122,6 +142,11 @@ priorities:
       file: TODO/main/planning/coverage-ci-enforcement.yaml
       title: Enforce per-module 50% coverage floor in CI
       category: Testing and Quality Assurance
+      status: Not Started
+    - id: timing-guardrails-and-legacy-cleanup
+      file: TODO/main/planning/timing-guardrails-and-legacy-cleanup.yaml
+      title: Enforce timing guardrails and remove legacy timing compatibility paths
+      category: Code Quality and Technical Debt
       status: Not Started
     - id: firebolt-cloud-deployment
       file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
