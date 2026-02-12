@@ -1,4 +1,4 @@
-generated_at: '2026-02-11T21:44:06.879220'
+generated_at: '2026-02-12T10:56:03.691819'
 total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
@@ -368,7 +368,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 116
+    count: 117
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -609,6 +609,11 @@ categories:
     - id: pyspark-unified-expr-methods
       file: DONE/dataframe-expansion/active/pyspark-unified-expr-methods.yaml
       title: Fix PySpark DataFrame query failures - missing UnifiedExpr methods
+      priority: High
+      status: Completed
+    - id: fix-read-primitives-datafusion-df
+      file: DONE/dataframe-benchmarks/active/fix-read-primitives-datafusion-df.yaml
+      title: Fix Read Primitives DataFusion DataFrame Mode (41 Failing Queries)
       priority: High
       status: Completed
     - id: fix-tpc-power-throughput-maintenance-test-implementation-tpc-h-and-tpc-ds

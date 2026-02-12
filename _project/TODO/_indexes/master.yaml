@@ -1,4 +1,4 @@
-generated_at: '2026-02-11T21:44:05.994864'
+generated_at: '2026-02-12T10:56:02.802395'
 total_items: 45
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -751,8 +751,8 @@ items:
   - joe
   estimated_effort: 5-8 days
   work_total: 7
-  work_done: 3
-  work_ready: 2
+  work_done: 6
+  work_ready: 1
   needs:
   - timing-guardrails-and-legacy-cleanup
 - id: reenable-comprehensive-ci
