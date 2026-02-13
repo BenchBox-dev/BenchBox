@@ -140,7 +140,7 @@ work:
 - id: w3
   summary: "Implement table-aware stale artifact pruning for regeneration in TPC data generators"
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: "Harden DataFrame cache conversion with schema/table filtering and leaf-manifest pruning"
   needs: [w2]
