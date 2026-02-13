@@ -136,7 +136,7 @@ work:
 - id: w2
   summary: "Add databases path helper and reroute DuckDB/SQLite/DataFusion + config DB artifact paths"
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Implement table-aware stale artifact pruning for regeneration in TPC data generators"
   needs: [w2]
