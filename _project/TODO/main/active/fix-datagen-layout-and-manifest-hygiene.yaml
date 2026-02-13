@@ -152,7 +152,7 @@ work:
 - id: w6
   summary: "Add one-time migration utility (dry-run/apply) for DB relocation and stale-file cleanup reporting"
   needs: [w4, w5]
-  status: pending
+  status: done
 - id: w7
   summary: "Run verification suite, update indexes, and finalize TODO integration"
   needs: [w6]
