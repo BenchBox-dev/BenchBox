@@ -2,7 +2,7 @@ id: fix-datagen-layout-and-manifest-hygiene
 title: "Fix datagen layout, naming normalization, and manifest/cache hygiene"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Core Functionality
 description: |
   benchmark_runs/datagen has drifted due to mixed responsibilities (SQL datagen,
@@ -156,4 +156,4 @@ work:
 - id: w7
   summary: "Run verification suite, update indexes, and finalize TODO integration"
   needs: [w6]
-  status: pending
+  status: done

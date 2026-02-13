@@ -1,5 +1,5 @@
-generated_at: '2026-02-12T16:31:21.014407'
-total_items: 453
+generated_at: '2026-02-13T10:21:02.073385'
+total_items: 454
 priorities:
   Critical:
     count: 31
@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 158
+    count: 159
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -416,6 +416,11 @@ priorities:
     - id: fix-tpch-reference-seed-and-parameter-parity
       file: DONE/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
       title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
+      category: Core Functionality
+      status: Completed
+    - id: fix-datagen-layout-and-manifest-hygiene
+      file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml
+      title: Fix datagen layout, naming normalization, and manifest/cache hygiene
       category: Core Functionality
       status: Completed
     - id: fix-sharded-dataframe-parquet-bypass

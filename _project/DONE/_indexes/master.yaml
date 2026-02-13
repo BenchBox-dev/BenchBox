@@ -1,5 +1,5 @@
-generated_at: '2026-02-12T16:31:21.014075'
-total_items: 453
+generated_at: '2026-02-13T10:21:02.073050'
+total_items: 454
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1130,6 +1130,23 @@ items:
   - joe
   estimated_effort: 1-2 days
   completed_date: '2026-02-06'
+- id: fix-datagen-layout-and-manifest-hygiene
+  file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml
+  title: Fix datagen layout, naming normalization, and manifest/cache hygiene
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - datagen
+  - manifests
+  - dataframe-cache
+  - pathing
+  - hygiene
+  estimated_effort: Large
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: fix-sharded-dataframe-parquet-bypass
   file: DONE/main/active/fix-sharded-dataframe-parquet-bypass.yaml
   title: Fix sharded DataFrame Parquet bypass causing Polars date-string failures

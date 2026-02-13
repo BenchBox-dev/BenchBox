@@ -1,4 +1,4 @@
-generated_at: '2026-02-12T16:31:21.014285'
+generated_at: '2026-02-13T10:21:02.073264'
 total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 117
+    count: 118
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -639,6 +639,11 @@ categories:
     - id: fix-tpch-reference-seed-and-parameter-parity
       file: DONE/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
       title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
+      priority: High
+      status: Completed
+    - id: fix-datagen-layout-and-manifest-hygiene
+      file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml
+      title: Fix datagen layout, naming normalization, and manifest/cache hygiene
       priority: High
       status: Completed
     - id: fix-result-filename-redundancy
