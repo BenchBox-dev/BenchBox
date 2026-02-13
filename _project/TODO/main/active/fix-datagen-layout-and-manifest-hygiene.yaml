@@ -148,7 +148,7 @@ work:
 - id: w5
   summary: "Fix Data Vault manifest path normalization and add validation tests"
   needs: [w3]
-  status: pending
+  status: done
 - id: w6
   summary: "Add one-time migration utility (dry-run/apply) for DB relocation and stale-file cleanup reporting"
   needs: [w4, w5]
