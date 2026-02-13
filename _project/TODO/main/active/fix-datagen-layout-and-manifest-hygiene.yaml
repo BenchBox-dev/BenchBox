@@ -144,7 +144,7 @@ work:
 - id: w4
   summary: "Harden DataFrame cache conversion with schema/table filtering and leaf-manifest pruning"
   needs: [w2]
-  status: pending
+  status: done
 - id: w5
   summary: "Fix Data Vault manifest path normalization and add validation tests"
   needs: [w3]
