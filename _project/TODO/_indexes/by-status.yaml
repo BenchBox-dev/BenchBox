@@ -1,5 +1,5 @@
-generated_at: '2026-02-13T10:21:01.149956'
-total_items: 44
+generated_at: '2026-02-14T20:05:52.622861'
+total_items: 47
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 42
+    count: 45
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -61,6 +61,21 @@ statuses:
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
       priority: Medium-High
+      category: Platform Expansion
+    - id: pg-duckdb-platform-adapter
+      file: TODO/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
+      title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
+      priority: Medium-High
+      category: Platform Expansion
+    - id: pg-mooncake-platform-adapter
+      file: TODO/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
+      title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
+      priority: Medium-High
+      category: Platform Expansion
+    - id: postgres-extension-benchmarking-infrastructure
+      file: TODO/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
+      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
+      priority: Medium
       category: Platform Expansion
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
