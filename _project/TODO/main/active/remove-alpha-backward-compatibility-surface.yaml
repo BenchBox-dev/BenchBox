@@ -61,7 +61,7 @@ work:
 - id: w7
   summary: "Remove compatibility behavior in result export/load/schema boundaries"
   needs: [w1]
-  status: pending
+  status: done
   notes: "Delete legacy result-shape adaptation and compatibility-only read/write paths; keep canonical result schema behavior."
 
 - id: w8
