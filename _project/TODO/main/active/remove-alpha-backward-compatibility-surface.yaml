@@ -67,7 +67,7 @@ work:
 - id: w8
   summary: "Remove DataFrame-layer compatibility format branches"
   needs: [w1]
-  status: pending
+  status: done
   notes: "Covers unified_frame legacy tuple format handling and profiling compatibility conversion methods."
 
 - id: w9
