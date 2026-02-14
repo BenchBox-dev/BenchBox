@@ -36,7 +36,7 @@ work:
 - id: w3
   summary: "Remove core benchmark compatibility structs and legacy benchmark fields"
   needs: [w1]
-  status: pending
+  status: done
   notes: "Covers tpc_compliance, tpcds benchmark legacy dataclasses/phase names, and power/throughput compatibility attributes."
 
 - id: w4
