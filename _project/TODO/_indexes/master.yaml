@@ -1,5 +1,5 @@
-generated_at: '2026-02-13T10:21:01.149884'
-total_items: 44
+generated_at: '2026-02-14T19:48:46.882964'
+total_items: 43
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -67,23 +67,6 @@ items:
   deferred_count: 6
   needs:
   - fix-dataframe-parameter-parity-follow-up-findings
-- id: motherduck-platform-adapter
-  file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
-  title: MotherDuck Platform Adapter
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: High
-  status: In Progress
-  tags:
-  - platform-adapter
-  - motherduck
-  - duckdb
-  - cloud
-  estimated_effort: 3-4 days
-  work_total: 21
-  work_done: 21
-  work_ready: 0
-  deferred_count: 4
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes

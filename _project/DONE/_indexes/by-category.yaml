@@ -1,4 +1,4 @@
-generated_at: '2026-02-13T10:21:02.073264'
+generated_at: '2026-02-14T19:48:49.164583'
 total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
@@ -1455,7 +1455,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 41
+    count: 42
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1587,6 +1587,11 @@ categories:
       title: Microsoft Fabric Spark Platform
       priority: Medium-High
       status: Completed
+    - id: motherduck-platform-adapter
+      file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      priority: High
+      status: Completed
     - id: pt-03-redshift-ddl
       file: DONE/physical-tuning/planning/pt-03-redshift-ddl.yaml
       title: 'PT-03: Redshift Physical Tuning DDL Generator'
@@ -1698,13 +1703,13 @@ categories:
       title: DuckDB TPC-DS and TPC-H Example Updates for Enhanced Tuning ✅ COMPLETED
       priority: Medium
       status: Completed
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Completed
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Completed

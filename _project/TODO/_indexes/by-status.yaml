@@ -1,19 +1,14 @@
-generated_at: '2026-02-13T10:21:01.149956'
-total_items: 44
+generated_at: '2026-02-14T19:48:46.883100'
+total_items: 43
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       priority: High
       category: Core Functionality
-    - id: motherduck-platform-adapter
-      file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
-      title: MotherDuck Platform Adapter
-      priority: High
-      category: Platform Expansion
   Not Started:
     count: 42
     items:

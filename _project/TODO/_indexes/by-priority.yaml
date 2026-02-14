@@ -1,5 +1,5 @@
-generated_at: '2026-02-13T10:21:01.149943'
-total_items: 44
+generated_at: '2026-02-14T19:48:46.883072'
+total_items: 43
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 4
+    count: 3
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
@@ -21,11 +21,6 @@ priorities:
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       category: Core Functionality
-      status: In Progress
-    - id: motherduck-platform-adapter
-      file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
-      title: MotherDuck Platform Adapter
-      category: Platform Expansion
       status: In Progress
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
