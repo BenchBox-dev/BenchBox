@@ -1,4 +1,4 @@
-generated_at: '2026-02-13T10:21:02.073500'
+generated_at: '2026-02-14T20:10:20.490523'
 total_items: 454
 statuses:
   In Progress:
@@ -664,13 +664,13 @@ statuses:
       title: Compressed Data Generation Gaps (all benchmarks) ✅
       priority: Medium
       category: Data Quality and Compatibility Issues
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       category: Performance and Efficiency
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       category: Performance and Efficiency
@@ -1725,13 +1725,13 @@ statuses:
       title: Security Audit
       priority: Medium
       category: Pre-Release Medium Priority Tasks (Nice-to-Have)
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
@@ -2065,13 +2065,13 @@ statuses:
       title: ✅ Implement Standalone Export Command
       priority: Medium
       category: User Experience and CLI Enhancement
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       category: Pre-Release High Priority Tasks (COMPLETED)
