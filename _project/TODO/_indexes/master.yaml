@@ -1,5 +1,5 @@
-generated_at: '2026-02-13T10:21:01.149884'
-total_items: 44
+generated_at: '2026-02-14T20:09:47.398483'
+total_items: 50
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -21,6 +21,54 @@ items:
   work_total: 24
   work_done: 0
   work_ready: 10
+- id: ascii-chart-normalized-speedup
+  file: TODO/core-functionality/planning/ascii-chart-normalized-speedup.yaml
+  title: Add ASCII Normalized Speedup chart (relative to baseline platform)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - visualization
+  - ascii-charts
+  - normalization
+  - comparison
+  estimated_effort: Medium
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+- id: ascii-chart-percentile-ladder
+  file: TODO/core-functionality/planning/ascii-chart-percentile-ladder.yaml
+  title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - visualization
+  - ascii-charts
+  - percentile
+  - latency
+  estimated_effort: Medium
+  work_total: 6
+  work_done: 0
+  work_ready: 2
+- id: ascii-chart-stacked-phase-breakdown
+  file: TODO/core-functionality/planning/ascii-chart-stacked-phase-breakdown.yaml
+  title: Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - visualization
+  - ascii-charts
+  - phases
+  - stacked-bar
+  estimated_effort: Medium
+  work_total: 6
+  work_done: 0
+  work_ready: 1
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
   title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
@@ -221,6 +269,40 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: ascii-chart-cdf
+  file: TODO/core-functionality/planning/ascii-chart-cdf.yaml
+  title: Add ASCII CDF chart (cumulative distribution of query latency)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - visualization
+  - ascii-charts
+  - cdf
+  - distribution
+  - latency
+  estimated_effort: Medium
+  work_total: 7
+  work_done: 0
+  work_ready: 1
+- id: ascii-chart-rank-table
+  file: TODO/core-functionality/planning/ascii-chart-rank-table.yaml
+  title: Add ASCII Rank Table chart (per-query competitive ranking with win/loss tally)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - visualization
+  - ascii-charts
+  - ranking
+  - leaderboard
+  - competitive
+  estimated_effort: Medium
+  work_total: 7
+  work_done: 0
+  work_ready: 1
 - id: cedardb-adapter
   file: TODO/platform-expansion/planning/cedardb-adapter.yaml
   title: Add CedarDB Platform Adapter
@@ -646,6 +728,23 @@ items:
   work_total: 14
   work_done: 0
   work_ready: 7
+- id: ascii-chart-sparkline-table
+  file: TODO/core-functionality/planning/ascii-chart-sparkline-table.yaml
+  title: Add ASCII Sparkline Table chart (compact multi-metric leaderboard)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - visualization
+  - ascii-charts
+  - sparkline
+  - leaderboard
+  - multi-metric
+  estimated_effort: Medium
+  work_total: 7
+  work_done: 0
+  work_ready: 1
 - id: apache-doris-olap-platform
   file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
   title: Add Apache Doris MPP OLAP platform support

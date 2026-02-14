@@ -1,0 +1,142 @@
+# Sparkline Table Chart for compact multi-metric platform overview
+#
+# Location: _project/TODO/core-functionality/planning/ascii-chart-sparkline-table.yaml
+
+id: ascii-chart-sparkline-table
+title: "Add ASCII Sparkline Table chart (compact multi-metric leaderboard)"
+worktree: core-functionality
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+description: |
+  Add a new ASCII chart type that displays a compact leaderboard table where each row
+  is a platform and each column is a metric, with inline sparkline-style mini-bars
+  showing relative values. This combines the information density of a table with
+  visual comparison cues.
+
+  This is the format used by ClickBench's dashboard and most database comparison sites.
+  When comparing many platforms across many dimensions (total time, geometric mean, P99,
+  cost, success rate, data load time), a pure table is hard to scan visually, while
+  individual charts for each metric create information overload.
+
+  Example output:
+  ```
+  Platform Comparison Overview
+  ──────────────────────────────────────────────────────────────
+  Platform   Total(ms)   GeoMean    P99(ms)   Load(s)   Success
+  DuckDB     ▇  1,240    ▇  56      ▅ 120     ▂  2.1    ████ 100%
+  Polars     ▆  1,580    ▆  72      ▇ 310     ▁  1.2    ████ 100%
+  SQLite     ▃  4,820    ▃ 219      ▃ 450     ▅  8.4    ███░  95%
+  Pandas     ▁ 12,300    ▁ 559      ▁ 980     ▃  5.2    ██░░  82%
+  ──────────────────────────────────────────────────────────────
+  ▇=best  ▁=worst  (bars scaled per column)
+  ```
+
+  This is distinct from the Summary Box (single run stats), the Heatmap (query-level
+  detail), and the Bar Chart (one metric at a time). The sparkline table uniquely
+  combines multiple aggregate metrics in a single compact view with embedded
+  visual encoding.
+
+metadata:
+  tags:
+    - visualization
+    - ascii-charts
+    - sparkline
+    - leaderboard
+    - multi-metric
+  estimated_effort: Medium
+  created_date: "2026-02-14"
+
+impact:
+  business_value: |
+    Multi-platform comparison is a core BenchBox use case. A compact leaderboard
+    is the most actionable single-view summary for decision makers evaluating
+    platform choices across multiple performance dimensions.
+  user_impact: |
+    Users get a single at-a-glance view comparing all platforms across all key
+    metrics. No need to cross-reference multiple charts or parse raw numbers.
+
+files_affected:
+  added:
+    - benchbox/core/visualization/ascii/sparkline_table.py
+  modified:
+    - benchbox/core/visualization/ascii/__init__.py
+    - benchbox/core/visualization/exporters.py
+    - benchbox/core/visualization/templates.py
+    - tests/unit/visualization/ascii/test_ascii_charts.py
+
+must_preserve:
+  - "All 9 existing chart types continue to render identically"
+  - "render_ascii_chart() in exporters.py handles all existing chart_type strings"
+  - "ASCIISummaryBox behavior unchanged (sparkline table is multi-platform overview,
+    summary box is single-run aggregate stats)"
+
+approach: |
+  Build as a table renderer with inline mini-bars rather than a traditional chart:
+
+  1. Create SparklineColumn (name, values dict[platform, float], higher_is_better) and
+     SparklineTableData (platforms, columns) dataclasses.
+  2. Create ASCIISparklineTable(ASCIIChartBase) with render().
+  3. For each column, normalize values to 0.0-1.0 range and render as a 1-4 character
+     vertical block using LOWER_BLOCK_CHARS (▁▂▃▄▅▆▇█).
+  4. Respect higher_is_better flag: for latency metrics (lower is better), invert the
+     normalization so the best platform gets the tallest bar.
+  5. Color the best value green (#1b9e77) and worst red (#d95f02) per column.
+  6. Add from_normalized_results() factory that populates columns from standard metrics.
+
+  Column width calculation should be dynamic: metric name width + sparkline bar width +
+  value width, constrained to fit within terminal width. If too many columns, truncate
+  lower-priority columns with "..." indicator.
+
+anti_patterns:
+  - "DO NOT use full-width bar charts per cell — because the value of this chart is
+    compactness — use 1-4 character sparkline bars only"
+  - "DO NOT hardcode metric columns — because different benchmarks expose different
+    metrics — accept a flexible list of SparklineColumn instances"
+
+verification:
+  - description: "New chart class renders without error"
+    command: "uv run -- python -c \"from benchbox.core.visualization.ascii.sparkline_table import ASCIISparklineTable, SparklineColumn, SparklineTableData; cols = [SparklineColumn('Total(ms)', {'DuckDB': 1240, 'Polars': 1580}, False), SparklineColumn('Success', {'DuckDB': 100, 'Polars': 100}, True)]; data = SparklineTableData(['DuckDB', 'Polars'], cols); chart = ASCIISparklineTable(data=data); print(chart.render())\""
+    expected_output: "Rendered table with sparkline bars and values"
+  - description: "Existing chart tests still pass"
+    command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - benchbox/core/visualization/ascii/
+    - benchbox/core/visualization/exporters.py
+    - benchbox/core/visualization/templates.py
+    - tests/unit/visualization/ascii/
+
+work:
+  - id: w1
+    summary: "Create SparklineColumn, SparklineTableData dataclasses and ASCIISparklineTable class"
+    status: pending
+  - id: w2
+    summary: "Implement per-column normalization with higher_is_better inversion and sparkline bar rendering"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Implement dynamic column width calculation with truncation for narrow terminals"
+    needs: [w1]
+    status: pending
+  - id: w4
+    summary: "Add from_normalized_results() factory that populates standard benchmark metrics"
+    needs: [w1, w2]
+    status: pending
+  - id: w5
+    summary: "Register chart in __init__.py and add 'sparkline_table' case to render_ascii_chart() in exporters.py"
+    needs: [w1]
+    status: pending
+  - id: w6
+    summary: "Add unit tests (multi-platform, mixed higher/lower-is-better, edge cases, narrow terminal)"
+    needs: [w1, w2, w3]
+    status: pending
+  - id: w7
+    summary: "Add sparkline_table to flagship template in templates.py"
+    needs: [w5]
+    status: pending
+
+deps:
+  needs: []

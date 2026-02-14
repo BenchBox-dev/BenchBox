@@ -1,0 +1,132 @@
+# Stacked Phase Breakdown Chart for benchmark phase time decomposition
+#
+# Location: _project/TODO/core-functionality/planning/ascii-chart-stacked-phase-breakdown.yaml
+
+id: ascii-chart-stacked-phase-breakdown
+title: "Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)"
+worktree: core-functionality
+priority: High
+status: Not Started
+category: Core Functionality
+description: |
+  Add a new ASCII chart type that shows how total benchmark time is distributed across
+  execution phases (data generation, schema creation, data loading, warmup, power test,
+  throughput test, maintenance) as a horizontal stacked bar for each platform.
+
+  BenchBox already captures detailed phase timing in its ExecutionPhases model but has
+  no dedicated visualization for this data. This chart exposes data that is already
+  collected but currently invisible.
+
+  Example output:
+  ```
+  Phase Breakdown by Platform
+  ──────────────────────────────────────────────────────
+  DuckDB   ░░▒▒▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██████              12.4s
+  Polars   ░░░▒▒▒▒▒▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓████████████          15.2s
+  SQLite   ░░░░▒▒▒▒▒▒▒▒▒▒▒▓▓▓▓▓▓▓▓▓████████████████     28.7s
+  ──────────────────────────────────────────────────────
+  ░ DataGen  ▒ Load  ▓ Power  █ Throughput
+  ```
+
+  This reveals insights like "Platform X is 2x faster at queries but 5x slower at
+  data loading" which are invisible in query-only charts. TPC benchmarks explicitly
+  separate phases because they measure different capabilities.
+
+metadata:
+  tags:
+    - visualization
+    - ascii-charts
+    - phases
+    - stacked-bar
+  estimated_effort: Medium
+  created_date: "2026-02-14"
+
+impact:
+  business_value: |
+    Phase-level timing analysis is a core part of TPC compliance reporting.
+    Understanding where time is spent guides optimization decisions and platform
+    selection based on workload characteristics.
+  user_impact: |
+    Users see at a glance whether a platform is slow because of data loading
+    vs query execution, enabling informed platform selection for their
+    specific workload pattern (batch ETL vs interactive queries).
+
+files_affected:
+  added:
+    - benchbox/core/visualization/ascii/stacked_bar.py
+  modified:
+    - benchbox/core/visualization/ascii/__init__.py
+    - benchbox/core/visualization/exporters.py
+    - benchbox/core/visualization/templates.py
+    - tests/unit/visualization/ascii/test_ascii_charts.py
+
+must_preserve:
+  - "All 9 existing chart types continue to render identically"
+  - "render_ascii_chart() in exporters.py handles all existing chart_type strings"
+  - "ExecutionPhases model is read-only for this chart — no modifications to the model"
+
+approach: |
+  Follow the pattern in benchbox/core/visualization/ascii/bar_chart.py for the
+  horizontal bar layout, extended with stacked segments:
+
+  1. Create StackedBarSegment (phase_name, value, color) and StackedBarData (label,
+     segments, total) dataclasses.
+  2. Create ASCIIStackedBar(ASCIIChartBase) with a render() method.
+  3. Each bar is composed of multiple segments with distinct fill characters or colors
+     from DEFAULT_PALETTE. Use unicode block chars for consistent segment boundaries.
+  4. Add a from_execution_phases() factory that extracts phase durations from
+     BenchmarkResults or ExecutionPhases data.
+  5. Show total time at the end of each bar.
+  6. Include a phase-color legend below the chart.
+
+  Phase ordering should be chronological: DataGen → Schema → Load → Warmup → Power →
+  Throughput → Maintenance. Phases with zero duration are omitted.
+
+anti_patterns:
+  - "DO NOT import or depend on specific platform adapters — because the chart
+    should be platform-agnostic — only use ExecutionPhases data"
+  - "DO NOT render phases with zero duration as empty segments — because they add
+    visual noise — skip them entirely"
+
+verification:
+  - description: "New chart class renders without error"
+    command: "uv run -- python -c \"from benchbox.core.visualization.ascii.stacked_bar import ASCIIStackedBar, StackedBarData, StackedBarSegment; segs = [StackedBarSegment('Load', 2.0), StackedBarSegment('Power', 8.0), StackedBarSegment('Throughput', 4.0)]; data = [StackedBarData('DuckDB', segs, 14.0)]; chart = ASCIIStackedBar(data=data); print(chart.render())\""
+    expected_output: "Rendered chart with one platform row showing stacked segments"
+  - description: "Existing chart tests still pass"
+    command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - benchbox/core/visualization/ascii/
+    - benchbox/core/visualization/exporters.py
+    - benchbox/core/visualization/templates.py
+    - tests/unit/visualization/ascii/
+
+work:
+  - id: w1
+    summary: "Create StackedBarSegment, StackedBarData dataclasses and ASCIIStackedBar class with render()"
+    status: pending
+  - id: w2
+    summary: "Implement stacked segment rendering with per-phase colors/fill characters and total label"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Add from_execution_phases() factory to extract phase durations from BenchmarkResults"
+    needs: [w1]
+    status: pending
+  - id: w4
+    summary: "Register chart in __init__.py and add 'stacked_phase' case to render_ascii_chart() in exporters.py"
+    needs: [w1]
+    status: pending
+  - id: w5
+    summary: "Add unit tests (single platform, multi-platform, empty phases, all-zero edge case)"
+    needs: [w1, w2]
+    status: pending
+  - id: w6
+    summary: "Add stacked_phase to default and flagship templates in templates.py"
+    needs: [w4]
+    status: pending
+
+deps:
+  needs: []

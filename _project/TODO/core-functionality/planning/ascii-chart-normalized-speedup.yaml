@@ -1,0 +1,133 @@
+# Normalized Speedup Chart for relative cross-platform comparison
+#
+# Location: _project/TODO/core-functionality/planning/ascii-chart-normalized-speedup.yaml
+
+id: ascii-chart-normalized-speedup
+title: "Add ASCII Normalized Speedup chart (relative to baseline platform)"
+worktree: core-functionality
+priority: High
+status: Not Started
+category: Core Functionality
+description: |
+  Add a new ASCII chart type that shows platform performance as a ratio relative to a
+  user-selected baseline platform (e.g., "DuckDB is 3.2x faster than SQLite"). The
+  baseline is rendered at 1.0x with a vertical reference line. Platforms faster than
+  baseline extend right, slower ones extend left.
+
+  This is the standard way TPC and SPEC results are formally reported. When comparing
+  platforms that span orders of magnitude (50ms to 50,000ms), absolute bar charts make
+  fast platforms invisible slivers. Normalized ratios make relative performance
+  immediately clear regardless of absolute magnitude.
+
+  Example output:
+  ```
+  Normalized Performance (baseline: SQLite = 1.0x)
+  ────────────────────────────────────────────────────────
+           Slower          │         Faster
+  SQLite                   │█  1.0x
+  Pandas             ██████│   0.4x
+  DuckDB                   │████████████████████  8.2x
+  Polars                   │██████████████████  7.5x
+  ClickHouse               │██████████████████████████  12.1x
+  ────────────────────────────────────────────────────────
+  ```
+
+  This is distinct from the existing bar chart (absolute values) and the diverging bar
+  chart (percentage change between two runs of the same platform). The normalized speedup
+  chart shows cross-platform comparison ratios with a centered baseline reference.
+
+metadata:
+  tags:
+    - visualization
+    - ascii-charts
+    - normalization
+    - comparison
+  estimated_effort: Medium
+  created_date: "2026-02-14"
+
+impact:
+  business_value: |
+    This is the formal reporting format for TPC publications, SPEC CPU benchmarks,
+    and academic papers. Adding this chart elevates BenchBox output to publication
+    quality and enables direct comparison with industry benchmark results.
+  user_impact: |
+    Users comparing platforms with vastly different performance levels (e.g., DuckDB vs
+    Pandas) get a readable chart where all platforms are visible and directly comparable,
+    rather than having fast platforms squished into invisible slivers.
+
+files_affected:
+  added:
+    - benchbox/core/visualization/ascii/normalized_speedup.py
+  modified:
+    - benchbox/core/visualization/ascii/__init__.py
+    - benchbox/core/visualization/exporters.py
+    - benchbox/core/visualization/templates.py
+    - tests/unit/visualization/ascii/test_ascii_charts.py
+
+must_preserve:
+  - "All 9 existing chart types continue to render identically"
+  - "render_ascii_chart() in exporters.py handles all existing chart_type strings"
+  - "ASCIIBarChart behavior unchanged (this is a new chart type, not a modification)"
+
+approach: |
+  Follow the pattern in benchbox/core/visualization/ascii/diverging_bar.py for the
+  centered-zero layout with bars extending left and right from a reference line:
+
+  1. Create SpeedupData dataclass (name, ratio, is_baseline).
+  2. Create ASCIINormalizedSpeedup(ASCIIChartBase) with a render() method.
+  3. Draw a vertical baseline reference line at 1.0x in the center.
+  4. Ratios > 1.0 extend right (faster, green), ratios < 1.0 extend left (slower, red).
+  5. Add from_normalized_results() factory that computes ratios given results + baseline name.
+  6. Use logarithmic scaling for the bar width to handle large ratio ranges (e.g., 0.1x to 50x).
+
+  The baseline platform selection should accept either a platform name or "slowest"/"fastest"
+  as convenience aliases.
+
+anti_patterns:
+  - "DO NOT use linear scaling for bar widths — because ratios can span 0.01x to 100x —
+    use log2 scaling so 2x and 0.5x are symmetric around the baseline"
+  - "DO NOT modify ASCIIBarChart or ASCIIDivergingBar — because they serve different purposes
+    (absolute values, pct change) — implement as a new class"
+
+verification:
+  - description: "New chart class renders without error"
+    command: "uv run -- python -c \"from benchbox.core.visualization.ascii.normalized_speedup import ASCIINormalizedSpeedup, SpeedupData; data = [SpeedupData('SQLite', 1.0, True), SpeedupData('DuckDB', 8.2, False), SpeedupData('Pandas', 0.4, False)]; chart = ASCIINormalizedSpeedup(data=data); print(chart.render())\""
+    expected_output: "Rendered chart with baseline at center and bars extending left/right"
+  - description: "Existing chart tests still pass"
+    command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - benchbox/core/visualization/ascii/
+    - benchbox/core/visualization/exporters.py
+    - benchbox/core/visualization/templates.py
+    - tests/unit/visualization/ascii/
+
+work:
+  - id: w1
+    summary: "Create SpeedupData dataclass and ASCIINormalizedSpeedup class with render() using log2-scaled bars"
+    status: pending
+  - id: w2
+    summary: "Implement centered baseline reference line with left (slower) / right (faster) bar layout"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Add from_normalized_results() factory that computes ratios from NormalizedResult data and baseline name"
+    needs: [w1]
+    status: pending
+  - id: w4
+    summary: "Register chart in __init__.py and add 'normalized_speedup' case to render_ascii_chart() in exporters.py"
+    needs: [w1]
+    status: pending
+  - id: w5
+    summary: "Add unit tests (symmetry of log scaling, edge cases, single platform, many platforms)"
+    needs: [w1, w2]
+    status: pending
+  - id: w6
+    summary: "Add normalized_speedup to flagship and head_to_head templates in templates.py"
+    needs: [w4]
+    status: pending
+
+deps:
+  needs: []

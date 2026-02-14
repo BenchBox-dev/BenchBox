@@ -1,5 +1,5 @@
-generated_at: '2026-02-13T10:21:01.149943'
-total_items: 44
+generated_at: '2026-02-14T20:09:47.398567'
+total_items: 50
 priorities:
   Critical:
     count: 1
@@ -10,8 +10,23 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 4
+    count: 7
     items:
+    - id: ascii-chart-normalized-speedup
+      file: TODO/core-functionality/planning/ascii-chart-normalized-speedup.yaml
+      title: Add ASCII Normalized Speedup chart (relative to baseline platform)
+      category: Core Functionality
+      status: Not Started
+    - id: ascii-chart-percentile-ladder
+      file: TODO/core-functionality/planning/ascii-chart-percentile-ladder.yaml
+      title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+      category: Core Functionality
+      status: Not Started
+    - id: ascii-chart-stacked-phase-breakdown
+      file: TODO/core-functionality/planning/ascii-chart-stacked-phase-breakdown.yaml
+      title: Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)
+      category: Core Functionality
+      status: Not Started
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
@@ -33,8 +48,13 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 8
+    count: 9
     items:
+    - id: ascii-chart-sparkline-table
+      file: TODO/core-functionality/planning/ascii-chart-sparkline-table.yaml
+      title: Add ASCII Sparkline Table chart (compact multi-metric leaderboard)
+      category: Core Functionality
+      status: Not Started
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
@@ -76,8 +96,18 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 24
+    count: 26
     items:
+    - id: ascii-chart-cdf
+      file: TODO/core-functionality/planning/ascii-chart-cdf.yaml
+      title: Add ASCII CDF chart (cumulative distribution of query latency)
+      category: Core Functionality
+      status: Not Started
+    - id: ascii-chart-rank-table
+      file: TODO/core-functionality/planning/ascii-chart-rank-table.yaml
+      title: Add ASCII Rank Table chart (per-query competitive ranking with win/loss tally)
+      category: Core Functionality
+      status: Not Started
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
