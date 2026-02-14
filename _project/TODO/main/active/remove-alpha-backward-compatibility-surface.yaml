@@ -30,7 +30,7 @@ work:
 - id: w2
   summary: "Remove core package alias/re-export shims in benchbox/core"
   needs: [w1]
-  status: pending
+  status: done
   notes: "Covers entrypoint aliases and compatibility exports in TPCH/TPCDS modules."
 
 - id: w3
