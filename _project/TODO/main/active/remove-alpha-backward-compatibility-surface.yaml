@@ -48,7 +48,7 @@ work:
 - id: w5
   summary: "Remove platform legacy connection/config normalization fallbacks"
   needs: [w1]
-  status: pending
+  status: done
   notes: "Covers sqlite nested connection keys, clickhouse deployment compatibility paths, firebolt mode fallbacks, and related
     adapter fallback logic."
 
