@@ -1,4 +1,4 @@
-generated_at: '2026-02-13T10:21:01.149884'
+generated_at: '2026-02-14T20:10:18.158755'
 total_items: 44
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -22,12 +22,12 @@ items:
   work_done: 0
   work_ready: 10
 - id: lakesail-spark-platform
-  file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
+  file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
   title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
   worktree: platform-expansion
   category: Platform Expansion
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - lakesail
   - sail
@@ -42,8 +42,8 @@ items:
   - open-source
   estimated_effort: Large
   work_total: 91
-  work_done: 0
-  work_ready: 19
+  work_done: 76
+  work_ready: 3
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks

@@ -1,4 +1,4 @@
-generated_at: '2026-02-13T10:21:01.149943'
+generated_at: '2026-02-14T20:10:18.158850'
 total_items: 44
 priorities:
   Critical:
@@ -13,10 +13,10 @@ priorities:
     count: 4
     items:
     - id: lakesail-spark-platform
-      file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
+      file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
-      status: Not Started
+      status: In Progress
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
