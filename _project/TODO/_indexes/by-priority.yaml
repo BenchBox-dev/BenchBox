@@ -1,12 +1,17 @@
-generated_at: '2026-02-13T10:21:01.149943'
-total_items: 44
+generated_at: '2026-02-14T10:20:14.266363'
+total_items: 45
 priorities:
   Critical:
-    count: 1
+    count: 2
     items:
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
       title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
+      category: Core Functionality
+      status: Not Started
+    - id: remove-alpha-backward-compatibility-surface
+      file: TODO/main/planning/remove-alpha-backward-compatibility-surface.yaml
+      title: Remove alpha-stage backward compatibility surface across BenchBox
       category: Core Functionality
       status: Not Started
   High:

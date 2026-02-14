@@ -1,5 +1,5 @@
-generated_at: '2026-02-13T10:21:01.149884'
-total_items: 44
+generated_at: '2026-02-14T10:20:14.266302'
+total_items: 45
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -21,6 +21,22 @@ items:
   work_total: 24
   work_done: 0
   work_ready: 10
+- id: remove-alpha-backward-compatibility-surface
+  file: TODO/main/planning/remove-alpha-backward-compatibility-surface.yaml
+  title: Remove alpha-stage backward compatibility surface across BenchBox
+  worktree: main
+  category: Core Functionality
+  priority: Critical
+  status: Not Started
+  tags:
+  - api-simplification
+  - alpha-cleanup
+  - breaking-change
+  - compatibility-removal
+  estimated_effort: Large
+  work_total: 12
+  work_done: 0
+  work_ready: 1
 - id: lakesail-spark-platform
   file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
   title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking

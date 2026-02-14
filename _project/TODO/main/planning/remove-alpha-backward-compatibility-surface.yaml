@@ -1,0 +1,149 @@
+id: "remove-alpha-backward-compatibility-surface"
+title: "Remove alpha-stage backward compatibility surface across BenchBox"
+worktree: "main"
+priority: "Critical"
+status: "Not Started"
+description: |
+  Remove all backward-compatibility elements currently tracked in
+  docs/reference/backward-compatibility.md to align with alpha-stage product policy.
+
+  The registry currently tracks 89 compatibility markers (67 active, 22 deprecate).
+  This item executes immediate removal of the entire compatibility surface, including:
+  - alias/re-export compatibility shims
+  - legacy argument and field fallbacks
+  - legacy mode and path synonyms
+  - old result-shape adaptation logic where still retained
+  - compatibility-only CLI branches and helper wrappers
+
+  This work intentionally allows API and behavior changes in favor of a smaller,
+  cleaner, canonical pre-1.0 interface. Documentation and tests must be updated
+  in the same implementation window so CI remains green on the canonical paths.
+
+category: "Core Functionality"
+
+work:
+  - id: w1
+    summary: "Freeze canonical API contract and define removal matrix from registry"
+    status: pending
+    notes: "Convert each registry row into a remove/change action with owner module and expected replacement behavior."
+
+  - id: w2
+    summary: "Remove core alias/re-export shims in benchbox/core and benchbox/platforms"
+    needs: [w1]
+    status: pending
+    notes: "Includes remaining alias constants/classes such as TPCH official benchmark aliases and any residual class aliases."
+
+  - id: w3
+    summary: "Remove legacy CLI compatibility branches and fallback command paths"
+    needs: [w1]
+    status: pending
+    notes: "Targets legacy handling in run/shell/setup/platform hooks and compatibility-only CLI type re-exports."
+
+  - id: w4
+    summary: "Remove platform adapter legacy config fallbacks and synonym handling"
+    needs: [w1]
+    status: pending
+    notes: "Covers sqlite legacy connection normalization, clickhouse embedded/local synonym, firebolt mode aliasing, and related fallbacks."
+
+  - id: w5
+    summary: "Remove TPC benchmark legacy compatibility fields and result-shape adapters"
+    needs: [w1]
+    status: pending
+    notes: "Covers tpc_compliance, tpcds benchmark legacy dataclasses/phase names, tpch/tpcds generator fallbacks, and power/throughput legacy attributes."
+
+  - id: w6
+    summary: "Remove DataFrame-layer compatibility shims and legacy format branches"
+    needs: [w1]
+    status: pending
+    notes: "Covers unified_frame legacy tuple format handling and profiling compatibility conversion methods."
+
+  - id: w7
+    summary: "Remove compatibility-only behavior in result export/load and filename normalization"
+    needs: [w1]
+    status: pending
+    notes: "Delete v1-related compatibility logic and legacy filename normalization behavior; keep only canonical result schema path."
+
+  - id: w8
+    summary: "Remove compatibility surfaces in DataVault and TPC-DI modules"
+    needs: [w1]
+    status: pending
+    notes: "Drop legacy QUERIES paths, backwards-compatible query loaders, alias classes, and benchmark kwargs compatibility paths."
+
+  - id: w9
+    summary: "Refactor tests to canonical APIs and delete compatibility-specific test cases"
+    needs: [w2, w3, w4, w5, w6, w7, w8]
+    status: pending
+    notes: "Replace alias-import tests with canonical import tests and remove assertions validating legacy behavior."
+
+  - id: w10
+    summary: "Update docs to remove compatibility claims and document intentional alpha break policy"
+    needs: [w2, w3, w4, w5, w6, w7, w8]
+    status: pending
+    notes: "Update reference/platform/guides and rewrite backward-compatibility page as a historical removal log or remove it entirely."
+
+  - id: w11
+    summary: "Run full quality gates and fix regressions introduced by shim removals"
+    needs: [w9, w10]
+    status: pending
+    notes: "Ruff, typing, fast/unit/integration suites most impacted by compatibility changes."
+
+  - id: w12
+    summary: "Finalize removal report with before/after inventory and migration notes"
+    needs: [w11]
+    status: pending
+    notes: "Produce explicit list of deleted symbols/branches and canonical replacements for contributors."
+
+metadata:
+  tags:
+    - "api-simplification"
+    - "alpha-cleanup"
+    - "breaking-change"
+    - "compatibility-removal"
+  estimated_effort: "Large"
+  created_date: "2026-02-14"
+  last_updated: "2026-02-14T00:00:00"
+
+must_preserve:
+  - "Canonical benchmark execution paths (`benchbox run` with supported platforms/benchmarks) remain functional."
+  - "Core result generation and export for the canonical schema continue to work end-to-end."
+  - "Non-compatibility feature behavior (query execution correctness and validation semantics) is not changed beyond compatibility removal."
+
+approach: |
+  Use docs/reference/backward-compatibility.md as the single source of truth and process
+  removals module-by-module in deterministic waves: core/platform/cli first, then tests,
+  then docs. Prefer deleting code paths over redirecting aliases. When a legacy path and
+  canonical path share logic, extract canonical behavior first, then remove branching.
+
+anti_patterns:
+  - "DO NOT keep aliases with deprecation warnings — because this prolongs surface-area and maintenance cost — remove symbols outright in alpha."
+  - "DO NOT batch unverified removals across unrelated subsystems — because regression root-cause becomes opaque — validate each wave before proceeding."
+  - "DO NOT update only docs or only tests without deleting code branches — because stale compatibility paths will remain executable — delete implementation first then align tests/docs."
+
+verification:
+  - description: "No tracked compatibility markers remain in production code for this initiative"
+    command: "rg -n \"backward compatibility|Backward compatibility|legacy compatibility|for backward compatibility|Legacy|backward-compatible|Backward-compatible\" benchbox"
+    expected_output: "No compatibility markers that represent shims/fallbacks targeted by this TODO remain"
+  - description: "Lint and formatting checks pass"
+    command: "make ci-lint"
+    expected_output: "All lint/format checks pass"
+  - description: "Type checks pass"
+    command: "make typecheck-uv"
+    expected_output: "Type checking passes with no errors"
+  - description: "Fast CI test profile passes"
+    command: "make ci-test"
+    expected_output: "Fast tests pass at project CI gate"
+
+scope_limit:
+  do_not_modify:
+    - "_sources/"
+    - "_binaries/"
+    - "benchmark_runs/"
+
+success_metrics:
+  - "All compatibility rows in docs/reference/backward-compatibility.md are either removed from code or explicitly justified as non-shim and moved out of the registry."
+  - "No alias/re-export compatibility entries remain for alpha API surfaces in benchbox/core, benchbox/platforms, or benchbox/cli."
+  - "Repository CI profile used by test-fix (`make ci-lint && make ci-test`) passes after removals."
+
+open_questions:
+  - "Should result-schema v1.x reader support be fully removed now or retained until a specific beta gate?"
+  - "Should the backward-compatibility registry remain as a historical record in docs, or be replaced by a breaking-changes policy page?"

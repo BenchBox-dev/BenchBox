@@ -1,5 +1,5 @@
-generated_at: '2026-02-13T10:21:01.149956'
-total_items: 44
+generated_at: '2026-02-14T10:20:14.266376'
+total_items: 45
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 42
+    count: 43
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -157,6 +157,11 @@ statuses:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: Medium-High
       category: Testing and Quality Assurance
+    - id: remove-alpha-backward-compatibility-surface
+      file: TODO/main/planning/remove-alpha-backward-compatibility-surface.yaml
+      title: Remove alpha-stage backward compatibility surface across BenchBox
+      priority: Critical
+      category: Core Functionality
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
