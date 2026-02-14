@@ -1,4 +1,4 @@
-generated_at: '2026-02-15T04:03:56.277922'
+generated_at: '2026-02-14T20:04:06.955786'
 total_items: 44
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -22,12 +22,12 @@ items:
   work_done: 0
   work_ready: 10
 - id: lakesail-spark-platform
-  file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
+  file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
   title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
   worktree: platform-expansion
   category: Platform Expansion
   priority: High
-  status: In Progress
+  status: Not Started
   tags:
   - lakesail
   - sail
@@ -42,8 +42,8 @@ items:
   - open-source
   estimated_effort: Large
   work_total: 91
-  work_done: 76
-  work_ready: 3
+  work_done: 0
+  work_ready: 19
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -67,6 +67,23 @@ items:
   deferred_count: 6
   needs:
   - fix-dataframe-parameter-parity-follow-up-findings
+- id: motherduck-platform-adapter
+  file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
+  title: MotherDuck Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: In Progress
+  tags:
+  - platform-adapter
+  - motherduck
+  - duckdb
+  - cloud
+  estimated_effort: 3-4 days
+  work_total: 21
+  work_done: 21
+  work_ready: 0
+  deferred_count: 4
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -101,7 +118,7 @@ items:
   worktree: platform-expansion
   category: Platform Expansion
   priority: Low
-  status: In Progress
+  status: Not Started
   tags:
   - cloud-native
   - olap
@@ -110,8 +127,8 @@ items:
   - object-storage
   estimated_effort: 2-3 days
   work_total: 22
-  work_done: 12
-  work_ready: 10
+  work_done: 0
+  work_ready: 19
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -271,7 +288,7 @@ items:
   worktree: platform-expansion
   category: Platform Expansion
   priority: Medium
-  status: In Progress
+  status: Not Started
   tags:
   - questdb
   - timeseries
@@ -281,8 +298,8 @@ items:
   - ilp
   estimated_effort: Medium
   work_total: 40
-  work_done: 15
-  work_ready: 10
+  work_done: 0
+  work_ready: 12
 - id: singlestore-adapter
   file: TODO/platform-expansion/planning/singlestore-adapter.yaml
   title: Add SingleStore Platform Adapter
@@ -630,12 +647,12 @@ items:
   work_done: 0
   work_ready: 7
 - id: apache-doris-olap-platform
-  file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
+  file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
   title: Add Apache Doris MPP OLAP platform support
   worktree: platform-expansion
   category: Platform Expansion
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - doris
   - apache
@@ -650,8 +667,8 @@ items:
   - cloud
   estimated_effort: Medium
   work_total: 40
-  work_done: 0
-  work_ready: 12
+  work_done: 19
+  work_ready: 11
 - id: starrocks-olap-platform
   file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
   title: Add StarRocks MPP OLAP platform support

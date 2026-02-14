@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T04:03:58.593483'
-total_items: 457
+generated_at: '2026-02-14T20:04:09.197783'
+total_items: 454
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1465,24 +1465,6 @@ items:
   category: platform-adapter
   priority: High
   status: Completed
-- id: motherduck-platform-adapter
-  file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
-  title: MotherDuck Platform Adapter
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: High
-  status: Completed
-  tags:
-  - platform-adapter
-  - motherduck
-  - duckdb
-  - cloud
-  estimated_effort: 3-4 days
-  completed_date: '2026-02-14'
-  work_total: 21
-  work_done: 21
-  work_ready: 0
-  deferred_count: 4
 - id: nyc-taxi-olap-benchmark-core-implementation
   file: DONE/benchmark-expansion/active/nyc-taxi-olap-benchmark-core-implementation.yaml
   title: NYC Taxi OLAP Benchmark (Core Implementation)
@@ -2999,25 +2981,6 @@ items:
   deferred_count: 2
   needs:
   - implement-dataframe-benchmarks
-- id: postgres-extension-benchmarking-infrastructure
-  file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
-  title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium
-  status: Completed
-  tags:
-  - infrastructure
-  - postgresql-extension
-  - docker
-  - testing
-  - documentation
-  estimated_effort: 2-3 days
-  completed_date: '2026-02-15'
-  work_total: 5
-  work_done: 5
-  work_ready: 0
-  deferred_count: 3
 - id: cli-data-only-and-load-only-execution-options
   file: DONE/unknown/planning/cli-data-only-and-load-only-execution-options.yaml
   title: CLI Data-Only and Load-Only Execution Options
@@ -4692,45 +4655,6 @@ items:
   - interactive
   estimated_effort: Small
   completed_date: '2026-01-07'
-- id: pg-duckdb-platform-adapter
-  file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
-  title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: Completed
-  tags:
-  - platform-adapter
-  - postgresql-extension
-  - pg-duckdb
-  - olap
-  - duckdb
-  estimated_effort: 3-4 days
-  completed_date: '2026-02-15'
-  work_total: 10
-  work_done: 10
-  work_ready: 0
-  deferred_count: 3
-- id: pg-mooncake-platform-adapter
-  file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
-  title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: Completed
-  tags:
-  - platform-adapter
-  - postgresql-extension
-  - pg-mooncake
-  - columnstore
-  - olap
-  - iceberg
-  estimated_effort: 3-4 days
-  completed_date: '2026-02-15'
-  work_total: 11
-  work_done: 11
-  work_ready: 0
-  deferred_count: 4
 - id: mcp-visualization-tools
   file: DONE/mcp-integration/mcp-visualization-tools.yaml
   title: Add visualization tools to MCP server

@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T04:03:58.594231'
-total_items: 457
+generated_at: '2026-02-14T20:04:09.198439'
+total_items: 454
 priorities:
   Critical:
     count: 31
@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 160
+    count: 159
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -537,11 +537,6 @@ priorities:
       file: DONE/fabric-platform/planning/fabric-adapter-architecture.yaml
       title: Microsoft Fabric Data Warehouse Adapter Architecture
       category: platform-adapter
-      status: Completed
-    - id: motherduck-platform-adapter
-      file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
-      title: MotherDuck Platform Adapter
-      category: Platform Expansion
       status: Completed
     - id: nyc-taxi-olap-benchmark-core-implementation
       file: DONE/benchmark-expansion/active/nyc-taxi-olap-benchmark-core-implementation.yaml
@@ -964,7 +959,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 42
+    count: 40
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1006,16 +1001,6 @@ priorities:
       file: DONE/ux-improvements/active/platform-setup-numbered-list-selection.yaml
       title: Add numbered list selection to platform setup wizard
       category: User Experience
-      status: Completed
-    - id: pg-duckdb-platform-adapter
-      file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
-      title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
-      category: Platform Expansion
-      status: Completed
-    - id: pg-mooncake-platform-adapter
-      file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
-      title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
-      category: Platform Expansion
       status: Completed
     - id: mcp-visualization-tools
       file: DONE/mcp-integration/mcp-visualization-tools.yaml
@@ -1178,7 +1163,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 212
+    count: 211
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1403,11 +1388,6 @@ priorities:
     - id: bodo-dataframe-platform
       file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
       title: Bodo DataFrame Platform Adapter
-      category: Platform Expansion
-      status: Completed
-    - id: postgres-extension-benchmarking-infrastructure
-      file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
-      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       category: Platform Expansion
       status: Completed
     - id: cli-data-only-and-load-only-execution-options

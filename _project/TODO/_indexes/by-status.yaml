@@ -1,41 +1,36 @@
-generated_at: '2026-02-15T04:03:56.278156'
+generated_at: '2026-02-14T20:04:06.955902'
 total_items: 44
 statuses:
   In Progress:
-    count: 4
+    count: 3
     items:
-    - id: lakesail-spark-platform
-      file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
-      title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
-      priority: High
-      category: Platform Expansion
-    - id: questdb-timeseries-platform
-      file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
-      title: Add QuestDB time-series database platform support
-      priority: Medium
-      category: Platform Expansion
-    - id: databend-cloud-olap-platform
-      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
-      title: Databend Cloud-Native OLAP Platform Integration
-      priority: Low
+    - id: apache-doris-olap-platform
+      file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
+      title: Add Apache Doris MPP OLAP platform support
+      priority: Medium-High
       category: Platform Expansion
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       priority: High
       category: Core Functionality
-  Not Started:
-    count: 39
-    items:
-    - id: apache-doris-olap-platform
-      file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
-      title: Add Apache Doris MPP OLAP platform support
-      priority: Medium-High
+    - id: motherduck-platform-adapter
+      file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      priority: High
       category: Platform Expansion
+  Not Started:
+    count: 41
+    items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
       priority: Medium
+      category: Platform Expansion
+    - id: lakesail-spark-platform
+      file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
+      title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+      priority: High
       category: Platform Expansion
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -45,6 +40,11 @@ statuses:
     - id: fabric-spark-notebooks-platform
       file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
       title: Add Microsoft Fabric Spark Notebooks platform support
+      priority: Medium
+      category: Platform Expansion
+    - id: questdb-timeseries-platform
+      file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
+      title: Add QuestDB time-series database platform support
       priority: Medium
       category: Platform Expansion
     - id: singlestore-adapter
@@ -66,6 +66,11 @@ statuses:
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
       priority: Medium
+      category: Platform Expansion
+    - id: databend-cloud-olap-platform
+      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+      title: Databend Cloud-Native OLAP Platform Integration
+      priority: Low
       category: Platform Expansion
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
