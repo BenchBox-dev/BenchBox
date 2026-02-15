@@ -1,8 +1,8 @@
-generated_at: '2026-02-14T10:20:14.266376'
+generated_at: '2026-02-14T11:47:37.089244'
 total_items: 45
 statuses:
   In Progress:
-    count: 2
+    count: 3
     items:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
@@ -14,8 +14,13 @@ statuses:
       title: MotherDuck Platform Adapter
       priority: High
       category: Platform Expansion
+    - id: remove-alpha-backward-compatibility-surface
+      file: TODO/main/active/remove-alpha-backward-compatibility-surface.yaml
+      title: Remove alpha-stage backward compatibility surface across BenchBox
+      priority: Critical
+      category: Core Functionality
   Not Started:
-    count: 43
+    count: 42
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -157,11 +162,6 @@ statuses:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: Medium-High
       category: Testing and Quality Assurance
-    - id: remove-alpha-backward-compatibility-surface
-      file: TODO/main/planning/remove-alpha-backward-compatibility-surface.yaml
-      title: Remove alpha-stage backward compatibility surface across BenchBox
-      priority: Critical
-      category: Core Functionality
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

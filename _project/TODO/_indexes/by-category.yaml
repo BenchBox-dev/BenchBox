@@ -1,4 +1,4 @@
-generated_at: '2026-02-14T10:20:14.266347'
+generated_at: '2026-02-14T11:47:37.089213'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -109,10 +109,10 @@ categories:
       priority: Low
       status: Not Started
     - id: remove-alpha-backward-compatibility-surface
-      file: TODO/main/planning/remove-alpha-backward-compatibility-surface.yaml
+      file: TODO/main/active/remove-alpha-backward-compatibility-surface.yaml
       title: Remove alpha-stage backward compatibility surface across BenchBox
       priority: Critical
-      status: Not Started
+      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

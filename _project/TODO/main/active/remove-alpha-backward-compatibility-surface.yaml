@@ -7,7 +7,8 @@ description: |
   Remove all backward-compatibility elements currently tracked in
   docs/reference/backward-compatibility.md to align with alpha-stage product policy.
 
-  The registry currently tracks 89 compatibility markers (67 active, 22 deprecate).
+  Baseline inventory at kickoff tracked 89 compatibility markers
+  (67 active, 22 deprecate).
   This item executes immediate removal of the entire compatibility surface, including:
   - alias/re-export compatibility shims
   - legacy argument and field fallbacks
@@ -135,7 +136,7 @@ metadata:
   - "compatibility-removal"
   estimated_effort: "Large"
   created_date: "2026-02-14"
-  last_updated: "2026-02-14T00:00:00"
+  last_updated: "2026-02-14T23:45:00"
 
 must_preserve:
 - "Canonical benchmark execution paths (`benchbox run` with supported platforms/benchmarks) remain functional."
@@ -178,12 +179,17 @@ verification:
 
 scope_limit:
   only_modify:
-  - "benchbox/"
-  - "tests/"
+  - "benchbox/core/"
+  - "benchbox/cli/"
+  - "benchbox/platforms/"
+  - "benchbox/utils/"
+  - "tests/unit/"
+  - "tests/integration/"
   - "docs/reference/backward-compatibility.md"
   - "docs/reference/index.md"
-  - "_project/TODO/"
-  - "_project/DONE/"
+  - "_project/TODO/main/active/remove-alpha-backward-compatibility-surface.yaml"
+  - "_project/TODO/_indexes/"
+  - "_project/DONE/_indexes/"
   do_not_modify:
   - "_sources/"
   - "_binaries/"
@@ -195,7 +201,4 @@ success_metrics:
 - "No alias/re-export compatibility entries remain for alpha API surfaces in benchbox/core, benchbox/platforms, or benchbox/cli."
 - "Repository CI profile used by test-fix (`make ci-lint && make ci-test`) passes after removals."
 
-open_questions:
-- "Should result-schema v1.x reader support be fully removed now or retained until a specific beta gate?"
-- "Should the backward-compatibility registry remain as a historical record in docs, or be replaced by a breaking-changes
-  policy page?"
+open_questions: []

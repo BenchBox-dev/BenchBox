@@ -1,4 +1,4 @@
-generated_at: '2026-02-14T10:20:14.266363'
+generated_at: '2026-02-14T11:47:37.089230'
 total_items: 45
 priorities:
   Critical:
@@ -10,10 +10,10 @@ priorities:
       category: Core Functionality
       status: Not Started
     - id: remove-alpha-backward-compatibility-surface
-      file: TODO/main/planning/remove-alpha-backward-compatibility-surface.yaml
+      file: TODO/main/active/remove-alpha-backward-compatibility-surface.yaml
       title: Remove alpha-stage backward compatibility surface across BenchBox
       category: Core Functionality
-      status: Not Started
+      status: In Progress
   High:
     count: 4
     items:
