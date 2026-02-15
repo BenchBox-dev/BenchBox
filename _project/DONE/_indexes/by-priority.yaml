@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T00:41:18.656666'
-total_items: 455
+generated_at: '2026-02-15T04:12:56.471002'
+total_items: 460
 priorities:
   Critical:
     count: 31
@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 160
+    count: 162
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -212,9 +212,19 @@ priorities:
       title: Add --seed option to interactive wizard for reproducibility
       category: User Experience
       status: Not Started
+    - id: ascii-chart-normalized-speedup
+      file: DONE/core-functionality/active/ascii-chart-normalized-speedup.yaml
+      title: Add ASCII Normalized Speedup chart (relative to baseline platform)
+      category: Core Functionality
+      status: Completed
     - id: ascii-chart-percentile-ladder
       file: DONE/core-functionality/active/ascii-chart-percentile-ladder.yaml
       title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+      category: Core Functionality
+      status: Completed
+    - id: ascii-chart-stacked-phase-breakdown
+      file: DONE/core-functionality/active/ascii-chart-stacked-phase-breakdown.yaml
+      title: Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)
       category: Core Functionality
       status: Completed
     - id: datafusion-sql-query-transformer
@@ -964,7 +974,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 40
+    count: 41
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -974,6 +984,11 @@ priorities:
     - id: ascii-chart-visualizations
       file: DONE/main/active/ascii-chart-visualizations.yaml
       title: ASCII Chart Visualizations for CLI and MCP Server
+      category: Core Functionality
+      status: Completed
+    - id: ascii-chart-sparkline-table
+      file: DONE/core-functionality/active/ascii-chart-sparkline-table.yaml
+      title: Add ASCII Sparkline Table chart (compact multi-metric leaderboard)
       category: Core Functionality
       status: Completed
     - id: hudi-support-parity
@@ -1168,7 +1183,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 211
+    count: 213
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1280,6 +1295,16 @@ priorities:
       title: Add --validation mode selection to interactive wizard
       category: User Experience
       status: Not Started
+    - id: ascii-chart-cdf
+      file: DONE/core-functionality/active/ascii-chart-cdf.yaml
+      title: Add ASCII CDF chart (cumulative distribution of query latency)
+      category: Core Functionality
+      status: Completed
+    - id: ascii-chart-rank-table
+      file: DONE/core-functionality/active/ascii-chart-rank-table.yaml
+      title: Add ASCII Rank Table chart (per-query competitive ranking with win/loss tally)
+      category: Core Functionality
+      status: Completed
     - id: add-azure-synapse-adapter
       file: DONE/platform-expansion/planning/add-azure-synapse-adapter.yaml
       title: Add Azure Synapse Adapter

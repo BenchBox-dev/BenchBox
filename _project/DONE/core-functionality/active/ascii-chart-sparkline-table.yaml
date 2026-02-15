@@ -6,7 +6,8 @@ id: ascii-chart-sparkline-table
 title: "Add ASCII Sparkline Table chart (compact multi-metric leaderboard)"
 worktree: core-functionality
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-02-15"
 category: Core Functionality
 description: |
   Add a new ASCII chart type that displays a compact leaderboard table where each row
@@ -39,11 +40,11 @@ description: |
 
 metadata:
   tags:
-    - visualization
-    - ascii-charts
-    - sparkline
-    - leaderboard
-    - multi-metric
+  - visualization
+  - ascii-charts
+  - sparkline
+  - leaderboard
+  - multi-metric
   estimated_effort: Medium
   created_date: "2026-02-14"
 
@@ -58,18 +59,17 @@ impact:
 
 files_affected:
   added:
-    - benchbox/core/visualization/ascii/sparkline_table.py
+  - benchbox/core/visualization/ascii/sparkline_table.py
   modified:
-    - benchbox/core/visualization/ascii/__init__.py
-    - benchbox/core/visualization/exporters.py
-    - benchbox/core/visualization/templates.py
-    - tests/unit/visualization/ascii/test_ascii_charts.py
+  - benchbox/core/visualization/ascii/__init__.py
+  - benchbox/core/visualization/exporters.py
+  - benchbox/core/visualization/templates.py
+  - tests/unit/visualization/ascii/test_ascii_charts.py
 
 must_preserve:
-  - "All 9 existing chart types continue to render identically"
-  - "render_ascii_chart() in exporters.py handles all existing chart_type strings"
-  - "ASCIISummaryBox behavior unchanged (sparkline table is multi-platform overview,
-    summary box is single-run aggregate stats)"
+- "All 9 existing chart types continue to render identically"
+- "render_ascii_chart() in exporters.py handles all existing chart_type strings"
+- "ASCIISummaryBox behavior unchanged (sparkline table is multi-platform overview, summary box is single-run aggregate stats)"
 
 approach: |
   Build as a table renderer with inline mini-bars rather than a traditional chart:
@@ -89,54 +89,57 @@ approach: |
   lower-priority columns with "..." indicator.
 
 anti_patterns:
-  - "DO NOT use full-width bar charts per cell — because the value of this chart is
-    compactness — use 1-4 character sparkline bars only"
-  - "DO NOT hardcode metric columns — because different benchmarks expose different
-    metrics — accept a flexible list of SparklineColumn instances"
+- "DO NOT use full-width bar charts per cell — because the value of this chart is compactness — use 1-4 character sparkline
+  bars only"
+- "DO NOT hardcode metric columns — because different benchmarks expose different metrics — accept a flexible list of SparklineColumn
+  instances"
 
 verification:
-  - description: "New chart class renders without error"
-    command: "uv run -- python -c \"from benchbox.core.visualization.ascii.sparkline_table import ASCIISparklineTable, SparklineColumn, SparklineTableData; cols = [SparklineColumn('Total(ms)', {'DuckDB': 1240, 'Polars': 1580}, False), SparklineColumn('Success', {'DuckDB': 100, 'Polars': 100}, True)]; data = SparklineTableData(['DuckDB', 'Polars'], cols); chart = ASCIISparklineTable(data=data); print(chart.render())\""
-    expected_output: "Rendered table with sparkline bars and values"
-  - description: "Existing chart tests still pass"
-    command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
-    expected_output: "all tests pass, 0 failures"
+- description: "New chart class renders without error"
+  command: "uv run -- python -c \"from benchbox.core.visualization.ascii.sparkline_table import ASCIISparklineTable, SparklineColumn,
+    SparklineTableData; cols = [SparklineColumn('Total(ms)', {'DuckDB': 1240, 'Polars': 1580}, False), SparklineColumn('Success',
+    {'DuckDB': 100, 'Polars': 100}, True)]; data = SparklineTableData(['DuckDB', 'Polars'], cols); chart = ASCIISparklineTable(data=data);
+    print(chart.render())\""
+  expected_output: "Rendered table with sparkline bars and values"
+- description: "Existing chart tests still pass"
+  command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
+  expected_output: "all tests pass, 0 failures"
 
 scope_limit:
   only_modify:
-    - benchbox/core/visualization/ascii/
-    - benchbox/core/visualization/exporters.py
-    - benchbox/core/visualization/templates.py
-    - tests/unit/visualization/ascii/
+  - benchbox/core/visualization/ascii/
+  - benchbox/core/visualization/exporters.py
+  - benchbox/core/visualization/templates.py
+  - tests/unit/visualization/ascii/
 
 work:
-  - id: w1
-    summary: "Create SparklineColumn, SparklineTableData dataclasses and ASCIISparklineTable class"
-    status: pending
-  - id: w2
-    summary: "Implement per-column normalization with higher_is_better inversion and sparkline bar rendering"
-    needs: [w1]
-    status: pending
-  - id: w3
-    summary: "Implement dynamic column width calculation with truncation for narrow terminals"
-    needs: [w1]
-    status: pending
-  - id: w4
-    summary: "Add from_normalized_results() factory that populates standard benchmark metrics"
-    needs: [w1, w2]
-    status: pending
-  - id: w5
-    summary: "Register chart in __init__.py and add 'sparkline_table' case to render_ascii_chart() in exporters.py"
-    needs: [w1]
-    status: pending
-  - id: w6
-    summary: "Add unit tests (multi-platform, mixed higher/lower-is-better, edge cases, narrow terminal)"
-    needs: [w1, w2, w3]
-    status: pending
-  - id: w7
-    summary: "Add sparkline_table to flagship template in templates.py"
-    needs: [w5]
-    status: pending
+- id: w1
+  summary: "Create SparklineColumn, SparklineTableData dataclasses and ASCIISparklineTable class"
+  status: done
+- id: w2
+  summary: "Implement per-column normalization with higher_is_better inversion and sparkline bar rendering"
+  needs: [w1]
+  status: done
+- id: w3
+  summary: "Implement dynamic column width calculation with truncation for narrow terminals"
+  needs: [w1]
+  status: done
+- id: w4
+  summary: "Add from_normalized_results() factory that populates standard benchmark metrics"
+  needs: [w1, w2]
+  status: done
+- id: w5
+  summary: "Register chart in __init__.py and add 'sparkline_table' case to render_ascii_chart() in exporters.py"
+  needs: [w1]
+  status: done
+- id: w6
+  summary: "Add unit tests (multi-platform, mixed higher/lower-is-better, edge cases, narrow terminal)"
+  needs: [w1, w2, w3]
+  status: done
+- id: w7
+  summary: "Add sparkline_table to flagship template in templates.py"
+  needs: [w5]
+  status: done
 
 deps:
   needs: []
