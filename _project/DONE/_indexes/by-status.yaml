@@ -1,4 +1,4 @@
-generated_at: '2026-02-14T19:48:49.165017'
+generated_at: '2026-02-15T00:36:20.496506'
 total_items: 455
 statuses:
   In Progress:
@@ -664,13 +664,13 @@ statuses:
       title: Compressed Data Generation Gaps (all benchmarks) ✅
       priority: Medium
       category: Data Quality and Compatibility Issues
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       category: Performance and Efficiency
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       category: Performance and Efficiency
@@ -2070,13 +2070,13 @@ statuses:
       title: ✅ Implement Standalone Export Command
       priority: Medium
       category: User Experience and CLI Enhancement
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       category: Pre-Release High Priority Tasks (COMPLETED)

@@ -1,4 +1,4 @@
-generated_at: '2026-02-14T19:48:49.164800'
+generated_at: '2026-02-15T00:36:20.496256'
 total_items: 455
 priorities:
   Critical:
@@ -1440,13 +1440,13 @@ priorities:
       title: Compressed Data Generation Gaps (all benchmarks) ✅
       category: Data Quality and Compatibility Issues
       status: Completed
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Completed
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Completed
@@ -2130,13 +2130,13 @@ priorities:
       title: ✅ Implement Standalone Export Command
       category: User Experience and CLI Enhancement
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       category: Pre-Release High Priority Tasks (COMPLETED)
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       category: Pre-Release High Priority Tasks (COMPLETED)
       status: Completed
