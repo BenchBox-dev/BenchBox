@@ -1,0 +1,253 @@
+id: pg-duckdb-platform-adapter
+title: "Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics"
+worktree: platform-expansion
+priority: Medium-High
+status: Completed
+completed_date: "2026-02-15"
+category: Platform Expansion
+description: |
+  Add a pg_duckdb platform adapter that enables benchmarking PostgreSQL with
+  the pg_duckdb extension installed. pg_duckdb embeds DuckDB's vectorized
+  analytical engine inside PostgreSQL, accelerating OLAP queries by up to
+  1500x on certain workloads without requiring SQL changes.
+
+  This adapter should inherit from PostgreSQLAdapter (following the TimescaleDB
+  pattern) and add pg_duckdb-specific configuration: enabling the extension,
+  setting GUC parameters like duckdb.force_execution, configuring thread counts
+  for parallel scans, and optionally connecting to MotherDuck for hybrid queries.
+
+  Key benchmarking scenarios:
+  - pg_duckdb on regular PostgreSQL heap tables (row-oriented, DuckDB execution)
+  - pg_duckdb vs vanilla PostgreSQL (same data, same queries, different engine)
+  - pg_duckdb vs native DuckDB (comparing embedded vs standalone)
+  - pg_duckdb with MotherDuck cloud offload (deployment mode: motherduck)
+
+  The adapter should support TPC-H, TPC-DS, and ClickBench benchmarks, which
+  are the most relevant OLAP workloads for pg_duckdb's acceleration capabilities.
+
+context_sections:
+  "Background and Motivation": |
+    pg_duckdb (https://github.com/duckdb/pg_duckdb) is an open-source PostgreSQL
+    extension built by DuckDB Labs and MotherDuck that embeds DuckDB's columnar
+    vectorized execution engine inside PostgreSQL. It reached v1.0 production
+    readiness and is now supported by managed providers (DigitalOcean, Neon,
+    Supabase).
+
+    Key capabilities:
+    - Transparent query acceleration via duckdb.force_execution GUC
+    - No SQL changes needed for existing queries on heap tables
+    - Data lake integration (Parquet, Iceberg, Delta Lake on S3/GCS/Azure)
+    - MotherDuck integration for cloud-based hybrid queries
+    - Parallel table scanning with configurable thread count
+
+    Performance characteristics:
+    - Up to ~4x faster than PostgreSQL with full indexes on TPC-H
+    - Up to 1500x faster on specific TPC-DS queries vs unindexed PostgreSQL
+    - Row-oriented storage limits: no columnar compression benefits on heap tables
+    - Best results on analytical scans, aggregations, and joins
+
+  "Technical Context": |
+    pg_duckdb connects via standard PostgreSQL wire protocol (psycopg2), so
+    connection management, COPY loading, and SQL dialect are identical to
+    PostgreSQL. The key differences are:
+
+    1. Extension lifecycle: CREATE EXTENSION pg_duckdb in create_connection()
+    2. GUC parameters: duckdb.force_execution, duckdb.threads_for_postgres_scan
+    3. Deployment modes: self-hosted (default) and motherduck (cloud offload)
+    4. MotherDuck mode: SET duckdb.motherduck_token, hybrid local+cloud queries
+    5. Data lake queries: duckdb.read_parquet(), duckdb.read_csv() functions
+
+    The adapter inherits PostgreSQLAdapter's COPY-based loading, EXPLAIN ANALYZE
+    plan capture, and postgres SQL dialect. Only extension setup and GUC
+    configuration need to be added.
+
+    Design consideration: pg_duckdb conflicts with pg_mooncake (shared
+    libduckdb.so). These extensions cannot coexist in the same PostgreSQL
+    instance. The adapter should document this constraint.
+
+metadata:
+  tags:
+  - platform-adapter
+  - postgresql-extension
+  - pg-duckdb
+  - olap
+  - duckdb
+  estimated_effort: "3-4 days"
+  created_date: "2026-02-14"
+
+impact:
+  business_value: |
+    Enables head-to-head benchmarking of pg_duckdb against vanilla PostgreSQL,
+    native DuckDB, and other OLAP platforms. This is highly relevant given
+    pg_duckdb's growing adoption on managed PostgreSQL providers and its unique
+    position as an in-process analytical accelerator.
+  user_impact: |
+    Users can benchmark pg_duckdb with a single command:
+    benchbox run --platform pg-duckdb --benchmark tpch --scale 1
+    And compare directly against --platform postgresql and --platform duckdb.
+
+files_affected:
+  added:
+  - "benchbox/platforms/pg_duckdb.py"
+  - "benchbox/core/tuning/generators/pg_duckdb.py"
+  - "tests/unit/platforms/test_pg_duckdb_adapter.py"
+  - "docs/platforms/pg_duckdb.md"
+  modified:
+  - "benchbox/core/platform_registry.py"
+  - "benchbox/platforms/__init__.py"
+
+technical_requirements:
+  dependencies:
+  - "psycopg2-binary>=2.9.0 (existing, shared with PostgreSQL adapter)"
+  - "PostgreSQL 14+ with pg_duckdb extension installed"
+  constraints:
+  - "Requires pg_duckdb extension pre-installed on PostgreSQL server"
+  - "Conflicts with pg_mooncake — cannot coexist in same instance"
+  - "MotherDuck mode requires MOTHERDUCK_TOKEN environment variable"
+  - "Thread count tuning requires superuser or pg_duckdb role"
+  compatibility: |
+    PostgreSQL 14-18 with pg_duckdb 1.0+. Standard psycopg2 driver — no
+    additional Python dependencies. MotherDuck integration is optional.
+
+must_preserve:
+- "PostgreSQLAdapter.load_data() COPY pipeline unchanged — pg_duckdb inherits it directly"
+- "PostgreSQLAdapter.execute_query() return format unchanged — pg_duckdb only overrides configuration"
+- "All existing PostgreSQL adapter tests pass: uv run -- python -m pytest tests/unit/platforms/test_postgresql_adapter.py
+  -v"
+- "Platform registry autodiscovery for all existing platforms unaffected"
+
+approach: |
+  Follow the TimescaleDB pattern (benchbox/platforms/timescaledb.py) which extends
+  PostgreSQLAdapter with extension-specific lifecycle hooks:
+
+  1. Create PgDuckDBAdapter(PostgreSQLAdapter) in benchbox/platforms/pg_duckdb.py
+  2. Override create_connection() to verify/install pg_duckdb extension and set GUCs
+  3. Override configure_for_benchmark() to set duckdb.force_execution=true and
+     thread configuration based on benchmark type (OLAP vs mixed)
+  4. Add MotherDuck deployment mode with token-based authentication
+  5. Register in platform_registry.py with metadata (category: "olap-accelerator",
+     platform_family: "pg_duckdb", deployment_modes: self-hosted + motherduck)
+  6. Add CLI config builder in __init__.py following TimescaleDB pattern
+
+  For the DDL generator (benchbox/core/tuning/generators/pg_duckdb.py), extend
+  PostgreSQLDDLGenerator. pg_duckdb works with standard PostgreSQL DDL — the
+  generator mainly needs to handle index recommendations (pg_duckdb benefits
+  less from B-tree indexes since it bypasses them for analytical scans).
+
+anti_patterns:
+- "DO NOT add a new SQL dialect for pg_duckdb — because pg_duckdb uses standard PostgreSQL SQL parsed by DuckDB internally
+  — reuse POSTGRES_DIALECT from the PostgreSQL adapter"
+- "DO NOT require pg_duckdb for the PostgreSQL adapter — because they are separate platforms — pg_duckdb adapter is its own
+  class that happens to inherit from PostgreSQLAdapter"
+- "DO NOT try to install pg_duckdb via CREATE EXTENSION in production — because extension installation requires server admin
+  privileges — only verify it exists and raise a clear error if missing"
+- "DO NOT add data lake query support in the initial implementation — because it requires S3/GCS credentials and Parquet file
+  management — defer to a separate work item"
+
+verification:
+- description: "pg_duckdb adapter module imports without error"
+  command: "uv run -- python -c \"from benchbox.platforms.pg_duckdb import PgDuckDBAdapter; print('import OK')\""
+  expected_output: "import OK"
+- description: "All existing platform tests still pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "pg_duckdb unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_pg_duckdb_adapter.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Platform registry lists pg-duckdb"
+  command: "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry; print('pg-duckdb' in PlatformRegistry.list_platforms())\""
+  expected_output: "True"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/pg_duckdb.py"
+  - "benchbox/platforms/__init__.py"
+  - "benchbox/core/platform_registry.py"
+  - "benchbox/core/tuning/generators/pg_duckdb.py"
+  - "tests/unit/platforms/test_pg_duckdb_adapter.py"
+  - "docs/platforms/pg_duckdb.md"
+  do_not_modify:
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/duckdb.py"
+  - "benchbox/platforms/timescaledb.py"
+  - "benchbox/core/runner.py"
+
+deps:
+  needs: []
+
+success_metrics:
+- "benchbox run --platform pg-duckdb --benchmark tpch --scale 0.01 --dry-run succeeds"
+- "Unit tests cover adapter creation, extension verification, GUC configuration, and MotherDuck mode"
+- "Platform appears in benchbox run --help with correct description"
+
+work:
+- id: w1
+  summary: "Create PgDuckDBAdapter class extending PostgreSQLAdapter with platform_name, get_target_dialect, and basic class
+    structure"
+  status: done
+
+- id: w2
+  summary: "Implement create_connection() override to verify pg_duckdb extension is installed and set default GUC parameters
+    (duckdb.force_execution, threads)"
+  needs: [w1]
+  status: done
+
+- id: w3
+  summary: "Implement configure_for_benchmark() override to set pg_duckdb-specific OLAP optimizations (force_execution=true,
+    thread tuning per benchmark type)"
+  needs: [w2]
+  status: done
+
+- id: w4
+  summary: "Add MotherDuck deployment mode with token-based authentication (MOTHERDUCK_TOKEN env var, duckdb.motherduck_token
+    GUC)"
+  needs: [w2]
+  status: done
+  notes: "Follow TimescaleDB cloud deployment pattern for deployment mode handling"
+
+- id: w5
+  summary: "Register pg-duckdb in platform_registry.py with metadata (display_name, category, libraries, deployment_modes:
+    self-hosted + motherduck)"
+  needs: [w1]
+  status: done
+
+- id: w6
+  summary: "Add CLI config builder and hook registration in platforms/__init__.py with pg-duckdb-specific arguments (--pgduckdb-force-execution,
+    --pgduckdb-threads)"
+  needs: [w5]
+  status: done
+
+- id: w7
+  summary: "Create PgDuckDBDDLGenerator extending PostgreSQLDDLGenerator with pg_duckdb-aware index recommendations"
+  needs: [w1]
+  status: done
+
+- id: w8
+  summary: "Write unit tests: adapter creation, extension verification mock, GUC parameter setting, MotherDuck mode configuration,
+    error handling for missing extension"
+  needs: [w3, w4]
+  status: done
+
+- id: w9
+  summary: "Write platform registration tests and CLI integration tests"
+  needs: [w5, w6]
+  status: done
+
+- id: w10
+  summary: "Write platform documentation (docs/platforms/pg_duckdb.md) covering setup, usage, deployment modes, and comparison
+    with native DuckDB"
+  needs: [w3, w4]
+  status: done
+
+deferred:
+- summary: "Data lake query support (S3 Parquet/Iceberg reads via pg_duckdb)"
+  reason: "Requires cloud storage credentials and Parquet file management — separate feature"
+- summary: "MotherDuck cloud deployment integration testing"
+  reason: "Requires active MotherDuck account — handle in live-platform-test workflow"
+- summary: "pg_duckdb vs native DuckDB automated comparison reports"
+  reason: "Requires comparison framework — handle after both adapters are stable"
+
+open_questions:
+- "Should pg_duckdb automatically disable PostgreSQL indexes during benchmarking since DuckDB bypasses them?"
+- "How should we handle pg_duckdb version detection (v1.0 vs v1.1 feature differences)?"
+- "Should MotherDuck mode be a separate platform name (pg-duckdb:motherduck) or a CLI flag?"

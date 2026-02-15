@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T00:36:20.496256'
-total_items: 455
+generated_at: '2026-02-15T04:03:58.594231'
+total_items: 457
 priorities:
   Critical:
     count: 31
@@ -964,7 +964,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 40
+    count: 42
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1006,6 +1006,16 @@ priorities:
       file: DONE/ux-improvements/active/platform-setup-numbered-list-selection.yaml
       title: Add numbered list selection to platform setup wizard
       category: User Experience
+      status: Completed
+    - id: pg-duckdb-platform-adapter
+      file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
+      title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
+      category: Platform Expansion
+      status: Completed
+    - id: pg-mooncake-platform-adapter
+      file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
+      title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
+      category: Platform Expansion
       status: Completed
     - id: mcp-visualization-tools
       file: DONE/mcp-integration/mcp-visualization-tools.yaml
@@ -1168,7 +1178,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 211
+    count: 212
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1393,6 +1403,11 @@ priorities:
     - id: bodo-dataframe-platform
       file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
       title: Bodo DataFrame Platform Adapter
+      category: Platform Expansion
+      status: Completed
+    - id: postgres-extension-benchmarking-infrastructure
+      file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
+      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       category: Platform Expansion
       status: Completed
     - id: cli-data-only-and-load-only-execution-options
