@@ -42,7 +42,7 @@ work:
 - id: w2
   summary: "Merge DataFusion into single `datafusion` extra with pyarrow"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Current state:
       datafusion = ["datafusion>=50.1.0", "pyarrow>=10.0.0"]     # SQL mode
@@ -57,7 +57,7 @@ work:
 - id: w3
   summary: "Align PySpark to single version floor and add `pyspark` plain-name alias"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Current state:
       spark = ["pyspark>=4.0.1"]                                   # SQL mode
