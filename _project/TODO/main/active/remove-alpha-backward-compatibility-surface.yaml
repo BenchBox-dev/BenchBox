@@ -94,13 +94,13 @@ work:
 - id: w12
   summary: "Delete compatibility-specific tests and rewrite tests to canonical API behavior"
   needs: [w2, w3, w4, w5, w6, w7, w8, w9, w10, w11]
-  status: pending
+  status: done
   notes: "Remove tests asserting alias/fallback behavior; preserve and expand canonical behavior tests."
 
 - id: w13
   summary: "Update docs to remove compatibility claims and document alpha break policy"
   needs: [w2, w3, w4, w5, w6, w7, w8, w9, w10, w11]
-  status: pending
+  status: done
   notes: "Update reference/platform/guides and rewrite backward-compatibility page as historical removal record or replace
     with breaking-changes policy."
 
