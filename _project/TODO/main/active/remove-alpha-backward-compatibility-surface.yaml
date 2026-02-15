@@ -80,7 +80,7 @@ work:
 - id: w10
   summary: "Remove compatibility surfaces in tuning/validation/config utilities"
   needs: [w1]
-  status: pending
+  status: done
   notes: "Covers tuning interface legacy constructors/merge paths, validation legacy properties, and config re-export compatibility
     layers."
 
