@@ -219,7 +219,7 @@ work:
 - id: w7
   summary: "Create PgDuckDBDDLGenerator extending PostgreSQLDDLGenerator with pg_duckdb-aware index recommendations"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w8
   summary: "Write unit tests: adapter creation, extension verification mock, GUC parameter setting, MotherDuck mode configuration,
