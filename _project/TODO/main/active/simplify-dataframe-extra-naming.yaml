@@ -90,7 +90,7 @@ work:
 - id: w5
   summary: "Update error messages and install suggestions in platform_checker and __init__"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Files:
       - benchbox/platforms/dataframe/platform_checker.py: extra_name params, get_installation_suggestion()
