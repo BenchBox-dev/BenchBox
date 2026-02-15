@@ -187,7 +187,7 @@ work:
   summary: "Create comparison report template for PostgreSQL baseline vs extension performance (speedup ratios, storage size,
     load time)"
   needs: [w2]
-  status: pending
+  status: done
   notes: "Template format only — actual comparison implementation is in individual adapter items"
 
 deferred:
