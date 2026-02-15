@@ -6,7 +6,7 @@ id: ascii-chart-sparkline-table
 title: "Add ASCII Sparkline Table chart (compact multi-metric leaderboard)"
 worktree: core-functionality
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Add a new ASCII chart type that displays a compact leaderboard table where each row

@@ -6,7 +6,7 @@ id: ascii-chart-rank-table
 title: "Add ASCII Rank Table chart (per-query competitive ranking with win/loss tally)"
 worktree: core-functionality
 priority: Medium
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Add a new ASCII chart type that shows a ranked leaderboard table with each platform's

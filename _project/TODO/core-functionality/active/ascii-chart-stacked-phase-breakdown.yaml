@@ -6,7 +6,7 @@ id: ascii-chart-stacked-phase-breakdown
 title: "Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)"
 worktree: core-functionality
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Add a new ASCII chart type that shows how total benchmark time is distributed across

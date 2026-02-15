@@ -6,7 +6,7 @@ id: ascii-chart-cdf
 title: "Add ASCII CDF chart (cumulative distribution of query latency)"
 worktree: core-functionality
 priority: Medium
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Add a new ASCII chart type that renders a cumulative distribution function (CDF) plot
