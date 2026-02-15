@@ -116,7 +116,7 @@ work:
 - id: w7
   summary: "Update documentation to use plain extra names"
   needs: [w4, w5]
-  status: pending
+  status: done
   notes: |
     Files:
       - docs/platforms/quick-reference.md
