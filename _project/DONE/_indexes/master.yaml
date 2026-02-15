@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T04:03:58.593483'
-total_items: 457
+generated_at: '2026-02-15T04:12:56.470243'
+total_items: 460
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -520,6 +520,57 @@ items:
   - interactive
   - reproducibility
   estimated_effort: Small
+- id: ascii-chart-normalized-speedup
+  file: DONE/core-functionality/active/ascii-chart-normalized-speedup.yaml
+  title: Add ASCII Normalized Speedup chart (relative to baseline platform)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - normalization
+  - comparison
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+- id: ascii-chart-percentile-ladder
+  file: DONE/core-functionality/active/ascii-chart-percentile-ladder.yaml
+  title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - percentile
+  - latency
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+- id: ascii-chart-stacked-phase-breakdown
+  file: DONE/core-functionality/active/ascii-chart-stacked-phase-breakdown.yaml
+  title: Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - phases
+  - stacked-bar
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: datafusion-sql-query-transformer
   file: DONE/core-functionality/active/datafusion-sql-query-transformer.yaml
   title: Add DataFusion SQL query transformer for TPC-H Q11, Q16, Q18, Q20
@@ -2714,6 +2765,42 @@ items:
   - interactive
   - validation
   estimated_effort: Small
+- id: ascii-chart-cdf
+  file: DONE/core-functionality/active/ascii-chart-cdf.yaml
+  title: Add ASCII CDF chart (cumulative distribution of query latency)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - cdf
+  - distribution
+  - latency
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+- id: ascii-chart-rank-table
+  file: DONE/core-functionality/active/ascii-chart-rank-table.yaml
+  title: Add ASCII Rank Table chart (per-query competitive ranking with win/loss tally)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - ranking
+  - leaderboard
+  - competitive
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: add-azure-synapse-adapter
   file: DONE/platform-expansion/planning/add-azure-synapse-adapter.yaml
   title: Add Azure Synapse Adapter
@@ -4600,6 +4687,24 @@ items:
   - rich-library
   estimated_effort: 2-3 weeks
   completed_date: '2026-02-05'
+- id: ascii-chart-sparkline-table
+  file: DONE/core-functionality/active/ascii-chart-sparkline-table.yaml
+  title: Add ASCII Sparkline Table chart (compact multi-metric leaderboard)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - sparkline
+  - leaderboard
+  - multi-metric
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: hudi-support-parity
   file: DONE/table-format-parity/hudi-support-parity.yaml
   title: Add Apache Hudi Support on Par with Delta Lake and Iceberg
