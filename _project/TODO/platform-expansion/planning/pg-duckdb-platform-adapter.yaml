@@ -225,12 +225,12 @@ work:
   summary: "Write unit tests: adapter creation, extension verification mock, GUC parameter setting, MotherDuck mode configuration,
     error handling for missing extension"
   needs: [w3, w4]
-  status: pending
+  status: done
 
 - id: w9
   summary: "Write platform registration tests and CLI integration tests"
   needs: [w5, w6]
-  status: pending
+  status: done
 
 - id: w10
   summary: "Write platform documentation (docs/platforms/pg_duckdb.md) covering setup, usage, deployment modes, and comparison
