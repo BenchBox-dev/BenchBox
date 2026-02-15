@@ -6,7 +6,8 @@ id: ascii-chart-percentile-ladder
 title: "Add ASCII Percentile Ladder chart (P50/P90/P95/P99)"
 worktree: core-functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-15"
 category: Core Functionality
 description: |
   Add a new ASCII chart type that visualizes percentile latency bands (P50, P90, P95, P99)
@@ -37,10 +38,10 @@ description: |
 
 metadata:
   tags:
-    - visualization
-    - ascii-charts
-    - percentile
-    - latency
+  - visualization
+  - ascii-charts
+  - percentile
+  - latency
   estimated_effort: Medium
   created_date: "2026-02-14"
 
@@ -56,17 +57,17 @@ impact:
 
 files_affected:
   added:
-    - benchbox/core/visualization/ascii/percentile_ladder.py
+  - benchbox/core/visualization/ascii/percentile_ladder.py
   modified:
-    - benchbox/core/visualization/ascii/__init__.py
-    - benchbox/core/visualization/exporters.py
-    - benchbox/core/visualization/templates.py
-    - tests/unit/visualization/ascii/test_ascii_charts.py
+  - benchbox/core/visualization/ascii/__init__.py
+  - benchbox/core/visualization/exporters.py
+  - benchbox/core/visualization/templates.py
+  - tests/unit/visualization/ascii/test_ascii_charts.py
 
 must_preserve:
-  - "All 9 existing chart types continue to render identically (no changes to their logic)"
-  - "render_ascii_chart() in exporters.py continues to handle all existing chart_type strings"
-  - "ASCIIChartBase interface contract (render() method, options, metadata) unchanged"
+- "All 9 existing chart types continue to render identically (no changes to their logic)"
+- "render_ascii_chart() in exporters.py continues to handle all existing chart_type strings"
+- "ASCIIChartBase interface contract (render() method, options, metadata) unchanged"
 
 approach: |
   Follow the established pattern in benchbox/core/visualization/ascii/bar_chart.py:
@@ -82,52 +83,54 @@ approach: |
   (no numpy dependency). The chart should handle single-platform and multi-platform modes.
 
 anti_patterns:
-  - "DO NOT add numpy/scipy as a dependency — because the visualization module has zero
-    external deps — compute percentiles with sorted arrays and linear interpolation"
-  - "DO NOT modify ASCIIBoxPlot — because box plots and percentile ladders serve different
-    purposes (IQR vs tail-latency thresholds) — implement as a new chart class"
+- "DO NOT add numpy/scipy as a dependency — because the visualization module has zero external deps — compute percentiles
+  with sorted arrays and linear interpolation"
+- "DO NOT modify ASCIIBoxPlot — because box plots and percentile ladders serve different purposes (IQR vs tail-latency thresholds)
+  — implement as a new chart class"
 
 verification:
-  - description: "New chart class renders without error"
-    command: "uv run -- python -c \"from benchbox.core.visualization.ascii.percentile_ladder import ASCIIPercentileLadder, PercentileData; data = [PercentileData('DuckDB', 12, 45, 78, 120), PercentileData('Polars', 15, 52, 95, 310)]; chart = ASCIIPercentileLadder(data=data); print(chart.render())\""
-    expected_output: "Rendered chart with two platform rows showing layered bars"
-  - description: "Existing chart tests still pass"
-    command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
-    expected_output: "all tests pass, 0 failures"
-  - description: "New chart registered in exporters"
-    command: "uv run -- python -c \"from benchbox.core.visualization.exporters import render_ascii_chart; print('OK')\""
-    expected_output: "OK"
+- description: "New chart class renders without error"
+  command: "uv run -- python -c \"from benchbox.core.visualization.ascii.percentile_ladder import ASCIIPercentileLadder, PercentileData;
+    data = [PercentileData('DuckDB', 12, 45, 78, 120), PercentileData('Polars', 15, 52, 95, 310)]; chart = ASCIIPercentileLadder(data=data);
+    print(chart.render())\""
+  expected_output: "Rendered chart with two platform rows showing layered bars"
+- description: "Existing chart tests still pass"
+  command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
+  expected_output: "all tests pass, 0 failures"
+- description: "New chart registered in exporters"
+  command: "uv run -- python -c \"from benchbox.core.visualization.exporters import render_ascii_chart; print('OK')\""
+  expected_output: "OK"
 
 scope_limit:
   only_modify:
-    - benchbox/core/visualization/ascii/
-    - benchbox/core/visualization/exporters.py
-    - benchbox/core/visualization/templates.py
-    - tests/unit/visualization/ascii/
+  - benchbox/core/visualization/ascii/
+  - benchbox/core/visualization/exporters.py
+  - benchbox/core/visualization/templates.py
+  - tests/unit/visualization/ascii/
 
 work:
-  - id: w1
-    summary: "Create PercentileData dataclass and ASCIIPercentileLadder class with render() method"
-    status: pending
-  - id: w2
-    summary: "Implement percentile computation helper (from raw query times to P50/P90/P95/P99)"
-    status: pending
-  - id: w3
-    summary: "Add from_query_results() factory function for creating chart from NormalizedResult data"
-    needs: [w1, w2]
-    status: pending
-  - id: w4
-    summary: "Register chart in __init__.py and add 'percentile_ladder' case to render_ascii_chart() in exporters.py"
-    needs: [w1]
-    status: pending
-  - id: w5
-    summary: "Add unit tests for percentile ladder (single platform, multi-platform, edge cases)"
-    needs: [w1, w2]
-    status: pending
-  - id: w6
-    summary: "Add percentile_ladder to relevant templates in templates.py (flagship, default)"
-    needs: [w4]
-    status: pending
+- id: w1
+  summary: "Create PercentileData dataclass and ASCIIPercentileLadder class with render() method"
+  status: done
+- id: w2
+  summary: "Implement percentile computation helper (from raw query times to P50/P90/P95/P99)"
+  status: done
+- id: w3
+  summary: "Add from_query_results() factory function for creating chart from NormalizedResult data"
+  needs: [w1, w2]
+  status: done
+- id: w4
+  summary: "Register chart in __init__.py and add 'percentile_ladder' case to render_ascii_chart() in exporters.py"
+  needs: [w1]
+  status: done
+- id: w5
+  summary: "Add unit tests for percentile ladder (single platform, multi-platform, edge cases)"
+  needs: [w1, w2]
+  status: done
+- id: w6
+  summary: "Add percentile_ladder to relevant templates in templates.py (flagship, default)"
+  needs: [w4]
+  status: done
 
 deps:
   needs: []

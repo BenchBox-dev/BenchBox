@@ -1,5 +1,5 @@
-generated_at: '2026-02-14T20:09:49.431625'
-total_items: 454
+generated_at: '2026-02-15T00:41:18.656000'
+total_items: 455
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -520,6 +520,23 @@ items:
   - interactive
   - reproducibility
   estimated_effort: Small
+- id: ascii-chart-percentile-ladder
+  file: DONE/core-functionality/active/ascii-chart-percentile-ladder.yaml
+  title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - percentile
+  - latency
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: datafusion-sql-query-transformer
   file: DONE/core-functionality/active/datafusion-sql-query-transformer.yaml
   title: Add DataFusion SQL query transformer for TPC-H Q11, Q16, Q18, Q20

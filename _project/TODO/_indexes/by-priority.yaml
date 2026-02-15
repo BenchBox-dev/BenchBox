@@ -1,5 +1,5 @@
-generated_at: '2026-02-14T20:09:47.398567'
-total_items: 50
+generated_at: '2026-02-15T00:41:16.389881'
+total_items: 49
 priorities:
   Critical:
     count: 1
@@ -10,16 +10,11 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 7
+    count: 6
     items:
     - id: ascii-chart-normalized-speedup
       file: TODO/core-functionality/planning/ascii-chart-normalized-speedup.yaml
       title: Add ASCII Normalized Speedup chart (relative to baseline platform)
-      category: Core Functionality
-      status: Not Started
-    - id: ascii-chart-percentile-ladder
-      file: TODO/core-functionality/planning/ascii-chart-percentile-ladder.yaml
-      title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
       category: Core Functionality
       status: Not Started
     - id: ascii-chart-stacked-phase-breakdown

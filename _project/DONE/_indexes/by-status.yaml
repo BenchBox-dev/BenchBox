@@ -1,5 +1,5 @@
-generated_at: '2026-02-14T20:09:49.432476'
-total_items: 454
+generated_at: '2026-02-15T00:41:18.657349'
+total_items: 455
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 407
+    count: 408
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -363,6 +363,11 @@ statuses:
       title: AWS Glue Managed Spark Platform
       priority: High
       category: Platform Expansion
+    - id: ascii-chart-percentile-ladder
+      file: DONE/core-functionality/active/ascii-chart-percentile-ladder.yaml
+      title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+      priority: High
+      category: Core Functionality
     - id: hudi-support-parity
       file: DONE/table-format-parity/hudi-support-parity.yaml
       title: Add Apache Hudi Support on Par with Delta Lake and Iceberg

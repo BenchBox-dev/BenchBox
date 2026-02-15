@@ -1,5 +1,5 @@
-generated_at: '2026-02-14T20:09:47.398589'
-total_items: 50
+generated_at: '2026-02-15T00:41:16.389908'
+total_items: 49
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 48
+    count: 47
     items:
     - id: ascii-chart-cdf
       file: TODO/core-functionality/planning/ascii-chart-cdf.yaml
@@ -25,11 +25,6 @@ statuses:
     - id: ascii-chart-normalized-speedup
       file: TODO/core-functionality/planning/ascii-chart-normalized-speedup.yaml
       title: Add ASCII Normalized Speedup chart (relative to baseline platform)
-      priority: High
-      category: Core Functionality
-    - id: ascii-chart-percentile-ladder
-      file: TODO/core-functionality/planning/ascii-chart-percentile-ladder.yaml
-      title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
       priority: High
       category: Core Functionality
     - id: ascii-chart-rank-table

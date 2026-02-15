@@ -1,4 +1,4 @@
-generated_at: '2026-02-14T20:09:49.432047'
+generated_at: '2026-02-15T00:41:18.656422'
 total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 118
+    count: 119
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -389,6 +389,11 @@ categories:
       file: DONE/main/active/ascii-chart-visualizations.yaml
       title: ASCII Chart Visualizations for CLI and MCP Server
       priority: Medium-High
+      status: Completed
+    - id: ascii-chart-percentile-ladder
+      file: DONE/core-functionality/active/ascii-chart-percentile-ladder.yaml
+      title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+      priority: High
       status: Completed
     - id: hudi-support-parity
       file: DONE/table-format-parity/hudi-support-parity.yaml
