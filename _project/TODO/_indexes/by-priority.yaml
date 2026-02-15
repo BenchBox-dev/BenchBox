@@ -1,4 +1,4 @@
-generated_at: '2026-02-14T20:04:06.955873'
+generated_at: '2026-02-14T20:10:18.158850'
 total_items: 44
 priorities:
   Critical:
@@ -13,10 +13,10 @@ priorities:
     count: 4
     items:
     - id: lakesail-spark-platform
-      file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
+      file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
-      status: Not Started
+      status: In Progress
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -36,10 +36,10 @@ priorities:
     count: 8
     items:
     - id: apache-doris-olap-platform
-      file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
+      file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
       category: Platform Expansion
-      status: In Progress
+      status: Not Started
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support

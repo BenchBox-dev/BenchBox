@@ -1,13 +1,13 @@
-generated_at: '2026-02-14T20:04:06.955902'
+generated_at: '2026-02-14T20:10:18.158873'
 total_items: 44
 statuses:
   In Progress:
     count: 3
     items:
-    - id: apache-doris-olap-platform
-      file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
-      title: Add Apache Doris MPP OLAP platform support
-      priority: Medium-High
+    - id: lakesail-spark-platform
+      file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
+      title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+      priority: High
       category: Platform Expansion
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
@@ -22,15 +22,15 @@ statuses:
   Not Started:
     count: 41
     items:
+    - id: apache-doris-olap-platform
+      file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
+      title: Add Apache Doris MPP OLAP platform support
+      priority: Medium-High
+      category: Platform Expansion
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
       priority: Medium
-      category: Platform Expansion
-    - id: lakesail-spark-platform
-      file: TODO/platform-expansion/planning/lakesail-spark-platform.yaml
-      title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
-      priority: High
       category: Platform Expansion
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
