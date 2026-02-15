@@ -87,7 +87,7 @@ work:
 - id: w11
   summary: "Remove remaining utility compatibility shims and legacy defaults"
   needs: [w1]
-  status: pending
+  status: done
   notes: "Covers filename normalization fallbacks, database naming legacy fallbacks, datagen manifest legacy handlers, and
     similar utility shims."
 
