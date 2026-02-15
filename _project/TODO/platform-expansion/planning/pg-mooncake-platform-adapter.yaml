@@ -245,7 +245,7 @@ work:
   summary: "Create PgMooncakeDDLGenerator extending PostgreSQLDDLGenerator that adds USING columnstore to all CREATE TABLE
     DDL"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w9
   summary: "Write unit tests: adapter creation, extension verification mock, columnstore DDL generation, storage config, unsupported
