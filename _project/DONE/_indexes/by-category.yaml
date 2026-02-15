@@ -1,5 +1,5 @@
-generated_at: '2026-02-14T11:47:38.058453'
-total_categories: 63
+generated_at: '2026-02-15T12:25:05.253172'
+total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 118
+    count: 124
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -389,6 +389,36 @@ categories:
       file: DONE/main/active/ascii-chart-visualizations.yaml
       title: ASCII Chart Visualizations for CLI and MCP Server
       priority: Medium-High
+      status: Completed
+    - id: ascii-chart-cdf
+      file: DONE/core-functionality/active/ascii-chart-cdf.yaml
+      title: Add ASCII CDF chart (cumulative distribution of query latency)
+      priority: Medium
+      status: Completed
+    - id: ascii-chart-normalized-speedup
+      file: DONE/core-functionality/active/ascii-chart-normalized-speedup.yaml
+      title: Add ASCII Normalized Speedup chart (relative to baseline platform)
+      priority: High
+      status: Completed
+    - id: ascii-chart-percentile-ladder
+      file: DONE/core-functionality/active/ascii-chart-percentile-ladder.yaml
+      title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+      priority: High
+      status: Completed
+    - id: ascii-chart-rank-table
+      file: DONE/core-functionality/active/ascii-chart-rank-table.yaml
+      title: Add ASCII Rank Table chart (per-query competitive ranking with win/loss tally)
+      priority: Medium
+      status: Completed
+    - id: ascii-chart-sparkline-table
+      file: DONE/core-functionality/active/ascii-chart-sparkline-table.yaml
+      title: Add ASCII Sparkline Table chart (compact multi-metric leaderboard)
+      priority: Medium-High
+      status: Completed
+    - id: ascii-chart-stacked-phase-breakdown
+      file: DONE/core-functionality/active/ascii-chart-stacked-phase-breakdown.yaml
+      title: Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)
+      priority: High
       status: Completed
     - id: hudi-support-parity
       file: DONE/table-format-parity/hudi-support-parity.yaml
@@ -1072,6 +1102,14 @@ categories:
       title: ✅ Unified Runner Comprehensive Export (Core Exporter Integration)
       priority: Medium
       status: Completed
+  Developer Experience:
+    count: 1
+    items:
+    - id: simplify-dataframe-extra-naming
+      file: DONE/main/active/simplify-dataframe-extra-naming.yaml
+      title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'
+      priority: Medium-High
+      status: Completed
   Documentation:
     count: 11
     items:
@@ -1455,7 +1493,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 41
+    count: 45
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1502,6 +1540,16 @@ categories:
       title: Add cost tracking for local/self-hosted platforms
       priority: Low
       status: Completed
+    - id: pg-duckdb-platform-adapter
+      file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
+      title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
+      priority: Medium-High
+      status: Completed
+    - id: pg-mooncake-platform-adapter
+      file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
+      title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
+      priority: Medium-High
+      status: Completed
     - id: athena-spark-platform
       file: DONE/platform-expansion/planning/athena-spark-platform.yaml
       title: Amazon Athena for Apache Spark Platform
@@ -1530,6 +1578,11 @@ categories:
     - id: bodo-dataframe-platform
       file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
       title: Bodo DataFrame Platform Adapter
+      priority: Medium
+      status: Completed
+    - id: postgres-extension-benchmarking-infrastructure
+      file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
+      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       priority: Medium
       status: Completed
     - id: modin-cudf-dask-production-ready
@@ -1586,6 +1639,11 @@ categories:
       file: DONE/platform-expansion/planning/fabric-spark-platform.yaml
       title: Microsoft Fabric Spark Platform
       priority: Medium-High
+      status: Completed
+    - id: motherduck-platform-adapter
+      file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      priority: High
       status: Completed
     - id: pt-03-redshift-ddl
       file: DONE/physical-tuning/planning/pt-03-redshift-ddl.yaml

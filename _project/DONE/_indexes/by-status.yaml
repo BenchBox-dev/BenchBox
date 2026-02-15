@@ -1,5 +1,5 @@
-generated_at: '2026-02-14T11:47:38.058690'
-total_items: 454
+generated_at: '2026-02-15T12:25:05.253421'
+total_items: 465
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 407
+    count: 418
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -363,6 +363,36 @@ statuses:
       title: AWS Glue Managed Spark Platform
       priority: High
       category: Platform Expansion
+    - id: ascii-chart-cdf
+      file: DONE/core-functionality/active/ascii-chart-cdf.yaml
+      title: Add ASCII CDF chart (cumulative distribution of query latency)
+      priority: Medium
+      category: Core Functionality
+    - id: ascii-chart-normalized-speedup
+      file: DONE/core-functionality/active/ascii-chart-normalized-speedup.yaml
+      title: Add ASCII Normalized Speedup chart (relative to baseline platform)
+      priority: High
+      category: Core Functionality
+    - id: ascii-chart-percentile-ladder
+      file: DONE/core-functionality/active/ascii-chart-percentile-ladder.yaml
+      title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+      priority: High
+      category: Core Functionality
+    - id: ascii-chart-rank-table
+      file: DONE/core-functionality/active/ascii-chart-rank-table.yaml
+      title: Add ASCII Rank Table chart (per-query competitive ranking with win/loss tally)
+      priority: Medium
+      category: Core Functionality
+    - id: ascii-chart-sparkline-table
+      file: DONE/core-functionality/active/ascii-chart-sparkline-table.yaml
+      title: Add ASCII Sparkline Table chart (compact multi-metric leaderboard)
+      priority: Medium-High
+      category: Core Functionality
+    - id: ascii-chart-stacked-phase-breakdown
+      file: DONE/core-functionality/active/ascii-chart-stacked-phase-breakdown.yaml
+      title: Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)
+      priority: High
+      category: Core Functionality
     - id: hudi-support-parity
       file: DONE/table-format-parity/hudi-support-parity.yaml
       title: Add Apache Hudi Support on Par with Delta Lake and Iceberg
@@ -469,6 +499,16 @@ statuses:
       title: Add numbered list selection to platform setup wizard
       priority: Medium-High
       category: User Experience
+    - id: pg-duckdb-platform-adapter
+      file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
+      title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
+      priority: Medium-High
+      category: Platform Expansion
+    - id: pg-mooncake-platform-adapter
+      file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
+      title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
+      priority: Medium-High
+      category: Platform Expansion
     - id: tpcds-stdout-fix-test-stdout-datagen
       file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
       title: Add regression tests for TPC-DS stdout data generation
@@ -562,6 +602,11 @@ statuses:
     - id: bodo-dataframe-platform
       file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
       title: Bodo DataFrame Platform Adapter
+      priority: Medium
+      category: Platform Expansion
+    - id: postgres-extension-benchmarking-infrastructure
+      file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
+      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       priority: Medium
       category: Platform Expansion
     - id: bundle-tpc-query-templates-in-wheel
@@ -1295,6 +1340,11 @@ statuses:
       title: Minimize Emoji Usage ✅ COMPLETED
       priority: Medium
       category: Code Quality and Documentation
+    - id: motherduck-platform-adapter
+      file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      priority: High
+      category: Platform Expansion
     - id: multi-region-performance-testing
       file: DONE/enterprise-ops-multi-region/planning/multi-region-performance-testing.yaml
       title: Multi-Region Performance Testing
@@ -1735,6 +1785,11 @@ statuses:
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
+    - id: simplify-dataframe-extra-naming
+      file: DONE/main/active/simplify-dataframe-extra-naming.yaml
+      title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'
+      priority: Medium-High
+      category: Developer Experience
     - id: slim-release-distributions
       file: DONE/release-readiness/planning/slim-release-distributions.yaml
       title: Slim Release Distributions

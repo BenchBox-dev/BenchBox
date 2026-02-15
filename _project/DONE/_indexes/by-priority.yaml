@@ -1,5 +1,5 @@
-generated_at: '2026-02-14T11:47:38.058578'
-total_items: 454
+generated_at: '2026-02-15T12:25:05.253302'
+total_items: 465
 priorities:
   Critical:
     count: 31
@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 159
+    count: 163
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -212,6 +212,21 @@ priorities:
       title: Add --seed option to interactive wizard for reproducibility
       category: User Experience
       status: Not Started
+    - id: ascii-chart-normalized-speedup
+      file: DONE/core-functionality/active/ascii-chart-normalized-speedup.yaml
+      title: Add ASCII Normalized Speedup chart (relative to baseline platform)
+      category: Core Functionality
+      status: Completed
+    - id: ascii-chart-percentile-ladder
+      file: DONE/core-functionality/active/ascii-chart-percentile-ladder.yaml
+      title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+      category: Core Functionality
+      status: Completed
+    - id: ascii-chart-stacked-phase-breakdown
+      file: DONE/core-functionality/active/ascii-chart-stacked-phase-breakdown.yaml
+      title: Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)
+      category: Core Functionality
+      status: Completed
     - id: datafusion-sql-query-transformer
       file: DONE/core-functionality/active/datafusion-sql-query-transformer.yaml
       title: Add DataFusion SQL query transformer for TPC-H Q11, Q16, Q18, Q20
@@ -537,6 +552,11 @@ priorities:
       file: DONE/fabric-platform/planning/fabric-adapter-architecture.yaml
       title: Microsoft Fabric Data Warehouse Adapter Architecture
       category: platform-adapter
+      status: Completed
+    - id: motherduck-platform-adapter
+      file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      category: Platform Expansion
       status: Completed
     - id: nyc-taxi-olap-benchmark-core-implementation
       file: DONE/benchmark-expansion/active/nyc-taxi-olap-benchmark-core-implementation.yaml
@@ -959,7 +979,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 40
+    count: 44
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -969,6 +989,11 @@ priorities:
     - id: ascii-chart-visualizations
       file: DONE/main/active/ascii-chart-visualizations.yaml
       title: ASCII Chart Visualizations for CLI and MCP Server
+      category: Core Functionality
+      status: Completed
+    - id: ascii-chart-sparkline-table
+      file: DONE/core-functionality/active/ascii-chart-sparkline-table.yaml
+      title: Add ASCII Sparkline Table chart (compact multi-metric leaderboard)
       category: Core Functionality
       status: Completed
     - id: hudi-support-parity
@@ -1001,6 +1026,16 @@ priorities:
       file: DONE/ux-improvements/active/platform-setup-numbered-list-selection.yaml
       title: Add numbered list selection to platform setup wizard
       category: User Experience
+      status: Completed
+    - id: pg-duckdb-platform-adapter
+      file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
+      title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
+      category: Platform Expansion
+      status: Completed
+    - id: pg-mooncake-platform-adapter
+      file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
+      title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
+      category: Platform Expansion
       status: Completed
     - id: mcp-visualization-tools
       file: DONE/mcp-integration/mcp-visualization-tools.yaml
@@ -1152,6 +1187,11 @@ priorities:
       title: Remove Polars SQL mode support - DataFrame only
       category: Platform Expansion
       status: Completed
+    - id: simplify-dataframe-extra-naming
+      file: DONE/main/active/simplify-dataframe-extra-naming.yaml
+      title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'
+      category: Developer Experience
+      status: Completed
     - id: snowpark-connect-platform
       file: DONE/platform-expansion/planning/snowpark-connect-platform.yaml
       title: Snowpark Connect for Spark Platform
@@ -1163,7 +1203,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 211
+    count: 214
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1275,6 +1315,16 @@ priorities:
       title: Add --validation mode selection to interactive wizard
       category: User Experience
       status: Not Started
+    - id: ascii-chart-cdf
+      file: DONE/core-functionality/active/ascii-chart-cdf.yaml
+      title: Add ASCII CDF chart (cumulative distribution of query latency)
+      category: Core Functionality
+      status: Completed
+    - id: ascii-chart-rank-table
+      file: DONE/core-functionality/active/ascii-chart-rank-table.yaml
+      title: Add ASCII Rank Table chart (per-query competitive ranking with win/loss tally)
+      category: Core Functionality
+      status: Completed
     - id: add-azure-synapse-adapter
       file: DONE/platform-expansion/planning/add-azure-synapse-adapter.yaml
       title: Add Azure Synapse Adapter
@@ -1388,6 +1438,11 @@ priorities:
     - id: bodo-dataframe-platform
       file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
       title: Bodo DataFrame Platform Adapter
+      category: Platform Expansion
+      status: Completed
+    - id: postgres-extension-benchmarking-infrastructure
+      file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
+      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       category: Platform Expansion
       status: Completed
     - id: cli-data-only-and-load-only-execution-options

@@ -1,5 +1,5 @@
-generated_at: '2026-02-14T11:47:38.058244'
-total_items: 454
+generated_at: '2026-02-15T12:25:05.252960'
+total_items: 465
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -520,6 +520,57 @@ items:
   - interactive
   - reproducibility
   estimated_effort: Small
+- id: ascii-chart-normalized-speedup
+  file: DONE/core-functionality/active/ascii-chart-normalized-speedup.yaml
+  title: Add ASCII Normalized Speedup chart (relative to baseline platform)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - normalization
+  - comparison
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+- id: ascii-chart-percentile-ladder
+  file: DONE/core-functionality/active/ascii-chart-percentile-ladder.yaml
+  title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - percentile
+  - latency
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+- id: ascii-chart-stacked-phase-breakdown
+  file: DONE/core-functionality/active/ascii-chart-stacked-phase-breakdown.yaml
+  title: Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - phases
+  - stacked-bar
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: datafusion-sql-query-transformer
   file: DONE/core-functionality/active/datafusion-sql-query-transformer.yaml
   title: Add DataFusion SQL query transformer for TPC-H Q11, Q16, Q18, Q20
@@ -1465,6 +1516,24 @@ items:
   category: platform-adapter
   priority: High
   status: Completed
+- id: motherduck-platform-adapter
+  file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
+  title: MotherDuck Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Completed
+  tags:
+  - platform-adapter
+  - motherduck
+  - duckdb
+  - cloud
+  estimated_effort: 3-4 days
+  completed_date: '2026-02-14'
+  work_total: 21
+  work_done: 21
+  work_ready: 0
+  deferred_count: 4
 - id: nyc-taxi-olap-benchmark-core-implementation
   file: DONE/benchmark-expansion/active/nyc-taxi-olap-benchmark-core-implementation.yaml
   title: NYC Taxi OLAP Benchmark (Core Implementation)
@@ -2696,6 +2765,42 @@ items:
   - interactive
   - validation
   estimated_effort: Small
+- id: ascii-chart-cdf
+  file: DONE/core-functionality/active/ascii-chart-cdf.yaml
+  title: Add ASCII CDF chart (cumulative distribution of query latency)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - cdf
+  - distribution
+  - latency
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+- id: ascii-chart-rank-table
+  file: DONE/core-functionality/active/ascii-chart-rank-table.yaml
+  title: Add ASCII Rank Table chart (per-query competitive ranking with win/loss tally)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - ranking
+  - leaderboard
+  - competitive
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: add-azure-synapse-adapter
   file: DONE/platform-expansion/planning/add-azure-synapse-adapter.yaml
   title: Add Azure Synapse Adapter
@@ -2981,6 +3086,25 @@ items:
   deferred_count: 2
   needs:
   - implement-dataframe-benchmarks
+- id: postgres-extension-benchmarking-infrastructure
+  file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
+  title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  tags:
+  - infrastructure
+  - postgresql-extension
+  - docker
+  - testing
+  - documentation
+  estimated_effort: 2-3 days
+  completed_date: '2026-02-15'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  deferred_count: 3
 - id: cli-data-only-and-load-only-execution-options
   file: DONE/unknown/planning/cli-data-only-and-load-only-execution-options.yaml
   title: CLI Data-Only and Load-Only Execution Options
@@ -4563,6 +4687,24 @@ items:
   - rich-library
   estimated_effort: 2-3 weeks
   completed_date: '2026-02-05'
+- id: ascii-chart-sparkline-table
+  file: DONE/core-functionality/active/ascii-chart-sparkline-table.yaml
+  title: Add ASCII Sparkline Table chart (compact multi-metric leaderboard)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - sparkline
+  - leaderboard
+  - multi-metric
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: hudi-support-parity
   file: DONE/table-format-parity/hudi-support-parity.yaml
   title: Add Apache Hudi Support on Par with Delta Lake and Iceberg
@@ -4655,6 +4797,45 @@ items:
   - interactive
   estimated_effort: Small
   completed_date: '2026-01-07'
+- id: pg-duckdb-platform-adapter
+  file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
+  title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - platform-adapter
+  - postgresql-extension
+  - pg-duckdb
+  - olap
+  - duckdb
+  estimated_effort: 3-4 days
+  completed_date: '2026-02-15'
+  work_total: 10
+  work_done: 10
+  work_ready: 0
+  deferred_count: 3
+- id: pg-mooncake-platform-adapter
+  file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
+  title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - platform-adapter
+  - postgresql-extension
+  - pg-mooncake
+  - columnstore
+  - olap
+  - iceberg
+  estimated_effort: 3-4 days
+  completed_date: '2026-02-15'
+  work_total: 11
+  work_done: 11
+  work_ready: 0
+  deferred_count: 4
 - id: mcp-visualization-tools
   file: DONE/mcp-integration/mcp-visualization-tools.yaml
   title: Add visualization tools to MCP server
@@ -5100,6 +5281,22 @@ items:
   - dataframe
   - breaking-change
   estimated_effort: 1-2 days
+- id: simplify-dataframe-extra-naming
+  file: DONE/main/active/simplify-dataframe-extra-naming.yaml
+  title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'
+  worktree: main
+  category: Developer Experience
+  priority: Medium-High
+  status: Completed
+  tags:
+  - developer-experience
+  - naming-convention
+  - pyproject-extras
+  estimated_effort: Medium
+  completed_date: '2026-02-15'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: snowpark-connect-platform
   file: DONE/platform-expansion/planning/snowpark-connect-platform.yaml
   title: Snowpark Connect for Spark Platform
