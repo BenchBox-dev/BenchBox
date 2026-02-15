@@ -1,4 +1,4 @@
-generated_at: '2026-02-14T20:10:20.489634'
+generated_at: '2026-02-15T00:36:20.496002'
 total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
@@ -1455,7 +1455,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 41
+    count: 42
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1586,6 +1586,11 @@ categories:
       file: DONE/platform-expansion/planning/fabric-spark-platform.yaml
       title: Microsoft Fabric Spark Platform
       priority: Medium-High
+      status: Completed
+    - id: motherduck-platform-adapter
+      file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      priority: High
       status: Completed
     - id: pt-03-redshift-ddl
       file: DONE/physical-tuning/planning/pt-03-redshift-ddl.yaml
