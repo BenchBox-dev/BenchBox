@@ -7,7 +7,7 @@ id: databend-cloud-olap-platform
 title: "Databend Cloud-Native OLAP Platform Integration"
 worktree: platform-expansion
 priority: Low
-status: Not Started
+status: In Progress
 description: |
   Implement Databend (https://github.com/databendlabs/databend) as a supported platform
   in BenchBox. Databend is a cloud-native, Rust-based data warehouse with Snowflake-
@@ -62,15 +62,12 @@ files_affected:
   added:
   - "benchbox/platforms/databend/__init__.py"
   - "benchbox/platforms/databend/adapter.py"
-  - "benchbox/platforms/databend/client.py"
-  - "benchbox/platforms/databend/query_transformer.py"
   - "tests/unit/platforms/test_databend_adapter.py"
-  - "tests/integration/platforms/test_databend_smoke.py"
-  - "docs/platforms/databend.md"
-  - "examples/getting_started/cloud/databend_tpch.py"
   modified:
   - "pyproject.toml"
   - "benchbox/utils/dependencies.py"
+  - "benchbox/core/platform_registry.py"
+  - "benchbox/platforms/__init__.py"
 
 context_sections:
   "Background and Motivation": |
@@ -144,43 +141,43 @@ success_metrics:
 work:
 - id: w1
   summary: "Create databend/ platform module structure"
-  status: pending
+  status: done
 - id: w2
   summary: "Implement base DatabendAdapter class"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Implement connection handling with databend-driver"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w4
   summary: "Configure Snowflake dialect as translation proxy"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w5
   summary: "Implement CLI argument registration"
-  status: pending
+  status: done
 - id: w6
   summary: "Add databend dependency group to pyproject.toml"
-  status: pending
+  status: done
 - id: w7
   summary: "Implement schema creation with Snowflake SQL translation"
-  status: pending
+  status: done
 - id: w8
-  summary: "Implement data loading (COPY INTO from S3/staged files)"
-  status: pending
+  summary: "Implement data loading (INSERT batching)"
+  status: done
 - id: w9
   summary: "Implement query execution with result handling"
-  status: pending
+  status: done
 - id: w10
   summary: "Add query plan capture support (EXPLAIN)"
-  status: pending
+  status: done
 - id: w11
-  summary: "Implement tuning support (clustering keys, partitioning)"
-  status: pending
+  summary: "Implement tuning support (clustering keys)"
+  status: done
 - id: w12
   summary: "Test all 22 TPC-H queries for compatibility"
   status: pending
@@ -195,7 +192,7 @@ work:
   status: pending
 - id: w16
   summary: "Create unit tests (test_databend_adapter.py)"
-  status: pending
+  status: done
 - id: w17
   summary: "Create Docker Compose for Databend + MinIO"
   status: pending

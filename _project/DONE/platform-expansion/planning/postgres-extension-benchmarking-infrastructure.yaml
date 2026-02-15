@@ -1,0 +1,205 @@
+id: postgres-extension-benchmarking-infrastructure
+title: "Build Shared Infrastructure for Benchmarking PostgreSQL Extensions"
+worktree: platform-expansion
+priority: Medium
+status: Completed
+completed_date: "2026-02-15"
+category: Platform Expansion
+description: |
+  Create shared infrastructure, documentation, and testing patterns for
+  benchmarking PostgreSQL extensions as first-class platforms. BenchBox already
+  supports TimescaleDB (the first PostgreSQL extension), and two more are
+  planned: pg_duckdb and pg_mooncake. This item establishes the common patterns,
+  comparison framework, and Docker-based test infrastructure needed to support
+  a growing family of PostgreSQL extensions efficiently.
+
+  This is NOT about creating a new abstract base class — PostgreSQLAdapter
+  already serves that role well. Instead, this is about:
+
+  1. Docker Compose templates for spinning up PostgreSQL with specific extensions
+  2. A comparison report template for PostgreSQL vs extension benchmarks
+  3. Shared test fixtures and mocks for PostgreSQL extension adapters
+  4. Documentation of the "PostgreSQL extension adapter" pattern
+  5. Extension conflict detection (pg_duckdb vs pg_mooncake share libduckdb.so)
+
+context_sections:
+  "Background and Motivation": |
+    The PostgreSQL extension ecosystem is rapidly growing as a way to add
+    analytical capabilities to existing PostgreSQL deployments. BenchBox is
+    well-positioned to benchmark these extensions because:
+
+    - We already have a mature PostgreSQLAdapter base class
+    - TimescaleDB proved the inheritance pattern works cleanly
+    - Extensions share connection handling, COPY loading, and SQL dialect
+    - Users want to compare extensions against vanilla PostgreSQL
+
+    Current and planned PostgreSQL extensions:
+    - TimescaleDB (supported) — time-series hypertables
+    - pg_duckdb (planned) — DuckDB vectorized execution on heap tables
+    - pg_mooncake (planned) — columnstore tables with DuckDB execution
+    - pg_analytics/ParadeDB (future) — DuckDB-powered data lake analytics
+    - Citus (future) — distributed PostgreSQL
+
+    Shared infrastructure reduces per-extension implementation effort from
+    ~4 days to ~2 days by providing reusable Docker configs, test fixtures,
+    and comparison tooling.
+
+  "Technical Context": |
+    All PostgreSQL extensions share these characteristics:
+    - Same wire protocol (psycopg2)
+    - Same SQL dialect (postgres via SQLGlot)
+    - Same data loading (COPY FROM STDIN)
+    - Extension installed via CREATE EXTENSION
+    - Configuration via GUC parameters (SET extension.param = value)
+
+    Key differences between extensions:
+    | Feature | TimescaleDB | pg_duckdb | pg_mooncake |
+    |---------|-------------|-----------|-------------|
+    | Storage | Hypertables (chunked heap) | Standard heap | Columnstore (Parquet) |
+    | Execution | PostgreSQL planner | DuckDB engine | DuckDB engine |
+    | DDL changes | create_hypertable() | None | USING columnstore |
+    | Workload focus | Time-series | OLAP acceleration | OLAP columnstore |
+    | Cloud variant | Timescale Cloud | MotherDuck | S3/GCS storage |
+
+    Extension conflicts to handle:
+    - pg_duckdb and pg_mooncake CANNOT coexist (shared libduckdb.so)
+    - TimescaleDB is compatible with both (different extension)
+    - Docker Compose needs separate service definitions per extension
+
+metadata:
+  tags:
+  - infrastructure
+  - postgresql-extension
+  - docker
+  - testing
+  - documentation
+  estimated_effort: "2-3 days"
+  created_date: "2026-02-14"
+
+impact:
+  business_value: |
+    Reduces the marginal cost of adding new PostgreSQL extension support,
+    making BenchBox the go-to tool for comparing PostgreSQL extensions.
+    Creates a systematic approach to benchmarking the growing PostgreSQL
+    analytical extension ecosystem.
+  user_impact: |
+    Users get consistent comparison reports when benchmarking PostgreSQL
+    extensions, Docker Compose files for quick setup, and clear documentation
+    of extension compatibility and trade-offs.
+
+files_affected:
+  added:
+  - "docker/postgres-extensions/docker-compose.pg-duckdb.yaml"
+  - "docker/postgres-extensions/docker-compose.pg-mooncake.yaml"
+  - "docker/postgres-extensions/docker-compose.timescaledb.yaml"
+  - "docker/postgres-extensions/README.md"
+  - "tests/unit/platforms/conftest_pg_extensions.py"
+  - "docs/guides/postgresql-extensions.md"
+  modified:
+  - "benchbox/core/platform_registry.py"
+
+technical_requirements:
+  constraints:
+  - "Docker Compose files must work with standard docker compose (v2+)"
+  - "Extension conflict detection must be at registration time, not runtime"
+  - "Test fixtures must not require running PostgreSQL instances"
+
+must_preserve:
+- "Existing TimescaleDB adapter and tests unchanged"
+- "PostgreSQLAdapter base class unchanged — no new abstract methods"
+- "Platform registry behavior for all existing platforms unchanged"
+
+approach: |
+  1. Docker Compose templates: one per extension, each with PostgreSQL + extension
+     pre-installed, health checks, and volume mounts for data persistence.
+     Follow pattern: docker/postgres-extensions/docker-compose.{extension}.yaml
+
+  2. Shared test fixtures (tests/unit/platforms/conftest_pg_extensions.py):
+     - mock_pg_connection: psycopg2 connection mock with cursor
+     - mock_extension_check: simulates CREATE EXTENSION / SELECT extversion
+     - mock_guc_setting: captures SET parameter calls for verification
+     - Reusable across TimescaleDB, pg_duckdb, pg_mooncake test files
+
+  3. Extension conflict detection in platform_registry.py:
+     - Add "conflicts_with" field to platform metadata
+     - Warn (not error) when user benchmarks conflicting extensions
+     - Document that separate PostgreSQL instances are required
+
+  4. Comparison report template: standardized output for comparing
+     PostgreSQL baseline vs extension performance, including:
+     - Query-by-query speedup ratios
+     - Storage size comparison (heap vs columnstore vs hypertable)
+     - Load time comparison
+
+  5. Documentation (docs/guides/postgresql-extensions.md):
+     - Overview of supported PostgreSQL extensions
+     - Docker setup instructions per extension
+     - Compatibility matrix (which extensions work together)
+     - Benchmarking guide with recommended comparisons
+
+anti_patterns:
+- "DO NOT create a new PostgreSQLExtensionAdapter abstract class — because PostgreSQLAdapter already provides the right abstraction
+  — each extension adapts at its own override points"
+- "DO NOT merge Docker Compose files into a single file — because extensions conflict with each other — keep separate compose
+  files per extension"
+- "DO NOT add extension-specific logic to the PostgreSQL base adapter — because that couples unrelated extensions — each extension
+  adapter handles its own setup"
+
+verification:
+- description: "Docker Compose files are valid"
+  command: "docker compose -f docker/postgres-extensions/docker-compose.pg-duckdb.yaml config --quiet 2>&1 && echo 'valid'"
+  expected_output: "valid"
+- description: "Test fixtures importable"
+  command: "uv run -- python -c \"import tests.unit.platforms.conftest_pg_extensions; print('import OK')\""
+  expected_output: "import OK"
+- description: "All existing platform tests still pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  do_not_modify:
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/timescaledb.py"
+  - "benchbox/core/runner.py"
+
+work:
+- id: w1
+  summary: "Create Docker Compose templates for pg_duckdb, pg_mooncake, and TimescaleDB with health checks and volume mounts"
+  status: done
+
+- id: w2
+  summary: "Create shared pytest fixtures for PostgreSQL extension adapter testing (mock connection, extension check, GUC
+    capture)"
+  status: done
+
+- id: w3
+  summary: "Add extension conflict metadata to platform_registry.py (conflicts_with field in platform metadata, warning on
+    conflicting benchmarks)"
+  needs: [w1]
+  status: done
+
+- id: w4
+  summary: "Write PostgreSQL extensions guide (docs/guides/postgresql-extensions.md) covering setup, Docker usage, compatibility
+    matrix, and benchmarking recommendations"
+  needs: [w1, w2]
+  status: done
+
+- id: w5
+  summary: "Create comparison report template for PostgreSQL baseline vs extension performance (speedup ratios, storage size,
+    load time)"
+  needs: [w2]
+  status: done
+  notes: "Template format only — actual comparison implementation is in individual adapter items"
+
+deferred:
+- summary: "Automated multi-extension comparison pipeline (run baseline + all extensions sequentially)"
+  reason: "Requires orchestration layer beyond current benchbox run — design separately"
+- summary: "CI/CD integration tests with Docker-based PostgreSQL extensions"
+  reason: "Requires Docker-in-Docker or dedicated CI runners — handle with CI infrastructure"
+- summary: "pg_analytics (ParadeDB) and Citus extension support"
+  reason: "Lower priority than pg_duckdb and pg_mooncake — plan after initial extensions are stable"
+
+open_questions:
+- "Should Docker Compose files live in docker/ at project root or alongside platform code?"
+- "Should the comparison report be a built-in benchbox command (benchbox compare) or a post-processing script?"
+- "How should we handle PostgreSQL version matrix testing (extensions support different PG versions)?"

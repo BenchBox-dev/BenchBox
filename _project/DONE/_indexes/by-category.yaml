@@ -1485,7 +1485,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 41
+    count: 44
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1532,6 +1532,16 @@ categories:
       title: Add cost tracking for local/self-hosted platforms
       priority: Low
       status: Completed
+    - id: pg-duckdb-platform-adapter
+      file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
+      title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
+      priority: Medium-High
+      status: Completed
+    - id: pg-mooncake-platform-adapter
+      file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
+      title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
+      priority: Medium-High
+      status: Completed
     - id: athena-spark-platform
       file: DONE/platform-expansion/planning/athena-spark-platform.yaml
       title: Amazon Athena for Apache Spark Platform
@@ -1560,6 +1570,11 @@ categories:
     - id: bodo-dataframe-platform
       file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
       title: Bodo DataFrame Platform Adapter
+      priority: Medium
+      status: Completed
+    - id: postgres-extension-benchmarking-infrastructure
+      file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
+      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       priority: Medium
       status: Completed
     - id: modin-cudf-dask-production-ready
@@ -1616,6 +1631,11 @@ categories:
       file: DONE/platform-expansion/planning/fabric-spark-platform.yaml
       title: Microsoft Fabric Spark Platform
       priority: Medium-High
+      status: Completed
+    - id: motherduck-platform-adapter
+      file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      priority: High
       status: Completed
     - id: pt-03-redshift-ddl
       file: DONE/physical-tuning/planning/pt-03-redshift-ddl.yaml
