@@ -169,7 +169,7 @@ work:
 - id: w2
   summary: "Create shared pytest fixtures for PostgreSQL extension adapter testing (mock connection, extension check, GUC
     capture)"
-  status: pending
+  status: done
 
 - id: w3
   summary: "Add extension conflict metadata to platform_registry.py (conflicts_with field in platform metadata, warning on
