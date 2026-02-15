@@ -251,12 +251,12 @@ work:
   summary: "Write unit tests: adapter creation, extension verification mock, columnstore DDL generation, storage config, unsupported
     type handling"
   needs: [w3, w4, w5]
-  status: pending
+  status: done
 
 - id: w10
   summary: "Write platform registration tests and CLI integration tests"
   needs: [w6, w7]
-  status: pending
+  status: done
 
 - id: w11
   summary: "Write platform documentation (docs/platforms/pg_mooncake.md) covering setup, Docker usage, storage backends, and
