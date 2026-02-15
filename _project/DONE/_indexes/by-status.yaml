@@ -1,5 +1,5 @@
-generated_at: '2026-02-14T20:10:20.490523'
-total_items: 454
+generated_at: '2026-02-15T04:12:56.471279'
+total_items: 460
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 407
+    count: 413
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -363,6 +363,36 @@ statuses:
       title: AWS Glue Managed Spark Platform
       priority: High
       category: Platform Expansion
+    - id: ascii-chart-cdf
+      file: DONE/core-functionality/active/ascii-chart-cdf.yaml
+      title: Add ASCII CDF chart (cumulative distribution of query latency)
+      priority: Medium
+      category: Core Functionality
+    - id: ascii-chart-normalized-speedup
+      file: DONE/core-functionality/active/ascii-chart-normalized-speedup.yaml
+      title: Add ASCII Normalized Speedup chart (relative to baseline platform)
+      priority: High
+      category: Core Functionality
+    - id: ascii-chart-percentile-ladder
+      file: DONE/core-functionality/active/ascii-chart-percentile-ladder.yaml
+      title: Add ASCII Percentile Ladder chart (P50/P90/P95/P99)
+      priority: High
+      category: Core Functionality
+    - id: ascii-chart-rank-table
+      file: DONE/core-functionality/active/ascii-chart-rank-table.yaml
+      title: Add ASCII Rank Table chart (per-query competitive ranking with win/loss tally)
+      priority: Medium
+      category: Core Functionality
+    - id: ascii-chart-sparkline-table
+      file: DONE/core-functionality/active/ascii-chart-sparkline-table.yaml
+      title: Add ASCII Sparkline Table chart (compact multi-metric leaderboard)
+      priority: Medium-High
+      category: Core Functionality
+    - id: ascii-chart-stacked-phase-breakdown
+      file: DONE/core-functionality/active/ascii-chart-stacked-phase-breakdown.yaml
+      title: Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)
+      priority: High
+      category: Core Functionality
     - id: hudi-support-parity
       file: DONE/table-format-parity/hudi-support-parity.yaml
       title: Add Apache Hudi Support on Par with Delta Lake and Iceberg
