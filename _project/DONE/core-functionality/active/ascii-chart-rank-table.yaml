@@ -1,0 +1,147 @@
+# Rank Table with Win/Loss Tally for competitive per-query ranking
+#
+# Location: _project/TODO/core-functionality/planning/ascii-chart-rank-table.yaml
+
+id: ascii-chart-rank-table
+title: "Add ASCII Rank Table chart (per-query competitive ranking with win/loss tally)"
+worktree: core-functionality
+priority: Medium
+status: Completed
+completed_date: "2026-02-15"
+category: Core Functionality
+description: |
+  Add a new ASCII chart type that shows a ranked leaderboard table with each platform's
+  rank position per query, plus aggregate win/loss/tie counts and an overall geometric
+  mean rank. Each cell shows a compact rank indicator (1st, 2nd, 3rd...) with color
+  coding. The footer summarizes total wins, losses, and the overall ranking.
+
+  This is how ClickBench presents its results. When comparing 4+ platforms across 22+
+  queries, it is hard to determine an overall winner from raw timing data. A rank table
+  immediately shows: "DuckDB wins 18 of 22 queries, Polars wins 3, SQLite wins 1."
+
+  Example output:
+  ```
+  Query Rankings (1st = fastest)
+  ──────────────────────────────────────────────
+  Query    DuckDB  Polars  SQLite  Pandas
+  Q1        1st     2nd     3rd     4th
+  Q2        2nd     1st     3rd     4th
+  Q3        1st     1st     3rd     4th
+  Q4        1st     2nd     4th     3rd
+  ...
+  Q22       1st     3rd     2nd     4th
+  ──────────────────────────────────────────────
+  1st wins    15      5       2       0
+  GeoRank    1.2    1.8     2.8     3.9
+  ──────────────────────────────────────────────
+  ```
+
+  This is distinct from the Heatmap (shows absolute times color-coded by magnitude,
+  not relative rankings), the Comparison Bar (handles only two platforms), and the
+  Bar Chart (one aggregate metric, not per-query ranking). Rank tables answer
+  "which platform wins the most queries?" rather than "how fast is each platform?"
+
+metadata:
+  tags:
+  - visualization
+  - ascii-charts
+  - ranking
+  - leaderboard
+  - competitive
+  estimated_effort: Medium
+  created_date: "2026-02-14"
+
+impact:
+  business_value: |
+    Competitive ranking is the most intuitive format for decision makers evaluating
+    platform choices. It directly answers "which platform should we choose?" by
+    showing consistent winners across the full query workload.
+  user_impact: |
+    Users immediately see which platform wins the most queries without mentally
+    comparing numbers across a heatmap or bar chart. Tie-breaking and consistency
+    patterns become obvious.
+
+files_affected:
+  added:
+  - benchbox/core/visualization/ascii/rank_table.py
+  modified:
+  - benchbox/core/visualization/ascii/__init__.py
+  - benchbox/core/visualization/exporters.py
+  - benchbox/core/visualization/templates.py
+  - tests/unit/visualization/ascii/test_ascii_charts.py
+
+must_preserve:
+- "All 9 existing chart types continue to render identically"
+- "render_ascii_chart() in exporters.py handles all existing chart_type strings"
+- "ASCIIHeatmap behavior unchanged (heatmap shows absolute values, rank table shows ordinal positions)"
+
+approach: |
+  Build as a table renderer (similar approach to ASCIIHeatmap) with ranking logic:
+
+  1. Create RankTableData (queries list[str], platforms list[str],
+     times dict[tuple[platform, query], float]) dataclass.
+  2. Create ASCIIRankTable(ASCIIChartBase) with render().
+  3. For each query, rank platforms by execution time (lower is better). Handle ties
+     by assigning the same rank (1st, 1st, 3rd, 4th for a two-way tie).
+  4. Color 1st place green (#1b9e77), last place red (#d95f02), middle ranks dim.
+  5. Footer: count 1st-place wins per platform, compute geometric mean of ranks.
+  6. Add from_heatmap_data() factory that reuses the same matrix data as ASCIIHeatmap.
+  7. Auto-split into multiple charts when queries exceed terminal height (similar to
+     histogram chunking pattern).
+
+  Use natural query sort order (Q1, Q2, Q10 not Q1, Q10, Q2) matching
+  ASCIIQueryHistogram._natural_sort_key().
+
+anti_patterns:
+- "DO NOT modify ASCIIHeatmap — because the heatmap shows absolute values with intensity encoding, while the rank table shows
+  ordinal positions — implement as a new class that can accept the same input data"
+- "DO NOT use floating-point rank display — because ranks are ordinal — show '1st', '2nd', '3rd' text, not '1.0', '2.0'"
+
+verification:
+- description: "New chart class renders without error"
+  command: "uv run -- python -c \"from benchbox.core.visualization.ascii.rank_table import ASCIIRankTable, RankTableData;
+    data = RankTableData(['Q1','Q2'], ['DuckDB','Polars'], {('DuckDB','Q1'): 10, ('Polars','Q1'): 20, ('DuckDB','Q2'): 30,
+    ('Polars','Q2'): 15}); chart = ASCIIRankTable(data=data); print(chart.render())\""
+  expected_output: "Rendered table with rank positions and win/loss tally"
+- description: "Existing chart tests still pass"
+  command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
+  expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+  - benchbox/core/visualization/ascii/
+  - benchbox/core/visualization/exporters.py
+  - benchbox/core/visualization/templates.py
+  - tests/unit/visualization/ascii/
+
+work:
+- id: w1
+  summary: "Create RankTableData dataclass and ASCIIRankTable class with render()"
+  status: done
+- id: w2
+  summary: "Implement per-query ranking with tie handling (1st, 1st, 3rd) and color coding"
+  needs: [w1]
+  status: done
+- id: w3
+  summary: "Implement footer with win tallies and geometric mean rank computation"
+  needs: [w2]
+  status: done
+- id: w4
+  summary: "Add from_heatmap_data() factory that accepts the same matrix format as ASCIIHeatmap"
+  needs: [w1]
+  status: done
+- id: w5
+  summary: "Register chart in __init__.py and add 'rank_table' case to render_ascii_chart() in exporters.py"
+  needs: [w1]
+  status: done
+- id: w6
+  summary: "Add unit tests (ties, single platform, many platforms, auto-split for many queries)"
+  needs: [w1, w2, w3]
+  status: done
+- id: w7
+  summary: "Add rank_table to head_to_head and flagship templates in templates.py"
+  needs: [w5]
+  status: done
+
+deps:
+  needs: []
