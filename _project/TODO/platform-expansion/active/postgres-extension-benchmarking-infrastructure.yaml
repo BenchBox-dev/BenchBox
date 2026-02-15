@@ -181,7 +181,7 @@ work:
   summary: "Write PostgreSQL extensions guide (docs/guides/postgresql-extensions.md) covering setup, Docker usage, compatibility
     matrix, and benchmarking recommendations"
   needs: [w1, w2]
-  status: pending
+  status: done
 
 - id: w5
   summary: "Create comparison report template for PostgreSQL baseline vs extension performance (speedup ratios, storage size,
