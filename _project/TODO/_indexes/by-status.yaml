@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T00:48:11.272954'
-total_items: 45
+generated_at: '2026-02-15T04:03:56.278156'
+total_items: 44
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Platform Expansion
   Not Started:
-    count: 43
+    count: 42
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -61,11 +61,6 @@ statuses:
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
       priority: Medium-High
-      category: Platform Expansion
-    - id: postgres-extension-benchmarking-infrastructure
-      file: TODO/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
-      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
-      priority: Medium
       category: Platform Expansion
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml

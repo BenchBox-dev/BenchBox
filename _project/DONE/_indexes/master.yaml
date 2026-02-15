@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T00:48:13.674229'
-total_items: 456
+generated_at: '2026-02-15T04:03:58.593483'
+total_items: 457
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2981,6 +2981,25 @@ items:
   deferred_count: 2
   needs:
   - implement-dataframe-benchmarks
+- id: postgres-extension-benchmarking-infrastructure
+  file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
+  title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  tags:
+  - infrastructure
+  - postgresql-extension
+  - docker
+  - testing
+  - documentation
+  estimated_effort: 2-3 days
+  completed_date: '2026-02-15'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  deferred_count: 3
 - id: cli-data-only-and-load-only-execution-options
   file: DONE/unknown/planning/cli-data-only-and-load-only-execution-options.yaml
   title: CLI Data-Only and Load-Only Execution Options

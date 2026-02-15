@@ -1,4 +1,4 @@
-generated_at: '2026-02-15T00:48:13.674746'
+generated_at: '2026-02-15T04:03:58.593987'
 total_categories: 63
 categories:
   '"Bug Fixes & Reliability"':
@@ -1455,7 +1455,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 43
+    count: 44
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1540,6 +1540,11 @@ categories:
     - id: bodo-dataframe-platform
       file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
       title: Bodo DataFrame Platform Adapter
+      priority: Medium
+      status: Completed
+    - id: postgres-extension-benchmarking-infrastructure
+      file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
+      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       priority: Medium
       status: Completed
     - id: modin-cudf-dask-production-ready

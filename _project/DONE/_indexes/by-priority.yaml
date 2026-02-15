@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T00:48:13.675001'
-total_items: 456
+generated_at: '2026-02-15T04:03:58.594231'
+total_items: 457
 priorities:
   Critical:
     count: 31
@@ -1173,7 +1173,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 211
+    count: 212
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1398,6 +1398,11 @@ priorities:
     - id: bodo-dataframe-platform
       file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
       title: Bodo DataFrame Platform Adapter
+      category: Platform Expansion
+      status: Completed
+    - id: postgres-extension-benchmarking-infrastructure
+      file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
+      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       category: Platform Expansion
       status: Completed
     - id: cli-data-only-and-load-only-execution-options

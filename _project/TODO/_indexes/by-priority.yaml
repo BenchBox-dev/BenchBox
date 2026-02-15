@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T00:48:11.272924'
-total_items: 45
+generated_at: '2026-02-15T04:03:56.278099'
+total_items: 44
 priorities:
   Critical:
     count: 1
@@ -76,7 +76,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 25
+    count: 24
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -101,11 +101,6 @@ priorities:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
-      category: Platform Expansion
-      status: Not Started
-    - id: postgres-extension-benchmarking-infrastructure
-      file: TODO/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
-      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       category: Platform Expansion
       status: Not Started
     - id: clickhouse-cloud-deployment
