@@ -2,7 +2,7 @@ id: postgres-extension-benchmarking-infrastructure
 title: "Build Shared Infrastructure for Benchmarking PostgreSQL Extensions"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: In Progress
 category: Platform Expansion
 description: |
   Create shared infrastructure, documentation, and testing patterns for
@@ -67,11 +67,11 @@ context_sections:
 
 metadata:
   tags:
-    - infrastructure
-    - postgresql-extension
-    - docker
-    - testing
-    - documentation
+  - infrastructure
+  - postgresql-extension
+  - docker
+  - testing
+  - documentation
   estimated_effort: "2-3 days"
   created_date: "2026-02-14"
 
@@ -88,25 +88,25 @@ impact:
 
 files_affected:
   added:
-    - "docker/postgres-extensions/docker-compose.pg-duckdb.yaml"
-    - "docker/postgres-extensions/docker-compose.pg-mooncake.yaml"
-    - "docker/postgres-extensions/docker-compose.timescaledb.yaml"
-    - "docker/postgres-extensions/README.md"
-    - "tests/unit/platforms/conftest_pg_extensions.py"
-    - "docs/guides/postgresql-extensions.md"
+  - "docker/postgres-extensions/docker-compose.pg-duckdb.yaml"
+  - "docker/postgres-extensions/docker-compose.pg-mooncake.yaml"
+  - "docker/postgres-extensions/docker-compose.timescaledb.yaml"
+  - "docker/postgres-extensions/README.md"
+  - "tests/unit/platforms/conftest_pg_extensions.py"
+  - "docs/guides/postgresql-extensions.md"
   modified:
-    - "benchbox/core/platform_registry.py"
+  - "benchbox/core/platform_registry.py"
 
 technical_requirements:
   constraints:
-    - "Docker Compose files must work with standard docker compose (v2+)"
-    - "Extension conflict detection must be at registration time, not runtime"
-    - "Test fixtures must not require running PostgreSQL instances"
+  - "Docker Compose files must work with standard docker compose (v2+)"
+  - "Extension conflict detection must be at registration time, not runtime"
+  - "Test fixtures must not require running PostgreSQL instances"
 
 must_preserve:
-  - "Existing TimescaleDB adapter and tests unchanged"
-  - "PostgreSQLAdapter base class unchanged — no new abstract methods"
-  - "Platform registry behavior for all existing platforms unchanged"
+- "Existing TimescaleDB adapter and tests unchanged"
+- "PostgreSQLAdapter base class unchanged — no new abstract methods"
+- "Platform registry behavior for all existing platforms unchanged"
 
 approach: |
   1. Docker Compose templates: one per extension, each with PostgreSQL + extension
@@ -137,61 +137,68 @@ approach: |
      - Benchmarking guide with recommended comparisons
 
 anti_patterns:
-  - "DO NOT create a new PostgreSQLExtensionAdapter abstract class — because PostgreSQLAdapter already provides the right abstraction — each extension adapts at its own override points"
-  - "DO NOT merge Docker Compose files into a single file — because extensions conflict with each other — keep separate compose files per extension"
-  - "DO NOT add extension-specific logic to the PostgreSQL base adapter — because that couples unrelated extensions — each extension adapter handles its own setup"
+- "DO NOT create a new PostgreSQLExtensionAdapter abstract class — because PostgreSQLAdapter already provides the right abstraction
+  — each extension adapts at its own override points"
+- "DO NOT merge Docker Compose files into a single file — because extensions conflict with each other — keep separate compose
+  files per extension"
+- "DO NOT add extension-specific logic to the PostgreSQL base adapter — because that couples unrelated extensions — each extension
+  adapter handles its own setup"
 
 verification:
-  - description: "Docker Compose files are valid"
-    command: "docker compose -f docker/postgres-extensions/docker-compose.pg-duckdb.yaml config --quiet 2>&1 && echo 'valid'"
-    expected_output: "valid"
-  - description: "Test fixtures importable"
-    command: "uv run -- python -c \"import tests.unit.platforms.conftest_pg_extensions; print('import OK')\""
-    expected_output: "import OK"
-  - description: "All existing platform tests still pass"
-    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-    expected_output: "all tests pass, 0 failures"
+- description: "Docker Compose files are valid"
+  command: "docker compose -f docker/postgres-extensions/docker-compose.pg-duckdb.yaml config --quiet 2>&1 && echo 'valid'"
+  expected_output: "valid"
+- description: "Test fixtures importable"
+  command: "uv run -- python -c \"import tests.unit.platforms.conftest_pg_extensions; print('import OK')\""
+  expected_output: "import OK"
+- description: "All existing platform tests still pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
 
 scope_limit:
   do_not_modify:
-    - "benchbox/platforms/postgresql.py"
-    - "benchbox/platforms/timescaledb.py"
-    - "benchbox/core/runner.py"
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/timescaledb.py"
+  - "benchbox/core/runner.py"
 
 work:
-  - id: w1
-    summary: "Create Docker Compose templates for pg_duckdb, pg_mooncake, and TimescaleDB with health checks and volume mounts"
-    status: pending
+- id: w1
+  summary: "Create Docker Compose templates for pg_duckdb, pg_mooncake, and TimescaleDB with health checks and volume mounts"
+  status: done
 
-  - id: w2
-    summary: "Create shared pytest fixtures for PostgreSQL extension adapter testing (mock connection, extension check, GUC capture)"
-    status: pending
+- id: w2
+  summary: "Create shared pytest fixtures for PostgreSQL extension adapter testing (mock connection, extension check, GUC
+    capture)"
+  status: pending
 
-  - id: w3
-    summary: "Add extension conflict metadata to platform_registry.py (conflicts_with field in platform metadata, warning on conflicting benchmarks)"
-    needs: [w1]
-    status: pending
+- id: w3
+  summary: "Add extension conflict metadata to platform_registry.py (conflicts_with field in platform metadata, warning on
+    conflicting benchmarks)"
+  needs: [w1]
+  status: pending
 
-  - id: w4
-    summary: "Write PostgreSQL extensions guide (docs/guides/postgresql-extensions.md) covering setup, Docker usage, compatibility matrix, and benchmarking recommendations"
-    needs: [w1, w2]
-    status: pending
+- id: w4
+  summary: "Write PostgreSQL extensions guide (docs/guides/postgresql-extensions.md) covering setup, Docker usage, compatibility
+    matrix, and benchmarking recommendations"
+  needs: [w1, w2]
+  status: pending
 
-  - id: w5
-    summary: "Create comparison report template for PostgreSQL baseline vs extension performance (speedup ratios, storage size, load time)"
-    needs: [w2]
-    status: pending
-    notes: "Template format only — actual comparison implementation is in individual adapter items"
+- id: w5
+  summary: "Create comparison report template for PostgreSQL baseline vs extension performance (speedup ratios, storage size,
+    load time)"
+  needs: [w2]
+  status: pending
+  notes: "Template format only — actual comparison implementation is in individual adapter items"
 
 deferred:
-  - summary: "Automated multi-extension comparison pipeline (run baseline + all extensions sequentially)"
-    reason: "Requires orchestration layer beyond current benchbox run — design separately"
-  - summary: "CI/CD integration tests with Docker-based PostgreSQL extensions"
-    reason: "Requires Docker-in-Docker or dedicated CI runners — handle with CI infrastructure"
-  - summary: "pg_analytics (ParadeDB) and Citus extension support"
-    reason: "Lower priority than pg_duckdb and pg_mooncake — plan after initial extensions are stable"
+- summary: "Automated multi-extension comparison pipeline (run baseline + all extensions sequentially)"
+  reason: "Requires orchestration layer beyond current benchbox run — design separately"
+- summary: "CI/CD integration tests with Docker-based PostgreSQL extensions"
+  reason: "Requires Docker-in-Docker or dedicated CI runners — handle with CI infrastructure"
+- summary: "pg_analytics (ParadeDB) and Citus extension support"
+  reason: "Lower priority than pg_duckdb and pg_mooncake — plan after initial extensions are stable"
 
 open_questions:
-  - "Should Docker Compose files live in docker/ at project root or alongside platform code?"
-  - "Should the comparison report be a built-in benchbox command (benchbox compare) or a post-processing script?"
-  - "How should we handle PostgreSQL version matrix testing (extensions support different PG versions)?"
+- "Should Docker Compose files live in docker/ at project root or alongside platform code?"
+- "Should the comparison report be a built-in benchbox command (benchbox compare) or a post-processing script?"
+- "How should we handle PostgreSQL version matrix testing (extensions support different PG versions)?"
