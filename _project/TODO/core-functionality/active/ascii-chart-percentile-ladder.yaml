@@ -6,7 +6,7 @@ id: ascii-chart-percentile-ladder
 title: "Add ASCII Percentile Ladder chart (P50/P90/P95/P99)"
 worktree: core-functionality
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Add a new ASCII chart type that visualizes percentile latency bands (P50, P90, P95, P99)
