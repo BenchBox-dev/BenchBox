@@ -103,7 +103,7 @@ work:
 - id: w6
   summary: "Update tests to use plain extra names"
   needs: [w4, w5]
-  status: pending
+  status: done
   notes: |
     Files:
       - tests/unit/platforms/test_dataframe_factory.py: update "dataframe-pandas" etc. assertions
