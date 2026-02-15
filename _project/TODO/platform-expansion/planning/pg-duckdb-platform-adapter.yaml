@@ -214,7 +214,7 @@ work:
   summary: "Add CLI config builder and hook registration in platforms/__init__.py with pg-duckdb-specific arguments (--pgduckdb-force-execution,
     --pgduckdb-threads)"
   needs: [w5]
-  status: pending
+  status: done
 
 - id: w7
   summary: "Create PgDuckDBDDLGenerator extending PostgreSQLDDLGenerator with pg_duckdb-aware index recommendations"
