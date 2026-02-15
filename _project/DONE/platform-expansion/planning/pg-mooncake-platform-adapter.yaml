@@ -2,7 +2,8 @@ id: pg-mooncake-platform-adapter
 title: "Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-02-15"
 category: Platform Expansion
 description: |
   Add a pg_mooncake platform adapter that enables benchmarking PostgreSQL with
@@ -262,7 +263,7 @@ work:
   summary: "Write platform documentation (docs/platforms/pg_mooncake.md) covering setup, Docker usage, storage backends, and
     ClickBench comparison notes"
   needs: [w3, w5]
-  status: pending
+  status: done
 
 deferred:
 - summary: "pg_moonlink WAL-based replication for real-time analytics benchmarking"

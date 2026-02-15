@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T00:37:38.721071'
-total_items: 455
+generated_at: '2026-02-15T00:48:13.675670'
+total_items: 456
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 408
+    count: 409
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -472,6 +472,11 @@ statuses:
     - id: pg-duckdb-platform-adapter
       file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
       title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
+      priority: Medium-High
+      category: Platform Expansion
+    - id: pg-mooncake-platform-adapter
+      file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
+      title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
       priority: Medium-High
       category: Platform Expansion
     - id: tpcds-stdout-fix-test-stdout-datagen

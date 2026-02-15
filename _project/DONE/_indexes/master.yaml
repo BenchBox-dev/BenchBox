@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T00:37:38.719814'
-total_items: 455
+generated_at: '2026-02-15T00:48:13.674229'
+total_items: 456
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4674,6 +4674,26 @@ items:
   work_done: 10
   work_ready: 0
   deferred_count: 3
+- id: pg-mooncake-platform-adapter
+  file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
+  title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - platform-adapter
+  - postgresql-extension
+  - pg-mooncake
+  - columnstore
+  - olap
+  - iceberg
+  estimated_effort: 3-4 days
+  completed_date: '2026-02-15'
+  work_total: 11
+  work_done: 11
+  work_ready: 0
+  deferred_count: 4
 - id: mcp-visualization-tools
   file: DONE/mcp-integration/mcp-visualization-tools.yaml
   title: Add visualization tools to MCP server

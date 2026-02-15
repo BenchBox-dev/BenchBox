@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T00:37:38.720473'
-total_items: 455
+generated_at: '2026-02-15T00:48:13.675001'
+total_items: 456
 priorities:
   Critical:
     count: 31
@@ -959,7 +959,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 41
+    count: 42
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1005,6 +1005,11 @@ priorities:
     - id: pg-duckdb-platform-adapter
       file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
       title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
+      category: Platform Expansion
+      status: Completed
+    - id: pg-mooncake-platform-adapter
+      file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
+      title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
       category: Platform Expansion
       status: Completed
     - id: mcp-visualization-tools

@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T00:37:36.352715'
-total_items: 46
+generated_at: '2026-02-15T00:48:11.272924'
+total_items: 45
 priorities:
   Critical:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 9
+    count: 8
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -43,11 +43,6 @@ priorities:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
-      category: Platform Expansion
-      status: Not Started
-    - id: pg-mooncake-platform-adapter
-      file: TODO/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
-      title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
       category: Platform Expansion
       status: Not Started
     - id: ctas-sorted-data-loading
