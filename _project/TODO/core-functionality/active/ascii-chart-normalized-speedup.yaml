@@ -6,7 +6,7 @@ id: ascii-chart-normalized-speedup
 title: "Add ASCII Normalized Speedup chart (relative to baseline platform)"
 worktree: core-functionality
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Add a new ASCII chart type that shows platform performance as a ratio relative to a
