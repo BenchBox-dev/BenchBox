@@ -1,5 +1,5 @@
-generated_at: '2026-02-14T20:05:52.622838'
-total_items: 47
+generated_at: '2026-02-15T00:37:36.352715'
+total_items: 46
 priorities:
   Critical:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 10
+    count: 9
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/planning/apache-doris-olap-platform.yaml
@@ -43,11 +43,6 @@ priorities:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
-      category: Platform Expansion
-      status: Not Started
-    - id: pg-duckdb-platform-adapter
-      file: TODO/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
-      title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
       category: Platform Expansion
       status: Not Started
     - id: pg-mooncake-platform-adapter

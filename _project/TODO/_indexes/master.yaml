@@ -1,5 +1,5 @@
-generated_at: '2026-02-14T20:05:52.622742'
-total_items: 47
+generated_at: '2026-02-15T00:37:36.352604'
+total_items: 46
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -705,24 +705,6 @@ items:
   work_total: 16
   work_done: 0
   work_ready: 1
-- id: pg-duckdb-platform-adapter
-  file: TODO/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
-  title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - platform-adapter
-  - postgresql-extension
-  - pg-duckdb
-  - olap
-  - duckdb
-  estimated_effort: 3-4 days
-  work_total: 10
-  work_done: 0
-  work_ready: 1
-  deferred_count: 3
 - id: pg-mooncake-platform-adapter
   file: TODO/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
   title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
