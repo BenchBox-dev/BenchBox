@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 3
+    count: 4
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
@@ -21,6 +21,11 @@ priorities:
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       category: Core Functionality
+      status: In Progress
+    - id: motherduck-platform-adapter
+      file: TODO/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      category: Platform Expansion
       status: In Progress
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -92,7 +97,7 @@ priorities:
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
       category: Platform Expansion
-      status: In Progress
+      status: Not Started
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
@@ -205,7 +210,7 @@ priorities:
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
       category: Platform Expansion
-      status: In Progress
+      status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

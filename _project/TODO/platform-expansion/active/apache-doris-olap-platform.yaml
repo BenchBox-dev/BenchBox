@@ -2,7 +2,7 @@ id: apache-doris-olap-platform
 title: "Add Apache Doris MPP OLAP platform support"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: In Progress
 description: |
   Integrate Apache Doris as a supported BenchBox platform. Apache Doris is an
   Apache Top-Level Project providing a high-performance real-time analytical
@@ -193,35 +193,35 @@ context_sections:
 work:
 - id: w1
   summary: "Create benchbox/platforms/doris.py adapter"
-  status: pending
+  status: done
 - id: w2
   summary: "Implement DorisAdapter class inheriting from PlatformAdapter"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Set _dialect = 'doris' for SQLGlot transpilation"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w4
   summary: "Implement create_connection() using PyMySQL"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w5
   summary: "Implement execute_query() with timing and row count validation"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w6
   summary: "Implement data loading via Stream Load HTTP API"
-  status: pending
+  status: done
 - id: w7
   summary: "Create HTTP PUT to FE/BE node for CSV data loading"
   needs:
   - w6
-  status: pending
+  status: done
 - id: w8
   summary: "Handle chunked loading for large files"
   needs:
@@ -231,10 +231,10 @@ work:
   summary: "Implement load status checking and error handling"
   needs:
   - w6
-  status: pending
+  status: done
 - id: w10
   summary: "Implement schema creation with Doris-specific DDL"
-  status: pending
+  status: done
 - id: w11
   summary: "Support Duplicate/Aggregate/Unique Key table models"
   needs:
@@ -252,18 +252,18 @@ work:
   status: pending
 - id: w14
   summary: "Register platform in platform_registry.py"
-  status: pending
+  status: done
 - id: w15
   summary: "Add pymysql to optional dependencies in pyproject.toml"
-  status: pending
+  status: done
 - id: w16
   summary: "Implement query cache control"
-  status: pending
+  status: done
 - id: w17
   summary: "Disable query cache via SET enable_query_cache = false"
   needs:
   - w16
-  status: pending
+  status: done
 - id: w18
   summary: "Add validation that cache is disabled"
   needs:
@@ -271,7 +271,7 @@ work:
   status: pending
 - id: w19
   summary: "Implement platform optimizations"
-  status: pending
+  status: done
 - id: w20
   summary: "Add Bloom filter index support for high-cardinality columns"
   needs:
@@ -286,7 +286,7 @@ work:
   summary: "Implement ANALYZE for statistics collection"
   needs:
   - w19
-  status: pending
+  status: done
 - id: w23
   summary: "Create tuning profile for Doris"
   status: pending
@@ -307,22 +307,22 @@ work:
   status: pending
 - id: w27
   summary: "Create unit tests for Doris adapter"
-  status: pending
+  status: done
 - id: w28
   summary: "Test connection handling and configuration"
   needs:
   - w27
-  status: pending
+  status: done
 - id: w29
   summary: "Test SQL generation and dialect handling"
   needs:
   - w27
-  status: pending
+  status: done
 - id: w30
   summary: "Test Stream Load request formatting"
   needs:
   - w27
-  status: pending
+  status: done
 - id: w31
   summary: "Create integration tests"
   status: pending

@@ -499,16 +499,6 @@ statuses:
       title: Add numbered list selection to platform setup wizard
       priority: Medium-High
       category: User Experience
-    - id: pg-duckdb-platform-adapter
-      file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
-      title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
-      priority: Medium-High
-      category: Platform Expansion
-    - id: pg-mooncake-platform-adapter
-      file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
-      title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
-      priority: Medium-High
-      category: Platform Expansion
     - id: tpcds-stdout-fix-test-stdout-datagen
       file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
       title: Add regression tests for TPC-DS stdout data generation
@@ -602,11 +592,6 @@ statuses:
     - id: bodo-dataframe-platform
       file: DONE/platform-expansion/planning/bodo-dataframe-platform.yaml
       title: Bodo DataFrame Platform Adapter
-      priority: Medium
-      category: Platform Expansion
-    - id: postgres-extension-benchmarking-infrastructure
-      file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
-      title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       priority: Medium
       category: Platform Expansion
     - id: bundle-tpc-query-templates-in-wheel
@@ -1340,11 +1325,6 @@ statuses:
       title: Minimize Emoji Usage ✅ COMPLETED
       priority: Medium
       category: Code Quality and Documentation
-    - id: motherduck-platform-adapter
-      file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
-      title: MotherDuck Platform Adapter
-      priority: High
-      category: Platform Expansion
     - id: multi-region-performance-testing
       file: DONE/enterprise-ops-multi-region/planning/multi-region-performance-testing.yaml
       title: Multi-Region Performance Testing
