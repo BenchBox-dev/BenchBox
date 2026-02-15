@@ -208,7 +208,7 @@ work:
   summary: "Register pg-duckdb in platform_registry.py with metadata (display_name, category, libraries, deployment_modes:
     self-hosted + motherduck)"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w6
   summary: "Add CLI config builder and hook registration in platforms/__init__.py with pg-duckdb-specific arguments (--pgduckdb-force-execution,
