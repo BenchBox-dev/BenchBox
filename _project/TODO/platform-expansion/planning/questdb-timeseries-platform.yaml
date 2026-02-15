@@ -2,7 +2,7 @@ id: questdb-timeseries-platform
 title: "Add QuestDB time-series database platform support"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: In Progress
 description: |
   Integrate QuestDB as a supported BenchBox platform. QuestDB is a high-performance
   open-source time-series database (Apache 2.0 license) optimized for fast ingestion
@@ -118,35 +118,35 @@ context_sections:
 work:
 - id: w1
   summary: "Create benchbox/platforms/questdb.py adapter"
-  status: pending
+  status: done
 - id: w2
   summary: "Implement QuestDBAdapter class inheriting from PlatformAdapter"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Determine SQLGlot dialect (postgres or custom)"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w4
   summary: "Implement create_connection() using psycopg2 (PG wire protocol)"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w5
   summary: "Implement execute_query() with timing and row count validation"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w6
   summary: "Implement data loading options"
-  status: pending
+  status: done
 - id: w7
   summary: "Primary: REST API CSV import (/imp endpoint)"
   needs:
   - w6
-  status: pending
+  status: done
 - id: w8
   summary: "Alternative: InfluxDB Line Protocol for time-series data"
   needs:
@@ -156,10 +156,10 @@ work:
   summary: "Fallback: COPY command via PG protocol"
   needs:
   - w6
-  status: pending
+  status: done
 - id: w10
   summary: "Implement schema creation with QuestDB-specific DDL"
-  status: pending
+  status: done
 - id: w11
   summary: "Handle timestamp column designation (designated timestamp)"
   needs:
@@ -177,10 +177,10 @@ work:
   status: pending
 - id: w14
   summary: "Register platform in platform_registry.py"
-  status: pending
+  status: done
 - id: w15
   summary: "Add psycopg2 to optional dependencies in pyproject.toml"
-  status: pending
+  status: done
 - id: w16
   summary: "Assess TPC-H query compatibility"
   status: pending
@@ -232,22 +232,22 @@ work:
   status: pending
 - id: w27
   summary: "Create unit tests for QuestDB adapter"
-  status: pending
+  status: done
 - id: w28
   summary: "Test connection handling and configuration"
   needs:
   - w27
-  status: pending
+  status: done
 - id: w29
   summary: "Test SQL generation and any dialect handling"
   needs:
   - w27
-  status: pending
+  status: done
 - id: w30
   summary: "Test REST API import request formatting"
   needs:
   - w27
-  status: pending
+  status: done
 - id: w31
   summary: "Create integration tests"
   status: pending

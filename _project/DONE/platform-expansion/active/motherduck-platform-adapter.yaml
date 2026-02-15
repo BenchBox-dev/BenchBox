@@ -2,7 +2,8 @@ id: motherduck-platform-adapter
 title: "MotherDuck Platform Adapter"
 worktree: platform-expansion
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-14"
 category: Platform Expansion
 description: |
   Implement MotherDuck platform adapter as the first "distinct service name"

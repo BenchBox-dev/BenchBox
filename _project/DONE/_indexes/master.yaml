@@ -1465,6 +1465,24 @@ items:
   category: platform-adapter
   priority: High
   status: Completed
+- id: motherduck-platform-adapter
+  file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
+  title: MotherDuck Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Completed
+  tags:
+  - platform-adapter
+  - motherduck
+  - duckdb
+  - cloud
+  estimated_effort: 3-4 days
+  completed_date: '2026-02-14'
+  work_total: 21
+  work_done: 21
+  work_ready: 0
+  deferred_count: 4
 - id: nyc-taxi-olap-benchmark-core-implementation
   file: DONE/benchmark-expansion/active/nyc-taxi-olap-benchmark-core-implementation.yaml
   title: NYC Taxi OLAP Benchmark (Core Implementation)

@@ -1310,6 +1310,11 @@ statuses:
       title: Minimize Emoji Usage ✅ COMPLETED
       priority: Medium
       category: Code Quality and Documentation
+    - id: motherduck-platform-adapter
+      file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      priority: High
+      category: Platform Expansion
     - id: multi-region-performance-testing
       file: DONE/enterprise-ops-multi-region/planning/multi-region-performance-testing.yaml
       title: Multi-Region Performance Testing

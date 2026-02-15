@@ -160,7 +160,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 159
+    count: 160
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -537,6 +537,11 @@ priorities:
       file: DONE/fabric-platform/planning/fabric-adapter-architecture.yaml
       title: Microsoft Fabric Data Warehouse Adapter Architecture
       category: platform-adapter
+      status: Completed
+    - id: motherduck-platform-adapter
+      file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      category: Platform Expansion
       status: Completed
     - id: nyc-taxi-olap-benchmark-core-implementation
       file: DONE/benchmark-expansion/active/nyc-taxi-olap-benchmark-core-implementation.yaml

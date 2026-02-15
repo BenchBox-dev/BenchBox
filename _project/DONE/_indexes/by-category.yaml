@@ -1602,6 +1602,11 @@ categories:
       title: Microsoft Fabric Spark Platform
       priority: Medium-High
       status: Completed
+    - id: motherduck-platform-adapter
+      file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
+      title: MotherDuck Platform Adapter
+      priority: High
+      status: Completed
     - id: pt-03-redshift-ddl
       file: DONE/physical-tuning/planning/pt-03-redshift-ddl.yaml
       title: 'PT-03: Redshift Physical Tuning DDL Generator'
