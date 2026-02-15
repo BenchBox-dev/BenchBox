@@ -74,7 +74,7 @@ work:
 - id: w4
   summary: "Update PLATFORM_TO_EXTRA and DEPENDENCY_GROUPS in dependencies.py"
   needs: [w1, w2, w3]
-  status: pending
+  status: done
   notes: |
     File: benchbox/utils/dependencies.py
     Changes:
