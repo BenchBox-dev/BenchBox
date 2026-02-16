@@ -1,0 +1,133 @@
+id: platform-adapter-sql-injection-gaps
+title: "Close SQL injection gaps in platform adapter identifier validation"
+worktree: platform-expansion
+priority: High
+status: Completed
+completed_date: "2026-02-16"
+description: |
+  Adversarial code reviews found that while most new adapters have _validate_identifier()
+  methods, they are inconsistently applied. Several code paths interpolate identifiers
+  or user-supplied values into SQL via f-strings without validation:
+
+  1. **LakeSail create_connection()** (PR #27): target_database interpolated into
+     CREATE DATABASE and USE statements without _validate_identifier(). The drop_database
+     method correctly validates, but create_connection does not.
+
+  2. **LakeSail _normalize_table_name_in_sql()** (PR #27): Strips IF NOT EXISTS from
+     CREATE TABLE statements, changing DDL semantics. Not injection per se, but a
+     correctness issue in SQL transformation.
+
+  3. **Databend _load_table_via_copy() delimiter** (PR #29): Delimiter interpolated into
+     COPY SQL without validation. Currently only returns | or , but future changes could
+     introduce injection.
+
+  4. **Doris database in Stream Load URL** (PR #30): self.database used in HTTP URL
+     construction without _validate_identifier(). Path traversal risk.
+
+  5. **pg_mooncake analyze_table** (PR #32): Table name interpolated without validation.
+
+  6. **LakeSail create_schema fallback** (PR #27): Extracted table name used in DROP TABLE
+     without validation.
+
+  7. **Doris _validate_identifier() for database** (PR #30): Database name not validated
+     at __init__ time, only table names validated at point of use.
+
+  The fix is straightforward: apply _validate_identifier() at every f-string SQL
+  interpolation point. This is a defense-in-depth measure — most values come from
+  config or benchmark definitions, not raw user input.
+
+category: Platform Expansion
+
+work:
+- id: w1
+  summary: "Add _validate_identifier(target_database) in LakeSail create_connection()"
+  status: done
+  notes: "lakesail.py:376, before CREATE DATABASE and USE statements"
+
+- id: w2
+  summary: "Fix LakeSail _normalize_table_name_in_sql to preserve IF NOT EXISTS"
+  status: done
+  notes: "lakesail.py:654-672 — regex replacement drops IF NOT EXISTS safety guard"
+
+- id: w3
+  summary: "Validate delimiter in Databend _load_table_via_copy()"
+  status: done
+  notes: "databend/adapter.py:411-413 — assert single safe character before interpolation"
+
+- id: w4
+  summary: "Add _validate_identifier(self.database) at Doris __init__ time"
+  status: done
+  notes: "doris.py:418 — database used in Stream Load URL without validation"
+
+- id: w5
+  summary: "Add _validate_identifier in pg_mooncake analyze_table"
+  status: done
+  notes: "pg_mooncake.py:198-225 — table_name in f-string SQL"
+
+- id: w6
+  summary: "Add _validate_identifier in LakeSail create_schema fallback DROP TABLE path"
+  status: done
+  notes: "lakesail.py:431 — extracted table name used without validation"
+
+- id: w7
+  summary: "Add tests for identifier validation on all fixed paths"
+  needs: [w1, w2, w3, w4, w5, w6]
+  status: done
+
+metadata:
+  tags:
+  - security
+  - sql-injection
+  - identifier-validation
+  - defense-in-depth
+  - code-review-finding
+  estimated_effort: 1-2 days
+  created_date: "2026-02-15"
+  owners:
+  - joe
+
+must_preserve:
+- "All existing platform adapter tests pass"
+- "_validate_identifier() behavior unchanged — same regex pattern and error messages"
+- "Valid identifiers (alphanumeric, underscore) continue to pass validation"
+
+approach: |
+  For each gap, add a _validate_identifier() call before the f-string SQL construction.
+  Follow the pattern already established in each adapter's other methods (e.g.,
+  QuestDB's drop_table, LakeSail's drop_database).
+
+  For the LakeSail IF NOT EXISTS fix, update the regex replacement to check for and
+  preserve the IF NOT EXISTS clause.
+
+  For the Databend delimiter, add a simple validation:
+    if delimiter not in (',', '|', '\t'):
+        raise ValueError(f"Unsafe delimiter: {delimiter!r}")
+
+anti_patterns:
+- "DO NOT add parameterized queries for DDL — because DDL identifiers cannot be parameterized in SQL — use _validate_identifier()
+  instead"
+- "DO NOT relax _validate_identifier() regex — because the current ^[a-zA-Z_][a-zA-Z0-9_]*$ pattern is deliberately strict
+  — keep it strict"
+
+verification:
+- description: "All platform adapter tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass"
+- description: "LakeSail adapter tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_lakesail_adapter.py -v --tb=short"
+  expected_output: "all tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/lakesail.py"
+  - "benchbox/platforms/databend/adapter.py"
+  - "benchbox/platforms/doris.py"
+  - "benchbox/platforms/pg_mooncake.py"
+  - "tests/unit/platforms/test_lakesail_adapter.py"
+  - "tests/unit/platforms/test_databend_adapter.py"
+  - "tests/unit/platforms/test_doris_adapter.py"
+  - "tests/unit/platforms/test_pg_mooncake_adapter.py"
+  do_not_modify:
+  - "benchbox/core/"
+  - "benchbox/platforms/duckdb.py"
+  - "benchbox/platforms/postgres.py"

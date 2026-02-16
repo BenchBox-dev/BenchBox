@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T09:01:15.187227'
-total_items: 468
+generated_at: '2026-02-16T09:37:26.845308'
+total_items: 469
 priorities:
   Critical:
     count: 32
@@ -165,7 +165,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 165
+    count: 166
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -291,6 +291,11 @@ priorities:
       file: DONE/release-readiness/completed/canonicalize-result-schema.yaml
       title: Canonicalize Result Schema
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+      status: Completed
+    - id: platform-adapter-sql-injection-gaps
+      file: DONE/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
+      title: Close SQL injection gaps in platform adapter identifier validation
+      category: Platform Expansion
       status: Completed
     - id: compare-command-ux-improvements
       file: DONE/ux-improvements/active/compare-command-ux-improvements.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T09:06:24.496775'
-total_items: 47
+generated_at: '2026-02-16T09:37:25.811918'
+total_items: 46
 statuses:
   In Progress:
     count: 6
@@ -35,7 +35,7 @@ statuses:
       priority: Critical
       category: Core Functionality
   Not Started:
-    count: 41
+    count: 40
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -76,11 +76,6 @@ statuses:
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
       priority: Medium-High
-      category: Platform Expansion
-    - id: platform-adapter-sql-injection-gaps
-      file: TODO/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
-      title: Close SQL injection gaps in platform adapter identifier validation
-      priority: High
       category: Platform Expansion
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T09:01:15.187340'
-total_items: 468
+generated_at: '2026-02-16T09:37:26.845422'
+total_items: 469
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 421
+    count: 422
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -654,6 +654,11 @@ statuses:
       title: Circular Import Issues ✅ COMPLETED
       priority: Medium
       category: Code Quality and Technical Debt
+    - id: platform-adapter-sql-injection-gaps
+      file: DONE/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
+      title: Close SQL injection gaps in platform adapter identifier validation
+      priority: High
+      category: Platform Expansion
     - id: cloud-platform-error-context
       file: DONE/observability-quality/planning/cloud-platform-error-context.yaml
       title: Cloud Platform Error Message Context

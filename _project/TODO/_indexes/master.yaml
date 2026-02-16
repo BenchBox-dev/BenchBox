@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T09:06:24.496711'
-total_items: 47
+generated_at: '2026-02-16T09:37:25.811847'
+total_items: 46
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -60,25 +60,6 @@ items:
   work_total: 91
   work_done: 76
   work_ready: 3
-- id: platform-adapter-sql-injection-gaps
-  file: TODO/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
-  title: Close SQL injection gaps in platform adapter identifier validation
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: High
-  status: Not Started
-  tags:
-  - security
-  - sql-injection
-  - identifier-validation
-  - defense-in-depth
-  - code-review-finding
-  owners:
-  - joe
-  estimated_effort: 1-2 days
-  work_total: 7
-  work_done: 0
-  work_ready: 6
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks

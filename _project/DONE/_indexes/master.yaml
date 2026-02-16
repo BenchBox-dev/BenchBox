@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T09:01:15.186913'
-total_items: 468
+generated_at: '2026-02-16T09:37:26.844958'
+total_items: 469
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -771,6 +771,26 @@ items:
   category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   priority: High
   status: Completed
+- id: platform-adapter-sql-injection-gaps
+  file: DONE/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
+  title: Close SQL injection gaps in platform adapter identifier validation
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Completed
+  tags:
+  - security
+  - sql-injection
+  - identifier-validation
+  - defense-in-depth
+  - code-review-finding
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+  completed_date: '2026-02-16'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: compare-command-ux-improvements
   file: DONE/ux-improvements/active/compare-command-ux-improvements.yaml
   title: Compare Command UX Improvements

@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T09:01:15.187103'
+generated_at: '2026-02-16T09:37:26.845183'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -1493,7 +1493,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 48
+    count: 49
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1584,6 +1584,11 @@ categories:
       file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
       title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       priority: Medium
+      status: Completed
+    - id: platform-adapter-sql-injection-gaps
+      file: DONE/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
+      title: Close SQL injection gaps in platform adapter identifier validation
+      priority: High
       status: Completed
     - id: modin-cudf-dask-production-ready
       file: DONE/dataframe-expansion/planning/modin-cudf-dask-production-ready.yaml
