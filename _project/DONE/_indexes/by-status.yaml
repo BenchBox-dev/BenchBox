@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T13:38:52.304419'
-total_items: 472
+generated_at: '2026-02-16T14:46:54.924921'
+total_items: 475
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 424
+    count: 427
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -443,6 +443,11 @@ statuses:
       title: Add InfluxDB Platform Support for Time Series Benchmarking
       priority: Medium-High
       category: Platform Expansion
+    - id: lakesail-spark-platform
+      file: DONE/platform-expansion/active/lakesail-spark-platform.yaml
+      title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+      priority: High
+      category: Platform Expansion
     - id: onehouse-quanton-platform
       file: DONE/platform-expansion/planning/onehouse-quanton-platform.yaml
       title: Add Onehouse Quanton platform support for managed Spark benchmarking
@@ -456,6 +461,11 @@ statuses:
     - id: add-prestodb-platform-adapter
       file: DONE/platform-expansion-presto/planning/add-prestodb-platform-adapter.yaml
       title: Add PrestoDB Platform Adapter
+      priority: Medium
+      category: Platform Expansion
+    - id: starrocks-olap-platform
+      file: DONE/platform-expansion/planning/starrocks-olap-platform.yaml
+      title: Add StarRocks MPP OLAP platform support
       priority: Medium
       category: Platform Expansion
     - id: tpcds-obt-benchmark-implementation
@@ -1040,6 +1050,11 @@ statuses:
       title: Finalize Monitoring Module Scope
       priority: Medium
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: firebolt-cloud-deployment
+      file: DONE/platform-expansion/planning/firebolt-cloud-deployment.yaml
+      title: Firebolt Cloud Deployment Mode
+      priority: Low
+      category: Platform Expansion
     - id: firebolt-mode-validation
       file: DONE/platform-expansion/planning/firebolt-mode-validation.yaml
       title: Firebolt Core/Cloud Mode Validation

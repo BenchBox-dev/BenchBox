@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T13:38:52.304286'
-total_items: 472
+generated_at: '2026-02-16T14:46:54.924821'
+total_items: 475
 priorities:
   Critical:
     count: 32
@@ -165,7 +165,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 166
+    count: 167
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -236,6 +236,11 @@ priorities:
       file: DONE/core-functionality/active/datafusion-sql-query-transformer.yaml
       title: Add DataFusion SQL query transformer for TPC-H Q11, Q16, Q18, Q20
       category: Core Functionality
+      status: Completed
+    - id: lakesail-spark-platform
+      file: DONE/platform-expansion/active/lakesail-spark-platform.yaml
+      title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+      category: Platform Expansion
       status: Completed
     - id: onehouse-quanton-platform
       file: DONE/platform-expansion/planning/onehouse-quanton-platform.yaml
@@ -1228,7 +1233,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 215
+    count: 216
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1383,6 +1388,11 @@ priorities:
     - id: add-prestodb-platform-adapter
       file: DONE/platform-expansion-presto/planning/add-prestodb-platform-adapter.yaml
       title: Add PrestoDB Platform Adapter
+      category: Platform Expansion
+      status: Completed
+    - id: starrocks-olap-platform
+      file: DONE/platform-expansion/planning/starrocks-olap-platform.yaml
+      title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
       status: Completed
     - id: platform-adapter-http-tls-support
@@ -2306,7 +2316,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 14
+    count: 15
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -2342,6 +2352,11 @@ priorities:
       file: DONE/ux-improvements/active/metrics-command-group.yaml
       title: Create metrics command group and consolidate calculate-qphh
       category: ux-improvements
+      status: Completed
+    - id: firebolt-cloud-deployment
+      file: DONE/platform-expansion/planning/firebolt-cloud-deployment.yaml
+      title: Firebolt Cloud Deployment Mode
+      category: Platform Expansion
       status: Completed
     - id: fix-tpc-ds-optional-dependency-example-test
       file: DONE/testing-improvements/completed/fix-tpc-ds-optional-dependency-example-test.yaml

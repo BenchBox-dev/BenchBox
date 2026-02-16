@@ -2,7 +2,8 @@ id: lakesail-spark-platform
 title: "Add LakeSail Sail platform support for SQL and DataFrame benchmarking"
 worktree: platform-expansion
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-16"
 description: |
   Integrate LakeSail Sail as a supported BenchBox platform for high-performance
   Spark-compatible SQL and DataFrame benchmarking.
@@ -651,3 +652,9 @@ work:
   needs:
   - w88
   status: pending
+
+deferred:
+- id: d1
+  summary: "Platform documentation, examples, and overview updates (w77-w91)"
+  reason: "Core adapter (SQL + DataFrame) fully implemented and tested — docs are additive polish"
+  revisit_when: "Documentation sprint or pre-release checklist"

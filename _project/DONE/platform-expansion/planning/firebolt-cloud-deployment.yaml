@@ -2,7 +2,8 @@ id: firebolt-cloud-deployment
 title: "Firebolt Cloud Deployment Mode"
 worktree: platform-expansion
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-02-16"
 category: Platform Expansion
 description: |
   Ensure full support for Firebolt Cloud deployment mode via the firebolt:cloud

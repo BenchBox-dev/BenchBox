@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T13:38:51.167926'
-total_items: 43
+generated_at: '2026-02-16T14:46:53.971225'
+total_items: 40
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -37,29 +37,6 @@ items:
   work_total: 17
   work_done: 13
   work_ready: 1
-- id: lakesail-spark-platform
-  file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
-  title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: High
-  status: In Progress
-  tags:
-  - lakesail
-  - sail
-  - spark
-  - spark-connect
-  - datafusion
-  - rust
-  - high-performance
-  - dataframe
-  - sql
-  - platform
-  - open-source
-  estimated_effort: Large
-  work_total: 91
-  work_done: 76
-  work_ready: 3
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -129,23 +106,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: firebolt-cloud-deployment
-  file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
-  title: Firebolt Cloud Deployment Mode
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Low
-  status: Not Started
-  tags:
-  - platform-adapter
-  - firebolt
-  - cloud
-  - deployment-modes
-  estimated_effort: 2-3 days
-  work_total: 24
-  work_done: 18
-  work_ready: 4
-  deferred_count: 2
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -300,25 +260,6 @@ items:
   work_total: 15
   work_done: 0
   work_ready: 15
-- id: starrocks-olap-platform
-  file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
-  title: Add StarRocks MPP OLAP platform support
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium
-  status: In Progress
-  tags:
-  - starrocks
-  - olap
-  - mpp
-  - columnar
-  - platform
-  - mysql-protocol
-  estimated_effort: Medium
-  work_total: 16
-  work_done: 12
-  work_ready: 3
-  deferred_count: 1
 - id: clickhouse-cloud-deployment
   file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
   title: ClickHouse Cloud Deployment Mode

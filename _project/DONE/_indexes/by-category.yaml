@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T13:38:52.304155'
+generated_at: '2026-02-16T14:46:54.924710'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -1493,7 +1493,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 52
+    count: 55
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1520,6 +1520,11 @@ categories:
       title: Add InfluxDB Platform Support for Time Series Benchmarking
       priority: Medium-High
       status: Completed
+    - id: lakesail-spark-platform
+      file: DONE/platform-expansion/active/lakesail-spark-platform.yaml
+      title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+      priority: High
+      status: Completed
     - id: onehouse-quanton-platform
       file: DONE/platform-expansion/planning/onehouse-quanton-platform.yaml
       title: Add Onehouse Quanton platform support for managed Spark benchmarking
@@ -1528,6 +1533,11 @@ categories:
     - id: add-prestodb-platform-adapter
       file: DONE/platform-expansion-presto/planning/add-prestodb-platform-adapter.yaml
       title: Add PrestoDB Platform Adapter
+      priority: Medium
+      status: Completed
+    - id: starrocks-olap-platform
+      file: DONE/platform-expansion/planning/starrocks-olap-platform.yaml
+      title: Add StarRocks MPP OLAP platform support
       priority: Medium
       status: Completed
     - id: platform-adapter-http-tls-support
@@ -1615,6 +1625,11 @@ categories:
       title: Extract SparkSessionManager for shared PySpark session management
       priority: High
       status: Not Started
+    - id: firebolt-cloud-deployment
+      file: DONE/platform-expansion/planning/firebolt-cloud-deployment.yaml
+      title: Firebolt Cloud Deployment Mode
+      priority: Low
+      status: Completed
     - id: dask-platform-compatibility
       file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml
       title: Fix Dask DataFrame Platform Compatibility

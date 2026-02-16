@@ -2,7 +2,8 @@ id: starrocks-olap-platform
 title: "Add StarRocks MPP OLAP platform support"
 worktree: platform-expansion
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-02-16"
 description: |
   Integrate StarRocks as a supported BenchBox platform. StarRocks is an open-source
   MPP columnar OLAP database (Linux Foundation project) with strong performance
@@ -233,3 +234,7 @@ deferred:
   summary: "End-to-end TPC-H/TPC-DS validation on live StarRocks cluster (w13-w14)"
   reason: "Requires running StarRocks FE+BE cluster — not available in local dev"
   revisit_when: "StarRocks Docker Compose harness available in CI"
+- id: d2
+  summary: "Platform documentation and example script (w15-w16)"
+  reason: "Core adapter fully implemented and tested — docs are additive polish"
+  revisit_when: "Documentation sprint or pre-release checklist"

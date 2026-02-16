@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T13:38:52.303931'
-total_items: 472
+generated_at: '2026-02-16T14:46:54.924514'
+total_items: 475
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -605,6 +605,31 @@ items:
   - query-transformer
   estimated_effort: 2-3 days
   completed_date: '2026-02-06'
+- id: lakesail-spark-platform
+  file: DONE/platform-expansion/active/lakesail-spark-platform.yaml
+  title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Completed
+  tags:
+  - lakesail
+  - sail
+  - spark
+  - spark-connect
+  - datafusion
+  - rust
+  - high-performance
+  - dataframe
+  - sql
+  - platform
+  - open-source
+  estimated_effort: Large
+  completed_date: '2026-02-16'
+  work_total: 91
+  work_done: 76
+  work_ready: 3
+  deferred_count: 1
 - id: onehouse-quanton-platform
   file: DONE/platform-expansion/planning/onehouse-quanton-platform.yaml
   title: Add Onehouse Quanton platform support for managed Spark benchmarking
@@ -2604,6 +2629,24 @@ items:
   category: ux-improvements
   priority: Low
   status: Completed
+- id: firebolt-cloud-deployment
+  file: DONE/platform-expansion/planning/firebolt-cloud-deployment.yaml
+  title: Firebolt Cloud Deployment Mode
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Completed
+  tags:
+  - platform-adapter
+  - firebolt
+  - cloud
+  - deployment-modes
+  estimated_effort: 2-3 days
+  completed_date: '2026-02-16'
+  work_total: 24
+  work_done: 18
+  work_ready: 4
+  deferred_count: 2
 - id: fix-tpc-ds-optional-dependency-example-test
   file: DONE/testing-improvements/completed/fix-tpc-ds-optional-dependency-example-test.yaml
   title: Fix TPC-DS Optional Dependency Example Test
@@ -2981,6 +3024,26 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 1 week (0.5 FTE)
   completed_date: '2025-11-29'
+- id: starrocks-olap-platform
+  file: DONE/platform-expansion/planning/starrocks-olap-platform.yaml
+  title: Add StarRocks MPP OLAP platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  tags:
+  - starrocks
+  - olap
+  - mpp
+  - columnar
+  - platform
+  - mysql-protocol
+  estimated_effort: Medium
+  completed_date: '2026-02-16'
+  work_total: 16
+  work_done: 12
+  work_ready: 3
+  deferred_count: 2
 - id: platform-adapter-http-tls-support
   file: DONE/platform-adapter-http-tls-support.yaml
   title: Add TLS/HTTPS option for HTTP-based data loading endpoints

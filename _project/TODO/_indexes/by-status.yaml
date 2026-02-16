@@ -1,28 +1,18 @@
-generated_at: '2026-02-16T13:38:51.167991'
-total_items: 43
+generated_at: '2026-02-16T14:46:53.971280'
+total_items: 40
 statuses:
   In Progress:
-    count: 8
+    count: 6
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
       priority: Medium-High
       category: Platform Expansion
-    - id: lakesail-spark-platform
-      file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
-      title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
-      priority: High
-      category: Platform Expansion
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
       priority: Medium-High
-      category: Platform Expansion
-    - id: starrocks-olap-platform
-      file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
-      title: Add StarRocks MPP OLAP platform support
-      priority: Medium
       category: Platform Expansion
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
@@ -45,7 +35,7 @@ statuses:
       priority: Critical
       category: Core Functionality
   Not Started:
-    count: 35
+    count: 34
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -87,11 +77,6 @@ statuses:
       title: Enforce per-module 50% coverage floor in CI
       priority: Medium
       category: Testing and Quality Assurance
-    - id: firebolt-cloud-deployment
-      file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
-      title: Firebolt Cloud Deployment Mode
-      priority: Low
-      category: Platform Expansion
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
       title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
