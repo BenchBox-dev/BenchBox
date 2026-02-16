@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T10:52:51.267986'
+generated_at: '2026-02-16T13:21:25.061071'
 total_items: 44
 priorities:
   Critical:
@@ -33,7 +33,7 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 10
+    count: 9
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
@@ -45,16 +45,11 @@ priorities:
       title: Add QuestDB time-series database platform support
       category: Platform Expansion
       status: In Progress
-    - id: starrocks-olap-platform
-      file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
-      title: Add StarRocks MPP OLAP platform support
+    - id: databend-cloud-olap-platform
+      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+      title: Databend Cloud-Native OLAP Platform Integration
       category: Platform Expansion
-      status: Not Started
-    - id: clickhouse-cloud-deployment
-      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
-      title: ClickHouse Cloud Deployment Mode
-      category: Platform Expansion
-      status: Not Started
+      status: In Progress
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
@@ -86,7 +81,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 22
+    count: 21
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -103,11 +98,16 @@ priorities:
       title: Add SingleStore Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: databend-cloud-olap-platform
-      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
-      title: Databend Cloud-Native OLAP Platform Integration
+    - id: starrocks-olap-platform
+      file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
+      title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
-      status: In Progress
+      status: Not Started
+    - id: clickhouse-cloud-deployment
+      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+      title: ClickHouse Cloud Deployment Mode
+      category: Platform Expansion
+      status: Not Started
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -122,11 +122,6 @@ priorities:
       file: TODO/main/planning/coverage-ci-enforcement.yaml
       title: Enforce per-module 50% coverage floor in CI
       category: Testing and Quality Assurance
-      status: Not Started
-    - id: firebolt-cloud-deployment
-      file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
-      title: Firebolt Cloud Deployment Mode
-      category: Platform Expansion
       status: Not Started
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
@@ -147,11 +142,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: starburst-platform-adapter
-      file: TODO/platform-expansion/planning/starburst-platform-adapter.yaml
-      title: Starburst Platform Adapter
-      category: Platform Expansion
       status: Not Started
     - id: timescaledb-cloud-deployment
       file: TODO/platform-expansion/planning/timescaledb-cloud-deployment.yaml
@@ -199,7 +189,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 7
+    count: 9
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -209,6 +199,11 @@ priorities:
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: firebolt-cloud-deployment
+      file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
+      title: Firebolt Cloud Deployment Mode
       category: Platform Expansion
       status: Not Started
     - id: future-ideas-backlog
@@ -230,6 +225,11 @@ priorities:
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       category: Core Functionality
+      status: Not Started
+    - id: starburst-platform-adapter
+      file: TODO/platform-expansion/planning/starburst-platform-adapter.yaml
+      title: Starburst Platform Adapter
+      category: Platform Expansion
       status: Not Started
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml

@@ -1,7 +1,7 @@
 id: firebolt-cloud-deployment
 title: "Firebolt Cloud Deployment Mode"
 worktree: platform-expansion
-priority: Medium
+priority: Low
 status: Not Started
 category: Platform Expansion
 description: |
