@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T08:53:59.016258'
-total_items: 467
+generated_at: '2026-02-16T09:01:15.187340'
+total_items: 468
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 420
+    count: 421
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1130,6 +1130,11 @@ statuses:
       title: Fix critical CI issues for green builds
       priority: Critical
       category: Testing and Quality Assurance
+    - id: platform-adapter-cursor-resource-leaks
+      file: DONE/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
+      title: Fix cursor and connection resource leaks across new platform adapters
+      priority: High
+      category: Platform Expansion
     - id: fix-datagen-layout-and-manifest-hygiene
       file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml
       title: Fix datagen layout, naming normalization, and manifest/cache hygiene

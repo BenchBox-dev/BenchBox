@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T08:53:58.050576'
-total_items: 48
+generated_at: '2026-02-16T09:01:14.243247'
+total_items: 47
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -60,25 +60,6 @@ items:
   work_total: 91
   work_done: 76
   work_ready: 3
-- id: platform-adapter-cursor-resource-leaks
-  file: TODO/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
-  title: Fix cursor and connection resource leaks across new platform adapters
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: High
-  status: Not Started
-  tags:
-  - resource-leak
-  - cursor
-  - connection
-  - reliability
-  - code-review-finding
-  owners:
-  - joe
-  estimated_effort: 1-2 days
-  work_total: 6
-  work_done: 0
-  work_ready: 5
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks

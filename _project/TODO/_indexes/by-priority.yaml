@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T08:53:58.050623'
-total_items: 48
+generated_at: '2026-02-16T09:01:14.243307'
+total_items: 47
 priorities:
   Critical:
     count: 2
@@ -15,18 +15,13 @@ priorities:
       category: Core Functionality
       status: In Progress
   High:
-    count: 4
+    count: 3
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
       status: In Progress
-    - id: platform-adapter-cursor-resource-leaks
-      file: TODO/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
-      title: Fix cursor and connection resource leaks across new platform adapters
-      category: Platform Expansion
-      status: Not Started
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks

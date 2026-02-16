@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T08:53:59.015841'
-total_items: 467
+generated_at: '2026-02-16T09:01:15.186913'
+total_items: 468
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1220,6 +1220,26 @@ items:
   completed_date: '2026-02-16'
   work_total: 7
   work_done: 7
+  work_ready: 0
+- id: platform-adapter-cursor-resource-leaks
+  file: DONE/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
+  title: Fix cursor and connection resource leaks across new platform adapters
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Completed
+  tags:
+  - resource-leak
+  - cursor
+  - connection
+  - reliability
+  - code-review-finding
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+  completed_date: '2026-02-16'
+  work_total: 6
+  work_done: 6
   work_ready: 0
 - id: fix-datagen-layout-and-manifest-hygiene
   file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml

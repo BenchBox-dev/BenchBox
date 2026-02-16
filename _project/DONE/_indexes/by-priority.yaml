@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T08:53:59.016154'
-total_items: 467
+generated_at: '2026-02-16T09:01:15.187227'
+total_items: 468
 priorities:
   Critical:
     count: 32
@@ -165,7 +165,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 164
+    count: 165
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -441,6 +441,11 @@ priorities:
     - id: platform-adapter-broken-runtime-paths
       file: DONE/platform-expansion/active/platform-adapter-broken-runtime-paths.yaml
       title: Fix broken runtime paths in Databend, LakeSail, StarRocks, and pg_duckdb adapters
+      category: Platform Expansion
+      status: Completed
+    - id: platform-adapter-cursor-resource-leaks
+      file: DONE/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
+      title: Fix cursor and connection resource leaks across new platform adapters
       category: Platform Expansion
       status: Completed
     - id: fix-datagen-layout-and-manifest-hygiene

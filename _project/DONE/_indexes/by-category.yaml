@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T08:53:59.016032'
+generated_at: '2026-02-16T09:01:15.187103'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -1493,7 +1493,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 47
+    count: 48
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1618,6 +1618,11 @@ categories:
     - id: platform-adapter-broken-runtime-paths
       file: DONE/platform-expansion/active/platform-adapter-broken-runtime-paths.yaml
       title: Fix broken runtime paths in Databend, LakeSail, StarRocks, and pg_duckdb adapters
+      priority: High
+      status: Completed
+    - id: platform-adapter-cursor-resource-leaks
+      file: DONE/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
+      title: Fix cursor and connection resource leaks across new platform adapters
       priority: High
       status: Completed
     - id: gcp-dataproc-platform
