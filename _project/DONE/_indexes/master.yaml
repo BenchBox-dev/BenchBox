@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T12:25:05.252960'
-total_items: 465
+generated_at: '2026-02-15T21:35:31.682536'
+total_items: 466
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -185,6 +185,26 @@ items:
   - joeharris76
   estimated_effort: 2-3 hours
   completed_date: '2025-12-24'
+- id: platform-adapter-benchmark-correctness
+  file: DONE/platform-expansion/active/platform-adapter-benchmark-correctness.yaml
+  title: Fix benchmark correctness issues in Databend, Doris, and pg_duckdb adapters
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Critical
+  status: Completed
+  tags:
+  - benchmark-correctness
+  - timing
+  - cache
+  - measurement-accuracy
+  - code-review-finding
+  owners:
+  - joe
+  estimated_effort: 1 day
+  completed_date: '2026-02-15'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: fix-ci-critical-issues
   file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml
   title: Fix critical CI issues for green builds

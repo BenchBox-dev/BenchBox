@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T12:25:04.245349'
-total_items: 44
+generated_at: '2026-02-15T21:35:30.743076'
+total_items: 49
 priorities:
   Critical:
     count: 2
@@ -15,13 +15,23 @@ priorities:
       category: Core Functionality
       status: In Progress
   High:
-    count: 3
+    count: 5
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
       status: In Progress
+    - id: platform-adapter-broken-runtime-paths
+      file: TODO/platform-expansion/planning/platform-adapter-broken-runtime-paths.yaml
+      title: Fix broken runtime paths in Databend, LakeSail, StarRocks, and pg_duckdb adapters
+      category: Platform Expansion
+      status: Not Started
+    - id: platform-adapter-cursor-resource-leaks
+      file: TODO/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
+      title: Fix cursor and connection resource leaks across new platform adapters
+      category: Platform Expansion
+      status: Not Started
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -33,7 +43,7 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 8
+    count: 10
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
@@ -43,6 +53,16 @@ priorities:
     - id: starrocks-olap-platform
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
+      category: Platform Expansion
+      status: Not Started
+    - id: platform-adapter-sql-injection-gaps
+      file: TODO/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
+      title: Close SQL injection gaps in platform adapter identifier validation
+      category: Platform Expansion
+      status: Not Started
+    - id: platform-adapter-silent-error-handling
+      file: TODO/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
+      title: Fix silent error swallowing in schema creation and connection setup across adapters
       category: Platform Expansion
       status: Not Started
     - id: ctas-sorted-data-loading
@@ -76,7 +96,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 24
+    count: 25
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -101,6 +121,11 @@ priorities:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: platform-adapter-http-tls-support
+      file: TODO/platform-expansion/planning/platform-adapter-http-tls-support.yaml
+      title: Add TLS/HTTPS option for HTTP-based data loading endpoints
       category: Platform Expansion
       status: Not Started
     - id: clickhouse-cloud-deployment

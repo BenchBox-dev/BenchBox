@@ -1,8 +1,8 @@
-generated_at: '2026-02-15T12:25:05.253302'
-total_items: 465
+generated_at: '2026-02-15T21:35:31.682825'
+total_items: 466
 priorities:
   Critical:
-    count: 31
+    count: 32
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -68,6 +68,11 @@ priorities:
       file: DONE/security-hardening/active/timescaledb-sql-injection-remediation.yaml
       title: Fix SQL injection vulnerabilities in TimescaleDB adapter
       category: Security and Compliance
+      status: Completed
+    - id: platform-adapter-benchmark-correctness
+      file: DONE/platform-expansion/active/platform-adapter-benchmark-correctness.yaml
+      title: Fix benchmark correctness issues in Databend, Doris, and pg_duckdb adapters
+      category: Platform Expansion
       status: Completed
     - id: fix-ci-critical-issues
       file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml

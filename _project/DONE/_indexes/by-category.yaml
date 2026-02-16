@@ -1,4 +1,4 @@
-generated_at: '2026-02-15T12:25:05.253172'
+generated_at: '2026-02-15T21:35:31.682717'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -1493,7 +1493,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 45
+    count: 46
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1609,6 +1609,11 @@ categories:
       file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml
       title: Fix Dask DataFrame Platform Compatibility
       priority: High
+      status: Completed
+    - id: platform-adapter-benchmark-correctness
+      file: DONE/platform-expansion/active/platform-adapter-benchmark-correctness.yaml
+      title: Fix benchmark correctness issues in Databend, Doris, and pg_duckdb adapters
+      priority: Critical
       status: Completed
     - id: gcp-dataproc-platform
       file: DONE/platform-expansion/planning/gcp-dataproc-platform.yaml
