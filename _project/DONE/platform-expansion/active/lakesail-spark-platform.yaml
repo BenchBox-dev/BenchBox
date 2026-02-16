@@ -585,76 +585,72 @@ work:
   status: done
 - id: w77
   summary: "Create platform documentation"
-  status: pending
+  status: done
 - id: w78
   summary: "Create docs/platforms/lakesail.md with full user guide"
   needs:
   - w77
-  status: pending
+  status: done
 - id: w79
   summary: "Document installation (pip install pysail or pyspark)"
   needs:
   - w77
-  status: pending
+  status: done
 - id: w80
   summary: "Document Sail server setup and configuration"
   needs:
   - w77
-  status: pending
+  status: done
 - id: w81
   summary: "Document deployment modes (local vs distributed)"
   needs:
   - w77
-  status: pending
+  status: done
 - id: w82
   summary: "Add CLI usage examples"
   needs:
   - w77
-  status: pending
+  status: done
 - id: w83
   summary: "Add Python API usage examples"
   needs:
   - w77
-  status: pending
+  status: done
 - id: w84
   summary: "Create example scripts"
-  status: pending
+  status: done
 - id: w85
   summary: "Create examples/getting_started/sql/lakesail_tpch.py"
   needs:
   - w84
-  status: pending
+  status: done
 - id: w86
   summary: "Create examples/getting_started/dataframe/lakesail_df_tpch.py"
   needs:
   - w84
-  status: pending
+  status: done
 - id: w87
   summary: "Create examples/platforms/lakesail_vs_spark_comparison.py"
   needs:
   - w84
-  status: pending
+  status: done
 - id: w88
   summary: "Update platform overview documentation"
-  status: pending
+  status: done
 - id: w89
   summary: "Add LakeSail to docs/platforms/overview.md"
   needs:
   - w88
-  status: pending
+  status: done
 - id: w90
   summary: "Add to platform comparison tables"
   needs:
   - w88
-  status: pending
+  status: done
 - id: w91
   summary: "Document Spark vs LakeSail benchmark comparison guidance"
   needs:
   - w88
-  status: pending
+  status: done
 
-deferred:
-- id: d1
-  summary: "Platform documentation, examples, and overview updates (w77-w91)"
-  reason: "Core adapter (SQL + DataFrame) fully implemented and tested — docs are additive polish"
-  revisit_when: "Documentation sprint or pre-release checklist"
+deferred: []
