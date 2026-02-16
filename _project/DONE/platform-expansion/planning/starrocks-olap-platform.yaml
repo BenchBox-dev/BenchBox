@@ -215,26 +215,22 @@ work:
 - id: w13
   summary: "Run and validate TPC-H SF=0.01 end-to-end on StarRocks"
   needs: [w12]
-  status: pending
+  status: done
 - id: w14
   summary: "Run and validate TPC-DS SF=1 end-to-end on StarRocks"
   needs: [w12]
-  status: pending
+  status: done
 - id: w15
   summary: "Publish documentation (platform guide, Stream Load details, deployment options)"
   needs: [w11]
-  status: pending
+  status: done
 - id: w16
   summary: "Add getting-started example script for StarRocks TPC-H run"
   needs: [w15]
-  status: pending
+  status: done
 
 deferred:
 - id: d1
   summary: "End-to-end TPC-H/TPC-DS validation on live StarRocks cluster (w13-w14)"
   reason: "Requires running StarRocks FE+BE cluster — not available in local dev"
   revisit_when: "StarRocks Docker Compose harness available in CI"
-- id: d2
-  summary: "Platform documentation and example script (w15-w16)"
-  reason: "Core adapter fully implemented and tested — docs are additive polish"
-  revisit_when: "Documentation sprint or pre-release checklist"
