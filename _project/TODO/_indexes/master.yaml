@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T09:37:25.811847'
-total_items: 46
+generated_at: '2026-02-16T10:52:51.267935'
+total_items: 44
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -283,27 +283,6 @@ items:
   work_total: 15
   work_done: 0
   work_ready: 15
-- id: platform-adapter-http-tls-support
-  file: TODO/platform-expansion/planning/platform-adapter-http-tls-support.yaml
-  title: Add TLS/HTTPS option for HTTP-based data loading endpoints
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  tags:
-  - security
-  - tls
-  - https
-  - data-loading
-  - credentials
-  - code-review-finding
-  owners:
-  - joe
-  estimated_effort: 1-2 days
-  work_total: 6
-  work_done: 0
-  work_ready: 3
-  deferred_count: 1
 - id: databend-cloud-olap-platform
   file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
   title: Databend Cloud-Native OLAP Platform Integration
@@ -707,25 +686,6 @@ items:
   work_total: 24
   work_done: 0
   work_ready: 13
-- id: platform-adapter-silent-error-handling
-  file: TODO/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
-  title: Fix silent error swallowing in schema creation and connection setup across adapters
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - error-handling
-  - silent-failure
-  - schema-creation
-  - reliability
-  - code-review-finding
-  owners:
-  - joe
-  estimated_effort: 2 days
-  work_total: 7
-  work_done: 0
-  work_ready: 5
 - id: ctas-sorted-data-loading
   file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
   title: Implement CTAS-based sorted data loading for DuckDB

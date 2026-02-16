@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T09:37:25.811905'
-total_items: 46
+generated_at: '2026-02-16T10:52:51.267986'
+total_items: 44
 priorities:
   Critical:
     count: 2
@@ -33,7 +33,7 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 11
+    count: 10
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
@@ -53,11 +53,6 @@ priorities:
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
-      category: Platform Expansion
-      status: Not Started
-    - id: platform-adapter-silent-error-handling
-      file: TODO/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
-      title: Fix silent error swallowing in schema creation and connection setup across adapters
       category: Platform Expansion
       status: Not Started
     - id: ctas-sorted-data-loading
@@ -91,7 +86,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 23
+    count: 22
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -106,11 +101,6 @@ priorities:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
-      category: Platform Expansion
-      status: Not Started
-    - id: platform-adapter-http-tls-support
-      file: TODO/platform-expansion/planning/platform-adapter-http-tls-support.yaml
-      title: Add TLS/HTTPS option for HTTP-based data loading endpoints
       category: Platform Expansion
       status: Not Started
     - id: databend-cloud-olap-platform

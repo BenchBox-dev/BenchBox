@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T09:37:25.811889'
+generated_at: '2026-02-16T10:52:51.267968'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -132,7 +132,7 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 17
+    count: 15
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
@@ -179,11 +179,6 @@ categories:
       title: Add StarRocks MPP OLAP platform support
       priority: Medium-High
       status: Not Started
-    - id: platform-adapter-http-tls-support
-      file: TODO/platform-expansion/planning/platform-adapter-http-tls-support.yaml
-      title: Add TLS/HTTPS option for HTTP-based data loading endpoints
-      priority: Medium
-      status: Not Started
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
@@ -198,11 +193,6 @@ categories:
       file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode
       priority: Medium
-      status: Not Started
-    - id: platform-adapter-silent-error-handling
-      file: TODO/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
-      title: Fix silent error swallowing in schema creation and connection setup across adapters
-      priority: Medium-High
       status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml

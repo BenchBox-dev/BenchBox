@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T09:37:26.844958'
-total_items: 469
+generated_at: '2026-02-16T10:52:52.319938'
+total_items: 471
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2963,6 +2963,27 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 1 week (0.5 FTE)
   completed_date: '2025-11-29'
+- id: platform-adapter-http-tls-support
+  file: DONE/platform-adapter-http-tls-support.yaml
+  title: Add TLS/HTTPS option for HTTP-based data loading endpoints
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - security
+  - tls
+  - https
+  - data-loading
+  - credentials
+  - code-review-finding
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  deferred_count: 1
 - id: tpcds-obt-benchmark-implementation
   file: DONE/benchmark-expansion/planning/tpcds-obt-benchmark-implementation.yaml
   title: Add TPC-DS-OBT (One Big Table) Benchmark Implementation
@@ -5090,6 +5111,26 @@ items:
   - terminal
   estimated_effort: 3-5 days
   completed_date: '2026-02-06'
+- id: platform-adapter-silent-error-handling
+  file: DONE/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
+  title: Fix silent error swallowing in schema creation and connection setup across adapters
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - error-handling
+  - silent-failure
+  - schema-creation
+  - reliability
+  - code-review-finding
+  owners:
+  - joe
+  estimated_effort: 2 days
+  completed_date: '2026-02-16'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: fix-type-checking-errors
   file: DONE/main/active/fix-type-checking-errors.yaml
   title: Fix type checking errors ignored in ty config

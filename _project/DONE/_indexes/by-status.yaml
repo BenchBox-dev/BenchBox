@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T09:37:26.845422'
-total_items: 469
+generated_at: '2026-02-16T10:52:52.320414'
+total_items: 471
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Usability
   Not Started:
-    count: 43
+    count: 44
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -87,6 +87,11 @@ statuses:
       title: Add --verbose/-v option to interactive wizard
       priority: Low
       category: User Experience
+    - id: platform-adapter-http-tls-support
+      file: DONE/platform-adapter-http-tls-support.yaml
+      title: Add TLS/HTTPS option for HTTP-based data loading endpoints
+      priority: Medium
+      category: Platform Expansion
     - id: pyspark-sql-tests
       file: DONE/dataframe-expansion/planning/pyspark-sql-tests.yaml
       title: Add comprehensive tests for PySpark SQL adapter
@@ -246,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 422
+    count: 423
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1155,6 +1160,11 @@ statuses:
       title: Fix sharded DataFrame Parquet bypass causing Polars date-string failures
       priority: High
       category: Core Functionality
+    - id: platform-adapter-silent-error-handling
+      file: DONE/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
+      title: Fix silent error swallowing in schema creation and connection setup across adapters
+      priority: Medium-High
+      category: Platform Expansion
     - id: fix-type-checking-quick-wins
       file: DONE/main/active/fix-type-checking-quick-wins.yaml
       title: Fix type checking errors - Quick Wins (4 rules enabled)

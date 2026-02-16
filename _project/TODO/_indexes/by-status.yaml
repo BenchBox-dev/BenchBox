@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T09:37:25.811918'
-total_items: 46
+generated_at: '2026-02-16T10:52:51.267999'
+total_items: 44
 statuses:
   In Progress:
     count: 6
@@ -35,7 +35,7 @@ statuses:
       priority: Critical
       category: Core Functionality
   Not Started:
-    count: 40
+    count: 38
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -67,11 +67,6 @@ statuses:
       title: Add StarRocks MPP OLAP platform support
       priority: Medium-High
       category: Platform Expansion
-    - id: platform-adapter-http-tls-support
-      file: TODO/platform-expansion/planning/platform-adapter-http-tls-support.yaml
-      title: Add TLS/HTTPS option for HTTP-based data loading endpoints
-      priority: Medium
-      category: Platform Expansion
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
@@ -102,11 +97,6 @@ statuses:
       title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
       priority: Critical
       category: Core Functionality
-    - id: platform-adapter-silent-error-handling
-      file: TODO/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
-      title: Fix silent error swallowing in schema creation and connection setup across adapters
-      priority: Medium-High
-      category: Platform Expansion
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics

@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T09:37:26.845308'
-total_items: 469
+generated_at: '2026-02-16T10:52:52.320296'
+total_items: 471
 priorities:
   Critical:
     count: 32
@@ -999,7 +999,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 44
+    count: 45
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1117,6 +1117,11 @@ priorities:
       title: Enhance and extend ASCII charting with new chart types and comparison visualizations
       category: Core Functionality
       status: Completed
+    - id: platform-adapter-silent-error-handling
+      file: DONE/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
+      title: Fix silent error swallowing in schema creation and connection setup across adapters
+      category: Platform Expansion
+      status: Completed
     - id: fix-type-checking-errors
       file: DONE/main/active/fix-type-checking-errors.yaml
       title: Fix type checking errors ignored in ty config
@@ -1223,7 +1228,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 214
+    count: 215
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1380,6 +1385,11 @@ priorities:
       title: Add PrestoDB Platform Adapter
       category: Platform Expansion
       status: Completed
+    - id: platform-adapter-http-tls-support
+      file: DONE/platform-adapter-http-tls-support.yaml
+      title: Add TLS/HTTPS option for HTTP-based data loading endpoints
+      category: Platform Expansion
+      status: Not Started
     - id: tpcds-obt-benchmark-implementation
       file: DONE/benchmark-expansion/planning/tpcds-obt-benchmark-implementation.yaml
       title: Add TPC-DS-OBT (One Big Table) Benchmark Implementation
