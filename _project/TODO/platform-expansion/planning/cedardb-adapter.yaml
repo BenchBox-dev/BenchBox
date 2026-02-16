@@ -1,7 +1,7 @@
 id: cedardb-adapter
 title: "Add CedarDB Platform Adapter"
 worktree: platform-expansion
-priority: Medium
+priority: Low
 status: Not Started
 category: Platform Expansion
 description: |

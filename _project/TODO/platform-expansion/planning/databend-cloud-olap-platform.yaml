@@ -1,12 +1,12 @@
 # Databend Cloud-Native OLAP Platform Integration
 #
 # Location: _project/TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
-# Priority: Low (deferred based on analysis)
+# Priority: Medium (promoted — 11/22 work units done, active investment)
 
 id: databend-cloud-olap-platform
 title: "Databend Cloud-Native OLAP Platform Integration"
 worktree: platform-expansion
-priority: Low
+priority: Medium
 status: In Progress
 description: |
   Implement Databend (https://github.com/databendlabs/databend) as a supported platform

@@ -1,7 +1,7 @@
 id: clickhouse-cloud-deployment
 title: "ClickHouse Cloud Deployment Mode"
 worktree: platform-expansion
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Platform Expansion
 description: |

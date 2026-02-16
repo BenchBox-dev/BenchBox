@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T09:01:14.243247'
+generated_at: '2026-02-16T09:06:24.496711'
 total_items: 47
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -60,6 +60,25 @@ items:
   work_total: 91
   work_done: 76
   work_ready: 3
+- id: platform-adapter-sql-injection-gaps
+  file: TODO/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
+  title: Close SQL injection gaps in platform adapter identifier validation
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - security
+  - sql-injection
+  - identifier-validation
+  - defense-in-depth
+  - code-review-finding
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+  work_total: 7
+  work_done: 0
+  work_ready: 6
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -93,6 +112,24 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
+- id: cedardb-adapter
+  file: TODO/platform-expansion/planning/cedardb-adapter.yaml
+  title: Add CedarDB Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  tags:
+  - platform
+  - sql
+  - postgresql-compatible
+  - olap
+  - oltp
+  - cedardb
+  estimated_effort: Medium
+  work_total: 11
+  work_done: 0
+  work_ready: 11
 - id: siriusdb-adapter
   file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
   title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
@@ -111,23 +148,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: databend-cloud-olap-platform
-  file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
-  title: Databend Cloud-Native OLAP Platform Integration
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Low
-  status: In Progress
-  tags:
-  - cloud-native
-  - olap
-  - snowflake-compatible
-  - rust
-  - object-storage
-  estimated_effort: 2-3 days
-  work_total: 22
-  work_done: 12
-  work_ready: 10
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -220,24 +240,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: cedardb-adapter
-  file: TODO/platform-expansion/planning/cedardb-adapter.yaml
-  title: Add CedarDB Platform Adapter
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  tags:
-  - platform
-  - sql
-  - postgresql-compatible
-  - olap
-  - oltp
-  - cedardb
-  estimated_effort: Medium
-  work_total: 11
-  work_done: 0
-  work_ready: 11
 - id: fabric-lakehouse-sql-platform
   file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
   title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
@@ -281,24 +283,6 @@ items:
   work_total: 50
   work_done: 0
   work_ready: 12
-- id: questdb-timeseries-platform
-  file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
-  title: Add QuestDB time-series database platform support
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium
-  status: In Progress
-  tags:
-  - questdb
-  - timeseries
-  - columnar
-  - platform
-  - postgres-protocol
-  - ilp
-  estimated_effort: Medium
-  work_total: 40
-  work_done: 15
-  work_ready: 10
 - id: singlestore-adapter
   file: TODO/platform-expansion/planning/singlestore-adapter.yaml
   title: Add SingleStore Platform Adapter
@@ -339,22 +323,23 @@ items:
   work_done: 0
   work_ready: 3
   deferred_count: 1
-- id: clickhouse-cloud-deployment
-  file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
-  title: ClickHouse Cloud Deployment Mode
+- id: databend-cloud-olap-platform
+  file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+  title: Databend Cloud-Native OLAP Platform Integration
   worktree: platform-expansion
   category: Platform Expansion
   priority: Medium
-  status: Not Started
+  status: In Progress
   tags:
-  - platform-adapter
-  - clickhouse
-  - cloud
-  - deployment-modes
+  - cloud-native
+  - olap
+  - snowflake-compatible
+  - rust
+  - object-storage
   estimated_effort: 2-3 days
-  work_total: 24
-  work_done: 0
-  work_ready: 13
+  work_total: 22
+  work_done: 12
+  work_ready: 10
 - id: influxdb-blog-post-edits
   file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
   title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -689,6 +674,24 @@ items:
   work_total: 40
   work_done: 19
   work_ready: 11
+- id: questdb-timeseries-platform
+  file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
+  title: Add QuestDB time-series database platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: In Progress
+  tags:
+  - questdb
+  - timeseries
+  - columnar
+  - platform
+  - postgres-protocol
+  - ilp
+  estimated_effort: Medium
+  work_total: 40
+  work_done: 15
+  work_ready: 10
 - id: starrocks-olap-platform
   file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
   title: Add StarRocks MPP OLAP platform support
@@ -707,25 +710,22 @@ items:
   work_total: 16
   work_done: 0
   work_ready: 1
-- id: platform-adapter-sql-injection-gaps
-  file: TODO/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
-  title: Close SQL injection gaps in platform adapter identifier validation
+- id: clickhouse-cloud-deployment
+  file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+  title: ClickHouse Cloud Deployment Mode
   worktree: platform-expansion
   category: Platform Expansion
   priority: Medium-High
   status: Not Started
   tags:
-  - security
-  - sql-injection
-  - identifier-validation
-  - defense-in-depth
-  - code-review-finding
-  owners:
-  - joe
-  estimated_effort: 1-2 days
-  work_total: 7
+  - platform-adapter
+  - clickhouse
+  - cloud
+  - deployment-modes
+  estimated_effort: 2-3 days
+  work_total: 24
   work_done: 0
-  work_ready: 6
+  work_ready: 13
 - id: platform-adapter-silent-error-handling
   file: TODO/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
   title: Fix silent error swallowing in schema creation and connection setup across adapters

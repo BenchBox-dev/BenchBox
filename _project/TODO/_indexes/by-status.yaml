@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T09:01:14.243320'
+generated_at: '2026-02-16T09:06:24.496775'
 total_items: 47
 statuses:
   In Progress:
@@ -17,12 +17,12 @@ statuses:
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
-      priority: Medium
+      priority: Medium-High
       category: Platform Expansion
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
-      priority: Low
+      priority: Medium
       category: Platform Expansion
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
@@ -40,7 +40,7 @@ statuses:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
-      priority: Medium
+      priority: Low
       category: Platform Expansion
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -75,12 +75,12 @@ statuses:
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
-      priority: Medium
+      priority: Medium-High
       category: Platform Expansion
     - id: platform-adapter-sql-injection-gaps
       file: TODO/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
       title: Close SQL injection gaps in platform adapter identifier validation
-      priority: Medium-High
+      priority: High
       category: Platform Expansion
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml

@@ -1,7 +1,7 @@
 id: questdb-timeseries-platform
 title: "Add QuestDB time-series database platform support"
 worktree: platform-expansion
-priority: Medium
+priority: Medium-High
 status: In Progress
 description: |
   Integrate QuestDB as a supported BenchBox platform. QuestDB is a high-performance

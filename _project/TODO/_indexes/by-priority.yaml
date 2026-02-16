@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T09:01:14.243307'
+generated_at: '2026-02-16T09:06:24.496756'
 total_items: 47
 priorities:
   Critical:
@@ -15,13 +15,18 @@ priorities:
       category: Core Functionality
       status: In Progress
   High:
-    count: 3
+    count: 4
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
       status: In Progress
+    - id: platform-adapter-sql-injection-gaps
+      file: TODO/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
+      title: Close SQL injection gaps in platform adapter identifier validation
+      category: Platform Expansion
+      status: Not Started
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -33,11 +38,16 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 10
+    count: 11
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
+      category: Platform Expansion
+      status: In Progress
+    - id: questdb-timeseries-platform
+      file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
+      title: Add QuestDB time-series database platform support
       category: Platform Expansion
       status: In Progress
     - id: starrocks-olap-platform
@@ -45,9 +55,9 @@ priorities:
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
       status: Not Started
-    - id: platform-adapter-sql-injection-gaps
-      file: TODO/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
-      title: Close SQL injection gaps in platform adapter identifier validation
+    - id: clickhouse-cloud-deployment
+      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+      title: ClickHouse Cloud Deployment Mode
       category: Platform Expansion
       status: Not Started
     - id: platform-adapter-silent-error-handling
@@ -86,13 +96,8 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 25
+    count: 23
     items:
-    - id: cedardb-adapter
-      file: TODO/platform-expansion/planning/cedardb-adapter.yaml
-      title: Add CedarDB Platform Adapter
-      category: Platform Expansion
-      status: Not Started
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
       title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
@@ -103,11 +108,6 @@ priorities:
       title: Add Microsoft Fabric Spark Notebooks platform support
       category: Platform Expansion
       status: Not Started
-    - id: questdb-timeseries-platform
-      file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
-      title: Add QuestDB time-series database platform support
-      category: Platform Expansion
-      status: In Progress
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
@@ -118,11 +118,11 @@ priorities:
       title: Add TLS/HTTPS option for HTTP-based data loading endpoints
       category: Platform Expansion
       status: Not Started
-    - id: clickhouse-cloud-deployment
-      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
-      title: ClickHouse Cloud Deployment Mode
+    - id: databend-cloud-olap-platform
+      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+      title: Databend Cloud-Native OLAP Platform Integration
       category: Platform Expansion
-      status: Not Started
+      status: In Progress
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -216,16 +216,16 @@ priorities:
   Low:
     count: 7
     items:
+    - id: cedardb-adapter
+      file: TODO/platform-expansion/planning/cedardb-adapter.yaml
+      title: Add CedarDB Platform Adapter
+      category: Platform Expansion
+      status: Not Started
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: databend-cloud-olap-platform
-      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
-      title: Databend Cloud-Native OLAP Platform Integration
-      category: Platform Expansion
-      status: In Progress
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

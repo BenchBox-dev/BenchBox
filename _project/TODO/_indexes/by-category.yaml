@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T09:01:14.243290'
+generated_at: '2026-02-16T09:06:24.496741'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -142,7 +142,7 @@ categories:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
-      priority: Medium
+      priority: Low
       status: Not Started
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
@@ -162,7 +162,7 @@ categories:
     - id: questdb-timeseries-platform
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
-      priority: Medium
+      priority: Medium-High
       status: In Progress
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -187,17 +187,17 @@ categories:
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: platform-adapter-sql-injection-gaps
       file: TODO/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
       title: Close SQL injection gaps in platform adapter identifier validation
-      priority: Medium-High
+      priority: High
       status: Not Started
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
-      priority: Low
+      priority: Medium
       status: In Progress
     - id: firebolt-cloud-deployment
       file: TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml
