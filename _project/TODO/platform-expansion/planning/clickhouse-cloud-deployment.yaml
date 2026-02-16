@@ -110,65 +110,65 @@ success_metrics:
 work:
 - id: w1
   summary: "Add 'cloud' deployment mode to ClickHouse registry metadata"
-  status: pending
+  status: done
 - id: w2
   summary: "Set requires_credentials=True"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Set requires_cloud_storage=True"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w4
   summary: "Define auth_methods=['api_key', 'oauth']"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w5
   summary: "Add cloud-specific configuration options"
-  status: pending
+  status: done
 - id: w6
   summary: "Cloud endpoint URL"
   needs:
   - w5
-  status: pending
+  status: done
 - id: w7
   summary: "Organization/service ID"
   needs:
   - w5
-  status: pending
+  status: done
 - id: w8
   summary: "API key or OAuth token"
   needs:
   - w5
-  status: pending
+  status: done
 - id: w9
   summary: "Implement API key authentication"
-  status: pending
+  status: done
 - id: w10
   summary: "Implement OAuth token authentication"
   status: pending
 - id: w11
   summary: "Add credential setup wizard for ClickHouse Cloud"
-  status: pending
+  status: done
 - id: w12
   summary: "Support environment variables"
-  status: pending
+  status: done
 - id: w13
   summary: "CLICKHOUSE_CLOUD_ENDPOINT"
   needs:
   - w12
-  status: pending
+  status: done
 - id: w14
   summary: "CLICKHOUSE_CLOUD_API_KEY"
   needs:
   - w12
-  status: pending
+  status: done
 - id: w15
   summary: "Implement cloud endpoint connection"
-  status: pending
+  status: done
 - id: w16
   summary: "Implement cloud storage upload for data loading"
   status: pending
@@ -189,10 +189,10 @@ work:
   status: pending
 - id: w20
   summary: "Configure result caching behavior"
-  status: pending
+  status: done
 - id: w21
   summary: "Unit tests for cloud authentication"
-  status: pending
+  status: done
 - id: w22
   summary: "Integration tests with ClickHouse Cloud (requires account)"
   status: pending

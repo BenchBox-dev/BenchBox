@@ -166,51 +166,51 @@ context_sections:
 work:
 - id: w1
   summary: "Implement adapter skeleton and dialect wiring in benchbox/platforms/starrocks.py"
-  status: pending
+  status: done
 - id: w2
   summary: "Implement connection and query execution paths (PyMySQL + timing/row validation)"
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Implement StarRocks schema creation (table models, distribution, partitioning)"
   needs: [w1]
-  status: pending
+  status: done
 - id: w4
   summary: "Implement Stream Load via BE HTTP endpoint on port 8040 with robust error handling"
   needs: [w1]
-  status: pending
+  status: done
 - id: w5
   summary: "Implement chunked Stream Load and load status validation for large files"
   needs: [w4]
-  status: pending
+  status: done
 - id: w6
   summary: "Register platform in registry and package metadata (platform_registry, __init__, pyproject extras)"
   needs: [w2]
-  status: pending
+  status: done
 - id: w7
   summary: "Implement cache-control and validation hooks (disable query cache + verify)"
   needs: [w2]
-  status: pending
+  status: done
 - id: w8
   summary: "Implement platform optimization hooks (bitmap/bloom indexes and ANALYZE support)"
   needs: [w3]
-  status: pending
+  status: done
 - id: w9
   summary: "Add StarRocks tuning profile with benchmark-specific defaults (TPC-H)"
   needs: [w8]
-  status: pending
+  status: done
 - id: w10
   summary: "Add TPC-DS tuning defaults for StarRocks profile"
   needs: [w9]
-  status: pending
+  status: done
 - id: w11
   summary: "Create unit test suite for adapter connection, SQL generation, and Stream Load formatting"
   needs: [w2, w4]
-  status: pending
+  status: done
 - id: w12
   summary: "Create integration smoke coverage (local cluster harness + adapter smoke tests)"
   needs: [w6, w11]
-  status: pending
+  status: done
 - id: w13
   summary: "Run and validate TPC-H SF=0.01 end-to-end on StarRocks"
   needs: [w12]

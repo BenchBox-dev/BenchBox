@@ -121,75 +121,75 @@ open_questions:
 work:
 - id: w1
   summary: "Create benchbox/platforms/starburst.py"
-  status: pending
+  status: done
 - id: w2
   summary: "Implement StarburstAdapter class extending PlatformAdapter"
-  status: pending
+  status: done
 - id: w3
   summary: "Set up inheritance from Trino (dialect, capabilities)"
-  status: pending
+  status: done
 - id: w4
   summary: "Register platform in registry with deployment metadata"
-  status: pending
+  status: done
 - id: w5
   summary: "Implement OAuth authentication for Galaxy"
-  status: pending
+  status: done
 - id: w6
   summary: "Implement basic auth for Enterprise"
-  status: pending
+  status: done
 - id: w7
   summary: "Add credential setup wizard for Starburst"
-  status: pending
+  status: done
 - id: w8
   summary: "Support environment variables"
-  status: pending
+  status: done
 - id: w9
   summary: "STARBURST_HOST"
   needs:
   - w8
-  status: pending
+  status: done
 - id: w10
   summary: "STARBURST_TOKEN or STARBURST_PASSWORD"
   needs:
   - w8
-  status: pending
+  status: done
 - id: w11
   summary: "Implement Galaxy connection handling"
-  status: pending
+  status: done
 - id: w12
   summary: "Implement catalog selection/creation"
-  status: pending
+  status: done
 - id: w13
   summary: "Handle data loading via connectors"
-  status: pending
+  status: done
 - id: w14
   summary: "S3 connector for data files"
   needs:
   - w13
-  status: pending
+  status: done
 - id: w15
   summary: "Hive metastore integration"
   needs:
   - w13
-  status: pending
+  status: done
 - id: w16
   summary: "Configure query execution settings"
-  status: pending
+  status: done
 - id: w17
   summary: "Inherit query execution from Trino adapter"
-  status: pending
+  status: done
 - id: w18
   summary: "Handle Starburst-specific query features"
-  status: pending
+  status: done
 - id: w19
   summary: "Implement performance metrics collection"
-  status: pending
+  status: done
 - id: w20
   summary: "Handle cloud-specific error scenarios"
-  status: pending
+  status: done
 - id: w21
   summary: "Unit tests for adapter (mocked connection)"
-  status: pending
+  status: done
 - id: w22
   summary: "Integration tests with Starburst Galaxy (requires account)"
   status: pending
