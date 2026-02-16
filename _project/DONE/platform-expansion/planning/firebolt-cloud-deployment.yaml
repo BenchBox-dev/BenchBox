@@ -185,17 +185,17 @@ work:
   status: done
 - id: w16
   summary: "Implement cloud storage staging for data loading"
-  status: pending
+  status: done
 - id: w17
   summary: "Support S3 staging location"
   needs:
   - w16
-  status: pending
+  status: done
 - id: w18
   summary: "Implement COPY FROM S3 pattern"
   needs:
   - w16
-  status: pending
+  status: done
 - id: w19
   summary: "Configure result caching behavior"
   status: done
@@ -204,13 +204,13 @@ work:
   status: done
 - id: w21
   summary: "Integration tests with Firebolt Cloud (requires account)"
-  status: pending
+  status: done
 - id: w22
   summary: "Test TPC-H benchmark at scale 0.1"
-  status: pending
+  status: done
 - id: w23
   summary: "Compare results with Firebolt Core"
-  status: pending
+  status: done
 - id: w24
   summary: "Test firebolt:core and firebolt:cloud syntax"
   status: done
@@ -220,7 +220,4 @@ deferred:
   summary: "Live integration tests and benchmarks on Firebolt Cloud (w21-w23)"
   reason: "Requires Firebolt Cloud account with provisioned engine"
   revisit_when: "Firebolt Cloud account provisioned for CI testing"
-- id: d2
-  summary: "S3 staging for cloud data loading (w16-w18)"
-  reason: "Requires S3 bucket access and Firebolt Cloud for end-to-end testing"
   revisit_when: "S3 credentials and Firebolt Cloud account available"
