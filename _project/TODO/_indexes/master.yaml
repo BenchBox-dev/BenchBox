@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T15:00:16.867106'
+generated_at: '2026-02-16T18:47:25.015944'
 total_items: 40
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -261,7 +261,7 @@ items:
   work_done: 0
   work_ready: 15
 - id: clickhouse-cloud-deployment
-  file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+  file: TODO/platform-expansion/active/clickhouse-cloud-deployment.yaml
   title: ClickHouse Cloud Deployment Mode
   worktree: platform-expansion
   category: Platform Expansion
@@ -580,7 +580,7 @@ items:
   work_done: 19
   work_ready: 11
 - id: questdb-timeseries-platform
-  file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
+  file: TODO/platform-expansion/active/questdb-timeseries-platform.yaml
   title: Add QuestDB time-series database platform support
   worktree: platform-expansion
   category: Platform Expansion
@@ -598,7 +598,7 @@ items:
   work_done: 15
   work_ready: 10
 - id: databend-cloud-olap-platform
-  file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+  file: TODO/platform-expansion/active/databend-cloud-olap-platform.yaml
   title: Databend Cloud-Native OLAP Platform Integration
   worktree: platform-expansion
   category: Platform Expansion

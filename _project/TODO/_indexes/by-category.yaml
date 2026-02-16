@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T15:00:16.867153'
+generated_at: '2026-02-16T18:47:25.015973'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -155,7 +155,7 @@ categories:
       priority: Medium
       status: Not Started
     - id: questdb-timeseries-platform
-      file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
+      file: TODO/platform-expansion/active/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
       priority: Medium-High
       status: In Progress
@@ -170,12 +170,12 @@ categories:
       priority: Low
       status: Not Started
     - id: clickhouse-cloud-deployment
-      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+      file: TODO/platform-expansion/active/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
       priority: Medium
       status: In Progress
     - id: databend-cloud-olap-platform
-      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+      file: TODO/platform-expansion/active/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
       priority: Medium-High
       status: In Progress

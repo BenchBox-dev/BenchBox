@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T15:00:16.867184'
+generated_at: '2026-02-16T18:47:25.015997'
 total_items: 40
 statuses:
   In Progress:
@@ -10,17 +10,17 @@ statuses:
       priority: Medium-High
       category: Platform Expansion
     - id: questdb-timeseries-platform
-      file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
+      file: TODO/platform-expansion/active/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
       priority: Medium-High
       category: Platform Expansion
     - id: clickhouse-cloud-deployment
-      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+      file: TODO/platform-expansion/active/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
       priority: Medium
       category: Platform Expansion
     - id: databend-cloud-olap-platform
-      file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
+      file: TODO/platform-expansion/active/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
       priority: Medium-High
       category: Platform Expansion
