@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T10:52:52.319938'
-total_items: 471
+generated_at: '2026-02-16T13:38:52.303931'
+total_items: 472
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2658,6 +2658,24 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Small
+- id: starburst-platform-adapter
+  file: DONE/platform-expansion/planning/starburst-platform-adapter.yaml
+  title: Starburst Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Completed
+  tags:
+  - platform-adapter
+  - starburst
+  - trino
+  - cloud
+  estimated_effort: 3-4 days
+  completed_date: '2026-02-16'
+  work_total: 24
+  work_done: 21
+  work_ready: 3
+  deferred_count: 1
 - id: tpc-havoc-query-variant-system-implementation
   file: DONE/benchmark-expansion/completed/tpc-havoc-query-variant-system-implementation.yaml
   title: TPC-Havoc Query Variant System Implementation

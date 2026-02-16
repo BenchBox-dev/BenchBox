@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T10:52:52.320296'
-total_items: 471
+generated_at: '2026-02-16T13:38:52.304286'
+total_items: 472
 priorities:
   Critical:
     count: 32
@@ -2306,7 +2306,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 13
+    count: 14
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -2362,6 +2362,11 @@ priorities:
       file: DONE/platform-comparison/planning/sql-cross-platform-benchmark-suite.yaml
       title: SQL Cross-Platform Benchmark Suite
       category: Performance and Efficiency
+      status: Completed
+    - id: starburst-platform-adapter
+      file: DONE/platform-expansion/planning/starburst-platform-adapter.yaml
+      title: Starburst Platform Adapter
+      category: Platform Expansion
       status: Completed
     - id: tpc-havoc-query-variant-system-implementation
       file: DONE/benchmark-expansion/completed/tpc-havoc-query-variant-system-implementation.yaml

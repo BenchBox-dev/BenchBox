@@ -2,7 +2,7 @@ id: clickhouse-cloud-deployment
 title: "ClickHouse Cloud Deployment Mode"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: In Progress
 category: Platform Expansion
 description: |
   Add ClickHouse Cloud deployment mode to the existing ClickHouse adapter,
@@ -202,3 +202,13 @@ work:
 - id: w24
   summary: "Compare results with self-hosted ClickHouse"
   status: pending
+
+deferred:
+- id: d1
+  summary: "Live integration tests and benchmarks on ClickHouse Cloud (w22-w24)"
+  reason: "Requires ClickHouse Cloud account and provisioned service"
+  revisit_when: "ClickHouse Cloud account provisioned for CI testing"
+- id: d2
+  summary: "Cloud storage staging for data loading (w16-w19)"
+  reason: "Requires S3/GCS bucket access and ClickHouse Cloud for end-to-end testing"
+  revisit_when: "Cloud storage credentials available for CI"

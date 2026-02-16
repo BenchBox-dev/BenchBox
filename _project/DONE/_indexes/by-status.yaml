@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T10:52:52.320414'
-total_items: 471
+generated_at: '2026-02-16T13:38:52.304419'
+total_items: 472
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 423
+    count: 424
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1855,6 +1855,11 @@ statuses:
       title: Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED
       priority: Medium
       category: Core Functionality
+    - id: starburst-platform-adapter
+      file: DONE/platform-expansion/planning/starburst-platform-adapter.yaml
+      title: Starburst Platform Adapter
+      priority: Low
+      category: Platform Expansion
     - id: switch-tpc-ds-base-dialect-from-ansi-to-netezza-2
       file: DONE/unknown/planning/switch-tpc-ds-base-dialect-from-ansi-to-netezza-2.yaml
       title: Switch TPC-DS Base Dialect from ANSI to Netezza ✅

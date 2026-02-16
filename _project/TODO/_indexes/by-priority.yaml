@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T13:21:25.061071'
-total_items: 44
+generated_at: '2026-02-16T13:38:51.167979'
+total_items: 43
 priorities:
   Critical:
     count: 2
@@ -102,12 +102,12 @@ priorities:
       file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
       category: Platform Expansion
-      status: Not Started
+      status: In Progress
     - id: clickhouse-cloud-deployment
       file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
       category: Platform Expansion
-      status: Not Started
+      status: In Progress
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -189,7 +189,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 9
+    count: 8
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -225,11 +225,6 @@ priorities:
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       category: Core Functionality
-      status: Not Started
-    - id: starburst-platform-adapter
-      file: TODO/platform-expansion/planning/starburst-platform-adapter.yaml
-      title: Starburst Platform Adapter
-      category: Platform Expansion
       status: Not Started
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml

@@ -1,8 +1,8 @@
-generated_at: '2026-02-16T13:21:25.061102'
-total_items: 44
+generated_at: '2026-02-16T13:38:51.167991'
+total_items: 43
 statuses:
   In Progress:
-    count: 6
+    count: 8
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
@@ -18,6 +18,16 @@ statuses:
       file: TODO/platform-expansion/planning/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
       priority: Medium-High
+      category: Platform Expansion
+    - id: starrocks-olap-platform
+      file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
+      title: Add StarRocks MPP OLAP platform support
+      priority: Medium
+      category: Platform Expansion
+    - id: clickhouse-cloud-deployment
+      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
+      title: ClickHouse Cloud Deployment Mode
+      priority: Medium
       category: Platform Expansion
     - id: databend-cloud-olap-platform
       file: TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
@@ -35,7 +45,7 @@ statuses:
       priority: Critical
       category: Core Functionality
   Not Started:
-    count: 38
+    count: 35
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -61,16 +71,6 @@ statuses:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
-      category: Platform Expansion
-    - id: starrocks-olap-platform
-      file: TODO/platform-expansion/planning/starrocks-olap-platform.yaml
-      title: Add StarRocks MPP OLAP platform support
-      priority: Medium
-      category: Platform Expansion
-    - id: clickhouse-cloud-deployment
-      file: TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml
-      title: ClickHouse Cloud Deployment Mode
-      priority: Medium
       category: Platform Expansion
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
@@ -162,11 +162,6 @@ statuses:
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       priority: Medium
       category: Benchmark Development
-    - id: starburst-platform-adapter
-      file: TODO/platform-expansion/planning/starburst-platform-adapter.yaml
-      title: Starburst Platform Adapter
-      priority: Low
-      category: Platform Expansion
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

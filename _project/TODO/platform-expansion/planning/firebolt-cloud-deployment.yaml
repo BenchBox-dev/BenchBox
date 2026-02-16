@@ -213,3 +213,13 @@ work:
 - id: w24
   summary: "Test firebolt:core and firebolt:cloud syntax"
   status: done
+
+deferred:
+- id: d1
+  summary: "Live integration tests and benchmarks on Firebolt Cloud (w21-w23)"
+  reason: "Requires Firebolt Cloud account with provisioned engine"
+  revisit_when: "Firebolt Cloud account provisioned for CI testing"
+- id: d2
+  summary: "S3 staging for cloud data loading (w16-w18)"
+  reason: "Requires S3 bucket access and Firebolt Cloud for end-to-end testing"
+  revisit_when: "S3 credentials and Firebolt Cloud account available"

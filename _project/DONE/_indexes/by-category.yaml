@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T10:52:52.320166'
+generated_at: '2026-02-16T13:38:52.304155'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -1493,7 +1493,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 51
+    count: 52
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1739,6 +1739,11 @@ categories:
       file: DONE/platform-expansion/planning/snowpark-connect-platform.yaml
       title: Snowpark Connect for Spark Platform
       priority: Medium-High
+      status: Completed
+    - id: starburst-platform-adapter
+      file: DONE/platform-expansion/planning/starburst-platform-adapter.yaml
+      title: Starburst Platform Adapter
+      priority: Low
       status: Completed
     - id: tpcds-pyspark-compatibility
       file: DONE/dataframe-expansion/active/tpcds-pyspark-compatibility.yaml
