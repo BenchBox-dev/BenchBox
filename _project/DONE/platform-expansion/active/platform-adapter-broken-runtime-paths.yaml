@@ -1,0 +1,131 @@
+id: platform-adapter-broken-runtime-paths
+title: "Fix broken runtime paths in Databend, LakeSail, StarRocks, and pg_duckdb adapters"
+worktree: platform-expansion
+priority: High
+status: Completed
+completed_date: "2026-02-16"
+description: |
+  Adversarial code reviews identified runtime paths that will crash or fail silently
+  when users attempt to use these adapters:
+
+  1. **Databend lazy config builder broken** (PR #29): _make_lazy_config_builder calls
+     getattr(module, "_build_databend_config") on the package, but the function is only
+     defined in adapter.py and not exported from __init__.py. Will raise AttributeError
+     when benchbox run --platform databend is used via CLI.
+
+  2. **LakeSail missing from adapter_factory** (PR #27): _get_dataframe_adapter() mapping
+     in adapter_factory.py doesn't include 'lakesail'. benchbox run --platform lakesail-df
+     via the unified adapter factory will fail with "Unknown DataFrame platform: lakesail".
+
+  3. **LakeSail missing pyproject.toml extra** (PR #27): No lakesail = [...] extra in
+     pyproject.toml. uv sync --extra lakesail will fail. DEPENDENCY_GROUPS and
+     PLATFORM_TO_EXTRA reference "lakesail" but the extra doesn't exist.
+
+  4. **StarRocks integration test stubs never merged** (PR #33): test_starrocks_smoke.py
+     imports symbols from common.py that were never added. Integration tests crash with
+     ImportError.
+
+  5. **pg_duckdb from_config() doesn't pass deployment_mode or motherduck_token** (PR #32):
+     MotherDuck deployment mode is unreachable via the standard config pipeline. The
+     for key in [...] passthrough loop doesn't include these keys.
+
+  6. **pg_duckdb/pg_mooncake silent exception swallowing** (PR #32): create_connection()
+     catches all exceptions and returns connections in potentially aborted transaction state.
+
+category: Platform Expansion
+
+work:
+- id: w1
+  summary: "Fix Databend config builder — export _build_databend_config from __init__.py or move to __init__.py"
+  status: done
+  notes: "Follow Databricks pattern: move builder to __init__.py, remove eager registration from adapter.py:912-918"
+
+- id: w2
+  summary: "Add LakeSail to adapter_factory._get_dataframe_adapter() mapping"
+  status: done
+  notes: "adapter_factory.py:232-240 — add 'lakesail' entry matching pattern of other DF platforms"
+
+- id: w3
+  summary: "Add lakesail extra to pyproject.toml"
+  status: done
+  notes: 'Add lakesail = ["pyspark>=3.4.0"] to [project.optional-dependencies]'
+
+- id: w4
+  summary: "Add StarRocks stub implementation to tests/integration/platforms/common.py"
+  status: done
+  notes: "Add StarRocksStubState, _StarRocksCursor, _StarRocksConnection, install_starrocks_stub"
+
+- id: w5
+  summary: "Fix pg_duckdb from_config() to pass deployment_mode and motherduck_token"
+  status: done
+  notes: "pg_duckdb.py:116-165 — add keys to the passthrough loop or extract explicitly"
+
+- id: w6
+  summary: "Fix pg_duckdb/pg_mooncake create_connection() exception handling — re-raise or narrow catch"
+  status: done
+  notes: "pg_duckdb.py:261-265, pg_mooncake.py:171-175 — silently returning aborted connections corrupts results"
+
+- id: w7
+  summary: "Add tests verifying all fixed runtime paths work"
+  needs: [w1, w2, w3, w4, w5, w6]
+  status: done
+
+metadata:
+  tags:
+  - runtime-crash
+  - integration
+  - config-builder
+  - adapter-factory
+  - code-review-finding
+  estimated_effort: 2 days
+  created_date: "2026-02-15"
+  owners:
+  - joe
+
+must_preserve:
+- "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+- "Existing adapter_factory paths for duckdb, polars-df, pandas-df continue working"
+- "benchbox run --platform duckdb --benchmark tpch still works end-to-end"
+
+approach: |
+  Each fix is independent and can be addressed in any order:
+
+  Databend: Follow the Databricks pattern in benchbox/platforms/databricks/__init__.py
+  which defines the config builder in __init__.py alongside the lazy adapter import.
+
+  LakeSail: Add entry to adapter_factory._get_dataframe_adapter() dict following the
+  existing polars-df and pandas-df entries.
+
+  StarRocks: Copy the stub pattern from ClickHouse or Doris integration stubs in
+  tests/integration/platforms/common.py.
+
+  pg_duckdb: Add 'deployment_mode' and 'motherduck_token' to the key passthrough list,
+  and narrow the exception handling in create_connection() to specific expected exceptions.
+
+verification:
+- description: "All platform adapter tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass"
+- description: "Databend config builder resolves"
+  command: "uv run -- python -c \"from benchbox.platforms.databend import DatabendAdapter; print('OK')\""
+  expected_output: "OK"
+- description: "LakeSail DF adapter is discoverable"
+  command: "uv run -- python -c \"from benchbox.platforms.adapter_factory import get_adapter; print('OK')\""
+  expected_output: "OK"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/databend/__init__.py"
+  - "benchbox/platforms/databend/adapter.py"
+  - "benchbox/platforms/adapter_factory.py"
+  - "benchbox/platforms/lakesail.py"
+  - "benchbox/platforms/pg_duckdb.py"
+  - "benchbox/platforms/pg_mooncake.py"
+  - "pyproject.toml"
+  - "tests/integration/platforms/common.py"
+  - "tests/unit/platforms/test_databend_adapter.py"
+  - "tests/unit/platforms/test_pg_duckdb_adapter.py"
+  - "tests/unit/platforms/test_pg_mooncake_adapter.py"
+  do_not_modify:
+  - "benchbox/core/runner.py"
+  - "benchbox/platforms/duckdb.py"

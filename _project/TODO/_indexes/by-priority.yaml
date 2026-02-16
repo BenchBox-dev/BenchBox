@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T21:35:30.743076'
-total_items: 49
+generated_at: '2026-02-16T08:53:58.050623'
+total_items: 48
 priorities:
   Critical:
     count: 2
@@ -15,18 +15,13 @@ priorities:
       category: Core Functionality
       status: In Progress
   High:
-    count: 5
+    count: 4
     items:
     - id: lakesail-spark-platform
       file: TODO/platform-expansion/active/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       category: Platform Expansion
       status: In Progress
-    - id: platform-adapter-broken-runtime-paths
-      file: TODO/platform-expansion/planning/platform-adapter-broken-runtime-paths.yaml
-      title: Fix broken runtime paths in Databend, LakeSail, StarRocks, and pg_duckdb adapters
-      category: Platform Expansion
-      status: Not Started
     - id: platform-adapter-cursor-resource-leaks
       file: TODO/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
       title: Fix cursor and connection resource leaks across new platform adapters

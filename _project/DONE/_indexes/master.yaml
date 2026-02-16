@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T21:35:31.682536'
-total_items: 466
+generated_at: '2026-02-16T08:53:59.015841'
+total_items: 467
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1201,6 +1201,26 @@ items:
   - joe
   estimated_effort: 1-2 days
   completed_date: '2026-02-06'
+- id: platform-adapter-broken-runtime-paths
+  file: DONE/platform-expansion/active/platform-adapter-broken-runtime-paths.yaml
+  title: Fix broken runtime paths in Databend, LakeSail, StarRocks, and pg_duckdb adapters
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Completed
+  tags:
+  - runtime-crash
+  - integration
+  - config-builder
+  - adapter-factory
+  - code-review-finding
+  owners:
+  - joe
+  estimated_effort: 2 days
+  completed_date: '2026-02-16'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: fix-datagen-layout-and-manifest-hygiene
   file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml
   title: Fix datagen layout, naming normalization, and manifest/cache hygiene

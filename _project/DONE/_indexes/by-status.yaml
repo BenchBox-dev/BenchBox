@@ -1,5 +1,5 @@
-generated_at: '2026-02-15T21:35:31.682928'
-total_items: 466
+generated_at: '2026-02-16T08:53:59.016258'
+total_items: 467
 statuses:
   In Progress:
     count: 2
@@ -246,7 +246,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 419
+    count: 420
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1119,6 +1119,11 @@ statuses:
       file: DONE/platform-expansion/active/platform-adapter-benchmark-correctness.yaml
       title: Fix benchmark correctness issues in Databend, Doris, and pg_duckdb adapters
       priority: Critical
+      category: Platform Expansion
+    - id: platform-adapter-broken-runtime-paths
+      file: DONE/platform-expansion/active/platform-adapter-broken-runtime-paths.yaml
+      title: Fix broken runtime paths in Databend, LakeSail, StarRocks, and pg_duckdb adapters
+      priority: High
       category: Platform Expansion
     - id: fix-ci-critical-issues
       file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml

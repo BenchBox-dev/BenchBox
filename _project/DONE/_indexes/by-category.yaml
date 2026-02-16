@@ -1,4 +1,4 @@
-generated_at: '2026-02-15T21:35:31.682717'
+generated_at: '2026-02-16T08:53:59.016032'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -1493,7 +1493,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 46
+    count: 47
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1614,6 +1614,11 @@ categories:
       file: DONE/platform-expansion/active/platform-adapter-benchmark-correctness.yaml
       title: Fix benchmark correctness issues in Databend, Doris, and pg_duckdb adapters
       priority: Critical
+      status: Completed
+    - id: platform-adapter-broken-runtime-paths
+      file: DONE/platform-expansion/active/platform-adapter-broken-runtime-paths.yaml
+      title: Fix broken runtime paths in Databend, LakeSail, StarRocks, and pg_duckdb adapters
+      priority: High
       status: Completed
     - id: gcp-dataproc-platform
       file: DONE/platform-expansion/planning/gcp-dataproc-platform.yaml
