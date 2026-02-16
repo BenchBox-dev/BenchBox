@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T14:46:54.924514'
+generated_at: '2026-02-16T15:00:17.964584'
 total_items: 475
 items:
 - id: interactive-wizard-dry-run-support
@@ -627,9 +627,8 @@ items:
   estimated_effort: Large
   completed_date: '2026-02-16'
   work_total: 91
-  work_done: 76
-  work_ready: 3
-  deferred_count: 1
+  work_done: 91
+  work_ready: 0
 - id: onehouse-quanton-platform
   file: DONE/platform-expansion/planning/onehouse-quanton-platform.yaml
   title: Add Onehouse Quanton platform support for managed Spark benchmarking
@@ -2644,9 +2643,9 @@ items:
   estimated_effort: 2-3 days
   completed_date: '2026-02-16'
   work_total: 24
-  work_done: 18
-  work_ready: 4
-  deferred_count: 2
+  work_done: 24
+  work_ready: 0
+  deferred_count: 1
 - id: fix-tpc-ds-optional-dependency-example-test
   file: DONE/testing-improvements/completed/fix-tpc-ds-optional-dependency-example-test.yaml
   title: Fix TPC-DS Optional Dependency Example Test
@@ -3041,9 +3040,9 @@ items:
   estimated_effort: Medium
   completed_date: '2026-02-16'
   work_total: 16
-  work_done: 12
-  work_ready: 3
-  deferred_count: 2
+  work_done: 16
+  work_ready: 0
+  deferred_count: 1
 - id: platform-adapter-http-tls-support
   file: DONE/platform-adapter-http-tls-support.yaml
   title: Add TLS/HTTPS option for HTTP-based data loading endpoints
