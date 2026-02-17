@@ -67,7 +67,7 @@ work:
 
 - id: w6
   summary: "Fix summary-box comparison-row width accounting so no-color pct arrows do not overflow borders"
-  status: pending
+  status: done
 
 - id: w7
   summary: "Clamp/wrap summary-box title and best/worst rows to prevent border overflow with long text"
