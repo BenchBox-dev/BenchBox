@@ -1,27 +1,12 @@
-generated_at: '2026-02-16T18:47:25.015997'
-total_items: 40
+generated_at: '2026-02-16T23:40:01.020043'
+total_items: 37
 statuses:
   In Progress:
-    count: 6
+    count: 3
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
-      priority: Medium-High
-      category: Platform Expansion
-    - id: questdb-timeseries-platform
-      file: TODO/platform-expansion/active/questdb-timeseries-platform.yaml
-      title: Add QuestDB time-series database platform support
-      priority: Medium-High
-      category: Platform Expansion
-    - id: clickhouse-cloud-deployment
-      file: TODO/platform-expansion/active/clickhouse-cloud-deployment.yaml
-      title: ClickHouse Cloud Deployment Mode
-      priority: Medium
-      category: Platform Expansion
-    - id: databend-cloud-olap-platform
-      file: TODO/platform-expansion/active/databend-cloud-olap-platform.yaml
-      title: Databend Cloud-Native OLAP Platform Integration
       priority: Medium-High
       category: Platform Expansion
     - id: implement-dataframe-benchmarks

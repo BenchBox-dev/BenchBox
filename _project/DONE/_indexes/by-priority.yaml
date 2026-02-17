@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T18:47:25.958151'
-total_items: 475
+generated_at: '2026-02-16T23:40:02.020802'
+total_items: 478
 priorities:
   Critical:
     count: 32
@@ -1004,7 +1004,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 45
+    count: 47
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1034,6 +1034,11 @@ priorities:
     - id: influxdb-timeseries-platform
       file: DONE/platform-expansion/active/influxdb-timeseries-platform.yaml
       title: Add InfluxDB Platform Support for Time Series Benchmarking
+      category: Platform Expansion
+      status: Completed
+    - id: questdb-timeseries-platform
+      file: DONE/platform-expansion/active/questdb-timeseries-platform.yaml
+      title: Add QuestDB time-series database platform support
       category: Platform Expansion
       status: Completed
     - id: release-automation-unit-tests
@@ -1106,6 +1111,11 @@ priorities:
       file: DONE/core-functionality/active/consolidate-trailing-delimiter-handling.yaml
       title: Consolidate trailing delimiter handling into shared utility
       category: Core Functionality
+      status: Completed
+    - id: databend-cloud-olap-platform
+      file: DONE/platform-expansion/active/databend-cloud-olap-platform.yaml
+      title: Databend Cloud-Native OLAP Platform Integration
+      category: Platform Expansion
       status: Completed
     - id: dataframe-write-primitives-model
       file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
@@ -1233,7 +1243,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 216
+    count: 217
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1509,6 +1519,11 @@ priorities:
       file: DONE/unknown/planning/circular-import-issues-completed.yaml
       title: Circular Import Issues ✅ COMPLETED
       category: Code Quality and Technical Debt
+      status: Completed
+    - id: clickhouse-cloud-deployment
+      file: DONE/platform-expansion/active/clickhouse-cloud-deployment.yaml
+      title: ClickHouse Cloud Deployment Mode
+      category: Platform Expansion
       status: Completed
     - id: cloud-platform-error-context
       file: DONE/observability-quality/planning/cloud-platform-error-context.yaml

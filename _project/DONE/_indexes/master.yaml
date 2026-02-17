@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T18:47:25.957838'
-total_items: 475
+generated_at: '2026-02-16T23:40:02.020456'
+total_items: 478
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3328,6 +3328,23 @@ items:
   category: Code Quality and Technical Debt
   priority: Medium
   status: Completed
+- id: clickhouse-cloud-deployment
+  file: DONE/platform-expansion/active/clickhouse-cloud-deployment.yaml
+  title: ClickHouse Cloud Deployment Mode
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  tags:
+  - platform-adapter
+  - clickhouse
+  - cloud
+  - deployment-modes
+  estimated_effort: 2-3 days
+  completed_date: '2026-02-16'
+  work_total: 24
+  work_done: 24
+  work_ready: 0
 - id: cloud-platform-error-context
   file: DONE/observability-quality/planning/cloud-platform-error-context.yaml
   title: Cloud Platform Error Message Context
@@ -4932,6 +4949,25 @@ items:
   owners:
   - joe
   estimated_effort: Medium
+- id: questdb-timeseries-platform
+  file: DONE/platform-expansion/active/questdb-timeseries-platform.yaml
+  title: Add QuestDB time-series database platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - questdb
+  - timeseries
+  - columnar
+  - platform
+  - postgres-protocol
+  - ilp
+  estimated_effort: Medium
+  completed_date: '2026-02-16'
+  work_total: 40
+  work_done: 40
+  work_ready: 0
 - id: release-automation-unit-tests
   file: DONE/core-functionality/active/release-automation-unit-tests.yaml
   title: Add comprehensive unit tests for release automation (fingerprinting, timestamps, content validation, size checks,
@@ -5147,6 +5183,24 @@ items:
   completed_date: '2026-02-09'
   work_total: 8
   work_done: 8
+  work_ready: 0
+- id: databend-cloud-olap-platform
+  file: DONE/platform-expansion/active/databend-cloud-olap-platform.yaml
+  title: Databend Cloud-Native OLAP Platform Integration
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - cloud-native
+  - olap
+  - snowflake-compatible
+  - rust
+  - object-storage
+  estimated_effort: 2-3 days
+  completed_date: '2026-02-16'
+  work_total: 22
+  work_done: 22
   work_ready: 0
 - id: dataframe-write-primitives-model
   file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml

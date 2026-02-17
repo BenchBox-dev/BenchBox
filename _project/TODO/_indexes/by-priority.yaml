@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T18:47:25.015987'
-total_items: 40
+generated_at: '2026-02-16T23:40:01.020032'
+total_items: 37
 priorities:
   Critical:
     count: 2
@@ -28,21 +28,11 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 9
+    count: 7
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
-      category: Platform Expansion
-      status: In Progress
-    - id: questdb-timeseries-platform
-      file: TODO/platform-expansion/active/questdb-timeseries-platform.yaml
-      title: Add QuestDB time-series database platform support
-      category: Platform Expansion
-      status: In Progress
-    - id: databend-cloud-olap-platform
-      file: TODO/platform-expansion/active/databend-cloud-olap-platform.yaml
-      title: Databend Cloud-Native OLAP Platform Integration
       category: Platform Expansion
       status: In Progress
     - id: ctas-sorted-data-loading
@@ -76,7 +66,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 20
+    count: 19
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -93,11 +83,6 @@ priorities:
       title: Add SingleStore Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: clickhouse-cloud-deployment
-      file: TODO/platform-expansion/active/clickhouse-cloud-deployment.yaml
-      title: ClickHouse Cloud Deployment Mode
-      category: Platform Expansion
-      status: In Progress
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication

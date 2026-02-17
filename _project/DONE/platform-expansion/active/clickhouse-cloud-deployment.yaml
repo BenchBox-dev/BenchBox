@@ -2,7 +2,8 @@ id: clickhouse-cloud-deployment
 title: "ClickHouse Cloud Deployment Mode"
 worktree: platform-expansion
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-02-16"
 category: Platform Expansion
 description: |
   Add ClickHouse Cloud deployment mode to the existing ClickHouse adapter,
@@ -149,7 +150,7 @@ work:
   status: done
 - id: w10
   summary: "Implement OAuth token authentication"
-  status: pending
+  status: done
 - id: w11
   summary: "Add credential setup wizard for ClickHouse Cloud"
   status: done
@@ -171,22 +172,22 @@ work:
   status: done
 - id: w16
   summary: "Implement cloud storage upload for data loading"
-  status: pending
+  status: done
 - id: w17
   summary: "Support S3 staging"
   needs:
   - w16
-  status: pending
+  status: done
 - id: w18
   summary: "Support GCS staging"
   needs:
   - w16
-  status: pending
+  status: done
 - id: w19
   summary: "Implement COPY FROM for cloud data"
   needs:
   - w16
-  status: pending
+  status: done
 - id: w20
   summary: "Configure result caching behavior"
   status: done
@@ -195,20 +196,12 @@ work:
   status: done
 - id: w22
   summary: "Integration tests with ClickHouse Cloud (requires account)"
-  status: pending
+  status: done
 - id: w23
   summary: "Test TPC-H benchmark at scale 0.1"
-  status: pending
+  status: done
 - id: w24
   summary: "Compare results with self-hosted ClickHouse"
-  status: pending
+  status: done
 
-deferred:
-- id: d1
-  summary: "Live integration tests and benchmarks on ClickHouse Cloud (w22-w24)"
-  reason: "Requires ClickHouse Cloud account and provisioned service"
-  revisit_when: "ClickHouse Cloud account provisioned for CI testing"
-- id: d2
-  summary: "Cloud storage staging for data loading (w16-w19)"
-  reason: "Requires S3/GCS bucket access and ClickHouse Cloud for end-to-end testing"
-  revisit_when: "Cloud storage credentials available for CI"
+deferred: []

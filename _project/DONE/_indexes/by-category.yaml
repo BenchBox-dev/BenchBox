@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T18:47:25.958037'
+generated_at: '2026-02-16T23:40:02.020671'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -1493,7 +1493,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 55
+    count: 58
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1534,6 +1534,11 @@ categories:
       file: DONE/platform-expansion-presto/planning/add-prestodb-platform-adapter.yaml
       title: Add PrestoDB Platform Adapter
       priority: Medium
+      status: Completed
+    - id: questdb-timeseries-platform
+      file: DONE/platform-expansion/active/questdb-timeseries-platform.yaml
+      title: Add QuestDB time-series database platform support
+      priority: Medium-High
       status: Completed
     - id: starrocks-olap-platform
       file: DONE/platform-expansion/planning/starrocks-olap-platform.yaml
@@ -1600,6 +1605,11 @@ categories:
       title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       priority: Medium
       status: Completed
+    - id: clickhouse-cloud-deployment
+      file: DONE/platform-expansion/active/clickhouse-cloud-deployment.yaml
+      title: ClickHouse Cloud Deployment Mode
+      priority: Medium
+      status: Completed
     - id: platform-adapter-sql-injection-gaps
       file: DONE/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
       title: Close SQL injection gaps in platform adapter identifier validation
@@ -1614,6 +1624,11 @@ categories:
       file: DONE/platform-expansion/active/timescaledb-first-class-platform.yaml
       title: Create first-class TimescaleDB platform adapter
       priority: High
+      status: Completed
+    - id: databend-cloud-olap-platform
+      file: DONE/platform-expansion/active/databend-cloud-olap-platform.yaml
+      title: Databend Cloud-Native OLAP Platform Integration
+      priority: Medium-High
       status: Completed
     - id: databricks-dataframe-mode
       file: DONE/platform-expansion/active/databricks-dataframe-mode.yaml

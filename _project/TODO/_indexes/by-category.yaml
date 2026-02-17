@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T18:47:25.015973'
+generated_at: '2026-02-16T23:40:01.020018'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -132,7 +132,7 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 11
+    count: 8
     items:
     - id: apache-doris-olap-platform
       file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
@@ -154,11 +154,6 @@ categories:
       title: Add Microsoft Fabric Spark Notebooks platform support
       priority: Medium
       status: Not Started
-    - id: questdb-timeseries-platform
-      file: TODO/platform-expansion/active/questdb-timeseries-platform.yaml
-      title: Add QuestDB time-series database platform support
-      priority: Medium-High
-      status: In Progress
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
@@ -169,16 +164,6 @@ categories:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
       status: Not Started
-    - id: clickhouse-cloud-deployment
-      file: TODO/platform-expansion/active/clickhouse-cloud-deployment.yaml
-      title: ClickHouse Cloud Deployment Mode
-      priority: Medium
-      status: In Progress
-    - id: databend-cloud-olap-platform
-      file: TODO/platform-expansion/active/databend-cloud-olap-platform.yaml
-      title: Databend Cloud-Native OLAP Platform Integration
-      priority: Medium-High
-      status: In Progress
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

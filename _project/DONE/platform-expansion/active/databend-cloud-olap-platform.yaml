@@ -7,7 +7,8 @@ id: databend-cloud-olap-platform
 title: "Databend Cloud-Native OLAP Platform Integration"
 worktree: platform-expansion
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-02-16"
 description: |
   Implement Databend (https://github.com/databendlabs/databend) as a supported platform
   in BenchBox. Databend is a cloud-native, Rust-based data warehouse with Snowflake-
@@ -180,34 +181,34 @@ work:
   status: done
 - id: w12
   summary: "Test all 22 TPC-H queries for compatibility"
-  status: pending
+  status: done
 - id: w13
   summary: "Test all 99 TPC-DS queries for compatibility"
-  status: pending
+  status: done
 - id: w14
   summary: "Implement QueryTransformer for edge cases if needed"
-  status: pending
+  status: done
 - id: w15
   summary: "Document any query modifications required"
-  status: pending
+  status: done
 - id: w16
   summary: "Create unit tests (test_databend_adapter.py)"
   status: done
 - id: w17
   summary: "Create Docker Compose for Databend + MinIO"
-  status: pending
+  status: done
 - id: w18
   summary: "Add integration smoke tests"
-  status: pending
+  status: done
 - id: w19
   summary: "Add CI workflow for Databend testing"
-  status: pending
+  status: done
 - id: w20
   summary: "Create platform documentation (docs/platforms/databend.md)"
-  status: pending
+  status: done
 - id: w21
   summary: "Add example script (examples/getting_started/cloud/)"
-  status: pending
+  status: done
 - id: w22
   summary: "Update platform comparison matrix"
-  status: pending
+  status: done

@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T18:47:25.958254'
-total_items: 475
+generated_at: '2026-02-16T23:40:02.020917'
+total_items: 478
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 427
+    count: 430
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -463,6 +463,11 @@ statuses:
       title: Add PrestoDB Platform Adapter
       priority: Medium
       category: Platform Expansion
+    - id: questdb-timeseries-platform
+      file: DONE/platform-expansion/active/questdb-timeseries-platform.yaml
+      title: Add QuestDB time-series database platform support
+      priority: Medium-High
+      category: Platform Expansion
     - id: starrocks-olap-platform
       file: DONE/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
@@ -669,6 +674,11 @@ statuses:
       title: Circular Import Issues ✅ COMPLETED
       priority: Medium
       category: Code Quality and Technical Debt
+    - id: clickhouse-cloud-deployment
+      file: DONE/platform-expansion/active/clickhouse-cloud-deployment.yaml
+      title: ClickHouse Cloud Deployment Mode
+      priority: Medium
+      category: Platform Expansion
     - id: platform-adapter-sql-injection-gaps
       file: DONE/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
       title: Close SQL injection gaps in platform adapter identifier validation
@@ -874,6 +884,11 @@ statuses:
       title: Database Validation and Enhanced Results ✅ COMPLETED
       priority: Medium
       category: '"Technical Debt & Refactoring"'
+    - id: databend-cloud-olap-platform
+      file: DONE/platform-expansion/active/databend-cloud-olap-platform.yaml
+      title: Databend Cloud-Native OLAP Platform Integration
+      priority: Medium-High
+      category: Platform Expansion
     - id: databricks-dataframe-mode
       file: DONE/platform-expansion/active/databricks-dataframe-mode.yaml
       title: Databricks DataFrame Mode - CRITICAL PRIORITY
