@@ -54,7 +54,7 @@ work:
 
 - id: w3
   summary: "Improve box plot series label layout to avoid marker-driven truncation and preserve informative names"
-  status: pending
+  status: done
 
 - id: w4
   summary: "Improve no-color heatmap density/readability with right-aligned numeric cells and clearer column separators"
