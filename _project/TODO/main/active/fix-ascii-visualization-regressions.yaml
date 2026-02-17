@@ -72,7 +72,7 @@ work:
 - id: w7
   summary: "Clamp/wrap summary-box title and best/worst rows to prevent border overflow with long text"
   needs: [w6]
-  status: pending
+  status: done
 
 - id: w8
   summary: "Restore percentage-change visibility in two-column summary mode and add width-regression tests"
