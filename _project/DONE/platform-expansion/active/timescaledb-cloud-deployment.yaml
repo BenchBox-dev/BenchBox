@@ -2,7 +2,8 @@ id: timescaledb-cloud-deployment
 title: "TigerData Cloud Deployment Mode"
 worktree: platform-expansion
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-02-17"
 category: Platform Expansion
 description: |
   Update the existing TimescaleDB cloud deployment mode to reflect the
@@ -274,7 +275,7 @@ work:
   - w10
   - w11
   - w14
-  status: pending
+  status: done
 
 deferred:
 - id: d1

@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T08:55:18.419433'
-total_items: 36
+generated_at: '2026-02-17T09:30:58.524375'
+total_items: 35
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Critical
       category: Core Functionality
   Not Started:
-    count: 34
+    count: 33
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -132,11 +132,6 @@ statuses:
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
       priority: Medium-High
       category: Core Functionality
-    - id: timescaledb-cloud-deployment
-      file: TODO/platform-expansion/planning/timescaledb-cloud-deployment.yaml
-      title: TigerData Cloud Deployment Mode
-      priority: Medium
-      category: Platform Expansion
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support

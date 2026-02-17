@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T08:55:19.408071'
-total_items: 479
+generated_at: '2026-02-17T09:30:59.520936'
+total_items: 480
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4545,6 +4545,26 @@ items:
   category: Testing and Quality Assurance
   priority: Medium
   status: Completed
+- id: timescaledb-cloud-deployment
+  file: DONE/platform-expansion/active/timescaledb-cloud-deployment.yaml
+  title: TigerData Cloud Deployment Mode
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  tags:
+  - platform-adapter
+  - timescaledb
+  - tigerdata
+  - cloud
+  - deployment-modes
+  - rebrand
+  estimated_effort: 1-2 days
+  completed_date: '2026-02-17'
+  work_total: 15
+  work_done: 15
+  work_ready: 0
+  deferred_count: 3
 - id: trim-viz-deps-plotly-only
   file: DONE/main/active/trim-viz-deps-plotly-only.yaml
   title: Trim visualization dependencies to Plotly-only (remove Kaleido, Pandas, Pillow)

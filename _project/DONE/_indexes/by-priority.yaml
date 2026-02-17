@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T08:55:19.408390'
-total_items: 479
+generated_at: '2026-02-17T09:30:59.521255'
+total_items: 480
 priorities:
   Critical:
     count: 32
@@ -1248,7 +1248,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 217
+    count: 218
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2129,6 +2129,11 @@ priorities:
       file: DONE/unknown/planning/test-suite-reliability-completed.yaml
       title: Test Suite Reliability ✅ COMPLETED
       category: Testing and Quality Assurance
+      status: Completed
+    - id: timescaledb-cloud-deployment
+      file: DONE/platform-expansion/active/timescaledb-cloud-deployment.yaml
+      title: TigerData Cloud Deployment Mode
+      category: Platform Expansion
       status: Completed
     - id: trim-viz-deps-plotly-only
       file: DONE/main/active/trim-viz-deps-plotly-only.yaml

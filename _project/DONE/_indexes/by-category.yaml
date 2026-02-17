@@ -1,4 +1,4 @@
-generated_at: '2026-02-17T08:55:19.408275'
+generated_at: '2026-02-17T09:30:59.521138'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -1493,7 +1493,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 59
+    count: 60
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1784,6 +1784,11 @@ categories:
       file: DONE/dataframe-expansion/active/tpcds-pyspark-compatibility.yaml
       title: TPC-DS PySpark Compatibility - Add missing UnifiedExpr methods and context functions
       priority: High
+      status: Completed
+    - id: timescaledb-cloud-deployment
+      file: DONE/platform-expansion/active/timescaledb-cloud-deployment.yaml
+      title: TigerData Cloud Deployment Mode
+      priority: Medium
       status: Completed
     - id: trino-platform-adapter
       file: DONE/platform-expansion-trino/completed/trino-platform-adapter.yaml

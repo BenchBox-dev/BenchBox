@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T08:55:18.419423'
-total_items: 36
+generated_at: '2026-02-17T09:30:58.524365'
+total_items: 35
 priorities:
   Critical:
     count: 2
@@ -61,7 +61,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 19
+    count: 18
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -112,11 +112,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: timescaledb-cloud-deployment
-      file: TODO/platform-expansion/planning/timescaledb-cloud-deployment.yaml
-      title: TigerData Cloud Deployment Mode
-      category: Platform Expansion
       status: Not Started
     - id: arm-graviton-generations-benchmarks
       file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
