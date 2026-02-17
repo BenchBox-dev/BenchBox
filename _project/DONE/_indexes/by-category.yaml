@@ -1,4 +1,4 @@
-generated_at: '2026-02-17T12:02:15.374431'
+generated_at: '2026-02-17T18:44:07.380250'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 125
+    count: 126
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -626,6 +626,11 @@ categories:
       title: Expand query plan fingerprint coverage and verification
       priority: High
       status: Not Started
+    - id: fix-ascii-visualization-regressions
+      file: DONE/main/active/fix-ascii-visualization-regressions.yaml
+      title: Fix ASCII visualization regressions in summary box, histogram semantics, box labels, and heatmap readability
+      priority: High
+      status: Completed
     - id: fix-cli-power-throughput-test-execution-and-tuning-configuration-issues
       file: DONE/unknown/planning/fix-cli-power-throughput-test-execution-and-tuning-configuration-issues.yaml
       title: Fix CLI Power/Throughput Test Execution and Tuning Configuration Issues

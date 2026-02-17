@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T12:02:15.374228'
-total_items: 481
+generated_at: '2026-02-17T18:44:07.380010'
+total_items: 482
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1134,6 +1134,25 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 4-6 hours
+- id: fix-ascii-visualization-regressions
+  file: DONE/main/active/fix-ascii-visualization-regressions.yaml
+  title: Fix ASCII visualization regressions in summary box, histogram semantics, box labels, and heatmap readability
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - no-color
+  - histogram
+  - heatmap
+  - summary-box
+  estimated_effort: 1-2 days
+  completed_date: '2026-02-17'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
 - id: dask-platform-compatibility
   file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml
   title: Fix Dask DataFrame Platform Compatibility

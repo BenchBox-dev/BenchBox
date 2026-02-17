@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T12:02:15.374549'
-total_items: 481
+generated_at: '2026-02-17T18:44:07.380385'
+total_items: 482
 priorities:
   Critical:
     count: 32
@@ -165,7 +165,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 167
+    count: 168
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -412,6 +412,11 @@ priorities:
       file: DONE/docs-experience/planning/firebolt-platform-documentation.yaml
       title: Firebolt Platform Documentation
       category: Documentation and User Experience
+      status: Completed
+    - id: fix-ascii-visualization-regressions
+      file: DONE/main/active/fix-ascii-visualization-regressions.yaml
+      title: Fix ASCII visualization regressions in summary box, histogram semantics, box labels, and heatmap readability
+      category: Core Functionality
       status: Completed
     - id: dask-platform-compatibility
       file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml

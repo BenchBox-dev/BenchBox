@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T12:02:15.374656'
-total_items: 481
+generated_at: '2026-02-17T18:44:07.380505'
+total_items: 482
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 433
+    count: 434
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1090,6 +1090,11 @@ statuses:
       title: Firebolt Platform Documentation
       priority: High
       category: Documentation and User Experience
+    - id: fix-ascii-visualization-regressions
+      file: DONE/main/active/fix-ascii-visualization-regressions.yaml
+      title: Fix ASCII visualization regressions in summary box, histogram semantics, box labels, and heatmap readability
+      priority: High
+      category: Core Functionality
     - id: fix-cli-benchmarks-module-critical-issues
       file: DONE/unknown/planning/fix-cli-benchmarks-module-critical-issues.yaml
       title: Fix CLI Benchmarks Module Critical Issues
