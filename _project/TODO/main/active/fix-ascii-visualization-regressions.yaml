@@ -77,7 +77,7 @@ work:
 - id: w8
   summary: "Restore percentage-change visibility in two-column summary mode and add width-regression tests"
   needs: [w6]
-  status: pending
+  status: done
 
 must_preserve:
 - "Colored rendering behavior for ASCII charts remains unchanged when use_color=True"
