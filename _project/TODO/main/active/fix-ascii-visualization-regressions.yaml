@@ -63,7 +63,7 @@ work:
 - id: w5
   summary: "Audit heatmap truncation logic, fix dead row-truncation path if needed, and add regression tests"
   needs: [w4]
-  status: pending
+  status: done
 
 - id: w6
   summary: "Fix summary-box comparison-row width accounting so no-color pct arrows do not overflow borders"
