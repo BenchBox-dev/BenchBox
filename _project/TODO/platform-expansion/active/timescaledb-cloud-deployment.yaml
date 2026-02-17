@@ -204,7 +204,7 @@ work:
 - id: w5
   summary: "Update platform_registry.py cloud deployment: display_name → 'TigerData', description → 'TigerData managed PostgreSQL
     service'"
-  status: pending
+  status: done
 
 # --- Phase 3: Update tests ---
 - id: w6
