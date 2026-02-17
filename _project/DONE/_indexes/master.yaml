@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T23:40:02.020456'
-total_items: 478
+generated_at: '2026-02-17T08:36:15.702187'
+total_items: 479
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4902,6 +4902,30 @@ items:
   completed_date: '2026-02-15'
   work_total: 7
   work_done: 7
+  work_ready: 0
+- id: apache-doris-olap-platform
+  file: DONE/platform-expansion/active/apache-doris-olap-platform.yaml
+  title: Add Apache Doris MPP OLAP platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - doris
+  - apache
+  - olap
+  - mpp
+  - columnar
+  - platform
+  - mysql-protocol
+  - real-time-analytics
+  - velodb
+  - selectdb
+  - cloud
+  estimated_effort: Medium
+  completed_date: '2026-02-17'
+  work_total: 40
+  work_done: 40
   work_ready: 0
 - id: hudi-support-parity
   file: DONE/table-format-parity/hudi-support-parity.yaml

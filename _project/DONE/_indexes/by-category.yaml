@@ -1,4 +1,4 @@
-generated_at: '2026-02-16T23:40:02.020671'
+generated_at: '2026-02-17T08:36:15.702422'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -1493,7 +1493,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 58
+    count: 59
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1504,6 +1504,11 @@ categories:
       file: DONE/platform-expansion/planning/aws-glue-platform.yaml
       title: AWS Glue Managed Spark Platform
       priority: High
+      status: Completed
+    - id: apache-doris-olap-platform
+      file: DONE/platform-expansion/active/apache-doris-olap-platform.yaml
+      title: Add Apache Doris MPP OLAP platform support
+      priority: Medium-High
       status: Completed
     - id: ducklake-open-table-format
       file: DONE/platform-expansion/planning/ducklake-open-table-format.yaml

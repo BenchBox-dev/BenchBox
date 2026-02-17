@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T23:40:01.019985'
-total_items: 37
+generated_at: '2026-02-17T08:36:14.560858'
+total_items: 36
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -539,29 +539,6 @@ items:
   work_total: 14
   work_done: 0
   work_ready: 7
-- id: apache-doris-olap-platform
-  file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
-  title: Add Apache Doris MPP OLAP platform support
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - doris
-  - apache
-  - olap
-  - mpp
-  - columnar
-  - platform
-  - mysql-protocol
-  - real-time-analytics
-  - velodb
-  - selectdb
-  - cloud
-  estimated_effort: Medium
-  work_total: 40
-  work_done: 19
-  work_ready: 11
 - id: ctas-sorted-data-loading
   file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
   title: Implement CTAS-based sorted data loading for DuckDB

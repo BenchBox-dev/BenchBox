@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T23:40:02.020802'
-total_items: 478
+generated_at: '2026-02-17T08:36:15.702556'
+total_items: 479
 priorities:
   Critical:
     count: 32
@@ -1004,7 +1004,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 47
+    count: 48
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1020,6 +1020,11 @@ priorities:
       file: DONE/core-functionality/active/ascii-chart-sparkline-table.yaml
       title: Add ASCII Sparkline Table chart (compact multi-metric leaderboard)
       category: Core Functionality
+      status: Completed
+    - id: apache-doris-olap-platform
+      file: DONE/platform-expansion/active/apache-doris-olap-platform.yaml
+      title: Add Apache Doris MPP OLAP platform support
+      category: Platform Expansion
       status: Completed
     - id: hudi-support-parity
       file: DONE/table-format-parity/hudi-support-parity.yaml

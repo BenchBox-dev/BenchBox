@@ -1,5 +1,5 @@
-generated_at: '2026-02-16T23:40:02.020917'
-total_items: 478
+generated_at: '2026-02-17T08:36:15.702675'
+total_items: 479
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 430
+    count: 431
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -398,6 +398,11 @@ statuses:
       title: Add ASCII Stacked Phase Breakdown chart (datagen/load/power/throughput)
       priority: High
       category: Core Functionality
+    - id: apache-doris-olap-platform
+      file: DONE/platform-expansion/active/apache-doris-olap-platform.yaml
+      title: Add Apache Doris MPP OLAP platform support
+      priority: Medium-High
+      category: Platform Expansion
     - id: hudi-support-parity
       file: DONE/table-format-parity/hudi-support-parity.yaml
       title: Add Apache Hudi Support on Par with Delta Lake and Iceberg

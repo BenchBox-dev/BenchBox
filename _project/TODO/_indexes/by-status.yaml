@@ -1,14 +1,9 @@
-generated_at: '2026-02-16T23:40:01.020043'
-total_items: 37
+generated_at: '2026-02-17T08:36:14.560937'
+total_items: 36
 statuses:
   In Progress:
-    count: 3
+    count: 2
     items:
-    - id: apache-doris-olap-platform
-      file: TODO/platform-expansion/active/apache-doris-olap-platform.yaml
-      title: Add Apache Doris MPP OLAP platform support
-      priority: Medium-High
-      category: Platform Expansion
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
