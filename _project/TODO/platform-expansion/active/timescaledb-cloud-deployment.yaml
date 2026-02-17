@@ -186,19 +186,19 @@ work:
     update env var examples to show TIGERDATA_HOST with TIMESCALE_HOST as fallback"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Update docstrings: module docstring line 11 'Timescale Cloud' → 'TigerData', _configure_cloud_mode() docstring,
     _parse_service_url() docstring, cloud-mode log messages"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w4
   summary: "Update error message for invalid service URL: 'Invalid TIMESCALE_SERVICE_URL' → 'Invalid TIGERDATA_SERVICE_URL
     (or TIMESCALE_SERVICE_URL)'"
   needs:
   - w1
-  status: pending
+  status: done
 
 # --- Phase 2: Rebrand registry ---
 - id: w5
@@ -212,24 +212,24 @@ work:
     verify they take priority over TIMESCALE_* equivalents"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w7
   summary: "Update test_timescaledb_cloud.py: add test that TIMESCALE_* env vars still work when TIGERDATA_* are not set (backward
     compatibility)"
   needs:
   - w6
-  status: pending
+  status: done
 - id: w8
   summary: "Update test_timescaledb_cloud.py: update error message assertions to check for 'TigerData' instead of 'Timescale
     Cloud' in validation errors"
   needs:
   - w2
-  status: pending
+  status: done
 - id: w9
   summary: "Update test registry assertions: verify cloud display_name is 'TigerData'"
   needs:
   - w5
-  status: pending
+  status: done
 - id: w10
   summary: "Run full test suite and fix any regressions: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
   needs:
