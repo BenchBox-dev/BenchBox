@@ -50,7 +50,7 @@ work:
 - id: w2
   summary: "Make grouped histogram legend glyphs semantically match rendered bar glyphs in no-color mode"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Improve box plot series label layout to avoid marker-driven truncation and preserve informative names"
