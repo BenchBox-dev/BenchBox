@@ -1,4 +1,4 @@
-generated_at: '2026-02-17T09:39:40.548923'
+generated_at: '2026-02-17T12:02:14.354963'
 total_items: 36
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -194,7 +194,7 @@ items:
   estimated_effort: 1-2 days
   work_total: 3
   work_done: 0
-  work_ready: 0
+  work_ready: 1
 - id: wikipedia-pageviews-benchmark
   file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
   title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload

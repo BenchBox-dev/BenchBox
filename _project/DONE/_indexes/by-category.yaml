@@ -1,4 +1,4 @@
-generated_at: '2026-02-17T09:39:41.543199'
+generated_at: '2026-02-17T12:02:15.374431'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 124
+    count: 125
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -458,6 +458,11 @@ categories:
     - id: interactive-wizard-execution-style-selection
       file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml
       title: Add execution style selection step to interactive wizard
+      priority: Medium-High
+      status: Completed
+    - id: greyscale-ascii-visualization-fallbacks
+      file: DONE/main/greyscale-ascii-visualization-fallbacks.yaml
+      title: Add greyscale fallback rendering for ASCII visualizations
       priority: Medium-High
       status: Completed
     - id: mcp-visualization-tools

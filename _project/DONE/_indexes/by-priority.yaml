@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T09:39:41.543320'
-total_items: 480
+generated_at: '2026-02-17T12:02:15.374549'
+total_items: 481
 priorities:
   Critical:
     count: 32
@@ -1004,7 +1004,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 48
+    count: 49
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1055,6 +1055,11 @@ priorities:
     - id: interactive-wizard-execution-style-selection
       file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml
       title: Add execution style selection step to interactive wizard
+      category: Core Functionality
+      status: Completed
+    - id: greyscale-ascii-visualization-fallbacks
+      file: DONE/main/greyscale-ascii-visualization-fallbacks.yaml
+      title: Add greyscale fallback rendering for ASCII visualizations
       category: Core Functionality
       status: Completed
     - id: platform-setup-numbered-list-selection

@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T09:39:41.543429'
-total_items: 480
+generated_at: '2026-02-17T12:02:15.374656'
+total_items: 481
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 432
+    count: 433
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -517,6 +517,11 @@ statuses:
     - id: interactive-wizard-execution-style-selection
       file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml
       title: Add execution style selection step to interactive wizard
+      priority: Medium-High
+      category: Core Functionality
+    - id: greyscale-ascii-visualization-fallbacks
+      file: DONE/main/greyscale-ascii-visualization-fallbacks.yaml
+      title: Add greyscale fallback rendering for ASCII visualizations
       priority: Medium-High
       category: Core Functionality
     - id: platform-setup-numbered-list-selection

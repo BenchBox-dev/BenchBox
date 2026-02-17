@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T09:39:41.542979'
-total_items: 480
+generated_at: '2026-02-17T12:02:15.374228'
+total_items: 481
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5043,6 +5043,24 @@ items:
   - joe
   estimated_effort: Medium
   completed_date: '2025-12-26'
+- id: greyscale-ascii-visualization-fallbacks
+  file: DONE/main/greyscale-ascii-visualization-fallbacks.yaml
+  title: Add greyscale fallback rendering for ASCII visualizations
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - visualization
+  - ascii-charts
+  - accessibility
+  - mcp
+  estimated_effort: 2-3 days
+  completed_date: '2026-02-17'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  deferred_count: 2
 - id: platform-setup-numbered-list-selection
   file: DONE/ux-improvements/active/platform-setup-numbered-list-selection.yaml
   title: Add numbered list selection to platform setup wizard
