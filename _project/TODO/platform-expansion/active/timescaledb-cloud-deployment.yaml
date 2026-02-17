@@ -245,19 +245,19 @@ work:
     vars (TIGERDATA_* primary, TIMESCALE_* fallback), SSL requirements, and example commands"
   needs:
   - w10
-  status: pending
+  status: done
 - id: w12
   summary: "Update docs/platforms/index.md: add TimescaleDB entry under Cloud Data Warehouses section with TigerData cloud
     note, add to toctree"
   needs:
   - w11
-  status: pending
+  status: done
 - id: w13
   summary: "Update docs/platforms/comparison-matrix.md: add TimescaleDB/TigerData row to all comparison tables (protocol:
     PostgreSQL, auth: password, SSL: required, storage: managed)"
   needs:
   - w11
-  status: pending
+  status: done
 
 # --- Phase 5: Example script ---
 - id: w14
@@ -265,7 +265,7 @@ work:
     env var setup, timescaledb:cloud platform syntax, TPC-H at scale 0.01"
   needs:
   - w10
-  status: pending
+  status: done
 
 # --- Phase 6: Final verification ---
 - id: w15
