@@ -237,7 +237,7 @@ work:
   - w7
   - w8
   - w9
-  status: pending
+  status: done
 
 # --- Phase 4: Documentation ---
 - id: w11
