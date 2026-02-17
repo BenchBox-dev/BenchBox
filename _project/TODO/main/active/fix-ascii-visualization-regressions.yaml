@@ -58,7 +58,7 @@ work:
 
 - id: w4
   summary: "Improve no-color heatmap density/readability with right-aligned numeric cells and clearer column separators"
-  status: pending
+  status: done
 
 - id: w5
   summary: "Audit heatmap truncation logic, fix dead row-truncation path if needed, and add regression tests"
