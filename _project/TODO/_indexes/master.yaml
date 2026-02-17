@@ -1,4 +1,4 @@
-generated_at: '2026-02-17T08:36:14.560858'
+generated_at: '2026-02-17T08:55:18.419377'
 total_items: 36
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -391,7 +391,7 @@ items:
   work_ready: 17
 - id: timescaledb-cloud-deployment
   file: TODO/platform-expansion/planning/timescaledb-cloud-deployment.yaml
-  title: TimescaleDB Cloud Deployment Mode
+  title: TigerData Cloud Deployment Mode
   worktree: platform-expansion
   category: Platform Expansion
   priority: Medium
@@ -399,12 +399,15 @@ items:
   tags:
   - platform-adapter
   - timescaledb
+  - tigerdata
   - cloud
   - deployment-modes
-  estimated_effort: 2 days
-  work_total: 21
+  - rebrand
+  estimated_effort: 1-2 days
+  work_total: 15
   work_done: 0
-  work_ready: 13
+  work_ready: 2
+  deferred_count: 3
 - id: arm-graviton-generations-benchmarks
   file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
   title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'

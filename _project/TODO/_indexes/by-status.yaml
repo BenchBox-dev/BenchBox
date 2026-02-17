@@ -1,4 +1,4 @@
-generated_at: '2026-02-17T08:36:14.560937'
+generated_at: '2026-02-17T08:55:18.419433'
 total_items: 36
 statuses:
   In Progress:
@@ -134,7 +134,7 @@ statuses:
       category: Core Functionality
     - id: timescaledb-cloud-deployment
       file: TODO/platform-expansion/planning/timescaledb-cloud-deployment.yaml
-      title: TimescaleDB Cloud Deployment Mode
+      title: TigerData Cloud Deployment Mode
       priority: Medium
       category: Platform Expansion
     - id: vector-search-benchmark-support

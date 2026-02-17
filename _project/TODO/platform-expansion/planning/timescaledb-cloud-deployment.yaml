@@ -1,185 +1,271 @@
 id: timescaledb-cloud-deployment
-title: "TimescaleDB Cloud Deployment Mode"
+title: "TigerData Cloud Deployment Mode"
 worktree: platform-expansion
 priority: Medium
 status: Not Started
 category: Platform Expansion
 description: |
-  Add TimescaleDB Cloud deployment mode to the existing TimescaleDB adapter,
-  enabling benchmarking of Timescale's managed cloud service via the
-  timescaledb:cloud syntax.
+  Update the existing TimescaleDB cloud deployment mode to reflect the
+  TigerData rebrand (Timescale → TigerData, Timescale Cloud → TigerData).
+  Rename environment variables from TIMESCALE_* to TIGERDATA_* (with backward
+  compatibility), update registry display names, error messages, docstrings,
+  and tests. Add platform documentation, example scripts, and comparison
+  matrix entry consistent with other cloud adapters.
+
+  The core cloud connection logic already works (SSL, service URL parsing,
+  env var auth, skip_database_management). This TODO focuses on the rebrand
+  alignment and the documentation/example gap.
+
+  Note: TigerData still uses *.tsdb.cloud.timescale.com hostnames, tsdbadmin
+  default user, and tsdb default database — the infrastructure is unchanged,
+  only the branding.
 
 context_sections:
   "Background and Motivation": |
-    Timescale Cloud is Timescale's managed PostgreSQL service with TimescaleDB:
-    - Fully managed TimescaleDB instances
-    - Automatic scaling and maintenance
-    - Cloud-native features (continuous aggregates, compression)
-    - PostgreSQL wire protocol compatibility
+    Timescale has rebranded to TigerData (announced mid-2025):
+    - Company: Timescale → TigerData
+    - Cloud product: Timescale Cloud → TigerData (just "TigerData")
+    - Open-source extension: TimescaleDB (unchanged)
+    - Domain: timescale.com → tigerdata.com
+    - Docs: docs.timescale.com → tigerdata.com/docs
 
-    Adding cloud support enables users to compare self-hosted TimescaleDB
-    performance with the managed service.
+    The existing TimescaleDB adapter already has a working cloud deployment
+    mode (timescaledb:cloud) with SSL, service URL parsing, env var auth,
+    and cloud-specific connection logic. However, all user-facing strings,
+    environment variable names, error messages, and documentation still
+    reference the old "Timescale Cloud" branding.
 
   "Technical Context": |
-    TimescaleDB Cloud uses standard PostgreSQL wire protocol, so connection
-    handling is similar to self-hosted. Key differences:
-    - Connection string format (cloud hostnames)
-    - SSL requirements
-    - Authentication (password, certificates)
-    - Service tier configuration
+    TigerData uses standard PostgreSQL wire protocol (psycopg2). Key details:
+    - Hostnames: *.tsdb.cloud.timescale.com (unchanged despite rebrand)
+    - Default user: tsdbadmin
+    - Default database: tsdb
+    - SSL: required (verify-full recommended)
+    - Connection pooling: session pool and transaction pool available
+    - Service URL: postgres://user:pass@host:port/db?sslmode=require
+
+    Existing implementation in benchbox/platforms/timescaledb.py:
+    - _configure_cloud_mode(): env var resolution, SSL enforcement
+    - _parse_service_url(): postgres:// URL parsing
+    - Deployment mode validation: self-hosted | cloud
+    - skip_database_management: True for cloud
+
+    Existing tests in tests/unit/platforms/test_timescaledb_cloud.py:
+    - 12 tests covering cloud mode auth, SSL, env vars, service URL parsing
+
+  "What Already Works": |
+    The following are already implemented and tested:
+    - Cloud deployment mode in registry (platform_registry.py:515-525)
+    - Cloud mode validation in __init__ (self-hosted | cloud)
+    - _configure_cloud_mode() with env var resolution
+    - _parse_service_url() for postgres:// URLs
+    - SSL enforcement (sslmode=require)
+    - skip_database_management for managed databases
+    - 12 unit tests for cloud authentication and configuration
+
+    What needs to change is branding alignment and documentation completeness.
 
 metadata:
   tags:
   - platform-adapter
   - timescaledb
+  - tigerdata
   - cloud
   - deployment-modes
-  estimated_effort: "2 days"
+  - rebrand
+  estimated_effort: "1-2 days"
   created_date: "2026-01-14"
+  updated_date: "2026-02-17"
+  rebrand_note: "Timescale → TigerData (mid-2025). Cloud product is now just 'TigerData'."
 
   related:
   - deployment-factory-integration
-  migration_review_required: true
+  - timescaledb-blog-post-edits
+  migration_review_required: false
 impact:
   business_value: |
-    Enables comparison of self-hosted vs managed TimescaleDB, particularly
-    valuable for time-series workload benchmarking.
+    Ensures BenchBox reflects current TigerData branding, preventing user
+    confusion. Adds documentation parity with other cloud adapters
+    (ClickHouse Cloud, Firebolt, Databend).
   user_impact: |
-    Users can benchmark TimescaleDB Cloud alongside self-hosted TimescaleDB
-    using the same benchmark suite.
+    Users see correct "TigerData" naming in CLI output, error messages, and
+    documentation. Environment variables use TIGERDATA_* prefix (with
+    backward-compatible TIMESCALE_* fallback).
 
 files_affected:
   modified:
   - "benchbox/platforms/timescaledb.py"
   - "benchbox/core/platform_registry.py"
+  - "tests/unit/platforms/test_timescaledb_cloud.py"
   added:
-  - "benchbox/platforms/credentials/timescaledb_cloud.py"
+  - "docs/platforms/timescaledb.md"
+  - "examples/getting_started/cloud/tigerdata_tpch.py"
   removed: []
 technical_requirements:
   dependencies:
-  - "psycopg2 or asyncpg (existing)"
+  - "psycopg2-binary (existing)"
   constraints:
-  - "Requires TimescaleDB Cloud account for testing"
-  - "SSL connection required"
+  - "Requires TigerData account for live integration testing"
+  - "SSL connection required (verify-full recommended)"
+  - "TIMESCALE_* env vars must still work for backward compatibility"
 
 must_preserve:
 - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
 - "Platform registry autodiscovery continues working for all existing platforms"
-- "Existing self-hosted TimescaleDB mode unchanged"
-- "Existing TimescaleDB unit tests continue to pass"
+- "Existing self-hosted TimescaleDB mode unchanged — no behavior change for self-hosted users"
+- "Existing TimescaleDB unit tests continue to pass: uv run -- python -m pytest tests/unit/platforms/test_timescaledb_adapter.py -v"
+- "TIMESCALE_* environment variables still work (backward compatibility)"
+- "timescaledb:cloud colon syntax unchanged"
 
 anti_patterns:
-- "DO NOT break existing self-hosted TimescaleDB mode — because self-hosted users depend on current behavior — add cloud as
-  an additional deployment option"
-- "DO NOT require cloud credentials for self-hosted mode — because self-hosted users connect directly — gate cloud configuration
-  behind deployment mode checks"
-- "DO NOT remove existing connection logic — because the self-hosted path is stable and tested — add cloud connection as a
-  separate code path"
+- "DO NOT break existing self-hosted TimescaleDB mode — because self-hosted users depend on current behavior — cloud rebrand
+  changes only affect cloud-mode code paths and user-facing strings"
+- "DO NOT remove TIMESCALE_* env var support — because existing users may have these configured — add TIGERDATA_* as primary
+  with TIMESCALE_* as documented fallback"
+- "DO NOT rename the adapter module from timescaledb.py — because TimescaleDB is still the extension name and the platform
+  identifier — only update display names and user-facing strings"
+- "DO NOT change the colon syntax from timescaledb:cloud — because this is the established convention and TimescaleDB is still
+  the extension name — update only display_name and description in registry"
 
 verification:
-- description: "Cloud credentials module imports correctly"
-  command: "uv run -- python -c \"from benchbox.platforms.credentials.timescaledb_cloud import *; print('import OK')\""
-  expected_output: "import OK"
+- description: "TimescaleDB cloud unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_timescaledb_cloud.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
 - description: "TimescaleDB adapter unit tests pass"
   command: "uv run -- python -m pytest tests/unit/platforms/test_timescaledb_adapter.py -v --tb=short"
   expected_output: "all tests pass, 0 failures"
-- description: "Existing platform tests unaffected"
+- description: "All platform tests unaffected"
   command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
   expected_output: "all tests pass, 0 failures"
+- description: "TIGERDATA_* env vars work"
+  command: "uv run -- python -c \"import os; os.environ['TIGERDATA_HOST']='x.com'; os.environ['TIGERDATA_PASSWORD']='p'; from benchbox.platforms.timescaledb import TimescaleDBAdapter; a = TimescaleDBAdapter(deployment_mode='cloud'); assert a.host == 'x.com'; print('OK')\""
+  expected_output: "OK"
+- description: "TIMESCALE_* env vars still work (backward compat)"
+  command: "uv run -- python -c \"import os; os.environ['TIMESCALE_HOST']='y.com'; os.environ['TIMESCALE_PASSWORD']='p'; from benchbox.platforms.timescaledb import TimescaleDBAdapter; a = TimescaleDBAdapter(deployment_mode='cloud'); assert a.host == 'y.com'; print('OK')\""
+  expected_output: "OK"
+- description: "Example script syntax check"
+  command: "uv run -- python -m py_compile examples/getting_started/cloud/tigerdata_tpch.py"
+  expected_output: "no output (success)"
 
 scope_limit:
   only_modify:
   - "benchbox/platforms/timescaledb.py"
-  - "benchbox/platforms/credentials/timescaledb_cloud.py"
   - "benchbox/core/platform_registry.py"
-  - "tests/unit/platforms/test_timescaledb_adapter.py"
+  - "tests/unit/platforms/test_timescaledb_cloud.py"
+  - "docs/platforms/timescaledb.md"
+  - "docs/platforms/index.md"
+  - "docs/platforms/comparison-matrix.md"
+  - "examples/getting_started/cloud/tigerdata_tpch.py"
   do_not_modify:
   - "benchbox/platforms/postgresql.py"
   - "benchbox/platforms/duckdb.py"
   - "benchbox/core/runner.py"
+  - "tests/unit/platforms/test_timescaledb_adapter.py"
 
 success_metrics:
-- "timescaledb:cloud connects successfully"
-- "TPC-H benchmark runs at scale 0.1"
-- "Results comparable with self-hosted TimescaleDB"
-- "SSL connection works correctly"
+- "timescaledb:cloud connects successfully with TIGERDATA_* env vars"
+- "TIMESCALE_* env vars still work as fallback"
+- "Registry display_name shows 'TigerData' for cloud mode"
+- "Error messages reference TigerData, not Timescale Cloud"
+- "Platform docs page exists at docs/platforms/timescaledb.md"
+- "Example script compiles and follows cloud adapter conventions"
+
 work:
+# --- Phase 1: Rebrand adapter code ---
 - id: w1
-  summary: "Add 'cloud' deployment mode to TimescaleDB registry metadata"
+  summary: "Update _configure_cloud_mode() env vars: add TIGERDATA_* as primary with TIMESCALE_* fallback for HOST, PASSWORD, USER, PORT, DATABASE, SERVICE_URL"
   status: pending
 - id: w2
-  summary: "Set requires_credentials=True"
+  summary: "Update error messages in _configure_cloud_mode(): 'Timescale Cloud requires host' → 'TigerData requires host', update env var examples to show TIGERDATA_HOST with TIMESCALE_HOST as fallback"
   needs:
   - w1
   status: pending
 - id: w3
-  summary: "Set requires_network=True"
+  summary: "Update docstrings: module docstring line 11 'Timescale Cloud' → 'TigerData', _configure_cloud_mode() docstring, _parse_service_url() docstring, cloud-mode log messages"
   needs:
   - w1
   status: pending
 - id: w4
-  summary: "Define auth_methods=['password', 'certificate']"
+  summary: "Update error message for invalid service URL: 'Invalid TIMESCALE_SERVICE_URL' → 'Invalid TIGERDATA_SERVICE_URL (or TIMESCALE_SERVICE_URL)'"
   needs:
   - w1
   status: pending
+
+# --- Phase 2: Rebrand registry ---
 - id: w5
-  summary: "Add cloud-specific configuration options"
+  summary: "Update platform_registry.py cloud deployment: display_name → 'TigerData', description → 'TigerData managed PostgreSQL service'"
   status: pending
+
+# --- Phase 3: Update tests ---
 - id: w6
-  summary: "Cloud host endpoint"
+  summary: "Update test_timescaledb_cloud.py: add tests for TIGERDATA_* env vars (TIGERDATA_HOST, TIGERDATA_PASSWORD, etc.), verify they take priority over TIMESCALE_* equivalents"
   needs:
-  - w5
+  - w1
   status: pending
 - id: w7
-  summary: "Service ID"
+  summary: "Update test_timescaledb_cloud.py: add test that TIMESCALE_* env vars still work when TIGERDATA_* are not set (backward compatibility)"
   needs:
-  - w5
+  - w6
   status: pending
 - id: w8
-  summary: "SSL configuration"
+  summary: "Update test_timescaledb_cloud.py: update error message assertions to check for 'TigerData' instead of 'Timescale Cloud' in validation errors"
+  needs:
+  - w2
+  status: pending
+- id: w9
+  summary: "Update test registry assertions: verify cloud display_name is 'TigerData'"
   needs:
   - w5
   status: pending
-- id: w9
-  summary: "Implement password authentication for cloud"
-  status: pending
 - id: w10
-  summary: "Implement certificate authentication"
+  summary: "Run full test suite and fix any regressions: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  needs:
+  - w6
+  - w7
+  - w8
+  - w9
   status: pending
+
+# --- Phase 4: Documentation ---
 - id: w11
-  summary: "Add credential setup wizard for TimescaleDB Cloud"
+  summary: "Create docs/platforms/timescaledb.md covering both self-hosted and TigerData cloud modes, connection setup, env vars (TIGERDATA_* primary, TIMESCALE_* fallback), SSL requirements, and example commands"
+  needs:
+  - w10
   status: pending
 - id: w12
-  summary: "Support environment variables"
+  summary: "Update docs/platforms/index.md: add TimescaleDB entry under Cloud Data Warehouses section with TigerData cloud note, add to toctree"
+  needs:
+  - w11
   status: pending
 - id: w13
-  summary: "TIMESCALE_CLOUD_HOST"
+  summary: "Update docs/platforms/comparison-matrix.md: add TimescaleDB/TigerData row to all comparison tables (protocol: PostgreSQL, auth: password, SSL: required, storage: managed)"
   needs:
-  - w12
+  - w11
   status: pending
+
+# --- Phase 5: Example script ---
 - id: w14
-  summary: "TIMESCALE_CLOUD_PASSWORD"
+  summary: "Create examples/getting_started/cloud/tigerdata_tpch.py following conventions from databend_tpch.py: show TIGERDATA_* env var setup, timescaledb:cloud platform syntax, TPC-H at scale 0.01"
   needs:
-  - w12
+  - w10
   status: pending
+
+# --- Phase 6: Final verification ---
 - id: w15
-  summary: "Implement cloud endpoint connection with SSL"
+  summary: "Run all verification commands from this TODO's verification section, confirm all pass"
+  needs:
+  - w10
+  - w11
+  - w14
   status: pending
-- id: w16
-  summary: "Handle cloud-specific connection pooling"
-  status: pending
-- id: w17
-  summary: "Configure query timeout for cloud latency"
-  status: pending
-- id: w18
-  summary: "Unit tests for cloud authentication"
-  status: pending
-- id: w19
-  summary: "Integration tests with TimescaleDB Cloud (requires account)"
-  status: pending
-- id: w20
-  summary: "Test TPC-H benchmark at scale 0.1"
-  status: pending
-- id: w21
-  summary: "Compare results with self-hosted TimescaleDB"
-  status: pending
+
+deferred:
+- id: d1
+  summary: "Add connection pooling mode selection (direct, session pool, transaction pool) — TigerData offers three connection modes on different ports"
+  reason: "Requires TigerData account to test pool behavior differences; direct connection sufficient for benchmarking"
+- id: d2
+  summary: "Add sslmode=verify-full support with CA certificate configuration — TigerData recommends verify-full but require works"
+  reason: "sslmode=require is functional; verify-full needs CA cert distribution strategy"
+- id: d3
+  summary: "Integration smoke tests with live TigerData account"
+  reason: "Requires paid TigerData account; unit tests cover all code paths"
