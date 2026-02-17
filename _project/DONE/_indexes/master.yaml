@@ -1,4 +1,4 @@
-generated_at: '2026-02-17T09:30:59.520936'
+generated_at: '2026-02-17T09:39:41.542979'
 total_items: 480
 items:
 - id: interactive-wizard-dry-run-support
@@ -4564,7 +4564,6 @@ items:
   work_total: 15
   work_done: 15
   work_ready: 0
-  deferred_count: 3
 - id: trim-viz-deps-plotly-only
   file: DONE/main/active/trim-viz-deps-plotly-only.yaml
   title: Trim visualization dependencies to Plotly-only (remove Kaleido, Pandas, Pillow)

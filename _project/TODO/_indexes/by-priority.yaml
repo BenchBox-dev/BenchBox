@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T09:30:58.524365'
-total_items: 35
+generated_at: '2026-02-17T09:39:40.548975'
+total_items: 36
 priorities:
   Critical:
     count: 2
@@ -154,7 +154,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 7
+    count: 8
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -185,6 +185,11 @@ priorities:
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       category: Core Functionality
+      status: Not Started
+    - id: tigerdata-cloud-enhancements
+      file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
+      title: TigerData Cloud Enhancements
+      category: Platform Expansion
       status: Not Started
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml

@@ -278,14 +278,5 @@ work:
   status: done
 
 deferred:
-- id: d1
-  summary: "Add connection pooling mode selection (direct, session pool, transaction pool) — TigerData offers three connection
-    modes on different ports"
-  reason: "Requires TigerData account to test pool behavior differences; direct connection sufficient for benchmarking"
-- id: d2
-  summary: "Add sslmode=verify-full support with CA certificate configuration — TigerData recommends verify-full but require
-    works"
-  reason: "sslmode=require is functional; verify-full needs CA cert distribution strategy"
-- id: d3
-  summary: "Integration smoke tests with live TigerData account"
-  reason: "Requires paid TigerData account; unit tests cover all code paths"
+  split_to: tigerdata-cloud-enhancements
+  note: "Connection pooling, verify-full SSL, and live integration tests moved to separate TODO"

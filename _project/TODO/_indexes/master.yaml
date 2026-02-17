@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T09:30:58.524328'
-total_items: 35
+generated_at: '2026-02-17T09:39:40.548923'
+total_items: 36
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -178,6 +178,23 @@ items:
   work_total: 14
   work_done: 0
   work_ready: 12
+- id: tigerdata-cloud-enhancements
+  file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
+  title: TigerData Cloud Enhancements
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  tags:
+  - platform-adapter
+  - timescaledb
+  - tigerdata
+  - cloud
+  - enhancements
+  estimated_effort: 1-2 days
+  work_total: 3
+  work_done: 0
+  work_ready: 0
 - id: wikipedia-pageviews-benchmark
   file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
   title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
