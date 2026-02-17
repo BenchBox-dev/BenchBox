@@ -2,7 +2,7 @@ id: timescaledb-cloud-deployment
 title: "TigerData Cloud Deployment Mode"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: In Progress
 category: Platform Expansion
 description: |
   Update the existing TimescaleDB cloud deployment mode to reflect the
@@ -113,7 +113,8 @@ must_preserve:
 - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
 - "Platform registry autodiscovery continues working for all existing platforms"
 - "Existing self-hosted TimescaleDB mode unchanged — no behavior change for self-hosted users"
-- "Existing TimescaleDB unit tests continue to pass: uv run -- python -m pytest tests/unit/platforms/test_timescaledb_adapter.py -v"
+- "Existing TimescaleDB unit tests continue to pass: uv run -- python -m pytest tests/unit/platforms/test_timescaledb_adapter.py
+  -v"
 - "TIMESCALE_* environment variables still work (backward compatibility)"
 - "timescaledb:cloud colon syntax unchanged"
 
@@ -138,10 +139,14 @@ verification:
   command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
   expected_output: "all tests pass, 0 failures"
 - description: "TIGERDATA_* env vars work"
-  command: "uv run -- python -c \"import os; os.environ['TIGERDATA_HOST']='x.com'; os.environ['TIGERDATA_PASSWORD']='p'; from benchbox.platforms.timescaledb import TimescaleDBAdapter; a = TimescaleDBAdapter(deployment_mode='cloud'); assert a.host == 'x.com'; print('OK')\""
+  command: "uv run -- python -c \"import os; os.environ['TIGERDATA_HOST']='x.com'; os.environ['TIGERDATA_PASSWORD']='p'; from
+    benchbox.platforms.timescaledb import TimescaleDBAdapter; a = TimescaleDBAdapter(deployment_mode='cloud'); assert a.host
+    == 'x.com'; print('OK')\""
   expected_output: "OK"
 - description: "TIMESCALE_* env vars still work (backward compat)"
-  command: "uv run -- python -c \"import os; os.environ['TIMESCALE_HOST']='y.com'; os.environ['TIMESCALE_PASSWORD']='p'; from benchbox.platforms.timescaledb import TimescaleDBAdapter; a = TimescaleDBAdapter(deployment_mode='cloud'); assert a.host == 'y.com'; print('OK')\""
+  command: "uv run -- python -c \"import os; os.environ['TIMESCALE_HOST']='y.com'; os.environ['TIMESCALE_PASSWORD']='p'; from
+    benchbox.platforms.timescaledb import TimescaleDBAdapter; a = TimescaleDBAdapter(deployment_mode='cloud'); assert a.host
+    == 'y.com'; print('OK')\""
   expected_output: "OK"
 - description: "Example script syntax check"
   command: "uv run -- python -m py_compile examples/getting_started/cloud/tigerdata_tpch.py"
@@ -173,42 +178,50 @@ success_metrics:
 work:
 # --- Phase 1: Rebrand adapter code ---
 - id: w1
-  summary: "Update _configure_cloud_mode() env vars: add TIGERDATA_* as primary with TIMESCALE_* fallback for HOST, PASSWORD, USER, PORT, DATABASE, SERVICE_URL"
-  status: pending
+  summary: "Update _configure_cloud_mode() env vars: add TIGERDATA_* as primary with TIMESCALE_* fallback for HOST, PASSWORD,
+    USER, PORT, DATABASE, SERVICE_URL"
+  status: done
 - id: w2
-  summary: "Update error messages in _configure_cloud_mode(): 'Timescale Cloud requires host' → 'TigerData requires host', update env var examples to show TIGERDATA_HOST with TIMESCALE_HOST as fallback"
+  summary: "Update error messages in _configure_cloud_mode(): 'Timescale Cloud requires host' → 'TigerData requires host',
+    update env var examples to show TIGERDATA_HOST with TIMESCALE_HOST as fallback"
   needs:
   - w1
   status: pending
 - id: w3
-  summary: "Update docstrings: module docstring line 11 'Timescale Cloud' → 'TigerData', _configure_cloud_mode() docstring, _parse_service_url() docstring, cloud-mode log messages"
+  summary: "Update docstrings: module docstring line 11 'Timescale Cloud' → 'TigerData', _configure_cloud_mode() docstring,
+    _parse_service_url() docstring, cloud-mode log messages"
   needs:
   - w1
   status: pending
 - id: w4
-  summary: "Update error message for invalid service URL: 'Invalid TIMESCALE_SERVICE_URL' → 'Invalid TIGERDATA_SERVICE_URL (or TIMESCALE_SERVICE_URL)'"
+  summary: "Update error message for invalid service URL: 'Invalid TIMESCALE_SERVICE_URL' → 'Invalid TIGERDATA_SERVICE_URL
+    (or TIMESCALE_SERVICE_URL)'"
   needs:
   - w1
   status: pending
 
 # --- Phase 2: Rebrand registry ---
 - id: w5
-  summary: "Update platform_registry.py cloud deployment: display_name → 'TigerData', description → 'TigerData managed PostgreSQL service'"
+  summary: "Update platform_registry.py cloud deployment: display_name → 'TigerData', description → 'TigerData managed PostgreSQL
+    service'"
   status: pending
 
 # --- Phase 3: Update tests ---
 - id: w6
-  summary: "Update test_timescaledb_cloud.py: add tests for TIGERDATA_* env vars (TIGERDATA_HOST, TIGERDATA_PASSWORD, etc.), verify they take priority over TIMESCALE_* equivalents"
+  summary: "Update test_timescaledb_cloud.py: add tests for TIGERDATA_* env vars (TIGERDATA_HOST, TIGERDATA_PASSWORD, etc.),
+    verify they take priority over TIMESCALE_* equivalents"
   needs:
   - w1
   status: pending
 - id: w7
-  summary: "Update test_timescaledb_cloud.py: add test that TIMESCALE_* env vars still work when TIGERDATA_* are not set (backward compatibility)"
+  summary: "Update test_timescaledb_cloud.py: add test that TIMESCALE_* env vars still work when TIGERDATA_* are not set (backward
+    compatibility)"
   needs:
   - w6
   status: pending
 - id: w8
-  summary: "Update test_timescaledb_cloud.py: update error message assertions to check for 'TigerData' instead of 'Timescale Cloud' in validation errors"
+  summary: "Update test_timescaledb_cloud.py: update error message assertions to check for 'TigerData' instead of 'Timescale
+    Cloud' in validation errors"
   needs:
   - w2
   status: pending
@@ -228,24 +241,28 @@ work:
 
 # --- Phase 4: Documentation ---
 - id: w11
-  summary: "Create docs/platforms/timescaledb.md covering both self-hosted and TigerData cloud modes, connection setup, env vars (TIGERDATA_* primary, TIMESCALE_* fallback), SSL requirements, and example commands"
+  summary: "Create docs/platforms/timescaledb.md covering both self-hosted and TigerData cloud modes, connection setup, env
+    vars (TIGERDATA_* primary, TIMESCALE_* fallback), SSL requirements, and example commands"
   needs:
   - w10
   status: pending
 - id: w12
-  summary: "Update docs/platforms/index.md: add TimescaleDB entry under Cloud Data Warehouses section with TigerData cloud note, add to toctree"
+  summary: "Update docs/platforms/index.md: add TimescaleDB entry under Cloud Data Warehouses section with TigerData cloud
+    note, add to toctree"
   needs:
   - w11
   status: pending
 - id: w13
-  summary: "Update docs/platforms/comparison-matrix.md: add TimescaleDB/TigerData row to all comparison tables (protocol: PostgreSQL, auth: password, SSL: required, storage: managed)"
+  summary: "Update docs/platforms/comparison-matrix.md: add TimescaleDB/TigerData row to all comparison tables (protocol:
+    PostgreSQL, auth: password, SSL: required, storage: managed)"
   needs:
   - w11
   status: pending
 
 # --- Phase 5: Example script ---
 - id: w14
-  summary: "Create examples/getting_started/cloud/tigerdata_tpch.py following conventions from databend_tpch.py: show TIGERDATA_* env var setup, timescaledb:cloud platform syntax, TPC-H at scale 0.01"
+  summary: "Create examples/getting_started/cloud/tigerdata_tpch.py following conventions from databend_tpch.py: show TIGERDATA_*
+    env var setup, timescaledb:cloud platform syntax, TPC-H at scale 0.01"
   needs:
   - w10
   status: pending
@@ -261,10 +278,12 @@ work:
 
 deferred:
 - id: d1
-  summary: "Add connection pooling mode selection (direct, session pool, transaction pool) — TigerData offers three connection modes on different ports"
+  summary: "Add connection pooling mode selection (direct, session pool, transaction pool) — TigerData offers three connection
+    modes on different ports"
   reason: "Requires TigerData account to test pool behavior differences; direct connection sufficient for benchmarking"
 - id: d2
-  summary: "Add sslmode=verify-full support with CA certificate configuration — TigerData recommends verify-full but require works"
+  summary: "Add sslmode=verify-full support with CA certificate configuration — TigerData recommends verify-full but require
+    works"
   reason: "sslmode=require is functional; verify-full needs CA cert distribution strategy"
 - id: d3
   summary: "Integration smoke tests with live TigerData account"
