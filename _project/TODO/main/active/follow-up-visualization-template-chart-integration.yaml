@@ -132,7 +132,7 @@ work:
 - id: w3
   summary: "Align CLI --chart-type validation/help and all/auto behavior with canonical registry"
   needs: [w1]
-  status: pending
+  status: done
 - id: w4
   summary: "Align MCP validation and docs with canonical registry; update suggestion logic for new charts"
   needs: [w1, w2]
