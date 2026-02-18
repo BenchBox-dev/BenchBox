@@ -162,7 +162,7 @@ work:
   summary: "Refactor `_execute_dataframe_queries()` to clear overrides in `finally` regardless of exceptions"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Ensure early exits (including no-query paths) also clear overrides before return"
   needs:
