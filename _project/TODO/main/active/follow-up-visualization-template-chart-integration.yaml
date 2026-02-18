@@ -161,7 +161,7 @@ work:
   summary: "Add regression tests for template-chart parity, registry consistency, skip reasons, heatmap layout, and box-plot
     label formatting"
   needs: [w3, w4, w5, w9]
-  status: pending
+  status: done
 - id: w11
   summary: "Run verification suite and finalize with updated TODO indexes"
   needs: [w10]
