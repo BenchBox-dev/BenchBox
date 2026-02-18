@@ -114,7 +114,7 @@ work:
 - id: w5
   summary: "Add orchestration and error-path tests for core/tpcdi/etl/batch.py with mocked dependencies"
   needs: [w1]
-  status: pending
+  status: done
 - id: w6
   summary: "Add benchmark flow/phase wiring tests for core/tpcdi/benchmark.py"
   needs: [w5]
