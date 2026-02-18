@@ -1,17 +1,14 @@
-generated_at: '2026-02-18T11:57:53.392864'
-total_items: 36
+generated_at: '2026-02-18T13:30:13.075925'
+total_items: 35
 priorities:
-  Critical:
-    count: 1
-    items:
-    - id: fix-dataframe-parameter-parity-follow-up-findings
-      file: TODO/core-functionality/active/fix-dataframe-parameter-parity-follow-up-findings.yaml
-      title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
-      category: Core Functionality
-      status: Completed
   High:
-    count: 2
+    count: 3
     items:
+    - id: enforce-explicit-query-run-type-across-executions
+      file: TODO/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
+      title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths
+      category: Core Functionality
+      status: In Progress
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -23,7 +20,7 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 7
+    count: 6
     items:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
@@ -40,11 +37,6 @@ priorities:
       title: Improve test coverage for core/tpcdi module to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
-    - id: migrate-remaining-print-leaks-to-emit
-      file: TODO/main/active/migrate-remaining-print-leaks-to-emit.yaml
-      title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
-      category: Core Functionality
-      status: In Progress
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)

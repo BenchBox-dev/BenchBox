@@ -1,8 +1,8 @@
-generated_at: '2026-02-18T11:57:54.446636'
-total_items: 486
+generated_at: '2026-02-18T13:30:14.189658'
+total_items: 487
 priorities:
   Critical:
-    count: 33
+    count: 34
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -62,6 +62,11 @@ priorities:
     - id: design-and-implement-core-dataframe-abstractions
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
       title: Design and Implement Core DataFrame Abstractions
+      category: Core Functionality
+      status: Completed
+    - id: fix-dataframe-parameter-parity-follow-up-findings
+      file: DONE/core-functionality/active/fix-dataframe-parameter-parity-follow-up-findings.yaml
+      title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
       category: Core Functionality
       status: Completed
     - id: timescaledb-sql-injection-remediation

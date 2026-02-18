@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T11:57:54.446766'
-total_items: 486
+generated_at: '2026-02-18T13:30:14.189779'
+total_items: 487
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 438
+    count: 439
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1125,6 +1125,11 @@ statuses:
       title: Fix Dask DataFrame Platform Compatibility
       priority: High
       category: Platform Expansion
+    - id: fix-dataframe-parameter-parity-follow-up-findings
+      file: DONE/core-functionality/active/fix-dataframe-parameter-parity-follow-up-findings.yaml
+      title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
+      priority: Critical
+      category: Core Functionality
     - id: fix-datafusion-dataframe-regression
       file: DONE/main/active/fix-datafusion-dataframe-regression.yaml
       title: 'Fix DataFusion DataFrame regression: .tbl loading, data prep, and fail-fast'

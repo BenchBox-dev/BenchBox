@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T11:57:54.446280'
-total_items: 486
+generated_at: '2026-02-18T13:30:14.189293'
+total_items: 487
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -169,6 +169,26 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 1 week
   completed_date: '2025-12-02'
+- id: fix-dataframe-parameter-parity-follow-up-findings
+  file: DONE/core-functionality/active/fix-dataframe-parameter-parity-follow-up-findings.yaml
+  title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Critical
+  status: Completed
+  tags:
+  - tpcds
+  - dataframe
+  - parameter-substitution
+  - stream-parity
+  - correctness
+  - follow-up
+  owners:
+  - joe
+  estimated_effort: 2-4 days
+  work_total: 24
+  work_done: 24
+  work_ready: 0
 - id: timescaledb-sql-injection-remediation
   file: DONE/security-hardening/active/timescaledb-sql-injection-remediation.yaml
   title: Fix SQL injection vulnerabilities in TimescaleDB adapter

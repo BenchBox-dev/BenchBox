@@ -1,18 +1,18 @@
-generated_at: '2026-02-18T11:57:53.392876'
-total_items: 36
+generated_at: '2026-02-18T13:30:13.075936'
+total_items: 35
 statuses:
   In Progress:
     count: 2
     items:
+    - id: enforce-explicit-query-run-type-across-executions
+      file: TODO/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
+      title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths
+      priority: High
+      category: Core Functionality
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       priority: High
-      category: Core Functionality
-    - id: migrate-remaining-print-leaks-to-emit
-      file: TODO/main/active/migrate-remaining-print-leaks-to-emit.yaml
-      title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
-      priority: Medium-High
       category: Core Functionality
   Not Started:
     count: 33
@@ -182,11 +182,3 @@ statuses:
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
       category: Blog Revision
-  Completed:
-    count: 1
-    items:
-    - id: fix-dataframe-parameter-parity-follow-up-findings
-      file: TODO/core-functionality/active/fix-dataframe-parameter-parity-follow-up-findings.yaml
-      title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
-      priority: Critical
-      category: Core Functionality
