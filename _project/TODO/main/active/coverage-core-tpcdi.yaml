@@ -2,7 +2,7 @@ id: coverage-core-tpcdi
 title: "Improve test coverage for core/tpcdi module to ≥50%"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 description: |
   The TPC-DI (Data Integration) benchmark module is at 42.3% coverage with
@@ -27,7 +27,7 @@ metadata:
   - tpcdi
   estimated_effort: Medium
   created_date: "2026-02-07"
-  last_updated: "2026-02-07T09:00:00"
+  last_updated: "2026-02-18T13:43:27"
 
 impact:
   business_value: |
@@ -56,9 +56,21 @@ anti_patterns:
   factors — mock data generation calls"
 
 verification:
-- description: "TPC-DI tests pass and coverage reaches 50%"
-  command: "uv run -- python -m pytest tests/unit/ -k tpcdi -v --tb=short"
+- description: "TPC-DI unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/tpcdi -v --tb=short"
   expected_output: "all tests pass, 0 failures"
+- description: "core/tpcdi package coverage reaches >=50%"
+  command: "uv run -- python -m pytest tests/unit/core/tpcdi --cov=benchbox/core/tpcdi --cov-report=term --cov-fail-under=50
+    -q"
+  expected_output: "coverage check passes with total >=50%"
+- description: "Each targeted TPC-DI file reaches >=50% coverage"
+  command: >-
+    make coverage-per-file && for f in benchbox/core/tpcdi/etl/transformations.py
+    benchbox/core/tpcdi/etl/scd_processor.py benchbox/core/tpcdi/source_generators.py
+    benchbox/core/tpcdi/etl/batch.py benchbox/core/tpcdi/benchmark.py; do
+    v=$(jq -r --arg f "$f" '.files[$f].summary.percent_covered_display' coverage.json);
+    echo "$f: $v"; awk -v n="$v" 'BEGIN { exit !(n+0 >= 50) }' || exit 1; done
+  expected_output: "each listed file prints a value >=50 and command exits 0"
 
 success_metrics:
 - "core/tpcdi package reaches ≥50% line coverage overall"
@@ -66,28 +78,48 @@ success_metrics:
 
 files_affected:
   added:
-  - "tests/unit/benchmarks/test_tpcdi_etl.py"
-  - "tests/unit/benchmarks/test_tpcdi_scd.py"
-  - "tests/unit/benchmarks/test_tpcdi_benchmark.py"
+  - "tests/unit/core/tpcdi/test_etl_transformations_core_tpcdi.py"
+  - "tests/unit/core/tpcdi/test_scd_processor_core_tpcdi.py"
+  - "tests/unit/core/tpcdi/test_source_generators_core_tpcdi.py"
+  - "tests/unit/core/tpcdi/test_batch_core_tpcdi.py"
+  - "tests/unit/core/tpcdi/test_benchmark_core_tpcdi.py"
 
 scope_limit:
   only_modify:
-  - "tests/unit/benchmarks/"
+  - "_project/TODO/main/planning/coverage-core-tpcdi.yaml"
+  - "tests/unit/core/tpcdi/test_etl_transformations_core_tpcdi.py"
+  - "tests/unit/core/tpcdi/test_scd_processor_core_tpcdi.py"
+  - "tests/unit/core/tpcdi/test_source_generators_core_tpcdi.py"
+  - "tests/unit/core/tpcdi/test_batch_core_tpcdi.py"
+  - "tests/unit/core/tpcdi/test_benchmark_core_tpcdi.py"
   do_not_modify:
-  - "benchbox/"
+  - "benchbox/core/tpcdi/"
+  - "tests/integration/"
 work:
 - id: w1
-  summary: "Add tests for core/tpcdi/etl/transformations.py (11.9% → 50%)"
-  status: pending
+  summary: "Create shared TPC-DI unit fixtures/utilities for fast synthetic ETL inputs"
+  status: done
 - id: w2
-  summary: "Add tests for core/tpcdi/etl/scd_processor.py (24.2% → 50%)"
+  summary: "Add baseline and edge-path tests for core/tpcdi/etl/transformations.py"
+  needs: [w1]
   status: pending
 - id: w3
-  summary: "Add tests for core/tpcdi/source_generators.py (10.3% → 50%)"
+  summary: "Add Type 1 and Type 2 SCD behavior tests for core/tpcdi/etl/scd_processor.py"
+  needs: [w1]
   status: pending
 - id: w4
-  summary: "Add tests for core/tpcdi/etl/batch.py (17.3% → 50%)"
+  summary: "Add deterministic generation and failure-mode tests for core/tpcdi/source_generators.py"
+  needs: [w1]
   status: pending
 - id: w5
-  summary: "Add tests for core/tpcdi/benchmark.py (36.8% → 50%)"
+  summary: "Add orchestration and error-path tests for core/tpcdi/etl/batch.py with mocked dependencies"
+  needs: [w1]
+  status: pending
+- id: w6
+  summary: "Add benchmark flow/phase wiring tests for core/tpcdi/benchmark.py"
+  needs: [w5]
+  status: pending
+- id: w7
+  summary: "Run coverage-per-file, close remaining file gaps to >=50%, and capture final evidence"
+  needs: [w2, w3, w4, w5, w6]
   status: pending
