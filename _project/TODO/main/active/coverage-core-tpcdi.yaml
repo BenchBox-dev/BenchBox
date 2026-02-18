@@ -65,10 +65,12 @@ verification:
   expected_output: "coverage check passes with total >=50%"
 - description: "Each targeted TPC-DI file reaches >=50% coverage"
   command: >-
-    make coverage-per-file && for f in benchbox/core/tpcdi/etl/transformations.py
+    uv run -- python -m pytest tests/unit/core/tpcdi -p pytest_cov
+    --cov=benchbox/core/tpcdi --cov-report=json:coverage_tpcdi.json
+    --cov-report=term --cov-fail-under=0 -q && for f in benchbox/core/tpcdi/etl/transformations.py
     benchbox/core/tpcdi/etl/scd_processor.py benchbox/core/tpcdi/source_generators.py
     benchbox/core/tpcdi/etl/batch.py benchbox/core/tpcdi/benchmark.py; do
-    v=$(jq -r --arg f "$f" '.files[$f].summary.percent_covered_display' coverage.json);
+    v=$(jq -r --arg f "$f" '.files[$f].summary.percent_covered_display' coverage_tpcdi.json);
     echo "$f: $v"; awk -v n="$v" 'BEGIN { exit !(n+0 >= 50) }' || exit 1; done
   expected_output: "each listed file prints a value >=50 and command exits 0"
 
@@ -122,4 +124,4 @@ work:
 - id: w7
   summary: "Run coverage-per-file, close remaining file gaps to >=50%, and capture final evidence"
   needs: [w2, w3, w4, w5, w6]
-  status: pending
+  status: done
