@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T09:13:42.691382'
+generated_at: '2026-02-18T09:49:27.419482'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -86,13 +86,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 5
+    count: 6
     items:
     - id: fix-dataframe-parameter-parity-follow-up-findings
-      file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
+      file: TODO/core-functionality/active/fix-dataframe-parameter-parity-follow-up-findings.yaml
       title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
       priority: Critical
-      status: Not Started
+      status: Completed
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
@@ -108,6 +108,11 @@ categories:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
+    - id: migrate-remaining-print-leaks-to-emit
+      file: TODO/main/active/migrate-remaining-print-leaks-to-emit.yaml
+      title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
+      priority: Medium-High
+      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

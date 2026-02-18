@@ -1,16 +1,21 @@
-generated_at: '2026-02-18T09:13:42.691406'
-total_items: 35
+generated_at: '2026-02-18T09:49:27.419505'
+total_items: 36
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       priority: High
       category: Core Functionality
+    - id: migrate-remaining-print-leaks-to-emit
+      file: TODO/main/active/migrate-remaining-print-leaks-to-emit.yaml
+      title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
+      priority: Medium-High
+      category: Core Functionality
   Not Started:
-    count: 34
+    count: 33
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -52,11 +57,6 @@ statuses:
       title: Enforce per-module 50% coverage floor in CI
       priority: Medium
       category: Testing and Quality Assurance
-    - id: fix-dataframe-parameter-parity-follow-up-findings
-      file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
-      title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
-      priority: Critical
-      category: Core Functionality
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -182,3 +182,11 @@ statuses:
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
       category: Blog Revision
+  Completed:
+    count: 1
+    items:
+    - id: fix-dataframe-parameter-parity-follow-up-findings
+      file: TODO/core-functionality/active/fix-dataframe-parameter-parity-follow-up-findings.yaml
+      title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
+      priority: Critical
+      category: Core Functionality

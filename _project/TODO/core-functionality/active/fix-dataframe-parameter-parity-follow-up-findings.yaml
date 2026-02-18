@@ -2,7 +2,7 @@ id: fix-dataframe-parameter-parity-follow-up-findings
 title: "Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)"
 worktree: "core-functionality"
 priority: "Critical"
-status: "In Progress"
+status: "Completed"
 description: |
   Follow-up work is required after adversarial review of the DataFrame parameter
   substitution parity implementation (commit e6d83095). Three concrete issues were
@@ -194,67 +194,67 @@ work:
     extraction"
   needs:
   - w8
-  status: pending
+  status: done
 - id: w10
   summary: "Preserve TPC-H behavior (no stream argument) and avoid unnecessary duplicate extraction for identical seed/SF/stream
     triples"
   needs:
   - w8
-  status: pending
+  status: done
 - id: w11
   summary: "Add stream-parity tests that prove different stream IDs can yield different effective parameters"
-  status: pending
+  status: done
 - id: w12
   summary: "Mock extractor responses per stream and assert query execution uses stream-specific overrides"
   needs:
   - w11
-  status: pending
+  status: done
 - id: w13
   summary: "Add regression test that SQL/DataFrame parameter source inputs align for stream-aware runs"
   needs:
   - w11
-  status: pending
+  status: done
 - id: w14
   summary: "Inventory TPCDS_DEFAULT_PARAMS keys and rank uncovered keys by query impact and parity risk"
-  status: pending
+  status: done
 - id: w15
   summary: "Implement extraction for high-impact uncovered parameter families"
-  status: pending
+  status: done
 - id: w16
   summary: "Add robust regex/pattern handlers for missing keys used by critical parity queries (for example `hours`, category/city/state-set
     style filters)"
   needs:
   - w15
-  status: pending
+  status: done
 - id: w17
   summary: "Keep extraction generic and keyed by expected defaults to avoid injecting irrelevant fields"
   needs:
   - w15
-  status: pending
+  status: done
 - id: w18
   summary: "Document intentionally unsupported keys and fallback rationale for non-critical cases"
   needs:
   - w15
-  status: pending
+  status: done
 - id: w19
   summary: "Add unit tests for new extraction families and fallback behavior"
-  status: pending
+  status: done
 - id: w20
   summary: "Include positive extraction cases and malformed SQL/fallback cases"
   needs:
   - w19
-  status: pending
+  status: done
 - id: w21
   summary: "Add coverage assertion that supported parameter-key set grows and is tracked"
   needs:
   - w19
-  status: pending
+  status: done
 - id: w22
   summary: "Run focused parity tests and existing DataFrame fast/unit suites"
-  status: pending
+  status: done
 - id: w23
   summary: "Validate TODO scope with targeted benchmark smoke runs for seeded stream-aware TPC-DS"
-  status: pending
+  status: done
 - id: w24
   summary: "Capture before/after parity evidence in commit message or TODO notes"
-  status: pending
+  status: done

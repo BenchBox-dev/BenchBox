@@ -1,13 +1,13 @@
-generated_at: '2026-02-18T09:13:42.691352'
-total_items: 35
+generated_at: '2026-02-18T09:49:27.419450'
+total_items: 36
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
-  file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
+  file: TODO/core-functionality/active/fix-dataframe-parameter-parity-follow-up-findings.yaml
   title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)
   worktree: core-functionality
   category: Core Functionality
   priority: Critical
-  status: Not Started
+  status: Completed
   tags:
   - tpcds
   - dataframe
@@ -19,8 +19,8 @@ items:
   - joe
   estimated_effort: 2-4 days
   work_total: 24
-  work_done: 0
-  work_ready: 10
+  work_done: 24
+  work_ready: 0
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks
@@ -571,6 +571,23 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 5
+- id: migrate-remaining-print-leaks-to-emit
+  file: TODO/main/active/migrate-remaining-print-leaks-to-emit.yaml
+  title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: In Progress
+  tags:
+  - output
+  - quiet-mode
+  - emit
+  - print-leak
+  - ratchet
+  estimated_effort: 3-4 days
+  work_total: 13
+  work_done: 1
+  work_ready: 11
 - id: reenable-comprehensive-ci
   file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
   title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
