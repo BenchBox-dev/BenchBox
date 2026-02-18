@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T09:49:28.394656'
-total_items: 485
+generated_at: '2026-02-18T11:57:54.446280'
+total_items: 486
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5537,6 +5537,24 @@ items:
   - firebolt
   - deployment-modes
   estimated_effort: 2-3 days
+- id: migrate-remaining-print-leaks-to-emit
+  file: DONE/main/active/migrate-remaining-print-leaks-to-emit.yaml
+  title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - output
+  - quiet-mode
+  - emit
+  - print-leak
+  - ratchet
+  estimated_effort: 3-4 days
+  completed_date: '2026-02-18'
+  work_total: 13
+  work_done: 13
+  work_ready: 0
 - id: timing-runtime-wide-monotonic-migration
   file: DONE/main/active/timing-runtime-wide-monotonic-migration.yaml
   title: Migrate runtime elapsed and timeout timing to centralized monotonic clock

@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T09:49:28.395104'
-total_items: 485
+generated_at: '2026-02-18T11:57:54.446766'
+total_items: 486
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 437
+    count: 438
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1413,6 +1413,11 @@ statuses:
     - id: migrate-clickhouse-firebolt-deployment
       file: DONE/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
       title: Migrate ClickHouse/Firebolt to Deployment Registry
+      priority: Medium-High
+      category: Core Functionality
+    - id: migrate-remaining-print-leaks-to-emit
+      file: DONE/main/active/migrate-remaining-print-leaks-to-emit.yaml
+      title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
       priority: Medium-High
       category: Core Functionality
     - id: timing-runtime-wide-monotonic-migration

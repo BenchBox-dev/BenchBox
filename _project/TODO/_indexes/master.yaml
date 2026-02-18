@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T09:49:27.419450'
+generated_at: '2026-02-18T11:57:53.392810'
 total_items: 36
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
@@ -586,8 +586,8 @@ items:
   - ratchet
   estimated_effort: 3-4 days
   work_total: 13
-  work_done: 1
-  work_ready: 11
+  work_done: 13
+  work_ready: 0
 - id: reenable-comprehensive-ci
   file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
   title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
