@@ -47,7 +47,7 @@ work:
 - id: w8
   summary: "Expand CLI quiet-mode tests to cover consolidated output channels"
   needs: [w2, w3, w4]
-  status: pending
+  status: done
 - id: w9
   summary: "Add MCP regression tests asserting no non-JSON stdout leakage in benchmark tool paths"
   needs: [w6]
