@@ -118,7 +118,7 @@ work:
 - id: w6
   summary: "Add benchmark flow/phase wiring tests for core/tpcdi/benchmark.py"
   needs: [w5]
-  status: pending
+  status: done
 - id: w7
   summary: "Run coverage-per-file, close remaining file gaps to >=50%, and capture final evidence"
   needs: [w2, w3, w4, w5, w6]
