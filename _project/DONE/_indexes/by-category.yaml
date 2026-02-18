@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T13:30:14.189526'
+generated_at: '2026-02-18T13:32:45.262832'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 131
+    count: 132
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -589,6 +589,11 @@ categories:
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output
       priority: Medium-High
+      status: Completed
+    - id: enforce-explicit-query-run-type-across-executions
+      file: DONE/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
+      title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths
+      priority: High
       status: Completed
     - id: enhance-ascii-charting
       file: DONE/core-functionality/planning/enhance-ascii-charting.yaml

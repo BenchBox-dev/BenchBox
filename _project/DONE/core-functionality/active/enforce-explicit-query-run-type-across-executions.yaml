@@ -2,7 +2,7 @@ id: enforce-explicit-query-run-type-across-executions
 title: "Enforce explicit query run_type tagging across SQL and DataFrame execution paths"
 worktree: core-functionality
 priority: High
-status: In Progress
+status: Completed
 category: Core Functionality
 description: |
   Query result rows currently rely on fallback inference for `run_type` in several
@@ -149,4 +149,4 @@ work:
 - id: w9
   summary: "Run focused verification suite and document any residual edge cases"
   needs: [w8]
-  status: pending
+  status: done

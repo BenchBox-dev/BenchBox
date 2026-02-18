@@ -1,14 +1,9 @@
-generated_at: '2026-02-18T13:30:13.075925'
-total_items: 35
+generated_at: '2026-02-18T13:32:44.214665'
+total_items: 34
 priorities:
   High:
-    count: 3
+    count: 2
     items:
-    - id: enforce-explicit-query-run-type-across-executions
-      file: TODO/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
-      title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths
-      category: Core Functionality
-      status: In Progress
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks

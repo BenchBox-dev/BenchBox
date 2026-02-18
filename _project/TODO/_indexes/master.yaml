@@ -1,25 +1,6 @@
-generated_at: '2026-02-18T13:30:13.075872'
-total_items: 35
+generated_at: '2026-02-18T13:32:44.214621'
+total_items: 34
 items:
-- id: enforce-explicit-query-run-type-across-executions
-  file: TODO/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
-  title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths
-  worktree: core-functionality
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - results
-  - query-normalization
-  - sql
-  - dataframe
-  - run-type
-  owners:
-  - joe
-  estimated_effort: Medium
-  work_total: 9
-  work_done: 7
-  work_ready: 1
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks

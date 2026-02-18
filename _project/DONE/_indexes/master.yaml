@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T13:30:14.189293'
-total_items: 487
+generated_at: '2026-02-18T13:32:45.262613'
+total_items: 488
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1058,6 +1058,25 @@ items:
   - marketing
   - visibility
   estimated_effort: Medium
+- id: enforce-explicit-query-run-type-across-executions
+  file: DONE/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
+  title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - results
+  - query-normalization
+  - sql
+  - dataframe
+  - run-type
+  owners:
+  - joe
+  estimated_effort: Medium
+  work_total: 9
+  work_done: 9
+  work_ready: 0
 - id: dataframe-parameter-substitution-parity
   file: DONE/core-functionality/active/dataframe-parameter-substitution-parity.yaml
   title: Ensure DataFrame variants use identical parameter substitution and ordering permutations as SQL variants for TPC-H

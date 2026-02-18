@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T13:30:14.189658'
-total_items: 487
+generated_at: '2026-02-18T13:32:45.262955'
+total_items: 488
 priorities:
   Critical:
     count: 34
@@ -175,7 +175,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 170
+    count: 171
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -381,6 +381,11 @@ priorities:
       file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
       title: Elevate MCP Feature on Landing Page and Documentation
       category: Documentation
+      status: Completed
+    - id: enforce-explicit-query-run-type-across-executions
+      file: DONE/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
+      title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths
+      category: Core Functionality
       status: Completed
     - id: dataframe-parameter-substitution-parity
       file: DONE/core-functionality/active/dataframe-parameter-substitution-parity.yaml

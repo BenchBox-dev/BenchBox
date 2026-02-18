@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T13:30:14.189779'
-total_items: 487
+generated_at: '2026-02-18T13:32:45.263084'
+total_items: 488
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 439
+    count: 440
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -989,6 +989,11 @@ statuses:
       title: Enable SSB ClickHouse Embedded Platform Support
       priority: Medium
       category: Data Quality and Compatibility Issues
+    - id: enforce-explicit-query-run-type-across-executions
+      file: DONE/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
+      title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths
+      priority: High
+      category: Core Functionality
     - id: timing-guardrails-and-legacy-cleanup
       file: DONE/main/active/timing-guardrails-and-legacy-cleanup.yaml
       title: Enforce timing guardrails and remove legacy timing compatibility paths
