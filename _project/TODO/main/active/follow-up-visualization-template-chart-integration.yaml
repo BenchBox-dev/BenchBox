@@ -1,0 +1,172 @@
+id: follow-up-visualization-template-chart-integration
+title: "Integrate additional ASCII chart types into template workflows"
+worktree: main
+priority: High
+status: In Progress
+category: Core Functionality
+description: |
+  Recent visualization enhancements introduced additional ASCII chart types,
+  but template and selection workflows are not fully integrated end-to-end.
+  Several chart types are declared in named templates yet silently skipped at
+  render time because chart registries and render dispatch paths are out of sync.
+
+  This follow-up aligns chart type registries, rendering support, template
+  composition, and recommendation logic so named templates are trustworthy and
+  directly selectable chart types match actual capabilities.
+
+  The implementation must also prevent silent omissions by surfacing explicit
+  "not applicable" reasons, and add regression tests for template/chart parity.
+
+  In addition, no-color readability regressions must be addressed in this
+  follow-up: query heatmap cells need consistent block widths with improved
+  numeric spacing, and query distribution labels must remove decorative series
+  marker prefixes that are not part of plotted geometry.
+
+metadata:
+  tags:
+  - visualization
+  - templates
+  - ascii-charts
+  estimated_effort: Medium
+  created_date: "2026-02-18"
+  last_updated: "2026-02-18T00:15:00"
+
+impact:
+  business_value: |
+    Named templates are a primary UX entry point for chart exploration. If
+    declared charts do not render, users lose trust in output quality and
+    cannot reliably compare benchmark runs.
+  user_impact: |
+    Users can consistently access the full chart suite from CLI/MCP, with
+    predictable template behavior and clear feedback when data is insufficient.
+  technical_debt: |
+    Eliminates duplicated/stale chart-type registries and closes parity gaps
+    between templates, CLI validation, MCP validation, and rendering dispatch.
+
+must_preserve:
+- "Existing chart outputs for performance_bar, distribution_box, query_heatmap, query_histogram, cost_scatter, and time_series
+  remain unchanged for identical inputs"
+- "benchbox visualize existing templates (default, flagship, head_to_head, trends, cost_optimization, comparison) remain valid
+  CLI choices"
+- "No regression in no-color/no-unicode rendering behavior for comparison and summary charts"
+- "Query heatmap no-color rendering keeps fixed-width per-cell layout with stable column separators"
+- "Query distribution labels remain text-first with no unused marker glyph prefixes"
+
+approach: |
+  Introduce a single chart-type capability registry and derive CLI help,
+  --chart-type validation, MCP validation, and template parity checks from it.
+  Extend runtime rendering dispatch to cover all chart types currently declared
+  in templates using existing ASCII chart adapters and conversion helpers.
+
+  For template rendering, replace silent drop behavior with explicit skipped
+  reasons when a chart is inapplicable (for example, insufficient runs or
+  missing query data). Keep rendering resilient while making omissions visible.
+
+  For heatmap readability, standardize fixed-width cell geometry so shaded
+  blocks and right-aligned numerals consistently occupy the same width in each
+  platform column, with explicit separators retained between columns.
+
+  For query distribution output, remove series marker prefixes from labels
+  (for example square/diamond glyphs) when they do not encode plotted data.
+
+  Revisit template composition and add targeted templates where appropriate
+  (latency deep dive, regression triage, executive summary) only if backed by
+  implemented render paths and tests.
+
+anti_patterns:
+- "DO NOT add new chart names directly in multiple modules — because duplicated registries drift — define one canonical source
+  and import it"
+- "DO NOT silently skip unsupported template chart types — because users cannot trust template output completeness — emit
+  explicit skip reasons and test them"
+- "DO NOT widen comparison charts to arbitrary N-way semantics without design — because current logic is pairwise and order-sensitive
+  — enforce two-run expectations or provide explicit selection"
+- "DO NOT render heatmap cells with mixed-width fill/value layouts — because scanability collapses across rows — enforce fixed
+  cell width and right-aligned numerals"
+- "DO NOT prepend decorative series glyphs to box-plot labels when glyphs are not used in the plot body — because they waste
+  label width and add noise — use plain series names"
+
+verification:
+- description: "Visualization unit tests pass for ASCII charts and no-color rendering"
+  command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py tests/unit/visualization/test_nocolor_rendering.py
+    -q"
+  expected_output: "all tests pass, 0 failures"
+- description: "MCP visualization tool tests pass with updated chart registry expectations"
+  command: "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py -q"
+  expected_output: "all tests pass, 0 failures"
+- description: "Ruff passes on touched visualization and CLI modules"
+  command: "uv run ruff check benchbox/core/visualization/ benchbox/cli/commands/visualize.py benchbox/mcp/tools/visualization.py
+    tests/unit/visualization/ tests/unit/mcp/test_visualization_tools.py"
+  expected_output: "no lint errors"
+- description: "Heatmap and box-plot readability regressions are covered by focused tests"
+  command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -k \"heatmap or box_plot\" -q"
+  expected_output: "all selected tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/visualization/"
+  - "benchbox/cli/commands/visualize.py"
+  - "benchbox/mcp/tools/visualization.py"
+  - "tests/unit/visualization/"
+  - "tests/unit/mcp/test_visualization_tools.py"
+  do_not_modify:
+  - "benchbox/core/runner.py"
+  - "benchbox/platforms/"
+  - "benchbox/core/execution/"
+
+success_metrics:
+- "Every chart type declared in each named template is either rendered or reported with an explicit skip reason"
+- "--chart-type all includes every directly supported chart type from the canonical registry"
+- "CLI and MCP chart-type validation lists are generated from the same source"
+- "Template integration tests prevent future drift between template declarations and renderer support"
+- "Heatmap output uses consistent fixed-width block/value cells with stable inter-column separators in no-color mode"
+- "Query distribution labels do not include unused marker prefixes (for example square/diamond glyphs)"
+
+work:
+- id: w1
+  summary: "Create canonical chart capability registry shared by templates, CLI, and MCP"
+  status: done
+- id: w2
+  summary: "Implement missing render dispatch paths for template-declared chart types"
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Align CLI --chart-type validation/help and all/auto behavior with canonical registry"
+  needs: [w1]
+  status: pending
+- id: w4
+  summary: "Align MCP validation and docs with canonical registry; update suggestion logic for new charts"
+  needs: [w1, w2]
+  status: pending
+- id: w5
+  summary: "Add explicit template skip reporting for inapplicable charts instead of silent omission"
+  needs: [w2]
+  status: pending
+- id: w6
+  summary: "Define/enforce comparison chart input semantics (two-run enforcement or explicit selection)"
+  needs: [w2, w4]
+  status: pending
+- id: w7
+  summary: "Improve query heatmap no-color scanability with fixed-width cell blocks and numeral spacing"
+  needs: [w4, w5, w6]
+  status: pending
+- id: w8
+  summary: "Remove non-semantic series marker prefixes from query distribution labels"
+  needs: [w2]
+  status: pending
+- id: w9
+  summary: "Evaluate and update named templates (existing and optional new templates) based on supported chart/data fit"
+  needs: [w4, w5, w6, w7, w8]
+  status: pending
+- id: w10
+  summary: "Add regression tests for template-chart parity, registry consistency, skip reasons, heatmap layout, and box-plot
+    label formatting"
+  needs: [w3, w4, w5, w9]
+  status: pending
+- id: w11
+  summary: "Run verification suite and finalize with updated TODO indexes"
+  needs: [w10]
+  status: pending
+
+deferred:
+- summary: "Add non-ASCII (PNG/HTML) equivalents for new template bundles"
+  reason: "Current follow-up is scoped to ASCII chart integration and template correctness"
