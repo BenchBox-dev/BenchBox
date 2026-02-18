@@ -172,7 +172,7 @@ work:
   summary: "Preserve current behavior when seed is None (no overrides set)"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w5
   summary: "Add tests that explicitly fail inside execution and verify overrides are always cleared"
   status: pending
