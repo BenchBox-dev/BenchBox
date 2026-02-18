@@ -188,7 +188,7 @@ work:
   status: done
 - id: w8
   summary: "Thread stream ID into TPC-DS override extraction for each execution stream"
-  status: pending
+  status: done
 - id: w9
   summary: "Update runner override setup flow so TPC-DS extraction receives current stream context instead of a single global
     extraction"
