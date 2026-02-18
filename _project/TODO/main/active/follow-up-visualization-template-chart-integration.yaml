@@ -140,7 +140,7 @@ work:
 - id: w5
   summary: "Add explicit template skip reporting for inapplicable charts instead of silent omission"
   needs: [w2]
-  status: pending
+  status: done
 - id: w6
   summary: "Define/enforce comparison chart input semantics (two-run enforcement or explicit selection)"
   needs: [w2, w4]
