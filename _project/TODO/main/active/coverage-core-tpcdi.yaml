@@ -110,7 +110,7 @@ work:
 - id: w4
   summary: "Add deterministic generation and failure-mode tests for core/tpcdi/source_generators.py"
   needs: [w1]
-  status: pending
+  status: done
 - id: w5
   summary: "Add orchestration and error-path tests for core/tpcdi/etl/batch.py with mocked dependencies"
   needs: [w1]
