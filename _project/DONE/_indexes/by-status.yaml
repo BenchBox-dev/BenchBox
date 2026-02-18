@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T18:44:07.380505'
-total_items: 482
+generated_at: '2026-02-17T20:28:21.645365'
+total_items: 483
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 434
+    count: 435
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1364,6 +1364,11 @@ statuses:
       file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml
       title: Integrate Write Primitives DataFrame Mode with Runner and Registry
       priority: Medium-High
+      category: Core Functionality
+    - id: follow-up-visualization-template-chart-integration
+      file: DONE/main/active/follow-up-visualization-template-chart-integration.yaml
+      title: Integrate additional ASCII chart types into template workflows
+      priority: High
       category: Core Functionality
     - id: tpcds-stdout-fix-integrate-stdout-datagen
       file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml

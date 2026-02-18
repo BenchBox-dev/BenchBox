@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T18:44:07.380385'
-total_items: 482
+generated_at: '2026-02-17T20:28:21.645234'
+total_items: 483
 priorities:
   Critical:
     count: 32
@@ -165,7 +165,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 168
+    count: 169
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -556,6 +556,11 @@ priorities:
     - id: tpch-stdout-fix-integrate-stdout-datagen
       file: DONE/tpch-stdout-fix/planning/integrate-stdout-datagen.yaml
       title: Integrate TPC-H stdout datagen with compression and format pipelines
+      category: Core Functionality
+      status: Completed
+    - id: follow-up-visualization-template-chart-integration
+      file: DONE/main/active/follow-up-visualization-template-chart-integration.yaml
+      title: Integrate additional ASCII chart types into template workflows
       category: Core Functionality
       status: Completed
     - id: tpcds-stdout-fix-integrate-stdout-datagen

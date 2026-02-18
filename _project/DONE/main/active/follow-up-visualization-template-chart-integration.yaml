@@ -2,7 +2,7 @@ id: follow-up-visualization-template-chart-integration
 title: "Integrate additional ASCII chart types into template workflows"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Core Functionality
 description: |
   Recent visualization enhancements introduced additional ASCII chart types,
@@ -170,3 +170,5 @@ work:
 deferred:
 - summary: "Add non-ASCII (PNG/HTML) equivalents for new template bundles"
   reason: "Current follow-up is scoped to ASCII chart integration and template correctness"
+
+completed_date: "2026-02-18"

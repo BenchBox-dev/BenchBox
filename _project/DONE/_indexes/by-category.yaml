@@ -1,4 +1,4 @@
-generated_at: '2026-02-17T18:44:07.380250'
+generated_at: '2026-02-17T20:28:21.645099'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 126
+    count: 127
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -805,6 +805,11 @@ categories:
       file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml
       title: Integrate Write Primitives DataFrame Mode with Runner and Registry
       priority: Medium-High
+      status: Completed
+    - id: follow-up-visualization-template-chart-integration
+      file: DONE/main/active/follow-up-visualization-template-chart-integration.yaml
+      title: Integrate additional ASCII chart types into template workflows
+      priority: High
       status: Completed
     - id: tpcds-stdout-fix-integrate-stdout-datagen
       file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml

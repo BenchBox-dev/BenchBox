@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T18:44:07.380010'
-total_items: 482
+generated_at: '2026-02-17T20:28:21.644821'
+total_items: 483
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1576,6 +1576,23 @@ items:
   - compression
   - integration
   estimated_effort: 3-4 hours
+- id: follow-up-visualization-template-chart-integration
+  file: DONE/main/active/follow-up-visualization-template-chart-integration.yaml
+  title: Integrate additional ASCII chart types into template workflows
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - visualization
+  - templates
+  - ascii-charts
+  estimated_effort: Medium
+  completed_date: '2026-02-18'
+  work_total: 11
+  work_done: 11
+  work_ready: 0
+  deferred_count: 1
 - id: tpcds-stdout-fix-integrate-stdout-datagen
   file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
   title: Integrate stdout datagen with compression and format pipelines
