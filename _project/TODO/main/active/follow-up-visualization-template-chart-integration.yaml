@@ -144,7 +144,7 @@ work:
 - id: w6
   summary: "Define/enforce comparison chart input semantics (two-run enforcement or explicit selection)"
   needs: [w2, w4]
-  status: pending
+  status: done
 - id: w7
   summary: "Improve query heatmap no-color scanability with fixed-width cell blocks and numeral spacing"
   needs: [w4, w5, w6]
