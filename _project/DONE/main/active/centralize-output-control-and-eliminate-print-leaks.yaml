@@ -2,7 +2,7 @@ id: "centralize-output-control-and-eliminate-print-leaks"
 title: "Centralize user output control and eliminate print leaks across CLI/core/MCP paths"
 worktree: "main"
 priority: "High"
-status: "In Progress"
+status: "Completed"
 description: |
   Audit findings show multiple user-visible output paths bypassing the centralized output mechanism:
   - direct Console() instances in CLI commands
@@ -55,7 +55,7 @@ work:
 - id: w10
   summary: "Run full verification suite and close remaining output-control gaps"
   needs: [w7, w8, w9]
-  status: pending
+  status: done
 
 metadata:
   tags:
@@ -64,6 +64,7 @@ metadata:
   - "mcp"
   - "cli"
   created_date: "2026-02-18"
+  completed_date: "2026-02-18"
 
 must_preserve:
 - "benchbox run --quiet produces no user-visible stdout/stderr output while still returning correct exit codes"

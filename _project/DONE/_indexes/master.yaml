@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T20:28:21.644821'
-total_items: 483
+generated_at: '2026-02-18T08:59:34.336049'
+total_items: 484
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -795,6 +795,21 @@ items:
   category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   priority: High
   status: Completed
+- id: centralize-output-control-and-eliminate-print-leaks
+  file: DONE/main/active/centralize-output-control-and-eliminate-print-leaks.yaml
+  title: Centralize user output control and eliminate print leaks across CLI/core/MCP paths
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - output
+  - quiet-mode
+  - mcp
+  - cli
+  work_total: 10
+  work_done: 10
+  work_ready: 0
 - id: platform-adapter-sql-injection-gaps
   file: DONE/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
   title: Close SQL injection gaps in platform adapter identifier validation

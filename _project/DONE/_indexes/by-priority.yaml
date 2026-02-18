@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T20:28:21.645234'
-total_items: 483
+generated_at: '2026-02-18T08:59:34.336365'
+total_items: 484
 priorities:
   Critical:
     count: 32
@@ -165,7 +165,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 169
+    count: 170
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -296,6 +296,11 @@ priorities:
       file: DONE/release-readiness/completed/canonicalize-result-schema.yaml
       title: Canonicalize Result Schema
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+      status: Completed
+    - id: centralize-output-control-and-eliminate-print-leaks
+      file: DONE/main/active/centralize-output-control-and-eliminate-print-leaks.yaml
+      title: Centralize user output control and eliminate print leaks across CLI/core/MCP paths
+      category: Core Functionality
       status: Completed
     - id: platform-adapter-sql-injection-gaps
       file: DONE/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml

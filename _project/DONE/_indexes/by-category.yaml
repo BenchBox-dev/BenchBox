@@ -1,4 +1,4 @@
-generated_at: '2026-02-17T20:28:21.645099'
+generated_at: '2026-02-18T08:59:34.336253'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 127
+    count: 128
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -499,6 +499,11 @@ categories:
       file: DONE/core-functionality/centralize-file-format-detection.yaml
       title: Centralize File Format and Compression Extension Detection
       priority: Medium-High
+      status: Completed
+    - id: centralize-output-control-and-eliminate-print-leaks
+      file: DONE/main/active/centralize-output-control-and-eliminate-print-leaks.yaml
+      title: Centralize user output control and eliminate print leaks across CLI/core/MCP paths
+      priority: High
       status: Completed
     - id: cloud-spark-adapter-consolidation
       file: DONE/platform-expansion/active/cloud-spark-adapter-consolidation.yaml

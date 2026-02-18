@@ -1,5 +1,5 @@
-generated_at: '2026-02-17T20:28:21.645365'
-total_items: 483
+generated_at: '2026-02-18T08:59:34.336469'
+total_items: 484
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 435
+    count: 436
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -678,6 +678,11 @@ statuses:
       file: DONE/core-functionality/centralize-file-format-detection.yaml
       title: Centralize File Format and Compression Extension Detection
       priority: Medium-High
+      category: Core Functionality
+    - id: centralize-output-control-and-eliminate-print-leaks
+      file: DONE/main/active/centralize-output-control-and-eliminate-print-leaks.yaml
+      title: Centralize user output control and eliminate print leaks across CLI/core/MCP paths
+      priority: High
       category: Core Functionality
     - id: circular-import-issues-completed
       file: DONE/unknown/planning/circular-import-issues-completed.yaml
