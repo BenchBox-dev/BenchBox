@@ -1,0 +1,133 @@
+id: "centralize-output-control-and-eliminate-print-leaks"
+title: "Centralize user output control and eliminate print leaks across CLI/core/MCP paths"
+worktree: "main"
+priority: "High"
+status: "In Progress"
+description: |
+  Audit findings show multiple user-visible output paths bypassing the centralized output mechanism:
+  - direct Console() instances in CLI commands
+  - raw print() in core execution/data-generation flows
+  - mixed output channels in interactive shell paths
+  - transitive leak risk for MCP tools that invoke core code paths
+
+  This item consolidates all user-facing output behind a central output module and enforces quiet-mode
+  guarantees across CLI and MCP execution paths.
+
+category: "Core Functionality"
+
+work:
+- id: w1
+  summary: "Create canonical output policy and API in a central module"
+  status: done
+- id: w2
+  summary: "Migrate CLI commands (results/report/show-plan/compare-plans/plan-history) from Console() to shared quiet-aware
+    console"
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Normalize shell command output by removing raw print() paths and using centralized console helpers"
+  needs: [w1]
+  status: pending
+- id: w4
+  summary: "Replace raw print() in core runner/config/results display modules with centralized output/logging"
+  needs: [w1]
+  status: pending
+- id: w5
+  summary: "Replace raw print() in TPC-DS generator and benchmark runtime modules with centralized output/logging"
+  needs: [w1]
+  status: pending
+- id: w6
+  summary: "Wrap MCP benchmark execution/generation entrypoints with stdout/stderr suppression boundaries"
+  needs: [w1, w5]
+  status: pending
+- id: w7
+  summary: "Add static output-leak enforcement checks for runtime modules"
+  needs: [w2, w3, w4, w5, w6]
+  status: pending
+- id: w8
+  summary: "Expand CLI quiet-mode tests to cover consolidated output channels"
+  needs: [w2, w3, w4]
+  status: pending
+- id: w9
+  summary: "Add MCP regression tests asserting no non-JSON stdout leakage in benchmark tool paths"
+  needs: [w6]
+  status: pending
+- id: w10
+  summary: "Run full verification suite and close remaining output-control gaps"
+  needs: [w7, w8, w9]
+  status: pending
+
+metadata:
+  tags:
+  - "output"
+  - "quiet-mode"
+  - "mcp"
+  - "cli"
+  created_date: "2026-02-18"
+
+must_preserve:
+- "benchbox run --quiet produces no user-visible stdout/stderr output while still returning correct exit codes"
+- "MCP server stdout remains reserved for JSON-RPC messages only"
+- "Existing non-quiet CLI UX (tables/panels/help text) remains functionally unchanged"
+
+approach: |
+  Extend benchbox.utils.printing as the canonical output API and forbid new direct Console()/print() usage
+  in runtime modules. Replace command-local Console() instances with benchbox.cli.shared.console.
+  For core execution paths that can be called by CLI and MCP, route output through verbosity-aware logger
+  or centralized helpers; use silence_output only as a compatibility boundary where upstream third-party
+  writes cannot be controlled directly. Add targeted tests for quiet behavior in CLI and MCP tool execution.
+
+anti_patterns:
+- "DO NOT rely only on call-site silence_output wrappers -- because transitive core calls can still leak output in other entrypoints
+  -- route runtime output through centralized helpers/logging"
+- "DO NOT keep command-local Console() singletons -- because they bypass shared quiet policy -- use benchbox.cli.shared.console
+  or injected quiet-aware console"
+- "DO NOT use bare print() in runtime execution paths -- because it bypasses quiet controls and MCP stdout constraints --
+  use centralized printing/logging helpers"
+
+verification:
+- description: "Quiet-mode unit tests pass for CLI output suppression"
+  command: "uv run -- python -m pytest tests/unit/cli/test_quiet_mode.py -q"
+  expected_output: "all tests pass"
+- description: "MCP tools do not emit non-JSON output to stdout during benchmark execution paths"
+  command: "uv run -- python -m pytest tests/unit/mcp -q"
+  expected_output: "all tests pass with no stdout protocol violations"
+- description: "No direct runtime print leaks remain in CLI/core runtime modules"
+  command: "rg -n '^\\s*print\\(' benchbox/cli/commands/run.py benchbox/cli/commands/results.py benchbox/cli/commands/report.py
+    benchbox/cli/commands/show_plan.py benchbox/cli/commands/compare_plans.py benchbox/cli/commands/plan_history.py benchbox/cli/commands/shell.py
+    benchbox/core/runner/runner.py benchbox/core/tpcds/generator/manager.py benchbox/core/tpcds/generator/streaming.py benchbox/core/tpcds/generator/filesystem.py
+    benchbox/core/tpcds/generator/runner.py benchbox/core/tpcds/benchmark/runner.py benchbox/core/results/display.py benchbox/core/config_utils.py
+    benchbox/mcp/tools/benchmark.py"
+  expected_output: "no matches"
+
+scope_limit:
+  only_modify:
+  - "benchbox/utils/printing.py"
+  - "benchbox/cli/shared.py"
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/cli/commands/results.py"
+  - "benchbox/cli/commands/report.py"
+  - "benchbox/cli/commands/show_plan.py"
+  - "benchbox/cli/commands/compare_plans.py"
+  - "benchbox/cli/commands/plan_history.py"
+  - "benchbox/cli/commands/shell.py"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/core/tpcds/generator/manager.py"
+  - "benchbox/core/tpcds/generator/streaming.py"
+  - "benchbox/core/tpcds/generator/filesystem.py"
+  - "benchbox/core/tpcds/generator/runner.py"
+  - "benchbox/core/tpcds/benchmark/runner.py"
+  - "benchbox/core/results/display.py"
+  - "benchbox/core/config_utils.py"
+  - "benchbox/mcp/server.py"
+  - "benchbox/mcp/tools/benchmark.py"
+  - "tests/unit/cli/test_quiet_mode.py"
+  - "tests/unit/mcp/test_mcp_benchmark_stdout_suppression.py"
+  do_not_modify:
+  - "benchmark_runs/"
+  - "_project/DONE/"
+
+success_metrics:
+- "All user-facing runtime output channels are governed by centralized quiet-aware control"
+- "No protocol-breaking stdout leakage in MCP benchmark execution flows"
+- "Static and unit-test safeguards prevent reintroduction of direct print/Console() leaks"
