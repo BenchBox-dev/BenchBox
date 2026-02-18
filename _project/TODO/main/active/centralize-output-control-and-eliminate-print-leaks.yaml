@@ -51,7 +51,7 @@ work:
 - id: w9
   summary: "Add MCP regression tests asserting no non-JSON stdout leakage in benchmark tool paths"
   needs: [w6]
-  status: pending
+  status: done
 - id: w10
   summary: "Run full verification suite and close remaining output-control gaps"
   needs: [w7, w8, w9]
