@@ -134,7 +134,7 @@ work:
 - id: w6
   summary: "Add platform adapter unit tests asserting run_type presence across execution types"
   needs: [w2, w3]
-  status: pending
+  status: done
 
 - id: w7
   summary: "Add results-layer contract tests for explicit run_type and fallback compatibility"
