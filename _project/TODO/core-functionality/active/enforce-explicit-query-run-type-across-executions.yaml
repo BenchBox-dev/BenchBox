@@ -87,6 +87,7 @@ verification:
 scope_limit:
   only_modify:
   - benchbox/platforms/base/adapter.py
+  - benchbox/platforms/base/models.py
   - benchbox/platforms/dataframe/benchmark_mixin.py
   - benchbox/core/results/query_normalizer.py
   - benchbox/core/results/schema.py
@@ -123,7 +124,7 @@ work:
 - id: w4
   summary: "Propagate run_type into `_create_standard_execution_phase()` QueryExecution objects"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w5
   summary: "Retain normalization/schema run_type fallback as compatibility-only path with clarifying comments"
