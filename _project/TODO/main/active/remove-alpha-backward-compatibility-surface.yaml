@@ -107,7 +107,7 @@ work:
 - id: w14
   summary: "Run module-wave quality gates and fix regressions after each wave"
   needs: [w12, w13]
-  status: pending
+  status: done
   notes: "Run ruff/type/targeted tests incrementally to localize regressions before final CI run."
 
 - id: w15
