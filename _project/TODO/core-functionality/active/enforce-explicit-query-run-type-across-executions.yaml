@@ -139,7 +139,7 @@ work:
 - id: w7
   summary: "Add results-layer contract tests for explicit run_type and fallback compatibility"
   needs: [w5]
-  status: pending
+  status: done
 
 - id: w8
   summary: "Add MCP/result export regression tests to verify run_type continuity in payloads"
