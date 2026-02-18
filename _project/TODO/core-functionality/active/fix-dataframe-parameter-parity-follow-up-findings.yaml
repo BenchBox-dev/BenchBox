@@ -175,7 +175,7 @@ work:
   status: done
 - id: w5
   summary: "Add tests that explicitly fail inside execution and verify overrides are always cleared"
-  status: pending
+  status: done
 - id: w6
   summary: "Add one TPC-H test and one TPC-DS test for failure-path cleanup"
   needs:
