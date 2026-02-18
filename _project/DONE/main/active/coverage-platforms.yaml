@@ -2,7 +2,8 @@ id: coverage-platforms
 title: "Improve test coverage for platform adapter modules to ≥50%"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-02-18"
 category: Testing and Quality Assurance
 description: |
   Several platform adapter modules are below 50% test coverage. These include
@@ -37,7 +38,7 @@ metadata:
   - platforms
   estimated_effort: Medium
   created_date: "2026-02-07"
-  last_updated: "2026-02-18T14:40:51"
+  last_updated: "2026-02-18T16:20:00"
 
   migration_review_required: true
 impact:
@@ -97,49 +98,49 @@ scope_limit:
 work:
 - id: w1
   summary: "Add tests for platforms/dataframe/unified_frame.py (31.0% → 50%)"
-  status: pending
+  status: done
 - id: w2
   summary: "Add tests for platforms/dataframe/benchmark_mixin.py (38.5% → 50%)"
-  status: pending
+  status: done
 - id: w3
   summary: "Add tests for platforms/dataframe/expression_family.py (45.7% → 50%)"
-  status: pending
+  status: done
 - id: w4
   summary: "Add tests for platforms/dataframe/dask_df.py (26.1% → 50%)"
-  status: pending
+  status: done
 - id: w5
   summary: "Add tests for platforms/dataframe/ducklake_maintenance.py (0% → 50%)"
-  status: pending
+  status: done
 - id: w6
   summary: "Add tests for platforms/credentials/redshift.py (25.2% → 50%)"
-  status: pending
+  status: done
 - id: w7
   summary: "Add tests for platforms/credentials/bigquery.py (31.1% → 50%)"
-  status: pending
+  status: done
 - id: w8
   summary: "Add tests for platforms/credentials/snowflake.py (34.6% → 50%)"
-  status: pending
+  status: done
 - id: w9
   summary: "Add tests for platforms/databricks/credentials.py (31.7% → 50%)"
-  status: pending
+  status: done
 - id: w10
   summary: "Add tests for platforms/athena.py (39.7% → 50%)"
-  status: pending
+  status: done
 - id: w11
   summary: "Add tests for platforms/fabric_warehouse.py (43.9% → 50%)"
-  status: pending
+  status: done
 - id: w12
   summary: "Add tests for platforms/databricks/dataframe_adapter.py (23.6% → 50%)"
-  status: pending
+  status: done
 - id: w13
   summary: "Add tests for platforms/influxdb/ (26-44% → 50%)"
-  status: pending
+  status: done
 - id: w14
   summary: "Add tests for platforms/cudf.py (48.1% → 50%)"
-  status: pending
+  status: done
 - id: w15
   summary: "Add tests for platforms/motherduck.py (35.9% → 50%)"
-  status: pending
+  status: done
 - id: w16
   summary: "Add tests for platforms/clickhouse_cloud.py (49.3% → 50%)"
-  status: pending
+  status: done

@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T15:02:10.813724'
-total_items: 491
+generated_at: '2026-02-18T15:03:10.261234'
+total_items: 494
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 443
+    count: 446
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -994,6 +994,11 @@ statuses:
       title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths
       priority: High
       category: Core Functionality
+    - id: coverage-ci-enforcement
+      file: DONE/main/active/coverage-ci-enforcement.yaml
+      title: Enforce per-module 50% coverage floor in CI
+      priority: Medium-High
+      category: Testing and Quality Assurance
     - id: timing-guardrails-and-legacy-cleanup
       file: DONE/main/active/timing-guardrails-and-legacy-cleanup.yaml
       title: Enforce timing guardrails and remove legacy timing compatibility paths
@@ -1350,6 +1355,11 @@ statuses:
       title: Improve interactive file selection in compare command
       priority: Medium-High
       category: Core Functionality
+    - id: coverage-cli-modules
+      file: DONE/main/active/coverage-cli-modules.yaml
+      title: Improve test coverage for CLI modules to ≥50%
+      priority: High
+      category: Testing and Quality Assurance
     - id: coverage-core-benchmarks
       file: DONE/main/active/coverage-core-benchmarks.yaml
       title: Improve test coverage for core benchmark modules to ≥50%
@@ -1364,6 +1374,11 @@ statuses:
       file: DONE/main/active/coverage-core-tpcdi.yaml
       title: Improve test coverage for core/tpcdi module to ≥50%
       priority: Medium-High
+      category: Testing and Quality Assurance
+    - id: coverage-platforms
+      file: DONE/main/active/coverage-platforms.yaml
+      title: Improve test coverage for platform adapter modules to ≥50%
+      priority: High
       category: Testing and Quality Assurance
     - id: include-tpc-metrics-in-result-outputs
       file: DONE/main/active/include-tpc-metrics-in-result-outputs.yaml

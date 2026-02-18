@@ -1,27 +1,9 @@
-generated_at: '2026-02-18T15:02:09.207744'
-total_items: 39
+generated_at: '2026-02-18T15:03:09.244284'
+total_items: 36
 priorities:
-  High:
-    count: 2
-    items:
-    - id: coverage-cli-modules
-      file: TODO/main/planning/coverage-cli-modules.yaml
-      title: Improve test coverage for CLI modules to ≥50%
-      category: Testing and Quality Assurance
-      status: Not Started
-    - id: coverage-platforms
-      file: TODO/main/planning/coverage-platforms.yaml
-      title: Improve test coverage for platform adapter modules to ≥50%
-      category: Testing and Quality Assurance
-      status: Not Started
   Medium-High:
-    count: 5
+    count: 4
     items:
-    - id: coverage-ci-enforcement
-      file: TODO/main/planning/coverage-ci-enforcement.yaml
-      title: Enforce per-module 50% coverage floor in CI
-      category: Testing and Quality Assurance
-      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

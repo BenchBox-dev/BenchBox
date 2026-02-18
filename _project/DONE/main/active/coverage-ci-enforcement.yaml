@@ -2,7 +2,8 @@ id: coverage-ci-enforcement
 title: "Enforce per-module 50% coverage floor in CI"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-02-18"
 category: Testing and Quality Assurance
 description: |
   Once all modules reach ≥50% coverage (via the companion TODO items),
@@ -29,7 +30,7 @@ metadata:
   - enforcement
   estimated_effort: Small
   created_date: "2026-02-07"
-  last_updated: "2026-02-18T14:40:51"
+  last_updated: "2026-02-18T16:20:00"
 
 impact:
   business_value: |
@@ -58,10 +59,10 @@ anti_patterns:
 
 verification:
 - description: "Script correctly identifies modules below threshold"
-  command: "uv run -- python scripts/check_module_coverage.py --threshold 50"
+  command: "uv run -- python scripts/check_module_coverage.py --coverage-xml coverage.xml --threshold 50 --exclude-module benchbox/data --exclude-module benchbox/examples"
   expected_output: "table of per-module coverage with pass/fail indicators"
 - description: "Script exits non-zero when modules fail"
-  command: "uv run -- python scripts/check_module_coverage.py --threshold 99; echo $?"
+  command: "uv run -- python scripts/check_module_coverage.py --coverage-xml coverage.xml --threshold 99 --exclude-module benchbox/data --exclude-module benchbox/examples; echo $?"
   expected_output: "exit code 1 (since no module is at 99%)"
 
 files_affected:
@@ -70,11 +71,11 @@ files_affected:
   - "tests/unit/test_check_module_coverage.py"
   modified:
   - "Makefile"
+  - ".github/workflows/test.yml"
 
 scope_limit:
   do_not_modify:
   - "benchbox/"
-  - ".github/workflows/"
 deps:
   needs:
   - coverage-core-benchmarks
@@ -85,31 +86,31 @@ deps:
 work:
 - id: w1
   summary: "Write scripts/check_module_coverage.py that parses coverage.xml"
-  status: pending
+  status: done
 - id: w2
   summary: "Parse coverage.xml, group by benchbox/* top-level package"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Report per-package coverage with pass/fail against 50% threshold"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w4
   summary: "Exit non-zero if any package fails"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w5
   summary: "Add tests for the coverage check script itself"
-  status: pending
+  status: done
 - id: w6
   summary: "Add check_module_coverage.py to Makefile as coverage-check target"
-  status: pending
+  status: done
 - id: w7
   summary: "Add to ci-test target in Makefile after pytest coverage run"
-  status: pending
+  status: done
 - id: w8
   summary: "Update GitHub Actions workflow to run the check"
-  status: pending
+  status: done

@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T15:02:09.207728'
+generated_at: '2026-02-18T15:03:09.244270'
 total_categories: 11
 categories:
   AI/ML Capabilities:
@@ -199,23 +199,8 @@ categories:
       priority: Low
       status: Not Started
   Testing and Quality Assurance:
-    count: 4
+    count: 1
     items:
-    - id: coverage-ci-enforcement
-      file: TODO/main/planning/coverage-ci-enforcement.yaml
-      title: Enforce per-module 50% coverage floor in CI
-      priority: Medium-High
-      status: Not Started
-    - id: coverage-cli-modules
-      file: TODO/main/planning/coverage-cli-modules.yaml
-      title: Improve test coverage for CLI modules to ≥50%
-      priority: High
-      status: Not Started
-    - id: coverage-platforms
-      file: TODO/main/planning/coverage-platforms.yaml
-      title: Improve test coverage for platform adapter modules to ≥50%
-      priority: High
-      status: Not Started
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)

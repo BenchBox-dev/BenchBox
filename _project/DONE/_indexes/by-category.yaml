@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T15:02:10.813119'
+generated_at: '2026-02-18T15:03:10.261011'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -2341,7 +2341,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 26
+    count: 29
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2384,6 +2384,11 @@ categories:
       title: 'E2E CLI Test Suite: Complete Platform Coverage'
       priority: High
       status: Completed
+    - id: coverage-ci-enforcement
+      file: DONE/main/active/coverage-ci-enforcement.yaml
+      title: Enforce per-module 50% coverage floor in CI
+      priority: Medium-High
+      status: Completed
     - id: local-ci-equivalents
       file: DONE/ci-infrastructure/active/local-ci-equivalents.yaml
       title: Ensure local equivalents exist for all CI workflow steps
@@ -2409,6 +2414,11 @@ categories:
       title: Implement DataFrame Result Validation Framework
       priority: High
       status: Completed
+    - id: coverage-cli-modules
+      file: DONE/main/active/coverage-cli-modules.yaml
+      title: Improve test coverage for CLI modules to ≥50%
+      priority: High
+      status: Completed
     - id: coverage-core-benchmarks
       file: DONE/main/active/coverage-core-benchmarks.yaml
       title: Improve test coverage for core benchmark modules to ≥50%
@@ -2423,6 +2433,11 @@ categories:
       file: DONE/main/active/coverage-core-tpcdi.yaml
       title: Improve test coverage for core/tpcdi module to ≥50%
       priority: Medium-High
+      status: Completed
+    - id: coverage-platforms
+      file: DONE/main/active/coverage-platforms.yaml
+      title: Improve test coverage for platform adapter modules to ≥50%
+      priority: High
       status: Completed
     - id: integration-test-suite-cleanup-remove-placeholder-and-failing-tests
       file: DONE/unknown/planning/integration-test-suite-cleanup-remove-placeholder-and-failing-tests.yaml

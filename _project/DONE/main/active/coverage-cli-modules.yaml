@@ -2,7 +2,8 @@ id: coverage-cli-modules
 title: "Improve test coverage for CLI modules to ≥50%"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-02-18"
 category: Testing and Quality Assurance
 description: |
   Several CLI modules are below 50% test coverage. These handle user-facing
@@ -35,7 +36,7 @@ metadata:
   - cli
   estimated_effort: Medium
   created_date: "2026-02-07"
-  last_updated: "2026-02-18T14:40:51"
+  last_updated: "2026-02-18T16:20:00"
 
 impact:
   business_value: |
@@ -88,43 +89,43 @@ scope_limit:
 work:
 - id: w1
   summary: "Add tests for cli/commands/run.py (49.8% → 50%)"
-  status: pending
+  status: done
 - id: w2
   summary: "Add tests for cli/config.py (47.6% → 50%)"
-  status: pending
+  status: done
 - id: w3
   summary: "Add tests for cli/output.py (49.0% → 50%)"
-  status: pending
+  status: done
 - id: w4
   summary: "Add tests for cli/composite_params.py (46.4% → 50%)"
-  status: pending
+  status: done
 - id: w5
   summary: "Add tests for cli/system.py (43.3% → 50%)"
-  status: pending
+  status: done
 - id: w6
   summary: "Add tests for cli/tuning.py (0% → 50%)"
-  status: pending
+  status: done
 - id: w7
   summary: "Add tests for cli/onboarding.py (0% → 50%)"
-  status: pending
+  status: done
 - id: w8
   summary: "Add tests for cli/commands/compare.py (30.2% → 50%)"
-  status: pending
+  status: done
 - id: w9
   summary: "Add tests for cli/commands/shell.py (30.0% → 50%)"
-  status: pending
+  status: done
 - id: w10
   summary: "Add tests for cli/commands/compare_plans.py (11.6% → 50%)"
-  status: pending
+  status: done
 - id: w11
   summary: "Add tests for cli/commands/compare_dataframes.py (12.7% → 50%)"
-  status: pending
+  status: done
 - id: w12
   summary: "Add tests for cli/exceptions.py (36.9% → 50%)"
-  status: pending
+  status: done
 - id: w13
   summary: "Add tests for cli/preferences.py (19.2% → 50%)"
-  status: pending
+  status: done
 - id: w14
   summary: "Add tests for cli/presentation/system.py (16.7% → 50%)"
-  status: pending
+  status: done
