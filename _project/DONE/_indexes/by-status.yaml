@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T08:59:34.336469'
-total_items: 484
+generated_at: '2026-02-18T09:13:43.716303'
+total_items: 485
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 436
+    count: 437
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1800,6 +1800,11 @@ statuses:
       title: Remove TPC-H Parallel File Merging Anti-Pattern
       priority: Medium
       category: Code Quality and Technical Debt
+    - id: remove-alpha-backward-compatibility-surface
+      file: DONE/main/active/remove-alpha-backward-compatibility-surface.yaml
+      title: Remove alpha-stage backward compatibility surface across BenchBox
+      priority: Critical
+      category: Core Functionality
     - id: resource-management
       file: DONE/runtime-ops/completed/resource-management.yaml
       title: Resource Management

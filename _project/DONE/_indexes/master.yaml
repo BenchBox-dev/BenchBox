@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T08:59:34.336049'
-total_items: 484
+generated_at: '2026-02-18T09:13:43.715829'
+total_items: 485
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -358,6 +358,23 @@ items:
   category: Marketing Content Enablement
   priority: Critical
   status: Completed
+- id: remove-alpha-backward-compatibility-surface
+  file: DONE/main/active/remove-alpha-backward-compatibility-surface.yaml
+  title: Remove alpha-stage backward compatibility surface across BenchBox
+  worktree: main
+  category: Core Functionality
+  priority: Critical
+  status: Completed
+  tags:
+  - api-simplification
+  - alpha-cleanup
+  - breaking-change
+  - compatibility-removal
+  estimated_effort: Large
+  completed_date: '2026-02-18'
+  work_total: 17
+  work_done: 17
+  work_ready: 0
 - id: unify-tpcdi-sql-dataframe-execution-contract
   file: DONE/dataframe-benchmarks/active/unify-tpcdi-sql-dataframe-execution-contract.yaml
   title: Unify TPC-DI SQL/DataFrame Execution Contract and ETL Path

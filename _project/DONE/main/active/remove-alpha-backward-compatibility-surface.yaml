@@ -2,7 +2,8 @@ id: "remove-alpha-backward-compatibility-surface"
 title: "Remove alpha-stage backward compatibility surface across BenchBox"
 worktree: "main"
 priority: "Critical"
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-02-18"
 description: |
   Remove all backward-compatibility elements currently tracked in
   docs/reference/backward-compatibility.md to align with alpha-stage product policy.
@@ -113,19 +114,19 @@ work:
 - id: w15
   summary: "Run full CI profile and resolve remaining failures"
   needs: [w14]
-  status: pending
+  status: done
   notes: "Execute CI-equivalent checks and fix any end-to-end regressions introduced by compatibility removals."
 
 - id: w16
   summary: "Produce final before/after compatibility inventory diff"
   needs: [w15]
-  status: pending
+  status: done
   notes: "Demonstrate that all registry-tracked compatibility elements were removed or intentionally reclassified."
 
 - id: w17
   summary: "Finalize removal report with before/after inventory and migration notes"
   needs: [w16]
-  status: pending
+  status: done
   notes: "Produce explicit list of deleted symbols/branches and canonical replacements for contributors."
 
 metadata:

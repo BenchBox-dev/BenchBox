@@ -1,18 +1,13 @@
-generated_at: '2026-02-18T08:59:33.291061'
-total_items: 36
+generated_at: '2026-02-18T09:13:42.691406'
+total_items: 35
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
     - id: implement-dataframe-benchmarks
       file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
       title: Implement DataFrame Support for All SQL-Only Benchmarks
       priority: High
-      category: Core Functionality
-    - id: remove-alpha-backward-compatibility-surface
-      file: TODO/main/active/remove-alpha-backward-compatibility-surface.yaml
-      title: Remove alpha-stage backward compatibility surface across BenchBox
-      priority: Critical
       category: Core Functionality
   Not Started:
     count: 34

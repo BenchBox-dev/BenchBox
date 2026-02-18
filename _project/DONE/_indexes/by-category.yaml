@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T08:59:34.336253'
+generated_at: '2026-02-18T09:13:43.716050'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 128
+    count: 129
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -960,6 +960,11 @@ categories:
       file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
       title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
       priority: High
+      status: Completed
+    - id: remove-alpha-backward-compatibility-surface
+      file: DONE/main/active/remove-alpha-backward-compatibility-surface.yaml
+      title: Remove alpha-stage backward compatibility surface across BenchBox
+      priority: Critical
       status: Completed
     - id: fix-datafusion-read-write-primitives-parity
       file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml

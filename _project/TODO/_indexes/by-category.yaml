@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T08:59:33.291038'
+generated_at: '2026-02-18T09:13:42.691382'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -86,7 +86,7 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 6
+    count: 5
     items:
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -108,11 +108,6 @@ categories:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
-    - id: remove-alpha-backward-compatibility-surface
-      file: TODO/main/active/remove-alpha-backward-compatibility-surface.yaml
-      title: Remove alpha-stage backward compatibility surface across BenchBox
-      priority: Critical
-      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

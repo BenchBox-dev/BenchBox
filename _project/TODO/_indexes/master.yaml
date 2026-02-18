@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T08:59:33.291008'
-total_items: 36
+generated_at: '2026-02-18T09:13:42.691352'
+total_items: 35
 items:
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml
@@ -21,22 +21,6 @@ items:
   work_total: 24
   work_done: 0
   work_ready: 10
-- id: remove-alpha-backward-compatibility-surface
-  file: TODO/main/active/remove-alpha-backward-compatibility-surface.yaml
-  title: Remove alpha-stage backward compatibility surface across BenchBox
-  worktree: main
-  category: Core Functionality
-  priority: Critical
-  status: In Progress
-  tags:
-  - api-simplification
-  - alpha-cleanup
-  - breaking-change
-  - compatibility-removal
-  estimated_effort: Large
-  work_total: 17
-  work_done: 13
-  work_ready: 1
 - id: implement-dataframe-benchmarks
   file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
   title: Implement DataFrame Support for All SQL-Only Benchmarks

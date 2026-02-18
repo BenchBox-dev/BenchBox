@@ -1,8 +1,8 @@
-generated_at: '2026-02-18T08:59:34.336365'
-total_items: 484
+generated_at: '2026-02-18T09:13:43.716184'
+total_items: 485
 priorities:
   Critical:
-    count: 32
+    count: 33
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -128,6 +128,11 @@ priorities:
       file: DONE/content-enablement-ranking/completed/ranking-aggregation-system-platform-leaderboards-trends.yaml
       title: Ranking & Aggregation System - Platform Leaderboards & Trends
       category: Marketing Content Enablement
+      status: Completed
+    - id: remove-alpha-backward-compatibility-surface
+      file: DONE/main/active/remove-alpha-backward-compatibility-surface.yaml
+      title: Remove alpha-stage backward compatibility surface across BenchBox
+      category: Core Functionality
       status: Completed
     - id: unify-tpcdi-sql-dataframe-execution-contract
       file: DONE/dataframe-benchmarks/active/unify-tpcdi-sql-dataframe-execution-contract.yaml
