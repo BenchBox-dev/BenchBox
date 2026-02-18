@@ -156,7 +156,7 @@ work:
 - id: w9
   summary: "Evaluate and update named templates (existing and optional new templates) based on supported chart/data fit"
   needs: [w4, w5, w6, w7, w8]
-  status: pending
+  status: done
 - id: w10
   summary: "Add regression tests for template-chart parity, registry consistency, skip reasons, heatmap layout, and box-plot
     label formatting"
