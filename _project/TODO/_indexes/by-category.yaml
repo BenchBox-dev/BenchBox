@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T13:32:44.214651'
+generated_at: '2026-02-18T13:41:43.648661'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -86,18 +86,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 4
+    count: 3
     items:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
       priority: Medium-High
       status: Not Started
-    - id: implement-dataframe-benchmarks
-      file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
-      title: Implement DataFrame Support for All SQL-Only Benchmarks
-      priority: High
-      status: In Progress
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation

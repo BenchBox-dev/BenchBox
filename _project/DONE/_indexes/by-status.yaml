@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T13:32:45.263084'
-total_items: 488
+generated_at: '2026-02-18T13:41:44.725684'
+total_items: 489
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 440
+    count: 441
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1265,6 +1265,11 @@ statuses:
       title: Implement DataFrame Result Validation Framework
       priority: High
       category: Testing and Quality Assurance
+    - id: implement-dataframe-benchmarks
+      file: DONE/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
+      title: Implement DataFrame Support for All SQL-Only Benchmarks
+      priority: High
+      category: Core Functionality
     - id: dataframe-ai-primitives
       file: DONE/dataframe-benchmarks/completed/dataframe-ai-primitives.yaml
       title: Implement DataFrame Version of AI Primitives Benchmark

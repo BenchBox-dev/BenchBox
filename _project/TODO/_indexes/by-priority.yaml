@@ -1,14 +1,9 @@
-generated_at: '2026-02-18T13:32:44.214665'
-total_items: 34
+generated_at: '2026-02-18T13:41:43.648676'
+total_items: 33
 priorities:
   High:
-    count: 2
+    count: 1
     items:
-    - id: implement-dataframe-benchmarks
-      file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
-      title: Implement DataFrame Support for All SQL-Only Benchmarks
-      category: Core Functionality
-      status: In Progress
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

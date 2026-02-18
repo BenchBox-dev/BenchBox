@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T13:32:45.262613'
-total_items: 488
+generated_at: '2026-02-18T13:41:44.725236'
+total_items: 489
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1466,6 +1466,30 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 1 week
   completed_date: '2025-12-02'
+- id: implement-dataframe-benchmarks
+  file: DONE/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
+  title: Implement DataFrame Support for All SQL-Only Benchmarks
+  worktree: dataframe-benchmarks
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - dataframe
+  - benchmarks
+  - polars
+  - pandas
+  - pyspark
+  - datafusion
+  owners:
+  - joe
+  estimated_effort: Large (4-6 weeks total)
+  completed_date: '2026-02-18'
+  work_total: 53
+  work_done: 53
+  work_ready: 0
+  deferred_count: 6
+  needs:
+  - fix-dataframe-parameter-parity-follow-up-findings
 - id: dataframe-read-primitives
   file: DONE/dataframe-expansion/active/dataframe-read-primitives.yaml
   title: Implement DataFrame Version of Read Primitives Benchmark

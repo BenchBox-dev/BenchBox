@@ -1,14 +1,6 @@
-generated_at: '2026-02-18T13:32:44.214675'
-total_items: 34
+generated_at: '2026-02-18T13:41:43.648685'
+total_items: 33
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: implement-dataframe-benchmarks
-      file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
-      title: Implement DataFrame Support for All SQL-Only Benchmarks
-      priority: High
-      category: Core Functionality
   Not Started:
     count: 33
     items:

@@ -1,29 +1,6 @@
-generated_at: '2026-02-18T13:32:44.214621'
-total_items: 34
+generated_at: '2026-02-18T13:41:43.648632'
+total_items: 33
 items:
-- id: implement-dataframe-benchmarks
-  file: TODO/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
-  title: Implement DataFrame Support for All SQL-Only Benchmarks
-  worktree: dataframe-benchmarks
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - dataframe
-  - benchmarks
-  - polars
-  - pandas
-  - pyspark
-  - datafusion
-  owners:
-  - joe
-  estimated_effort: Large (4-6 weeks total)
-  work_total: 53
-  work_done: 49
-  work_ready: 4
-  deferred_count: 6
-  needs:
-  - fix-dataframe-parameter-parity-follow-up-findings
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes

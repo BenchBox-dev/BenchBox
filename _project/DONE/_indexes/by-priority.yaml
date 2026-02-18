@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T13:32:45.262955'
-total_items: 488
+generated_at: '2026-02-18T13:41:44.725571'
+total_items: 489
 priorities:
   Critical:
     count: 34
@@ -175,7 +175,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 171
+    count: 172
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -517,6 +517,11 @@ priorities:
       file: DONE/dataframe-validation/completed/implement-dataframe-result-validation-framework.yaml
       title: Implement DataFrame Result Validation Framework
       category: Testing and Quality Assurance
+      status: Completed
+    - id: implement-dataframe-benchmarks
+      file: DONE/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
+      title: Implement DataFrame Support for All SQL-Only Benchmarks
+      category: Core Functionality
       status: Completed
     - id: dataframe-read-primitives
       file: DONE/dataframe-expansion/active/dataframe-read-primitives.yaml

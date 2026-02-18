@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T13:32:45.262832'
+generated_at: '2026-02-18T13:41:44.725443'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 132
+    count: 133
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -720,6 +720,11 @@ categories:
       file: DONE/dataframe-expansion/active/dataframe-maintenance-operations.yaml
       title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
       priority: Medium-High
+      status: Completed
+    - id: implement-dataframe-benchmarks
+      file: DONE/dataframe-benchmarks/active/implement-dataframe-benchmarks.yaml
+      title: Implement DataFrame Support for All SQL-Only Benchmarks
+      priority: High
       status: Completed
     - id: dataframe-ai-primitives
       file: DONE/dataframe-benchmarks/completed/dataframe-ai-primitives.yaml
