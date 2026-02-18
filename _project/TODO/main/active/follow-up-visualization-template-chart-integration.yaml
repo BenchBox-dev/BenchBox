@@ -165,7 +165,7 @@ work:
 - id: w11
   summary: "Run verification suite and finalize with updated TODO indexes"
   needs: [w10]
-  status: pending
+  status: done
 
 deferred:
 - summary: "Add non-ASCII (PNG/HTML) equivalents for new template bundles"
