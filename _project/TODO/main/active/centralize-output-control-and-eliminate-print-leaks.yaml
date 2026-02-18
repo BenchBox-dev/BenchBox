@@ -31,7 +31,7 @@ work:
 - id: w4
   summary: "Replace raw print() in core runner/config/results display modules with centralized output/logging"
   needs: [w1]
-  status: pending
+  status: done
 - id: w5
   summary: "Replace raw print() in TPC-DS generator and benchmark runtime modules with centralized output/logging"
   needs: [w1]
