@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T14:40:51.666033'
-total_categories: 8
+generated_at: '2026-02-18T14:47:47.205117'
+total_categories: 11
 categories:
   AI/ML Capabilities:
     count: 1
@@ -40,6 +40,14 @@ categories:
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+      priority: Low
+      status: Not Started
+  Benchmark Expansion:
+    count: 1
+    items:
+    - id: deferred-dataframe-benchmark-implementations
+      file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
+      title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
       status: Not Started
   Blog Revision:
@@ -86,8 +94,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 3
+    count: 4
     items:
+    - id: deferred-storage-and-cache-unification
+      file: TODO/core-functionality/planning/deferred-storage-and-cache-unification.yaml
+      title: Deferred Storage Location and Cache Unification Enhancements
+      priority: Low
+      status: Not Started
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
@@ -116,8 +129,16 @@ categories:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       priority: Medium
       status: Not Started
+  Performance Analysis:
+    count: 1
+    items:
+    - id: deferred-dataframe-performance-analysis
+      file: TODO/main/planning/deferred-dataframe-performance-analysis.yaml
+      title: Deferred DataFrame Performance Cross-Platform Analysis
+      priority: Low
+      status: Not Started
   Platform Expansion:
-    count: 7
+    count: 9
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -144,6 +165,16 @@ categories:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
       status: Not Started
+    - id: cloud-integration-test-infrastructure
+      file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
+      title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
+      priority: Medium
+      status: Not Started
+    - id: deferred-platform-adapter-enhancements
+      file: TODO/platform-expansion/planning/deferred-platform-adapter-enhancements.yaml
+      title: Deferred Platform Adapter Enhancements — TLS, Bodo, pg_mooncake, pg_duckdb
+      priority: Low
+      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
@@ -168,20 +199,28 @@ categories:
     - id: coverage-ci-enforcement
       file: TODO/main/planning/coverage-ci-enforcement.yaml
       title: Enforce per-module 50% coverage floor in CI
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: coverage-cli-modules
       file: TODO/main/planning/coverage-cli-modules.yaml
       title: Improve test coverage for CLI modules to ≥50%
-      priority: Medium-High
+      priority: High
       status: Not Started
     - id: coverage-platforms
       file: TODO/main/planning/coverage-platforms.yaml
       title: Improve test coverage for platform adapter modules to ≥50%
-      priority: Medium
+      priority: High
       status: Not Started
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: Medium-High
+      status: Not Started
+  User Experience:
+    count: 1
+    items:
+    - id: deferred-visualization-and-output-enhancements
+      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
+      title: Deferred Visualization and Output Format Enhancements
+      priority: Low
       status: Not Started

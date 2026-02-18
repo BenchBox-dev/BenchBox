@@ -1,7 +1,7 @@
 id: coverage-platforms
 title: "Improve test coverage for platform adapter modules to ≥50%"
 worktree: main
-priority: Medium
+priority: High
 status: Not Started
 category: Testing and Quality Assurance
 description: |
@@ -37,7 +37,7 @@ metadata:
   - platforms
   estimated_effort: Medium
   created_date: "2026-02-07"
-  last_updated: "2026-02-07T09:00:00"
+  last_updated: "2026-02-18T14:40:51"
 
   migration_review_required: true
 impact:

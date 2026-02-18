@@ -1,8 +1,8 @@
-generated_at: '2026-02-18T14:40:51.666056'
-total_items: 32
+generated_at: '2026-02-18T14:47:47.205141'
+total_items: 38
 statuses:
   Not Started:
-    count: 32
+    count: 38
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -29,6 +29,36 @@ statuses:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
       category: Platform Expansion
+    - id: cloud-integration-test-infrastructure
+      file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
+      title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
+      priority: Medium
+      category: Platform Expansion
+    - id: deferred-dataframe-benchmark-implementations
+      file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
+      title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
+      priority: Low
+      category: Benchmark Expansion
+    - id: deferred-dataframe-performance-analysis
+      file: TODO/main/planning/deferred-dataframe-performance-analysis.yaml
+      title: Deferred DataFrame Performance Cross-Platform Analysis
+      priority: Low
+      category: Performance Analysis
+    - id: deferred-platform-adapter-enhancements
+      file: TODO/platform-expansion/planning/deferred-platform-adapter-enhancements.yaml
+      title: Deferred Platform Adapter Enhancements — TLS, Bodo, pg_mooncake, pg_duckdb
+      priority: Low
+      category: Platform Expansion
+    - id: deferred-storage-and-cache-unification
+      file: TODO/core-functionality/planning/deferred-storage-and-cache-unification.yaml
+      title: Deferred Storage Location and Cache Unification Enhancements
+      priority: Low
+      category: Core Functionality
+    - id: deferred-visualization-and-output-enhancements
+      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
+      title: Deferred Visualization and Output Format Enhancements
+      priority: Low
+      category: User Experience
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -42,7 +72,7 @@ statuses:
     - id: coverage-ci-enforcement
       file: TODO/main/planning/coverage-ci-enforcement.yaml
       title: Enforce per-module 50% coverage floor in CI
-      priority: Medium
+      priority: Medium-High
       category: Testing and Quality Assurance
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
@@ -77,12 +107,12 @@ statuses:
     - id: coverage-cli-modules
       file: TODO/main/planning/coverage-cli-modules.yaml
       title: Improve test coverage for CLI modules to ≥50%
-      priority: Medium-High
+      priority: High
       category: Testing and Quality Assurance
     - id: coverage-platforms
       file: TODO/main/planning/coverage-platforms.yaml
       title: Improve test coverage for platform adapter modules to ≥50%
-      priority: Medium
+      priority: High
       category: Testing and Quality Assurance
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml

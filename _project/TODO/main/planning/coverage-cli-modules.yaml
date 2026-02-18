@@ -1,7 +1,7 @@
 id: coverage-cli-modules
 title: "Improve test coverage for CLI modules to ≥50%"
 worktree: main
-priority: Medium-High
+priority: High
 status: Not Started
 category: Testing and Quality Assurance
 description: |
@@ -35,7 +35,7 @@ metadata:
   - cli
   estimated_effort: Medium
   created_date: "2026-02-07"
-  last_updated: "2026-02-07T09:00:00"
+  last_updated: "2026-02-18T14:40:51"
 
 impact:
   business_value: |
