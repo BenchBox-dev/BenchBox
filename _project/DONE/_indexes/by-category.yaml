@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T14:47:48.236359'
+generated_at: '2026-02-18T15:02:10.813119'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 133
+    count: 134
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -716,6 +716,11 @@ categories:
       title: Harden plan comparison and visualization for unknown operator types
       priority: High
       status: Not Started
+    - id: ctas-sorted-data-loading
+      file: DONE/physical-tuning/active/ctas-sorted-data-loading.yaml
+      title: Implement CTAS-based sorted data loading for DuckDB
+      priority: Medium-High
+      status: Completed
     - id: dataframe-maintenance-operations
       file: DONE/dataframe-expansion/active/dataframe-maintenance-operations.yaml
       title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS

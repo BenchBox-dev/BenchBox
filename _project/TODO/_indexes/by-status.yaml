@@ -1,14 +1,6 @@
-generated_at: '2026-02-18T15:01:36.226465'
-total_items: 40
+generated_at: '2026-02-18T15:02:09.207755'
+total_items: 39
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: ctas-sorted-data-loading
-      file: TODO/physical-tuning/active/ctas-sorted-data-loading.yaml
-      title: Implement CTAS-based sorted data loading for DuckDB
-      priority: Medium-High
-      category: Core Functionality
   Not Started:
     count: 39
     items:

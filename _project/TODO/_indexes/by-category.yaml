@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T15:01:36.226437'
+generated_at: '2026-02-18T15:02:09.207728'
 total_categories: 11
 categories:
   AI/ML Capabilities:
@@ -94,18 +94,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 4
+    count: 3
     items:
     - id: deferred-storage-and-cache-unification
       file: TODO/core-functionality/planning/deferred-storage-and-cache-unification.yaml
       title: Deferred Storage Location and Cache Unification Enhancements
       priority: Medium
       status: Not Started
-    - id: ctas-sorted-data-loading
-      file: TODO/physical-tuning/active/ctas-sorted-data-loading.yaml
-      title: Implement CTAS-based sorted data loading for DuckDB
-      priority: Medium-High
-      status: In Progress
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation

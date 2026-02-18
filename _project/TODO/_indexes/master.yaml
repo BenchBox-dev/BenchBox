@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T15:01:36.226403'
-total_items: 40
+generated_at: '2026-02-18T15:02:09.207686'
+total_items: 39
 items:
 - id: coverage-cli-modules
   file: TODO/main/planning/coverage-cli-modules.yaml
@@ -615,23 +615,6 @@ items:
   - coverage-cli-modules
   - coverage-platforms
   - coverage-core-utilities
-- id: ctas-sorted-data-loading
-  file: TODO/physical-tuning/active/ctas-sorted-data-loading.yaml
-  title: Implement CTAS-based sorted data loading for DuckDB
-  worktree: physical-tuning
-  category: Core Functionality
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - tuning
-  - duckdb
-  - performance
-  - zone-maps
-  - data-loading
-  estimated_effort: Medium
-  work_total: 12
-  work_done: 12
-  work_ready: 0
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes

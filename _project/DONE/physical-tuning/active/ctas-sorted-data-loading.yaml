@@ -6,7 +6,8 @@ id: ctas-sorted-data-loading
 title: "Implement CTAS-based sorted data loading for DuckDB"
 worktree: physical-tuning
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-02-18"
 description: |
   BenchBox's tuning infrastructure generates sort clauses via DuckDBDDLGenerator
   (e.g., `ORDER BY L_SHIPDATE, L_ORDERKEY`), but the data loader uses INSERT INTO

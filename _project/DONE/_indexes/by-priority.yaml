@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T14:47:48.236491'
-total_items: 490
+generated_at: '2026-02-18T15:02:10.813452'
+total_items: 491
 priorities:
   Critical:
     count: 34
@@ -1039,7 +1039,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 51
+    count: 52
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1186,6 +1186,11 @@ priorities:
       file: DONE/main/active/fix-type-checking-errors.yaml
       title: Fix type checking errors ignored in ty config
       category: Testing and Quality Assurance
+      status: Completed
+    - id: ctas-sorted-data-loading
+      file: DONE/physical-tuning/active/ctas-sorted-data-loading.yaml
+      title: Implement CTAS-based sorted data loading for DuckDB
+      category: Core Functionality
       status: Completed
     - id: dataframe-maintenance-operations
       file: DONE/dataframe-expansion/active/dataframe-maintenance-operations.yaml

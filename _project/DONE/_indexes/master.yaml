@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T14:47:48.236127'
-total_items: 490
+generated_at: '2026-02-18T15:02:10.812505'
+total_items: 491
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5470,6 +5470,24 @@ items:
   - code-quality
   - ty
   estimated_effort: Large
+- id: ctas-sorted-data-loading
+  file: DONE/physical-tuning/active/ctas-sorted-data-loading.yaml
+  title: Implement CTAS-based sorted data loading for DuckDB
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - tuning
+  - duckdb
+  - performance
+  - zone-maps
+  - data-loading
+  estimated_effort: Medium
+  completed_date: '2026-02-18'
+  work_total: 12
+  work_done: 12
+  work_ready: 0
 - id: dataframe-maintenance-operations
   file: DONE/dataframe-expansion/active/dataframe-maintenance-operations.yaml
   title: Implement DataFrame Maintenance Operations for TPC-H/TPC-DS
