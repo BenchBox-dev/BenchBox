@@ -148,7 +148,7 @@ work:
 - id: w7
   summary: "Improve query heatmap no-color scanability with fixed-width cell blocks and numeral spacing"
   needs: [w4, w5, w6]
-  status: pending
+  status: done
 - id: w8
   summary: "Remove non-semantic series marker prefixes from query distribution labels"
   needs: [w2]
