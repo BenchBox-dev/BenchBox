@@ -1,0 +1,63 @@
+id: http-tls-certificate-validation
+title: "Add TLS Certificate Validation Options to HTTP-Based Data Loading"
+worktree: platform-expansion
+priority: Low
+status: Not Started
+category: Platform Expansion
+description: |
+  Add verify_ssl and ca_cert_path options to HTTP-based data loading endpoints.
+  Currently these platforms load data over HTTP without certificate validation
+  options. Users deploying with self-signed certs or strict TLS policies need
+  these controls.
+
+  Deferred from platform-adapter-http-tls-support (completed, status anomaly —
+  all work done but marked "Not Started").
+
+context_sections:
+  "Affected Platforms": |
+    Platforms that use HTTP-based data loading:
+    - Doris (benchbox/platforms/doris.py)
+    - StarRocks (benchbox/platforms/starrocks/adapter.py)
+    - InfluxDB (benchbox/platforms/influxdb/client.py)
+
+metadata:
+  tags:
+  - tls
+  - security
+  - http
+  - deferred-followup
+  estimated_effort: "Small — 1 day"
+  created_date: "2026-02-18"
+  split_from: platform-adapter-http-tls-support
+
+files_affected:
+  modified:
+  - "benchbox/platforms/doris.py"
+  - "benchbox/platforms/starrocks/adapter.py"
+  - "benchbox/platforms/influxdb/client.py"
+  - "tests/unit/platforms/test_doris.py"
+  - "tests/unit/platforms/test_starrocks.py"
+
+must_preserve:
+- "Existing HTTP loading continues to work without any TLS config (backwards-compatible defaults)"
+- "All current platform adapter tests pass unchanged"
+
+work:
+- id: w1
+  summary: "Add verify_ssl and ca_cert_path options to HTTP upload mixin/shared logic"
+  status: pending
+
+- id: w2
+  summary: "Wire options through Doris, StarRocks, and InfluxDB adapters"
+  needs: [w1]
+  status: pending
+
+- id: w3
+  summary: "Add unit tests for TLS options — verify cert path is passed through, verify_ssl=False disables validation"
+  needs: [w2]
+  status: pending
+
+verification:
+- description: "Existing platform tests still pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"

@@ -1,0 +1,64 @@
+id: deferred-storage-and-cache-unification
+title: "Deferred Storage Location and Cache Unification Enhancements"
+worktree: core-functionality
+priority: Medium
+status: Not Started
+category: Core Functionality
+description: |
+  Consolidates 3 deferred items from unify-dataframe-sql-default-storage-location
+  (completed 2026-02-09). The core fix unified DataFrame and SQL storage to
+  project-local benchmark_runs/. These are follow-up refinements:
+
+  1. CLI --global-cache flag to opt into ~/.benchbox/ location
+  2. Auto-migration of existing ~/.benchbox/dataframe-data/ contents
+  3. Unify cache subdirectory naming (datagen/ vs dataframe-data/)
+
+context_sections:
+  "Background": |
+    Before the unification, SQL data went to benchmark_runs/ (project-local)
+    while DataFrame data went to ~/.benchbox/dataframe-data/ (global). The fix
+    standardized on project-local. These deferred items handle edge cases for
+    users with existing global caches and cosmetic naming consistency.
+
+metadata:
+  tags:
+  - storage
+  - cache
+  - deferred-followup
+  estimated_effort: "Small — 1-2 days"
+  created_date: "2026-02-18"
+  split_from: unify-dataframe-sql-default-storage-location
+
+files_affected:
+  modified:
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/core/dataframe/data_loader.py"
+  - "benchbox/core/dataframe/__init__.py"
+  - "benchbox/platforms/dataframe/benchmark_mixin.py"
+
+must_preserve:
+- "Default project-local storage (benchmark_runs/) continues to work without any flags"
+- "Existing DataFrame and SQL data loading paths produce identical results"
+
+verification:
+- description: "Existing tests pass — storage paths unchanged by default"
+  command: "uv run -- python -m pytest tests/unit/core/dataframe/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+
+work:
+- id: w1
+  summary: "Add --global-cache CLI flag to opt into ~/.benchbox/ storage location for shared cross-project caching"
+  status: pending
+
+- id: w2
+  summary: "Add explicit migration command for existing ~/.benchbox/dataframe-data/ contents to project-local"
+  needs: [w1]
+  status: pending
+  notes: |
+    Migration should be opt-in and explicit. Users may intentionally share
+    global cache across projects.
+
+- id: w3
+  summary: "Unify cache subdirectory naming between SQL (datagen/) and DataFrame (dataframe-data/) paths"
+  needs: [w1]
+  status: pending

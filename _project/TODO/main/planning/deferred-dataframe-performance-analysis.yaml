@@ -1,0 +1,74 @@
+id: deferred-dataframe-performance-analysis
+title: "Deferred DataFrame Performance Cross-Platform Analysis"
+worktree: main
+priority: Medium
+status: Not Started
+category: Performance Analysis
+description: |
+  Consolidates 3 deferred items from dataframe-performance-optimization-and-analysis
+  (completed 2025-01-07). These represent the next tier of DataFrame performance
+  work beyond the initial profiling infrastructure.
+
+  Originally deferred 13+ months ago. The landscape has evolved — existing
+  adapters (Polars, Pandas, DataFusion, PySpark) now provide enough coverage
+  to start the cross-platform comparison without waiting for Modin/cuDF/Dask.
+
+  Deferred items:
+  1. Cross-platform benchmark suite — start with existing adapters (Polars,
+     Pandas, DataFusion, PySpark), expand to Modin/cuDF/Dask later
+  2. SQL vs DataFrame comparison benchmark (DuckDB SQL vs DataFrame API;
+     DataFusion SQL vs DataFrame) — both platforms support dual execution modes
+  3. Performance comparison report generation
+
+context_sections:
+  "Background": |
+    Basic profiling is available via execute_query_profiled(). The completed TODO
+    established the performance measurement infrastructure. These deferred items
+    build the higher-level analysis layer that compares across platforms.
+
+  "Revised Scope (Feb 2026)": |
+    Original deferral reason cited missing Modin/cuDF/Dask adapters. However,
+    4 DataFrame adapters now exist and are production-ready: Polars, Pandas,
+    DataFusion, PySpark. This is sufficient for a meaningful cross-platform
+    comparison. Modin/cuDF/Dask can be added incrementally when adapters exist.
+
+    The SQL vs DataFrame comparison is immediately feasible on DuckDB and
+    DataFusion, which both support SQL and DataFrame execution paths.
+
+metadata:
+  tags:
+  - dataframe
+  - performance
+  - deferred-followup
+  estimated_effort: "Medium — feasible with existing adapters"
+  created_date: "2026-02-18"
+  split_from: dataframe-performance-optimization-and-analysis
+
+work:
+- id: w1
+  summary: "Design cross-platform DataFrame benchmark matrix — Polars vs Pandas vs DataFusion vs PySpark on TPC-H queries"
+  status: pending
+  notes: |
+    Start with existing adapters. Define: which TPC-H queries, which scale
+    factors, which metrics (wall time, memory, CPU). Design output format
+    for comparison tables.
+
+- id: w2
+  summary: "Implement SQL vs DataFrame comparison mode — run identical TPC-H queries via SQL and DataFrame on DuckDB and DataFusion"
+  needs: [w1]
+  status: pending
+  notes: |
+    Both DuckDB and DataFusion support dual execution modes. Compare per-query
+    timing to quantify the overhead/advantage of each execution path.
+
+- id: w3
+  summary: "Build performance comparison report generator — aggregate multi-platform results into structured comparison output"
+  needs: [w1]
+  status: pending
+  notes: |
+    Generate comparison tables, highlight fastest/slowest per query, compute
+    geometric means. Integrate with existing ASCII chart system.
+
+deferred:
+- summary: "Modin, cuDF, and Dask adapter integration into cross-platform suite"
+  reason: "Adapters for these platforms don't exist yet. Add to the comparison suite incrementally as adapters are implemented."

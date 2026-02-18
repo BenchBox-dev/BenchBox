@@ -1,0 +1,137 @@
+id: cloud-integration-test-infrastructure
+title: "Cloud Platform Integration Test Infrastructure — Deferred Live Tests"
+worktree: platform-expansion
+priority: Low
+status: Not Started
+category: Platform Expansion
+description: |
+  Consolidates deferred live integration test work from 5 completed platform
+  adapter TODOs. Each adapter was implemented with full unit test coverage but
+  deferred live cloud testing due to account provisioning requirements.
+
+  Platforms with deferred live tests:
+  - Firebolt Cloud (from firebolt-cloud-deployment)
+  - StarRocks (from starrocks-olap-platform)
+  - Starburst Galaxy (from starburst-platform-adapter)
+  - MotherDuck (from motherduck-platform-adapter — also deferred credential
+    wizard, cloud storage upload, and result cache control)
+  - pg_duckdb via MotherDuck (from pg-duckdb-platform-adapter)
+  - pg_mooncake object storage (from pg-mooncake-platform-adapter)
+
+  Also consolidates deferred CI infrastructure items:
+  - Docker-based PostgreSQL extension testing (from postgres-extension-benchmarking-infrastructure)
+  - Automated multi-extension comparison pipeline
+
+context_sections:
+  "Background": |
+    During the platform expansion campaign (Jan-Feb 2026), adapters were built
+    with offline-first testing: mock connections, SQL dialect validation, config
+    parsing. Live integration tests were consistently deferred because they
+    require paid cloud accounts or running clusters.
+
+  "Deferred Source Items": |
+    - firebolt-cloud-deployment (completed 2026-02-16): w21-w23 live tests
+    - starrocks-olap-platform (completed 2026-02-16): w13-w14 live cluster tests
+    - starburst-platform-adapter (completed 2026-02-16): w22-w24 Galaxy tests
+    - motherduck-platform-adapter (completed 2026-02-14): credential wizard, cloud upload, cache control
+    - pg-duckdb-platform-adapter (completed 2026-02-15): MotherDuck integration, S3 lake queries
+    - pg-mooncake-platform-adapter (completed 2026-02-15): S3/GCS integration, WAL replication
+    - postgres-extension-benchmarking-infrastructure (completed 2026-02-15): Docker CI, comparison pipeline
+
+metadata:
+  tags:
+  - integration-tests
+  - cloud
+  - deferred-followup
+  estimated_effort: "Large — requires cloud account provisioning"
+  created_date: "2026-02-18"
+  split_from_multiple:
+  - firebolt-cloud-deployment
+  - starrocks-olap-platform
+  - starburst-platform-adapter
+  - motherduck-platform-adapter
+  - pg-duckdb-platform-adapter
+  - pg-mooncake-platform-adapter
+  - postgres-extension-benchmarking-infrastructure
+
+work:
+- id: w1
+  summary: "Design shared integration test harness — pytest markers, credential env var convention, skip-when-unavailable logic"
+  status: pending
+  notes: |
+    Create @pytest.mark.cloud_integration marker and a conftest fixture that
+    checks for platform-specific env vars (e.g., FIREBOLT_HOST, STARBURST_HOST).
+    Tests auto-skip when credentials are absent.
+
+- id: w2
+  summary: "Firebolt Cloud live smoke tests — connect, create table, run TPC-H Q1, validate result"
+  needs: [w1]
+  status: pending
+  notes: |
+    External blocker: requires Firebolt Cloud account with provisioned engine
+    and S3 credentials for data loading.
+
+- id: w3
+  summary: "StarRocks live smoke tests — connect, create table, run TPC-H Q1, validate result"
+  needs: [w1]
+  status: pending
+  notes: |
+    External blocker: requires running StarRocks FE+BE cluster. Can use Docker
+    Compose locally or connect to a remote cluster.
+
+- id: w4
+  summary: "Starburst Galaxy live smoke tests — connect, create table, run TPC-H Q1, validate result"
+  needs: [w1]
+  status: pending
+  notes: |
+    External blocker: requires Starburst Galaxy account and running cluster.
+
+- id: w5
+  summary: "MotherDuck credential setup wizard — interactive flow to configure MOTHERDUCK_TOKEN"
+  needs: [w1]
+  status: pending
+  notes: |
+    External blocker: requires MotherDuck account for end-to-end testing.
+
+- id: w6
+  summary: "MotherDuck cloud storage upload path — upload data via MotherDuck's cloud storage API"
+  needs: [w5]
+  status: pending
+
+- id: w7
+  summary: "MotherDuck result cache control — implement cache bypass/invalidation for consistent benchmarking"
+  needs: [w5]
+  status: pending
+  notes: |
+    Requires understanding of MotherDuck cache APIs. Important for benchmark
+    reproducibility — cached results would skew timing measurements.
+
+- id: w8
+  summary: "pg_duckdb MotherDuck mode integration tests and S3 Parquet/Iceberg data lake queries"
+  needs: [w1]
+  status: pending
+  notes: |
+    External blocker: requires active MotherDuck account and S3 bucket with
+    Parquet/Iceberg test data.
+
+- id: w9
+  summary: "pg_mooncake S3/GCS object storage integration tests and pg_moonlink WAL replication benchmarking"
+  needs: [w1]
+  status: pending
+  notes: |
+    External blocker: requires S3 or GCS bucket with credentials, and a
+    PostgreSQL instance with pg_mooncake extension and WAL configured.
+
+- id: w10
+  summary: "Docker-based PostgreSQL extension CI harness — Docker Compose for pg_duckdb, pg_mooncake, pg_analytics"
+  needs: [w1]
+  status: pending
+
+- id: w11
+  summary: "Automated multi-extension comparison pipeline — orchestrate runs across pg extensions and generate comparison reports"
+  needs: [w8, w9, w10]
+  status: pending
+
+open_questions:
+- "Which cloud accounts should be provisioned first? Prioritize by user demand."
+- "Should Docker-based tests run in CI or remain local-only initially?"

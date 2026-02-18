@@ -1,0 +1,63 @@
+id: pg-extension-advanced-benchmarking
+title: "Advanced pg_mooncake and pg_duckdb Benchmarking Features"
+worktree: platform-expansion
+priority: Low
+status: Not Started
+category: Platform Expansion
+description: |
+  Advanced benchmarking features for PostgreSQL extension adapters that go
+  beyond basic query execution.
+
+  From pg-mooncake-platform-adapter (completed 2026-02-15):
+  - Data type compatibility matrix documentation
+  - Heap-to-columnstore migration benchmarking (measuring conversion overhead)
+
+  From pg-duckdb-platform-adapter (completed 2026-02-15):
+  - pg_duckdb vs native DuckDB automated comparison reports
+
+  These are benchmarking enhancements, not integration tests (those are in
+  cloud-integration-test-infrastructure).
+
+context_sections:
+  "pg_mooncake Type Evolution": |
+    pg_mooncake is actively evolving; type support changes frequently across
+    releases. A compatibility matrix would need to be version-tagged and
+    maintained. The heap-to-columnstore migration benchmark measures the
+    overhead of converting existing PostgreSQL heap tables to pg_mooncake's
+    columnstore format.
+
+  "pg_duckdb Comparison": |
+    pg_duckdb runs DuckDB inside PostgreSQL. Comparing it to native DuckDB
+    reveals the overhead of the PostgreSQL integration layer. This comparison
+    needs structured output showing per-query timing differences.
+
+metadata:
+  tags:
+  - pg-extensions
+  - pg-mooncake
+  - pg-duckdb
+  - benchmarking
+  - deferred-followup
+  estimated_effort: "Small — 1-2 days"
+  created_date: "2026-02-18"
+  split_from_multiple:
+  - pg-mooncake-platform-adapter
+  - pg-duckdb-platform-adapter
+
+files_affected:
+  modified:
+  - "benchbox/platforms/pg_mooncake.py"
+  - "benchbox/platforms/pg_duckdb.py"
+
+work:
+- id: w1
+  summary: "Document pg_mooncake data type compatibility matrix — enumerate supported types per pg_mooncake version"
+  status: pending
+
+- id: w2
+  summary: "Add heap-to-columnstore migration benchmark — measure conversion time and storage overhead for pg_mooncake"
+  status: pending
+
+- id: w3
+  summary: "Build pg_duckdb vs native DuckDB comparison report — run identical queries on both, generate timing delta table"
+  status: pending

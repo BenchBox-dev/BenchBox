@@ -1,0 +1,76 @@
+id: deferred-visualization-and-output-enhancements
+title: "Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering"
+worktree: main
+priority: Low
+status: Not Started
+category: User Experience
+description: |
+  Extends the visualization system beyond ASCII with richer output formats.
+  Consolidates deferred work from 2 completed TODOs:
+
+  - follow-up-visualization-template-chart-integration (completed 2026-02-18):
+    Non-ASCII (PNG/HTML) equivalents for template chart bundles.
+  - greyscale-ascii-visualization-fallbacks (completed 2026-02-17):
+    Intermediate greyscale ColorMode (dim/bold ANSI tier) and HTML/SVG chart
+    output format for MCP.
+
+  The ASCII path is complete and functional with color, no-color, and
+  structural-pattern fallbacks. These items are aspirational — implement only
+  if user demand materializes.
+
+context_sections:
+  "Background": |
+    The ASCII visualization system is fully implemented covering CLI, MCP, and
+    --no-color use cases. These deferred items represent the next tier of
+    visualization richness for users who need exportable or web-embeddable charts.
+
+  "User Demand Signal": |
+    No user requests for PNG/HTML/SVG output have been received as of 2026-02-18.
+    These items should be re-evaluated when:
+    - Users report ASCII charts are insufficient for their workflow
+    - MCP web UIs become a primary consumption path
+    - Blog/documentation needs programmatic chart generation
+
+metadata:
+  tags:
+  - visualization
+  - charts
+  - deferred-followup
+  - research-needed
+  estimated_effort: "Medium"
+  created_date: "2026-02-18"
+  split_from_multiple:
+  - follow-up-visualization-template-chart-integration
+  - greyscale-ascii-visualization-fallbacks
+
+files_affected:
+  modified:
+  - "benchbox/core/visualization/"
+  - "benchbox/cli/commands/visualize.py"
+  added:
+  - "benchbox/core/visualization/png_backend.py"
+  - "benchbox/core/visualization/html_backend.py"
+
+work:
+- id: w1
+  summary: "Add PNG chart rendering backend using matplotlib — CLI flag --format=png writes image files to output directory"
+  status: pending
+  notes: |
+    Scope: CLI-only initially (benchbox visualize --format=png). Would add
+    matplotlib as an optional dependency. Generates one PNG per chart type.
+    MCP integration can follow as w1b if needed.
+
+- id: w2
+  summary: "Add HTML/SVG chart output format — self-contained HTML files with inline SVG for MCP web UIs and report embedding"
+  status: pending
+  notes: |
+    Could use lightweight SVG generation (no heavy dependency) or matplotlib's
+    SVG backend. Target: single self-contained HTML file per chart bundle.
+
+- id: w3
+  summary: "Add intermediate greyscale ColorMode (dim/bold ANSI) between full-color and structural-only"
+  status: pending
+  notes: |
+    The structural-pattern approach already covers the primary use cases.
+    This is a refinement for terminals that support bold/dim but not full
+    ANSI color (rare but exists). Lowest priority of the three items.

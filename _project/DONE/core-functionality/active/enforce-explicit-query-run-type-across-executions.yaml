@@ -81,7 +81,7 @@ verification:
   command: "uv run -- python -m pytest tests/unit/core/results -k 'run_type or query_normalizer or schema' -q"
   expected_output: "selected tests pass; no missing run_type regressions"
 - description: "MCP and result export behavior remains stable"
-  command: "uv run -- python -m pytest tests/unit/mcp/test_mcp_results_and_analytics.py -k run_benchmark -q"
+  command: "uv run -- python -m pytest tests/unit/mcp/test_mcp_results_and_analytics.py -k RunBenchmark -q"
   expected_output: "selected run_benchmark MCP tests pass"
 
 scope_limit:
