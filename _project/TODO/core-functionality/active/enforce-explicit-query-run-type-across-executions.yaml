@@ -128,7 +128,7 @@ work:
 - id: w5
   summary: "Retain normalization/schema run_type fallback as compatibility-only path with clarifying comments"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w6
   summary: "Add platform adapter unit tests asserting run_type presence across execution types"
