@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T13:41:44.725443'
+generated_at: '2026-02-18T13:54:35.303552'
 total_categories: 64
 categories:
   '"Bug Fixes & Reliability"':
@@ -2336,7 +2336,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 25
+    count: 26
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2412,6 +2412,11 @@ categories:
     - id: coverage-core-utilities
       file: DONE/main/active/coverage-core-utilities.yaml
       title: Improve test coverage for core utility and standalone modules to ≥50%
+      priority: Medium-High
+      status: Completed
+    - id: coverage-core-tpcdi
+      file: DONE/main/active/coverage-core-tpcdi.yaml
+      title: Improve test coverage for core/tpcdi module to ≥50%
       priority: Medium-High
       status: Completed
     - id: integration-test-suite-cleanup-remove-placeholder-and-failing-tests

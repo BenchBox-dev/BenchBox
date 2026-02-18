@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T13:41:44.725684'
-total_items: 489
+generated_at: '2026-02-18T13:54:35.303774'
+total_items: 490
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 441
+    count: 442
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1353,6 +1353,11 @@ statuses:
     - id: coverage-core-utilities
       file: DONE/main/active/coverage-core-utilities.yaml
       title: Improve test coverage for core utility and standalone modules to ≥50%
+      priority: Medium-High
+      category: Testing and Quality Assurance
+    - id: coverage-core-tpcdi
+      file: DONE/main/active/coverage-core-tpcdi.yaml
+      title: Improve test coverage for core/tpcdi module to ≥50%
       priority: Medium-High
       category: Testing and Quality Assurance
     - id: include-tpc-metrics-in-result-outputs

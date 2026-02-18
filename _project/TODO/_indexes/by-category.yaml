@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T13:41:43.648661'
+generated_at: '2026-02-18T13:54:34.240082'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -163,7 +163,7 @@ categories:
       priority: Low
       status: Not Started
   Testing and Quality Assurance:
-    count: 5
+    count: 4
     items:
     - id: coverage-ci-enforcement
       file: TODO/main/planning/coverage-ci-enforcement.yaml
@@ -173,11 +173,6 @@ categories:
     - id: coverage-cli-modules
       file: TODO/main/planning/coverage-cli-modules.yaml
       title: Improve test coverage for CLI modules to ≥50%
-      priority: Medium-High
-      status: Not Started
-    - id: coverage-core-tpcdi
-      file: TODO/main/planning/coverage-core-tpcdi.yaml
-      title: Improve test coverage for core/tpcdi module to ≥50%
       priority: Medium-High
       status: Not Started
     - id: coverage-platforms

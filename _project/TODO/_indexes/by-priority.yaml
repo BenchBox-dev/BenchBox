@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T13:41:43.648676'
-total_items: 33
+generated_at: '2026-02-18T13:54:34.240097'
+total_items: 32
 priorities:
   High:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 6
+    count: 5
     items:
     - id: ctas-sorted-data-loading
       file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
@@ -20,11 +20,6 @@ priorities:
     - id: coverage-cli-modules
       file: TODO/main/planning/coverage-cli-modules.yaml
       title: Improve test coverage for CLI modules to ≥50%
-      category: Testing and Quality Assurance
-      status: Not Started
-    - id: coverage-core-tpcdi
-      file: TODO/main/planning/coverage-core-tpcdi.yaml
-      title: Improve test coverage for core/tpcdi module to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
     - id: reenable-comprehensive-ci

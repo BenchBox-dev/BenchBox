@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T13:41:44.725236'
-total_items: 489
+generated_at: '2026-02-18T13:54:35.303347'
+total_items: 490
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5543,6 +5543,22 @@ items:
   - quick-wins
   estimated_effort: Small
   completed_date: '2026-02-07'
+- id: coverage-core-tpcdi
+  file: DONE/main/active/coverage-core-tpcdi.yaml
+  title: Improve test coverage for core/tpcdi module to ≥50%
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium-High
+  status: Completed
+  tags:
+  - testing
+  - coverage
+  - tpcdi
+  estimated_effort: Medium
+  completed_date: '2026-02-18'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: integrate-write-primitives-dataframe-mode
   file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml
   title: Integrate Write Primitives DataFrame Mode with Runner and Registry

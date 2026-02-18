@@ -1,8 +1,8 @@
-generated_at: '2026-02-18T13:41:43.648685'
-total_items: 33
+generated_at: '2026-02-18T13:54:34.240107'
+total_items: 32
 statuses:
   Not Started:
-    count: 33
+    count: 32
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
@@ -77,11 +77,6 @@ statuses:
     - id: coverage-cli-modules
       file: TODO/main/planning/coverage-cli-modules.yaml
       title: Improve test coverage for CLI modules to ≥50%
-      priority: Medium-High
-      category: Testing and Quality Assurance
-    - id: coverage-core-tpcdi
-      file: TODO/main/planning/coverage-core-tpcdi.yaml
-      title: Improve test coverage for core/tpcdi module to ≥50%
       priority: Medium-High
       category: Testing and Quality Assurance
     - id: coverage-platforms

@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T13:41:43.648632'
-total_items: 33
+generated_at: '2026-02-18T13:54:34.240051'
+total_items: 32
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -513,21 +513,6 @@ items:
   work_total: 14
   work_done: 0
   work_ready: 14
-- id: coverage-core-tpcdi
-  file: TODO/main/planning/coverage-core-tpcdi.yaml
-  title: Improve test coverage for core/tpcdi module to ≥50%
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - testing
-  - coverage
-  - tpcdi
-  estimated_effort: Medium
-  work_total: 5
-  work_done: 0
-  work_ready: 5
 - id: reenable-comprehensive-ci
   file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
   title: Re-enable comprehensive CI checks (linkcheck, security, coverage)

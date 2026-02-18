@@ -2,8 +2,9 @@ id: coverage-core-tpcdi
 title: "Improve test coverage for core/tpcdi module to ≥50%"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
 category: Testing and Quality Assurance
+completed_date: "2026-02-18"
 description: |
   The TPC-DI (Data Integration) benchmark module is at 42.3% coverage with
   5,668 missing lines out of 9,817 total. While close to 50% overall, several
