@@ -180,7 +180,7 @@ work:
   summary: "Add one TPC-H test and one TPC-DS test for failure-path cleanup"
   needs:
   - w5
-  status: pending
+  status: done
 - id: w7
   summary: "Add no-queries path test to prove cleanup is still executed"
   needs:
