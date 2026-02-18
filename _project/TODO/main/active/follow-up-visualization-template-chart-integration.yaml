@@ -136,7 +136,7 @@ work:
 - id: w4
   summary: "Align MCP validation and docs with canonical registry; update suggestion logic for new charts"
   needs: [w1, w2]
-  status: pending
+  status: done
 - id: w5
   summary: "Add explicit template skip reporting for inapplicable charts instead of silent omission"
   needs: [w2]
