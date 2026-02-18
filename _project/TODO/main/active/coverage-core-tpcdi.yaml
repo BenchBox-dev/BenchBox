@@ -106,7 +106,7 @@ work:
 - id: w3
   summary: "Add Type 1 and Type 2 SCD behavior tests for core/tpcdi/etl/scd_processor.py"
   needs: [w1]
-  status: pending
+  status: done
 - id: w4
   summary: "Add deterministic generation and failure-mode tests for core/tpcdi/source_generators.py"
   needs: [w1]
