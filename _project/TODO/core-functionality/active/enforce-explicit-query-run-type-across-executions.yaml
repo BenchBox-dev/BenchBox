@@ -118,7 +118,7 @@ work:
 - id: w3
   summary: "Ensure throughput/maintenance and fallback combined paths also emit explicit run_type for query rows"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w4
   summary: "Propagate run_type into `_create_standard_execution_phase()` QueryExecution objects"
