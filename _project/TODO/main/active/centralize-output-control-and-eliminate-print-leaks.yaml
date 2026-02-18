@@ -23,7 +23,7 @@ work:
   summary: "Migrate CLI commands (results/report/show-plan/compare-plans/plan-history) from Console() to shared quiet-aware
     console"
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Normalize shell command output by removing raw print() paths and using centralized console helpers"
   needs: [w1]
