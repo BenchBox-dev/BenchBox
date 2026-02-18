@@ -6,7 +6,7 @@ id: ctas-sorted-data-loading
 title: "Implement CTAS-based sorted data loading for DuckDB"
 worktree: physical-tuning
 priority: Medium-High
-status: Not Started
+status: In Progress
 description: |
   BenchBox's tuning infrastructure generates sort clauses via DuckDBDDLGenerator
   (e.g., `ORDER BY L_SHIPDATE, L_ORDERKEY`), but the data loader uses INSERT INTO
@@ -112,41 +112,41 @@ open_questions:
 work:
 - id: w1
   summary: "Document current data loading flow in DataLoader class"
-  status: pending
+  status: done
 - id: w2
   summary: "Identify integration point for tuning config in load path"
-  status: pending
+  status: done
 - id: w3
   summary: "Design CTAS-based loading strategy for DuckDB"
-  status: pending
+  status: done
 - id: w4
   summary: "Handle fresh load scenario (CTAS)"
   needs:
   - w3
-  status: pending
+  status: done
 - id: w5
   summary: "Handle append scenario (temp table + ordered insert)"
   needs:
   - w3
-  status: pending
+  status: done
 - id: w6
   summary: "Add tuning_config parameter to DataLoader"
-  status: pending
+  status: done
 - id: w7
   summary: "Implement DuckDB CTAS handler for sorted tables"
-  status: pending
+  status: done
 - id: w8
   summary: "Modify DuckDB adapter to pass tuning config to loader"
-  status: pending
+  status: done
 - id: w9
   summary: "Add generate_ctas_ddl usage in data loading path"
-  status: pending
+  status: done
 - id: w10
   summary: "Unit tests for sorted CTAS loading"
-  status: pending
+  status: done
 - id: w11
   summary: "Integration test: verify sortedness after load"
-  status: pending
+  status: done
 - id: w12
   summary: "Performance validation: confirm zone map pruning benefit"
-  status: pending
+  status: done

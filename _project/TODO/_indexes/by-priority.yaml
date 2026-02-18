@@ -1,8 +1,8 @@
-generated_at: '2026-02-18T14:47:47.205131'
-total_items: 38
+generated_at: '2026-02-18T15:01:36.226453'
+total_items: 40
 priorities:
   High:
-    count: 3
+    count: 2
     items:
     - id: coverage-cli-modules
       file: TODO/main/planning/coverage-cli-modules.yaml
@@ -14,13 +14,8 @@ priorities:
       title: Improve test coverage for platform adapter modules to ≥50%
       category: Testing and Quality Assurance
       status: Not Started
-    - id: reenable-fireducks-after-upstream-fixes
-      file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
-      title: Re-enable FireDucks after upstream stability fixes
-      category: Platform Expansion
-      status: Not Started
   Medium-High:
-    count: 5
+    count: 6
     items:
     - id: coverage-ci-enforcement
       file: TODO/main/planning/coverage-ci-enforcement.yaml
@@ -28,9 +23,14 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
     - id: ctas-sorted-data-loading
-      file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
+      file: TODO/physical-tuning/active/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
       category: Core Functionality
+      status: In Progress
+    - id: reenable-fireducks-after-upstream-fixes
+      file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
+      title: Re-enable FireDucks after upstream stability fixes
+      category: Platform Expansion
       status: Not Started
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
@@ -48,7 +48,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 17
+    count: 18
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -65,10 +65,15 @@ priorities:
       title: Add SingleStore Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: cloud-integration-test-infrastructure
-      file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
-      title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
-      category: Platform Expansion
+    - id: deferred-dataframe-performance-analysis
+      file: TODO/main/planning/deferred-dataframe-performance-analysis.yaml
+      title: Deferred DataFrame Performance Cross-Platform Analysis
+      category: Performance Analysis
+      status: Not Started
+    - id: deferred-storage-and-cache-unification
+      file: TODO/core-functionality/planning/deferred-storage-and-cache-unification.yaml
+      title: Deferred Storage Location and Cache Unification Enhancements
+      category: Core Functionality
       status: Not Started
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
@@ -136,8 +141,13 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 13
+    count: 14
     items:
+    - id: bodo-jit-and-mpi-support
+      file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
+      title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
+      category: Platform Expansion
+      status: Not Started
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
@@ -148,30 +158,25 @@ priorities:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
       status: Not Started
+    - id: http-tls-certificate-validation
+      file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
+      title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
+      category: Platform Expansion
+      status: Not Started
+    - id: pg-extension-advanced-benchmarking
+      file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
+      title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
+      category: Platform Expansion
+      status: Not Started
+    - id: cloud-integration-test-infrastructure
+      file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
+      title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
+      category: Platform Expansion
+      status: Not Started
     - id: deferred-dataframe-benchmark-implementations
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       category: Benchmark Expansion
-      status: Not Started
-    - id: deferred-dataframe-performance-analysis
-      file: TODO/main/planning/deferred-dataframe-performance-analysis.yaml
-      title: Deferred DataFrame Performance Cross-Platform Analysis
-      category: Performance Analysis
-      status: Not Started
-    - id: deferred-platform-adapter-enhancements
-      file: TODO/platform-expansion/planning/deferred-platform-adapter-enhancements.yaml
-      title: Deferred Platform Adapter Enhancements — TLS, Bodo, pg_mooncake, pg_duckdb
-      category: Platform Expansion
-      status: Not Started
-    - id: deferred-storage-and-cache-unification
-      file: TODO/core-functionality/planning/deferred-storage-and-cache-unification.yaml
-      title: Deferred Storage Location and Cache Unification Enhancements
-      category: Core Functionality
-      status: Not Started
-    - id: deferred-visualization-and-output-enhancements
-      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
-      title: Deferred Visualization and Output Format Enhancements
-      category: User Experience
       status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
@@ -192,6 +197,11 @@ priorities:
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       category: Core Functionality
+      status: Not Started
+    - id: deferred-visualization-and-output-enhancements
+      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
+      title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
+      category: User Experience
       status: Not Started
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml

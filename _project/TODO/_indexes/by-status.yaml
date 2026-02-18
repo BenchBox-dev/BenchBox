@@ -1,9 +1,22 @@
-generated_at: '2026-02-18T14:47:47.205141'
-total_items: 38
+generated_at: '2026-02-18T15:01:36.226465'
+total_items: 40
 statuses:
-  Not Started:
-    count: 38
+  In Progress:
+    count: 1
     items:
+    - id: ctas-sorted-data-loading
+      file: TODO/physical-tuning/active/ctas-sorted-data-loading.yaml
+      title: Implement CTAS-based sorted data loading for DuckDB
+      priority: Medium-High
+      category: Core Functionality
+  Not Started:
+    count: 39
+    items:
+    - id: bodo-jit-and-mpi-support
+      file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
+      title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
+      priority: Low
+      category: Platform Expansion
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
@@ -29,10 +42,20 @@ statuses:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
       category: Platform Expansion
+    - id: http-tls-certificate-validation
+      file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
+      title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
+      priority: Low
+      category: Platform Expansion
+    - id: pg-extension-advanced-benchmarking
+      file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
+      title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
+      priority: Low
+      category: Platform Expansion
     - id: cloud-integration-test-infrastructure
       file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
-      priority: Medium
+      priority: Low
       category: Platform Expansion
     - id: deferred-dataframe-benchmark-implementations
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
@@ -42,23 +65,13 @@ statuses:
     - id: deferred-dataframe-performance-analysis
       file: TODO/main/planning/deferred-dataframe-performance-analysis.yaml
       title: Deferred DataFrame Performance Cross-Platform Analysis
-      priority: Low
+      priority: Medium
       category: Performance Analysis
-    - id: deferred-platform-adapter-enhancements
-      file: TODO/platform-expansion/planning/deferred-platform-adapter-enhancements.yaml
-      title: Deferred Platform Adapter Enhancements — TLS, Bodo, pg_mooncake, pg_duckdb
-      priority: Low
-      category: Platform Expansion
     - id: deferred-storage-and-cache-unification
       file: TODO/core-functionality/planning/deferred-storage-and-cache-unification.yaml
       title: Deferred Storage Location and Cache Unification Enhancements
-      priority: Low
+      priority: Medium
       category: Core Functionality
-    - id: deferred-visualization-and-output-enhancements
-      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
-      title: Deferred Visualization and Output Format Enhancements
-      priority: Low
-      category: User Experience
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -94,11 +107,6 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: ctas-sorted-data-loading
-      file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
-      title: Implement CTAS-based sorted data loading for DuckDB
-      priority: Medium-High
-      category: Core Functionality
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
@@ -122,13 +130,18 @@ statuses:
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
-      priority: High
+      priority: Medium-High
       category: Platform Expansion
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: Medium-High
       category: Testing and Quality Assurance
+    - id: deferred-visualization-and-output-enhancements
+      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
+      title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
+      priority: Low
+      category: User Experience
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

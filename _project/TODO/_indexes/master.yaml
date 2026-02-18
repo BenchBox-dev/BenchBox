@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T14:47:47.205088'
-total_items: 38
+generated_at: '2026-02-18T15:01:36.226403'
+total_items: 40
 items:
 - id: coverage-cli-modules
   file: TODO/main/planning/coverage-cli-modules.yaml
@@ -31,14 +31,21 @@ items:
   work_total: 16
   work_done: 0
   work_ready: 16
-- id: reenable-fireducks-after-upstream-fixes
-  file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
-  title: Re-enable FireDucks after upstream stability fixes
-  worktree: main
+- id: bodo-jit-and-mpi-support
+  file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
+  title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
+  worktree: platform-expansion
   category: Platform Expansion
-  priority: High
+  priority: Low
   status: Not Started
-  work_total: 4
+  tags:
+  - bodo
+  - dataframe
+  - jit
+  - mpi
+  - deferred-followup
+  estimated_effort: Medium — 2-3 days
+  work_total: 3
   work_done: 0
   work_ready: 1
 - id: cedardb-adapter
@@ -77,6 +84,54 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: http-tls-certificate-validation
+  file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
+  title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  tags:
+  - tls
+  - security
+  - http
+  - deferred-followup
+  estimated_effort: Small — 1 day
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+- id: pg-extension-advanced-benchmarking
+  file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
+  title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  tags:
+  - pg-extensions
+  - pg-mooncake
+  - pg-duckdb
+  - benchmarking
+  - deferred-followup
+  estimated_effort: Small — 1-2 days
+  work_total: 3
+  work_done: 0
+  work_ready: 3
+- id: cloud-integration-test-infrastructure
+  file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
+  title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  tags:
+  - integration-tests
+  - cloud
+  - deferred-followup
+  estimated_effort: Large — requires cloud account provisioning
+  work_total: 11
+  work_done: 0
+  work_ready: 1
 - id: deferred-dataframe-benchmark-implementations
   file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
   title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
@@ -94,66 +149,6 @@ items:
   work_done: 0
   work_ready: 4
   deferred_count: 1
-- id: deferred-dataframe-performance-analysis
-  file: TODO/main/planning/deferred-dataframe-performance-analysis.yaml
-  title: Deferred DataFrame Performance Cross-Platform Analysis
-  worktree: main
-  category: Performance Analysis
-  priority: Low
-  status: Not Started
-  tags:
-  - dataframe
-  - performance
-  - deferred-followup
-  estimated_effort: Large — blocked on adapter implementations
-  work_total: 3
-  work_done: 0
-  work_ready: 1
-- id: deferred-platform-adapter-enhancements
-  file: TODO/platform-expansion/planning/deferred-platform-adapter-enhancements.yaml
-  title: Deferred Platform Adapter Enhancements — TLS, Bodo, pg_mooncake, pg_duckdb
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Low
-  status: Not Started
-  tags:
-  - platform-adapter
-  - enhancements
-  - deferred-followup
-  estimated_effort: Medium
-  work_total: 6
-  work_done: 0
-  work_ready: 5
-- id: deferred-storage-and-cache-unification
-  file: TODO/core-functionality/planning/deferred-storage-and-cache-unification.yaml
-  title: Deferred Storage Location and Cache Unification Enhancements
-  worktree: core-functionality
-  category: Core Functionality
-  priority: Low
-  status: Not Started
-  tags:
-  - storage
-  - cache
-  - deferred-followup
-  estimated_effort: Small — 1-2 days
-  work_total: 3
-  work_done: 0
-  work_ready: 1
-- id: deferred-visualization-and-output-enhancements
-  file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
-  title: Deferred Visualization and Output Format Enhancements
-  worktree: main
-  category: User Experience
-  priority: Low
-  status: Not Started
-  tags:
-  - visualization
-  - charts
-  - deferred-followup
-  estimated_effort: Medium
-  work_total: 3
-  work_done: 0
-  work_ready: 3
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -226,6 +221,22 @@ items:
   work_total: 14
   work_done: 0
   work_ready: 12
+- id: deferred-visualization-and-output-enhancements
+  file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
+  title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
+  worktree: main
+  category: User Experience
+  priority: Low
+  status: Not Started
+  tags:
+  - visualization
+  - charts
+  - deferred-followup
+  - research-needed
+  estimated_effort: Medium
+  work_total: 3
+  work_done: 0
+  work_ready: 3
 - id: tigerdata-cloud-enhancements
   file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
   title: TigerData Cloud Enhancements
@@ -325,19 +336,35 @@ items:
   work_total: 15
   work_done: 0
   work_ready: 15
-- id: cloud-integration-test-infrastructure
-  file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
-  title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
-  worktree: platform-expansion
-  category: Platform Expansion
+- id: deferred-dataframe-performance-analysis
+  file: TODO/main/planning/deferred-dataframe-performance-analysis.yaml
+  title: Deferred DataFrame Performance Cross-Platform Analysis
+  worktree: main
+  category: Performance Analysis
   priority: Medium
   status: Not Started
   tags:
-  - integration-tests
-  - cloud
+  - dataframe
+  - performance
   - deferred-followup
-  estimated_effort: Large — requires cloud account provisioning
-  work_total: 9
+  estimated_effort: Medium — feasible with existing adapters
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  deferred_count: 1
+- id: deferred-storage-and-cache-unification
+  file: TODO/core-functionality/planning/deferred-storage-and-cache-unification.yaml
+  title: Deferred Storage Location and Cache Unification Enhancements
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - storage
+  - cache
+  - deferred-followup
+  estimated_effort: Small — 1-2 days
+  work_total: 3
   work_done: 0
   work_ready: 1
 - id: influxdb-blog-post-edits
@@ -589,12 +616,12 @@ items:
   - coverage-platforms
   - coverage-core-utilities
 - id: ctas-sorted-data-loading
-  file: TODO/physical-tuning/planning/ctas-sorted-data-loading.yaml
+  file: TODO/physical-tuning/active/ctas-sorted-data-loading.yaml
   title: Implement CTAS-based sorted data loading for DuckDB
   worktree: physical-tuning
   category: Core Functionality
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - tuning
   - duckdb
@@ -603,8 +630,18 @@ items:
   - data-loading
   estimated_effort: Medium
   work_total: 12
+  work_done: 12
+  work_ready: 0
+- id: reenable-fireducks-after-upstream-fixes
+  file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
+  title: Re-enable FireDucks after upstream stability fixes
+  worktree: main
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  work_total: 4
   work_done: 0
-  work_ready: 10
+  work_ready: 1
 - id: reenable-comprehensive-ci
   file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
   title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
