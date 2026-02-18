@@ -144,7 +144,7 @@ work:
 - id: w8
   summary: "Add MCP/result export regression tests to verify run_type continuity in payloads"
   needs: [w6, w7]
-  status: pending
+  status: done
 
 - id: w9
   summary: "Run focused verification suite and document any residual edge cases"
