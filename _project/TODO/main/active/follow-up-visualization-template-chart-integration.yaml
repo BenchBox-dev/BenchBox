@@ -152,7 +152,7 @@ work:
 - id: w8
   summary: "Remove non-semantic series marker prefixes from query distribution labels"
   needs: [w2]
-  status: pending
+  status: done
 - id: w9
   summary: "Evaluate and update named templates (existing and optional new templates) based on supported chart/data fit"
   needs: [w4, w5, w6, w7, w8]
