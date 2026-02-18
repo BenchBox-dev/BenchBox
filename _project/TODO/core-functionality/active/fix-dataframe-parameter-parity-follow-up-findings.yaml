@@ -185,7 +185,7 @@ work:
   summary: "Add no-queries path test to prove cleanup is still executed"
   needs:
   - w5
-  status: pending
+  status: done
 - id: w8
   summary: "Thread stream ID into TPC-DS override extraction for each execution stream"
   status: pending
