@@ -102,7 +102,7 @@ work:
 - id: w2
   summary: "Add baseline and edge-path tests for core/tpcdi/etl/transformations.py"
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Add Type 1 and Type 2 SCD behavior tests for core/tpcdi/etl/scd_processor.py"
   needs: [w1]
