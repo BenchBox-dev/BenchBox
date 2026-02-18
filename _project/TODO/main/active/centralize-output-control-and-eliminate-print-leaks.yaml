@@ -43,7 +43,7 @@ work:
 - id: w7
   summary: "Add static output-leak enforcement checks for runtime modules"
   needs: [w2, w3, w4, w5, w6]
-  status: pending
+  status: done
 - id: w8
   summary: "Expand CLI quiet-mode tests to cover consolidated output channels"
   needs: [w2, w3, w4]
