@@ -1,0 +1,258 @@
+# CTAS Sort — Base Class Centralization and DataLoader Connectivity
+#
+# Location: _project/TODO/physical-tuning/planning/ctas-sort-dataloader-connectivity.yaml
+
+id: ctas-sort-dataloader-connectivity
+title: "Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers"
+worktree: physical-tuning
+priority: High
+status: In Progress
+description: |
+  The initial CTAS sort implementation (ctas-sorted-data-loading) placed apply_ctas_sort()
+  directly on DuckDBAdapter and used a duck-typed hasattr() check in DataLoader. This works
+  for DuckDB today, but extending to additional platforms would require copy-pasting the common
+  lookup/validation/logging logic into each adapter.
+
+  This item centralizes apply_ctas_sort() in PlatformAdapter (base class) so that all common
+  behavior — case-insensitive table lookup, sort column extraction, validate_sql_identifier call,
+  dry-run capture_sql, success logging, and debug logging on skipped paths — lives in exactly
+  one place. Each platform adapter overrides only the SQL generation hook
+  _build_ctas_sort_sql(table_name, sort_columns) -> str | None, returning None if the platform
+  does not support CTAS-based sorting.
+
+  Secondary items in scope:
+  - Wire tuning_config into the DataLoader calls for ClickHouse, StarRocks, SQLite, and
+    MotherDuck (currently they construct DataLoader without tuning_config, so CTAS sort
+    never fires even when tuning is enabled).
+  - Rename the misleadingly named if_not_exists parameter in DuckDBDDLGenerator.generate_ctas_ddl()
+    to or_replace (the parameter generates CREATE OR REPLACE, not IF NOT EXISTS).
+  - Remove or simplify the hasattr(adapter, "apply_ctas_sort") guard in DataLoader now that
+    the method is guaranteed by the base class; keep the tuning_config None check as the opt-in.
+  - Add debug-level logging on all early-return paths in the base apply_ctas_sort() so
+    operators can understand why sorting was skipped.
+
+category: Core Functionality
+
+deps:
+  needs:
+  - ctas-sorted-data-loading
+
+work:
+- id: w1
+  summary: "Add _build_ctas_sort_sql(table_name, sort_columns) hook to PlatformAdapter base class returning None"
+  status: done
+  notes: |
+    Signature: def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None
+    Default implementation returns None (platform does not support CTAS sort).
+    Place near apply_unified_tuning() in benchbox/platforms/base/adapter.py.
+
+- id: w2
+  summary: "Implement centralized apply_ctas_sort() in PlatformAdapter with all common logic"
+  needs: [w1]
+  status: pending
+  notes: |
+    Move all logic from DuckDBAdapter.apply_ctas_sort() to PlatformAdapter:
+    1. Case-insensitive lookup of table_name in tuning_config.table_tunings
+    2. Extract sort columns via table_tuning.get_columns_by_type(TuningType.SORTING)
+    3. If no sort columns: log_debug("No sort columns for {table} — skipping CTAS sort") and return False
+    4. Call self._build_ctas_sort_sql(validated_table, sort_columns)
+    5. If None returned: log_debug("{platform} does not support CTAS sort — skipping") and return False
+    6. Dry-run path: self.capture_sql(sql, "ctas_sort", validated_table); return True
+    7. Execute sql via connection
+    8. self.log_verbose("Applied CTAS sorting to {table_name}: {col_names}")
+    9. Return True
+
+- id: w3
+  summary: "Migrate DuckDBAdapter._build_ctas_sort_sql override; remove duplicated apply_ctas_sort"
+  needs: [w2]
+  status: pending
+  notes: |
+    DuckDB override returns:
+      CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM {table_name} ORDER BY col1, col2;
+    Build ORDER BY string from sort_columns sorted by col.order.
+    Remove the now-redundant apply_ctas_sort() method from DuckDBAdapter entirely.
+    MotherDuck can be added here as well since it shares DuckDB SQL syntax.
+
+- id: w4
+  summary: "Rename generate_ctas_ddl(if_not_exists=...) parameter to or_replace in DuckDBDDLGenerator"
+  needs: [w3]
+  status: pending
+  notes: |
+    The parameter if_not_exists in benchbox/core/tuning/generators/duckdb.py:generate_ctas_ddl()
+    generates CREATE OR REPLACE TABLE — the name is factually wrong and misleading.
+    Rename to or_replace. Update all remaining call sites that still use the generator
+    (DuckDBAdapter._build_ctas_sort_sql should already be direct SQL by w3). Run grep to
+    find all usages before renaming.
+
+- id: w5
+  summary: "Wire tuning_config into ClickHouse DataLoader instantiation"
+  needs: [w2]
+  status: pending
+  notes: |
+    benchbox/platforms/clickhouse/workload.py constructs DataLoader without tuning_config.
+    Add: tuning_config=self.unified_tuning_configuration if self.tuning_enabled else None
+    ClickHouse uses its own ORDER BY at table creation; _build_ctas_sort_sql returns None
+    (deferred to ctas-sort-cloud-platforms) so this wiring is a no-op for now but enables
+    future opt-in without another connectivity change.
+
+- id: w6
+  summary: "Wire tuning_config into StarRocks DataLoader instantiation"
+  needs: [w2]
+  status: pending
+  notes: |
+    benchbox/platforms/starrocks/workload.py — same pattern as ClickHouse.
+    Add tuning_config parameter so future _build_ctas_sort_sql can activate.
+
+- id: w7
+  summary: "Wire tuning_config into SQLite DataLoader instantiation"
+  needs: [w2]
+  status: pending
+  notes: |
+    benchbox/platforms/sqlite.py — same pattern.
+    SQLite will likely return None from _build_ctas_sort_sql (no efficient CTAS sort path)
+    but the wiring must be present for the hook to have any effect.
+
+- id: w8
+  summary: "Wire tuning_config into MotherDuck load_data (custom loader, not DataLoader)"
+  needs: [w3]
+  status: pending
+  notes: |
+    MotherDuck has its own load_data() using raw INSERT INTO SELECT * FROM read_parquet().
+    After each table loads, add a call to self.apply_ctas_sort(table_name, effective_tuning, connection)
+    when tuning_enabled. MotherDuck _build_ctas_sort_sql returns DuckDB-compatible SQL (same engine).
+
+- id: w9
+  summary: "Remove hasattr(adapter, 'apply_ctas_sort') guard in DataLoader; keep tuning_config check"
+  needs: [w2]
+  status: pending
+  notes: |
+    In benchbox/platforms/base/data_loading.py the guard currently reads:
+      if self.tuning_config and hasattr(self.adapter, "apply_ctas_sort"):
+    Since apply_ctas_sort is now guaranteed on all PlatformAdapter subclasses, simplify to:
+      if self.tuning_config:
+    Update the docstring to remove duck-typing language; describe the base class hook protocol.
+
+- id: w10
+  summary: "Update DataLoader and base adapter docstrings to document the hook protocol"
+  needs: [w9]
+  status: pending
+  notes: |
+    DataLoader docstring: explain that adapters control CTAS sort via _build_ctas_sort_sql().
+    PlatformAdapter: document both apply_ctas_sort() (call from DataLoader/load_data) and
+    _build_ctas_sort_sql() (override in subclasses to enable platform-specific sorting).
+
+- id: w11
+  summary: "Update / add tests for centralized apply_ctas_sort in base adapter"
+  needs: [w2, w3, w9]
+  status: pending
+  notes: |
+    Move/adapt the TestApplyCtasSort and TestDataLoaderTuningConfig tests from
+    test_duckdb_sorted_loading.py so that base class behavior is tested through a
+    minimal concrete subclass, and DuckDB-specific tests remain in the DuckDB file.
+    Add test: platform that returns None from _build_ctas_sort_sql → apply_ctas_sort returns False.
+    Add test: MotherDuck hook returns correct DuckDB SQL.
+
+metadata:
+  tags:
+  - tuning
+  - duckdb
+  - motherduck
+  - clickhouse
+  - starrocks
+  - sqlite
+  - data-loading
+  - refactoring
+  - centralization
+  estimated_effort: "Medium"
+  created_date: "2026-02-18"
+
+impact:
+  business_value: |
+    Eliminates copy-paste risk by ensuring all future CTAS sort implementations
+    inherit shared lookup, validation, dry-run, and logging behavior automatically.
+    Enables the local and cloud platform extensions (ctas-sort-local-sql-platforms,
+    ctas-sort-cloud-platforms) without any further connectivity work.
+  user_impact: |
+    MotherDuck users will immediately gain sorted loading (same DuckDB engine).
+    ClickHouse, StarRocks, and SQLite users gain the wiring needed for future
+    platform-specific implementations to activate without additional changes.
+  technical_debt: |
+    Resolves duck-typed protocol gap introduced by the initial implementation.
+    Centralizing eliminates the need for each platform to re-implement table
+    lookup, identifier validation, dry-run, and logging.
+
+files_affected:
+  modified:
+  - "benchbox/platforms/base/adapter.py"
+  - "benchbox/platforms/base/data_loading.py"
+  - "benchbox/platforms/duckdb.py"
+  - "benchbox/platforms/motherduck.py"
+  - "benchbox/platforms/clickhouse/workload.py"
+  - "benchbox/platforms/starrocks/workload.py"
+  - "benchbox/platforms/sqlite.py"
+  - "benchbox/core/tuning/generators/duckdb.py"
+  - "tests/unit/platforms/test_duckdb_sorted_loading.py"
+  added:
+  - "tests/unit/platforms/test_base_adapter_ctas_sort.py"
+
+must_preserve:
+- "DuckDBAdapter.load_data() produces identical row counts after refactor"
+- "All existing test_duckdb_sorted_loading.py tests pass unchanged or are migrated 1-for-1"
+- "DataLoader INSERT INTO path (tuning_config=None) is completely unaffected"
+- "DuckDBDDLGenerator.generate_ctas_ddl() behavioral output is identical after the parameter rename"
+- "apply_ctas_sort returns False (not exception) when platform returns None from _build_ctas_sort_sql"
+
+approach: |
+  Start with w1 (add the hook method signature to base adapter) before touching any
+  adapters, so the interface is settled before implementations follow.
+
+  For w2, keep the case-insensitive lookup and validate_sql_identifier call from the existing
+  DuckDBAdapter.apply_ctas_sort() — both are correct and should move verbatim.
+
+  For w3, DuckDBAdapter._build_ctas_sort_sql builds the ORDER BY string from sort_columns
+  without involving DuckDBDDLGenerator — just use f-string formatting directly since the
+  base class owns the logic that already extracted the columns. Only the SQL template string
+  belongs in the platform-specific hook.
+
+  For w4 (parameter rename), run grep first:
+    grep -rn "generate_ctas_ddl" benchbox/ tests/
+  to find all callers before renaming.
+
+  For w8 (MotherDuck), add the apply_ctas_sort call after each table's INSERT INTO completes
+  inside MotherDuck's existing load_data() loop — mirror the DataLoader pattern.
+
+anti_patterns:
+- "DO NOT make _build_ctas_sort_sql abstract — because not all platforms support CTAS sort and forcing every subclass to implement
+  it would break the many adapters that don't need it — return None by default (opt-in model)"
+- "DO NOT pass DuckDBDDLGenerator into _build_ctas_sort_sql — because the hook must be self-contained per platform — each
+  platform builds its own SQL string directly"
+- "DO NOT move the validate_sql_identifier call into _build_ctas_sort_sql — because identifier validation is a shared safety
+  concern, not platform-specific — keep it in the base apply_ctas_sort() before calling the hook"
+- "DO NOT rename generate_ctas_ddl parameter without grep-checking all callers first"
+
+verification:
+- description: "All existing DuckDB sorted loading tests pass after refactor"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_duckdb_sorted_loading.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "New base adapter CTAS tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_base_adapter_ctas_sort.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Full platform unit test suite passes"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "0 failures"
+- description: "Lint and type check pass"
+  command: "uv run ruff check . && uv run ty check"
+  expected_output: "no errors"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/base/adapter.py"
+  - "benchbox/platforms/base/data_loading.py"
+  - "benchbox/platforms/duckdb.py"
+  - "benchbox/platforms/motherduck.py"
+  - "benchbox/platforms/clickhouse/workload.py"
+  - "benchbox/platforms/starrocks/workload.py"
+  - "benchbox/platforms/sqlite.py"
+  - "benchbox/core/tuning/generators/duckdb.py"
+  - "tests/unit/platforms/test_duckdb_sorted_loading.py"
+  - "tests/unit/platforms/test_base_adapter_ctas_sort.py"
