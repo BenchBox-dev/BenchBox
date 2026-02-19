@@ -124,7 +124,7 @@ work:
 - id: w9
   summary: "Remove hasattr(adapter, 'apply_ctas_sort') guard in DataLoader; keep tuning_config check"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     In benchbox/platforms/base/data_loading.py the guard currently reads:
       if self.tuning_config and hasattr(self.adapter, "apply_ctas_sort"):
