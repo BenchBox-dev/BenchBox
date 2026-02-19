@@ -1,9 +1,14 @@
-generated_at: '2026-02-18T15:03:09.244284'
-total_items: 36
+generated_at: '2026-02-18T21:09:53.821641'
+total_items: 38
 priorities:
-  Medium-High:
-    count: 4
+  High:
+    count: 3
     items:
+    - id: ctas-sort-dataloader-connectivity
+      file: TODO/physical-tuning/planning/ctas-sort-dataloader-connectivity.yaml
+      title: Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers
+      category: Core Functionality
+      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
@@ -13,6 +18,14 @@ priorities:
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       category: Testing and Quality Assurance
+      status: Not Started
+  Medium-High:
+    count: 3
+    items:
+    - id: ctas-sort-local-sql-platforms
+      file: TODO/physical-tuning/planning/ctas-sort-local-sql-platforms.yaml
+      title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
+      category: Core Functionality
       status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
@@ -42,16 +55,11 @@ priorities:
       title: Add SingleStore Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: deferred-dataframe-performance-analysis
-      file: TODO/main/planning/deferred-dataframe-performance-analysis.yaml
-      title: Deferred DataFrame Performance Cross-Platform Analysis
-      category: Performance Analysis
-      status: Not Started
     - id: deferred-storage-and-cache-unification
-      file: TODO/core-functionality/planning/deferred-storage-and-cache-unification.yaml
+      file: TODO/core-functionality/active/deferred-storage-and-cache-unification.yaml
       title: Deferred Storage Location and Cache Unification Enhancements
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -66,6 +74,12 @@ priorities:
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
+      status: Not Started
+    - id: ctas-sort-cloud-platforms
+      file: TODO/physical-tuning/planning/ctas-sort-cloud-platforms.yaml
+      title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,
+        Azure Synapse)
+      category: Core Functionality
       status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml

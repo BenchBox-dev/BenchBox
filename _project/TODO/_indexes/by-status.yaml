@@ -1,8 +1,16 @@
-generated_at: '2026-02-18T15:03:09.244295'
-total_items: 36
+generated_at: '2026-02-18T21:09:53.821652'
+total_items: 38
 statuses:
+  In Progress:
+    count: 1
+    items:
+    - id: deferred-storage-and-cache-unification
+      file: TODO/core-functionality/active/deferred-storage-and-cache-unification.yaml
+      title: Deferred Storage Location and Cache Unification Enhancements
+      priority: Medium
+      category: Core Functionality
   Not Started:
-    count: 36
+    count: 37
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -44,6 +52,11 @@ statuses:
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Low
       category: Platform Expansion
+    - id: ctas-sort-dataloader-connectivity
+      file: TODO/physical-tuning/planning/ctas-sort-dataloader-connectivity.yaml
+      title: Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers
+      priority: High
+      category: Core Functionality
     - id: cloud-integration-test-infrastructure
       file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
@@ -54,16 +67,6 @@ statuses:
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
       category: Benchmark Expansion
-    - id: deferred-dataframe-performance-analysis
-      file: TODO/main/planning/deferred-dataframe-performance-analysis.yaml
-      title: Deferred DataFrame Performance Cross-Platform Analysis
-      priority: Medium
-      category: Performance Analysis
-    - id: deferred-storage-and-cache-unification
-      file: TODO/core-functionality/planning/deferred-storage-and-cache-unification.yaml
-      title: Deferred Storage Location and Cache Unification Enhancements
-      priority: Medium
-      category: Core Functionality
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -94,6 +97,17 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
+    - id: ctas-sort-cloud-platforms
+      file: TODO/physical-tuning/planning/ctas-sort-cloud-platforms.yaml
+      title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,
+        Azure Synapse)
+      priority: Medium
+      category: Core Functionality
+    - id: ctas-sort-local-sql-platforms
+      file: TODO/physical-tuning/planning/ctas-sort-local-sql-platforms.yaml
+      title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
+      priority: Medium-High
+      category: Core Functionality
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
@@ -107,12 +121,12 @@ statuses:
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
-      priority: Medium-High
+      priority: High
       category: Platform Expansion
     - id: reenable-comprehensive-ci
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
-      priority: Medium-High
+      priority: High
       category: Testing and Quality Assurance
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
