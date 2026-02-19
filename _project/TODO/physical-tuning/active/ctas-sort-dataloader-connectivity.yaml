@@ -106,7 +106,7 @@ work:
 - id: w7
   summary: "Wire tuning_config into SQLite DataLoader instantiation"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     benchbox/platforms/sqlite.py — same pattern.
     SQLite will likely return None from _build_ctas_sort_sql (no efficient CTAS sort path)
