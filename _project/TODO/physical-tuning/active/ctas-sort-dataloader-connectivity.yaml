@@ -49,7 +49,7 @@ work:
 - id: w2
   summary: "Implement centralized apply_ctas_sort() in PlatformAdapter with all common logic"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Move all logic from DuckDBAdapter.apply_ctas_sort() to PlatformAdapter:
     1. Case-insensitive lookup of table_name in tuning_config.table_tunings
