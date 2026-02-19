@@ -1,4 +1,4 @@
-generated_at: '2026-02-19T01:06:47.169000'
+generated_at: '2026-02-19T03:11:00.317724'
 total_categories: 65
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 136
+    count: 137
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -810,6 +810,11 @@ categories:
       file: DONE/dataframe-tpch-pandas/completed/implement-tpc-h-queries-for-pandas-family.yaml
       title: Implement TPC-H Queries for Pandas Family
       priority: Critical
+      status: Completed
+    - id: ctas-sort-local-sql-platforms
+      file: DONE/physical-tuning/active/ctas-sort-local-sql-platforms.yaml
+      title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
+      priority: Medium-High
       status: Completed
     - id: compare-interactive-file-selection
       file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml

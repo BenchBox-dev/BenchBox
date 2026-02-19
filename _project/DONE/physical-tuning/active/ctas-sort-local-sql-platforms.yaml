@@ -6,7 +6,8 @@ id: ctas-sort-local-sql-platforms
 title: "Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)"
 worktree: physical-tuning
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-02-19"
 description: |
   With the centralized apply_ctas_sort() in PlatformAdapter (ctas-sort-dataloader-connectivity),
   each local SQL platform needs only to override _build_ctas_sort_sql(table_name, sort_columns)

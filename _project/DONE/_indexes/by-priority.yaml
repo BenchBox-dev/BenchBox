@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T01:06:47.169135'
-total_items: 499
+generated_at: '2026-02-19T03:11:00.317854'
+total_items: 500
 priorities:
   Critical:
     count: 34
@@ -1054,7 +1054,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 53
+    count: 54
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1225,6 +1225,11 @@ priorities:
     - id: implement-tpcds-obt-dataframe-queries
       file: DONE/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
       title: Implement TPC-DS-OBT DataFrame Query Families
+      category: Core Functionality
+      status: Completed
+    - id: ctas-sort-local-sql-platforms
+      file: DONE/physical-tuning/active/ctas-sort-local-sql-platforms.yaml
+      title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
       category: Core Functionality
       status: Completed
     - id: compare-interactive-file-selection

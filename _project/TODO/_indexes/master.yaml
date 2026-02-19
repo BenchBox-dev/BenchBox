@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T01:06:46.019430'
-total_items: 34
+generated_at: '2026-02-19T03:10:59.016087'
+total_items: 33
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -542,27 +542,6 @@ items:
   work_total: 14
   work_done: 0
   work_ready: 7
-- id: ctas-sort-local-sql-platforms
-  file: TODO/physical-tuning/planning/ctas-sort-local-sql-platforms.yaml
-  title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
-  worktree: physical-tuning
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - tuning
-  - datafusion
-  - postgresql
-  - starrocks
-  - sqlite
-  - data-loading
-  - zone-maps
-  estimated_effort: Medium
-  work_total: 9
-  work_done: 0
-  work_ready: 4
-  needs:
-  - ctas-sort-dataloader-connectivity
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats

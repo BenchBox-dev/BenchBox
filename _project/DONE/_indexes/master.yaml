@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T01:06:47.168800'
-total_items: 499
+generated_at: '2026-02-19T03:11:00.317525'
+total_items: 500
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5690,6 +5690,28 @@ items:
   - joe
   estimated_effort: Large
   completed_date: '2026-02-07'
+- id: ctas-sort-local-sql-platforms
+  file: DONE/physical-tuning/active/ctas-sort-local-sql-platforms.yaml
+  title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - tuning
+  - datafusion
+  - postgresql
+  - starrocks
+  - sqlite
+  - data-loading
+  - zone-maps
+  estimated_effort: Medium
+  completed_date: '2026-02-19'
+  work_total: 9
+  work_done: 9
+  work_ready: 0
+  needs:
+  - ctas-sort-dataloader-connectivity
 - id: compare-interactive-file-selection
   file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
   title: Improve interactive file selection in compare command
