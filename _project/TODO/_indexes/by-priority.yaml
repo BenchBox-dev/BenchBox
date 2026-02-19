@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T21:10:32.320934'
-total_items: 37
+generated_at: '2026-02-18T21:11:36.064020'
+total_items: 35
 priorities:
   High:
     count: 3
@@ -38,18 +38,8 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 17
+    count: 15
     items:
-    - id: fabric-lakehouse-sql-platform
-      file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
-      title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
-      category: Platform Expansion
-      status: Not Started
-    - id: fabric-spark-notebooks-platform
-      file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
-      title: Add Microsoft Fabric Spark Notebooks platform support
-      category: Platform Expansion
-      status: Not Started
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter

@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T21:10:34.593193'
+generated_at: '2026-02-18T21:11:37.347771'
 total_categories: 65
 categories:
   '"Bug Fixes & Reliability"':
@@ -1556,7 +1556,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 60
+    count: 62
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1592,6 +1592,16 @@ categories:
       file: DONE/platform-expansion/active/lakesail-spark-platform.yaml
       title: Add LakeSail Sail platform support for SQL and DataFrame benchmarking
       priority: High
+      status: Completed
+    - id: fabric-lakehouse-sql-platform
+      file: DONE/platform-expansion/active/fabric-lakehouse-sql-platform.yaml
+      title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
+      priority: Medium
+      status: Completed
+    - id: fabric-spark-notebooks-platform
+      file: DONE/platform-expansion/active/fabric-spark-notebooks-platform.yaml
+      title: Add Microsoft Fabric Spark Notebooks platform support
+      priority: Medium
       status: Completed
     - id: onehouse-quanton-platform
       file: DONE/platform-expansion/planning/onehouse-quanton-platform.yaml

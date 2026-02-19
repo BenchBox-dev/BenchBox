@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T21:10:32.320883'
-total_items: 37
+generated_at: '2026-02-18T21:11:36.063976'
+total_items: 35
 items:
 - id: ctas-sort-dataloader-connectivity
   file: TODO/physical-tuning/planning/ctas-sort-dataloader-connectivity.yaml
@@ -294,49 +294,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: fabric-lakehouse-sql-platform
-  file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
-  title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  tags:
-  - fabric
-  - lakehouse
-  - sql-analytics
-  - read-only
-  - delta-lake
-  - azure
-  - platform
-  - cloud
-  estimated_effort: Medium
-  work_total: 47
-  work_done: 0
-  work_ready: 12
-  needs:
-  - fabric-spark-notebooks-platform
-- id: fabric-spark-notebooks-platform
-  file: TODO/platform-expansion/planning/fabric-spark-notebooks-platform.yaml
-  title: Add Microsoft Fabric Spark Notebooks platform support
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  tags:
-  - fabric
-  - spark
-  - livy
-  - managed-spark
-  - lakehouse
-  - delta-lake
-  - azure
-  - platform
-  - cloud
-  estimated_effort: Large
-  work_total: 50
-  work_done: 0
-  work_ready: 12
 - id: singlestore-adapter
   file: TODO/platform-expansion/planning/singlestore-adapter.yaml
   title: Add SingleStore Platform Adapter

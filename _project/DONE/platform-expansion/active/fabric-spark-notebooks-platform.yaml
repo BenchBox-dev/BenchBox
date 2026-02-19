@@ -2,7 +2,7 @@ id: fabric-spark-notebooks-platform
 title: "Add Microsoft Fabric Spark Notebooks platform support"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: Completed
 description: |
   Integrate Microsoft Fabric Spark Notebooks as a supported BenchBox platform for
   managed Spark-based benchmarking in the Fabric ecosystem.
@@ -30,6 +30,7 @@ description: |
   and explicitly states Lakehouse requires Spark for data loading.
 
 category: Platform Expansion
+completed_date: "2026-02-19"
 
 metadata:
   tags:
@@ -191,227 +192,227 @@ context_sections:
 work:
 - id: w1
   summary: "Create benchbox/platforms/fabric_spark.py adapter"
-  status: pending
+  status: done
 - id: w2
   summary: "Implement FabricSparkAdapter class inheriting from PlatformAdapter"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Set _dialect = 'spark' for SQLGlot transpilation"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w4
   summary: "Implement Livy session management (create/poll/delete)"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w5
   summary: "Implement Entra ID authentication for Livy API"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w6
   summary: "Implement Livy statement execution"
-  status: pending
+  status: done
 - id: w7
   summary: "Create statement submission via POST /sessions/{id}/statements"
   needs:
   - w6
-  status: pending
+  status: done
 - id: w8
   summary: "Implement async polling for statement completion"
   needs:
   - w6
-  status: pending
+  status: done
 - id: w9
   summary: "Handle statement output parsing (JSON/DataFrame results)"
   needs:
   - w6
-  status: pending
+  status: done
 - id: w10
   summary: "Implement proper error handling and retry logic"
   needs:
   - w6
-  status: pending
+  status: done
 - id: w11
   summary: "Implement OneLake data staging"
-  status: pending
+  status: done
 - id: w12
   summary: "Reuse OneLake upload logic from fabric_warehouse.py"
   needs:
   - w11
-  status: pending
+  status: done
 - id: w13
   summary: "Generate abfss:// paths for Spark access"
   needs:
   - w11
-  status: pending
+  status: done
 - id: w14
   summary: "Handle Delta Lake table creation paths"
   needs:
   - w11
-  status: pending
+  status: done
 - id: w15
   summary: "Implement schema creation via Spark SQL"
-  status: pending
+  status: done
 - id: w16
   summary: "Generate CREATE TABLE ... USING DELTA statements"
   needs:
   - w15
-  status: pending
+  status: done
 - id: w17
   summary: "Support OneLake table paths (managed tables in Lakehouse)"
   needs:
   - w15
-  status: pending
+  status: done
 - id: w18
   summary: "Handle Fabric-specific Spark configurations"
   needs:
   - w15
-  status: pending
+  status: done
 - id: w19
   summary: "Implement data loading"
-  status: pending
+  status: done
 - id: w20
   summary: "Load data via spark.read.csv/parquet from OneLake staging"
   needs:
   - w19
-  status: pending
+  status: done
 - id: w21
   summary: "Write to Delta tables with insertInto or saveAsTable"
   needs:
   - w19
-  status: pending
+  status: done
 - id: w22
   summary: "Support V-Order optimization during write"
   needs:
   - w19
-  status: pending
+  status: done
 - id: w23
   summary: "Implement query execution"
-  status: pending
+  status: done
 - id: w24
   summary: "Execute Spark SQL queries via Livy statements"
   needs:
   - w23
-  status: pending
+  status: done
 - id: w25
   summary: "Parse result schema and row counts"
   needs:
   - w23
-  status: pending
+  status: done
 - id: w26
   summary: "Handle Fabric-specific query timeout handling"
   needs:
   - w23
-  status: pending
+  status: done
 - id: w27
   summary: "Implement result cache control"
-  status: pending
+  status: done
 - id: w28
   summary: "Disable Spark SQL cache for benchmarking accuracy"
   needs:
   - w27
-  status: pending
+  status: done
 - id: w29
   summary: "Clear Delta Lake caches between queries"
   needs:
   - w27
-  status: pending
+  status: done
 - id: w30
   summary: "Implement Fabric Spark optimizations"
-  status: pending
+  status: done
 - id: w31
   summary: "Enable V-Order for columnar optimization"
   needs:
   - w30
-  status: pending
+  status: done
 - id: w32
   summary: "Configure appropriate Spark pool sizing via session conf"
   needs:
   - w30
-  status: pending
+  status: done
 - id: w33
   summary: "Implement OPTIMIZE and Z-ORDER for Delta tables"
   needs:
   - w30
-  status: pending
+  status: done
 - id: w34
   summary: "Add platform info collection"
-  status: pending
+  status: done
 - id: w35
   summary: "Capture Spark version from Livy session"
   needs:
   - w34
-  status: pending
+  status: done
 - id: w36
   summary: "Capture executor/driver configuration"
   needs:
   - w34
-  status: pending
+  status: done
 - id: w37
   summary: "Record Fabric capacity unit information if available"
   needs:
   - w34
-  status: pending
+  status: done
 - id: w38
   summary: "Create unit tests for Fabric Spark adapter"
-  status: pending
+  status: done
 - id: w39
   summary: "Test Livy session management mocking"
   needs:
   - w38
-  status: pending
+  status: done
 - id: w40
   summary: "Test statement execution and result parsing"
   needs:
   - w38
-  status: pending
+  status: done
 - id: w41
   summary: "Test OneLake path generation"
   needs:
   - w38
-  status: pending
+  status: done
 - id: w42
   summary: "Create integration tests"
-  status: pending
+  status: done
 - id: w43
   summary: "Test against actual Fabric workspace (requires credentials)"
   needs:
   - w42
-  status: pending
+  status: done
 - id: w44
   summary: "Test TPC-H SF=0.01 end-to-end"
   needs:
   - w42
-  status: pending
+  status: done
 - id: w45
   summary: "Document CI/CD approach (skip without credentials)"
   needs:
   - w42
-  status: pending
+  status: done
 - id: w46
   summary: "Create documentation"
-  status: pending
+  status: done
 - id: w47
   summary: "Create docs/platforms/fabric-spark.md with connection guide"
   needs:
   - w46
-  status: pending
+  status: done
 - id: w48
   summary: "Document Fabric workspace setup requirements"
   needs:
   - w46
-  status: pending
+  status: done
 - id: w49
   summary: "Document Lakehouse vs Warehouse usage guidance"
   needs:
   - w46
-  status: pending
+  status: done
 - id: w50
   summary: "Add authentication setup (service principal, managed identity)"
   needs:
   - w46
-  status: pending
+  status: done

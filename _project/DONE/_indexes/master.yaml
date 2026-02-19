@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T21:10:34.592766'
-total_items: 496
+generated_at: '2026-02-18T21:11:37.347542'
+total_items: 498
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3157,6 +3157,51 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks
   completed_date: '2025-11-29'
+- id: fabric-lakehouse-sql-platform
+  file: DONE/platform-expansion/active/fabric-lakehouse-sql-platform.yaml
+  title: Add Microsoft Fabric Lakehouse SQL Analytics Endpoint support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  tags:
+  - fabric
+  - lakehouse
+  - sql-analytics
+  - read-only
+  - delta-lake
+  - azure
+  - platform
+  - cloud
+  estimated_effort: Medium
+  completed_date: '2026-02-19'
+  work_total: 47
+  work_done: 47
+  work_ready: 0
+  needs:
+  - fabric-spark-notebooks-platform
+- id: fabric-spark-notebooks-platform
+  file: DONE/platform-expansion/active/fabric-spark-notebooks-platform.yaml
+  title: Add Microsoft Fabric Spark Notebooks platform support
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  tags:
+  - fabric
+  - spark
+  - livy
+  - managed-spark
+  - lakehouse
+  - delta-lake
+  - azure
+  - platform
+  - cloud
+  estimated_effort: Large
+  completed_date: '2026-02-19'
+  work_total: 50
+  work_done: 50
+  work_ready: 0
 - id: add-postgresql-platform-adapter
   file: DONE/platform-expansion/planning/add-postgresql-platform-adapter.yaml
   title: Add PostgreSQL Platform Adapter
