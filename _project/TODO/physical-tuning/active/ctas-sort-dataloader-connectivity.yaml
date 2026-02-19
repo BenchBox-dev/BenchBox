@@ -98,7 +98,7 @@ work:
 - id: w6
   summary: "Wire tuning_config into StarRocks DataLoader instantiation"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     benchbox/platforms/starrocks/workload.py — same pattern as ClickHouse.
     Add tuning_config parameter so future _build_ctas_sort_sql can activate.
