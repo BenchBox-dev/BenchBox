@@ -76,7 +76,7 @@ work:
 - id: w4
   summary: "Rename generate_ctas_ddl(if_not_exists=...) parameter to or_replace in DuckDBDDLGenerator"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     The parameter if_not_exists in benchbox/core/tuning/generators/duckdb.py:generate_ctas_ddl()
     generates CREATE OR REPLACE TABLE — the name is factually wrong and misleading.
