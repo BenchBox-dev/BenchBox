@@ -65,7 +65,7 @@ work:
 - id: w3
   summary: "Migrate DuckDBAdapter._build_ctas_sort_sql override; remove duplicated apply_ctas_sort"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     DuckDB override returns:
       CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM {table_name} ORDER BY col1, col2;
