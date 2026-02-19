@@ -87,7 +87,7 @@ work:
 - id: w5
   summary: "Wire tuning_config into ClickHouse DataLoader instantiation"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     benchbox/platforms/clickhouse/workload.py constructs DataLoader without tuning_config.
     Add: tuning_config=self.unified_tuning_configuration if self.tuning_enabled else None
