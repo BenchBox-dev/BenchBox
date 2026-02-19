@@ -115,7 +115,7 @@ work:
 - id: w8
   summary: "Wire tuning_config into MotherDuck load_data (custom loader, not DataLoader)"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     MotherDuck has its own load_data() using raw INSERT INTO SELECT * FROM read_parquet().
     After each table loads, add a call to self.apply_ctas_sort(table_name, effective_tuning, connection)
