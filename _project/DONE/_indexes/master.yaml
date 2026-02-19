@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T03:11:00.317525'
-total_items: 500
+generated_at: '2026-02-19T04:05:54.861998'
+total_items: 501
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4192,6 +4192,33 @@ items:
   - pyspark
   estimated_effort: Large
   completed_date: '2026-01-31'
+- id: ctas-sort-cloud-platforms
+  file: DONE/physical-tuning/active/ctas-sort-cloud-platforms.yaml
+  title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,
+    Azure Synapse)
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - tuning
+  - snowflake
+  - databricks
+  - bigquery
+  - redshift
+  - clickhouse
+  - athena
+  - azure-synapse
+  - data-loading
+  - zone-maps
+  - cloud
+  estimated_effort: Large
+  completed_date: '2026-02-19'
+  work_total: 13
+  work_done: 13
+  work_ready: 0
+  needs:
+  - ctas-sort-dataloader-connectivity
 - id: improve-benchmark-execution-reliability
   file: DONE/unknown/planning/improve-benchmark-execution-reliability.yaml
   title: Improve Benchmark Execution Reliability

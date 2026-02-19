@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T03:10:59.016128'
-total_items: 33
+generated_at: '2026-02-19T04:05:53.298105'
+total_items: 32
 priorities:
   High:
     count: 2
@@ -28,7 +28,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 15
+    count: 14
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -49,12 +49,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
-      status: Not Started
-    - id: ctas-sort-cloud-platforms
-      file: TODO/physical-tuning/planning/ctas-sort-cloud-platforms.yaml
-      title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,
-        Azure Synapse)
-      category: Core Functionality
       status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml

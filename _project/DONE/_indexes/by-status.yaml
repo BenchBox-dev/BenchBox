@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T03:11:00.317971'
-total_items: 500
+generated_at: '2026-02-19T04:05:54.862685'
+total_items: 501
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 452
+    count: 453
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1369,6 +1369,12 @@ statuses:
       file: DONE/dataframe-tpch-pandas/completed/implement-tpc-h-queries-for-pandas-family.yaml
       title: Implement TPC-H Queries for Pandas Family
       priority: Critical
+      category: Core Functionality
+    - id: ctas-sort-cloud-platforms
+      file: DONE/physical-tuning/active/ctas-sort-cloud-platforms.yaml
+      title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,
+        Azure Synapse)
+      priority: Medium
       category: Core Functionality
     - id: ctas-sort-local-sql-platforms
       file: DONE/physical-tuning/active/ctas-sort-local-sql-platforms.yaml

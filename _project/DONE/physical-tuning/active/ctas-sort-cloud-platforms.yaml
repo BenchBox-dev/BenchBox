@@ -7,7 +7,8 @@ title: "Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databrick
   Azure Synapse)"
 worktree: physical-tuning
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-02-19"
 description: |
   With the centralized apply_ctas_sort() in PlatformAdapter (ctas-sort-dataloader-connectivity),
   cloud data warehouse platforms gain sorted-data loading by overriding only

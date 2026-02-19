@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T03:11:00.317854'
-total_items: 500
+generated_at: '2026-02-19T04:05:54.862499'
+total_items: 501
 priorities:
   Critical:
     count: 34
@@ -1328,7 +1328,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 222
+    count: 223
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1913,6 +1913,12 @@ priorities:
     - id: dataframe-transaction-primitives
       file: DONE/dataframe-benchmarks/active/dataframe-transaction-primitives.yaml
       title: Implement DataFrame Version of Transaction Primitives Benchmark
+      category: Core Functionality
+      status: Completed
+    - id: ctas-sort-cloud-platforms
+      file: DONE/physical-tuning/active/ctas-sort-cloud-platforms.yaml
+      title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,
+        Azure Synapse)
       category: Core Functionality
       status: Completed
     - id: improve-benchmark-execution-reliability

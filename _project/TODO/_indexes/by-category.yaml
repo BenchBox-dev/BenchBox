@@ -1,4 +1,4 @@
-generated_at: '2026-02-19T03:10:59.016115'
+generated_at: '2026-02-19T04:05:53.298089'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -94,14 +94,8 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 3
+    count: 2
     items:
-    - id: ctas-sort-cloud-platforms
-      file: TODO/physical-tuning/planning/ctas-sort-cloud-platforms.yaml
-      title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,
-        Azure Synapse)
-      priority: Medium
-      status: Not Started
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation

@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T03:10:59.016087'
-total_items: 33
+generated_at: '2026-02-19T04:05:53.298061'
+total_items: 32
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -344,32 +344,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: ctas-sort-cloud-platforms
-  file: TODO/physical-tuning/planning/ctas-sort-cloud-platforms.yaml
-  title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,
-    Azure Synapse)
-  worktree: physical-tuning
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - tuning
-  - snowflake
-  - databricks
-  - bigquery
-  - redshift
-  - clickhouse
-  - athena
-  - azure-synapse
-  - data-loading
-  - zone-maps
-  - cloud
-  estimated_effort: Large
-  work_total: 13
-  work_done: 0
-  work_ready: 7
-  needs:
-  - ctas-sort-dataloader-connectivity
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
