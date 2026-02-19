@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T21:11:37.347542'
-total_items: 498
+generated_at: '2026-02-19T01:06:47.168800'
+total_items: 499
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -832,6 +832,30 @@ items:
   category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   priority: High
   status: Completed
+- id: ctas-sort-dataloader-connectivity
+  file: DONE/physical-tuning/active/ctas-sort-dataloader-connectivity.yaml
+  title: Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tuning
+  - duckdb
+  - motherduck
+  - clickhouse
+  - starrocks
+  - sqlite
+  - data-loading
+  - refactoring
+  - centralization
+  estimated_effort: Medium
+  completed_date: '2026-02-19'
+  work_total: 11
+  work_done: 11
+  work_ready: 0
+  needs:
+  - ctas-sorted-data-loading
 - id: centralize-output-control-and-eliminate-print-leaks
   file: DONE/main/active/centralize-output-control-and-eliminate-print-leaks.yaml
   title: Centralize user output control and eliminate print leaks across CLI/core/MCP paths

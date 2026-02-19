@@ -1,8 +1,8 @@
-generated_at: '2026-02-18T21:11:36.064030'
-total_items: 35
+generated_at: '2026-02-19T01:06:46.019480'
+total_items: 34
 statuses:
   Not Started:
-    count: 35
+    count: 34
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -34,11 +34,6 @@ statuses:
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Low
       category: Platform Expansion
-    - id: ctas-sort-dataloader-connectivity
-      file: TODO/physical-tuning/planning/ctas-sort-dataloader-connectivity.yaml
-      title: Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers
-      priority: High
-      category: Core Functionality
     - id: cloud-integration-test-infrastructure
       file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests

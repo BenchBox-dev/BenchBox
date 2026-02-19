@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T21:11:37.348029'
-total_items: 498
+generated_at: '2026-02-19T01:06:47.169259'
+total_items: 499
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 450
+    count: 451
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -688,6 +688,11 @@ statuses:
       file: DONE/core-functionality/centralize-file-format-detection.yaml
       title: Centralize File Format and Compression Extension Detection
       priority: Medium-High
+      category: Core Functionality
+    - id: ctas-sort-dataloader-connectivity
+      file: DONE/physical-tuning/active/ctas-sort-dataloader-connectivity.yaml
+      title: Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers
+      priority: High
       category: Core Functionality
     - id: centralize-output-control-and-eliminate-print-leaks
       file: DONE/main/active/centralize-output-control-and-eliminate-print-leaks.yaml

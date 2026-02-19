@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T21:11:37.347771'
+generated_at: '2026-02-19T01:06:47.169000'
 total_categories: 65
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 135
+    count: 136
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -499,6 +499,11 @@ categories:
       file: DONE/core-functionality/centralize-file-format-detection.yaml
       title: Centralize File Format and Compression Extension Detection
       priority: Medium-High
+      status: Completed
+    - id: ctas-sort-dataloader-connectivity
+      file: DONE/physical-tuning/active/ctas-sort-dataloader-connectivity.yaml
+      title: Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers
+      priority: High
       status: Completed
     - id: centralize-output-control-and-eliminate-print-leaks
       file: DONE/main/active/centralize-output-control-and-eliminate-print-leaks.yaml

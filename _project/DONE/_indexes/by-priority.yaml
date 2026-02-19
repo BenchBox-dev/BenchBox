@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T21:11:37.347906'
-total_items: 498
+generated_at: '2026-02-19T01:06:47.169135'
+total_items: 499
 priorities:
   Critical:
     count: 34
@@ -175,7 +175,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 174
+    count: 175
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -306,6 +306,11 @@ priorities:
       file: DONE/release-readiness/completed/canonicalize-result-schema.yaml
       title: Canonicalize Result Schema
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+      status: Completed
+    - id: ctas-sort-dataloader-connectivity
+      file: DONE/physical-tuning/active/ctas-sort-dataloader-connectivity.yaml
+      title: Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers
+      category: Core Functionality
       status: Completed
     - id: centralize-output-control-and-eliminate-print-leaks
       file: DONE/main/active/centralize-output-control-and-eliminate-print-leaks.yaml

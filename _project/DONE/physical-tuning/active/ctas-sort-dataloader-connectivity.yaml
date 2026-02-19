@@ -6,7 +6,8 @@ id: ctas-sort-dataloader-connectivity
 title: "Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers"
 worktree: physical-tuning
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-19"
 description: |
   The initial CTAS sort implementation (ctas-sorted-data-loading) placed apply_ctas_sort()
   directly on DuckDBAdapter and used a duck-typed hasattr() check in DataLoader. This works

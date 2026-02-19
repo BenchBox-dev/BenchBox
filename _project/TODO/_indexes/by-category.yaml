@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T21:11:36.064006'
+generated_at: '2026-02-19T01:06:46.019456'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -94,13 +94,8 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 5
+    count: 4
     items:
-    - id: ctas-sort-dataloader-connectivity
-      file: TODO/physical-tuning/planning/ctas-sort-dataloader-connectivity.yaml
-      title: Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers
-      priority: High
-      status: Not Started
     - id: ctas-sort-cloud-platforms
       file: TODO/physical-tuning/planning/ctas-sort-cloud-platforms.yaml
       title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,

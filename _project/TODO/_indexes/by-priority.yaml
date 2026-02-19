@@ -1,14 +1,9 @@
-generated_at: '2026-02-18T21:11:36.064020'
-total_items: 35
+generated_at: '2026-02-19T01:06:46.019469'
+total_items: 34
 priorities:
   High:
-    count: 3
+    count: 2
     items:
-    - id: ctas-sort-dataloader-connectivity
-      file: TODO/physical-tuning/planning/ctas-sort-dataloader-connectivity.yaml
-      title: Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers
-      category: Core Functionality
-      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
