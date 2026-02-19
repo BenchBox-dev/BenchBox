@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T15:03:10.261234'
-total_items: 494
+generated_at: '2026-02-18T21:10:34.593970'
+total_items: 496
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 446
+    count: 448
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -914,6 +914,16 @@ statuses:
       title: Databricks Example Modernization ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
+    - id: deferred-dataframe-performance-analysis
+      file: DONE/main/active/deferred-dataframe-performance-analysis.yaml
+      title: Deferred DataFrame Performance Cross-Platform Analysis
+      priority: Medium
+      category: Performance Analysis
+    - id: deferred-storage-and-cache-unification
+      file: DONE/core-functionality/active/deferred-storage-and-cache-unification.yaml
+      title: Deferred Storage Location and Cache Unification Enhancements
+      priority: Medium
+      category: Core Functionality
     - id: dataframe-write-primitives-model
       file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
       title: Define DataFrame Execution Model for Write Primitives

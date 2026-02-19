@@ -1,14 +1,6 @@
-generated_at: '2026-02-18T21:09:53.821652'
-total_items: 38
+generated_at: '2026-02-18T21:10:32.320944'
+total_items: 37
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: deferred-storage-and-cache-unification
-      file: TODO/core-functionality/active/deferred-storage-and-cache-unification.yaml
-      title: Deferred Storage Location and Cache Unification Enhancements
-      priority: Medium
-      category: Core Functionality
   Not Started:
     count: 37
     items:

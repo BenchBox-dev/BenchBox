@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T15:03:10.261128'
-total_items: 494
+generated_at: '2026-02-18T21:10:34.593557'
+total_items: 496
 priorities:
   Critical:
     count: 34
@@ -1318,7 +1318,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 218
+    count: 220
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1714,6 +1714,16 @@ priorities:
       file: DONE/unknown/planning/databricks-example-modernization-completed.yaml
       title: Databricks Example Modernization ✅ COMPLETED
       category: Platform Support and Deployment
+      status: Completed
+    - id: deferred-dataframe-performance-analysis
+      file: DONE/main/active/deferred-dataframe-performance-analysis.yaml
+      title: Deferred DataFrame Performance Cross-Platform Analysis
+      category: Performance Analysis
+      status: Completed
+    - id: deferred-storage-and-cache-unification
+      file: DONE/core-functionality/active/deferred-storage-and-cache-unification.yaml
+      title: Deferred Storage Location and Cache Unification Enhancements
+      category: Core Functionality
       status: Completed
     - id: interactive-wizard-cli-command-preview
       file: DONE/ux-improvements/active/interactive-wizard-cli-command-preview.yaml

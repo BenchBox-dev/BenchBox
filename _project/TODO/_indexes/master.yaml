@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T21:09:53.821566'
-total_items: 38
+generated_at: '2026-02-18T21:10:32.320883'
+total_items: 37
 items:
 - id: ctas-sort-dataloader-connectivity
   file: TODO/physical-tuning/planning/ctas-sort-dataloader-connectivity.yaml
@@ -356,21 +356,6 @@ items:
   work_total: 15
   work_done: 0
   work_ready: 15
-- id: deferred-storage-and-cache-unification
-  file: TODO/core-functionality/active/deferred-storage-and-cache-unification.yaml
-  title: Deferred Storage Location and Cache Unification Enhancements
-  worktree: core-functionality
-  category: Core Functionality
-  priority: Medium
-  status: In Progress
-  tags:
-  - storage
-  - cache
-  - deferred-followup
-  estimated_effort: Small — 1-2 days
-  work_total: 3
-  work_done: 3
-  work_ready: 0
 - id: influxdb-blog-post-edits
   file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
   title: Edit InfluxDB 3.x FDAP Architecture blog post before publication

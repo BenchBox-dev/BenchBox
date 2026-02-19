@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T15:03:10.261011'
-total_categories: 64
+generated_at: '2026-02-18T21:10:34.593193'
+total_categories: 65
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 134
+    count: 135
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -565,6 +565,11 @@ categories:
       title: DataFrame Platform Availability Detection and Error Handling
       priority: Critical
       status: Not Started
+    - id: deferred-storage-and-cache-unification
+      file: DONE/core-functionality/active/deferred-storage-and-cache-unification.yaml
+      title: Deferred Storage Location and Cache Unification Enhancements
+      priority: Medium
+      status: Completed
     - id: dataframe-write-primitives-model
       file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
       title: Define DataFrame Execution Model for Write Primitives
@@ -1436,6 +1441,14 @@ categories:
       file: DONE/query-plan-remediation/phase-2-performance-observability.yaml
       title: 'Query Plan Remediation - Phase 2: Performance & Observability'
       priority: Critical
+      status: Completed
+  Performance Analysis:
+    count: 1
+    items:
+    - id: deferred-dataframe-performance-analysis
+      file: DONE/main/active/deferred-dataframe-performance-analysis.yaml
+      title: Deferred DataFrame Performance Cross-Platform Analysis
+      priority: Medium
       status: Completed
   Performance and Efficiency:
     count: 9

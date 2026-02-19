@@ -1,4 +1,4 @@
-generated_at: '2026-02-18T21:09:53.821622'
+generated_at: '2026-02-18T21:10:32.320918'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -94,18 +94,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 6
+    count: 5
     items:
     - id: ctas-sort-dataloader-connectivity
       file: TODO/physical-tuning/planning/ctas-sort-dataloader-connectivity.yaml
       title: Centralize apply_ctas_sort in PlatformAdapter base class and wire all DataLoader callers
       priority: High
       status: Not Started
-    - id: deferred-storage-and-cache-unification
-      file: TODO/core-functionality/active/deferred-storage-and-cache-unification.yaml
-      title: Deferred Storage Location and Cache Unification Enhancements
-      priority: Medium
-      status: In Progress
     - id: ctas-sort-cloud-platforms
       file: TODO/physical-tuning/planning/ctas-sort-cloud-platforms.yaml
       title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,

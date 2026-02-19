@@ -1,5 +1,5 @@
-generated_at: '2026-02-18T21:09:53.821641'
-total_items: 38
+generated_at: '2026-02-18T21:10:32.320934'
+total_items: 37
 priorities:
   High:
     count: 3
@@ -38,7 +38,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 18
+    count: 17
     items:
     - id: fabric-lakehouse-sql-platform
       file: TODO/platform-expansion/planning/fabric-lakehouse-sql-platform.yaml
@@ -55,11 +55,6 @@ priorities:
       title: Add SingleStore Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: deferred-storage-and-cache-unification
-      file: TODO/core-functionality/active/deferred-storage-and-cache-unification.yaml
-      title: Deferred Storage Location and Cache Unification Enhancements
-      category: Core Functionality
-      status: In Progress
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
