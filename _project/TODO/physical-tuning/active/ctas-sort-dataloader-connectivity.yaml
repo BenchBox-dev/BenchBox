@@ -135,7 +135,7 @@ work:
 - id: w10
   summary: "Update DataLoader and base adapter docstrings to document the hook protocol"
   needs: [w9]
-  status: pending
+  status: done
   notes: |
     DataLoader docstring: explain that adapters control CTAS sort via _build_ctas_sort_sql().
     PlatformAdapter: document both apply_ctas_sort() (call from DataLoader/load_data) and
