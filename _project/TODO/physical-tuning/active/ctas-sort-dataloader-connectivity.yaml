@@ -144,7 +144,7 @@ work:
 - id: w11
   summary: "Update / add tests for centralized apply_ctas_sort in base adapter"
   needs: [w2, w3, w9]
-  status: pending
+  status: done
   notes: |
     Move/adapt the TestApplyCtasSort and TestDataLoaderTuningConfig tests from
     test_duckdb_sorted_loading.py so that base class behavior is tested through a
