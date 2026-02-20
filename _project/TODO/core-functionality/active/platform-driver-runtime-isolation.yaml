@@ -126,7 +126,7 @@ work:
     metadata"
   needs:
   - w5
-  status: pending
+  status: done
 
 - id: w7
   summary: "Persist requested, resolved, and actual runtime versions in result metadata and JSON export without breaking existing
