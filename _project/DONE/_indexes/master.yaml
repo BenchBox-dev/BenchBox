@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T09:16:49.607334'
-total_items: 506
+generated_at: '2026-02-20T09:41:44.331916'
+total_items: 507
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2309,6 +2309,24 @@ items:
   - developer-experience
   - install-size
   estimated_effort: Medium
+- id: run-lifecycle-and-export-unification-refactor
+  file: DONE/main/active/run-lifecycle-and-export-unification-refactor.yaml
+  title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - architecture
+  - run-command
+  - orchestration
+  - export
+  - metadata
+  estimated_effort: Large
+  completed_date: '2026-02-20'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
 - id: pyspark-sql-registry-integration
   file: DONE/dataframe-expansion/planning/pyspark-sql-registry-integration.yaml
   title: Register PySpark SQL mode in platform registry

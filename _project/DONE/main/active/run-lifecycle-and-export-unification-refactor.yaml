@@ -2,7 +2,8 @@ id: run-lifecycle-and-export-unification-refactor
 title: "Refactor run lifecycle to a single execution path with unified export and metadata wiring"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-20"
 category: Core Functionality
 description: |
   The benchmark run entrypoint currently has multiple execution branches in

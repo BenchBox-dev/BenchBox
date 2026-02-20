@@ -1,9 +1,14 @@
-generated_at: '2026-02-20T09:16:48.465863'
+generated_at: '2026-02-20T09:41:43.232783'
 total_items: 32
 priorities:
   High:
     count: 4
     items:
+    - id: duplicate-code-followup-triage-centralization
+      file: TODO/core-functionality/planning/duplicate-code-followup-triage-centralization.yaml
+      title: Follow-up duplicate-code triage and consolidation from AST clone report
+      category: Code Quality and Technical Debt
+      status: Not Started
     - id: platform-driver-runtime-isolation
       file: TODO/core-functionality/active/platform-driver-runtime-isolation.yaml
       title: Implement per-run platform driver runtime isolation (DuckDB first)
@@ -18,11 +23,6 @@ priorities:
       file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       category: Testing and Quality Assurance
-      status: Not Started
-    - id: run-lifecycle-and-export-unification-refactor
-      file: TODO/main/planning/run-lifecycle-and-export-unification-refactor.yaml
-      title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
-      category: Core Functionality
       status: Not Started
   Medium-High:
     count: 2

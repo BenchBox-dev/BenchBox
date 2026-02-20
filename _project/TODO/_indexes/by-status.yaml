@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T09:16:48.465876'
+generated_at: '2026-02-20T09:41:43.232793'
 total_items: 32
 statuses:
   In Progress:
@@ -72,6 +72,11 @@ statuses:
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       priority: Medium
       category: Benchmark Development
+    - id: duplicate-code-followup-triage-centralization
+      file: TODO/core-functionality/planning/duplicate-code-followup-triage-centralization.yaml
+      title: Follow-up duplicate-code triage and consolidation from AST clone report
+      priority: High
+      category: Code Quality and Technical Debt
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -107,11 +112,6 @@ statuses:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: High
       category: Testing and Quality Assurance
-    - id: run-lifecycle-and-export-unification-refactor
-      file: TODO/main/planning/run-lifecycle-and-export-unification-refactor.yaml
-      title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
-      priority: High
-      category: Core Functionality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T09:16:49.607736'
-total_items: 506
+generated_at: '2026-02-20T09:41:44.332300'
+total_items: 507
 priorities:
   Critical:
     count: 34
@@ -175,7 +175,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 177
+    count: 178
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -801,6 +801,11 @@ priorities:
     - id: refactor-core-dependencies-to-optional
       file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
       title: Refactor platform-specific packages from core to optional dependencies
+      category: Core Functionality
+      status: Completed
+    - id: run-lifecycle-and-export-unification-refactor
+      file: DONE/main/active/run-lifecycle-and-export-unification-refactor.yaml
+      title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
       category: Core Functionality
       status: Completed
     - id: pyspark-sql-registry-integration

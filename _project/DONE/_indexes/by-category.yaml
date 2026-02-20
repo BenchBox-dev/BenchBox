@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T09:16:49.607593'
+generated_at: '2026-02-20T09:41:44.332165'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -391,7 +391,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 140
+    count: 141
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1028,6 +1028,11 @@ categories:
     - id: refactor-core-dependencies-to-optional
       file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
       title: Refactor platform-specific packages from core to optional dependencies
+      priority: High
+      status: Completed
+    - id: run-lifecycle-and-export-unification-refactor
+      file: DONE/main/active/run-lifecycle-and-export-unification-refactor.yaml
+      title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
       priority: High
       status: Completed
     - id: remove-sql-coupling-from-tpcdi-dataframe-mode
