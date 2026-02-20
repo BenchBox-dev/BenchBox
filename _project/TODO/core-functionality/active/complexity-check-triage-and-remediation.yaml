@@ -117,7 +117,7 @@ work:
 - id: w10
   summary: "Refactor accidental complexity batch C: platform adapter load_data families"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Normalize shared load flow into scoped helpers/mixins for adapters with parallel logic
     (Redshift/BigQuery/Databricks/Trino/Presto/Athena/Snowflake) without changing platform-specific semantics.
