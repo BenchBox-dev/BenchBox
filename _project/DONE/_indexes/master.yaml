@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T21:00:10.227589'
-total_items: 502
+generated_at: '2026-02-20T12:07:27.292614'
+total_items: 503
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3649,15 +3649,15 @@ items:
   category: Data Quality and Compatibility Issues
   priority: Medium
   status: Completed
-- id: compressed-data-generation-completed
-  file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+- id: compressed-data-generation-completed-2
+  file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
   title: Compressed Data Generation ✅ COMPLETED
   worktree: unknown
   category: Performance and Efficiency
   priority: Medium
   status: Completed
-- id: compressed-data-generation-completed-2
-  file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+- id: compressed-data-generation-completed
+  file: DONE/unknown/planning/compressed-data-generation-completed.yaml
   title: Compressed Data Generation ✅ COMPLETED
   worktree: unknown
   category: Performance and Efficiency
@@ -4737,15 +4737,15 @@ items:
   priority: Medium
   status: Completed
   completed_date: '2025-11-27'
-- id: simple-cloud-storage-path-support-completed
-  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+- id: simple-cloud-storage-path-support-completed-2
+  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
   title: Simple Cloud Storage Path Support ✅ COMPLETED
   worktree: unknown
   category: Platform Support and Deployment
   priority: Medium
   status: Completed
-- id: simple-cloud-storage-path-support-completed-2
-  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+- id: simple-cloud-storage-path-support-completed
+  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
   title: Simple Cloud Storage Path Support ✅ COMPLETED
   worktree: unknown
   category: Platform Support and Deployment
@@ -4926,6 +4926,23 @@ items:
   priority: Medium
   status: Completed
   completed_date: '2025-12-14'
+- id: tutorial-benchmark-verification
+  file: DONE/blog-content/planning/tutorial-benchmark-verification.yaml
+  title: '[Tutorials] Verify benchmark commands in tutorial posts'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Completed
+  tags:
+  - tutorials
+  - benchmarking
+  - blog-data
+  - verification
+  estimated_effort: 30-60 minutes
+  completed_date: '2026-02-20'
+  work_total: 14
+  work_done: 14
+  work_ready: 0
 - id: add-end-to-end-cli-testing
   file: DONE/unknown/planning/add-end-to-end-cli-testing.yaml
   title: ✅ Add End-to-End CLI Testing
@@ -5052,15 +5069,15 @@ items:
   category: User Experience and CLI Enhancement
   priority: Medium
   status: Completed
-- id: implement-or-remove-incomplete-cli-commands
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+- id: implement-or-remove-incomplete-cli-commands-2
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)
   priority: Medium
   status: Completed
-- id: implement-or-remove-incomplete-cli-commands-2
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+- id: implement-or-remove-incomplete-cli-commands
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)

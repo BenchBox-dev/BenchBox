@@ -1,13 +1,13 @@
-generated_at: '2026-02-19T21:00:09.112190'
-total_items: 33
+generated_at: '2026-02-20T12:07:24.352546'
+total_items: 32
 items:
 - id: databricks-liquid-clustering-tuning-support
-  file: TODO/physical-tuning/planning/databricks-liquid-clustering-tuning-support.yaml
+  file: TODO/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml
   title: Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations
   worktree: physical-tuning
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - databricks
   - liquid-clustering
@@ -16,38 +16,11 @@ items:
   - performance
   estimated_effort: Large
   work_total: 7
-  work_done: 0
+  work_done: 2
   work_ready: 1
   needs:
   - ctas-sort-cloud-platforms
   - cloud-dw-sorted-data-ingestion
-- id: reenable-fireducks-after-upstream-fixes
-  file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
-  title: Re-enable FireDucks after upstream stability fixes
-  worktree: main
-  category: Platform Expansion
-  priority: High
-  status: Not Started
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-- id: reenable-comprehensive-ci
-  file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
-  title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
-  worktree: ci-infrastructure
-  category: Testing and Quality Assurance
-  priority: High
-  status: Not Started
-  tags:
-  - ci
-  - quality
-  - documentation
-  owners:
-  - joe
-  estimated_effort: 1-2 days
-  work_total: 22
-  work_done: 0
-  work_ready: 18
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -520,22 +493,33 @@ items:
   work_total: 25
   work_done: 0
   work_ready: 16
-- id: tutorial-benchmark-verification
-  file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
-  title: '[Tutorials] Verify benchmark commands in tutorial posts'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium
+- id: reenable-fireducks-after-upstream-fixes
+  file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
+  title: Re-enable FireDucks after upstream stability fixes
+  worktree: main
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+- id: reenable-comprehensive-ci
+  file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
+  title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
+  worktree: ci-infrastructure
+  category: Testing and Quality Assurance
+  priority: Medium-High
   status: Not Started
   tags:
-  - tutorials
-  - benchmarking
-  - blog-data
-  - verification
-  estimated_effort: 30-60 minutes
-  work_total: 14
+  - ci
+  - quality
+  - documentation
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+  work_total: 22
   work_done: 0
-  work_ready: 7
+  work_ready: 18
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats
