@@ -2,7 +2,7 @@ id: duckdb-version-performance-benchmarks
 title: "[DuckDB Version Performance] Run multi-version benchmark suite"
 worktree: blog-content
 priority: Medium
-status: In Progress
+status: Completed
 category: Blog Revision
 description: |
   Run comprehensive benchmarks across 5 DuckDB versions (0.9.2, 0.10.3, 1.0.0,
@@ -161,3 +161,4 @@ work:
 - id: w31
   summary: "Memory usage measurement for sorting"
   status: done
+completed_date: '2026-02-20'

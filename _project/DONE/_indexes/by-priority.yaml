@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T21:23:46.108333'
-total_items: 503
+generated_at: '2026-02-20T04:41:02.367141'
+total_items: 504
 priorities:
   Critical:
     count: 34
@@ -1338,7 +1338,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 223
+    count: 224
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2270,6 +2270,11 @@ priorities:
       file: DONE/ux-improvements/active/compare-command-unification.yaml
       title: Unify compare and compare-plans commands
       category: ux-improvements
+      status: Completed
+    - id: duckdb-version-performance-benchmarks
+      file: DONE/blog-content/active/duckdb-version-performance-benchmarks.yaml
+      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+      category: Blog Revision
       status: Completed
     - id: add-end-to-end-cli-testing
       file: DONE/unknown/planning/add-end-to-end-cli-testing.yaml
