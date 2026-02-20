@@ -1,0 +1,278 @@
+id: consolidate-duplicate-code
+title: "Consolidate duplicate code identified by AST structural clone detection"
+worktree: core-functionality
+priority: Medium-High
+status: "In Progress"
+category: "Code Quality and Technical Debt"
+description: |
+  The `make duplicate-check-verbose` tool reports 440 duplicate function groups totalling
+  ~17,595 duplicated lines (threshold: 20,000). After careful analysis of the top 30 groups,
+  13 groups are genuine parallel implementations that should be consolidated, while 17 are
+  intended boilerplate (interface implementations, structural patterns, or facade delegations)
+  that should be marked for ignore.
+
+  This work reduces the duplicated-line count by an estimated 2,500-3,000 lines through
+  targeted consolidation of the highest-value groups, while configuring the duplicate checker
+  to suppress known-intentional patterns so future regressions are caught at a lower threshold.
+
+  Key consolidation targets (by estimated line savings):
+  - transaction_primitives/write_primitives generator fork (~530 lines)
+  - catalog loaders (transaction/write/metadata/read primitives) (~310 lines)
+  - benchmark base class (generate_data, load_data_to_database) (~210 lines)
+  - query manager base class (get_query, _load_queries pattern) (~140 lines)
+  - DataFrame query registry list_*_queries functions (~120 lines)
+  - platform adapter apply_constraint_configuration / apply_unified_tuning (~360 lines via ignore)
+
+context_sections:
+  "Analysis Methodology": |
+    Each of the top 30 duplicate groups from `make duplicate-check-verbose` was inspected
+    by reading 2-3 representative instances. Each was classified as:
+
+    1. **Parallel implementation** - Genuinely identical code that should be consolidated
+    2. **Structural pattern** - Same AST shape but different data/domain content (ignore)
+    3. **Intended boilerplate** - Interface implementations or facade delegations (ignore)
+
+  "Classification Results": |
+    CONSOLIDATE (parallel implementations):
+    - Group 11: _generate_special_test_files (2x, ~159 lines each) - byte-for-byte identical
+    - Group 29: generate_bulk_load_files (2x, ~107 lines each) - byte-for-byte identical
+    - Group 14: load_transaction/write_primitives_catalog (2x, ~153 lines each)
+    - Group 28: load_metadata/primitives_catalog (2x, ~110 lines each)
+    - Group 30: generate_data (5x, ~26 lines each) - only TABLES ref differs
+    - Group 22: load_data_to_database (3x, ~57 lines each) - CSV loading boilerplate
+    - Group 24: get_query (4x, ~28 lines each) - parameterized query resolution
+    - Group 23: list_*_queries registry (9x, ~14 lines each) - filtering logic
+    - Group 9a: get_create_tables_sql tuning unpacking (5x, ~11 lines each)
+
+    IGNORE (intended boilerplate / structural patterns):
+    - Group 3: from_config (8x) - platform-specific config extraction, interface pattern
+    - Group 7: apply_constraint_configuration (14x) - interface implementations
+    - Group 15: apply_unified_tuning (13x) - interface implementations
+    - Group 18: supports_tuning_type (7x) - interface implementations
+    - Group 4a: cast_date/cast_string DataFrame adapters (28x) - interface implementations
+    - Group 4b: get_all_variants facade chain - layered architecture, intentional
+    - Group 1/5: _load_queries (structural pattern - same dict-building, different SQL)
+    - Group 16: _generate_default_params (structural pattern - same shape, different params)
+    - Group 6: unified_frame.py aggregation methods - protocol implementations
+    - Group 2: tpcds_obt transformer methods - ETL domain, different column mappings
+    - Group 13: TPC-DI SQL dimension generators - different schemas per dimension
+    - Group 12: execute_query (Firebolt/Presto/Trino) - similar but platform-specific
+    - Group 17: apply_tuning_configuration cloud/spark adapters - interface pattern
+    - Group 9b: get_create_tables_sql facade files - one-liner delegations
+    - Group 19/20: DataFrame cast_date/cast_string/col - per-platform implementations
+    - Group 25: DataFrame protocol abstract methods - protocol definitions
+    - Group 27: benchmark cast_date/cast_string/apply_platform_optimizations - structural
+
+  "Architectural Observation": |
+    Groups 11, 14, 28, and 29 reveal that transaction_primitives and write_primitives
+    were forked from each other and share identical generator logic, catalog loading, and
+    special file generation. These two benchmarks should share a common base module for
+    their overlapping infrastructure.
+
+work:
+- id: w1
+  summary: "Create shared primitives generator base class consolidating _generate_special_test_files and generate_bulk_load_files
+    from transaction_primitives and write_primitives generators"
+  status: done
+  notes: |
+    Create benchbox/core/primitives/generator_base.py with shared methods from
+    transaction_primitives/generator.py and write_primitives/generator.py.
+    Both generators inherit from this base. Methods to extract:
+    - _generate_special_test_files (~159 lines, byte-for-byte identical)
+    - generate_bulk_load_files (~107 lines, byte-for-byte identical)
+    Estimated savings: ~530 duplicated lines.
+
+- id: w2
+  summary: "Create shared catalog loader for transaction/write/metadata/read primitives catalog YAML parsing"
+  needs: [w1]
+  status: done
+  notes: |
+    Create benchbox/core/primitives/catalog/loader.py with generic
+    load_operations_catalog() and load_query_catalog() functions.
+    The 4 existing loaders become thin wrappers passing their error class and package.
+    Unify identical dataclass definitions (ValidationQuery, WriteOperation,
+    MetadataQuery, PrimitiveQuery) where field structures match.
+    Estimated savings: ~310 duplicated lines.
+
+- id: w3
+  summary: "Extract common benchmark mixin with generate_data() and load_data_to_database()"
+  status: pending
+  notes: |
+    Create a DataGenerationMixin in benchbox/core/benchmark_mixins.py (standalone,
+    not modifying the existing base class hierarchy):
+    - generate_data(): 5 copies differ only in TABLES reference.
+      Mixin provides the method; each benchmark defines _get_table_schema() -> dict.
+    - load_data_to_database(): 3 copies (clickbench, read_primitives, ssb).
+      Parameterize the schema dict and provide as mixin method.
+    Each benchmark class adds the mixin to its bases and implements _get_table_schema().
+    Estimated savings: ~210 duplicated lines.
+
+- id: w4
+  summary: "Create ParameterizedQueryManager base class with shared get_query() method"
+  status: pending
+  notes: |
+    Create benchbox/core/query_manager.py (or add to existing base) with:
+    - get_query(query_id, params) template method
+    - Abstract _generate_default_params(query_id)
+    Subclass in SSB, AMPLab, TPC-DI sub-managers (4 copies eliminated).
+    Estimated savings: ~140 duplicated lines.
+
+- id: w5
+  summary: "Add list_queries() method to QueryRegistry class, simplify 9 registry wrapper functions"
+  status: pending
+  notes: |
+    The filtering logic in list_*_queries (family/category filter over get_all_queries)
+    is duplicated 9 times across dataframe_queries/registry.py files.
+    Move this logic to QueryRegistry.list_queries(family, category) method.
+    Each registry file's list_*_queries becomes a one-liner delegation.
+    Estimated savings: ~120 duplicated lines.
+
+- id: w6
+  summary: "Extract tuning config unpacking utility for get_create_tables_sql methods"
+  status: pending
+  notes: |
+    Create a small utility in benchbox/core/utils/tuning.py:
+      def extract_constraint_flags(tuning_config) -> tuple[bool, bool]
+    Used by 5 benchmark get_create_tables_sql implementations.
+    Minor savings (~50 lines) but reduces a common pattern to one line.
+
+- id: w7
+  summary: "Configure duplicate checker ignore patterns for intended boilerplate groups"
+  needs: [w1, w2, w3, w4, w5, w6]
+  status: pending
+  notes: |
+    After consolidation work is complete, update pyproject.toml
+    [tool.benchbox.duplicates] section or the check_duplicate_code.py script
+    to suppress known-intentional patterns:
+    - Platform adapter interface methods (from_config, apply_constraint_configuration,
+      apply_unified_tuning, supports_tuning_type)
+    - DataFrame adapter cast_date/cast_string implementations
+    - Facade/delegation one-liners
+    - Structural patterns (_load_queries, _generate_default_params)
+    Lower the threshold from 20,000 to catch future regressions.
+
+- id: w8
+  summary: "Run full test suite, update duplicate threshold, verify line count reduction"
+  needs: [w7]
+  status: pending
+  notes: |
+    Run: uv run -- python -m pytest -x -v
+    Run: make duplicate-check-verbose
+    Verify duplicated lines dropped by ~2,500-3,000 from baseline 17,595.
+    Update threshold in pyproject.toml to new level + 10% buffer.
+
+deferred:
+- summary: "Full transaction_primitives/write_primitives module unification"
+  reason: "The two benchmarks share generators and catalogs but have distinct query sets and validation logic. Full unification
+    requires deeper analysis of behavioral differences."
+- summary: "Consolidate Firebolt/Presto/Trino execute_query implementations"
+  reason: "These are similar (~79 lines each) but have platform-specific error handling and cursor semantics. Consolidation
+    requires careful testing against live platforms."
+- summary: "Unify DataFrame protocol abstract method definitions"
+  reason: "Protocol methods in protocols.py have structural duplication but serve as the interface contract. Changing them
+    risks breaking the protocol hierarchy."
+
+must_preserve:
+- "All existing platform adapter tests pass (uv run -- python -m pytest tests/unit/platforms/ -v)"
+- "All benchmark tests pass (uv run -- python -m pytest tests/unit/ -v --timeout=120)"
+- "DuckDB TPC-H smoke test passes (benchbox run --platform duckdb --benchmark tpch --scale 0.01)"
+- "DataFrame query registry tests pass (uv run -- python -m pytest tests/ -k 'registry or dataframe_quer' -v)"
+- "Catalog loader tests pass (uv run -- python -m pytest tests/ -k 'catalog or loader' -v)"
+
+approach: |
+  Work in phases, each independently testable and committable:
+
+  Phase 1 (w1-w2): Extract shared infrastructure for the primitives fork. These are the
+  highest-value targets with byte-for-byte identical code. Create new shared modules,
+  update imports, verify with existing tests.
+
+  Phase 2 (w3-w5): Consolidate benchmark base class methods and query infrastructure.
+  These are lower-risk refactors touching well-tested code paths.
+
+  Phase 3 (w6-w8): Minor utility extraction, ignore-list configuration, and threshold
+  adjustment. This is the cleanup phase.
+
+  For each consolidation:
+  1. Read both/all copies side-by-side to confirm true equivalence
+  2. Create the shared module with the canonical implementation
+  3. Update all call sites to use the shared version
+  4. Run targeted tests for affected modules
+  5. Run make duplicate-check-verbose to confirm line count drop
+  6. Commit
+
+anti_patterns:
+- "DO NOT create deep inheritance hierarchies -- because the adapter hierarchy is already 3 levels deep -- use mixins or standalone
+  utility functions instead"
+- "DO NOT consolidate code that only looks structurally similar -- because AST hashing ignores identifiers -- always read
+  the actual implementations to confirm true duplication"
+- "DO NOT change public API signatures during consolidation -- because downstream code and tests depend on them -- only change
+  internal implementations"
+- "DO NOT consolidate platform adapter interface methods (from_config, apply_constraint_configuration) -- because these are
+  intended per-platform implementations even when structurally identical"
+
+verification:
+- description: "All unit tests pass after each work unit"
+  command: "uv run -- python -m pytest tests/unit/ -v --timeout=120"
+  expected_output: "all tests pass, 0 failures"
+- description: "Duplicate line count reduced below 15500"
+  command: "make duplicate-check-verbose 2>&1 | tail -1"
+  expected_output: "PASS: duplicated lines within threshold (value below 15500)"
+- description: "Smoke test passes"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all fast-marked tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/primitives/"
+  - "benchbox/core/transaction_primitives/generator.py"
+  - "benchbox/core/write_primitives/generator.py"
+  - "benchbox/core/transaction_primitives/catalog/loader.py"
+  - "benchbox/core/write_primitives/catalog/loader.py"
+  - "benchbox/core/metadata_primitives/catalog/loader.py"
+  - "benchbox/core/read_primitives/catalog/loader.py"
+  - "benchbox/core/benchmark_mixins.py"
+  - "benchbox/core/amplab/benchmark.py"
+  - "benchbox/core/clickbench/benchmark.py"
+  - "benchbox/core/h2odb/benchmark.py"
+  - "benchbox/core/read_primitives/benchmark.py"
+  - "benchbox/core/ssb/benchmark.py"
+  - "benchbox/core/amplab/queries.py"
+  - "benchbox/core/ssb/queries.py"
+  - "benchbox/core/tpcdi/queries.py"
+  - "benchbox/core/tpcdi/query_analytics.py"
+  - "benchbox/core/tpcdi/query_etl.py"
+  - "benchbox/core/tpcdi/query_validation.py"
+  - "benchbox/core/*/dataframe_queries/registry.py"
+  - "benchbox/core/dataframe/query_registry.py"
+  - "benchbox/core/query_manager.py"
+  - "benchbox/core/utils/tuning.py"
+  - "pyproject.toml"
+  - "scripts/check_duplicate_code.py"
+  - "tests/unit/core/"
+  - "tests/unit/platforms/"
+  do_not_modify:
+  - "benchbox/platforms/"
+  - "benchbox/cli/"
+  - "benchbox/core/dataframe/protocols.py"
+  - "benchbox/core/dataframe/context.py"
+
+impact:
+  technical_debt: |
+    Reduces duplicated code by ~2,500-3,000 lines (14-17% of total).
+    Lowers the duplicate threshold, making future regressions detectable.
+    Establishes shared infrastructure for the primitives benchmark family.
+
+metadata:
+  tags:
+  - code-quality
+  - technical-debt
+  - refactoring
+  - duplicate-detection
+  estimated_effort: "3-5 days"
+  created_date: "2026-02-20"
+
+success_metrics:
+- "Duplicated line count drops from ~17,595 to ~14,500 or below"
+- "Duplicate threshold in pyproject.toml lowered to 16,000 or less"
+- "Zero test regressions across all unit and fast-marked tests"
+- "All 9 parallel implementation groups from analysis have shared modules"
