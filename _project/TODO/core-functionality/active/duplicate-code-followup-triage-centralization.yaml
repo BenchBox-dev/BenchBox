@@ -155,7 +155,7 @@ work:
 - id: w11
   summary: "Consolidate TPC-DI and generator helper duplicates that are true parallel scaffolding"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Address repeated query metadata accessors/filtering helpers and generator scaffolding
     only where behavioral equivalence is demonstrated.
