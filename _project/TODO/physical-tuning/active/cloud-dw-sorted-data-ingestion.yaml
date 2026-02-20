@@ -62,7 +62,7 @@ work:
 - id: w7
   summary: "Add result metadata for ingestion strategy, runtime overhead, and cost-impact comparability"
   needs: [w3, w4, w5, w6]
-  status: pending
+  status: done
 - id: w8
   summary: "Unit/integration test coverage for strategy selection and SQL/action generation in dry-run mode"
   needs: [w3, w4, w5, w6, w7]
