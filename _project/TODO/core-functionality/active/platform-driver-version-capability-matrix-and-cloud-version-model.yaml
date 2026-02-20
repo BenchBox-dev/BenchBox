@@ -178,12 +178,12 @@ work:
   summary: "Add unit tests for capability declarations, resolver behavior, and fail-fast enforcement across SQL/DataFrame
     factories"
   needs: [w5, w6, w11]
-  status: pending
+  status: done
 
 - id: w16
   summary: "Add unit tests for cloud engine-version extraction and schema serialization"
   needs: [w13, w14]
-  status: pending
+  status: done
 
 - id: w17
   summary: "Add integration matrix tests for multi-version supported adapters plus regression coverage for unsupported paths"
