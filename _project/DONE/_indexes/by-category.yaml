@@ -1,4 +1,4 @@
-generated_at: '2026-02-19T21:00:10.227825'
+generated_at: '2026-02-19T21:23:46.108215'
 total_categories: 65
 categories:
   '"Bug Fixes & Reliability"':
@@ -373,7 +373,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 139
+    count: 140
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -459,6 +459,11 @@ categories:
       file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml
       title: Add execution style selection step to interactive wizard
       priority: Medium-High
+      status: Completed
+    - id: databricks-liquid-clustering-tuning-support
+      file: DONE/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml
+      title: Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations
+      priority: High
       status: Completed
     - id: greyscale-ascii-visualization-fallbacks
       file: DONE/main/greyscale-ascii-visualization-fallbacks.yaml

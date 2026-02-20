@@ -1,14 +1,9 @@
-generated_at: '2026-02-19T21:00:09.112230'
-total_items: 33
+generated_at: '2026-02-19T21:23:45.069145'
+total_items: 32
 priorities:
   High:
-    count: 3
+    count: 2
     items:
-    - id: databricks-liquid-clustering-tuning-support
-      file: TODO/physical-tuning/planning/databricks-liquid-clustering-tuning-support.yaml
-      title: Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations
-      category: Core Functionality
-      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
@@ -91,10 +86,10 @@ priorities:
       category: Blog Revision
       status: Not Started
     - id: duckdb-version-performance-benchmarks
-      file: TODO/blog-content/planning/duckdb-version-performance-benchmarks.yaml
+      file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'
       category: Blog Revision
-      status: Not Started
+      status: In Progress
     - id: snowflake-gen2-comparison-benchmarks
       file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'

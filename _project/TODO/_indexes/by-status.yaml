@@ -1,8 +1,16 @@
-generated_at: '2026-02-19T21:00:09.112240'
-total_items: 33
+generated_at: '2026-02-19T21:23:45.069153'
+total_items: 32
 statuses:
+  In Progress:
+    count: 1
+    items:
+    - id: duckdb-version-performance-benchmarks
+      file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
+      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+      priority: Medium
+      category: Blog Revision
   Not Started:
-    count: 33
+    count: 31
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -29,11 +37,6 @@ statuses:
       title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
       priority: Low
       category: Platform Expansion
-    - id: databricks-liquid-clustering-tuning-support
-      file: TODO/physical-tuning/planning/databricks-liquid-clustering-tuning-support.yaml
-      title: Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations
-      priority: High
-      category: Core Functionality
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
@@ -152,11 +155,6 @@ statuses:
     - id: duckdb-architecture-verification
       file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
       title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
-      priority: Medium
-      category: Blog Revision
-    - id: duckdb-version-performance-benchmarks
-      file: TODO/blog-content/planning/duckdb-version-performance-benchmarks.yaml
-      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
       priority: Medium
       category: Blog Revision
     - id: snowflake-gen2-comparison-benchmarks

@@ -1,12 +1,13 @@
 # Databricks Liquid Clustering Tuning Support
 #
-# Location: _project/TODO/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml
+# Location: _project/DONE/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml
 
 id: databricks-liquid-clustering-tuning-support
 title: "Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations"
 worktree: physical-tuning
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-20"
 description: |
   Expand Databricks tuning support so Liquid Clustering is a first-class,
   configurable strategy in BenchBox, not a secondary/implicit path behind
@@ -51,15 +52,15 @@ work:
 - id: w5
   summary: "Add result metadata fields for applied Databricks clustering strategy and maintenance operations"
   needs: [w3, w4]
-  status: pending
+  status: done
 - id: w6
   summary: "Add unit/integration tests for config validation and adapter SQL/action generation"
   needs: [w3, w4, w5]
-  status: pending
+  status: done
 - id: w7
   summary: "Update docs/examples for liquid clustering usage, migration guidance, and A/B comparison with Z-ORDER"
   needs: [w6]
-  status: pending
+  status: done
 
 metadata:
   tags:

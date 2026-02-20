@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T21:00:10.227589'
-total_items: 502
+generated_at: '2026-02-19T21:23:46.108033'
+total_items: 503
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -722,6 +722,27 @@ items:
   - azure-fabric
   - azure-synapse
   estimated_effort: 3-5 days
+- id: databricks-liquid-clustering-tuning-support
+  file: DONE/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml
+  title: Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - databricks
+  - liquid-clustering
+  - tuning
+  - cloud
+  - performance
+  estimated_effort: Large
+  completed_date: '2026-02-20'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  needs:
+  - ctas-sort-cloud-platforms
+  - cloud-dw-sorted-data-ingestion
 - id: tpcds-stdout-fix-test-stdout-datagen
   file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
   title: Add regression tests for TPC-DS stdout data generation

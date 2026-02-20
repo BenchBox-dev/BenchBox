@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T21:00:10.227955'
-total_items: 502
+generated_at: '2026-02-19T21:23:46.108333'
+total_items: 503
 priorities:
   Critical:
     count: 34
@@ -175,7 +175,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 176
+    count: 177
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -266,6 +266,11 @@ priorities:
       file: DONE/platform-expansion/active/cloud-platform-cost-estimation.yaml
       title: Add cost estimation support for cloud platforms (Firebolt, Fabric, Synapse)
       category: Platform Expansion
+      status: Completed
+    - id: databricks-liquid-clustering-tuning-support
+      file: DONE/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml
+      title: Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations
+      category: Core Functionality
       status: Completed
     - id: tpcds-stdout-fix-test-stdout-datagen
       file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
