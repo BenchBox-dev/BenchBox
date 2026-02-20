@@ -124,7 +124,7 @@ work:
   summary: "Add branch-parity tests that assert identical export/metadata contracts across direct, load-only, and interactive-equivalent
     non-interactive runs"
   needs: [w5]
-  status: pending
+  status: done
 
 - id: w8
   summary: "Add architecture docs and alpha release notes describing removed branches and the single execution architecture"
