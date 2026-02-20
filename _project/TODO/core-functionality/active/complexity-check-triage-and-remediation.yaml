@@ -83,7 +83,7 @@ work:
 - id: w6
   summary: "Classify warning-band functions (15-20) and prioritize remediation queue"
   needs: [w3, w4, w5]
-  status: pending
+  status: done
   notes: |
     Classify all warning-band functions and assign priority buckets:
     immediate, near-term, monitor-only. May span multiple sessions if count exceeds ~40;
