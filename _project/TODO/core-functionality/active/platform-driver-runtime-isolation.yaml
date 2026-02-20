@@ -112,7 +112,7 @@ work:
     behavior unchanged"
   needs:
   - w1
-  status: pending
+  status: done
 
 - id: w5
   summary: "Implement DuckDB runtime execution path bound to requested driver runtime for actual query execution"
