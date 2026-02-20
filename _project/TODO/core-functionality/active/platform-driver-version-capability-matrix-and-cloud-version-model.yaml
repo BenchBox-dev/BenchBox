@@ -114,7 +114,7 @@ work:
   summary: "Define explicit capability declarations in platform metadata and adapter contract, with migration path from implicit
     getattr checks"
   needs: [w1, w2]
-  status: pending
+  status: done
 
 - id: w4
   summary: "Implement shared capability resolver helpers and standardized error categories for unsupported runtime-binding
