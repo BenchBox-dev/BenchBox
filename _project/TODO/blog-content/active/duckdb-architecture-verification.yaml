@@ -2,7 +2,7 @@ id: duckdb-architecture-verification
 title: "[DuckDB Architecture] Verify 'under 10 seconds' TPC-H claim"
 worktree: blog-content
 priority: Medium
-status: Not Started
+status: In Progress
 category: Blog Revision
 description: |
   Verify the claim in duckdb-architecture.md that DuckDB processes TPC-H SF10
@@ -46,32 +46,41 @@ success_metrics:
 - "Reproducibility command added"
 work:
 - id: w1
-  summary: "Run TPC-H SF10 on local machine"
-  status: pending
+  summary: "Confirm local benchmark environment and exact DuckDB TPC-H SF10 run configuration"
+  status: done
 - id: w2
-  summary: "benchbox run --platform duckdb --benchmark tpch --scale 10"
+  summary: "Execute baseline DuckDB TPC-H SF10 benchmark command and capture raw timing output"
   needs:
   - w1
   status: pending
 - id: w3
-  summary: "Record total time and hardware specs"
+  summary: "Run two additional trials and record per-run timings plus median runtime"
   needs:
-  - w1
+  - w2
   status: pending
 - id: w4
-  summary: "Run 3 times for median"
+  summary: "Record hardware context used for the benchmark (CPU, RAM, storage, OS)"
+  needs:
+  - w3
   status: pending
 - id: w5
-  summary: "Replace '10 seconds' with actual measured time"
+  summary: "Update draft claim with measured runtime and variability context from captured runs"
+  needs:
+  - w3
   status: pending
 - id: w6
-  summary: "Add hardware context (CPU, RAM, SSD type)"
+  summary: "Add reproducibility command and run notes for readers"
+  needs:
+  - w2
   status: pending
 - id: w7
-  summary: "Add reproducibility command for readers"
+  summary: "Cross-check all updated performance statements against captured benchmark evidence"
+  needs:
+  - w4
+  - w5
+  - w6
   status: pending
 - id: w8
-  summary: "Include: benchbox run --platform duckdb --benchmark tpch --scale 10"
-  needs:
-  - w7
+  summary: "Final editorial pass for consistency, citation clarity, and reproducibility wording"
+  needs: [w7]
   status: pending
