@@ -79,7 +79,7 @@ work:
   - w4
   - w5
   - w6
-  status: pending
+  status: done
 - id: w8
   summary: "Final editorial pass for consistency, citation clarity, and reproducibility wording"
   needs: [w7]
