@@ -98,7 +98,7 @@ work:
     selection"
   needs:
   - w1
-  status: pending
+  status: done
 
 - id: w3
   summary: "Implement runtime environment materialization path for Python driver packages with strict unavailable-version
