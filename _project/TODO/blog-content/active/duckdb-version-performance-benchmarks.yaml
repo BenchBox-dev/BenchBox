@@ -145,7 +145,7 @@ work:
   status: done
 - id: w26
   summary: "Run SSB SF10 on v0.9.2"
-  status: pending
+  status: done
 - id: w27
   summary: "Run SSB SF10 on v0.10.3"
   status: pending
