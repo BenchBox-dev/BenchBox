@@ -138,7 +138,7 @@ work:
 - id: w9
   summary: "Consolidate DataFrame family parallel implementations via pandas/expression shared helpers"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Focus on true parallel methods (`merge`, `groupby_agg`, `col/lit/from_pandas`, scalar conversion helpers)
     where semantics are aligned across adapters.
