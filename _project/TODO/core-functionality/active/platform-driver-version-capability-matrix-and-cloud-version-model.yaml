@@ -108,7 +108,7 @@ work:
 - id: w2
   summary: "Define canonical version semantics separating Python driver/client version from platform engine/service version"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Define explicit capability declarations in platform metadata and adapter contract, with migration path from implicit
