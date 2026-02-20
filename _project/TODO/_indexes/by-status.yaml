@@ -1,6 +1,14 @@
-generated_at: '2026-02-20T04:41:01.222793'
-total_items: 31
+generated_at: '2026-02-20T04:42:54.499933'
+total_items: 32
 statuses:
+  In Progress:
+    count: 1
+    items:
+    - id: duckdb-version-performance-benchmarks
+      file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
+      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+      priority: Medium
+      category: Blog Revision
   Not Started:
     count: 31
     items:

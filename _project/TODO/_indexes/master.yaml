@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T04:41:01.222749'
-total_items: 31
+generated_at: '2026-02-20T04:42:54.499886'
+total_items: 32
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -468,6 +468,22 @@ items:
   work_total: 8
   work_done: 0
   work_ready: 5
+- id: duckdb-version-performance-benchmarks
+  file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
+  title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: In Progress
+  tags:
+  - duckdb-performance
+  - benchmarking
+  - blog-data
+  - multi-version
+  estimated_effort: 3-5 hours
+  work_total: 31
+  work_done: 10
+  work_ready: 20
 - id: snowflake-gen2-comparison-benchmarks
   file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
   title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'

@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T04:41:02.366765'
-total_items: 504
+generated_at: '2026-02-20T04:42:55.595309'
+total_items: 503
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4947,23 +4947,6 @@ items:
   priority: Medium
   status: Completed
   completed_date: '2025-12-14'
-- id: duckdb-version-performance-benchmarks
-  file: DONE/blog-content/active/duckdb-version-performance-benchmarks.yaml
-  title: '[DuckDB Version Performance] Run multi-version benchmark suite'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium
-  status: Completed
-  tags:
-  - duckdb-performance
-  - benchmarking
-  - blog-data
-  - multi-version
-  estimated_effort: 3-5 hours
-  completed_date: '2026-02-20'
-  work_total: 31
-  work_done: 31
-  work_ready: 0
 - id: add-end-to-end-cli-testing
   file: DONE/unknown/planning/add-end-to-end-cli-testing.yaml
   title: ✅ Add End-to-End CLI Testing

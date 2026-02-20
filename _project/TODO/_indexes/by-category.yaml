@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T04:41:01.222771'
+generated_at: '2026-02-20T04:42:54.499909'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -51,7 +51,7 @@ categories:
       priority: Low
       status: Not Started
   Blog Revision:
-    count: 7
+    count: 8
     items:
     - id: arm-graviton-generations-benchmarks
       file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
@@ -78,6 +78,11 @@ categories:
       title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
       priority: Medium
       status: Not Started
+    - id: duckdb-version-performance-benchmarks
+      file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
+      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+      priority: Medium
+      status: In Progress
     - id: snowflake-gen2-comparison-benchmarks
       file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
