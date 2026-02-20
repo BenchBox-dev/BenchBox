@@ -83,4 +83,4 @@ work:
 - id: w8
   summary: "Final editorial pass for consistency, citation clarity, and reproducibility wording"
   needs: [w7]
-  status: pending
+  status: done
