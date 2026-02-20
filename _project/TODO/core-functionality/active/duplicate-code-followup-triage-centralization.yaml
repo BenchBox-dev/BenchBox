@@ -97,7 +97,7 @@ work:
 - id: w4
   summary: "Classify remaining duplicate groups and produce complete action matrix"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Evaluate every currently identified group from the full inventory (beyond top-N).
     Output one row per group with class, rationale, action, confidence, and owner module.
