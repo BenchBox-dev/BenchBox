@@ -129,7 +129,7 @@ work:
 - id: w8
   summary: "Add architecture docs and alpha release notes describing removed branches and the single execution architecture"
   needs: [w6, w7]
-  status: pending
+  status: done
 
 verification:
 - description: "TODO entry validates against schema"
