@@ -46,6 +46,22 @@ context_sections:
     - action decision (ignore, defer, or consolidate now)
     - risk notes and required regression tests
 
+    Objective classification checklist (all groups):
+    - Control-flow and side-effects equivalent across all copies
+    - Parameter/input contract equivalent
+    - Output and error semantics equivalent
+    - Platform/dialect behavior equivalent (or explicitly not equivalent)
+
+    Disqualifiers for consolidation:
+    - Interface/protocol contract methods meant to be per-platform/per-implementation
+    - Thin facade methods where duplication is API surface, not implementation debt
+    - Domain-specific SQL/transforms that are shape-similar but business-different
+
+    Consolidate only when:
+    - At least 3 of 4 objective checks pass and no disqualifier applies
+    - A shared abstraction point can be introduced without public API changes
+    - Regression tests exist (or are added) for affected behavior
+
 deps:
   needs: [consolidate-duplicate-code]
 
@@ -64,7 +80,7 @@ work:
 - id: w2
   summary: "Define strict classification rubric for intended boilerplate vs parallel implementation"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Create a checklist with objective decision criteria and examples.
     Add explicit disqualifiers for false consolidations (protocol methods, interface contracts,
