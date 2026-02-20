@@ -130,7 +130,7 @@ work:
 - id: w8
   summary: "Consolidate benchmark facade/query-helper parallel implementations into shared core utilities"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Target groups such as repeated benchmark wrapper helpers (`get_queries`, `get_query`,
     `get_create_tables_sql`) and repeated query metadata/filter helper patterns where behavior matches.
