@@ -62,7 +62,7 @@ work:
   summary: "Record hardware context used for the benchmark (CPU, RAM, storage, OS)"
   needs:
   - w3
-  status: pending
+  status: done
 - id: w5
   summary: "Update draft claim with measured runtime and variability context from captured runs"
   needs:
