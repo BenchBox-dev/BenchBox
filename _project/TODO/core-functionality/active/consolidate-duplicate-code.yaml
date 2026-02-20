@@ -129,7 +129,7 @@ work:
 
 - id: w6
   summary: "Extract tuning config unpacking utility for get_create_tables_sql methods"
-  status: pending
+  status: done
   notes: |
     Create a small utility in benchbox/core/utils/tuning.py:
       def extract_constraint_flags(tuning_config) -> tuple[bool, bool]
