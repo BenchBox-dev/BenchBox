@@ -54,7 +54,7 @@ work:
 - id: w5
   summary: "Implement Athena/Synapse deep-sort ingestion paths or explicit actionable errors"
   needs: [w2]
-  status: pending
+  status: done
 - id: w6
   summary: "Implement ClickHouse Cloud deep-sort ingestion path or explicit actionable error"
   needs: [w2]
