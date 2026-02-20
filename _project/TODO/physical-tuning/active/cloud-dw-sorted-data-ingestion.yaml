@@ -42,7 +42,7 @@ work:
   summary: "Implement capability matrix + guardrails for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, Athena,
     Synapse, ClickHouse Cloud)"
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Implement Snowflake/Databricks deep-sort ingestion paths with safe defaults and explicit method markers"
   needs: [w2]
