@@ -70,7 +70,7 @@ work:
 - id: w9
   summary: "Documentation and examples: deep-sort vs native-tuning comparison workflow"
   needs: [w8]
-  status: pending
+  status: done
 
 metadata:
   tags:
