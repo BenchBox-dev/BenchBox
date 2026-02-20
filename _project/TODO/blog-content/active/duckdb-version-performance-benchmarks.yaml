@@ -118,7 +118,7 @@ work:
   status: done
 - id: w17
   summary: "Run TPC-DS SF10 on v0.10.3"
-  status: pending
+  status: done
 - id: w18
   summary: "Run ClickBench on v1.0.0"
   status: pending
