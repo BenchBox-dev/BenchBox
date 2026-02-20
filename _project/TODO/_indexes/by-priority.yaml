@@ -1,14 +1,17 @@
-generated_at: '2026-02-19T21:00:09.112230'
-total_items: 33
+generated_at: '2026-02-20T12:31:15.326881'
+total_items: 32
 priorities:
   High:
-    count: 3
+    count: 1
     items:
     - id: databricks-liquid-clustering-tuning-support
-      file: TODO/physical-tuning/planning/databricks-liquid-clustering-tuning-support.yaml
+      file: TODO/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml
       title: Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations
       category: Core Functionality
-      status: Not Started
+      status: In Progress
+  Medium-High:
+    count: 4
+    items:
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
@@ -19,9 +22,6 @@ priorities:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       category: Testing and Quality Assurance
       status: Not Started
-  Medium-High:
-    count: 2
-    items:
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -33,7 +33,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 14
+    count: 13
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -98,11 +98,6 @@ priorities:
     - id: snowflake-gen2-comparison-benchmarks
       file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
-      category: Blog Revision
-      status: Not Started
-    - id: tutorial-benchmark-verification
-      file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
-      title: '[Tutorials] Verify benchmark commands in tutorial posts'
       category: Blog Revision
       status: Not Started
   Low:

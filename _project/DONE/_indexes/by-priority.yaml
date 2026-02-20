@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T21:00:10.227955'
-total_items: 502
+generated_at: '2026-02-20T12:31:18.051424'
+total_items: 503
 priorities:
   Critical:
     count: 34
@@ -1333,7 +1333,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 223
+    count: 224
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1645,13 +1645,13 @@ priorities:
       title: Compressed Data Generation Gaps (all benchmarks) ✅
       category: Data Quality and Compatibility Issues
       status: Completed
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Completed
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Completed
@@ -2161,13 +2161,13 @@ priorities:
       title: Security Audit
       category: Pre-Release Medium Priority Tasks (Nice-to-Have)
       status: Completed
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       category: Platform Support and Deployment
       status: Completed
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       category: Platform Support and Deployment
       status: Completed
@@ -2266,6 +2266,11 @@ priorities:
       title: Unify compare and compare-plans commands
       category: ux-improvements
       status: Completed
+    - id: tutorial-benchmark-verification
+      file: DONE/blog-content/planning/tutorial-benchmark-verification.yaml
+      title: '[Tutorials] Verify benchmark commands in tutorial posts'
+      category: Blog Revision
+      status: Completed
     - id: add-end-to-end-cli-testing
       file: DONE/unknown/planning/add-end-to-end-cli-testing.yaml
       title: ✅ Add End-to-End CLI Testing
@@ -2356,13 +2361,13 @@ priorities:
       title: ✅ Implement Standalone Export Command
       category: User Experience and CLI Enhancement
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       category: Pre-Release High Priority Tasks (COMPLETED)
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       category: Pre-Release High Priority Tasks (COMPLETED)
       status: Completed
