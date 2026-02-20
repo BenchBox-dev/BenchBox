@@ -114,7 +114,7 @@ work:
 - id: w6
   summary: "Remove legacy quick/no_regenerate branch shims and simplify control flow for alpha"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Prioritize deletion of dead or low-value compatibility logic. Where flags
     remain user-visible, prefer deterministic fail-fast or explicit remapping to
