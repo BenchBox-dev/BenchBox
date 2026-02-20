@@ -88,13 +88,35 @@ files_affected:
   - benchbox/platforms/spark.py
   - benchbox/platforms/pyspark.py
   - benchbox/platforms/lakesail.py
+  - benchbox/platforms/postgresql.py
+  - benchbox/platforms/doris.py
+  - benchbox/platforms/starrocks/adapter.py
+  - benchbox/platforms/questdb.py
+  - benchbox/platforms/timescaledb.py
+  - benchbox/platforms/snowpark_connect.py
+  - benchbox/platforms/motherduck.py
+  - benchbox/platforms/azure_synapse.py
+  - benchbox/platforms/fabric_warehouse.py
+  - benchbox/platforms/fabric_lakehouse.py
+  - benchbox/platforms/aws/emr_serverless_adapter.py
+  - benchbox/platforms/aws/athena_spark_adapter.py
+  - benchbox/platforms/aws/glue_adapter.py
+  - benchbox/platforms/gcp/dataproc_adapter.py
+  - benchbox/platforms/gcp/dataproc_serverless_adapter.py
+  - benchbox/platforms/azure/fabric_spark_adapter.py
+  - benchbox/platforms/azure/synapse_spark_adapter.py
+  - benchbox/platforms/cudf.py
+  - benchbox/platforms/sqlite.py
+  - benchbox/platforms/polars_platform.py
   - benchbox/core/results/models.py
   - benchbox/core/results/schema.py
   - benchbox/core/results/platform_info.py
+  - benchbox/core/results/builder.py
   - tests/unit/platforms/test_platform_driver_runtime_contract.py
   - tests/unit/utils/test_runtime_env.py
   - tests/unit/core/results/test_query_plan_serialization.py
   - tests/unit/core/test_runner_lifecycle.py
+  - tests/unit/cli/test_run_metadata_contract.py
   added:
   - tests/integration/test_platform_driver_version_matrix.py
   - tests/unit/platforms/test_cloud_engine_version_metadata.py
