@@ -58,7 +58,7 @@ work:
 - id: w6
   summary: "Implement ClickHouse Cloud deep-sort ingestion path or explicit actionable error"
   needs: [w2]
-  status: pending
+  status: done
 - id: w7
   summary: "Add result metadata for ingestion strategy, runtime overhead, and cost-impact comparability"
   needs: [w3, w4, w5, w6]
