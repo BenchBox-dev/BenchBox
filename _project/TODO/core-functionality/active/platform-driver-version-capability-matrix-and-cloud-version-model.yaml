@@ -120,7 +120,7 @@ work:
   summary: "Implement shared capability resolver helpers and standardized error categories for unsupported runtime-binding
     combinations"
   needs: [w3]
-  status: pending
+  status: done
 
 - id: w5
   summary: "Implement and verify DataFusion SQL isolated runtime binding with live client-version validation"
