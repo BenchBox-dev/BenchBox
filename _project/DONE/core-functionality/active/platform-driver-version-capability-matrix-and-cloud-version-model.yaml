@@ -2,7 +2,8 @@ id: platform-driver-version-capability-matrix-and-cloud-version-model
 title: "Plan cross-platform multi-driver-version support and cloud engine-version metadata"
 worktree: core-functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-20"
 category: Core Functionality
 description: |
   Follow-up planning item to close the remaining cross-platform gaps after the
@@ -199,7 +200,7 @@ work:
   summary: "Publish architecture note and finalize rollout checklist (coverage table, unsupported exceptions, follow-up-only
     infeasible items)"
   needs: [w18]
-  status: pending
+  status: done
 
 deferred:
 - summary: "Automated live-cloud verification against paid accounts in CI"
