@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T04:42:54.499886'
-total_items: 32
+generated_at: '2026-02-20T07:52:26.737822'
+total_items: 31
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -500,22 +500,6 @@ items:
   work_total: 25
   work_done: 0
   work_ready: 16
-- id: tutorial-benchmark-verification
-  file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
-  title: '[Tutorials] Verify benchmark commands in tutorial posts'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium
-  status: Not Started
-  tags:
-  - tutorials
-  - benchmarking
-  - blog-data
-  - verification
-  estimated_effort: 30-60 minutes
-  work_total: 14
-  work_done: 0
-  work_ready: 7
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats

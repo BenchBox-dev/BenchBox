@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T04:42:55.595685'
-total_items: 503
+generated_at: '2026-02-20T07:52:27.817284'
+total_items: 504
 priorities:
   Critical:
     count: 34
@@ -1338,7 +1338,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 223
+    count: 224
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2270,6 +2270,11 @@ priorities:
       file: DONE/ux-improvements/active/compare-command-unification.yaml
       title: Unify compare and compare-plans commands
       category: ux-improvements
+      status: Completed
+    - id: tutorial-benchmark-verification
+      file: DONE/blog-content/planning/tutorial-benchmark-verification.yaml
+      title: '[Tutorials] Verify benchmark commands in tutorial posts'
+      category: Blog Revision
       status: Completed
     - id: add-end-to-end-cli-testing
       file: DONE/unknown/planning/add-end-to-end-cli-testing.yaml

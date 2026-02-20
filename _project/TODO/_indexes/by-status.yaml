@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T04:42:54.499933'
-total_items: 32
+generated_at: '2026-02-20T07:52:26.737872'
+total_items: 31
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Blog Revision
   Not Started:
-    count: 31
+    count: 30
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -160,10 +160,5 @@ statuses:
     - id: snowflake-gen2-comparison-benchmarks
       file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
-      priority: Medium
-      category: Blog Revision
-    - id: tutorial-benchmark-verification
-      file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
-      title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
       category: Blog Revision

@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T04:42:55.595309'
-total_items: 503
+generated_at: '2026-02-20T07:52:27.816953'
+total_items: 504
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4947,6 +4947,23 @@ items:
   priority: Medium
   status: Completed
   completed_date: '2025-12-14'
+- id: tutorial-benchmark-verification
+  file: DONE/blog-content/planning/tutorial-benchmark-verification.yaml
+  title: '[Tutorials] Verify benchmark commands in tutorial posts'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Completed
+  tags:
+  - tutorials
+  - benchmarking
+  - blog-data
+  - verification
+  estimated_effort: 30-60 minutes
+  completed_date: '2026-02-20'
+  work_total: 14
+  work_done: 14
+  work_ready: 0
 - id: add-end-to-end-cli-testing
   file: DONE/unknown/planning/add-end-to-end-cli-testing.yaml
   title: ✅ Add End-to-End CLI Testing

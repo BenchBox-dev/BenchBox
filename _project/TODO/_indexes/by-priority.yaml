@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T04:42:54.499922'
-total_items: 32
+generated_at: '2026-02-20T07:52:26.737861'
+total_items: 31
 priorities:
   High:
     count: 2
@@ -28,7 +28,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 14
+    count: 13
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -93,11 +93,6 @@ priorities:
     - id: snowflake-gen2-comparison-benchmarks
       file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
-      category: Blog Revision
-      status: Not Started
-    - id: tutorial-benchmark-verification
-      file: TODO/blog-content/planning/tutorial-benchmark-verification.yaml
-      title: '[Tutorials] Verify benchmark commands in tutorial posts'
       category: Blog Revision
       status: Not Started
   Low:

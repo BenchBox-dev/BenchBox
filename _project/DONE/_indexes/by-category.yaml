@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T04:42:55.595546'
-total_categories: 65
+generated_at: '2026-02-20T07:52:27.817162'
+total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -146,6 +146,14 @@ categories:
       file: DONE/unknown/completed/tpc-di-data-generator-compression-support.yaml
       title: ✅ TPC-DI Data Generator Compression Support
       priority: Critical
+      status: Completed
+  Blog Revision:
+    count: 1
+    items:
+    - id: tutorial-benchmark-verification
+      file: DONE/blog-content/planning/tutorial-benchmark-verification.yaml
+      title: '[Tutorials] Verify benchmark commands in tutorial posts'
+      priority: Medium
       status: Completed
   Bug Fixes:
     count: 2
