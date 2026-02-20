@@ -39,7 +39,7 @@ work:
 - id: w2
   summary: "Add config parsing/normalization for liquid clustering in CLI and tuning loader paths"
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Implement Databricks adapter support for liquid clustering DDL/DML lifecycle operations"
   needs: [w2]
