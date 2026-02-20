@@ -138,7 +138,7 @@ work:
 - id: w13
   summary: "Re-run complexity checks and confirm pass/fail posture with updated ignores"
   needs: [w7, w12]
-  status: pending
+  status: done
   notes: |
     Ensure intentional complexity is narrowly allowlisted and accidental complexity
     reductions remove all remaining failures above max threshold.
