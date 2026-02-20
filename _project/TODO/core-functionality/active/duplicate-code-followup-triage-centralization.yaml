@@ -122,7 +122,7 @@ work:
 - id: w7
   summary: "Implement ignore rules batch B for intended facade/structural non-parallel groups"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Apply ignores for verified intentional duplication in thin facades and domain-specific structural clones.
     Keep ignore entries traceable to matrix rows and rationale.
