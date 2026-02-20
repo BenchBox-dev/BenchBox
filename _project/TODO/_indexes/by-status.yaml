@@ -1,8 +1,8 @@
-generated_at: '2026-02-20T11:23:12.440218'
+generated_at: '2026-02-20T11:28:36.542276'
 total_items: 33
 statuses:
   In Progress:
-    count: 3
+    count: 4
     items:
     - id: complexity-check-triage-and-remediation
       file: TODO/core-functionality/active/complexity-check-triage-and-remediation.yaml
@@ -14,13 +14,18 @@ statuses:
       title: Follow-up duplicate-code triage and consolidation from AST clone report
       priority: High
       category: Code Quality and Technical Debt
+    - id: platform-driver-version-capability-matrix-and-cloud-version-model
+      file: TODO/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
+      title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
+      priority: High
+      category: Core Functionality
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'
       priority: Medium
       category: Blog Revision
   Not Started:
-    count: 30
+    count: 29
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -102,11 +107,6 @@ statuses:
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       priority: Medium
       category: Benchmark Development
-    - id: platform-driver-version-capability-matrix-and-cloud-version-model
-      file: TODO/core-functionality/planning/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
-      title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
-      priority: High
-      category: Core Functionality
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

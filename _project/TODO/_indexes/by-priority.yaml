@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T11:23:12.440208'
+generated_at: '2026-02-20T11:28:36.542267'
 total_items: 33
 priorities:
   High:
@@ -15,10 +15,10 @@ priorities:
       category: Code Quality and Technical Debt
       status: In Progress
     - id: platform-driver-version-capability-matrix-and-cloud-version-model
-      file: TODO/core-functionality/planning/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
+      file: TODO/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
       title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

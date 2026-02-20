@@ -57,7 +57,7 @@ work:
 - id: w3
   summary: "Classify failing functions in core runner, result schema, and TPC-DS paths (>20)"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Review each failing function in `benchbox/core/` (runner, result shaping, lifecycle)
     and record: decision category, concrete rationale, proposed refactor strategy or exact
@@ -66,7 +66,7 @@ work:
 - id: w4
   summary: "Classify failing functions in platform adapters and dataframe orchestration (>20)"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Review each failing function in `benchbox/platforms/` and dataframe-related modules.
     Record same evidence as w3. Includes cloud adapter `load_data` families and
@@ -75,7 +75,7 @@ work:
 - id: w5
   summary: "Classify failing functions in CLI, visualization, and remaining modules (>20)"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Review remaining failing functions in `benchbox/cli/`, chart rendering, comparison
     output, and any other modules. Record same evidence as w3.

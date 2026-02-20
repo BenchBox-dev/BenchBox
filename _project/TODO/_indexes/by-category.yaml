@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T11:23:12.440192'
+generated_at: '2026-02-20T11:28:36.542254'
 total_categories: 11
 categories:
   AI/ML Capabilities:
@@ -105,10 +105,10 @@ categories:
       priority: Low
       status: Not Started
     - id: platform-driver-version-capability-matrix-and-cloud-version-model
-      file: TODO/core-functionality/planning/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
+      file: TODO/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
       title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
       priority: High
-      status: Not Started
+      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

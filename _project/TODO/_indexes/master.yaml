@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T11:23:12.440163'
+generated_at: '2026-02-20T11:28:36.542232'
 total_items: 33
 items:
 - id: complexity-check-triage-and-remediation
@@ -15,8 +15,8 @@ items:
   - quality-gate
   estimated_effort: Large
   work_total: 14
-  work_done: 1
-  work_ready: 1
+  work_done: 2
+  work_ready: 3
   deferred_count: 2
 - id: duplicate-code-followup-triage-centralization
   file: TODO/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
@@ -32,19 +32,19 @@ items:
   - duplicate-detection
   - follow-up
   estimated_effort: 4-7 days
-  work_total: 14
+  work_total: 15
   work_done: 9
   work_ready: 2
   deferred_count: 2
   needs:
   - consolidate-duplicate-code
 - id: platform-driver-version-capability-matrix-and-cloud-version-model
-  file: TODO/core-functionality/planning/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
+  file: TODO/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
   title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
   worktree: core-functionality
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - runtime-isolation
   - driver-versioning
@@ -53,7 +53,7 @@ items:
   - metadata-correctness
   estimated_effort: 4-7 days
   work_total: 19
-  work_done: 0
+  work_done: 1
   work_ready: 1
   deferred_count: 1
   needs:
