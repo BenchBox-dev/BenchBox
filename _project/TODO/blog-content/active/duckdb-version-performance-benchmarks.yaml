@@ -2,7 +2,7 @@ id: duckdb-version-performance-benchmarks
 title: "[DuckDB Version Performance] Run multi-version benchmark suite"
 worktree: blog-content
 priority: Medium
-status: Not Started
+status: In Progress
 category: Blog Revision
 description: |
   Run comprehensive benchmarks across 5 DuckDB versions (0.9.2, 0.10.3, 1.0.0,
@@ -58,7 +58,7 @@ success_metrics:
 work:
 - id: w1
   summary: "Create isolated Python environments for each DuckDB version"
-  status: pending
+  status: done
 - id: w2
   summary: "Create venv for DuckDB 1.0.0"
   needs:
