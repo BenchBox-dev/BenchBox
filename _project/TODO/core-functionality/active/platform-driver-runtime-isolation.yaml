@@ -119,7 +119,7 @@ work:
   needs:
   - w3
   - w4
-  status: pending
+  status: done
 
 - id: w6
   summary: "Capture and validate actual DuckDB runtime version from live connection context and expose it through adapter
