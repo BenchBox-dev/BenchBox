@@ -188,7 +188,7 @@ work:
 - id: w17
   summary: "Add integration matrix tests for multi-version supported adapters plus regression coverage for unsupported paths"
   needs: [w15, w16]
-  status: pending
+  status: done
 
 - id: w18
   summary: "Run explicit manual verification matrix commands and capture artifact evidence for runtime/metadata correctness"
