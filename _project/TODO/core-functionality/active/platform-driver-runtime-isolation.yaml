@@ -133,7 +133,7 @@ work:
     fields"
   needs:
   - w6
-  status: pending
+  status: done
 
 - id: w8
   summary: "Roll out the shared runtime-isolation contract to other package-based platforms and define explicit behavior for
@@ -141,7 +141,7 @@ work:
   needs:
   - w2
   - w4
-  status: pending
+  status: done
 
 - id: w9
   summary: "Add unit tests for runtime_env, DuckDB version-selection path, unavailable-version errors, default behavior, and
@@ -149,7 +149,7 @@ work:
   needs:
   - w7
   - w8
-  status: pending
+  status: done
 
 - id: w10
   summary: "Add integration-style test proving two requested DuckDB versions produce distinct actual runtime versions in separate
