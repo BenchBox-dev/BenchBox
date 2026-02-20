@@ -89,7 +89,7 @@ work:
 - id: w3
   summary: "Pilot classification on top duplicate groups and calibrate rubric"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Classify top 30 groups first, then refine rubric language where disagreements/ambiguity appear.
     This phase locks classification examples before full-inventory triage.
