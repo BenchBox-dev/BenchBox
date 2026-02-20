@@ -193,7 +193,7 @@ work:
 - id: w18
   summary: "Run explicit manual verification matrix commands and capture artifact evidence for runtime/metadata correctness"
   needs: [w17]
-  status: pending
+  status: done
 
 - id: w19
   summary: "Publish architecture note and finalize rollout checklist (coverage table, unsupported exceptions, follow-up-only
