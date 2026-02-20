@@ -114,7 +114,7 @@ work:
 - id: w6
   summary: "Implement ignore rules batch A for intended adapter/protocol boilerplate groups"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Update duplicate checker config/script with tightly scoped ignore rules
     (function names plus path constraints where needed). Avoid broad suppressions and broad path wildcards.
