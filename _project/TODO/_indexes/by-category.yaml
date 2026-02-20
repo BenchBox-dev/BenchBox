@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T11:28:36.542254'
+generated_at: '2026-02-20T14:05:51.322135'
 total_categories: 11
 categories:
   AI/ML Capabilities:
@@ -84,31 +84,21 @@ categories:
       priority: Medium
       status: Not Started
   Code Quality and Technical Debt:
-    count: 2
+    count: 1
     items:
-    - id: complexity-check-triage-and-remediation
-      file: TODO/core-functionality/active/complexity-check-triage-and-remediation.yaml
-      title: 'Complexity check follow-up: triage intended complexity and remediate accidental complexity'
-      priority: High
-      status: In Progress
     - id: duplicate-code-followup-triage-centralization
       file: TODO/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
       title: Follow-up duplicate-code triage and consolidation from AST clone report
       priority: High
       status: In Progress
   Core Functionality:
-    count: 3
+    count: 2
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
-    - id: platform-driver-version-capability-matrix-and-cloud-version-model
-      file: TODO/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
-      title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
-      priority: High
-      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

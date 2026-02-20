@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T11:23:13.511272'
+generated_at: '2026-02-20T14:05:52.422908'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -215,7 +215,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 30
+    count: 31
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -241,6 +241,11 @@ categories:
       file: DONE/unknown/planning/circular-import-issues-completed.yaml
       title: Circular Import Issues ✅ COMPLETED
       priority: Medium
+      status: Completed
+    - id: complexity-check-triage-and-remediation
+      file: DONE/core-functionality/active/complexity-check-triage-and-remediation.yaml
+      title: 'Complexity check follow-up: triage intended complexity and remediate accidental complexity'
+      priority: High
       status: Completed
     - id: consolidate-duplicate-code
       file: DONE/core-functionality/active/consolidate-duplicate-code.yaml
@@ -391,7 +396,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 142
+    count: 143
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -944,6 +949,11 @@ categories:
       file: DONE/dataframe-benchmarks/active/dataframe-tpcds-obt-adaptation.yaml
       title: Plan DataFrame Adaptation for TPC-DS-OBT
       priority: Medium-High
+      status: Completed
+    - id: platform-driver-version-capability-matrix-and-cloud-version-model
+      file: DONE/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
+      title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
+      priority: High
       status: Completed
     - id: deployment-config-inheritance
       file: DONE/platform-expansion/active/deployment-config-inheritance.yaml

@@ -2,7 +2,8 @@ id: complexity-check-triage-and-remediation
 title: "Complexity check follow-up: triage intended complexity and remediate accidental complexity"
 worktree: core-functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-20"
 category: "Code Quality and Technical Debt"
 description: |
   `make complexity-check` currently fails with significant complexity debt that mixes
@@ -134,6 +135,16 @@ work:
   summary: "Run targeted tests for each refactor batch and fix regressions"
   needs: [w8, w9, w10, w11]
   status: done
+  notes: |
+    Validated touched areas with focused suites:
+    - `tests/unit/platforms/test_{bigquery,presto,trino,athena,snowflake}_adapter.py`
+    - `tests/integration/test_tpch_maintenance_test.py`
+    - `tests/unit/core/tpcds_obt/test_tpcds_obt_queries.py`
+    - `tests/unit/cli/test_quiet_mode.py`
+    - `tests/unit/platforms/test_platform_driver_runtime_contract.py`
+    Combined targeted run result: 250 passed, 19 deselected.
+    Full `-m fast` run currently reports one order-dependent failure in
+    `test_dataframe_adapter_contract_rejects_isolated_runtime_without_binding_support`.
 
 - id: w13
   summary: "Re-run complexity checks and confirm pass/fail posture with updated ignores"
@@ -146,7 +157,12 @@ work:
 - id: w14
   summary: "Document before/after metrics, update TODO status, and regenerate indexes"
   needs: [w13]
-  status: pending
+  status: done
+  notes: |
+    Before (2026-02-20 baseline): 4906 scanned, 106 warnings, 70 failures.
+    After remediation: 5048 scanned, 109 warnings, 0 failures.
+    Net change: failures reduced by 70; complexity gate now passes.
+    Updated complexity artifact: `_project/analysis/complexity/latest-report.txt`.
 
 deferred:
 - summary: "Deep redesign of benchmark lifecycle architecture beyond targeted extraction"
@@ -232,4 +248,4 @@ metadata:
   - quality-gate
   estimated_effort: "Large"
   created_date: "2026-02-20"
-  last_updated: "2026-02-20T12:00:00"
+  last_updated: "2026-02-20T18:00:00"

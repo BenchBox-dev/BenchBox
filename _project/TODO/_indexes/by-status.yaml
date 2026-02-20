@@ -1,24 +1,14 @@
-generated_at: '2026-02-20T11:28:36.542276'
-total_items: 33
+generated_at: '2026-02-20T14:05:51.322155'
+total_items: 31
 statuses:
   In Progress:
-    count: 4
+    count: 2
     items:
-    - id: complexity-check-triage-and-remediation
-      file: TODO/core-functionality/active/complexity-check-triage-and-remediation.yaml
-      title: 'Complexity check follow-up: triage intended complexity and remediate accidental complexity'
-      priority: High
-      category: Code Quality and Technical Debt
     - id: duplicate-code-followup-triage-centralization
       file: TODO/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
       title: Follow-up duplicate-code triage and consolidation from AST clone report
       priority: High
       category: Code Quality and Technical Debt
-    - id: platform-driver-version-capability-matrix-and-cloud-version-model
-      file: TODO/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
-      title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
-      priority: High
-      category: Core Functionality
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'

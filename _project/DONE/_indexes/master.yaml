@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T11:23:13.511054'
-total_items: 508
+generated_at: '2026-02-20T14:05:52.422690'
+total_items: 510
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -949,6 +949,24 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Medium
+- id: complexity-check-triage-and-remediation
+  file: DONE/core-functionality/active/complexity-check-triage-and-remediation.yaml
+  title: 'Complexity check follow-up: triage intended complexity and remediate accidental complexity'
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: High
+  status: Completed
+  tags:
+  - complexity
+  - technical-debt
+  - refactor
+  - quality-gate
+  estimated_effort: Large
+  completed_date: '2026-02-20'
+  work_total: 14
+  work_done: 14
+  work_ready: 0
+  deferred_count: 2
 - id: comprehensive-docs-quality-audit
   file: DONE/docs-experience/active/comprehensive-docs-quality-audit.yaml
   title: Comprehensive Documentation Quality Audit
@@ -1979,6 +1997,27 @@ items:
   - stdout
   - patch
   estimated_effort: 1-2 hours
+- id: platform-driver-version-capability-matrix-and-cloud-version-model
+  file: DONE/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
+  title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - runtime-isolation
+  - driver-versioning
+  - platform-matrix
+  - cloud-version-model
+  - metadata-correctness
+  estimated_effort: 4-7 days
+  completed_date: '2026-02-20'
+  work_total: 19
+  work_done: 19
+  work_ready: 0
+  deferred_count: 1
+  needs:
+  - platform-driver-runtime-isolation
 - id: phase-4-infrastructure
   file: DONE/platform-config-audit/completed/phase-4-infrastructure.yaml
   title: 'Platform Config Audit: Infrastructure/Cluster Changes'

@@ -1,23 +1,6 @@
-generated_at: '2026-02-20T11:28:36.542232'
-total_items: 33
+generated_at: '2026-02-20T14:05:51.322114'
+total_items: 31
 items:
-- id: complexity-check-triage-and-remediation
-  file: TODO/core-functionality/active/complexity-check-triage-and-remediation.yaml
-  title: 'Complexity check follow-up: triage intended complexity and remediate accidental complexity'
-  worktree: core-functionality
-  category: Code Quality and Technical Debt
-  priority: High
-  status: In Progress
-  tags:
-  - complexity
-  - technical-debt
-  - refactor
-  - quality-gate
-  estimated_effort: Large
-  work_total: 14
-  work_done: 2
-  work_ready: 3
-  deferred_count: 2
 - id: duplicate-code-followup-triage-centralization
   file: TODO/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
   title: Follow-up duplicate-code triage and consolidation from AST clone report
@@ -33,31 +16,11 @@ items:
   - follow-up
   estimated_effort: 4-7 days
   work_total: 15
-  work_done: 9
-  work_ready: 2
+  work_done: 13
+  work_ready: 1
   deferred_count: 2
   needs:
   - consolidate-duplicate-code
-- id: platform-driver-version-capability-matrix-and-cloud-version-model
-  file: TODO/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
-  title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
-  worktree: core-functionality
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - runtime-isolation
-  - driver-versioning
-  - platform-matrix
-  - cloud-version-model
-  - metadata-correctness
-  estimated_effort: 4-7 days
-  work_total: 19
-  work_done: 1
-  work_ready: 1
-  deferred_count: 1
-  needs:
-  - platform-driver-runtime-isolation
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes

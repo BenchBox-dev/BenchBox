@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T11:23:13.511394'
-total_items: 508
+generated_at: '2026-02-20T14:05:52.423030'
+total_items: 510
 priorities:
   Critical:
     count: 34
@@ -175,7 +175,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 179
+    count: 181
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -337,6 +337,11 @@ priorities:
       title: Compare Command UX Improvements
       category: Usability
       status: In Progress
+    - id: complexity-check-triage-and-remediation
+      file: DONE/core-functionality/active/complexity-check-triage-and-remediation.yaml
+      title: 'Complexity check follow-up: triage intended complexity and remediate accidental complexity'
+      category: Code Quality and Technical Debt
+      status: Completed
     - id: comprehensive-docs-quality-audit
       file: DONE/docs-experience/active/comprehensive-docs-quality-audit.yaml
       title: Comprehensive Documentation Quality Audit
@@ -681,6 +686,11 @@ priorities:
     - id: patch-tpch-source-stdout
       file: DONE/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
       title: Patch TPC-H source to fix stdout data generation
+      category: Core Functionality
+      status: Completed
+    - id: platform-driver-version-capability-matrix-and-cloud-version-model
+      file: DONE/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
+      title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
       category: Core Functionality
       status: Completed
     - id: phase-4-infrastructure
