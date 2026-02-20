@@ -80,7 +80,7 @@ work:
 - id: w2
   summary: "Enforce canonical runtime path and retire ExecutionPipeline as a behavior-bearing runtime path"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Confirm canonical path is `BenchmarkOrchestrator` -> `run_benchmark_lifecycle`.
     Remove ambiguity: `ExecutionPipeline` must not remain a parallel source of
