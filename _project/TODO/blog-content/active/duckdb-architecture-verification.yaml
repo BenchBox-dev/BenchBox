@@ -57,7 +57,7 @@ work:
   summary: "Run two additional trials and record per-run timings plus median runtime"
   needs:
   - w2
-  status: pending
+  status: done
 - id: w4
   summary: "Record hardware context used for the benchmark (CPU, RAM, storage, OS)"
   needs:
