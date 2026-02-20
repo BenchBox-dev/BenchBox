@@ -72,7 +72,7 @@ work:
   summary: "Add reproducibility command and run notes for readers"
   needs:
   - w2
-  status: pending
+  status: done
 - id: w7
   summary: "Cross-check all updated performance statements against captured benchmark evidence"
   needs:
