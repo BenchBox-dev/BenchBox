@@ -106,7 +106,7 @@ work:
 - id: w5
   summary: "Refactor run.py branches to share one execute-and-export function while keeping mode-specific input validation"
   needs: [w3, w4]
-  status: pending
+  status: done
   notes: |
     Preserve mode-specific validation/prompting but route all benchmark execution
     and export through one internal function to remove drift.
