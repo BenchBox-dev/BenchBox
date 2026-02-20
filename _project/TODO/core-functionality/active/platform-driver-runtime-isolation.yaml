@@ -164,7 +164,7 @@ work:
     runtime isolation and metadata correctness"
   needs:
   - w10
-  status: pending
+  status: done
 
 must_preserve:
 - "Default runs without explicit requested version continue working for DuckDB and use current environment behavior."
