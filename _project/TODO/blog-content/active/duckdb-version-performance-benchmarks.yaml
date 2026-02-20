@@ -103,7 +103,7 @@ work:
   status: done
 - id: w12
   summary: "Run TPC-H SF10 on v0.10.3 (3 runs, median)"
-  status: pending
+  status: done
 - id: w13
   summary: "Run TPC-DS SF10 on v1.0.0"
   status: pending
