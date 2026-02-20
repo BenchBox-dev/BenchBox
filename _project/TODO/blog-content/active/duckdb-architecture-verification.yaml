@@ -67,7 +67,7 @@ work:
   summary: "Update draft claim with measured runtime and variability context from captured runs"
   needs:
   - w3
-  status: pending
+  status: done
 - id: w6
   summary: "Add reproducibility command and run notes for readers"
   needs:
