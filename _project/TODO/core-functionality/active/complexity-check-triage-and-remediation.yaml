@@ -1,0 +1,235 @@
+id: complexity-check-triage-and-remediation
+title: "Complexity check follow-up: triage intended complexity and remediate accidental complexity"
+worktree: core-functionality
+priority: High
+status: In Progress
+category: "Code Quality and Technical Debt"
+description: |
+  `make complexity-check` currently fails with significant complexity debt that mixes
+  intentional orchestration logic and accidental branching complexity.
+
+  Baseline captured on 2026-02-20:
+  - Total functions scanned: 4906
+  - Warnings (score >= 15): 106
+  - Failures (score > 20): 70
+  - Highest offenders: `_extract_common_params` (76), `build_result_payload` (63),
+    `render_ascii_chart_from_results` (51), multiple `load_data` methods in cloud
+    adapters, and runner/dataframe orchestration methods.
+
+  This TODO delivers a complete decision record for every flagged function (simplify vs
+  intentional ignore), implements refactors for accidental complexity, and applies narrow
+  ignore entries only where complexity is demonstrably irreducible and justified.
+
+context_sections:
+  "Scope and Decision Rule": |
+    Every function currently at score >= 15 must be reviewed and assigned one action:
+    1) simplify_now: complexity is accidental and should be reduced via extraction/splitting
+    2) ignore_with_rationale: complexity is required for contract/dispatch semantics
+    3) defer_with_owner: complexity reduction is valid but blocked by larger architecture work
+
+    Ignore entries are allowed only for (2), and each entry must map to a matrix row with
+    explicit rationale and re-review trigger.
+
+  "Current Hotspot Families": |
+    - Core orchestration and result shaping (`benchbox/core`)
+    - DataFrame runner/mixin and unified frame operations
+    - Platform adapter `load_data` / credential / platform metadata paths
+    - CLI rendering and comparison output formatting
+    - ASCII chart rendering paths
+
+work:
+- id: w1
+  summary: "Capture baseline complexity artifacts and seed function inventory"
+  status: done
+  notes: |
+    Persist current output from `scripts/check_complexity.py --no-fail --top 200` under
+    `_project/analysis/complexity/` and seed a machine-readable inventory with all
+    functions at score >= 15, including score, file, function, and module family.
+
+- id: w2
+  summary: "Define triage rubric for intended vs accidental complexity"
+  needs: [w1]
+  status: pending
+  notes: |
+    Create explicit criteria for `simplify_now`, `ignore_with_rationale`, and
+    `defer_with_owner`, including examples and disqualifiers for broad ignores.
+
+- id: w3
+  summary: "Classify failing functions in core runner, result schema, and TPC-DS paths (>20)"
+  needs: [w2]
+  status: pending
+  notes: |
+    Review each failing function in `benchbox/core/` (runner, result shaping, lifecycle)
+    and record: decision category, concrete rationale, proposed refactor strategy or exact
+    ignore key (`file:function`), and required regression tests.
+
+- id: w4
+  summary: "Classify failing functions in platform adapters and dataframe orchestration (>20)"
+  needs: [w2]
+  status: pending
+  notes: |
+    Review each failing function in `benchbox/platforms/` and dataframe-related modules.
+    Record same evidence as w3. Includes cloud adapter `load_data` families and
+    dataframe runner/mixin hotspots.
+
+- id: w5
+  summary: "Classify failing functions in CLI, visualization, and remaining modules (>20)"
+  needs: [w2]
+  status: pending
+  notes: |
+    Review remaining failing functions in `benchbox/cli/`, chart rendering, comparison
+    output, and any other modules. Record same evidence as w3.
+
+- id: w6
+  summary: "Classify warning-band functions (15-20) and prioritize remediation queue"
+  needs: [w3, w4, w5]
+  status: pending
+  notes: |
+    Classify all warning-band functions and assign priority buckets:
+    immediate, near-term, monitor-only. May span multiple sessions if count exceeds ~40;
+    batch by module family if needed.
+
+- id: w7
+  summary: "Finalize ignore candidates and add narrow exclusions with rationale linkage"
+  needs: [w6]
+  status: pending
+  notes: |
+    Update `[tool.benchbox.complexity].exclude_functions` in `pyproject.toml` only for
+    approved `ignore_with_rationale` cases. No module-wide excludes. Every entry must map
+    to the classification matrix and include a re-review note.
+
+- id: w8
+  summary: "Refactor accidental complexity batch A: visualization and CLI formatting paths"
+  needs: [w6]
+  status: pending
+  notes: |
+    Split high-complexity render/format functions into smaller pure helpers while
+    preserving output formatting and user-facing behavior.
+
+- id: w9
+  summary: "Refactor accidental complexity batch B: dataframe orchestration hotspots"
+  needs: [w6]
+  status: pending
+  notes: |
+    Reduce branching in dataframe benchmark mixins and unified frame hotspots by extracting
+    mode-specific helpers and consolidating repeated decision logic.
+
+- id: w10
+  summary: "Refactor accidental complexity batch C: platform adapter load_data families"
+  needs: [w6]
+  status: pending
+  notes: |
+    Normalize shared load flow into scoped helpers/mixins for adapters with parallel logic
+    (Redshift/BigQuery/Databricks/Trino/Presto/Athena/Snowflake) without changing platform-specific semantics.
+
+- id: w11
+  summary: "Refactor accidental complexity batch D: core runner, result schema, and TPC-DS paths"
+  needs: [w6]
+  status: pending
+  notes: |
+    Decompose large lifecycle/result-shaping functions into deterministic units with clear
+    contracts and easier test coverage.
+
+- id: w12
+  summary: "Run targeted tests for each refactor batch and fix regressions"
+  needs: [w8, w9, w10, w11]
+  status: pending
+
+- id: w13
+  summary: "Re-run complexity checks and confirm pass/fail posture with updated ignores"
+  needs: [w7, w12]
+  status: pending
+  notes: |
+    Ensure intentional complexity is narrowly allowlisted and accidental complexity
+    reductions remove all remaining failures above max threshold.
+
+- id: w14
+  summary: "Document before/after metrics, update TODO status, and regenerate indexes"
+  needs: [w13]
+  status: pending
+
+deferred:
+- summary: "Deep redesign of benchmark lifecycle architecture beyond targeted extraction"
+  reason: "Out of scope for this complexity remediation item; requires separate architecture proposal."
+- summary: "Live cloud integration validation for every adapter refactor"
+  reason: "Requires credentials/environments and should be handled in dedicated live-test follow-up if unit/integration mocks
+    are insufficient."
+
+must_preserve:
+- "`benchbox run` lifecycle behavior and phase ordering remain unchanged."
+- "Platform `load_data` semantics, supported file types, and option handling remain backward compatible."
+- "DataFrame benchmark execution parity between pandas-family and expression-family adapters."
+- "CLI output contracts for compare/export/visualization commands remain stable."
+- "Complexity check continues to detect real regressions (no broad suppressions)."
+
+approach: |
+  Use an evidence-first workflow:
+  1) Build a complete classification matrix for every flagged function.
+  2) Apply ignore entries only for truly irreducible complexity with explicit rationale.
+  3) Refactor accidental complexity in subsystem batches with focused tests.
+  4) Re-run complexity and regression tests after each batch.
+  5) Keep threshold policy (`max_complexity = 20`) intact unless a separate policy change is approved.
+
+  Preferred refactor strategy is extraction into private helpers with clear contracts and
+  reduced branch nesting, not broad architectural rewrites.
+
+scope_limit:
+  only_modify:
+  - "benchbox/**/*.py"
+  - "pyproject.toml (complexity config section only)"
+  - "scripts/check_complexity.py"
+  - "_project/analysis/complexity/"
+  do_not_modify:
+  - "benchbox/**/public API signatures or CLI command interfaces"
+  - "tests/fixtures/ or test fixture data"
+  - ".github/ or CI/CD configuration"
+  - "Makefile"
+  - "pyproject.toml (dependency specifications)"
+
+anti_patterns:
+- "DO NOT add module-wide or directory-wide complexity excludes -- because this hides future regressions -- add only function-level
+  excludes with rationale."
+- "DO NOT lower global complexity thresholds to make checks pass -- because this weakens enforcement -- reduce code complexity
+  or justify narrow ignores."
+- "DO NOT mix behavior changes with complexity-only refactors -- because this obscures regressions -- keep functional behavior
+  stable and test-backed."
+- "DO NOT collapse platform-specific error handling into generic paths -- because adapters have distinct semantics -- share
+  scaffolding only."
+
+verification:
+- description: "Complexity baseline and classification inventory are complete and consistent"
+  command: "uv run -- python scripts/check_complexity.py --no-fail --top 200"
+  expected_output: "Report completes successfully and all functions above warning threshold are represented in the classification
+    matrix."
+- description: "Primary complexity gate passes after remediation and approved ignores"
+  command: "make complexity-check"
+  expected_output: "PASS with zero functions above max complexity threshold."
+- description: "Fast regression suite remains green"
+  command: "uv run -- python -m pytest -m fast -q -n 0"
+  expected_output: "All fast tests pass with 0 failures."
+- description: "Touched subsystem tests remain green"
+  command: "uv run -- python -m pytest tests/unit/core tests/unit/platforms tests/unit/cli -q -n 0"
+  expected_output: "Targeted unit suites pass for modified modules."
+
+files_affected:
+  modified:
+  - "_project/TODO/core-functionality/planning/complexity-check-triage-and-remediation.yaml"
+  - "pyproject.toml"
+  - "scripts/check_complexity.py"
+  - "benchbox/core/ (runner, result shaping, lifecycle modules — specific files determined during w3a/w4)"
+  - "benchbox/platforms/ (cloud adapter load_data families — specific files determined during w3b/w4)"
+  - "benchbox/cli/ (rendering, comparison, visualization — specific files determined during w3c/w4)"
+  - "benchbox/core/dataframe/ (runner, mixin, unified frame — specific files determined during w3b/w4)"
+  added:
+  - "_project/analysis/complexity/latest-report.txt"
+  - "_project/analysis/complexity/classification-matrix.yaml"
+
+metadata:
+  tags:
+  - complexity
+  - technical-debt
+  - refactor
+  - quality-gate
+  estimated_effort: "Large"
+  created_date: "2026-02-20"
+  last_updated: "2026-02-20T12:00:00"

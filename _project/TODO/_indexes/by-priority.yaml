@@ -1,19 +1,29 @@
-generated_at: '2026-02-20T09:41:43.232783'
-total_items: 32
+generated_at: '2026-02-20T11:22:16.669997'
+total_items: 34
 priorities:
   High:
-    count: 4
+    count: 6
     items:
+    - id: complexity-check-triage-and-remediation
+      file: TODO/core-functionality/active/complexity-check-triage-and-remediation.yaml
+      title: 'Complexity check follow-up: triage intended complexity and remediate accidental complexity'
+      category: Code Quality and Technical Debt
+      status: In Progress
     - id: duplicate-code-followup-triage-centralization
-      file: TODO/core-functionality/planning/duplicate-code-followup-triage-centralization.yaml
+      file: TODO/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
       title: Follow-up duplicate-code triage and consolidation from AST clone report
       category: Code Quality and Technical Debt
-      status: Not Started
+      status: In Progress
     - id: platform-driver-runtime-isolation
       file: TODO/core-functionality/active/platform-driver-runtime-isolation.yaml
       title: Implement per-run platform driver runtime isolation (DuckDB first)
       category: Core Functionality
       status: In Progress
+    - id: platform-driver-version-capability-matrix-and-cloud-version-model
+      file: TODO/core-functionality/planning/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
+      title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
+      category: Core Functionality
+      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

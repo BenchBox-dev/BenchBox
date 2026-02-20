@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T09:41:43.232770'
+generated_at: '2026-02-20T11:22:16.669982'
 total_categories: 11
 categories:
   AI/ML Capabilities:
@@ -84,15 +84,20 @@ categories:
       priority: Medium
       status: Not Started
   Code Quality and Technical Debt:
-    count: 1
+    count: 2
     items:
+    - id: complexity-check-triage-and-remediation
+      file: TODO/core-functionality/active/complexity-check-triage-and-remediation.yaml
+      title: 'Complexity check follow-up: triage intended complexity and remediate accidental complexity'
+      priority: High
+      status: In Progress
     - id: duplicate-code-followup-triage-centralization
-      file: TODO/core-functionality/planning/duplicate-code-followup-triage-centralization.yaml
+      file: TODO/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
       title: Follow-up duplicate-code triage and consolidation from AST clone report
       priority: High
-      status: Not Started
+      status: In Progress
   Core Functionality:
-    count: 3
+    count: 4
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
@@ -104,6 +109,11 @@ categories:
       title: Implement per-run platform driver runtime isolation (DuckDB first)
       priority: High
       status: In Progress
+    - id: platform-driver-version-capability-matrix-and-cloud-version-model
+      file: TODO/core-functionality/planning/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
+      title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
+      priority: High
+      status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
