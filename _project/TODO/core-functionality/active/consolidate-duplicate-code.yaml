@@ -139,7 +139,7 @@ work:
 - id: w7
   summary: "Configure duplicate checker ignore patterns for intended boilerplate groups"
   needs: [w1, w2, w3, w4, w5, w6]
-  status: pending
+  status: done
   notes: |
     After consolidation work is complete, update pyproject.toml
     [tool.benchbox.duplicates] section or the check_duplicate_code.py script
