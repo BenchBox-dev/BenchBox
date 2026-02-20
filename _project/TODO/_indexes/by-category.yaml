@@ -1,4 +1,4 @@
-generated_at: '2026-02-19T04:05:53.298089'
+generated_at: '2026-02-19T21:00:09.112215'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -94,8 +94,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 2
+    count: 3
     items:
+    - id: databricks-liquid-clustering-tuning-support
+      file: TODO/physical-tuning/planning/databricks-liquid-clustering-tuning-support.yaml
+      title: Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations
+      priority: High
+      status: Not Started
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation

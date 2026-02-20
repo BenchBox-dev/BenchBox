@@ -1,9 +1,14 @@
-generated_at: '2026-02-19T04:05:53.298105'
-total_items: 32
+generated_at: '2026-02-19T21:00:09.112230'
+total_items: 33
 priorities:
   High:
-    count: 2
+    count: 3
     items:
+    - id: databricks-liquid-clustering-tuning-support
+      file: TODO/physical-tuning/planning/databricks-liquid-clustering-tuning-support.yaml
+      title: Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations
+      category: Core Functionality
+      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

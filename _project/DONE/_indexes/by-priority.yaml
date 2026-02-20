@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T04:05:54.862499'
-total_items: 501
+generated_at: '2026-02-19T21:00:10.227955'
+total_items: 502
 priorities:
   Critical:
     count: 34
@@ -175,7 +175,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 175
+    count: 176
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -276,6 +276,11 @@ priorities:
       file: DONE/tpch-stdout-fix/planning/test-stdout-datagen.yaml
       title: Add regression tests for TPC-H stdout data generation
       category: Testing and Quality Assurance
+      status: Completed
+    - id: cloud-dw-sorted-data-ingestion
+      file: DONE/physical-tuning/active/cloud-dw-sorted-data-ingestion.yaml
+      title: Add sorted data ingestion support for cloud data warehouses to compare against clustering/Z-order/partitioning
+      category: Core Functionality
       status: Completed
     - id: advanced-cost-analysis-framework-multi-region-pricing-models
       file: DONE/cost-intelligence-advanced/planning/advanced-cost-analysis-framework-multi-region-pricing-models.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T04:05:54.861998'
-total_items: 501
+generated_at: '2026-02-19T21:00:10.227589'
+total_items: 502
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -749,6 +749,28 @@ items:
   - regression
   - stdout
   estimated_effort: 2-3 hours
+- id: cloud-dw-sorted-data-ingestion
+  file: DONE/physical-tuning/active/cloud-dw-sorted-data-ingestion.yaml
+  title: Add sorted data ingestion support for cloud data warehouses to compare against clustering/Z-order/partitioning
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tuning
+  - cloud
+  - data-loading
+  - sorting
+  - performance
+  - cost-analysis
+  estimated_effort: Large
+  completed_date: '2026-02-20'
+  work_total: 9
+  work_done: 9
+  work_ready: 0
+  needs:
+  - ctas-sort-dataloader-connectivity
+  - ctas-sort-cloud-platforms
 - id: advanced-cost-analysis-framework-multi-region-pricing-models
   file: DONE/cost-intelligence-advanced/planning/advanced-cost-analysis-framework-multi-region-pricing-models.yaml
   title: Advanced Cost Analysis Framework - Multi-Region & Pricing Models

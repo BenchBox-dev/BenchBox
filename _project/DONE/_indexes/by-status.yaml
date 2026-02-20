@@ -1,5 +1,5 @@
-generated_at: '2026-02-19T04:05:54.862685'
-total_items: 501
+generated_at: '2026-02-19T21:00:10.228082'
+total_items: 502
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 453
+    count: 454
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -559,6 +559,11 @@ statuses:
       title: Add regression tests for TPC-H stdout data generation
       priority: High
       category: Testing and Quality Assurance
+    - id: cloud-dw-sorted-data-ingestion
+      file: DONE/physical-tuning/active/cloud-dw-sorted-data-ingestion.yaml
+      title: Add sorted data ingestion support for cloud data warehouses to compare against clustering/Z-order/partitioning
+      priority: High
+      category: Core Functionality
     - id: add-sphinx-tags
       file: DONE/docs-experience/active/add-sphinx-tags.yaml
       title: Add sphinx-tags to BenchBox Documentation

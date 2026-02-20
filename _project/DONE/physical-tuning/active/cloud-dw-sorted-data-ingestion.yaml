@@ -1,12 +1,13 @@
 # Cloud DW Sorted Data Ingestion (Deep Sort) Follow-up
 #
-# Location: _project/TODO/physical-tuning/active/cloud-dw-sorted-data-ingestion.yaml
+# Location: _project/DONE/physical-tuning/active/cloud-dw-sorted-data-ingestion.yaml
 
 id: cloud-dw-sorted-data-ingestion
 title: "Add sorted data ingestion support for cloud data warehouses to compare against clustering/Z-order/partitioning"
 worktree: physical-tuning
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-20"
 description: |
   Add explicit sorted data ingestion support for cloud data warehouse platforms as
   a first-class benchmark strategy, even when platform-native tuning features

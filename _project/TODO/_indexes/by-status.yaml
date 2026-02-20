@@ -1,8 +1,8 @@
-generated_at: '2026-02-19T04:05:53.298116'
-total_items: 32
+generated_at: '2026-02-19T21:00:09.112240'
+total_items: 33
 statuses:
   Not Started:
-    count: 32
+    count: 33
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -29,6 +29,11 @@ statuses:
       title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
       priority: Low
       category: Platform Expansion
+    - id: databricks-liquid-clustering-tuning-support
+      file: TODO/physical-tuning/planning/databricks-liquid-clustering-tuning-support.yaml
+      title: Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations
+      priority: High
+      category: Core Functionality
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
