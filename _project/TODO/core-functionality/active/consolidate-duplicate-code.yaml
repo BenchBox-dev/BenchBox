@@ -96,7 +96,7 @@ work:
 
 - id: w3
   summary: "Extract common benchmark mixin with generate_data() and load_data_to_database()"
-  status: pending
+  status: done
   notes: |
     Create a DataGenerationMixin in benchbox/core/benchmark_mixins.py (standalone,
     not modifying the existing base class hierarchy):
