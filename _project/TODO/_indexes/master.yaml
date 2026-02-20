@@ -1,6 +1,23 @@
-generated_at: '2026-02-20T07:53:30.347601'
-total_items: 31
+generated_at: '2026-02-20T08:30:09.625528'
+total_items: 32
 items:
+- id: platform-driver-runtime-isolation
+  file: TODO/core-functionality/planning/platform-driver-runtime-isolation.yaml
+  title: Implement per-run platform driver runtime isolation (DuckDB first)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Identified
+  tags:
+  - runtime-isolation
+  - driver-versioning
+  - duckdb
+  - correctness
+  - benchmark-integrity
+  estimated_effort: 2-4 days
+  work_total: 11
+  work_done: 0
+  work_ready: 1
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -452,22 +469,6 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 9
-- id: duckdb-architecture-verification
-  file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
-  title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium
-  status: Not Started
-  tags:
-  - duckdb
-  - platform-deep-dives
-  - verification
-  - quick-task
-  estimated_effort: 10-15 minutes
-  work_total: 8
-  work_done: 0
-  work_ready: 5
 - id: duckdb-version-performance-benchmarks
   file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
   title: '[DuckDB Version Performance] Run multi-version benchmark suite'
@@ -500,6 +501,23 @@ items:
   work_total: 25
   work_done: 0
   work_ready: 16
+- id: consolidate-duplicate-code
+  file: TODO/core-functionality/active/consolidate-duplicate-code.yaml
+  title: Consolidate duplicate code identified by AST structural clone detection
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: In Progress
+  tags:
+  - code-quality
+  - technical-debt
+  - refactoring
+  - duplicate-detection
+  estimated_effort: 3-5 days
+  work_total: 8
+  work_done: 1
+  work_ready: 5
+  deferred_count: 3
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats

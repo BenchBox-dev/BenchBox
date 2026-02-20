@@ -2,7 +2,8 @@ id: duckdb-architecture-verification
 title: "[DuckDB Architecture] Verify 'under 10 seconds' TPC-H claim"
 worktree: blog-content
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-02-20"
 category: Blog Revision
 description: |
   Verify the claim in duckdb-architecture.md that DuckDB processes TPC-H SF10

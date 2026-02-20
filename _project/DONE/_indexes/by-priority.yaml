@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T07:53:31.418512'
-total_items: 504
+generated_at: '2026-02-20T08:30:10.730711'
+total_items: 505
 priorities:
   Critical:
     count: 34
@@ -1338,7 +1338,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 224
+    count: 225
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2270,6 +2270,11 @@ priorities:
       file: DONE/ux-improvements/active/compare-command-unification.yaml
       title: Unify compare and compare-plans commands
       category: ux-improvements
+      status: Completed
+    - id: duckdb-architecture-verification
+      file: DONE/blog-content/active/duckdb-architecture-verification.yaml
+      title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
+      category: Blog Revision
       status: Completed
     - id: tutorial-benchmark-verification
       file: DONE/blog-content/planning/tutorial-benchmark-verification.yaml

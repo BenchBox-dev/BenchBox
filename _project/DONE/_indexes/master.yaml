@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T07:53:31.418175'
-total_items: 504
+generated_at: '2026-02-20T08:30:10.730222'
+total_items: 505
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4947,6 +4947,23 @@ items:
   priority: Medium
   status: Completed
   completed_date: '2025-12-14'
+- id: duckdb-architecture-verification
+  file: DONE/blog-content/active/duckdb-architecture-verification.yaml
+  title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium
+  status: Completed
+  tags:
+  - duckdb
+  - platform-deep-dives
+  - verification
+  - quick-task
+  estimated_effort: 10-15 minutes
+  completed_date: '2026-02-20'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
 - id: tutorial-benchmark-verification
   file: DONE/blog-content/planning/tutorial-benchmark-verification.yaml
   title: '[Tutorials] Verify benchmark commands in tutorial posts'

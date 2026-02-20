@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T07:53:31.418620'
-total_items: 504
+generated_at: '2026-02-20T08:30:10.730860'
+total_items: 505
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 456
+    count: 457
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2136,6 +2136,11 @@ statuses:
       title: Visualization Framework - Chart Generation & Results Display
       priority: Critical
       category: Marketing Content Enablement
+    - id: duckdb-architecture-verification
+      file: DONE/blog-content/active/duckdb-architecture-verification.yaml
+      title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
+      priority: Medium
+      category: Blog Revision
     - id: tutorial-benchmark-verification
       file: DONE/blog-content/planning/tutorial-benchmark-verification.yaml
       title: '[Tutorials] Verify benchmark commands in tutorial posts'

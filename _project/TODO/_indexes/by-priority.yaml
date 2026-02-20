@@ -1,9 +1,14 @@
-generated_at: '2026-02-20T07:53:30.347639'
-total_items: 31
+generated_at: '2026-02-20T08:30:09.625577'
+total_items: 32
 priorities:
   High:
-    count: 2
+    count: 3
     items:
+    - id: platform-driver-runtime-isolation
+      file: TODO/core-functionality/planning/platform-driver-runtime-isolation.yaml
+      title: Implement per-run platform driver runtime isolation (DuckDB first)
+      category: Core Functionality
+      status: Identified
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
@@ -15,8 +20,13 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 2
+    count: 3
     items:
+    - id: consolidate-duplicate-code
+      file: TODO/core-functionality/active/consolidate-duplicate-code.yaml
+      title: Consolidate duplicate code identified by AST structural clone detection
+      category: Code Quality and Technical Debt
+      status: In Progress
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -28,7 +38,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 13
+    count: 12
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -78,11 +88,6 @@ priorities:
     - id: clickhouse-optimizer-analysis-benchmarks
       file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
       title: '[ClickHouse Analysis] Run comparative benchmark suite'
-      category: Blog Revision
-      status: Not Started
-    - id: duckdb-architecture-verification
-      file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
-      title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
       category: Blog Revision
       status: Not Started
     - id: duckdb-version-performance-benchmarks

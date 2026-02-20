@@ -1,16 +1,21 @@
-generated_at: '2026-02-20T07:53:30.347648'
-total_items: 31
+generated_at: '2026-02-20T08:30:09.625590'
+total_items: 32
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
+    - id: consolidate-duplicate-code
+      file: TODO/core-functionality/active/consolidate-duplicate-code.yaml
+      title: Consolidate duplicate code identified by AST structural clone detection
+      priority: Medium-High
+      category: Code Quality and Technical Debt
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'
       priority: Medium
       category: Blog Revision
   Not Started:
-    count: 30
+    count: 29
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -152,13 +157,16 @@ statuses:
       title: '[ClickHouse Analysis] Run comparative benchmark suite'
       priority: Medium
       category: Blog Revision
-    - id: duckdb-architecture-verification
-      file: TODO/blog-content/planning/duckdb-architecture-verification.yaml
-      title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
-      priority: Medium
-      category: Blog Revision
     - id: snowflake-gen2-comparison-benchmarks
       file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
       priority: Medium
       category: Blog Revision
+  Identified:
+    count: 1
+    items:
+    - id: platform-driver-runtime-isolation
+      file: TODO/core-functionality/planning/platform-driver-runtime-isolation.yaml
+      title: Implement per-run platform driver runtime isolation (DuckDB first)
+      priority: High
+      category: Core Functionality

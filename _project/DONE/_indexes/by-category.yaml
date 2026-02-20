@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T07:53:31.418391'
+generated_at: '2026-02-20T08:30:10.730472'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -148,8 +148,13 @@ categories:
       priority: Critical
       status: Completed
   Blog Revision:
-    count: 1
+    count: 2
     items:
+    - id: duckdb-architecture-verification
+      file: DONE/blog-content/active/duckdb-architecture-verification.yaml
+      title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
+      priority: Medium
+      status: Completed
     - id: tutorial-benchmark-verification
       file: DONE/blog-content/planning/tutorial-benchmark-verification.yaml
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
