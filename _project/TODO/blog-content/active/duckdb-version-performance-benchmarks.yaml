@@ -112,7 +112,7 @@ work:
   status: done
 - id: w15
   summary: "Run TPC-DS SF10 on v1.2.2"
-  status: pending
+  status: done
 - id: w16
   summary: "Run TPC-DS SF10 on v0.9.2"
   status: pending
