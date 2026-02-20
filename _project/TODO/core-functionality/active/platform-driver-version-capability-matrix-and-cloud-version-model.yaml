@@ -125,12 +125,12 @@ work:
 - id: w5
   summary: "Implement and verify DataFusion SQL isolated runtime binding with live client-version validation"
   needs: [w4]
-  status: pending
+  status: done
 
 - id: w6
   summary: "Implement and verify DataFusion DataFrame isolated runtime binding with live client-version validation"
   needs: [w4]
-  status: pending
+  status: done
 
 - id: w7
   summary: "Audit remote/cloud adapters and classify each as feasible, blocked, or inapplicable for selectable Python driver
