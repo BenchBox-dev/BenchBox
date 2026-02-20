@@ -98,7 +98,7 @@ work:
 - id: w4
   summary: "Centralize result export policy into one helper used by all non-dry-run run.py branches"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Unify filename generation, output directory selection, export formats, and
     status rendering. Remove per-branch exporter setup differences.
