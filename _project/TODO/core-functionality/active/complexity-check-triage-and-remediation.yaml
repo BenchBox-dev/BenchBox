@@ -49,7 +49,7 @@ work:
 - id: w2
   summary: "Define triage rubric for intended vs accidental complexity"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Create explicit criteria for `simplify_now`, `ignore_with_rationale`, and
     `defer_with_owner`, including examples and disqualifiers for broad ignores.
