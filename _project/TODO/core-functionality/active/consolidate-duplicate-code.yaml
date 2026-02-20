@@ -119,7 +119,7 @@ work:
 
 - id: w5
   summary: "Add list_queries() method to QueryRegistry class, simplify 9 registry wrapper functions"
-  status: pending
+  status: done
   notes: |
     The filtering logic in list_*_queries (family/category filter over get_all_queries)
     is duplicated 9 times across dataframe_queries/registry.py files.
