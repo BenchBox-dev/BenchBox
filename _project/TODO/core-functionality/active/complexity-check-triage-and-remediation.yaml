@@ -125,7 +125,7 @@ work:
 - id: w11
   summary: "Refactor accidental complexity batch D: core runner, result schema, and TPC-DS paths"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Decompose large lifecycle/result-shaping functions into deterministic units with clear
     contracts and easier test coverage.
