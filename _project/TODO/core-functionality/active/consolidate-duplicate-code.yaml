@@ -109,7 +109,7 @@ work:
 
 - id: w4
   summary: "Create ParameterizedQueryManager base class with shared get_query() method"
-  status: pending
+  status: done
   notes: |
     Create benchbox/core/query_manager.py (or add to existing base) with:
     - get_query(query_id, params) template method
