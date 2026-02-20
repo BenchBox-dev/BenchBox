@@ -136,28 +136,28 @@ work:
   summary: "Audit remote/cloud adapters and classify each as feasible, blocked, or inapplicable for selectable Python driver
     versions"
   needs: [w4]
-  status: pending
+  status: done
 
 - id: w8
   summary: "Implement support (or explicit non-feasibility decision) for Trino-family adapters: trino, starburst, presto"
   needs: [w7]
-  status: pending
+  status: done
 
 - id: w9
   summary: "Implement support (or explicit non-feasibility decision) for warehouse adapters: bigquery, snowflake, redshift"
   needs: [w7]
-  status: pending
+  status: done
 
 - id: w10
   summary: "Implement support (or explicit non-feasibility decision) for connector-heavy adapters: databricks, athena, clickhouse-cloud,
     firebolt, spark-family"
   needs: [w7]
-  status: pending
+  status: done
 
 - id: w11
   summary: "Codify standardized unsupported rationale and actionable fail-fast remediation messages for non-feasible platforms"
   needs: [w8, w9, w10]
-  status: pending
+  status: done
 
 - id: w12
   summary: "Define cloud engine-version metadata model (field names, semantics, provenance/probe metadata)"
