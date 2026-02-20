@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T14:05:52.423142'
-total_items: 510
+generated_at: '2026-02-20T17:06:13.974171'
+total_items: 511
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 462
+    count: 463
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1285,6 +1285,11 @@ statuses:
       title: Fix type checking errors ignored in ty config
       priority: Medium-High
       category: Testing and Quality Assurance
+    - id: duplicate-code-followup-triage-centralization
+      file: DONE/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
+      title: Follow-up duplicate-code triage and consolidation from AST clone report
+      priority: High
+      category: Code Quality and Technical Debt
     - id: format-converter-remaining-work
       file: DONE/table-formats/completed/format-converter-remaining-work.yaml
       title: Format Converter Integration - Remaining Work (Phases 3-6)

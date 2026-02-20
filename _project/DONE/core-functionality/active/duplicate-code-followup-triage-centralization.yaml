@@ -2,7 +2,8 @@ id: duplicate-code-followup-triage-centralization
 title: "Follow-up duplicate-code triage and consolidation from AST clone report"
 worktree: core-functionality
 priority: High
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-02-20"
 category: "Code Quality and Technical Debt"
 description: |
   The latest `make duplicate-check-verbose` run reports 401 duplicate function groups and
@@ -170,7 +171,7 @@ work:
 - id: w13
   summary: "Run regression suite, re-run duplicate check, and lower threshold to new baseline + safety margin"
   needs: [w12]
-  status: pending
+  status: done
   notes: |
     Verify behavior parity with targeted tests for each consolidation track plus fast suite.
     Update threshold in pyproject to observed duplicated-line count plus 10% headroom.
@@ -178,7 +179,7 @@ work:
 - id: w14
   summary: "Finalize TODO completion state, capture before/after metrics, and regenerate indexes"
   needs: [w13]
-  status: pending
+  status: done
   notes: |
     Record total line reduction, finalized threshold, and list of consolidated groups.
     Move item through active -> done workflow only after all verification passes.

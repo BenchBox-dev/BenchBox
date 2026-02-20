@@ -1,18 +1,13 @@
-generated_at: '2026-02-20T14:05:51.322155'
-total_items: 31
+generated_at: '2026-02-20T17:06:12.837977'
+total_items: 30
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: duplicate-code-followup-triage-centralization
-      file: TODO/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
-      title: Follow-up duplicate-code triage and consolidation from AST clone report
-      priority: High
-      category: Code Quality and Technical Debt
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'
-      priority: Medium
+      priority: Medium-High
       category: Blog Revision
   Not Started:
     count: 29
@@ -95,7 +90,7 @@ statuses:
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
-      priority: Medium
+      priority: Medium-High
       category: Benchmark Development
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -140,7 +135,7 @@ statuses:
     - id: arm-graviton-generations-benchmarks
       file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
       title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
-      priority: Medium
+      priority: Medium-High
       category: Blog Revision
     - id: arm-hyperscaler-comparison-benchmarks
       file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml

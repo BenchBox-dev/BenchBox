@@ -1,14 +1,9 @@
-generated_at: '2026-02-20T14:05:51.322146'
-total_items: 31
+generated_at: '2026-02-20T17:06:12.837968'
+total_items: 30
 priorities:
   High:
-    count: 3
+    count: 2
     items:
-    - id: duplicate-code-followup-triage-centralization
-      file: TODO/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
-      title: Follow-up duplicate-code triage and consolidation from AST clone report
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
@@ -20,8 +15,13 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 2
+    count: 5
     items:
+    - id: nyc-taxi-benchmark-expansion
+      file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
+      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+      category: Benchmark Development
+      status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -32,8 +32,18 @@ priorities:
       title: Vector Search Benchmark Support
       category: AI/ML Capabilities
       status: Not Started
+    - id: arm-graviton-generations-benchmarks
+      file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
+      title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
+      category: Blog Revision
+      status: Not Started
+    - id: duckdb-version-performance-benchmarks
+      file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
+      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+      category: Blog Revision
+      status: In Progress
   Medium:
-    count: 12
+    count: 9
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -55,20 +65,10 @@ priorities:
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
       status: Not Started
-    - id: nyc-taxi-benchmark-expansion
-      file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
-      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
-      category: Benchmark Development
-      status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: arm-graviton-generations-benchmarks
-      file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
-      title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
-      category: Blog Revision
       status: Not Started
     - id: arm-hyperscaler-comparison-benchmarks
       file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml
@@ -85,11 +85,6 @@ priorities:
       title: '[ClickHouse Analysis] Run comparative benchmark suite'
       category: Blog Revision
       status: Not Started
-    - id: duckdb-version-performance-benchmarks
-      file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
-      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
-      category: Blog Revision
-      status: In Progress
     - id: snowflake-gen2-comparison-benchmarks
       file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'

@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T14:05:52.422908'
+generated_at: '2026-02-20T17:06:13.973930'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -215,7 +215,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 31
+    count: 32
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -271,6 +271,11 @@ categories:
       file: DONE/unknown/planning/fix-cli-orchestrator-module-critical-issues.yaml
       title: Fix CLI Orchestrator Module Critical Issues
       priority: Medium
+      status: Completed
+    - id: duplicate-code-followup-triage-centralization
+      file: DONE/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
+      title: Follow-up duplicate-code triage and consolidation from AST clone report
+      priority: High
       status: Completed
     - id: timing-runtime-wide-monotonic-migration
       file: DONE/main/active/timing-runtime-wide-monotonic-migration.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T14:05:52.422690'
-total_items: 510
+generated_at: '2026-02-20T17:06:13.973690'
+total_items: 511
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1494,6 +1494,27 @@ items:
   work_total: 7
   work_done: 7
   work_ready: 0
+- id: duplicate-code-followup-triage-centralization
+  file: DONE/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
+  title: Follow-up duplicate-code triage and consolidation from AST clone report
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: High
+  status: Completed
+  tags:
+  - code-quality
+  - technical-debt
+  - refactoring
+  - duplicate-detection
+  - follow-up
+  estimated_effort: 4-7 days
+  completed_date: '2026-02-20'
+  work_total: 15
+  work_done: 15
+  work_ready: 0
+  deferred_count: 2
+  needs:
+  - consolidate-duplicate-code
 - id: format-converter-remaining-work
   file: DONE/table-formats/completed/format-converter-remaining-work.yaml
   title: Format Converter Integration - Remaining Work (Phases 3-6)

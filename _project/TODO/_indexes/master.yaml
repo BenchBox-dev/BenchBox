@@ -1,26 +1,6 @@
-generated_at: '2026-02-20T14:05:51.322114'
-total_items: 31
+generated_at: '2026-02-20T17:06:12.837923'
+total_items: 30
 items:
-- id: duplicate-code-followup-triage-centralization
-  file: TODO/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
-  title: Follow-up duplicate-code triage and consolidation from AST clone report
-  worktree: core-functionality
-  category: Code Quality and Technical Debt
-  priority: High
-  status: In Progress
-  tags:
-  - code-quality
-  - technical-debt
-  - refactoring
-  - duplicate-detection
-  - follow-up
-  estimated_effort: 4-7 days
-  work_total: 15
-  work_done: 13
-  work_ready: 1
-  deferred_count: 2
-  needs:
-  - consolidate-duplicate-code
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -364,25 +344,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: nyc-taxi-benchmark-expansion
-  file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
-  title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
-  worktree: benchmark-expansion
-  category: Benchmark Development
-  priority: Medium
-  status: Not Started
-  tags:
-  - benchmark
-  - real-world
-  - nyc-taxi
-  - enhancement
-  - multi-source
-  owners:
-  - '@benchbox-maintainers'
-  estimated_effort: 2-3 weeks
-  work_total: 12
-  work_done: 0
-  work_ready: 12
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
@@ -400,23 +361,6 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 3-4 weeks
   work_total: 17
-  work_done: 0
-  work_ready: 17
-- id: arm-graviton-generations-benchmarks
-  file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
-  title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium
-  status: Not Started
-  tags:
-  - arm-performance
-  - graviton
-  - aws
-  - cloud-benchmarking
-  - blog-data
-  estimated_effort: 2-3 hours
-  work_total: 21
   work_done: 0
   work_ready: 17
 - id: arm-hyperscaler-comparison-benchmarks
@@ -472,22 +416,6 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 9
-- id: duckdb-version-performance-benchmarks
-  file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
-  title: '[DuckDB Version Performance] Run multi-version benchmark suite'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium
-  status: In Progress
-  tags:
-  - duckdb-performance
-  - benchmarking
-  - blog-data
-  - multi-version
-  estimated_effort: 3-5 hours
-  work_total: 31
-  work_done: 10
-  work_ready: 20
 - id: snowflake-gen2-comparison-benchmarks
   file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
   title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
@@ -504,6 +432,25 @@ items:
   work_total: 25
   work_done: 0
   work_ready: 16
+- id: nyc-taxi-benchmark-expansion
+  file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
+  title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - nyc-taxi
+  - enhancement
+  - multi-source
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 weeks
+  work_total: 12
+  work_done: 0
+  work_ready: 12
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -539,3 +486,36 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
+- id: arm-graviton-generations-benchmarks
+  file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
+  title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - arm-performance
+  - graviton
+  - aws
+  - cloud-benchmarking
+  - blog-data
+  estimated_effort: 2-3 hours
+  work_total: 21
+  work_done: 0
+  work_ready: 17
+- id: duckdb-version-performance-benchmarks
+  file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
+  title: '[DuckDB Version Performance] Run multi-version benchmark suite'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: In Progress
+  tags:
+  - duckdb-performance
+  - benchmarking
+  - blog-data
+  - multi-version
+  estimated_effort: 3-5 hours
+  work_total: 31
+  work_done: 10
+  work_ready: 20
