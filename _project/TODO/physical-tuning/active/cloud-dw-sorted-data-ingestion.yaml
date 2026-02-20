@@ -46,7 +46,7 @@ work:
 - id: w3
   summary: "Implement Snowflake/Databricks deep-sort ingestion paths with safe defaults and explicit method markers"
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: "Implement BigQuery/Redshift deep-sort ingestion paths or explicit actionable errors"
   needs: [w2]
