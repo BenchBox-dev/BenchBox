@@ -18,10 +18,17 @@ description: |
   Reference drafts: _blog/tutorials/drafts/
 
   Verification results:
-  - Read Primitives on DuckDB: 135/152 queries pass (88.8%)
+  - Read Primitives on DuckDB: 135/152 queries pass (88.8%), 31 categories
   - Read Primitives on SQLite: 74/152 queries pass (48.7%)
   - TPC-Havoc on DuckDB: 211/220 variants pass (95.9%)
   - Write Primitives on DuckDB: 73/109 operations pass (67.0%)
+
+  Post-review corrections applied:
+  - Fixed category count from 26 to 31 with accurate per-category counts
+  - Fixed SF 0.1 row count from ~7.4M to ~866K
+  - Added single-run timing caveat to TPC-Havoc results
+  - Moved bulk-load caveat adjacent to results table in Write Primitives
+  - Added CLI data-loading bug note to all three tutorials
 
   Note: CLI `benchbox run` has a data loading bug with sharded manifest
   files (files exist but loader reports "file not found"). Python API
