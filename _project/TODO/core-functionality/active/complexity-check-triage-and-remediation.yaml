@@ -92,7 +92,7 @@ work:
 - id: w7
   summary: "Finalize ignore candidates and add narrow exclusions with rationale linkage"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Update `[tool.benchbox.complexity].exclude_functions` in `pyproject.toml` only for
     approved `ignore_with_rationale` cases. No module-wide excludes. Every entry must map
