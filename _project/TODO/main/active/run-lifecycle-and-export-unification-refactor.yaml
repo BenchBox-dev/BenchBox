@@ -89,7 +89,7 @@ work:
 - id: w3
   summary: "Extract metadata enrichment into shared canonical post-processing invoked by orchestrator/lifecycle"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Move driver/runtime metadata wiring out of `execution_pipeline.py`-only flow.
     Ensure metadata contract is applied regardless of direct/load-only/interactive
