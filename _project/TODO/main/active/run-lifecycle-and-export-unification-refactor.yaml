@@ -1,0 +1,169 @@
+id: run-lifecycle-and-export-unification-refactor
+title: "Refactor run lifecycle to a single execution path with unified export and metadata wiring"
+worktree: main
+priority: High
+status: In Progress
+category: Core Functionality
+description: |
+  The benchmark run entrypoint currently has multiple execution branches in
+  `benchbox/cli/commands/run.py` and two orchestration architectures in the CLI
+  layer (`BenchmarkOrchestrator` + `run_benchmark_lifecycle` vs `ExecutionPipeline`).
+
+  In current real CLI execution, `run.py` routes through `BenchmarkOrchestrator`
+  and `run_benchmark_lifecycle`, not `ExecutionPipeline`. This means behavior and
+  metadata added only in `benchbox/cli/execution_pipeline.py` can be absent in
+  real exported artifacts.
+
+  This TODO converts architecture review findings into a concrete refactor plan
+  that reduces accidental complexity by:
+  - Selecting and enforcing one canonical benchmark execution path
+  - Unifying export behavior across direct, load/data-only, and interactive flows
+  - Relocating metadata enrichment to the canonical path so artifacts are consistent
+  - Removing or deprecating dead/legacy branches and compatibility shims
+  - Adding parity tests to prevent branch drift regressions
+
+must_preserve:
+- "Default CLI behavior and UX remain stable for existing `benchbox run` usage."
+- "Dry-run behavior remains fully functional and separate from live execution."
+- "Data-only and load-only flows remain supported with correct phase semantics."
+
+approach: |
+  Standardize on the currently used orchestration path (`BenchmarkOrchestrator`
+  delegating to `run_benchmark_lifecycle`) as the canonical execution engine.
+  Move metadata enrichment and export decisions into shared helpers invoked by
+  that canonical path, then collapse run-command branches to use one shared
+  execute-and-export routine.
+
+  For alpha, prioritize simplification over compatibility shims: make
+  `ExecutionPipeline` explicitly non-runtime (or remove runtime-facing usage),
+  and move all behavior-critical logic to the canonical path. Do not preserve
+  dual-runtime behavior just for backward compatibility.
+
+anti_patterns:
+- "DO NOT keep metadata enrichment only in `benchbox/cli/execution_pipeline.py` — because that path is not the default runtime
+  — move metadata wiring into shared canonical execution/export code."
+- "DO NOT duplicate export blocks in each `run.py` branch — because drift already exists — centralize export path selection,
+  filename assignment, and format handling in one helper."
+- "DO NOT introduce a third orchestration abstraction — because complexity is already excessive — consolidate around one runtime
+  path and reduce adapters/wrappers."
+- "DO NOT keep dead legacy shims (`quick`, `no_regenerate`-style branch logic) solely for compatibility — because this is
+  alpha and complexity cost is higher — remove or hard-fail obsolete paths with clear release notes."
+
+files_affected:
+  modified:
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/cli/orchestrator.py"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/core/results/exporter.py"
+  - "benchbox/cli/output.py"
+  - "benchbox/cli/execution_pipeline.py"
+  - "tests/unit/cli/commands/test_run_official_coverage.py"
+  - "tests/unit/cli/test_cli_orchestrator.py"
+  - "tests/unit/cli/test_execution_pipeline_driver_metadata.py"
+  - "tests/unit/core/test_runner_lifecycle.py"
+  - "tests/unit/test_results_exporter.py"
+  - "docs/architecture/"
+  added:
+  - "tests/unit/cli/test_run_execution_path_parity.py"
+  - "tests/unit/cli/test_run_export_consistency.py"
+  - "tests/unit/cli/test_run_metadata_contract.py"
+
+work:
+- id: w1
+  summary: "Trace and codify all run.py execution branches and artifact/export paths into a single lifecycle map"
+  status: done
+  notes: |
+    Produce a concrete branch matrix from `run.py` for direct execution,
+    data-only/load-only, interactive, and dry-run. Document exact call chains,
+    export path rules, and metadata insertion points.
+
+- id: w2
+  summary: "Enforce canonical runtime path and retire ExecutionPipeline as a behavior-bearing runtime path"
+  needs: [w1]
+  status: pending
+  notes: |
+    Confirm canonical path is `BenchmarkOrchestrator` -> `run_benchmark_lifecycle`.
+    Remove ambiguity: `ExecutionPipeline` must not remain a parallel source of
+    runtime behavior. It can be deleted, or reduced to a non-authoritative shim.
+
+- id: w3
+  summary: "Extract metadata enrichment into shared canonical post-processing invoked by orchestrator/lifecycle"
+  needs: [w2]
+  status: pending
+  notes: |
+    Move driver/runtime metadata wiring out of `execution_pipeline.py`-only flow.
+    Ensure metadata contract is applied regardless of direct/load-only/interactive
+    branch and regardless of adapter family.
+
+- id: w4
+  summary: "Centralize result export policy into one helper used by all non-dry-run run.py branches"
+  needs: [w2]
+  status: pending
+  notes: |
+    Unify filename generation, output directory selection, export formats, and
+    status rendering. Remove per-branch exporter setup differences.
+
+- id: w5
+  summary: "Refactor run.py branches to share one execute-and-export function while keeping mode-specific input validation"
+  needs: [w3, w4]
+  status: pending
+  notes: |
+    Preserve mode-specific validation/prompting but route all benchmark execution
+    and export through one internal function to remove drift.
+
+- id: w6
+  summary: "Remove legacy quick/no_regenerate branch shims and simplify control flow for alpha"
+  needs: [w5]
+  status: pending
+  notes: |
+    Prioritize deletion of dead or low-value compatibility logic. Where flags
+    remain user-visible, prefer deterministic fail-fast or explicit remapping to
+    canonical behavior over maintaining hidden branch variants.
+
+- id: w7
+  summary: "Add branch-parity tests that assert identical export/metadata contracts across direct, load-only, and interactive-equivalent
+    non-interactive runs"
+  needs: [w5]
+  status: pending
+
+- id: w8
+  summary: "Add architecture docs and alpha release notes describing removed branches and the single execution architecture"
+  needs: [w6, w7]
+  status: pending
+
+verification:
+- description: "TODO entry validates against schema"
+  command: "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/run-lifecycle-and-export-unification-refactor.yaml"
+  expected_output: "Validation passes with no schema errors"
+- description: "TODO dependency graph remains valid"
+  command: "uv run _project/scripts/todo_cli.py check-graph"
+  expected_output: "No dangling references or cycles"
+- description: "Run-command regression suite for orchestrator and run branches passes"
+  command: "uv run -- python -m pytest tests/unit/cli/test_cli_orchestrator.py tests/unit/cli/commands/test_run_official_coverage.py
+    -v --tb=short"
+  expected_output: "All selected tests pass"
+- description: "Metadata wiring parity tests pass"
+  command: "uv run -- python -m pytest tests/unit/cli/test_execution_pipeline_driver_metadata.py tests/unit/cli/test_run_metadata_contract.py
+    -v --tb=short"
+  expected_output: "All selected tests pass and metadata fields present in canonical artifacts"
+- description: "Core lifecycle and exporter contract tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/test_runner_lifecycle.py tests/unit/test_results_exporter.py tests/unit/cli/test_run_export_consistency.py
+    -v --tb=short"
+  expected_output: "All selected tests pass"
+
+metadata:
+  tags:
+  - architecture
+  - run-command
+  - orchestration
+  - export
+  - metadata
+  estimated_effort: "Large"
+  created_date: "2026-02-20"
+
+success_metrics:
+- "All non-dry-run `benchbox run` paths execute through one canonical lifecycle path"
+- "Export behavior is centralized and deterministic across remaining supported run modes"
+- "Driver/runtime metadata fields are present in real CLI artifacts, not only pipeline-only paths"
+- "ExecutionPipeline is no longer a parallel behavior-bearing runtime path"
+- "New parity tests prevent reintroduction of branch-specific drift"
