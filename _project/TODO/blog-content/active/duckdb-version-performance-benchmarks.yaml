@@ -160,4 +160,4 @@ work:
   status: done
 - id: w31
   summary: "Memory usage measurement for sorting"
-  status: pending
+  status: done
