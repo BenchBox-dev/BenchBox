@@ -121,7 +121,7 @@ work:
   status: done
 - id: w18
   summary: "Run ClickBench on v1.0.0"
-  status: pending
+  status: done
 - id: w19
   summary: "Run ClickBench on v1.1.3"
   status: pending
