@@ -105,7 +105,7 @@ work:
     error handling"
   needs:
   - w2
-  status: pending
+  status: done
 
 - id: w4
   summary: "Wire first-class per-run version selection through CLI/config and platform factory while keeping default no-version
