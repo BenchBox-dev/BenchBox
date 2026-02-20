@@ -130,7 +130,7 @@ work:
   status: done
 - id: w21
   summary: "Run ClickBench on v0.9.2"
-  status: pending
+  status: done
 - id: w22
   summary: "Run ClickBench on v0.10.3"
   status: pending
