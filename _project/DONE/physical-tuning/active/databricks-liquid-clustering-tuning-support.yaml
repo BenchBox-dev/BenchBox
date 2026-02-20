@@ -120,7 +120,7 @@ anti_patterns:
 
 verification:
 - description: "New TODO validates against schema"
-  command: "uv run _project/scripts/validate_todo.py _project/TODO/physical-tuning/planning/databricks-liquid-clustering-tuning-support.yaml"
+  command: "uv run _project/scripts/validate_todo.py _project/DONE/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml"
   expected_output: "Validation passed"
 - description: "Databricks liquid clustering tests pass"
   command: "uv run -- python -m pytest tests/unit/platforms/test_databricks_liquid_clustering.py -v --tb=short"

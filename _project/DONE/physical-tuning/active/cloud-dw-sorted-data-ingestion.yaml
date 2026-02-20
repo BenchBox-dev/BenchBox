@@ -141,7 +141,7 @@ anti_patterns:
 
 verification:
 - description: "New TODO validates against schema"
-  command: "uv run _project/scripts/validate_todo.py _project/TODO/physical-tuning/planning/cloud-dw-sorted-data-ingestion.yaml"
+  command: "uv run _project/scripts/validate_todo.py _project/DONE/physical-tuning/active/cloud-dw-sorted-data-ingestion.yaml"
   expected_output: "Validation passed"
 - description: "Cloud strategy tests pass"
   command: "uv run -- python -m pytest tests/unit/platforms/test_cloud_sorted_ingestion_strategy.py -v --tb=short"
