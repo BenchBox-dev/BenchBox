@@ -106,7 +106,7 @@ work:
 - id: w5
   summary: "Validate matrix completeness and freeze implementation/ignore backlog"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Verify one-to-one coverage between latest duplicate report groups and matrix rows.
     No implementation starts until coverage and action mapping are complete and internally consistent.
