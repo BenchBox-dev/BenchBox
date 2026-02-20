@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T11:22:16.669982'
+generated_at: '2026-02-20T11:23:12.440192'
 total_categories: 11
 categories:
   AI/ML Capabilities:
@@ -97,18 +97,13 @@ categories:
       priority: High
       status: In Progress
   Core Functionality:
-    count: 4
+    count: 3
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
-    - id: platform-driver-runtime-isolation
-      file: TODO/core-functionality/active/platform-driver-runtime-isolation.yaml
-      title: Implement per-run platform driver runtime isolation (DuckDB first)
-      priority: High
-      status: In Progress
     - id: platform-driver-version-capability-matrix-and-cloud-version-model
       file: TODO/core-functionality/planning/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
       title: Plan cross-platform multi-driver-version support and cloud engine-version metadata

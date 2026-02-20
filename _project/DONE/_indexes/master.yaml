@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T09:41:44.331916'
-total_items: 507
+generated_at: '2026-02-20T11:23:13.511054'
+total_items: 508
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1662,6 +1662,24 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 4 weeks
+- id: platform-driver-runtime-isolation
+  file: DONE/core-functionality/active/platform-driver-runtime-isolation.yaml
+  title: Implement per-run platform driver runtime isolation (DuckDB first)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - runtime-isolation
+  - driver-versioning
+  - duckdb
+  - correctness
+  - benchmark-integrity
+  estimated_effort: 2-4 days
+  completed_date: '2026-02-20'
+  work_total: 11
+  work_done: 11
+  work_ready: 0
 - id: pyspark-sql-schema-translation
   file: DONE/dataframe-expansion/planning/pyspark-sql-schema-translation.yaml
   title: Implement schema creation with SQLGlot translation for PySpark

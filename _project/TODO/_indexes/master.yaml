@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T11:22:16.669952'
-total_items: 34
+generated_at: '2026-02-20T11:23:12.440163'
+total_items: 33
 items:
 - id: complexity-check-triage-and-remediation
   file: TODO/core-functionality/active/complexity-check-triage-and-remediation.yaml
@@ -38,23 +38,6 @@ items:
   deferred_count: 2
   needs:
   - consolidate-duplicate-code
-- id: platform-driver-runtime-isolation
-  file: TODO/core-functionality/active/platform-driver-runtime-isolation.yaml
-  title: Implement per-run platform driver runtime isolation (DuckDB first)
-  worktree: core-functionality
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - runtime-isolation
-  - driver-versioning
-  - duckdb
-  - correctness
-  - benchmark-integrity
-  estimated_effort: 2-4 days
-  work_total: 11
-  work_done: 11
-  work_ready: 0
 - id: platform-driver-version-capability-matrix-and-cloud-version-model
   file: TODO/core-functionality/planning/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
   title: Plan cross-platform multi-driver-version support and cloud engine-version metadata

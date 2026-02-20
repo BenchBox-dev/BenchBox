@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T09:41:44.332417'
-total_items: 507
+generated_at: '2026-02-20T11:23:13.511502'
+total_items: 508
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 459
+    count: 460
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1395,6 +1395,11 @@ statuses:
       file: DONE/physical-tuning/active/ctas-sort-local-sql-platforms.yaml
       title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
       priority: Medium-High
+      category: Core Functionality
+    - id: platform-driver-runtime-isolation
+      file: DONE/core-functionality/active/platform-driver-runtime-isolation.yaml
+      title: Implement per-run platform driver runtime isolation (DuckDB first)
+      priority: High
       category: Core Functionality
     - id: improve-benchmark-execution-reliability
       file: DONE/unknown/planning/improve-benchmark-execution-reliability.yaml

@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T09:41:44.332165'
+generated_at: '2026-02-20T11:23:13.511272'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -391,7 +391,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 141
+    count: 142
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -849,6 +849,11 @@ categories:
       file: DONE/physical-tuning/active/ctas-sort-local-sql-platforms.yaml
       title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
       priority: Medium-High
+      status: Completed
+    - id: platform-driver-runtime-isolation
+      file: DONE/core-functionality/active/platform-driver-runtime-isolation.yaml
+      title: Implement per-run platform driver runtime isolation (DuckDB first)
+      priority: High
       status: Completed
     - id: compare-interactive-file-selection
       file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml

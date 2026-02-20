@@ -1,8 +1,8 @@
-generated_at: '2026-02-20T11:22:16.669997'
-total_items: 34
+generated_at: '2026-02-20T11:23:12.440208'
+total_items: 33
 priorities:
   High:
-    count: 6
+    count: 5
     items:
     - id: complexity-check-triage-and-remediation
       file: TODO/core-functionality/active/complexity-check-triage-and-remediation.yaml
@@ -13,11 +13,6 @@ priorities:
       file: TODO/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
       title: Follow-up duplicate-code triage and consolidation from AST clone report
       category: Code Quality and Technical Debt
-      status: In Progress
-    - id: platform-driver-runtime-isolation
-      file: TODO/core-functionality/active/platform-driver-runtime-isolation.yaml
-      title: Implement per-run platform driver runtime isolation (DuckDB first)
-      category: Core Functionality
       status: In Progress
     - id: platform-driver-version-capability-matrix-and-cloud-version-model
       file: TODO/core-functionality/planning/platform-driver-version-capability-matrix-and-cloud-version-model.yaml

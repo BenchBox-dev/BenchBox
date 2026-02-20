@@ -1,8 +1,8 @@
-generated_at: '2026-02-20T11:22:16.670007'
-total_items: 34
+generated_at: '2026-02-20T11:23:12.440218'
+total_items: 33
 statuses:
   In Progress:
-    count: 4
+    count: 3
     items:
     - id: complexity-check-triage-and-remediation
       file: TODO/core-functionality/active/complexity-check-triage-and-remediation.yaml
@@ -14,11 +14,6 @@ statuses:
       title: Follow-up duplicate-code triage and consolidation from AST clone report
       priority: High
       category: Code Quality and Technical Debt
-    - id: platform-driver-runtime-isolation
-      file: TODO/core-functionality/active/platform-driver-runtime-isolation.yaml
-      title: Implement per-run platform driver runtime isolation (DuckDB first)
-      priority: High
-      category: Core Functionality
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'
