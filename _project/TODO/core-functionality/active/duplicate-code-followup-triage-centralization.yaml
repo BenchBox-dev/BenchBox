@@ -163,7 +163,7 @@ work:
 - id: w12
   summary: "Run targeted regression tests per consolidation/ignore track and fix breakages"
   needs: [w6, w7, w8, w9, w10, w11]
-  status: pending
+  status: done
   notes: |
     Run targeted unit suites for every touched module family and resolve regressions before final verification.
 
