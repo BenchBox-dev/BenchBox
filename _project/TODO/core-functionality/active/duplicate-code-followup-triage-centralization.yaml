@@ -146,7 +146,7 @@ work:
 - id: w10
   summary: "Consolidate platform adapter parallel implementations into scoped mixins"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Evaluate and centralize genuinely parallel adapter methods (for example cloud adapter
     platform info blocks, cache/session validators, shared execute/load flows) while preserving
@@ -182,6 +182,20 @@ work:
   notes: |
     Record total line reduction, finalized threshold, and list of consolidated groups.
     Move item through active -> done workflow only after all verification passes.
+
+- id: w15
+  summary: "Document execute_query variant families and consolidation boundaries"
+  needs: [w10]
+  status: pending
+  notes: |
+    Add or update project documentation with a clear taxonomy of SQL platform `execute_query`
+    variants discovered during w10 analysis, including:
+    - DBAPI cursor + validation-helper family
+    - Spark SQL collect family
+    - cloud Spark submit/wait/fetch job family
+    - Livy statement API family
+    - engine-specific outliers (BigQuery/DataFusion/Databend/MotherDuck/InfluxDB)
+    Document which families are safe consolidation targets now vs intentionally distinct.
 
 deferred:
 - summary: "Consolidation requiring live cloud platform behavior validation"
