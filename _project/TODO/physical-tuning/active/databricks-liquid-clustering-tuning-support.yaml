@@ -43,7 +43,7 @@ work:
 - id: w3
   summary: "Implement Databricks adapter support for liquid clustering DDL/DML lifecycle operations"
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: "Maintain backward compatibility path for existing Z-ORDER configs with explicit precedence rules"
   needs: [w2, w3]
