@@ -83,7 +83,7 @@ work:
   summary: "Create venv for DuckDB 0.10.3"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w7
   summary: "Run TPC-H SF10 on v1.0.0 (3 runs, median)"
   status: pending
