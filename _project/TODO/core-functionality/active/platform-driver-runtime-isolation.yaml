@@ -157,7 +157,7 @@ work:
   needs:
   - w7
   - w9
-  status: pending
+  status: done
 
 - id: w11
   summary: "Run verification matrix (DuckDB 0.9.2 + 1.2.2 and at least one non-DuckDB platform), collect command output proving
