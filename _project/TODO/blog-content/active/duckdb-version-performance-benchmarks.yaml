@@ -154,7 +154,7 @@ work:
   status: done
 - id: w29
   summary: "Parquet LIMIT test (wide table) - v0.10.3 vs v1.0.0 vs v1.2.2"
-  status: pending
+  status: done
 - id: w30
   summary: "Sorting performance test (10M rows) - v1.0.0 vs v1.1.3 vs v1.2.2"
   status: pending
