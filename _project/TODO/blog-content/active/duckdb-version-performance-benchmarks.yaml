@@ -148,7 +148,7 @@ work:
   status: done
 - id: w27
   summary: "Run SSB SF10 on v0.10.3"
-  status: pending
+  status: done
 - id: w28
   summary: "CSV import test (10 GB) - v0.9.2 vs v1.0.0 vs v1.2.2"
   status: pending
