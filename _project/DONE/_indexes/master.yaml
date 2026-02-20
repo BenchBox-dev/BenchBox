@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T08:30:10.730222'
-total_items: 505
+generated_at: '2026-02-20T09:16:49.607334'
+total_items: 506
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5582,6 +5582,24 @@ items:
   - pyproject
   - documentation
   estimated_effort: Small
+- id: consolidate-duplicate-code
+  file: DONE/core-functionality/active/consolidate-duplicate-code.yaml
+  title: Consolidate duplicate code identified by AST structural clone detection
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: Completed
+  tags:
+  - code-quality
+  - technical-debt
+  - refactoring
+  - duplicate-detection
+  estimated_effort: 3-5 days
+  completed_date: '2026-02-20'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  deferred_count: 3
 - id: consolidate-file-format-detection
   file: DONE/core-functionality/consolidate-file-format-detection.yaml
   title: Consolidate file format detection to handle compressed and sharded files

@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T08:30:10.730472'
+generated_at: '2026-02-20T09:16:49.607593'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -215,7 +215,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 29
+    count: 30
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -241,6 +241,11 @@ categories:
       file: DONE/unknown/planning/circular-import-issues-completed.yaml
       title: Circular Import Issues ✅ COMPLETED
       priority: Medium
+      status: Completed
+    - id: consolidate-duplicate-code
+      file: DONE/core-functionality/active/consolidate-duplicate-code.yaml
+      title: Consolidate duplicate code identified by AST structural clone detection
+      priority: Medium-High
       status: Completed
     - id: timing-guardrails-and-legacy-cleanup
       file: DONE/main/active/timing-guardrails-and-legacy-cleanup.yaml

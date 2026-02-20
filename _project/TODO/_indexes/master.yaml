@@ -1,13 +1,13 @@
-generated_at: '2026-02-20T08:30:09.625528'
+generated_at: '2026-02-20T09:16:48.465816'
 total_items: 32
 items:
 - id: platform-driver-runtime-isolation
-  file: TODO/core-functionality/planning/platform-driver-runtime-isolation.yaml
+  file: TODO/core-functionality/active/platform-driver-runtime-isolation.yaml
   title: Implement per-run platform driver runtime isolation (DuckDB first)
   worktree: core-functionality
   category: Core Functionality
   priority: High
-  status: Identified
+  status: In Progress
   tags:
   - runtime-isolation
   - driver-versioning
@@ -16,7 +16,7 @@ items:
   - benchmark-integrity
   estimated_effort: 2-4 days
   work_total: 11
-  work_done: 0
+  work_done: 10
   work_ready: 1
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -45,6 +45,23 @@ items:
   work_total: 22
   work_done: 0
   work_ready: 18
+- id: run-lifecycle-and-export-unification-refactor
+  file: TODO/main/planning/run-lifecycle-and-export-unification-refactor.yaml
+  title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - architecture
+  - run-command
+  - orchestration
+  - export
+  - metadata
+  estimated_effort: Large
+  work_total: 8
+  work_done: 0
+  work_ready: 1
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -501,23 +518,6 @@ items:
   work_total: 25
   work_done: 0
   work_ready: 16
-- id: consolidate-duplicate-code
-  file: TODO/core-functionality/active/consolidate-duplicate-code.yaml
-  title: Consolidate duplicate code identified by AST structural clone detection
-  worktree: core-functionality
-  category: Code Quality and Technical Debt
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - code-quality
-  - technical-debt
-  - refactoring
-  - duplicate-detection
-  estimated_effort: 3-5 days
-  work_total: 8
-  work_done: 1
-  work_ready: 5
-  deferred_count: 3
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats

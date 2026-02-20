@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T08:30:09.625560'
-total_categories: 11
+generated_at: '2026-02-20T09:16:48.465846'
+total_categories: 10
 categories:
   AI/ML Capabilities:
     count: 1
@@ -83,16 +83,8 @@ categories:
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
       priority: Medium
       status: Not Started
-  Code Quality and Technical Debt:
-    count: 1
-    items:
-    - id: consolidate-duplicate-code
-      file: TODO/core-functionality/active/consolidate-duplicate-code.yaml
-      title: Consolidate duplicate code identified by AST structural clone detection
-      priority: Medium-High
-      status: In Progress
   Core Functionality:
-    count: 3
+    count: 4
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
@@ -100,10 +92,15 @@ categories:
       priority: Low
       status: Not Started
     - id: platform-driver-runtime-isolation
-      file: TODO/core-functionality/planning/platform-driver-runtime-isolation.yaml
+      file: TODO/core-functionality/active/platform-driver-runtime-isolation.yaml
       title: Implement per-run platform driver runtime isolation (DuckDB first)
       priority: High
-      status: Identified
+      status: In Progress
+    - id: run-lifecycle-and-export-unification-refactor
+      file: TODO/main/planning/run-lifecycle-and-export-unification-refactor.yaml
+      title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
+      priority: High
+      status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats

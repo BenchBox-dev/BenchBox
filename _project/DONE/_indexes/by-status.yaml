@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T08:30:10.730860'
-total_items: 505
+generated_at: '2026-02-20T09:16:49.607868'
+total_items: 506
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 457
+    count: 458
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -819,6 +819,11 @@ statuses:
       title: Consolidate benchmark name detection to use normalize_benchmark_id()
       priority: Low
       category: Code Quality
+    - id: consolidate-duplicate-code
+      file: DONE/core-functionality/active/consolidate-duplicate-code.yaml
+      title: Consolidate duplicate code identified by AST structural clone detection
+      priority: Medium-High
+      category: Code Quality and Technical Debt
     - id: consolidate-file-format-detection
       file: DONE/core-functionality/consolidate-file-format-detection.yaml
       title: Consolidate file format detection to handle compressed and sharded files

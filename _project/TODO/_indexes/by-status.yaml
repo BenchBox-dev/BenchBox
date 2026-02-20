@@ -1,21 +1,21 @@
-generated_at: '2026-02-20T08:30:09.625590'
+generated_at: '2026-02-20T09:16:48.465876'
 total_items: 32
 statuses:
   In Progress:
     count: 2
     items:
-    - id: consolidate-duplicate-code
-      file: TODO/core-functionality/active/consolidate-duplicate-code.yaml
-      title: Consolidate duplicate code identified by AST structural clone detection
-      priority: Medium-High
-      category: Code Quality and Technical Debt
+    - id: platform-driver-runtime-isolation
+      file: TODO/core-functionality/active/platform-driver-runtime-isolation.yaml
+      title: Implement per-run platform driver runtime isolation (DuckDB first)
+      priority: High
+      category: Core Functionality
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'
       priority: Medium
       category: Blog Revision
   Not Started:
-    count: 29
+    count: 30
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -107,6 +107,11 @@ statuses:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: High
       category: Testing and Quality Assurance
+    - id: run-lifecycle-and-export-unification-refactor
+      file: TODO/main/planning/run-lifecycle-and-export-unification-refactor.yaml
+      title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
+      priority: High
+      category: Core Functionality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
@@ -162,11 +167,3 @@ statuses:
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
       priority: Medium
       category: Blog Revision
-  Identified:
-    count: 1
-    items:
-    - id: platform-driver-runtime-isolation
-      file: TODO/core-functionality/planning/platform-driver-runtime-isolation.yaml
-      title: Implement per-run platform driver runtime isolation (DuckDB first)
-      priority: High
-      category: Core Functionality

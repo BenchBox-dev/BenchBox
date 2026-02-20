@@ -2,7 +2,8 @@ id: consolidate-duplicate-code
 title: "Consolidate duplicate code identified by AST structural clone detection"
 worktree: core-functionality
 priority: Medium-High
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-02-20"
 category: "Code Quality and Technical Debt"
 description: |
   The `make duplicate-check-verbose` tool reports 440 duplicate function groups totalling
@@ -154,7 +155,7 @@ work:
 - id: w8
   summary: "Run full test suite, update duplicate threshold, verify line count reduction"
   needs: [w7]
-  status: pending
+  status: done
   notes: |
     Run: uv run -- python -m pytest -x -v
     Run: make duplicate-check-verbose
