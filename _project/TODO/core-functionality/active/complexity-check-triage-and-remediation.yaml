@@ -133,7 +133,7 @@ work:
 - id: w12
   summary: "Run targeted tests for each refactor batch and fix regressions"
   needs: [w8, w9, w10, w11]
-  status: pending
+  status: done
 
 - id: w13
   summary: "Re-run complexity checks and confirm pass/fail posture with updated ignores"
