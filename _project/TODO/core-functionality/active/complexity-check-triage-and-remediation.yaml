@@ -101,7 +101,7 @@ work:
 - id: w8
   summary: "Refactor accidental complexity batch A: visualization and CLI formatting paths"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Split high-complexity render/format functions into smaller pure helpers while
     preserving output formatting and user-facing behavior.
@@ -109,7 +109,7 @@ work:
 - id: w9
   summary: "Refactor accidental complexity batch B: dataframe orchestration hotspots"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Reduce branching in dataframe benchmark mixins and unified frame hotspots by extracting
     mode-specific helpers and consolidating repeated decision logic.
