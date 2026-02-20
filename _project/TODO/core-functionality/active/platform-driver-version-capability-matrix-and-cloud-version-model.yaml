@@ -162,17 +162,17 @@ work:
 - id: w12
   summary: "Define cloud engine-version metadata model (field names, semantics, provenance/probe metadata)"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w13
   summary: "Implement core models/schema/export wiring for engine-version metadata with backward compatibility"
   needs: [w12]
-  status: pending
+  status: done
 
 - id: w14
   summary: "Implement adapter-level engine-version probe hooks for selected cloud platforms and record probe provenance"
   needs: [w11, w13]
-  status: pending
+  status: done
 
 - id: w15
   summary: "Add unit tests for capability declarations, resolver behavior, and fail-fast enforcement across SQL/DataFrame
