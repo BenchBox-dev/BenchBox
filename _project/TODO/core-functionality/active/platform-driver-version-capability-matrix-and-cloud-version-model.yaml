@@ -2,7 +2,7 @@ id: platform-driver-version-capability-matrix-and-cloud-version-model
 title: "Plan cross-platform multi-driver-version support and cloud engine-version metadata"
 worktree: core-functionality
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Follow-up planning item to close the remaining cross-platform gaps after the
@@ -101,8 +101,9 @@ files_affected:
 
 work:
 - id: w1
-  summary: "Build an authoritative platform capability inventory from registry and adapters (driver package, mode/deployment, runtime-binding behavior, live version probe support)"
-  status: pending
+  summary: "Build an authoritative platform capability inventory from registry and adapters (driver package, mode/deployment,
+    runtime-binding behavior, live version probe support)"
+  status: done
 
 - id: w2
   summary: "Define canonical version semantics separating Python driver/client version from platform engine/service version"
@@ -110,12 +111,14 @@ work:
   status: pending
 
 - id: w3
-  summary: "Define explicit capability declarations in platform metadata and adapter contract, with migration path from implicit getattr checks"
+  summary: "Define explicit capability declarations in platform metadata and adapter contract, with migration path from implicit
+    getattr checks"
   needs: [w1, w2]
   status: pending
 
 - id: w4
-  summary: "Implement shared capability resolver helpers and standardized error categories for unsupported runtime-binding combinations"
+  summary: "Implement shared capability resolver helpers and standardized error categories for unsupported runtime-binding
+    combinations"
   needs: [w3]
   status: pending
 
@@ -130,7 +133,8 @@ work:
   status: pending
 
 - id: w7
-  summary: "Audit remote/cloud adapters and classify each as feasible, blocked, or inapplicable for selectable Python driver versions"
+  summary: "Audit remote/cloud adapters and classify each as feasible, blocked, or inapplicable for selectable Python driver
+    versions"
   needs: [w4]
   status: pending
 
@@ -145,7 +149,8 @@ work:
   status: pending
 
 - id: w10
-  summary: "Implement support (or explicit non-feasibility decision) for connector-heavy adapters: databricks, athena, clickhouse-cloud, firebolt, spark-family"
+  summary: "Implement support (or explicit non-feasibility decision) for connector-heavy adapters: databricks, athena, clickhouse-cloud,
+    firebolt, spark-family"
   needs: [w7]
   status: pending
 
@@ -170,7 +175,8 @@ work:
   status: pending
 
 - id: w15
-  summary: "Add unit tests for capability declarations, resolver behavior, and fail-fast enforcement across SQL/DataFrame factories"
+  summary: "Add unit tests for capability declarations, resolver behavior, and fail-fast enforcement across SQL/DataFrame
+    factories"
   needs: [w5, w6, w11]
   status: pending
 
@@ -190,13 +196,15 @@ work:
   status: pending
 
 - id: w19
-  summary: "Publish architecture note and finalize rollout checklist (coverage table, unsupported exceptions, follow-up-only infeasible items)"
+  summary: "Publish architecture note and finalize rollout checklist (coverage table, unsupported exceptions, follow-up-only
+    infeasible items)"
   needs: [w18]
   status: pending
 
 deferred:
 - summary: "Automated live-cloud verification against paid accounts in CI"
-  reason: "Requires account provisioning/secrets policy decisions; keep implementation and metadata model decoupled from account availability."
+  reason: "Requires account provisioning/secrets policy decisions; keep implementation and metadata model decoupled from account
+    availability."
 
 must_preserve:
 - "Default runs with no explicit driver version continue to behave exactly as today for all platforms."
@@ -217,28 +225,40 @@ approach: |
   6. Add schema+test coverage to prevent regression and metadata conflation.
 
 anti_patterns:
-- "DO NOT infer support only from optional class attrs discovered via `getattr` -- because this hides platform contract intent -- define capability declarations explicitly in registry/contract metadata."
-- "DO NOT populate `driver_version_actual` from resolver metadata alone -- because resolver output is not proof of live runtime import/execution -- verify from live module/connection context."
-- "DO NOT treat cloud engine version as equivalent to Python driver version -- because they are independently versioned lifecycles -- model and export them separately."
-- "DO NOT silently continue on unsupported isolated runtime requests -- because that can produce invalid benchmark conclusions -- fail fast with specific remediation guidance."
-- "DO NOT remove or rename existing result keys without compatibility layer -- because downstream consumers depend on current schema -- add new fields alongside existing ones."
+- "DO NOT infer support only from optional class attrs discovered via `getattr` -- because this hides platform contract intent
+  -- define capability declarations explicitly in registry/contract metadata."
+- "DO NOT populate `driver_version_actual` from resolver metadata alone -- because resolver output is not proof of live runtime
+  import/execution -- verify from live module/connection context."
+- "DO NOT treat cloud engine version as equivalent to Python driver version -- because they are independently versioned lifecycles
+  -- model and export them separately."
+- "DO NOT silently continue on unsupported isolated runtime requests -- because that can produce invalid benchmark conclusions
+  -- fail fast with specific remediation guidance."
+- "DO NOT remove or rename existing result keys without compatibility layer -- because downstream consumers depend on current
+  schema -- add new fields alongside existing ones."
 
 verification:
 - description: "Driver runtime contract unit tests pass"
-  command: "uv run -- python -m pytest tests/unit/platforms/test_platform_driver_runtime_contract.py tests/unit/utils/test_runtime_env.py -v --tb=short"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_platform_driver_runtime_contract.py tests/unit/utils/test_runtime_env.py
+    -v --tb=short"
   expected_output: "all targeted contract/runtime tests pass with 0 failures"
 - description: "DataFusion SQL and DataFrame runtime-binding tests pass"
-  command: "uv run -- python -m pytest tests/unit/platforms/test_datafusion_adapter.py tests/unit/platforms/dataframe/test_datafusion_df.py -k 'driver or runtime or version' -v --tb=short"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_datafusion_adapter.py tests/unit/platforms/dataframe/test_datafusion_df.py
+    -k 'driver or runtime or version' -v --tb=short"
   expected_output: "DataFusion adapter tests covering runtime/version behavior pass"
 - description: "Result schema/runner metadata propagation remains correct"
-  command: "uv run -- python -m pytest tests/unit/core/results/test_query_plan_serialization.py tests/unit/core/test_runner_lifecycle.py -k 'driver or version' -v --tb=short"
+  command: "uv run -- python -m pytest tests/unit/core/results/test_query_plan_serialization.py tests/unit/core/test_runner_lifecycle.py
+    -k 'driver or version' -v --tb=short"
   expected_output: "driver/engine metadata fields are serialized correctly with no regression"
 - description: "Integration matrix verifies distinct actual driver versions across multiple supported platforms"
-  command: "uv run -- python -m pytest tests/integration/test_duckdb_version_isolation.py tests/integration/test_platform_driver_version_matrix.py -v --tb=short"
+  command: "uv run -- python -m pytest tests/integration/test_duckdb_version_isolation.py tests/integration/test_platform_driver_version_matrix.py
+    -v --tb=short"
   expected_output: "integration tests prove per-run version isolation where platform capability allows"
 - description: "Manual command matrix confirms runtime and metadata correctness"
-  command: "benchbox run --platform duckdb --benchmark tpch --scale 0.01 --platform-option driver_version=1.2.2 --non-interactive --quiet && benchbox run --platform datafusion --benchmark tpch --scale 0.01 --platform-option driver_version=51.0.0 --non-interactive --quiet"
-  expected_output: "for supported platforms, result JSON shows distinct verified actual driver versions; unsupported combinations fail fast with explicit guidance"
+  command: "benchbox run --platform duckdb --benchmark tpch --scale 0.01 --platform-option driver_version=1.2.2 --non-interactive
+    --quiet && benchbox run --platform datafusion --benchmark tpch --scale 0.01 --platform-option driver_version=51.0.0 --non-interactive
+    --quiet"
+  expected_output: "for supported platforms, result JSON shows distinct verified actual driver versions; unsupported combinations
+    fail fast with explicit guidance"
 
 scope_limit:
   do_not_modify:
@@ -254,16 +274,20 @@ deps:
   - platform-driver-runtime-isolation
 
 success_metrics:
-- "Each platform marked as supporting multi-driver-version execution can run at least two requested driver versions with distinct live-verified actual versions."
+- "Each platform marked as supporting multi-driver-version execution can run at least two requested driver versions with distinct
+  live-verified actual versions."
 - "No platform emits `driver_version_actual` unless sourced from live runtime context."
-- "Cloud/managed adapters expose engine/service version metadata when a reliable probe exists, without conflating it with client driver version."
+- "Cloud/managed adapters expose engine/service version metadata when a reliable probe exists, without conflating it with
+  client driver version."
 - "Unsupported capability combinations fail fast with deterministic, user-actionable errors."
 
 open_questions:
 - "What is the canonical field naming for engine/service versions: `platform_engine_version_*` vs `service_version_*`?"
-- "Should users be allowed to request an engine version, or should engine version remain observed/actual-only for managed services?"
+- "Should users be allowed to request an engine version, or should engine version remain observed/actual-only for managed
+  services?"
 - "How should multi-component cloud versions (warehouse runtime + SQL engine + connector) be represented without ambiguity?"
-- "Should platform capability declarations live only in `PlatformRegistry`, or also be surfaced via adapter introspection for plugin platforms?"
+- "Should platform capability declarations live only in `PlatformRegistry`, or also be surfaced via adapter introspection
+  for plugin platforms?"
 
 research_value:
   hypothesis: |
