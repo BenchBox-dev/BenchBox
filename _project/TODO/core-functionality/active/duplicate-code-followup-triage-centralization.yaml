@@ -186,7 +186,7 @@ work:
 - id: w15
   summary: "Document execute_query variant families and consolidation boundaries"
   needs: [w10]
-  status: pending
+  status: done
   notes: |
     Add or update project documentation with a clear taxonomy of SQL platform `execute_query`
     variants discovered during w10 analysis, including:
@@ -279,6 +279,7 @@ scope_limit:
   - "benchbox/core/tuning/generators/azure_synapse.py"
   - "benchbox/core/tuning/generators/clickhouse.py"
   - "benchbox/core/tuning/generators/firebolt.py"
+  - "docs/development/adding-new-platforms.md"
   - "benchbox/amplab.py"
   - "benchbox/clickbench.py"
   - "benchbox/h2odb.py"
