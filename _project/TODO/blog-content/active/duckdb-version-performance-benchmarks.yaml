@@ -68,7 +68,7 @@ work:
   summary: "Create venv for DuckDB 1.1.3"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w4
   summary: "Create venv for DuckDB 1.2.2"
   needs:
