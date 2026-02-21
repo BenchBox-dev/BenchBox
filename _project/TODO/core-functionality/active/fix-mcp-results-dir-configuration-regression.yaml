@@ -59,7 +59,7 @@ work:
 - id: w6
   summary: "Align MCP traversal/safe-root checks with configured results_dir"
   needs: [w4]
-  status: pending
+  status: done
 
 - id: w7
   summary: "Add/adjust unit tests for precedence, MCP write/read parity, and CLI compatibility"
