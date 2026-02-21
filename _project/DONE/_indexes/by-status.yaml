@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T08:39:03.837704'
-total_items: 514
+generated_at: '2026-02-21T12:57:14.970784'
+total_items: 524
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Usability
   Not Started:
-    count: 45
+    count: 51
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -132,6 +132,16 @@ statuses:
       title: DataFusion DataFrame Adapter Implementation
       priority: Medium
       category: Platform Enhancement
+    - id: complexity-mcp-analytics-w14
+      file: DONE/core-functionality/active/complexity-mcp-analytics-w14.yaml
+      title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
+      priority: Medium
+      category: Core Functionality
+    - id: complexity-ascii-renderers-w14
+      file: DONE/core-functionality/active/complexity-ascii-renderers-w14.yaml
+      title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
+      priority: Medium
+      category: Core Functionality
     - id: pyspark-sql-documentation
       file: DONE/dataframe-expansion/planning/pyspark-sql-documentation.yaml
       title: Document PySpark SQL mode usage
@@ -147,6 +157,16 @@ statuses:
       title: Extract SparkSessionManager for shared PySpark session management
       priority: High
       category: Platform Expansion
+    - id: complexity-cli-orchestration-w14
+      file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml
+      title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
+      priority: Medium
+      category: Core Functionality
+    - id: complexity-field-extraction-w14
+      file: DONE/core-functionality/active/complexity-field-extraction-w14.yaml
+      title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
+      priority: Medium-High
+      category: Core Functionality
     - id: gpu-acceleration-benchmarking-rapids-cudf-integration
       file: DONE/ai-ml-gpu/planning/gpu-acceleration-benchmarking-rapids-cudf-integration.yaml
       title: GPU Acceleration Benchmarking & RAPIDS cuDF Integration
@@ -232,6 +252,11 @@ statuses:
       title: 'PT-09: BigQuery Physical Tuning DDL Generator Enhancement'
       priority: Medium
       category: Platform Expansion
+    - id: complexity-validation-misc-w14
+      file: DONE/core-functionality/active/complexity-validation-misc-w14.yaml
+      title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
+      priority: Medium
+      category: Core Functionality
     - id: pyspark-sql-registry-integration
       file: DONE/dataframe-expansion/planning/pyspark-sql-registry-integration.yaml
       title: Register PySpark SQL mode in platform registry
@@ -241,6 +266,11 @@ statuses:
       file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
       title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
       priority: Medium-High
+      category: Core Functionality
+    - id: complexity-generators-pipelines-w14
+      file: DONE/core-functionality/active/complexity-generators-pipelines-w14.yaml
+      title: Simplify data generator and pipeline loading functions (complexity batch 5)
+      priority: Medium
       category: Core Functionality
   Identified:
     count: 2
@@ -256,7 +286,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 465
+    count: 469
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -508,6 +538,11 @@ statuses:
       title: Add blog to BenchBox site using ABlog Sphinx extension
       priority: Medium
       category: Documentation
+    - id: complexity-ignore-required-w15
+      file: DONE/core-functionality/active/complexity-ignore-required-w15.yaml
+      title: Add complexity exclusions for 5 functions with inherent required complexity
+      priority: Medium
+      category: Core Functionality
     - id: release-automation-unit-tests
       file: DONE/core-functionality/active/release-automation-unit-tests.yaml
       title: Add comprehensive unit tests for release automation (fingerprinting, timestamps, content validation, size checks,
@@ -542,6 +577,11 @@ statuses:
     - id: greyscale-ascii-visualization-fallbacks
       file: DONE/main/greyscale-ascii-visualization-fallbacks.yaml
       title: Add greyscale fallback rendering for ASCII visualizations
+      priority: Medium-High
+      category: Core Functionality
+    - id: dedup-ignore-rules-boilerplate
+      file: DONE/core-functionality/active/dedup-ignore-rules-boilerplate.yaml
+      title: Add ignore rules for 17 boilerplate duplicate groups identified by duplicate-check
       priority: Medium-High
       category: Core Functionality
     - id: platform-setup-numbered-list-selection
@@ -1885,6 +1925,16 @@ statuses:
       file: DONE/tpch-stdout-fix/planning/rebuild-tpch-binaries.yaml
       title: Rebuild TPC-H binaries with stdout fix for all platforms
       priority: High
+      category: Core Functionality
+    - id: complexity-cli-prompts-w15
+      file: DONE/core-functionality/active/complexity-cli-prompts-w15.yaml
+      title: Reduce complexity in CLI prompt and command functions (complexity batch 8)
+      priority: Medium
+      category: Core Functionality
+    - id: complexity-core-analysis-dataframe-w15
+      file: DONE/core-functionality/active/complexity-core-analysis-dataframe-w15.yaml
+      title: Reduce complexity in core analysis and dataframe functions (complexity batch 9)
+      priority: Medium
       category: Core Functionality
     - id: refactor-mcp-use-public-api
       file: DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml

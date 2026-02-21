@@ -1,4 +1,4 @@
-generated_at: '2026-02-21T08:39:03.837440'
+generated_at: '2026-02-21T12:57:14.970492'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 146
+    count: 156
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -483,6 +483,11 @@ categories:
       title: Add Time Series Benchmark Suite (TSBS) Implementation
       priority: Medium
       status: In Progress
+    - id: complexity-ignore-required-w15
+      file: DONE/core-functionality/active/complexity-ignore-required-w15.yaml
+      title: Add complexity exclusions for 5 functions with inherent required complexity
+      priority: Medium
+      status: Completed
     - id: interactive-wizard-execution-style-selection
       file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml
       title: Add execution style selection step to interactive wizard
@@ -496,6 +501,11 @@ categories:
     - id: greyscale-ascii-visualization-fallbacks
       file: DONE/main/greyscale-ascii-visualization-fallbacks.yaml
       title: Add greyscale fallback rendering for ASCII visualizations
+      priority: Medium-High
+      status: Completed
+    - id: dedup-ignore-rules-boilerplate
+      file: DONE/core-functionality/active/dedup-ignore-rules-boilerplate.yaml
+      title: Add ignore rules for 17 boilerplate duplicate groups identified by duplicate-check
       priority: Medium-High
       status: Completed
     - id: cloud-dw-sorted-data-ingestion
@@ -608,6 +618,16 @@ categories:
       title: DataFrame Platform Availability Detection and Error Handling
       priority: Critical
       status: Not Started
+    - id: complexity-mcp-analytics-w14
+      file: DONE/core-functionality/active/complexity-mcp-analytics-w14.yaml
+      title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
+      priority: Medium
+      status: Not Started
+    - id: complexity-ascii-renderers-w14
+      file: DONE/core-functionality/active/complexity-ascii-renderers-w14.yaml
+      title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
+      priority: Medium
+      status: Not Started
     - id: deferred-storage-and-cache-unification
       file: DONE/core-functionality/active/deferred-storage-and-cache-unification.yaml
       title: Deferred Storage Location and Cache Unification Enhancements
@@ -683,6 +703,16 @@ categories:
       file: DONE/query-plan-remediation/planning/expand-plan-fingerprint-verification.yaml
       title: Expand query plan fingerprint coverage and verification
       priority: High
+      status: Not Started
+    - id: complexity-cli-orchestration-w14
+      file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml
+      title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
+      priority: Medium
+      status: Not Started
+    - id: complexity-field-extraction-w14
+      file: DONE/core-functionality/active/complexity-field-extraction-w14.yaml
+      title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
+      priority: Medium-High
       status: Not Started
     - id: fix-ascii-visualization-regressions
       file: DONE/main/active/fix-ascii-visualization-regressions.yaml
@@ -1045,6 +1075,21 @@ categories:
       title: Rebuild TPC-H binaries with stdout fix for all platforms
       priority: High
       status: Completed
+    - id: complexity-cli-prompts-w15
+      file: DONE/core-functionality/active/complexity-cli-prompts-w15.yaml
+      title: Reduce complexity in CLI prompt and command functions (complexity batch 8)
+      priority: Medium
+      status: Completed
+    - id: complexity-core-analysis-dataframe-w15
+      file: DONE/core-functionality/active/complexity-core-analysis-dataframe-w15.yaml
+      title: Reduce complexity in core analysis and dataframe functions (complexity batch 9)
+      priority: Medium
+      status: Completed
+    - id: complexity-validation-misc-w14
+      file: DONE/core-functionality/active/complexity-validation-misc-w14.yaml
+      title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
+      priority: Medium
+      status: Not Started
     - id: refactor-mcp-use-public-api
       file: DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml
       title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
@@ -1090,6 +1135,11 @@ categories:
       title: Result Output Schema v2.0 Complete Redesign
       priority: High
       status: Completed
+    - id: complexity-generators-pipelines-w14
+      file: DONE/core-functionality/active/complexity-generators-pipelines-w14.yaml
+      title: Simplify data generator and pipeline loading functions (complexity batch 5)
+      priority: Medium
+      status: Not Started
     - id: standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com
       file: DONE/unknown/planning/standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com.yaml
       title: Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED

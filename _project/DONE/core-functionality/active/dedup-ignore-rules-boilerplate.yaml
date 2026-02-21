@@ -1,0 +1,150 @@
+id: dedup-ignore-rules-boilerplate
+title: "Add ignore rules for 17 boilerplate duplicate groups identified by duplicate-check"
+worktree: core-functionality
+priority: Medium-High
+status: Completed
+completed_date: "2026-02-21"
+category: Core Functionality
+description: |
+  The `make duplicate-check-verbose` report identifies 396 duplicate function groups
+  totaling 12,666 duplicated lines. Analysis of the top 30 groups reveals that 17 are
+  intentional boilerplate — interface-conforming stubs, protocol/ABC declarations,
+  platform adapter wrappers, and TPC-DS spec-mandated query patterns.
+
+  These groups should be suppressed via ignore_rules in pyproject.toml
+  [tool.benchbox.duplicates] to reduce noise and focus the duplicate checker on
+  genuine consolidation opportunities.
+
+  Groups to ignore (by report rank):
+  - G1  (344 lines): _fact_map/_role_aliases/_income_band_aliases in tpcds_obt/etl/transformer.py
+  - G2  (180 lines): get_queries_by_category/get_query_info facade delegation methods across benchmark.py files
+  - G3  (175 lines): _detect_format/col/get_dataframe_operations in dataframe platform adapters
+  - G5  (140 lines): execute_rule/get_operation/get_table_row_count domain-specific manager protocols
+  - G6  (132 lines): _load_base_queries/_load_etl_queries TPC-DI query dict builders
+  - G7  (120 lines): get_queries_by_category/complexity/frequency in tpcdi/query_*.py
+  - G8  (117 lines): cast_date/cast_string/col abstract stubs in dataframe context/protocols
+  - G9  (116 lines): filter/limit/scalar_to_df abstract method declarations
+  - G10 (100 lines): col/from_pandas/lit platform-specific thin wrappers
+  - G11  (99 lines): can_provide/create_schema/date_add abstract method stubs across ABCs
+  - G14  (91 lines): apply_platform_optimizations cloud platform stubs
+  - G16  (90 lines): get_schema/get_csv_loading_config benchmark interface conformance
+  - G18  (88 lines): first/floor/last multi-backend dispatch in unified_frame.py
+  - G20  (87 lines): max_/mean/std multi-backend dispatch in expression_family.py
+  - G22  (80 lines): _do_delete/delete_rows/generate_tuning_clauses Protocol+ABC stubs
+  - G26  (75 lines): q33/q60 expression_impl TPC-DS spec-mandated query family
+  - G28  (70 lines): q33/q60 pandas_impl TPC-DS spec-mandated query family
+
+  After adding these rules, the threshold in pyproject.toml should be lowered to
+  match the new effective duplicate count, preventing regressions.
+
+approach: |
+  Add new entries to the existing ignore_rules list in pyproject.toml under
+  [tool.benchbox.duplicates]. Follow the established pattern: group by
+  path_contains scope, list specific function_names.
+
+  Strategy per group type:
+  1. Protocol/ABC stubs (G8,G9,G11,G22): Ignore by function name within
+     benchbox/core/dataframe/ and benchbox/platforms/dataframe/ paths
+  2. Platform adapter wrappers (G3,G10,G14): Ignore by function name within
+     benchbox/platforms/ paths
+  3. Benchmark facade methods (G2,G5): Ignore by function name (global or
+     path-scoped to core/*/benchmark.py and top-level modules)
+  4. TPC-DS/TPC-DI domain (G1,G6,G7,G26,G28): Ignore by function name
+     within specific tpcds/tpcdi paths
+  5. Multi-backend dispatch (G18,G20): Ignore within unified_frame.py and
+     expression_family.py
+  6. Benchmark config methods (G16): Ignore get_schema/get_csv_loading_config
+     across benchmark modules
+
+  After adding rules, run `make duplicate-check-verbose` to verify reduction,
+  then lower the threshold proportionally.
+
+work:
+- id: w1
+  summary: "Add ignore rules for Protocol/ABC abstract stubs (G8,G9,G11,G22) — ~412 lines"
+  status: done
+  notes: |
+    Functions: cast_date, cast_string, col, filter, limit, scalar_to_df,
+    can_provide, create_schema, date_add, date_sub, _do_delete, delete_rows,
+    generate_tuning_clauses.
+    Paths: benchbox/core/dataframe/, benchbox/core/operations/,
+    benchbox/platforms/dataframe/, benchbox/core/tuning/ddl_generator.py,
+    benchbox/platforms/base/
+
+- id: w2
+  summary: "Add ignore rules for platform adapter wrappers (G3,G10,G14) — ~366 lines"
+  status: done
+  notes: |
+    Functions: _detect_format, col, from_pandas, lit, get_dataframe_operations,
+    apply_platform_optimizations (platform-level stubs).
+    Paths: benchbox/platforms/dataframe/, benchbox/platforms/bigquery.py,
+    benchbox/platforms/databricks/, benchbox/platforms/snowflake.py, etc.
+
+- id: w3
+  summary: "Add ignore rules for benchmark facade/delegation methods (G2,G5,G16) — ~410 lines"
+  status: done
+  notes: |
+    Functions: get_queries_by_category, get_query_info, get_operations_by_category,
+    execute_rule, get_operation, get_table_row_count, get_schema,
+    get_csv_loading_config, apply_platform_optimizations (benchmark-level).
+    Paths: benchbox/core/*/benchmark.py, benchbox/core/*/dataframe_operations.py,
+    benchbox/*.py (top-level modules)
+
+- id: w4
+  summary: "Add ignore rules for TPC-DS/TPC-DI domain patterns (G1,G6,G7,G26,G28) — ~741 lines"
+  status: done
+  notes: |
+    Functions: _fact_map, _role_aliases, _income_band_aliases, _load_base_queries,
+    _load_etl_queries, get_queries_by_category, get_queries_by_complexity,
+    get_queries_by_frequency, q33_expression_impl, q60_expression_impl,
+    q33_pandas_impl, q60_pandas_impl.
+    Paths: benchbox/core/tpcds_obt/etl/, benchbox/core/tpcdi/queries.py,
+    benchbox/core/tpcdi/query_*.py, benchbox/core/tpcds/dataframe_queries/
+
+- id: w5
+  summary: "Add ignore rules for multi-backend dispatch methods (G18,G20) — ~175 lines"
+  status: done
+  notes: |
+    Functions: first, floor, last, abs_, round_, ceil, sqrt, log, quantile,
+    max_, mean, std, sum, min_, count, var.
+    Paths: benchbox/platforms/dataframe/unified_frame.py,
+    benchbox/platforms/dataframe/expression_family.py
+
+- id: w6
+  summary: "Verify reduction and lower threshold in pyproject.toml"
+  needs: [w1, w2, w3, w4, w5]
+  status: done
+  notes: |
+    Run make duplicate-check-verbose, verify suppressed groups are gone,
+    calculate new effective duplicate count, lower threshold to ~10% above
+    the new baseline. Current threshold: 13886, expect to drop significantly.
+
+verification:
+- description: "Duplicate check still passes with lowered threshold"
+  command: "make duplicate-check"
+  expected_output: "PASS: N duplicated lines within threshold of M"
+- description: "No false negatives — consolidation targets still appear in report"
+  command: "make duplicate-check-verbose --top-n 10"
+  expected_output: "Report still shows consolidation candidates (Groups 4,12,13,17,19,21,23-25,27,29,30)"
+
+scope_limit:
+  only_modify:
+  - "pyproject.toml"
+
+must_preserve:
+- "Existing ignore_rules in pyproject.toml continue to work (do not break current suppressions)"
+- "make duplicate-check exit code behavior unchanged"
+
+anti_patterns:
+- "DO NOT use ignore_function_names (global) for functions that should only be ignored in specific paths — because it would
+  suppress genuine duplicates elsewhere — use ignore_rules with path_contains instead"
+- "DO NOT set threshold to exact current count — because normal development causes small fluctuations — set it ~10% above
+  baseline"
+
+metadata:
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: "2-3 hours"
+  created_date: "2026-02-21"

@@ -1,9 +1,14 @@
-generated_at: '2026-02-21T08:39:02.628056'
-total_items: 36
+generated_at: '2026-02-21T12:57:13.158354'
+total_items: 41
 priorities:
   High:
-    count: 2
+    count: 3
     items:
+    - id: fix-mcp-results-dir-configuration-regression
+      file: TODO/core-functionality/active/fix-mcp-results-dir-configuration-regression.yaml
+      title: Fix MCP results-dir regression with core-centralized path resolution
+      category: Core Functionality
+      status: In Progress
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
@@ -15,23 +20,18 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 6
+    count: 5
     items:
-    - id: complexity-field-extraction-w14
-      file: TODO/core-functionality/active/complexity-field-extraction-w14.yaml
-      title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
-      category: Core Functionality
-      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
       status: Not Started
     - id: presorted-open-table-format-datasets
-      file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
+      file: TODO/physical-tuning/active/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
@@ -48,22 +48,12 @@ priorities:
       category: Blog Revision
       status: In Progress
   Medium:
-    count: 14
+    count: 16
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: complexity-mcp-analytics-w14
-      file: TODO/core-functionality/active/complexity-mcp-analytics-w14.yaml
-      title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
-      category: Core Functionality
-      status: Not Started
-    - id: complexity-ascii-renderers-w14
-      file: TODO/core-functionality/active/complexity-ascii-renderers-w14.yaml
-      title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
-      category: Core Functionality
       status: Not Started
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
@@ -75,9 +65,29 @@ priorities:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       category: Documentation
       status: Not Started
-    - id: complexity-cli-orchestration-w14
-      file: TODO/core-functionality/active/complexity-cli-orchestration-w14.yaml
-      title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
+    - id: dedup-query-catalog-base
+      file: TODO/core-functionality/planning/dedup-query-catalog-base.yaml
+      title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
+      category: Core Functionality
+      status: Not Started
+    - id: dedup-tpcdi-dimension-generator
+      file: TODO/core-functionality/planning/dedup-tpcdi-dimension-generator.yaml
+      title: Extract _generate_dimension helper for TPC-DI SQL generator scaffolding
+      category: Core Functionality
+      status: Not Started
+    - id: dedup-sql-utilities
+      file: TODO/core-functionality/planning/dedup-sql-utilities.yaml
+      title: Extract _normalize_table_name_in_sql to shared SQL utility module
+      category: Core Functionality
+      status: Not Started
+    - id: dedup-spark-shared-base
+      file: TODO/core-functionality/planning/dedup-spark-shared-base.yaml
+      title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
+      category: Core Functionality
+      status: Not Started
+    - id: dedup-simple-benchmark-base-methods
+      file: TODO/core-functionality/planning/dedup-simple-benchmark-base-methods.yaml
+      title: Extract shared run_benchmark and _load_data to base benchmark class (amplab/clickbench/ssb)
       category: Core Functionality
       status: Not Started
     - id: flight-data-benchmark
@@ -85,14 +95,14 @@ priorities:
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
       status: Not Started
-    - id: complexity-validation-misc-w14
-      file: TODO/core-functionality/active/complexity-validation-misc-w14.yaml
-      title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
+    - id: dedup-tpcds-maintenance-returns
+      file: TODO/core-functionality/planning/dedup-tpcds-maintenance-returns.yaml
+      title: Parameterize _insert_{store,catalog,web}_returns in TPC-DS maintenance operations
       category: Core Functionality
       status: Not Started
-    - id: complexity-generators-pipelines-w14
-      file: TODO/core-functionality/active/complexity-generators-pipelines-w14.yaml
-      title: Simplify data generator and pipeline loading functions (complexity batch 5)
+    - id: complexity-plans-tpcds-w15
+      file: TODO/core-functionality/active/complexity-plans-tpcds-w15.yaml
+      title: Reduce complexity in query plan and TPC-DS functions (complexity batch 10)
       category: Core Functionality
       status: Not Started
     - id: stackoverflow-benchmark
@@ -121,7 +131,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 14
+    count: 17
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -157,6 +167,21 @@ priorities:
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       category: Benchmark Expansion
+      status: Not Started
+    - id: dedup-tpcds-constants-empty-results
+      file: TODO/core-functionality/planning/dedup-tpcds-constants-empty-results.yaml
+      title: Extract TPC-DS canonical table list and shared _empty_results to constants
+      category: Core Functionality
+      status: Not Started
+    - id: dedup-cloud-platform-shared-utilities
+      file: TODO/core-functionality/planning/dedup-cloud-platform-shared-utilities.yaml
+      title: Extract shared cloud platform utilities (session cache validation, credential prompts)
+      category: Core Functionality
+      status: Not Started
+    - id: dedup-tpcds-rolling-average-queries
+      file: TODO/core-functionality/planning/dedup-tpcds-rolling-average-queries.yaml
+      title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
+      category: Core Functionality
       status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml

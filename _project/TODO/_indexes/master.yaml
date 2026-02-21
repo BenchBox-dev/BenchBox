@@ -1,6 +1,24 @@
-generated_at: '2026-02-21T08:39:02.628009'
-total_items: 36
+generated_at: '2026-02-21T12:57:13.158226'
+total_items: 41
 items:
+- id: fix-mcp-results-dir-configuration-regression
+  file: TODO/core-functionality/active/fix-mcp-results-dir-configuration-regression.yaml
+  title: Fix MCP results-dir regression with core-centralized path resolution
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: In Progress
+  tags:
+  - mcp
+  - configuration
+  - regression
+  - path-resolution
+  - code-quality
+  estimated_effort: 1-2 days
+  work_total: 9
+  work_done: 0
+  work_ready: 1
+  deferred_count: 1
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -146,6 +164,51 @@ items:
   work_done: 0
   work_ready: 4
   deferred_count: 1
+- id: dedup-tpcds-constants-empty-results
+  file: TODO/core-functionality/planning/dedup-tpcds-constants-empty-results.yaml
+  title: Extract TPC-DS canonical table list and shared _empty_results to constants
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 1 hour
+  work_total: 3
+  work_done: 0
+  work_ready: 2
+- id: dedup-cloud-platform-shared-utilities
+  file: TODO/core-functionality/planning/dedup-cloud-platform-shared-utilities.yaml
+  title: Extract shared cloud platform utilities (session cache validation, credential prompts)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 2-3 hours
+  work_total: 5
+  work_done: 0
+  work_ready: 2
+- id: dedup-tpcds-rolling-average-queries
+  file: TODO/core-functionality/planning/dedup-tpcds-rolling-average-queries.yaml
+  title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 1-2 hours
+  work_total: 3
+  work_done: 0
+  work_ready: 1
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -290,38 +353,6 @@ items:
   work_total: 15
   work_done: 0
   work_ready: 15
-- id: complexity-mcp-analytics-w14
-  file: TODO/core-functionality/active/complexity-mcp-analytics-w14.yaml
-  title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - complexity
-  - refactor
-  - mcp
-  - analytics
-  estimated_effort: 1 day
-  work_total: 5
-  work_done: 0
-  work_ready: 4
-- id: complexity-ascii-renderers-w14
-  file: TODO/core-functionality/active/complexity-ascii-renderers-w14.yaml
-  title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - complexity
-  - refactor
-  - visualization
-  - ascii
-  estimated_effort: 1 day
-  work_total: 5
-  work_done: 0
-  work_ready: 4
 - id: influxdb-blog-post-edits
   file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
   title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -356,22 +387,81 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 7
-- id: complexity-cli-orchestration-w14
-  file: TODO/core-functionality/active/complexity-cli-orchestration-w14.yaml
-  title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
-  worktree: main
+- id: dedup-query-catalog-base
+  file: TODO/core-functionality/planning/dedup-query-catalog-base.yaml
+  title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
+  worktree: core-functionality
   category: Core Functionality
   priority: Medium
   status: Not Started
   tags:
-  - complexity
-  - refactor
-  - cli
-  - orchestration
-  estimated_effort: 1-2 days
-  work_total: 7
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 2-3 hours
+  work_total: 5
   work_done: 0
-  work_ready: 6
+  work_ready: 2
+- id: dedup-tpcdi-dimension-generator
+  file: TODO/core-functionality/planning/dedup-tpcdi-dimension-generator.yaml
+  title: Extract _generate_dimension helper for TPC-DI SQL generator scaffolding
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 1-2 hours
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+- id: dedup-sql-utilities
+  file: TODO/core-functionality/planning/dedup-sql-utilities.yaml
+  title: Extract _normalize_table_name_in_sql to shared SQL utility module
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 1-2 hours
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+- id: dedup-spark-shared-base
+  file: TODO/core-functionality/planning/dedup-spark-shared-base.yaml
+  title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 2-3 hours
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+- id: dedup-simple-benchmark-base-methods
+  file: TODO/core-functionality/planning/dedup-simple-benchmark-base-methods.yaml
+  title: Extract shared run_benchmark and _load_data to base benchmark class (amplab/clickbench/ssb)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 2-3 hours
+  work_total: 4
+  work_done: 0
+  work_ready: 1
 - id: flight-data-benchmark
   file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
   title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -392,38 +482,34 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: complexity-validation-misc-w14
-  file: TODO/core-functionality/active/complexity-validation-misc-w14.yaml
-  title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
-  worktree: main
+- id: dedup-tpcds-maintenance-returns
+  file: TODO/core-functionality/planning/dedup-tpcds-maintenance-returns.yaml
+  title: Parameterize _insert_{store,catalog,web}_returns in TPC-DS maintenance operations
+  worktree: core-functionality
   category: Core Functionality
   priority: Medium
   status: Not Started
   tags:
-  - complexity
-  - refactor
-  - misc
-  - validation
-  estimated_effort: 3-4 days
-  work_total: 8
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 1-2 hours
+  work_total: 3
   work_done: 0
-  work_ready: 7
-  needs:
-  - complexity-dict-dispatch-w14
-  - complexity-field-extraction-w14
-- id: complexity-generators-pipelines-w14
-  file: TODO/core-functionality/active/complexity-generators-pipelines-w14.yaml
-  title: Simplify data generator and pipeline loading functions (complexity batch 5)
-  worktree: main
+  work_ready: 1
+- id: complexity-plans-tpcds-w15
+  file: TODO/core-functionality/active/complexity-plans-tpcds-w15.yaml
+  title: Reduce complexity in query plan and TPC-DS functions (complexity batch 10)
+  worktree: core-functionality
   category: Core Functionality
   priority: Medium
   status: Not Started
   tags:
   - complexity
-  - refactor
-  - generators
-  - data-loading
-  estimated_effort: 1-2 days
+  - refactoring
+  - query-plans
+  - tpcds
+  estimated_effort: 3-4 hours
   work_total: 7
   work_done: 0
   work_ready: 6
@@ -515,21 +601,6 @@ items:
   work_total: 25
   work_done: 0
   work_ready: 16
-- id: complexity-field-extraction-w14
-  file: TODO/core-functionality/active/complexity-field-extraction-w14.yaml
-  title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - complexity
-  - refactor
-  - field-extraction
-  estimated_effort: 1-2 days
-  work_total: 7
-  work_done: 1
-  work_ready: 5
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -550,12 +621,12 @@ items:
   work_done: 0
   work_ready: 12
 - id: presorted-open-table-format-datasets
-  file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
+  file: TODO/physical-tuning/active/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats
   worktree: physical-tuning
   category: Core Functionality
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - data-generation
   - parquet
@@ -566,8 +637,8 @@ items:
   - performance
   estimated_effort: Large
   work_total: 15
-  work_done: 0
-  work_ready: 12
+  work_done: 1
+  work_ready: 1
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support

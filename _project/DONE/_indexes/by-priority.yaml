@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T08:39:03.837578'
-total_items: 514
+generated_at: '2026-02-21T12:57:14.970646'
+total_items: 524
 priorities:
   Critical:
     count: 35
@@ -1094,7 +1094,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 57
+    count: 59
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1150,6 +1150,11 @@ priorities:
     - id: greyscale-ascii-visualization-fallbacks
       file: DONE/main/greyscale-ascii-visualization-fallbacks.yaml
       title: Add greyscale fallback rendering for ASCII visualizations
+      category: Core Functionality
+      status: Completed
+    - id: dedup-ignore-rules-boilerplate
+      file: DONE/core-functionality/active/dedup-ignore-rules-boilerplate.yaml
+      title: Add ignore rules for 17 boilerplate duplicate groups identified by duplicate-check
       category: Core Functionality
       status: Completed
     - id: platform-setup-numbered-list-selection
@@ -1242,6 +1247,11 @@ priorities:
       title: Enhance and extend ASCII charting with new chart types and comparison visualizations
       category: Core Functionality
       status: Completed
+    - id: complexity-field-extraction-w14
+      file: DONE/core-functionality/active/complexity-field-extraction-w14.yaml
+      title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
+      category: Core Functionality
+      status: Not Started
     - id: platform-adapter-silent-error-handling
       file: DONE/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
       title: Fix silent error swallowing in schema creation and connection setup across adapters
@@ -1383,7 +1393,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 225
+    count: 233
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1579,6 +1589,11 @@ priorities:
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
       title: Add blog to BenchBox site using ABlog Sphinx extension
       category: Documentation
+      status: Completed
+    - id: complexity-ignore-required-w15
+      file: DONE/core-functionality/active/complexity-ignore-required-w15.yaml
+      title: Add complexity exclusions for 5 functions with inherent required complexity
+      category: Core Functionality
       status: Completed
     - id: add-dedicated-tags-for-platforms-and-benchmarks
       file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
@@ -1790,6 +1805,16 @@ priorities:
       title: Databricks Example Modernization ✅ COMPLETED
       category: Platform Support and Deployment
       status: Completed
+    - id: complexity-mcp-analytics-w14
+      file: DONE/core-functionality/active/complexity-mcp-analytics-w14.yaml
+      title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
+      category: Core Functionality
+      status: Not Started
+    - id: complexity-ascii-renderers-w14
+      file: DONE/core-functionality/active/complexity-ascii-renderers-w14.yaml
+      title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
+      category: Core Functionality
+      status: Not Started
     - id: deferred-dataframe-performance-analysis
       file: DONE/main/active/deferred-dataframe-performance-analysis.yaml
       title: Deferred DataFrame Performance Cross-Platform Analysis
@@ -1890,6 +1915,11 @@ priorities:
       title: Examples Code Duplication Consolidation
       category: Code Quality and Technical Debt
       status: Completed
+    - id: complexity-cli-orchestration-w14
+      file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml
+      title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
+      category: Core Functionality
+      status: Not Started
     - id: finalize-monitoring-module-scope
       file: DONE/observability-quality/completed/finalize-monitoring-module-scope.yaml
       title: Finalize Monitoring Module Scope
@@ -2161,6 +2191,21 @@ priorities:
       title: 'Query Plan Remediation - Phase 8: Documentation & Usability'
       category: Documentation
       status: Completed
+    - id: complexity-cli-prompts-w15
+      file: DONE/core-functionality/active/complexity-cli-prompts-w15.yaml
+      title: Reduce complexity in CLI prompt and command functions (complexity batch 8)
+      category: Core Functionality
+      status: Completed
+    - id: complexity-core-analysis-dataframe-w15
+      file: DONE/core-functionality/active/complexity-core-analysis-dataframe-w15.yaml
+      title: Reduce complexity in core analysis and dataframe functions (complexity batch 9)
+      category: Core Functionality
+      status: Completed
+    - id: complexity-validation-misc-w14
+      file: DONE/core-functionality/active/complexity-validation-misc-w14.yaml
+      title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
+      category: Core Functionality
+      status: Not Started
     - id: refactor-validation-logic-from-cli-to-core-module-completed
       file: DONE/unknown/planning/refactor-validation-logic-from-cli-to-core-module-completed.yaml
       title: Refactor Validation Logic from CLI to Core Module - COMPLETED ✅
@@ -2221,6 +2266,11 @@ priorities:
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       category: Platform Support and Deployment
       status: Completed
+    - id: complexity-generators-pipelines-w14
+      file: DONE/core-functionality/active/complexity-generators-pipelines-w14.yaml
+      title: Simplify data generator and pipeline loading functions (complexity batch 5)
+      category: Core Functionality
+      status: Not Started
     - id: slim-release-distributions
       file: DONE/release-readiness/planning/slim-release-distributions.yaml
       title: Slim Release Distributions
