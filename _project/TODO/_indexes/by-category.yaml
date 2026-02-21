@@ -1,4 +1,4 @@
-generated_at: '2026-02-21T13:22:01.406711'
+generated_at: '2026-02-21T13:44:21.121400'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -84,7 +84,7 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 12
+    count: 9
     items:
     - id: dedup-query-catalog-base
       file: TODO/core-functionality/planning/dedup-query-catalog-base.yaml
@@ -106,11 +106,6 @@ categories:
       title: Extract _normalize_table_name_in_sql to shared SQL utility module
       priority: Medium
       status: Not Started
-    - id: dedup-spark-shared-base
-      file: TODO/core-functionality/planning/dedup-spark-shared-base.yaml
-      title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
-      priority: Medium
-      status: Not Started
     - id: dedup-cloud-platform-shared-utilities
       file: TODO/core-functionality/planning/dedup-cloud-platform-shared-utilities.yaml
       title: Extract shared cloud platform utilities (session cache validation, credential prompts)
@@ -121,16 +116,6 @@ categories:
       title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
       priority: Low
       status: Not Started
-    - id: dedup-simple-benchmark-base-methods
-      file: TODO/core-functionality/planning/dedup-simple-benchmark-base-methods.yaml
-      title: Extract shared run_benchmark and _load_data to base benchmark class (amplab/clickbench/ssb)
-      priority: Medium
-      status: Not Started
-    - id: fix-mcp-results-dir-configuration-regression
-      file: TODO/core-functionality/active/fix-mcp-results-dir-configuration-regression.yaml
-      title: Fix MCP results-dir regression with core-centralized path resolution
-      priority: High
-      status: In Progress
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation

@@ -2,7 +2,8 @@ id: fix-mcp-results-dir-configuration-regression
 title: "Fix MCP results-dir regression with core-centralized path resolution"
 worktree: core-functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-21"
 category: Core Functionality
 description: |
   MCP benchmark execution currently ignores runtime configuration for result
@@ -74,7 +75,7 @@ work:
 - id: w9
   summary: "Run verification commands and close regression with evidence"
   needs: [w7, w8]
-  status: pending
+  status: done
 
 deferred:
 - summary: "Add a CLI run flag named --results-dir"

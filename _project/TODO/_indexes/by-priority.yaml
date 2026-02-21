@@ -1,14 +1,9 @@
-generated_at: '2026-02-21T13:22:01.406726'
-total_items: 40
+generated_at: '2026-02-21T13:44:21.121414'
+total_items: 37
 priorities:
   High:
-    count: 3
+    count: 2
     items:
-    - id: fix-mcp-results-dir-configuration-regression
-      file: TODO/core-functionality/active/fix-mcp-results-dir-configuration-regression.yaml
-      title: Fix MCP results-dir regression with core-centralized path resolution
-      category: Core Functionality
-      status: In Progress
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
@@ -48,7 +43,7 @@ priorities:
       category: Blog Revision
       status: In Progress
   Medium:
-    count: 15
+    count: 13
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -78,16 +73,6 @@ priorities:
     - id: dedup-sql-utilities
       file: TODO/core-functionality/planning/dedup-sql-utilities.yaml
       title: Extract _normalize_table_name_in_sql to shared SQL utility module
-      category: Core Functionality
-      status: Not Started
-    - id: dedup-spark-shared-base
-      file: TODO/core-functionality/planning/dedup-spark-shared-base.yaml
-      title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
-      category: Core Functionality
-      status: Not Started
-    - id: dedup-simple-benchmark-base-methods
-      file: TODO/core-functionality/planning/dedup-simple-benchmark-base-methods.yaml
-      title: Extract shared run_benchmark and _load_data to base benchmark class (amplab/clickbench/ssb)
       category: Core Functionality
       status: Not Started
     - id: flight-data-benchmark

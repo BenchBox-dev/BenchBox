@@ -1,14 +1,9 @@
-generated_at: '2026-02-21T13:22:01.406737'
-total_items: 40
+generated_at: '2026-02-21T13:44:21.121424'
+total_items: 37
 statuses:
   In Progress:
-    count: 3
+    count: 2
     items:
-    - id: fix-mcp-results-dir-configuration-regression
-      file: TODO/core-functionality/active/fix-mcp-results-dir-configuration-regression.yaml
-      title: Fix MCP results-dir regression with core-centralized path resolution
-      priority: High
-      category: Core Functionality
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/active/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
@@ -20,7 +15,7 @@ statuses:
       priority: Medium-High
       category: Blog Revision
   Not Started:
-    count: 37
+    count: 35
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -92,11 +87,6 @@ statuses:
       title: Extract _normalize_table_name_in_sql to shared SQL utility module
       priority: Medium
       category: Core Functionality
-    - id: dedup-spark-shared-base
-      file: TODO/core-functionality/planning/dedup-spark-shared-base.yaml
-      title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
-      priority: Medium
-      category: Core Functionality
     - id: dedup-cloud-platform-shared-utilities
       file: TODO/core-functionality/planning/dedup-cloud-platform-shared-utilities.yaml
       title: Extract shared cloud platform utilities (session cache validation, credential prompts)
@@ -106,11 +96,6 @@ statuses:
       file: TODO/core-functionality/planning/dedup-tpcds-rolling-average-queries.yaml
       title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
       priority: Low
-      category: Core Functionality
-    - id: dedup-simple-benchmark-base-methods
-      file: TODO/core-functionality/planning/dedup-simple-benchmark-base-methods.yaml
-      title: Extract shared run_benchmark and _load_data to base benchmark class (amplab/clickbench/ssb)
-      priority: Medium
       category: Core Functionality
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml

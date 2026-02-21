@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T13:22:02.609153'
-total_items: 525
+generated_at: '2026-02-21T13:44:22.288160'
+total_items: 528
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1359,6 +1359,25 @@ items:
   - '@joeharris'
   estimated_effort: Medium
   completed_date: '2026-01-26'
+- id: fix-mcp-results-dir-configuration-regression
+  file: DONE/core-functionality/active/fix-mcp-results-dir-configuration-regression.yaml
+  title: Fix MCP results-dir regression with core-centralized path resolution
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - mcp
+  - configuration
+  - regression
+  - path-resolution
+  - code-quality
+  estimated_effort: 1-2 days
+  completed_date: '2026-02-21'
+  work_total: 9
+  work_done: 9
+  work_ready: 0
+  deferred_count: 1
 - id: fix-mcp-stdout-corruption
   file: DONE/mcp-integration/active/fix-mcp-stdout-corruption.yaml
   title: Fix MCP server stdout corruption from ResultExporter
@@ -4245,6 +4264,38 @@ items:
   estimated_effort: 1-2 days
   work_total: 7
   work_done: 7
+  work_ready: 0
+- id: dedup-spark-shared-base
+  file: DONE/core-functionality/active/dedup-spark-shared-base.yaml
+  title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 2-3 hours
+  completed_date: '2026-02-21'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+- id: dedup-simple-benchmark-base-methods
+  file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
+  title: Extract shared run_benchmark and _load_data to base benchmark class (amplab/clickbench/ssb)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 2-3 hours
+  completed_date: '2026-02-21'
+  work_total: 4
+  work_done: 4
   work_ready: 0
 - id: finalize-monitoring-module-scope
   file: DONE/observability-quality/completed/finalize-monitoring-module-scope.yaml

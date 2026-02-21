@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T13:22:02.609550'
-total_items: 525
+generated_at: '2026-02-21T13:44:22.288517'
+total_items: 528
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 182
+    count: 183
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -471,6 +471,11 @@ priorities:
     - id: fix-datafusion-dataframe-regression
       file: DONE/main/active/fix-datafusion-dataframe-regression.yaml
       title: 'Fix DataFusion DataFrame regression: .tbl loading, data prep, and fail-fast'
+      category: Core Functionality
+      status: Completed
+    - id: fix-mcp-results-dir-configuration-regression
+      file: DONE/core-functionality/active/fix-mcp-results-dir-configuration-regression.yaml
+      title: Fix MCP results-dir regression with core-centralized path resolution
       category: Core Functionality
       status: Completed
     - id: fix-mcp-stdout-corruption
@@ -1393,7 +1398,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 234
+    count: 236
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1920,6 +1925,16 @@ priorities:
       title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
       category: Core Functionality
       status: Not Started
+    - id: dedup-spark-shared-base
+      file: DONE/core-functionality/active/dedup-spark-shared-base.yaml
+      title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
+      category: Core Functionality
+      status: Completed
+    - id: dedup-simple-benchmark-base-methods
+      file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
+      title: Extract shared run_benchmark and _load_data to base benchmark class (amplab/clickbench/ssb)
+      category: Core Functionality
+      status: Completed
     - id: finalize-monitoring-module-scope
       file: DONE/observability-quality/completed/finalize-monitoring-module-scope.yaml
       title: Finalize Monitoring Module Scope
