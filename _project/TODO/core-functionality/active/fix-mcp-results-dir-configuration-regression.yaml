@@ -39,7 +39,7 @@ work:
 - id: w2
   summary: "Refactor CLI internals to use core resolver without changing CLI interface"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Add MCP-specific CLI arg parsing (--results-dir, --charts-dir, --log-level) and env fallback"
