@@ -64,7 +64,7 @@ work:
 - id: w7
   summary: "Add/adjust unit tests for precedence, MCP write/read parity, and CLI compatibility"
   needs: [w2, w5, w6]
-  status: pending
+  status: done
 
 - id: w8
   summary: "Update MCP docs to reflect actual configuration behavior and precedence"
