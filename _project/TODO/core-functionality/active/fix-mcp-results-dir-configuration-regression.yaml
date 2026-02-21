@@ -44,7 +44,7 @@ work:
 - id: w3
   summary: "Add MCP-specific CLI arg parsing (--results-dir, --charts-dir, --log-level) and env fallback"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w4
   summary: "Inject resolved directories into MCP server registration instead of module constants"
