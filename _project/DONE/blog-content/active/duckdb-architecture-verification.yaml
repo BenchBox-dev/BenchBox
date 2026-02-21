@@ -39,6 +39,8 @@ impact:
 files_affected:
   modified:
   - "_blog/platform-deep-dives/drafts/duckdb-architecture.md"
+  added:
+  - "_blog/platform-deep-dives/research/duckdb-architecture-verification-2026-02-20.md"
 
 success_metrics:
 - "Benchmark completes successfully"

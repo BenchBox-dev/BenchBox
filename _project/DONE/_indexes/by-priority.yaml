@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T18:46:29.165949'
-total_items: 511
+generated_at: '2026-02-20T23:18:29.746471'
+total_items: 512
 priorities:
   Critical:
     count: 34
@@ -1089,7 +1089,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 55
+    count: 56
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1295,6 +1295,11 @@ priorities:
     - id: explicit-tuning-file-resolution
       file: DONE/ux-improvements/active/explicit-tuning-file-resolution.yaml
       title: Make tuning file resolution explicit and transparent in CLI
+      category: Core Functionality
+      status: Completed
+    - id: complexity-ignores-w14
+      file: DONE/core-functionality/active/complexity-ignores-w14.yaml
+      title: Mark required-complexity functions as approved ignores in pyproject.toml
       category: Core Functionality
       status: Completed
     - id: fabric-spark-platform

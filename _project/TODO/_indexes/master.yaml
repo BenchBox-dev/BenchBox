@@ -1,6 +1,26 @@
-generated_at: '2026-02-20T17:06:12.837923'
-total_items: 30
+generated_at: '2026-02-20T23:18:28.551683'
+total_items: 38
 items:
+- id: duckdb-tpcds-trailing-delimiter-regression
+  file: TODO/core-functionality/active/duckdb-tpcds-trailing-delimiter-regression.yaml
+  title: 'Fix DuckDB TPC-DS loader regression: trailing delimiter detection and CLI exit code'
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Critical
+  status: In Progress
+  tags:
+  - regression
+  - duckdb
+  - tpcds
+  - data-loading
+  - cli
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+  work_total: 4
+  work_done: 2
+  work_ready: 1
+  deferred_count: 1
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -290,6 +310,38 @@ items:
   work_total: 15
   work_done: 0
   work_ready: 15
+- id: complexity-mcp-analytics-w14
+  file: TODO/core-functionality/planning/complexity-mcp-analytics-w14.yaml
+  title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - complexity
+  - refactor
+  - mcp
+  - analytics
+  estimated_effort: 1 day
+  work_total: 5
+  work_done: 0
+  work_ready: 4
+- id: complexity-ascii-renderers-w14
+  file: TODO/core-functionality/planning/complexity-ascii-renderers-w14.yaml
+  title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - complexity
+  - refactor
+  - visualization
+  - ascii
+  estimated_effort: 1 day
+  work_total: 5
+  work_done: 0
+  work_ready: 4
 - id: influxdb-blog-post-edits
   file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
   title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -324,6 +376,22 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 7
+- id: complexity-cli-orchestration-w14
+  file: TODO/core-functionality/planning/complexity-cli-orchestration-w14.yaml
+  title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - complexity
+  - refactor
+  - cli
+  - orchestration
+  estimated_effort: 1-2 days
+  work_total: 7
+  work_done: 0
+  work_ready: 6
 - id: flight-data-benchmark
   file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
   title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -344,6 +412,41 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: complexity-validation-misc-w14
+  file: TODO/core-functionality/planning/complexity-validation-misc-w14.yaml
+  title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - complexity
+  - refactor
+  - misc
+  - validation
+  estimated_effort: 3-4 days
+  work_total: 8
+  work_done: 0
+  work_ready: 7
+  needs:
+  - complexity-dict-dispatch-w14
+  - complexity-field-extraction-w14
+- id: complexity-generators-pipelines-w14
+  file: TODO/core-functionality/planning/complexity-generators-pipelines-w14.yaml
+  title: Simplify data generator and pipeline loading functions (complexity batch 5)
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - complexity
+  - refactor
+  - generators
+  - data-loading
+  estimated_effort: 1-2 days
+  work_total: 7
+  work_done: 0
+  work_ready: 6
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
@@ -432,6 +535,21 @@ items:
   work_total: 25
   work_done: 0
   work_ready: 16
+- id: complexity-field-extraction-w14
+  file: TODO/core-functionality/planning/complexity-field-extraction-w14.yaml
+  title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - complexity
+  - refactor
+  - field-extraction
+  estimated_effort: 1-2 days
+  work_total: 7
+  work_done: 0
+  work_ready: 6
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -451,6 +569,21 @@ items:
   work_total: 12
   work_done: 0
   work_ready: 12
+- id: complexity-dict-dispatch-w14
+  file: TODO/core-functionality/planning/complexity-dict-dispatch-w14.yaml
+  title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - complexity
+  - refactor
+  - dict-dispatch
+  estimated_effort: 1 day
+  work_total: 7
+  work_done: 0
+  work_ready: 6
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats

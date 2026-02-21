@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T18:46:29.165513'
-total_items: 511
+generated_at: '2026-02-20T23:18:29.746063'
+total_items: 512
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6004,6 +6004,22 @@ items:
   - configuration
   estimated_effort: 3-5 days
   completed_date: '2026-01-16'
+- id: complexity-ignores-w14
+  file: DONE/core-functionality/active/complexity-ignores-w14.yaml
+  title: Mark required-complexity functions as approved ignores in pyproject.toml
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - complexity
+  - pyproject
+  - ignores
+  estimated_effort: 2-3 hours
+  completed_date: '2026-02-20'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: fabric-spark-platform
   file: DONE/platform-expansion/planning/fabric-spark-platform.yaml
   title: Microsoft Fabric Spark Platform

@@ -2,7 +2,7 @@ id: nyc-taxi-benchmark-expansion
 title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
 worktree: benchmark-expansion
 category: Benchmark Development
-priority: Medium
+priority: Medium-High
 status: Not Started
 description: |
   Expand the existing NYC Taxi benchmark to support additional TLC data sources

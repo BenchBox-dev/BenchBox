@@ -1,6 +1,14 @@
-generated_at: '2026-02-20T17:06:12.837968'
-total_items: 30
+generated_at: '2026-02-20T23:18:28.551734'
+total_items: 38
 priorities:
+  Critical:
+    count: 1
+    items:
+    - id: duckdb-tpcds-trailing-delimiter-regression
+      file: TODO/core-functionality/active/duckdb-tpcds-trailing-delimiter-regression.yaml
+      title: 'Fix DuckDB TPC-DS loader regression: trailing delimiter detection and CLI exit code'
+      category: Core Functionality
+      status: In Progress
   High:
     count: 2
     items:
@@ -15,12 +23,22 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 5
+    count: 7
     items:
+    - id: complexity-field-extraction-w14
+      file: TODO/core-functionality/planning/complexity-field-extraction-w14.yaml
+      title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
+      category: Core Functionality
+      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
+      status: Not Started
+    - id: complexity-dict-dispatch-w14
+      file: TODO/core-functionality/planning/complexity-dict-dispatch-w14.yaml
+      title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
+      category: Core Functionality
       status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
@@ -43,12 +61,22 @@ priorities:
       category: Blog Revision
       status: In Progress
   Medium:
-    count: 9
+    count: 14
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: complexity-mcp-analytics-w14
+      file: TODO/core-functionality/planning/complexity-mcp-analytics-w14.yaml
+      title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
+      category: Core Functionality
+      status: Not Started
+    - id: complexity-ascii-renderers-w14
+      file: TODO/core-functionality/planning/complexity-ascii-renderers-w14.yaml
+      title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
+      category: Core Functionality
       status: Not Started
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
@@ -60,10 +88,25 @@ priorities:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       category: Documentation
       status: Not Started
+    - id: complexity-cli-orchestration-w14
+      file: TODO/core-functionality/planning/complexity-cli-orchestration-w14.yaml
+      title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
+      category: Core Functionality
+      status: Not Started
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
+      status: Not Started
+    - id: complexity-validation-misc-w14
+      file: TODO/core-functionality/planning/complexity-validation-misc-w14.yaml
+      title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
+      category: Core Functionality
+      status: Not Started
+    - id: complexity-generators-pipelines-w14
+      file: TODO/core-functionality/planning/complexity-generators-pipelines-w14.yaml
+      title: Simplify data generator and pipeline loading functions (complexity batch 5)
+      category: Core Functionality
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml

@@ -1,7 +1,7 @@
 id: duckdb-version-performance-benchmarks
 title: "[DuckDB Version Performance] Run multi-version benchmark suite"
 worktree: blog-content
-priority: Medium
+priority: Medium-High
 status: In Progress
 category: Blog Revision
 description: |-

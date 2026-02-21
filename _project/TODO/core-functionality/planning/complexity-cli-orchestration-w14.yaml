@@ -1,0 +1,139 @@
+id: "complexity-cli-orchestration-w14"
+title: "Extract phases from monolithic CLI orchestration functions (complexity batch 4)"
+worktree: "main"
+priority: "Medium"
+status: "Not Started"
+description: |
+  9 CLI and core orchestration functions mix multiple independent concerns (validation,
+  loading, business logic, output) in a single large function. Each function has 3-6
+  distinct phases that can be extracted to named private helpers, making the top-level
+  function a readable orchestration narrative.
+
+  Target functions:
+    benchbox/base.py:create_enhanced_benchmark_result                 (20)
+    benchbox/cli/commands/compare.py:_run_file_comparison             (20)
+    benchbox/cli/tuning.py:run_dataframe_write_wizard                 (20)
+    benchbox/cli/tuning_resolver.py:resolve_tuning                    (18)
+    benchbox/cli/commands/shell.py:shell                              (18)
+    benchbox/core/cost/integration.py:add_cost_estimation_to_results  (18)
+    benchbox/core/dryrun.py:_extract_ddl_preview                      (18)
+    benchbox/core/dryrun.py:save_dry_run_results                      (15)
+    benchbox/cli/commands/aggregate.py:aggregate                      (16)
+
+category: "Core Functionality"
+
+work:
+  - id: w1
+    summary: "Decompose create_enhanced_benchmark_result into factory + normalizer helpers"
+    status: pending
+    notes: |
+      benchbox/base.py:588 — Mix of result field extraction, fallback normalization,
+      and dict manipulation. Extract:
+      - _normalize_benchmark_id(raw) → str
+      - _extract_query_results(raw_queries) → list[QueryResult]
+      - _build_execution_meta(raw) → ExecutionMeta
+      Top-level becomes: normalize → extract → build → return.
+
+  - id: w2
+    summary: "Decompose _run_file_comparison into validate/load/compare/output helpers"
+    status: pending
+    notes: |
+      benchbox/cli/commands/compare.py:1082 — four clear phases:
+      - _validate_comparison_inputs(file1, file2, opts) → or raise
+      - _load_comparison_files(file1, file2) → (result1, result2)
+      - _compute_comparison(r1, r2, opts) → ComparisonResult (delegate to existing)
+      - _output_comparison(comparison, opts) → None
+      Main function becomes 4 calls + early returns on validation failure.
+
+  - id: w3
+    summary: "Decompose run_dataframe_write_wizard into per-step handlers"
+    status: pending
+    notes: |
+      benchbox/cli/tuning.py:694 — 4+ wizard steps follow identical pattern:
+        capability_check → user_prompt → config_update
+      Extract _wizard_step(capability, prompt, config_key) → value or None.
+      Each step becomes a single function call. Steps are independent.
+
+  - id: w4
+    summary: "Decompose resolve_tuning into per-mode handler functions"
+    needs: []
+    status: pending
+    notes: |
+      benchbox/cli/tuning_resolver.py:162 — 4 sequential cases (notuning, auto, explicit path, tuned).
+      Each case is self-contained. Extract:
+      - _resolve_notuning() → TuningConfig
+      - _resolve_auto(platform, benchmark) → TuningConfig
+      - _resolve_explicit_path(path) → TuningConfig
+      - _resolve_tuned(platform, benchmark) → TuningConfig
+      Main function: mode → handler dispatch (dict or if/elif, each a 1-liner).
+
+  - id: w5
+    summary: "Decompose shell command and add_cost_estimation_to_results"
+    needs: []
+    status: pending
+    notes: |
+      shell (cli/commands/shell.py:329): extract _resolve_platform_from_args,
+      _discover_platform_interactive, _launch_shell_for_platform.
+      add_cost_estimation_to_results (core/cost/integration.py:70): extract
+      _validate_cost_inputs, _compute_query_costs, _compute_phase_costs.
+
+  - id: w6
+    summary: "Decompose _extract_ddl_preview, save_dry_run_results, and aggregate"
+    needs: []
+    status: pending
+    notes: |
+      _extract_ddl_preview (dryrun.py:963): extract _build_table_ddl(table, tunings) → str.
+      save_dry_run_results (dryrun.py:175): extract _save_queries_to_dir, _save_ddl_file.
+      aggregate (cli/commands/aggregate.py:40): extract _filter_results, _aggregate_metrics.
+
+  - id: w7
+    summary: "Run smoke tests and complexity check; verify all 9 functions below warn threshold"
+    needs: [w1, w2, w3, w4, w5, w6]
+    status: pending
+
+metadata:
+  estimated_effort: "1-2 days"
+  tags: ["complexity", "refactor", "cli", "orchestration"]
+
+must_preserve:
+  - "create_enhanced_benchmark_result: output BenchmarkResult must be structurally identical"
+  - "_run_file_comparison: comparison output (all formats) must be identical"
+  - "run_dataframe_write_wizard: wizard UX flow and resulting config must be unchanged"
+  - "resolve_tuning: tuning resolution logic must produce same config for all inputs"
+  - "add_cost_estimation_to_results: cost values must be identical (floating point exact)"
+
+approach: |
+  Pattern: identify the phases of each function using blank-line or comment boundaries.
+  Extract each phase to a private function with a clear name describing its role.
+  Keep all extracted functions in the same file unless they're generic utilities.
+
+  For wizard steps: prefer a single _wizard_step() helper over one helper per step,
+  since steps are structurally identical (same shape, different data).
+
+anti_patterns:
+  - "DO NOT change function signatures visible to callers (CLI commands, test fixtures)"
+  - "DO NOT merge phases that have different error handling — keep their error paths distinct"
+  - "DO NOT over-extract: aim for 3-5 helpers per function, not 10"
+  - "DO NOT add logging or validation to the new helpers beyond what's in the original"
+
+verification:
+  - description: "Integration tests pass"
+    command: "uv run -- python -m pytest tests/integration/ -q --timeout=30"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Smoke tests pass"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Target functions below warn threshold"
+    command: "uv run -- python scripts/check_complexity.py --top 150 2>&1 | grep -E '(create_enhanced|run_file_comparison|write_wizard|resolve_tuning|shell.*329|add_cost_estimation|extract_ddl|save_dry_run|aggregate.*40)'"
+    expected_output: "No WARN entries for the 9 target functions"
+
+scope_limit:
+  only_modify:
+    - "benchbox/base.py"
+    - "benchbox/cli/commands/compare.py"
+    - "benchbox/cli/tuning.py"
+    - "benchbox/cli/tuning_resolver.py"
+    - "benchbox/cli/commands/shell.py"
+    - "benchbox/core/cost/integration.py"
+    - "benchbox/core/dryrun.py"
+    - "benchbox/cli/commands/aggregate.py"

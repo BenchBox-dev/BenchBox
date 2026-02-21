@@ -1,7 +1,7 @@
 id: arm-graviton-generations-benchmarks
 title: "[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)"
 worktree: blog-content
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Blog Revision
 description: |

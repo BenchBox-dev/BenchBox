@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T18:46:29.165794'
+generated_at: '2026-02-20T23:18:29.746324'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 143
+    count: 144
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -913,6 +913,11 @@ categories:
     - id: explicit-tuning-file-resolution
       file: DONE/ux-improvements/active/explicit-tuning-file-resolution.yaml
       title: Make tuning file resolution explicit and transparent in CLI
+      priority: Medium-High
+      status: Completed
+    - id: complexity-ignores-w14
+      file: DONE/core-functionality/active/complexity-ignores-w14.yaml
+      title: Mark required-complexity functions as approved ignores in pyproject.toml
       priority: Medium-High
       status: Completed
     - id: migrate-clickhouse-firebolt-deployment
