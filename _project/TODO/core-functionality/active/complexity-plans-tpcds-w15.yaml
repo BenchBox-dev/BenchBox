@@ -1,0 +1,96 @@
+id: complexity-plans-tpcds-w15
+title: "Reduce complexity in query plan and TPC-DS functions (complexity batch 10)"
+worktree: core-functionality
+priority: Medium
+status: Not Started
+category: Core Functionality
+description: |
+  Six core functions at CC=14 in query plans and TPC-DS modules can be decomposed.
+
+  Target functions:
+  1. _compare_operator_properties (comparison.py:288) — replace if/elif dispatch with registry dict
+  2. _format_operator_properties (visualization.py:297) — extract _format_truncated_list() helper
+  3. load_operations_catalog (primitives/catalog/loader.py:24) — extract _parse_operation_entry()
+  4. run_streams (tpcds/benchmark/runner.py:687) — extract sequential stream runner, share with concurrent
+  5. run (tpcds/maintenance_test.py:131) — split loop from finalization logic
+  6. run_official_benchmark (tpcds/official_benchmark.py:97) — extract _extract_metric() helper
+
+work:
+- id: w1
+  summary: "Replace if/elif chain in _compare_operator_properties with dispatch dict pattern"
+  status: done
+
+- id: w2
+  summary: "Extract _format_truncated_list() from _format_operator_properties in visualization.py"
+  status: done
+
+- id: w3
+  summary: "Extract _parse_operation_entry() from load_operations_catalog in primitives/catalog/loader.py"
+  status: done
+
+- id: w4
+  summary: "Extract _run_single_stream() and _aggregate_stream_results() from run_streams in runner.py"
+  status: done
+
+- id: w5
+  summary: "Extract _run_maintenance_loop() and _finalize_maintenance_result() from run() in maintenance_test.py"
+  status: done
+
+- id: w6
+  summary: "Extract _extract_metric() helper from run_official_benchmark in official_benchmark.py"
+  status: done
+
+- id: w7
+  summary: "Run complexity check and full test suite to verify no regressions"
+  needs: [w1, w2, w3, w4, w5, w6]
+  status: done
+
+must_preserve:
+- "_compare_operator_properties() returns identical diff dict for all operator types"
+- "_format_operator_properties() truncation behavior (max 3 items + '... and N more')"
+- "load_operations_catalog() validation error messages and error types unchanged"
+- "run_streams() concurrent and sequential execution produce identical result structures"
+- "TPC-DS maintenance test success criteria (>=90% success rate) unchanged"
+- "QphDS@Size composite metric calculation in run_official_benchmark unchanged"
+
+approach: |
+  For _compare_operator_properties, use a COMPARE_DISPATCH: dict[str, Callable] pattern
+  mapping operator type strings to small comparison functions. For _format_operator_properties,
+  the _format_truncated_list(label, items, max_display=3) helper eliminates the repeated
+  truncation pattern. For run_streams, the key insight is that the sequential loop body
+  and the concurrent StreamExecutor._run_single_stream do the same thing — factor into one.
+
+anti_patterns:
+- "DO NOT change TPC-DS spec-mandated behavior in run_streams or maintenance_test — because TPC compliance depends on exact
+  execution semantics — only restructure the code"
+- "DO NOT create new files for extracted helpers — because these are small private functions — keep them in the same module"
+
+verification:
+- description: "Query plan tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/query_plans/ -v"
+  expected_output: "all tests pass"
+- description: "TPC-DS tests pass"
+  command: "uv run -- python -m pytest tests/ -v -k tpcds"
+  expected_output: "all tests pass"
+- description: "Complexity check passes"
+  command: "make complexity-check"
+  expected_output: "PASSED; these functions no longer in top-20"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/query_plans/comparison.py"
+  - "benchbox/core/query_plans/visualization.py"
+  - "benchbox/core/primitives/catalog/loader.py"
+  - "benchbox/core/tpcds/benchmark/runner.py"
+  - "benchbox/core/tpcds/maintenance_test.py"
+  - "benchbox/core/tpcds/official_benchmark.py"
+  - "tests/"
+
+metadata:
+  tags:
+  - complexity
+  - refactoring
+  - query-plans
+  - tpcds
+  estimated_effort: "3-4 hours"
+  created_date: "2026-02-21"
