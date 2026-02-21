@@ -182,7 +182,7 @@ work:
   summary: "Wire data_organization into generator pipeline as post-TBL hook"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Implement single-column sorting (e.g., by date) with unit tests"
   needs:
