@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T23:18:29.746063'
-total_items: 512
+generated_at: '2026-02-20T23:54:27.650786'
+total_items: 513
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -189,6 +189,27 @@ items:
   work_total: 24
   work_done: 24
   work_ready: 0
+- id: duckdb-tpcds-trailing-delimiter-regression
+  file: DONE/core-functionality/active/duckdb-tpcds-trailing-delimiter-regression.yaml
+  title: 'Fix DuckDB TPC-DS loader regression: trailing delimiter detection and CLI exit code'
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Critical
+  status: Completed
+  tags:
+  - regression
+  - duckdb
+  - tpcds
+  - data-loading
+  - cli
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+  completed_date: '2026-02-20'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  deferred_count: 1
 - id: timescaledb-sql-injection-remediation
   file: DONE/security-hardening/active/timescaledb-sql-injection-remediation.yaml
   title: Fix SQL injection vulnerabilities in TimescaleDB adapter

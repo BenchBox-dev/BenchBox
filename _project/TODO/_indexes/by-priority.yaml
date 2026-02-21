@@ -1,14 +1,6 @@
-generated_at: '2026-02-20T23:18:28.551734'
-total_items: 38
+generated_at: '2026-02-20T23:54:26.442242'
+total_items: 37
 priorities:
-  Critical:
-    count: 1
-    items:
-    - id: duckdb-tpcds-trailing-delimiter-regression
-      file: TODO/core-functionality/active/duckdb-tpcds-trailing-delimiter-regression.yaml
-      title: 'Fix DuckDB TPC-DS loader regression: trailing delimiter detection and CLI exit code'
-      category: Core Functionality
-      status: In Progress
   High:
     count: 2
     items:
@@ -26,7 +18,7 @@ priorities:
     count: 7
     items:
     - id: complexity-field-extraction-w14
-      file: TODO/core-functionality/planning/complexity-field-extraction-w14.yaml
+      file: TODO/core-functionality/active/complexity-field-extraction-w14.yaml
       title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
       category: Core Functionality
       status: Not Started
@@ -36,7 +28,7 @@ priorities:
       category: Benchmark Development
       status: Not Started
     - id: complexity-dict-dispatch-w14
-      file: TODO/core-functionality/planning/complexity-dict-dispatch-w14.yaml
+      file: TODO/core-functionality/active/complexity-dict-dispatch-w14.yaml
       title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
       category: Core Functionality
       status: Not Started
@@ -69,12 +61,12 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: complexity-mcp-analytics-w14
-      file: TODO/core-functionality/planning/complexity-mcp-analytics-w14.yaml
+      file: TODO/core-functionality/active/complexity-mcp-analytics-w14.yaml
       title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
       category: Core Functionality
       status: Not Started
     - id: complexity-ascii-renderers-w14
-      file: TODO/core-functionality/planning/complexity-ascii-renderers-w14.yaml
+      file: TODO/core-functionality/active/complexity-ascii-renderers-w14.yaml
       title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
       category: Core Functionality
       status: Not Started
@@ -89,7 +81,7 @@ priorities:
       category: Documentation
       status: Not Started
     - id: complexity-cli-orchestration-w14
-      file: TODO/core-functionality/planning/complexity-cli-orchestration-w14.yaml
+      file: TODO/core-functionality/active/complexity-cli-orchestration-w14.yaml
       title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
       category: Core Functionality
       status: Not Started
@@ -99,12 +91,12 @@ priorities:
       category: Benchmark Development
       status: Not Started
     - id: complexity-validation-misc-w14
-      file: TODO/core-functionality/planning/complexity-validation-misc-w14.yaml
+      file: TODO/core-functionality/active/complexity-validation-misc-w14.yaml
       title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
       category: Core Functionality
       status: Not Started
     - id: complexity-generators-pipelines-w14
-      file: TODO/core-functionality/planning/complexity-generators-pipelines-w14.yaml
+      file: TODO/core-functionality/active/complexity-generators-pipelines-w14.yaml
       title: Simplify data generator and pipeline loading functions (complexity batch 5)
       category: Core Functionality
       status: Not Started

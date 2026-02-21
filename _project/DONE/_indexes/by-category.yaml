@@ -1,4 +1,4 @@
-generated_at: '2026-02-20T23:18:29.746324'
+generated_at: '2026-02-20T23:54:27.651037'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 144
+    count: 145
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -703,6 +703,11 @@ categories:
       file: DONE/main/active/fix-datafusion-dataframe-regression.yaml
       title: 'Fix DataFusion DataFrame regression: .tbl loading, data prep, and fail-fast'
       priority: High
+      status: Completed
+    - id: duckdb-tpcds-trailing-delimiter-regression
+      file: DONE/core-functionality/active/duckdb-tpcds-trailing-delimiter-regression.yaml
+      title: 'Fix DuckDB TPC-DS loader regression: trailing delimiter detection and CLI exit code'
+      priority: Critical
       status: Completed
     - id: fix-mcp-stdout-corruption
       file: DONE/mcp-integration/active/fix-mcp-stdout-corruption.yaml
