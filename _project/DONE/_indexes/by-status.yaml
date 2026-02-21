@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T12:57:14.970784'
-total_items: 524
+generated_at: '2026-02-21T13:22:02.609680'
+total_items: 525
 statuses:
   In Progress:
     count: 2
@@ -286,7 +286,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 469
+    count: 470
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1934,6 +1934,11 @@ statuses:
     - id: complexity-core-analysis-dataframe-w15
       file: DONE/core-functionality/active/complexity-core-analysis-dataframe-w15.yaml
       title: Reduce complexity in core analysis and dataframe functions (complexity batch 9)
+      priority: Medium
+      category: Core Functionality
+    - id: complexity-plans-tpcds-w15
+      file: DONE/core-functionality/active/complexity-plans-tpcds-w15.yaml
+      title: Reduce complexity in query plan and TPC-DS functions (complexity batch 10)
       priority: Medium
       category: Core Functionality
     - id: refactor-mcp-use-public-api

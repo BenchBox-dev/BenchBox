@@ -1,4 +1,4 @@
-generated_at: '2026-02-21T12:57:14.970492'
+generated_at: '2026-02-21T13:22:02.609402'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 156
+    count: 157
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1083,6 +1083,11 @@ categories:
     - id: complexity-core-analysis-dataframe-w15
       file: DONE/core-functionality/active/complexity-core-analysis-dataframe-w15.yaml
       title: Reduce complexity in core analysis and dataframe functions (complexity batch 9)
+      priority: Medium
+      status: Completed
+    - id: complexity-plans-tpcds-w15
+      file: DONE/core-functionality/active/complexity-plans-tpcds-w15.yaml
+      title: Reduce complexity in query plan and TPC-DS functions (complexity batch 10)
       priority: Medium
       status: Completed
     - id: complexity-validation-misc-w14

@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T12:57:13.158384'
-total_items: 41
+generated_at: '2026-02-21T13:22:01.406737'
+total_items: 40
 statuses:
   In Progress:
     count: 3
@@ -20,7 +20,7 @@ statuses:
       priority: Medium-High
       category: Blog Revision
   Not Started:
-    count: 38
+    count: 37
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -157,11 +157,6 @@ statuses:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: High
       category: Testing and Quality Assurance
-    - id: complexity-plans-tpcds-w15
-      file: TODO/core-functionality/active/complexity-plans-tpcds-w15.yaml
-      title: Reduce complexity in query plan and TPC-DS functions (complexity batch 10)
-      priority: Medium
-      category: Core Functionality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

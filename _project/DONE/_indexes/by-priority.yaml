@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T12:57:14.970646'
-total_items: 524
+generated_at: '2026-02-21T13:22:02.609550'
+total_items: 525
 priorities:
   Critical:
     count: 35
@@ -1393,7 +1393,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 233
+    count: 234
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2199,6 +2199,11 @@ priorities:
     - id: complexity-core-analysis-dataframe-w15
       file: DONE/core-functionality/active/complexity-core-analysis-dataframe-w15.yaml
       title: Reduce complexity in core analysis and dataframe functions (complexity batch 9)
+      category: Core Functionality
+      status: Completed
+    - id: complexity-plans-tpcds-w15
+      file: DONE/core-functionality/active/complexity-plans-tpcds-w15.yaml
+      title: Reduce complexity in query plan and TPC-DS functions (complexity batch 10)
       category: Core Functionality
       status: Completed
     - id: complexity-validation-misc-w14

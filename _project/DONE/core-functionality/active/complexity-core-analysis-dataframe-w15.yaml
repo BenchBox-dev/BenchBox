@@ -1,0 +1,91 @@
+id: complexity-core-analysis-dataframe-w15
+title: "Reduce complexity in core analysis and dataframe functions (complexity batch 9)"
+worktree: core-functionality
+priority: Medium
+status: Completed
+completed_date: "2026-02-21"
+category: Core Functionality
+description: |
+  Five core functions at CC=14 have clear decomposition opportunities.
+
+  Target functions:
+  1. validate (comparison.py:196) — extract _detect_outliers() and _validate_query_overlap()
+  2. _rank_by_composite (ranking.py:361) — extract _compute_raw_scores() and _normalize_scores()
+  3. _run_sql_query (benchmark_suite.py:1081) — extract _run_on_duckdb() and _run_on_sqlite()
+     (most clear-cut: two 90%-identical platform branches)
+  4. convert_csv_to_parquet (data_loader.py:255) — extract _build_write_kwargs() and _resolve_arrow_types()
+  5. execute_dry_run (dryrun.py:110) — extract _resolve_execution_mode() and _init_platform_adapter()
+
+work:
+- id: w1
+  summary: "Extract _run_on_duckdb() and _run_on_sqlite() from _run_sql_query in benchmark_suite.py"
+  status: done
+  notes: "Most impactful — near-duplicate platform branches are the primary code smell"
+
+- id: w2
+  summary: "Extract _compute_raw_scores() and _normalize_scores() from _rank_by_composite in ranking.py"
+  status: done
+
+- id: w3
+  summary: "Extract _detect_outliers() and _validate_query_overlap() from validate in comparison.py"
+  status: done
+
+- id: w4
+  summary: "Extract _build_write_kwargs() and _resolve_arrow_types() from convert_csv_to_parquet in data_loader.py"
+  status: done
+
+- id: w5
+  summary: "Extract _resolve_execution_mode() and _init_platform_adapter() from execute_dry_run in dryrun.py"
+  status: done
+
+- id: w6
+  summary: "Run complexity check and full test suite to verify no regressions"
+  needs: [w1, w2, w3, w4, w5]
+  status: done
+
+must_preserve:
+- "_run_sql_query() returns identical (mean_time, row_count) tuple for both DuckDB and SQLite"
+- "_rank_by_composite() composite scoring formula and weight handling unchanged"
+- "validate() error/warning accumulation behavior and return type unchanged"
+- "convert_csv_to_parquet() handles both CSV and TBL files with trailing delimiters"
+- "execute_dry_run() DryRunResult construction and error handling paths unchanged"
+
+approach: |
+  Follow complexity batches 3-7 pattern. For _run_sql_query, the DuckDB and SQLite
+  branches are nearly identical — factor out shared logic (load tables loop, warmup loop,
+  benchmark loop with row count capture) into a common pattern or extract per-platform
+  helpers that share a _time_query_iterations() utility.
+
+anti_patterns:
+- "DO NOT create an ABC or strategy pattern for the DuckDB/SQLite dispatch — because only 2 platforms exist — simple if/else
+  with extracted helpers is sufficient"
+- "DO NOT change the scoring formula in _rank_by_composite — because results must remain comparable with prior runs — only
+  restructure the code"
+
+verification:
+- description: "Core analysis tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/ -v"
+  expected_output: "all tests pass"
+- description: "Dataframe tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/dataframe/ -v -k 'not integration'"
+  expected_output: "all tests pass"
+- description: "Complexity check passes"
+  command: "make complexity-check"
+  expected_output: "PASSED; these functions no longer in top-20"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/analysis/comparison.py"
+  - "benchbox/core/analysis/ranking.py"
+  - "benchbox/core/dataframe/benchmark_suite.py"
+  - "benchbox/core/dataframe/data_loader.py"
+  - "benchbox/core/dryrun.py"
+  - "tests/unit/core/"
+
+metadata:
+  tags:
+  - complexity
+  - refactoring
+  - core
+  estimated_effort: "3-4 hours"
+  created_date: "2026-02-21"

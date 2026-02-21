@@ -1,0 +1,77 @@
+id: complexity-cli-prompts-w15
+title: "Reduce complexity in CLI prompt and command functions (complexity batch 8)"
+worktree: core-functionality
+priority: Medium
+status: Completed
+completed_date: "2026-02-21"
+category: Core Functionality
+description: |
+  Four CLI functions at CC=14 have extractable sub-concerns that can be
+  decomposed into focused helpers without losing clarity.
+
+  Target functions:
+  1. prompt_phases (benchmarks.py:891) — extract _parse_phase_input() for dual-mode parser
+  2. prompt_platform_options (benchmarks.py:1387) — extract _prompt_single_option() type-dispatch
+  3. prompt_cloud_output_location (cloud_storage.py:21) — extract _prompt_and_validate_cloud_path()
+  4. check_dependencies (commands/checks.py:20) — extract _show_matrix(), _show_platform(), _show_overview()
+
+work:
+- id: w1
+  summary: "Extract _parse_phase_input() from prompt_phases in benchmarks.py"
+  status: done
+
+- id: w2
+  summary: "Extract _prompt_single_option() from prompt_platform_options in benchmarks.py"
+  status: done
+
+- id: w3
+  summary: "Extract _prompt_and_validate_cloud_path() from prompt_cloud_output_location in cloud_storage.py"
+  status: done
+
+- id: w4
+  summary: "Extract _show_matrix(), _show_platform(), _show_overview() from check_dependencies in checks.py"
+  status: done
+
+- id: w5
+  summary: "Run complexity check and full test suite to verify no regressions"
+  needs: [w1, w2, w3, w4]
+  status: done
+
+must_preserve:
+- "prompt_phases() return type and behavior remain identical (list of phase strings)"
+- "prompt_platform_options() correctly prompts for all option types (choice, bool, int, string)"
+- "prompt_cloud_output_location() validation logic for cloud:// paths unchanged"
+- "check_dependencies --matrix, --platform, and default output formats unchanged"
+
+approach: |
+  Follow the pattern established in complexity batches 3-7: extract private helper
+  functions within the same module, preserve the public function signature exactly,
+  and ensure the extracted helpers are independently testable.
+
+anti_patterns:
+- "DO NOT change public function signatures — because callers depend on them — only extract internal helpers"
+- "DO NOT move helpers to separate files — because these are small extractions — keep them in the same module"
+
+verification:
+- description: "All CLI tests pass"
+  command: "uv run -- python -m pytest tests/unit/cli/ -v"
+  expected_output: "all tests pass"
+- description: "Complexity check passes and these functions drop below 14"
+  command: "make complexity-check"
+  expected_output: "PASSED; prompt_phases, prompt_platform_options, prompt_cloud_output_location, check_dependencies no longer
+    in top-20"
+
+scope_limit:
+  only_modify:
+  - "benchbox/cli/benchmarks.py"
+  - "benchbox/cli/cloud_storage.py"
+  - "benchbox/cli/commands/checks.py"
+  - "tests/unit/cli/"
+
+metadata:
+  tags:
+  - complexity
+  - refactoring
+  - cli
+  estimated_effort: "2-3 hours"
+  created_date: "2026-02-21"

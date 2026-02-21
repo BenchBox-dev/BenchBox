@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T12:57:14.970189'
-total_items: 524
+generated_at: '2026-02-21T13:22:02.609153'
+total_items: 525
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4888,6 +4888,23 @@ items:
   completed_date: '2026-02-21'
   work_total: 6
   work_done: 6
+  work_ready: 0
+- id: complexity-plans-tpcds-w15
+  file: DONE/core-functionality/active/complexity-plans-tpcds-w15.yaml
+  title: Reduce complexity in query plan and TPC-DS functions (complexity batch 10)
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - complexity
+  - refactoring
+  - query-plans
+  - tpcds
+  estimated_effort: 3-4 hours
+  completed_date: '2026-02-21'
+  work_total: 7
+  work_done: 7
   work_ready: 0
 - id: complexity-validation-misc-w14
   file: DONE/core-functionality/active/complexity-validation-misc-w14.yaml
