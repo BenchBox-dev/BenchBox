@@ -54,7 +54,7 @@ work:
 - id: w5
   summary: "Route MCP benchmark export writes through configured results_dir"
   needs: [w4]
-  status: pending
+  status: done
 
 - id: w6
   summary: "Align MCP traversal/safe-root checks with configured results_dir"
