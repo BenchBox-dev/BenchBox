@@ -49,7 +49,7 @@ work:
 - id: w4
   summary: "Inject resolved directories into MCP server registration instead of module constants"
   needs: [w3]
-  status: pending
+  status: done
 
 - id: w5
   summary: "Route MCP benchmark export writes through configured results_dir"
