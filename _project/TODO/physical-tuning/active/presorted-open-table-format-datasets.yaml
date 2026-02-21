@@ -6,7 +6,7 @@ id: presorted-open-table-format-datasets
 title: "Support creation of pre-sorted / pre-clustered datasets in open table formats"
 worktree: physical-tuning
 priority: Medium-High
-status: Not Started
+status: In Progress
 description: |
   Enable BenchBox to generate benchmark datasets (TPC-H, TPC-DS, etc.) that are
   pre-sorted or pre-clustered in open table formats like Parquet, Delta Lake,
@@ -61,8 +61,8 @@ impact:
 files_affected:
   modified:
   - "benchbox/core/tpch/generator.py"
-  - "benchbox/core/tpcds/generator.py"
-  - "benchbox/cli/run.py"
+  - "benchbox/core/tpcds/generator/__init__.py"
+  - "benchbox/cli/commands/run.py"
   added:
   - "benchbox/core/data_organization/__init__.py"
   - "benchbox/core/data_organization/sorting.py"
@@ -106,6 +106,9 @@ technical_requirements:
   - "Must preserve data correctness (same rows, just reordered)"
   - "Should support all TPC benchmarks, not just TPC-H"
   - "Row group size must be configurable for zone map experiments"
+  - "Implementation is staged in this single item: Phase 1 Parquet baseline, Phase 2 clustering (Z-order/Hilbert), Phase 3
+    Delta/Iceberg integration"
+  - "Phase 3 integrations must reuse the core sorting/clustering abstractions validated in earlier phases"
 
 success_metrics:
 - "Can generate TPC-H Parquet files sorted by l_shipdate"
@@ -114,8 +117,13 @@ success_metrics:
 - "Generated files load correctly into target platforms"
 - "Performance delta matches expectations from research"
 
+decisions:
+- question: "Should sorting happen during generation or as post-processing?"
+  answer: "Post-processing. TPC compliance requires unmodified dbgen output. Sort as a separate step after TBL generation
+    using PyArrow."
+  decided: "2026-01-07"
+
 open_questions:
-- "Should sorting happen during generation or as post-processing?"
 - "How to handle very large scale factors (memory constraints)?"
 - "Should we support platform-specific formats (DuckDB native)?"
 
@@ -128,8 +136,10 @@ approach: |
   Post-process generated TBL/CSV files rather than modifying dbgen output.
   Use PyArrow's write_table() with sort_columns for Parquet output. New module
   benchbox/core/data_organization/ should be called by the existing generator
-  pipeline after TBL generation, not replace it. Phase 1 targets Parquet only;
-  Delta/Iceberg deferred to Phase 3.
+  pipeline after TBL generation, not replace it. Execute in three phases within
+  this TODO: (1) Parquet sorted export + CLI/config wiring, (2) clustering and
+  partition-aware strategies, (3) Delta Lake and Iceberg integrations using the
+  same validated ordering abstractions and tests.
 
 anti_patterns:
 - "DO NOT modify dbgen binary output format — because TPC compliance requires unmodified dbgen output — sort as a post-processing
@@ -148,63 +158,106 @@ verification:
 
 scope_limit:
   only_modify:
-  - "benchbox/core/data_organization/"
+  - "benchbox/core/data_organization/__init__.py"
+  - "benchbox/core/data_organization/sorting.py"
+  - "benchbox/core/data_organization/clustering.py"
   - "benchbox/core/tpch/generator.py"
-  - "benchbox/core/tpcds/generator.py"
-  - "tests/"
-  do_not_modify:
+  - "benchbox/core/tpcds/generator/__init__.py"
   - "benchbox/cli/commands/run.py"
+  - "tests/unit/core/data_organization/test_sorting.py"
+  - "tests/unit/core/data_organization/test_clustering.py"
+  - "tests/integration/core/data_organization/test_presorted_generation.py"
+  - "docs/guides/data-organization-strategies.md"
+  do_not_modify:
   - "benchbox/core/runner.py"
+  - "benchbox/platforms/base/data_loading.py"
+  - "benchbox/platforms/duckdb.py"
 
 work:
+# --- Phase 1: Sorted Parquet export + CLI/config wiring (w1-w7) ---
 - id: w1
-  summary: "Add sorted Parquet export to data generator"
-  status: pending
+  summary: "Create data_organization module skeleton with sorting interface and config types"
+  status: done
 - id: w2
-  summary: "Support single-column sorting (e.g., by date)"
+  summary: "Wire data_organization into generator pipeline as post-TBL hook"
   needs:
   - w1
   status: pending
 - id: w3
-  summary: "Support multi-column sorting with order specification"
+  summary: "Implement single-column sorting (e.g., by date) with unit tests"
   needs:
-  - w1
+  - w2
   status: pending
 - id: w4
-  summary: "Configure row group size for zone map granularity"
+  summary: "Implement multi-column sorting with order specification and unit tests"
   needs:
-  - w1
+  - w2
   status: pending
 - id: w5
-  summary: "Integrate with tuning config for sort column specification"
+  summary: "Implement configurable row group size for zone map granularity with unit tests"
+  needs:
+  - w2
   status: pending
 - id: w6
-  summary: "Add CLI option: --data-format parquet-sorted"
+  summary: "Integrate with tuning config for sort column and partition specification"
+  needs:
+  - w3
+  - w4
+  - w5
+  - w13
   status: pending
 - id: w7
-  summary: "Implement Z-order encoding for Parquet"
+  summary: "Add CLI option: --data-format parquet-sorted"
+  needs:
+  - w6
   status: pending
+# --- Phase 2: Clustering and partition-aware strategies (w8-w14) ---
 - id: w8
-  summary: "Implement Hilbert curve encoding option"
+  summary: "Implement Z-order encoding for Parquet with unit tests"
+  needs:
+  - w4
   status: pending
 - id: w9
-  summary: "Support cluster-by columns in tuning config"
+  summary: "Implement Hilbert curve encoding option with unit tests"
+  needs:
+  - w8
   status: pending
 - id: w10
-  summary: "Generate sorted Delta Lake tables with OPTIMIZE"
-  status: pending
-- id: w11
-  summary: "Generate Iceberg tables with sort orders"
-  status: pending
-- id: w12
-  summary: "Support partition-aware sorting"
+  summary: "Support cluster-by columns in tuning config"
+  needs:
+  - w8
+  - w9
   status: pending
 - id: w13
-  summary: "Unit tests for sorted data generation"
+  summary: "Implement partition-aware sorting with unit tests"
+  needs:
+  - w4
+  - w5
   status: pending
 - id: w14
-  summary: "Integration tests verifying sortedness metrics"
+  summary: "Integration tests verifying sortedness metrics end-to-end"
+  needs:
+  - w7
+  - w10
+  status: pending
+# --- Phase 3: Delta Lake and Iceberg integration (w11-w12, w15) ---
+- id: w11
+  summary: "Generate sorted Delta Lake tables with OPTIMIZE"
+  needs:
+  - w10
+  - w14
+  status: pending
+- id: w12
+  summary: "Generate Iceberg tables with sort orders"
+  needs:
+  - w10
+  - w14
   status: pending
 - id: w15
   summary: "Documentation: data organization strategies guide"
+  needs:
+  - w7
+  - w11
+  - w12
+  - w14
   status: pending
