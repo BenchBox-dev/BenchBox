@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T23:54:27.651175'
-total_items: 513
+generated_at: '2026-02-21T08:39:03.837578'
+total_items: 514
 priorities:
   Critical:
     count: 35
@@ -1094,7 +1094,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 56
+    count: 57
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1362,6 +1362,11 @@ priorities:
       title: Remove Polars SQL mode support - DataFrame only
       category: Platform Expansion
       status: Completed
+    - id: complexity-dict-dispatch-w14
+      file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
+      title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
+      category: Core Functionality
+      status: Not Started
     - id: simplify-dataframe-extra-naming
       file: DONE/main/active/simplify-dataframe-extra-naming.yaml
       title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'

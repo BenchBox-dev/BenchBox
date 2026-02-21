@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T23:54:27.651307'
-total_items: 513
+generated_at: '2026-02-21T08:39:03.837704'
+total_items: 514
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Usability
   Not Started:
-    count: 44
+    count: 45
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -237,6 +237,11 @@ statuses:
       title: Register PySpark SQL mode in platform registry
       priority: High
       category: Platform Expansion
+    - id: complexity-dict-dispatch-w14
+      file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
+      title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
+      priority: Medium-High
+      category: Core Functionality
   Identified:
     count: 2
     items:

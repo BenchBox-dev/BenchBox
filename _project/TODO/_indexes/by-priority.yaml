@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T23:54:26.442242'
-total_items: 37
+generated_at: '2026-02-21T08:39:02.628056'
+total_items: 36
 priorities:
   High:
     count: 2
@@ -15,7 +15,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 7
+    count: 6
     items:
     - id: complexity-field-extraction-w14
       file: TODO/core-functionality/active/complexity-field-extraction-w14.yaml
@@ -26,11 +26,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
-      status: Not Started
-    - id: complexity-dict-dispatch-w14
-      file: TODO/core-functionality/active/complexity-dict-dispatch-w14.yaml
-      title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
-      category: Core Functionality
       status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T23:54:27.650786'
-total_items: 513
+generated_at: '2026-02-21T08:39:03.837185'
+total_items: 514
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6214,6 +6214,21 @@ items:
   - dataframe
   - breaking-change
   estimated_effort: 1-2 days
+- id: complexity-dict-dispatch-w14
+  file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
+  title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - complexity
+  - refactor
+  - dict-dispatch
+  estimated_effort: 1 day
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: simplify-dataframe-extra-naming
   file: DONE/main/active/simplify-dataframe-extra-naming.yaml
   title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'

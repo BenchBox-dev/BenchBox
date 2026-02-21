@@ -1,5 +1,5 @@
-generated_at: '2026-02-20T23:54:26.442200'
-total_items: 37
+generated_at: '2026-02-21T08:39:02.628009'
+total_items: 36
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -528,8 +528,8 @@ items:
   - field-extraction
   estimated_effort: 1-2 days
   work_total: 7
-  work_done: 0
-  work_ready: 6
+  work_done: 1
+  work_ready: 5
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -549,21 +549,6 @@ items:
   work_total: 12
   work_done: 0
   work_ready: 12
-- id: complexity-dict-dispatch-w14
-  file: TODO/core-functionality/active/complexity-dict-dispatch-w14.yaml
-  title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - complexity
-  - refactor
-  - dict-dispatch
-  estimated_effort: 1 day
-  work_total: 7
-  work_done: 0
-  work_ready: 6
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats
