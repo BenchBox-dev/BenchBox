@@ -1,0 +1,71 @@
+id: dedup-tpcds-maintenance-returns
+title: "Parameterize _insert_{store,catalog,web}_returns in TPC-DS maintenance operations"
+worktree: core-functionality
+priority: Medium
+status: Completed
+completed_date: "2026-02-21"
+category: Core Functionality
+description: |
+  Group 17 from the duplicate-check report identifies 3 copies of nearly
+  identical logic in benchbox/core/tpcds/maintenance_operations.py:
+  - _insert_store_returns (line 470, ~44 lines)
+  - _insert_catalog_returns (line 515, ~44 lines)
+  - _insert_web_returns (line 564, ~44 lines)
+
+  All three follow the same algorithm:
+  1. Log the insert count
+  2. Get parameter placeholder
+  3. Build SELECT ... FROM {sales_table} ORDER BY RANDOM() LIMIT {n}
+  4. Execute query, fetch records
+  5. Handle empty result / error cases identically
+  6. Loop over records calling self._generate_{type}_returns_from_sale(sale)
+  7. Call self._execute_batched_insert(connection, table, columns, rows, N)
+
+  Only the table/column names and the row generator callback differ.
+
+approach: |
+  Extract a `_insert_returns_generic(self, connection, sales_table, returns_table,
+  sales_columns, returns_columns, row_generator_fn, estimated_rows)` method.
+  Each channel-specific method becomes a 5-line call site passing its specific
+  table names, column lists, and row generator callback.
+
+work:
+  - id: w1
+    summary: "Create _insert_returns_generic parameterized helper method"
+    status: done
+
+  - id: w2
+    summary: "Refactor _insert_{store,catalog,web}_returns to use generic helper"
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Run TPC-DS tests to verify no regressions"
+    needs: [w2]
+    status: done
+
+files_affected:
+  modified:
+    - "benchbox/core/tpcds/maintenance_operations.py"
+
+verification:
+  - description: "TPC-DS tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k tpcds"
+    expected_output: "all tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpcds/maintenance_operations.py"
+    - "tests/"
+
+must_preserve:
+  - "_insert_store_returns, _insert_catalog_returns, _insert_web_returns public API unchanged"
+  - "Batched insert behavior identical (same batch size, same error handling)"
+
+metadata:
+  tags:
+    - code-quality
+    - duplicate-check
+    - refactoring
+  estimated_effort: "1-2 hours"
+  created_date: "2026-02-21"
