@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T19:51:00.348636'
-total_items: 44
+generated_at: '2026-02-22T09:40:33.593200'
+total_items: 40
 priorities:
   High:
     count: 2
@@ -48,7 +48,7 @@ priorities:
       category: Blog Revision
       status: In Progress
   Medium:
-    count: 19
+    count: 18
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -79,11 +79,6 @@ priorities:
       file: TODO/blog-content/planning/timescaledb-blog-post-edits.yaml
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       category: Documentation
-      status: Not Started
-    - id: dedup-tpcdi-dimension-generator
-      file: TODO/core-functionality/planning/dedup-tpcdi-dimension-generator.yaml
-      title: Extract _generate_dimension helper for TPC-DI SQL generator scaffolding
-      category: Core Functionality
       status: Not Started
     - id: complexity-cli-orchestration-w14
       file: TODO/core-functionality/active/complexity-cli-orchestration-w14.yaml
@@ -146,7 +141,7 @@ priorities:
       category: Blog Revision
       status: Not Started
   Low:
-    count: 17
+    count: 14
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -182,21 +177,6 @@ priorities:
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       category: Benchmark Expansion
-      status: Not Started
-    - id: dedup-tpcds-constants-empty-results
-      file: TODO/core-functionality/planning/dedup-tpcds-constants-empty-results.yaml
-      title: Extract TPC-DS canonical table list and shared _empty_results to constants
-      category: Core Functionality
-      status: Not Started
-    - id: dedup-cloud-platform-shared-utilities
-      file: TODO/core-functionality/planning/dedup-cloud-platform-shared-utilities.yaml
-      title: Extract shared cloud platform utilities (session cache validation, credential prompts)
-      category: Core Functionality
-      status: Not Started
-    - id: dedup-tpcds-rolling-average-queries
-      file: TODO/core-functionality/planning/dedup-tpcds-rolling-average-queries.yaml
-      title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
-      category: Core Functionality
       status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml

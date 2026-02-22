@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T19:51:01.683074'
-total_items: 532
+generated_at: '2026-02-22T09:40:35.375825'
+total_items: 539
 priorities:
   Critical:
     count: 35
@@ -1930,6 +1930,11 @@ priorities:
       title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
       category: Core Functionality
       status: Completed
+    - id: dedup-tpcdi-dimension-generator
+      file: DONE/core-functionality/active/dedup-tpcdi-dimension-generator.yaml
+      title: Extract _generate_dimension helper for TPC-DI SQL generator scaffolding
+      category: Core Functionality
+      status: Completed
     - id: dedup-sql-utilities
       file: DONE/core-functionality/active/dedup-sql-utilities.yaml
       title: Extract _normalize_table_name_in_sql to shared SQL utility module
@@ -1943,11 +1948,6 @@ priorities:
     - id: dedup-spark-shared-base
       file: DONE/core-functionality/active/dedup-spark-shared-base.yaml
       title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
-      category: Core Functionality
-      status: Completed
-    - id: dedup-simple-benchmark-base-methods
-      file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
-      title: Extract shared run_benchmark and _load_data to base benchmark class (amplab/clickbench/ssb)
       category: Core Functionality
       status: Completed
     - id: finalize-monitoring-module-scope
@@ -2602,7 +2602,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 15
+    count: 21
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -2617,6 +2617,16 @@ priorities:
     - id: local-platform-cost-tracking
       file: DONE/platform-expansion/planning/local-platform-cost-tracking.yaml
       title: Add cost tracking for local/self-hosted platforms
+      category: Platform Expansion
+      status: Completed
+    - id: pg-mooncake-migration-benchmark
+      file: DONE/platform-expansion/active/pg-mooncake-migration-benchmark.yaml
+      title: Add heap-to-columnstore migration benchmark for pg_mooncake
+      category: Platform Expansion
+      status: Completed
+    - id: pg-duckdb-native-comparison
+      file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml
+      title: Build automated pg_duckdb vs native DuckDB comparison report
       category: Platform Expansion
       status: Completed
     - id: consolidate-tpc-delimiter-detection
@@ -2638,6 +2648,26 @@ priorities:
       file: DONE/ux-improvements/active/metrics-command-group.yaml
       title: Create metrics command group and consolidate calculate-qphh
       category: ux-improvements
+      status: Completed
+    - id: pg-mooncake-type-compat-matrix
+      file: DONE/platform-expansion/active/pg-mooncake-type-compat-matrix.yaml
+      title: Document pg_mooncake data type compatibility matrix with automated probing
+      category: Platform Expansion
+      status: Completed
+    - id: dedup-tpcds-constants-empty-results
+      file: DONE/core-functionality/active/dedup-tpcds-constants-empty-results.yaml
+      title: Extract TPC-DS canonical table list and shared _empty_results to constants
+      category: Core Functionality
+      status: Completed
+    - id: dedup-cloud-platform-shared-utilities
+      file: DONE/core-functionality/active/dedup-cloud-platform-shared-utilities.yaml
+      title: Extract shared cloud platform utilities (session cache validation, credential prompts)
+      category: Core Functionality
+      status: Completed
+    - id: dedup-tpcds-rolling-average-queries
+      file: DONE/core-functionality/active/dedup-tpcds-rolling-average-queries.yaml
+      title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
+      category: Core Functionality
       status: Completed
     - id: firebolt-cloud-deployment
       file: DONE/platform-expansion/planning/firebolt-cloud-deployment.yaml

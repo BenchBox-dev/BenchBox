@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T19:51:00.348649'
-total_items: 44
+generated_at: '2026-02-22T09:40:33.593302'
+total_items: 40
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Medium-High
       category: Blog Revision
   Not Started:
-    count: 42
+    count: 38
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -82,16 +82,6 @@ statuses:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       priority: Medium
       category: Documentation
-    - id: dedup-tpcds-constants-empty-results
-      file: TODO/core-functionality/planning/dedup-tpcds-constants-empty-results.yaml
-      title: Extract TPC-DS canonical table list and shared _empty_results to constants
-      priority: Low
-      category: Core Functionality
-    - id: dedup-tpcdi-dimension-generator
-      file: TODO/core-functionality/planning/dedup-tpcdi-dimension-generator.yaml
-      title: Extract _generate_dimension helper for TPC-DI SQL generator scaffolding
-      priority: Medium
-      category: Core Functionality
     - id: complexity-cli-orchestration-w14
       file: TODO/core-functionality/active/complexity-cli-orchestration-w14.yaml
       title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
@@ -101,16 +91,6 @@ statuses:
       file: TODO/core-functionality/active/complexity-field-extraction-w14.yaml
       title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
       priority: Medium-High
-      category: Core Functionality
-    - id: dedup-cloud-platform-shared-utilities
-      file: TODO/core-functionality/planning/dedup-cloud-platform-shared-utilities.yaml
-      title: Extract shared cloud platform utilities (session cache validation, credential prompts)
-      priority: Low
-      category: Core Functionality
-    - id: dedup-tpcds-rolling-average-queries
-      file: TODO/core-functionality/planning/dedup-tpcds-rolling-average-queries.yaml
-      title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
-      priority: Low
       category: Core Functionality
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml

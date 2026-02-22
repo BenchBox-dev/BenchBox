@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T19:51:01.682916'
-total_categories: 66
+generated_at: '2026-02-22T09:40:35.375669'
+total_categories: 67
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 164
+    count: 167
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -714,6 +714,16 @@ categories:
       title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
       priority: Medium
       status: Completed
+    - id: dedup-tpcds-constants-empty-results
+      file: DONE/core-functionality/active/dedup-tpcds-constants-empty-results.yaml
+      title: Extract TPC-DS canonical table list and shared _empty_results to constants
+      priority: Low
+      status: Completed
+    - id: dedup-tpcdi-dimension-generator
+      file: DONE/core-functionality/active/dedup-tpcdi-dimension-generator.yaml
+      title: Extract _generate_dimension helper for TPC-DI SQL generator scaffolding
+      priority: Medium
+      status: Completed
     - id: dedup-sql-utilities
       file: DONE/core-functionality/active/dedup-sql-utilities.yaml
       title: Extract _normalize_table_name_in_sql to shared SQL utility module
@@ -734,10 +744,15 @@ categories:
       title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
       priority: Medium
       status: Completed
-    - id: dedup-simple-benchmark-base-methods
-      file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
-      title: Extract shared run_benchmark and _load_data to base benchmark class (amplab/clickbench/ssb)
-      priority: Medium
+    - id: dedup-cloud-platform-shared-utilities
+      file: DONE/core-functionality/active/dedup-cloud-platform-shared-utilities.yaml
+      title: Extract shared cloud platform utilities (session cache validation, credential prompts)
+      priority: Low
+      status: Completed
+    - id: dedup-tpcds-rolling-average-queries
+      file: DONE/core-functionality/active/dedup-tpcds-rolling-average-queries.yaml
+      title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
+      priority: Low
       status: Completed
     - id: fix-ascii-visualization-regressions
       file: DONE/main/active/fix-ascii-visualization-regressions.yaml
@@ -1730,7 +1745,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 62
+    count: 65
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1812,6 +1827,11 @@ categories:
       title: Add cost tracking for local/self-hosted platforms
       priority: Low
       status: Completed
+    - id: pg-mooncake-migration-benchmark
+      file: DONE/platform-expansion/active/pg-mooncake-migration-benchmark.yaml
+      title: Add heap-to-columnstore migration benchmark for pg_mooncake
+      priority: Low
+      status: Completed
     - id: pg-duckdb-platform-adapter
       file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
       title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics
@@ -1857,6 +1877,11 @@ categories:
       title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       priority: Medium
       status: Completed
+    - id: pg-duckdb-native-comparison
+      file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml
+      title: Build automated pg_duckdb vs native DuckDB comparison report
+      priority: Low
+      status: Completed
     - id: clickhouse-cloud-deployment
       file: DONE/platform-expansion/active/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
@@ -1886,6 +1911,11 @@ categories:
       file: DONE/platform-expansion/active/databricks-dataframe-mode.yaml
       title: Databricks DataFrame Mode - CRITICAL PRIORITY
       priority: Critical
+      status: Completed
+    - id: pg-mooncake-type-compat-matrix
+      file: DONE/platform-expansion/active/pg-mooncake-type-compat-matrix.yaml
+      title: Document pg_mooncake data type compatibility matrix with automated probing
+      priority: Low
       status: Completed
     - id: pyspark-sql-session-manager
       file: DONE/dataframe-expansion/planning/pyspark-sql-session-manager.yaml
@@ -2836,6 +2866,14 @@ categories:
       title: Switch post-run histogram to horizontal bars when query names are long
       priority: Medium
       status: Completed
+  core-functionality:
+    count: 1
+    items:
+    - id: dedup-simple-benchmark-base-methods
+      file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
+      title: Extract shared run_benchmark and _load_data to SimpleBenchmarkMixin
+      priority: medium
+      status: completed
   platform-adapter:
     count: 1
     items:

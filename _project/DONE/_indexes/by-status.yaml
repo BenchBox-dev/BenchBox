@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T19:51:01.683211'
-total_items: 532
+generated_at: '2026-02-22T09:40:35.375962'
+total_items: 539
 statuses:
   In Progress:
     count: 2
@@ -286,7 +286,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 477
+    count: 483
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -579,6 +579,11 @@ statuses:
       title: Add greyscale fallback rendering for ASCII visualizations
       priority: Medium-High
       category: Core Functionality
+    - id: pg-mooncake-migration-benchmark
+      file: DONE/platform-expansion/active/pg-mooncake-migration-benchmark.yaml
+      title: Add heap-to-columnstore migration benchmark for pg_mooncake
+      priority: Low
+      category: Platform Expansion
     - id: dedup-ignore-rules-boilerplate
       file: DONE/core-functionality/active/dedup-ignore-rules-boilerplate.yaml
       title: Add ignore rules for 17 boilerplate duplicate groups identified by duplicate-check
@@ -708,6 +713,11 @@ statuses:
       file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
       title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       priority: Medium
+      category: Platform Expansion
+    - id: pg-duckdb-native-comparison
+      file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml
+      title: Build automated pg_duckdb vs native DuckDB comparison report
+      priority: Low
       category: Platform Expansion
     - id: bundle-tpc-query-templates-in-wheel
       file: DONE/release-readiness/bundle-tpc-query-templates-in-wheel.yaml
@@ -1039,6 +1049,11 @@ statuses:
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
       priority: High
       category: Documentation
+    - id: pg-mooncake-type-compat-matrix
+      file: DONE/platform-expansion/active/pg-mooncake-type-compat-matrix.yaml
+      title: Document pg_mooncake data type compatibility matrix with automated probing
+      priority: Low
+      category: Platform Expansion
     - id: drop-plotly-html-charts
       file: DONE/core-functionality/active/drop-plotly-html-charts.yaml
       title: Drop Plotly dependency and HTML chart rendering — go ASCII-only
@@ -1185,6 +1200,16 @@ statuses:
       title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
       priority: Medium
       category: Core Functionality
+    - id: dedup-tpcds-constants-empty-results
+      file: DONE/core-functionality/active/dedup-tpcds-constants-empty-results.yaml
+      title: Extract TPC-DS canonical table list and shared _empty_results to constants
+      priority: Low
+      category: Core Functionality
+    - id: dedup-tpcdi-dimension-generator
+      file: DONE/core-functionality/active/dedup-tpcdi-dimension-generator.yaml
+      title: Extract _generate_dimension helper for TPC-DI SQL generator scaffolding
+      priority: Medium
+      category: Core Functionality
     - id: dedup-sql-utilities
       file: DONE/core-functionality/active/dedup-sql-utilities.yaml
       title: Extract _normalize_table_name_in_sql to shared SQL utility module
@@ -1195,10 +1220,15 @@ statuses:
       title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
       priority: Medium
       category: Core Functionality
-    - id: dedup-simple-benchmark-base-methods
-      file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
-      title: Extract shared run_benchmark and _load_data to base benchmark class (amplab/clickbench/ssb)
-      priority: Medium
+    - id: dedup-cloud-platform-shared-utilities
+      file: DONE/core-functionality/active/dedup-cloud-platform-shared-utilities.yaml
+      title: Extract shared cloud platform utilities (session cache validation, credential prompts)
+      priority: Low
+      category: Core Functionality
+    - id: dedup-tpcds-rolling-average-queries
+      file: DONE/core-functionality/active/dedup-tpcds-rolling-average-queries.yaml
+      title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
+      priority: Low
       category: Core Functionality
     - id: finalize-monitoring-module-scope
       file: DONE/observability-quality/completed/finalize-monitoring-module-scope.yaml

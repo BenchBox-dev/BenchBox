@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T19:51:00.348583'
-total_items: 44
+generated_at: '2026-02-22T09:40:33.593035'
+total_items: 40
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -146,51 +146,6 @@ items:
   work_done: 0
   work_ready: 4
   deferred_count: 1
-- id: dedup-tpcds-constants-empty-results
-  file: TODO/core-functionality/planning/dedup-tpcds-constants-empty-results.yaml
-  title: Extract TPC-DS canonical table list and shared _empty_results to constants
-  worktree: core-functionality
-  category: Core Functionality
-  priority: Low
-  status: Not Started
-  tags:
-  - code-quality
-  - duplicate-check
-  - refactoring
-  estimated_effort: 1 hour
-  work_total: 3
-  work_done: 0
-  work_ready: 2
-- id: dedup-cloud-platform-shared-utilities
-  file: TODO/core-functionality/planning/dedup-cloud-platform-shared-utilities.yaml
-  title: Extract shared cloud platform utilities (session cache validation, credential prompts)
-  worktree: core-functionality
-  category: Core Functionality
-  priority: Low
-  status: Not Started
-  tags:
-  - code-quality
-  - duplicate-check
-  - refactoring
-  estimated_effort: 2-3 hours
-  work_total: 5
-  work_done: 0
-  work_ready: 2
-- id: dedup-tpcds-rolling-average-queries
-  file: TODO/core-functionality/planning/dedup-tpcds-rolling-average-queries.yaml
-  title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
-  worktree: core-functionality
-  category: Core Functionality
-  priority: Low
-  status: Not Started
-  tags:
-  - code-quality
-  - duplicate-check
-  - refactoring
-  estimated_effort: 1-2 hours
-  work_total: 3
-  work_done: 0
-  work_ready: 1
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -415,21 +370,6 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 7
-- id: dedup-tpcdi-dimension-generator
-  file: TODO/core-functionality/planning/dedup-tpcdi-dimension-generator.yaml
-  title: Extract _generate_dimension helper for TPC-DI SQL generator scaffolding
-  worktree: core-functionality
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - code-quality
-  - duplicate-check
-  - refactoring
-  estimated_effort: 1-2 hours
-  work_total: 2
-  work_done: 0
-  work_ready: 1
 - id: complexity-cli-orchestration-w14
   file: TODO/core-functionality/active/complexity-cli-orchestration-w14.yaml
   title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
