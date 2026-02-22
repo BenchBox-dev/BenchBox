@@ -1,8 +1,9 @@
 id: dedup-simple-benchmark-base-methods
 title: "Extract shared run_benchmark and _load_data to SimpleBenchmarkMixin"
-category: core-functionality
-priority: medium
-status: completed
+worktree: core-functionality
+category: Core Functionality
+priority: Medium
+status: Completed
 created_date: "2026-02-21"
 completed_date: "2026-02-21"
 description: |
@@ -17,15 +18,24 @@ description: |
   (query_results list vs queries dict).
 
 work:
-  - task: "Create SimpleBenchmarkMixin with shared run_benchmark and _load_data"
+  - id: w1
+    summary: "Create SimpleBenchmarkMixin with shared run_benchmark and _load_data"
     status: done
-  - task: "Update AMPLab to use SimpleBenchmarkMixin (run_benchmark + _load_data)"
+  - id: w2
+    summary: "Update AMPLab to use SimpleBenchmarkMixin (run_benchmark + _load_data)"
+    needs: [w1]
     status: done
-  - task: "Update ClickBench to use SimpleBenchmarkMixin (run_benchmark only)"
+  - id: w3
+    summary: "Update ClickBench to use SimpleBenchmarkMixin (run_benchmark only)"
+    needs: [w1]
     status: done
-  - task: "Update SSB to use SimpleBenchmarkMixin (_load_data only, keep run_benchmark)"
+  - id: w4
+    summary: "Update SSB to use SimpleBenchmarkMixin (_load_data only, keep run_benchmark)"
+    needs: [w1]
     status: done
-  - task: "Run tests to verify no regressions"
+  - id: w5
+    summary: "Run tests to verify no regressions"
+    needs: [w2, w3, w4]
     status: done
 
 files_changed:

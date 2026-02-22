@@ -2,7 +2,8 @@ id: "complexity-mcp-analytics-w14"
 title: "Decompose MCP tool implementations and analytics functions (complexity batch 6)"
 worktree: "main"
 priority: "Medium"
-status: "Not Started"
+status: Completed
+completed_date: "2026-02-22"
 description: |
   8 MCP tool and analytics functions mix phase logic (file enumeration, metric extraction,
   aggregation, formatting) in single long functions. Extracting phases to private helpers

@@ -1,4 +1,4 @@
-generated_at: '2026-02-22T09:43:22.185176'
+generated_at: '2026-02-22T10:00:58.154428'
 total_items: 539
 statuses:
   In Progress:
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Usability
   Not Started:
-    count: 51
+    count: 44
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -132,16 +132,6 @@ statuses:
       title: DataFusion DataFrame Adapter Implementation
       priority: Medium
       category: Platform Enhancement
-    - id: complexity-mcp-analytics-w14
-      file: DONE/core-functionality/active/complexity-mcp-analytics-w14.yaml
-      title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
-      priority: Medium
-      category: Core Functionality
-    - id: complexity-ascii-renderers-w14
-      file: DONE/core-functionality/active/complexity-ascii-renderers-w14.yaml
-      title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
-      priority: Medium
-      category: Core Functionality
     - id: pyspark-sql-documentation
       file: DONE/dataframe-expansion/planning/pyspark-sql-documentation.yaml
       title: Document PySpark SQL mode usage
@@ -157,16 +147,6 @@ statuses:
       title: Extract SparkSessionManager for shared PySpark session management
       priority: High
       category: Platform Expansion
-    - id: complexity-cli-orchestration-w14
-      file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml
-      title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
-      priority: Medium
-      category: Core Functionality
-    - id: complexity-field-extraction-w14
-      file: DONE/core-functionality/active/complexity-field-extraction-w14.yaml
-      title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
-      priority: Medium-High
-      category: Core Functionality
     - id: gpu-acceleration-benchmarking-rapids-cudf-integration
       file: DONE/ai-ml-gpu/planning/gpu-acceleration-benchmarking-rapids-cudf-integration.yaml
       title: GPU Acceleration Benchmarking & RAPIDS cuDF Integration
@@ -252,26 +232,11 @@ statuses:
       title: 'PT-09: BigQuery Physical Tuning DDL Generator Enhancement'
       priority: Medium
       category: Platform Expansion
-    - id: complexity-validation-misc-w14
-      file: DONE/core-functionality/active/complexity-validation-misc-w14.yaml
-      title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
-      priority: Medium
-      category: Core Functionality
     - id: pyspark-sql-registry-integration
       file: DONE/dataframe-expansion/planning/pyspark-sql-registry-integration.yaml
       title: Register PySpark SQL mode in platform registry
       priority: High
       category: Platform Expansion
-    - id: complexity-dict-dispatch-w14
-      file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
-      title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
-      priority: Medium-High
-      category: Core Functionality
-    - id: complexity-generators-pipelines-w14
-      file: DONE/core-functionality/active/complexity-generators-pipelines-w14.yaml
-      title: Simplify data generator and pipeline loading functions (complexity batch 5)
-      priority: Medium
-      category: Core Functionality
   Identified:
     count: 2
     items:
@@ -286,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 483
+    count: 491
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1009,6 +974,16 @@ statuses:
       title: Databricks Example Modernization ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
+    - id: complexity-mcp-analytics-w14
+      file: DONE/core-functionality/active/complexity-mcp-analytics-w14.yaml
+      title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
+      priority: Medium
+      category: Core Functionality
+    - id: complexity-ascii-renderers-w14
+      file: DONE/core-functionality/active/complexity-ascii-renderers-w14.yaml
+      title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
+      priority: Medium
+      category: Core Functionality
     - id: deferred-dataframe-performance-analysis
       file: DONE/main/active/deferred-dataframe-performance-analysis.yaml
       title: Deferred DataFrame Performance Cross-Platform Analysis
@@ -1215,6 +1190,16 @@ statuses:
       title: Extract _normalize_table_name_in_sql to shared SQL utility module
       priority: Medium
       category: Core Functionality
+    - id: complexity-cli-orchestration-w14
+      file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml
+      title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
+      priority: Medium
+      category: Core Functionality
+    - id: complexity-field-extraction-w14
+      file: DONE/core-functionality/active/complexity-field-extraction-w14.yaml
+      title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
+      priority: Medium-High
+      category: Core Functionality
     - id: dedup-spark-shared-base
       file: DONE/core-functionality/active/dedup-spark-shared-base.yaml
       title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
@@ -1229,6 +1214,11 @@ statuses:
       file: DONE/core-functionality/active/dedup-tpcds-rolling-average-queries.yaml
       title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
       priority: Low
+      category: Core Functionality
+    - id: dedup-simple-benchmark-base-methods
+      file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
+      title: Extract shared run_benchmark and _load_data to SimpleBenchmarkMixin
+      priority: Medium
       category: Core Functionality
     - id: finalize-monitoring-module-scope
       file: DONE/observability-quality/completed/finalize-monitoring-module-scope.yaml
@@ -2006,6 +1996,11 @@ statuses:
       title: Reduce complexity in query plan and TPC-DS functions (complexity batch 10)
       priority: Medium
       category: Core Functionality
+    - id: complexity-validation-misc-w14
+      file: DONE/core-functionality/active/complexity-validation-misc-w14.yaml
+      title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
+      priority: Medium
+      category: Core Functionality
     - id: refactor-mcp-use-public-api
       file: DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml
       title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
@@ -2060,6 +2055,11 @@ statuses:
       file: DONE/main/active/remove-alpha-backward-compatibility-surface.yaml
       title: Remove alpha-stage backward compatibility surface across BenchBox
       priority: Critical
+      category: Core Functionality
+    - id: complexity-dict-dispatch-w14
+      file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
+      title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
+      priority: Medium-High
       category: Core Functionality
     - id: resource-management
       file: DONE/runtime-ops/completed/resource-management.yaml
@@ -2131,6 +2131,11 @@ statuses:
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
+    - id: complexity-generators-pipelines-w14
+      file: DONE/core-functionality/active/complexity-generators-pipelines-w14.yaml
+      title: Simplify data generator and pipeline loading functions (complexity batch 5)
+      priority: Medium
+      category: Core Functionality
     - id: simplify-dataframe-extra-naming
       file: DONE/main/active/simplify-dataframe-extra-naming.yaml
       title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'

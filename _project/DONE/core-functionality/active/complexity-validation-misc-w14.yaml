@@ -2,7 +2,8 @@ id: "complexity-validation-misc-w14"
 title: "Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)"
 worktree: "main"
 priority: "Medium"
-status: "Not Started"
+status: Completed
+completed_date: "2026-02-22"
 description: |
   ~32 remaining functions with complexity 15-19 that don't fit cleanly into earlier batches.
   Grouped into 6 sub-areas for sequential implementation. Each sub-area shares a common

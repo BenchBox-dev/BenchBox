@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T09:43:20.990477'
-total_items: 40
+generated_at: '2026-02-22T10:00:57.044834'
+total_items: 30
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Medium-High
       category: Blog Revision
   Not Started:
-    count: 38
+    count: 28
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -42,11 +42,6 @@ statuses:
       title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
       priority: Low
       category: Platform Expansion
-    - id: complexity-ignore-required-w15
-      file: TODO/core-functionality/active/complexity-ignore-required-w15.yaml
-      title: Add complexity exclusions for 5 functions with inherent required complexity
-      priority: Medium
-      category: Core Functionality
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
@@ -57,16 +52,6 @@ statuses:
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
       priority: Low
       category: Platform Expansion
-    - id: complexity-mcp-analytics-w14
-      file: TODO/core-functionality/active/complexity-mcp-analytics-w14.yaml
-      title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
-      priority: Medium
-      category: Core Functionality
-    - id: complexity-ascii-renderers-w14
-      file: TODO/core-functionality/active/complexity-ascii-renderers-w14.yaml
-      title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
-      priority: Medium
-      category: Core Functionality
     - id: deferred-dataframe-benchmark-implementations
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
@@ -82,16 +67,6 @@ statuses:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       priority: Medium
       category: Documentation
-    - id: complexity-cli-orchestration-w14
-      file: TODO/core-functionality/active/complexity-cli-orchestration-w14.yaml
-      title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
-      priority: Medium
-      category: Core Functionality
-    - id: complexity-field-extraction-w14
-      file: TODO/core-functionality/active/complexity-field-extraction-w14.yaml
-      title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
-      priority: Medium-High
-      category: Core Functionality
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -132,36 +107,11 @@ statuses:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: High
       category: Testing and Quality Assurance
-    - id: complexity-cli-prompts-w15
-      file: TODO/core-functionality/active/complexity-cli-prompts-w15.yaml
-      title: Reduce complexity in CLI prompt and command functions (complexity batch 8)
-      priority: Medium
-      category: Core Functionality
-    - id: complexity-core-analysis-dataframe-w15
-      file: TODO/core-functionality/active/complexity-core-analysis-dataframe-w15.yaml
-      title: Reduce complexity in core analysis and dataframe functions (complexity batch 9)
-      priority: Medium
-      category: Core Functionality
-    - id: complexity-plans-tpcds-w15
-      file: TODO/core-functionality/active/complexity-plans-tpcds-w15.yaml
-      title: Reduce complexity in query plan and TPC-DS functions (complexity batch 10)
-      priority: Medium
-      category: Core Functionality
-    - id: complexity-validation-misc-w14
-      file: TODO/core-functionality/active/complexity-validation-misc-w14.yaml
-      title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
-      priority: Medium
-      category: Core Functionality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
       priority: Low
       category: User Experience
-    - id: complexity-generators-pipelines-w14
-      file: TODO/core-functionality/active/complexity-generators-pipelines-w14.yaml
-      title: Simplify data generator and pipeline loading functions (complexity batch 5)
-      priority: Medium
-      category: Core Functionality
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

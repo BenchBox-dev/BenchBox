@@ -2,7 +2,8 @@ id: "complexity-field-extraction-w14"
 title: "Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)"
 worktree: "main"
 priority: "Medium-High"
-status: "Not Started"
+status: Completed
+completed_date: "2026-02-22"
 description: |
   10 functions have high complexity caused by 10-20 nearly-identical conditional blocks
   that check a field, apply a transformation, and assign to a target. These are pure

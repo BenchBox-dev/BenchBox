@@ -1,4 +1,4 @@
-generated_at: '2026-02-22T09:43:22.184696'
+generated_at: '2026-02-22T10:00:58.153977'
 total_items: 539
 items:
 - id: interactive-wizard-dry-run-support
@@ -4129,13 +4129,14 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Not Started
+  status: Completed
   tags:
   - complexity
   - refactor
   - mcp
   - analytics
   estimated_effort: 1 day
+  completed_date: '2026-02-22'
   work_total: 5
   work_done: 5
   work_ready: 0
@@ -4145,13 +4146,14 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Not Started
+  status: Completed
   tags:
   - complexity
   - refactor
   - visualization
   - ascii
   estimated_effort: 1 day
+  completed_date: '2026-02-22'
   work_total: 5
   work_done: 5
   work_ready: 0
@@ -4422,13 +4424,14 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Not Started
+  status: Completed
   tags:
   - complexity
   - refactor
   - cli
   - orchestration
   estimated_effort: 1-2 days
+  completed_date: '2026-02-22'
   work_total: 7
   work_done: 7
   work_ready: 0
@@ -4447,6 +4450,17 @@ items:
   completed_date: '2026-02-21'
   work_total: 4
   work_done: 4
+  work_ready: 0
+- id: dedup-simple-benchmark-base-methods
+  file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
+  title: Extract shared run_benchmark and _load_data to SimpleBenchmarkMixin
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  completed_date: '2026-02-21'
+  work_total: 5
+  work_done: 5
   work_ready: 0
 - id: finalize-monitoring-module-scope
   file: DONE/observability-quality/completed/finalize-monitoring-module-scope.yaml
@@ -5130,13 +5144,14 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Not Started
+  status: Completed
   tags:
   - complexity
   - refactor
   - misc
   - validation
   estimated_effort: 3-4 days
+  completed_date: '2026-02-22'
   work_total: 8
   work_done: 8
   work_ready: 0
@@ -5244,13 +5259,14 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Not Started
+  status: Completed
   tags:
   - complexity
   - refactor
   - generators
   - data-loading
   estimated_effort: 1-2 days
+  completed_date: '2026-02-22'
   work_total: 7
   work_done: 7
   work_ready: 0
@@ -5381,6 +5397,7 @@ items:
   work_total: 15
   work_done: 15
   work_ready: 0
+  deferred_count: 1
 - id: trim-viz-deps-plotly-only
   file: DONE/main/active/trim-viz-deps-plotly-only.yaml
   title: Trim visualization dependencies to Plotly-only (remove Kaleido, Pandas, Pillow)
@@ -6220,12 +6237,13 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium-High
-  status: Not Started
+  status: Completed
   tags:
   - complexity
   - refactor
   - field-extraction
   estimated_effort: 1-2 days
+  completed_date: '2026-02-22'
   work_total: 7
   work_done: 7
   work_ready: 0
@@ -6616,12 +6634,13 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium-High
-  status: Not Started
+  status: Completed
   tags:
   - complexity
   - refactor
   - dict-dispatch
   estimated_effort: 1 day
+  completed_date: '2026-02-22'
   work_total: 7
   work_done: 7
   work_ready: 0
@@ -6671,14 +6690,3 @@ items:
   owners:
   - joe
   estimated_effort: Medium (2-3 days)
-- id: dedup-simple-benchmark-base-methods
-  file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
-  title: Extract shared run_benchmark and _load_data to SimpleBenchmarkMixin
-  worktree: unknown
-  category: core-functionality
-  priority: medium
-  status: completed
-  completed_date: '2026-02-21'
-  work_total: 5
-  work_done: 5
-  work_ready: 0

@@ -2,7 +2,8 @@ id: "complexity-generators-pipelines-w14"
 title: "Simplify data generator and pipeline loading functions (complexity batch 5)"
 worktree: "main"
 priority: "Medium"
-status: "Not Started"
+status: Completed
+completed_date: "2026-02-22"
 description: |
   8 generator and data-loading functions accumulate complexity through mixed concerns:
   artifact management, compression, validation, and loading all interleaved in one

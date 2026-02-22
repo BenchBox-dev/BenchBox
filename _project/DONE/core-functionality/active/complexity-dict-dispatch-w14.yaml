@@ -2,7 +2,8 @@ id: "complexity-dict-dispatch-w14"
 title: "Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)"
 worktree: "main"
 priority: "Medium-High"
-status: "Not Started"
+status: Completed
+completed_date: "2026-02-22"
 description: |
   8 functions have high cyclomatic complexity caused purely by if/elif chains performing
   data lookups. These are the simplest category to fix: replace the chain with a module-level

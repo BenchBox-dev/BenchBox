@@ -1,4 +1,4 @@
-generated_at: '2026-02-22T09:43:22.185053'
+generated_at: '2026-02-22T10:00:58.154318'
 total_items: 539
 priorities:
   Critical:
@@ -1256,7 +1256,7 @@ priorities:
       file: DONE/core-functionality/active/complexity-field-extraction-w14.yaml
       title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: platform-adapter-silent-error-handling
       file: DONE/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
       title: Fix silent error swallowing in schema creation and connection setup across adapters
@@ -1381,7 +1381,7 @@ priorities:
       file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
       title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: simplify-dataframe-extra-naming
       file: DONE/main/active/simplify-dataframe-extra-naming.yaml
       title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'
@@ -1398,7 +1398,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 240
+    count: 241
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1819,12 +1819,12 @@ priorities:
       file: DONE/core-functionality/active/complexity-mcp-analytics-w14.yaml
       title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: complexity-ascii-renderers-w14
       file: DONE/core-functionality/active/complexity-ascii-renderers-w14.yaml
       title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: deferred-dataframe-performance-analysis
       file: DONE/main/active/deferred-dataframe-performance-analysis.yaml
       title: Deferred DataFrame Performance Cross-Platform Analysis
@@ -1944,10 +1944,15 @@ priorities:
       file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml
       title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: dedup-spark-shared-base
       file: DONE/core-functionality/active/dedup-spark-shared-base.yaml
       title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
+      category: Core Functionality
+      status: Completed
+    - id: dedup-simple-benchmark-base-methods
+      file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
+      title: Extract shared run_benchmark and _load_data to SimpleBenchmarkMixin
       category: Core Functionality
       status: Completed
     - id: finalize-monitoring-module-scope
@@ -2245,7 +2250,7 @@ priorities:
       file: DONE/core-functionality/active/complexity-validation-misc-w14.yaml
       title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: refactor-validation-logic-from-cli-to-core-module-completed
       file: DONE/unknown/planning/refactor-validation-logic-from-cli-to-core-module-completed.yaml
       title: Refactor Validation Logic from CLI to Core Module - COMPLETED ✅
@@ -2310,7 +2315,7 @@ priorities:
       file: DONE/core-functionality/active/complexity-generators-pipelines-w14.yaml
       title: Simplify data generator and pipeline loading functions (complexity batch 5)
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: slim-release-distributions
       file: DONE/release-readiness/planning/slim-release-distributions.yaml
       title: Slim Release Distributions

@@ -278,5 +278,6 @@ work:
   status: done
 
 deferred:
-  split_to: tigerdata-cloud-enhancements
-  note: "Connection pooling, verify-full SSL, and live integration tests moved to separate TODO"
+  - id: d1
+    summary: "Connection pooling, verify-full SSL, and live integration tests"
+    reason: "Moved to separate TODO (tigerdata-cloud-enhancements)"

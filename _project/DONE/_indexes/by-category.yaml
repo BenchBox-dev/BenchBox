@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T09:43:22.184927'
-total_categories: 67
+generated_at: '2026-02-22T10:00:58.154197'
+total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 167
+    count: 168
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -627,12 +627,12 @@ categories:
       file: DONE/core-functionality/active/complexity-mcp-analytics-w14.yaml
       title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
       priority: Medium
-      status: Not Started
+      status: Completed
     - id: complexity-ascii-renderers-w14
       file: DONE/core-functionality/active/complexity-ascii-renderers-w14.yaml
       title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
       priority: Medium
-      status: Not Started
+      status: Completed
     - id: deferred-storage-and-cache-unification
       file: DONE/core-functionality/active/deferred-storage-and-cache-unification.yaml
       title: Deferred Storage Location and Cache Unification Enhancements
@@ -733,12 +733,12 @@ categories:
       file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml
       title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
       priority: Medium
-      status: Not Started
+      status: Completed
     - id: complexity-field-extraction-w14
       file: DONE/core-functionality/active/complexity-field-extraction-w14.yaml
       title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
       priority: Medium-High
-      status: Not Started
+      status: Completed
     - id: dedup-spark-shared-base
       file: DONE/core-functionality/active/dedup-spark-shared-base.yaml
       title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
@@ -753,6 +753,11 @@ categories:
       file: DONE/core-functionality/active/dedup-tpcds-rolling-average-queries.yaml
       title: Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations
       priority: Low
+      status: Completed
+    - id: dedup-simple-benchmark-base-methods
+      file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
+      title: Extract shared run_benchmark and _load_data to SimpleBenchmarkMixin
+      priority: Medium
       status: Completed
     - id: fix-ascii-visualization-regressions
       file: DONE/main/active/fix-ascii-visualization-regressions.yaml
@@ -1144,7 +1149,7 @@ categories:
       file: DONE/core-functionality/active/complexity-validation-misc-w14.yaml
       title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
       priority: Medium
-      status: Not Started
+      status: Completed
     - id: refactor-mcp-use-public-api
       file: DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml
       title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
@@ -1179,7 +1184,7 @@ categories:
       file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
       title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
       priority: Medium-High
-      status: Not Started
+      status: Completed
     - id: fix-datafusion-read-write-primitives-parity
       file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml
       title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
@@ -1194,7 +1199,7 @@ categories:
       file: DONE/core-functionality/active/complexity-generators-pipelines-w14.yaml
       title: Simplify data generator and pipeline loading functions (complexity batch 5)
       priority: Medium
-      status: Not Started
+      status: Completed
     - id: standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com
       file: DONE/unknown/planning/standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com.yaml
       title: Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED
@@ -2866,14 +2871,6 @@ categories:
       title: Switch post-run histogram to horizontal bars when query names are long
       priority: Medium
       status: Completed
-  core-functionality:
-    count: 1
-    items:
-    - id: dedup-simple-benchmark-base-methods
-      file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
-      title: Extract shared run_benchmark and _load_data to SimpleBenchmarkMixin
-      priority: medium
-      status: completed
   platform-adapter:
     count: 1
     items:
