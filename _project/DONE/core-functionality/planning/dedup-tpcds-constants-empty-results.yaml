@@ -2,7 +2,8 @@ id: dedup-tpcds-constants-empty-results
 title: "Extract TPC-DS canonical table list and shared _empty_results to constants"
 worktree: core-functionality
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-02-22"
 category: Core Functionality
 description: |
   Group 15 from the duplicate-check report identifies two consolidation targets:
@@ -27,16 +28,26 @@ approach: |
 work:
   - id: w1
     summary: "Create TPCDS_TABLE_NAMES constant and replace 3 copies"
-    status: pending
+    status: done
+    notes: |
+      constants.py already had TPCDS_TABLE_NAMES; c_tools.py and generator/manager.py
+      already imported it.  Replaced 3 hardcoded lists in runner.py (get_available_tables,
+      get_table_loading_order, load method).  Added TPCDS_TABLE_LOADING_ORDER constant
+      for the two identical dependency-ordered lists.
 
   - id: w2
     summary: "Consolidate _empty_results to single canonical location"
-    status: pending
+    status: done
+    notes: |
+      _empty_results only exists in tpc_patterns.py (no duplicate in base.py).
+      No consolidation needed; the reported duplication does not exist in the
+      current codebase.
 
   - id: w3
     summary: "Run TPC-DS tests"
     needs: [w1, w2]
-    status: pending
+    status: done
+    notes: "538 passed in 141s"
 
 files_affected:
   modified:
