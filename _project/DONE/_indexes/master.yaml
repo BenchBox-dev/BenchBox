@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T13:44:22.288160'
-total_items: 528
+generated_at: '2026-02-21T19:51:01.682631'
+total_items: 532
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3585,6 +3585,23 @@ items:
   work_total: 3
   work_done: 3
   work_ready: 0
+- id: preexisting-complexity-review-findings
+  file: DONE/core-functionality/active/preexisting-complexity-review-findings.yaml
+  title: Address pre-existing issues surfaced by complexity batch 8-10 review
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - complexity
+  - code-quality
+  - pre-existing-bugs
+  estimated_effort: 3-4 hours
+  completed_date: '2026-02-21'
+  work_total: 10
+  work_done: 10
+  work_ready: 0
+  deferred_count: 1
 - id: athena-spark-platform
   file: DONE/platform-expansion/planning/athena-spark-platform.yaml
   title: Amazon Athena for Apache Spark Platform
@@ -4249,6 +4266,38 @@ items:
   category: Code Quality and Technical Debt
   priority: Medium
   status: Completed
+- id: dedup-query-catalog-base
+  file: DONE/core-functionality/active/dedup-query-catalog-base.yaml
+  title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 2-3 hours
+  completed_date: '2026-02-21'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+- id: dedup-sql-utilities
+  file: DONE/core-functionality/active/dedup-sql-utilities.yaml
+  title: Extract _normalize_table_name_in_sql to shared SQL utility module
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 1-2 hours
+  completed_date: '2026-02-21'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: complexity-cli-orchestration-w14
   file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml
   title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
@@ -4724,6 +4773,22 @@ items:
   owners:
   - joe
   estimated_effort: Medium
+- id: dedup-tpcds-maintenance-returns
+  file: DONE/core-functionality/active/dedup-tpcds-maintenance-returns.yaml
+  title: Parameterize _insert_{store,catalog,web}_returns in TPC-DS maintenance operations
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  estimated_effort: 1-2 hours
+  completed_date: '2026-02-21'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: performance-regression-detection-system
   file: DONE/enterprise-ops-regression/planning/performance-regression-detection-system.yaml
   title: Performance Regression Detection System

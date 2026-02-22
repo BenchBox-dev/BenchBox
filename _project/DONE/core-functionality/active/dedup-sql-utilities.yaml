@@ -1,0 +1,70 @@
+id: dedup-sql-utilities
+title: "Extract _normalize_table_name_in_sql to shared SQL utility module"
+worktree: core-functionality
+priority: Medium
+status: Completed
+completed_date: "2026-02-21"
+category: Core Functionality
+description: |
+  Group 25 from the duplicate-check report identifies 5 copies of
+  `_normalize_table_name_in_sql` across platform adapters:
+  - firebolt.py:1072
+  - presto.py:956
+  - redshift.py:1612
+  - spark.py:722
+  - trino.py:956
+
+  Four of five copies are byte-for-byte identical (same two re.sub patterns
+  with identical regex and lambda replacements). Redshift has a minor variant
+  (missing the IF NOT EXISTS group in its CREATE TABLE pattern).
+
+  This is a pure utility function with no platform-specific behavior — it just
+  lowercases table names in SQL statements. It belongs in a shared module.
+
+approach: |
+  1. Create or add to `benchbox/core/sql_utils.py` (or find an existing
+     utilities module for SQL string manipulation)
+  2. Extract the canonical 4-copy version as `normalize_table_name_in_sql(sql)`
+  3. Handle the Redshift variant by parameterizing the regex pattern or having
+     Redshift call the shared version with a flag
+  4. Replace all 5 platform copies with imports from the shared module
+
+work:
+  - id: w1
+    summary: "Extract normalize_table_name_in_sql to benchbox/core/sql_utils.py"
+    status: done
+
+  - id: w2
+    summary: "Replace 5 platform copies with imports from shared module"
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Run platform tests to verify no regressions"
+    needs: [w2]
+    status: done
+
+files_affected:
+  modified:
+    - "benchbox/platforms/firebolt.py"
+    - "benchbox/platforms/presto.py"
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/spark.py"
+    - "benchbox/platforms/trino.py"
+
+verification:
+  - description: "Platform adapter tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v"
+    expected_output: "all tests pass"
+
+must_preserve:
+  - "SQL table name normalization produces identical output for all platforms"
+  - "Redshift-specific variant still handles its CREATE TABLE pattern correctly"
+
+metadata:
+  tags:
+    - code-quality
+    - duplicate-check
+    - refactoring
+  estimated_effort: "1-2 hours"
+  created_date: "2026-02-21"

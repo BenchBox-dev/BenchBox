@@ -1,0 +1,91 @@
+id: dedup-query-catalog-base
+title: "Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin"
+worktree: core-functionality
+priority: Medium
+status: Completed
+completed_date: "2026-02-21"
+category: Core Functionality
+description: |
+  Two groups from the duplicate-check report identify consolidation targets
+  in the query catalog and translation layer:
+
+  - Group 27 (74 lines): `get_query` is char-for-char identical across
+    ai_primitives/queries.py, metadata_primitives/queries.py, and
+    read_primitives/queries.py. The logic (lookup, skip_on check, variant
+    selection, fallback) is a generic query catalog pattern.
+
+  - Group 12 (95 lines): `translate_query_text` is byte-for-byte identical
+    across 5 benchmark classes (amplab, coffeeshop, h2odb, read_primitives, ssb).
+    All call `translate_sql_query(query=..., target_dialect=..., source_dialect="netezza")`.
+
+  These should be extracted to:
+  1. A `BaseQueryCatalog` class with the shared `get_query` implementation
+  2. A `TranslatableQueryMixin` with the shared `translate_query_text`
+
+approach: |
+  For BaseQueryCatalog:
+  - Check if ai_primitives, metadata_primitives, read_primitives query classes
+    already share a base. If so, add get_query there. If not, create a mixin.
+  - The shared get_query needs: self._entries dict, self._queries dict,
+    ValueError on missing, skip_on check, variant selection.
+
+  For TranslatableQueryMixin:
+  - Create a simple mixin with translate_query_text that delegates to
+    benchbox.utils.dialect_utils.translate_sql_query
+  - Parameterize source_dialect (currently hardcoded as "netezza" in all copies)
+    as a class attribute with default "netezza"
+  - Have amplab, coffeeshop, h2odb, read_primitives, ssb inherit from mixin
+
+work:
+  - id: w1
+    summary: "Create BaseQueryCatalog with shared get_query (~37 lines per copy, 3 copies)"
+    status: done
+
+  - id: w2
+    summary: "Refactor ai_primitives, metadata_primitives, read_primitives to use BaseQueryCatalog"
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Create TranslatableQueryMixin with shared translate_query_text"
+    status: done
+
+  - id: w4
+    summary: "Refactor amplab, coffeeshop, h2odb, read_primitives, ssb to use TranslatableQueryMixin"
+    needs: [w3]
+    status: done
+
+  - id: w5
+    summary: "Run tests to verify no regressions"
+    needs: [w2, w4]
+    status: done
+
+files_affected:
+  created:
+    - "benchbox/core/query_catalog_base.py"
+  modified:
+    - "benchbox/core/ai_primitives/queries.py"
+    - "benchbox/core/metadata_primitives/queries.py"
+    - "benchbox/core/read_primitives/queries.py"
+    - "benchbox/core/amplab/benchmark.py"
+    - "benchbox/core/coffeeshop/benchmark.py"
+    - "benchbox/core/h2odb/benchmark.py"
+    - "benchbox/core/read_primitives/benchmark.py"
+    - "benchbox/core/ssb/benchmark.py"
+
+verification:
+  - description: "All affected benchmark tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k 'primitives or amplab or coffeeshop or h2odb or ssb'"
+    expected_output: "all tests pass"
+
+must_preserve:
+  - "get_query(query_id, dialect) returns identical results for all query IDs"
+  - "translate_query_text(text, dialect) returns identical translations"
+
+metadata:
+  tags:
+    - code-quality
+    - duplicate-check
+    - refactoring
+  estimated_effort: "2-3 hours"
+  created_date: "2026-02-21"

@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T13:44:22.288517'
-total_items: 528
+generated_at: '2026-02-21T19:51:01.683074'
+total_items: 532
 priorities:
   Critical:
     count: 35
@@ -1398,7 +1398,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 236
+    count: 240
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1619,6 +1619,11 @@ priorities:
       file: DONE/main/active/summary-box-system-environment-info.yaml
       title: Add system environment details to the right side of the run summary box
       category: Visualization
+      status: Completed
+    - id: preexisting-complexity-review-findings
+      file: DONE/core-functionality/active/preexisting-complexity-review-findings.yaml
+      title: Address pre-existing issues surfaced by complexity batch 8-10 review
+      category: Core Functionality
       status: Completed
     - id: athena-spark-platform
       file: DONE/platform-expansion/planning/athena-spark-platform.yaml
@@ -1920,6 +1925,16 @@ priorities:
       title: Examples Code Duplication Consolidation
       category: Code Quality and Technical Debt
       status: Completed
+    - id: dedup-query-catalog-base
+      file: DONE/core-functionality/active/dedup-query-catalog-base.yaml
+      title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
+      category: Core Functionality
+      status: Completed
+    - id: dedup-sql-utilities
+      file: DONE/core-functionality/active/dedup-sql-utilities.yaml
+      title: Extract _normalize_table_name_in_sql to shared SQL utility module
+      category: Core Functionality
+      status: Completed
     - id: complexity-cli-orchestration-w14
       file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml
       title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
@@ -2120,6 +2135,11 @@ priorities:
       file: DONE/physical-tuning/planning/pt-12-remaining-platforms-ddl.yaml
       title: 'PT-12: Remaining Platforms Physical Tuning DDL Generator Enhancement'
       category: Platform Expansion
+      status: Completed
+    - id: dedup-tpcds-maintenance-returns
+      file: DONE/core-functionality/active/dedup-tpcds-maintenance-returns.yaml
+      title: Parameterize _insert_{store,catalog,web}_returns in TPC-DS maintenance operations
+      category: Core Functionality
       status: Completed
     - id: performance-regression-detection-system
       file: DONE/enterprise-ops-regression/planning/performance-regression-detection-system.yaml

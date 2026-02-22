@@ -1,4 +1,4 @@
-generated_at: '2026-02-21T13:44:21.121400'
+generated_at: '2026-02-21T19:51:00.348619'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -84,11 +84,21 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 9
+    count: 16
     items:
-    - id: dedup-query-catalog-base
-      file: TODO/core-functionality/planning/dedup-query-catalog-base.yaml
-      title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
+    - id: complexity-ignore-required-w15
+      file: TODO/core-functionality/active/complexity-ignore-required-w15.yaml
+      title: Add complexity exclusions for 5 functions with inherent required complexity
+      priority: Medium
+      status: Not Started
+    - id: complexity-mcp-analytics-w14
+      file: TODO/core-functionality/active/complexity-mcp-analytics-w14.yaml
+      title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
+      priority: Medium
+      status: Not Started
+    - id: complexity-ascii-renderers-w14
+      file: TODO/core-functionality/active/complexity-ascii-renderers-w14.yaml
+      title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
       priority: Medium
       status: Not Started
     - id: dedup-tpcds-constants-empty-results
@@ -101,10 +111,15 @@ categories:
       title: Extract _generate_dimension helper for TPC-DI SQL generator scaffolding
       priority: Medium
       status: Not Started
-    - id: dedup-sql-utilities
-      file: TODO/core-functionality/planning/dedup-sql-utilities.yaml
-      title: Extract _normalize_table_name_in_sql to shared SQL utility module
+    - id: complexity-cli-orchestration-w14
+      file: TODO/core-functionality/active/complexity-cli-orchestration-w14.yaml
+      title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
       priority: Medium
+      status: Not Started
+    - id: complexity-field-extraction-w14
+      file: TODO/core-functionality/active/complexity-field-extraction-w14.yaml
+      title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
+      priority: Medium-High
       status: Not Started
     - id: dedup-cloud-platform-shared-utilities
       file: TODO/core-functionality/planning/dedup-cloud-platform-shared-utilities.yaml
@@ -121,9 +136,29 @@ categories:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
-    - id: dedup-tpcds-maintenance-returns
-      file: TODO/core-functionality/planning/dedup-tpcds-maintenance-returns.yaml
-      title: Parameterize _insert_{store,catalog,web}_returns in TPC-DS maintenance operations
+    - id: complexity-cli-prompts-w15
+      file: TODO/core-functionality/active/complexity-cli-prompts-w15.yaml
+      title: Reduce complexity in CLI prompt and command functions (complexity batch 8)
+      priority: Medium
+      status: Not Started
+    - id: complexity-core-analysis-dataframe-w15
+      file: TODO/core-functionality/active/complexity-core-analysis-dataframe-w15.yaml
+      title: Reduce complexity in core analysis and dataframe functions (complexity batch 9)
+      priority: Medium
+      status: Not Started
+    - id: complexity-plans-tpcds-w15
+      file: TODO/core-functionality/active/complexity-plans-tpcds-w15.yaml
+      title: Reduce complexity in query plan and TPC-DS functions (complexity batch 10)
+      priority: Medium
+      status: Not Started
+    - id: complexity-validation-misc-w14
+      file: TODO/core-functionality/active/complexity-validation-misc-w14.yaml
+      title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
+      priority: Medium
+      status: Not Started
+    - id: complexity-generators-pipelines-w14
+      file: TODO/core-functionality/active/complexity-generators-pipelines-w14.yaml
+      title: Simplify data generator and pipeline loading functions (complexity batch 5)
       priority: Medium
       status: Not Started
     - id: presorted-open-table-format-datasets

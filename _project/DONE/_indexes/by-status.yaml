@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T13:44:22.288646'
-total_items: 528
+generated_at: '2026-02-21T19:51:01.683211'
+total_items: 532
 statuses:
   In Progress:
     count: 2
@@ -286,7 +286,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 473
+    count: 477
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -628,6 +628,11 @@ statuses:
       file: DONE/mcp-integration/mcp-visualization-tools.yaml
       title: Add visualization tools to MCP server
       priority: Medium-High
+      category: Core Functionality
+    - id: preexisting-complexity-review-findings
+      file: DONE/core-functionality/active/preexisting-complexity-review-findings.yaml
+      title: Address pre-existing issues surfaced by complexity batch 8-10 review
+      priority: Medium
       category: Core Functionality
     - id: advanced-cost-analysis-framework-multi-region-pricing-models
       file: DONE/cost-intelligence-advanced/planning/advanced-cost-analysis-framework-multi-region-pricing-models.yaml
@@ -1175,6 +1180,16 @@ statuses:
       title: Expand TPC-DS OBT Query Coverage to 93 Queries
       priority: High
       category: Core Functionality
+    - id: dedup-query-catalog-base
+      file: DONE/core-functionality/active/dedup-query-catalog-base.yaml
+      title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
+      priority: Medium
+      category: Core Functionality
+    - id: dedup-sql-utilities
+      file: DONE/core-functionality/active/dedup-sql-utilities.yaml
+      title: Extract _normalize_table_name_in_sql to shared SQL utility module
+      priority: Medium
+      category: Core Functionality
     - id: dedup-spark-shared-base
       file: DONE/core-functionality/active/dedup-spark-shared-base.yaml
       title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
@@ -1671,6 +1686,11 @@ statuses:
       title: 'PT-12: Remaining Platforms Physical Tuning DDL Generator Enhancement'
       priority: Medium
       category: Platform Expansion
+    - id: dedup-tpcds-maintenance-returns
+      file: DONE/core-functionality/active/dedup-tpcds-maintenance-returns.yaml
+      title: Parameterize _insert_{store,catalog,web}_returns in TPC-DS maintenance operations
+      priority: Medium
+      category: Core Functionality
     - id: patch-tpcds-source-stdout
       file: DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml
       title: Patch TPC-DS source to fix stdout data generation

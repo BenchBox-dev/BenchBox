@@ -1,0 +1,78 @@
+id: dedup-simple-benchmark-base-methods
+title: "Extract shared run_benchmark and _load_data to base benchmark class (amplab/clickbench/ssb)"
+worktree: core-functionality
+priority: Medium
+status: Completed
+completed_date: "2026-02-21"
+category: Core Functionality
+description: |
+  Groups 23 and 24 from the duplicate-check report identify near-identical
+  implementations shared between the simpler benchmark modules:
+
+  - `run_benchmark` (~78 lines): amplab/benchmark.py and clickbench/benchmark.py
+    are byte-for-byte identical except for the benchmark name string
+  - `_load_data` (~76 lines): amplab/benchmark.py and ssb/benchmark.py are
+    identical except for table_order list and log message strings
+
+  These benchmarks share a common execution pattern (iterate queries, time them,
+  build results dict) and loading pattern (split schema SQL, iterate tables,
+  call _load_table_data). The logic belongs in a shared base class or mixin,
+  parameterized by benchmark name and table list.
+
+approach: |
+  1. Identify or create a shared base class (check if amplab, clickbench, ssb
+     already share a common parent in their class hierarchy)
+  2. Extract `run_benchmark` to the base, parameterized by `self.benchmark_name`
+     (or similar attribute already present on each class)
+  3. Extract `_load_data` to the base, parameterized by a `self.table_order`
+     attribute or property that each subclass defines
+  4. Reduce each benchmark's methods to attribute definitions + super() calls
+
+work:
+  - id: w1
+    summary: "Analyze class hierarchy of amplab, clickbench, ssb benchmarks"
+    status: done
+    notes: "Determine if they share a common base. If not, decide on mixin vs new ABC."
+
+  - id: w2
+    summary: "Extract shared run_benchmark to base class (~78 lines saved)"
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Extract shared _load_data to base class (~76 lines saved)"
+    needs: [w1]
+    status: done
+
+  - id: w4
+    summary: "Verify all three benchmarks work with extracted base methods"
+    needs: [w2, w3]
+    status: done
+
+files_affected:
+  modified:
+    - "benchbox/core/amplab/benchmark.py"
+    - "benchbox/core/clickbench/benchmark.py"
+    - "benchbox/core/ssb/benchmark.py"
+    - "benchbox/core/base_benchmark.py"
+
+verification:
+  - description: "Benchmark tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k 'amplab or clickbench or ssb'"
+    expected_output: "all tests pass"
+  - description: "Dry run works for each benchmark"
+    command: "benchbox run --dry-run /tmp/test --platform duckdb --benchmark amplab"
+    expected_output: "dry-run preview succeeds"
+
+must_preserve:
+  - "AMPLabBenchmark.run_benchmark() returns identical result dict structure"
+  - "ClickBenchBenchmark.run_benchmark() returns identical result dict structure"
+  - "SSBBenchmark._load_data() loads tables in correct order"
+
+metadata:
+  tags:
+    - code-quality
+    - duplicate-check
+    - refactoring
+  estimated_effort: "2-3 hours"
+  created_date: "2026-02-21"

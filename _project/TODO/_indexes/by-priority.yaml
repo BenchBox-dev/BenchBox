@@ -1,5 +1,5 @@
-generated_at: '2026-02-21T13:44:21.121414'
-total_items: 37
+generated_at: '2026-02-21T19:51:00.348636'
+total_items: 44
 priorities:
   High:
     count: 2
@@ -15,8 +15,13 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 5
+    count: 6
     items:
+    - id: complexity-field-extraction-w14
+      file: TODO/core-functionality/active/complexity-field-extraction-w14.yaml
+      title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
+      category: Core Functionality
+      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -43,12 +48,27 @@ priorities:
       category: Blog Revision
       status: In Progress
   Medium:
-    count: 13
+    count: 19
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: complexity-ignore-required-w15
+      file: TODO/core-functionality/active/complexity-ignore-required-w15.yaml
+      title: Add complexity exclusions for 5 functions with inherent required complexity
+      category: Core Functionality
+      status: Not Started
+    - id: complexity-mcp-analytics-w14
+      file: TODO/core-functionality/active/complexity-mcp-analytics-w14.yaml
+      title: Decompose MCP tool implementations and analytics functions (complexity batch 6)
+      category: Core Functionality
+      status: Not Started
+    - id: complexity-ascii-renderers-w14
+      file: TODO/core-functionality/active/complexity-ascii-renderers-w14.yaml
+      title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
+      category: Core Functionality
       status: Not Started
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
@@ -60,19 +80,14 @@ priorities:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       category: Documentation
       status: Not Started
-    - id: dedup-query-catalog-base
-      file: TODO/core-functionality/planning/dedup-query-catalog-base.yaml
-      title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
-      category: Core Functionality
-      status: Not Started
     - id: dedup-tpcdi-dimension-generator
       file: TODO/core-functionality/planning/dedup-tpcdi-dimension-generator.yaml
       title: Extract _generate_dimension helper for TPC-DI SQL generator scaffolding
       category: Core Functionality
       status: Not Started
-    - id: dedup-sql-utilities
-      file: TODO/core-functionality/planning/dedup-sql-utilities.yaml
-      title: Extract _normalize_table_name_in_sql to shared SQL utility module
+    - id: complexity-cli-orchestration-w14
+      file: TODO/core-functionality/active/complexity-cli-orchestration-w14.yaml
+      title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)
       category: Core Functionality
       status: Not Started
     - id: flight-data-benchmark
@@ -80,9 +95,29 @@ priorities:
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
       status: Not Started
-    - id: dedup-tpcds-maintenance-returns
-      file: TODO/core-functionality/planning/dedup-tpcds-maintenance-returns.yaml
-      title: Parameterize _insert_{store,catalog,web}_returns in TPC-DS maintenance operations
+    - id: complexity-cli-prompts-w15
+      file: TODO/core-functionality/active/complexity-cli-prompts-w15.yaml
+      title: Reduce complexity in CLI prompt and command functions (complexity batch 8)
+      category: Core Functionality
+      status: Not Started
+    - id: complexity-core-analysis-dataframe-w15
+      file: TODO/core-functionality/active/complexity-core-analysis-dataframe-w15.yaml
+      title: Reduce complexity in core analysis and dataframe functions (complexity batch 9)
+      category: Core Functionality
+      status: Not Started
+    - id: complexity-plans-tpcds-w15
+      file: TODO/core-functionality/active/complexity-plans-tpcds-w15.yaml
+      title: Reduce complexity in query plan and TPC-DS functions (complexity batch 10)
+      category: Core Functionality
+      status: Not Started
+    - id: complexity-validation-misc-w14
+      file: TODO/core-functionality/active/complexity-validation-misc-w14.yaml
+      title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
+      category: Core Functionality
+      status: Not Started
+    - id: complexity-generators-pipelines-w14
+      file: TODO/core-functionality/active/complexity-generators-pipelines-w14.yaml
+      title: Simplify data generator and pipeline loading functions (complexity batch 5)
       category: Core Functionality
       status: Not Started
     - id: stackoverflow-benchmark
