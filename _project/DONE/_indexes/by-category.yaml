@@ -1,4 +1,4 @@
-generated_at: '2026-02-22T10:00:58.154197'
+generated_at: '2026-02-22T11:44:48.550353'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 168
+    count: 169
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -849,6 +849,11 @@ categories:
       title: Harden plan comparison and visualization for unknown operator types
       priority: High
       status: Not Started
+    - id: harmonize-platform-display-names
+      file: DONE/main/active/harmonize-platform-display-names.yaml
+      title: Harmonize platform display names and CLI keys for consistency
+      priority: Medium
+      status: Completed
     - id: ctas-sorted-data-loading
       file: DONE/physical-tuning/active/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB

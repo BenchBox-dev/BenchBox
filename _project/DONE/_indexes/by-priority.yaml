@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T10:00:58.154318'
-total_items: 539
+generated_at: '2026-02-22T11:44:48.550509'
+total_items: 540
 priorities:
   Critical:
     count: 35
@@ -1398,7 +1398,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 241
+    count: 242
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2020,6 +2020,11 @@ priorities:
       title: GPU Acceleration Benchmarking & RAPIDS cuDF Integration
       category: AI/ML Capabilities
       status: Not Started
+    - id: harmonize-platform-display-names
+      file: DONE/main/active/harmonize-platform-display-names.yaml
+      title: Harmonize platform display names and CLI keys for consistency
+      category: Core Functionality
+      status: Completed
     - id: dataframe-ai-primitives
       file: DONE/dataframe-benchmarks/completed/dataframe-ai-primitives.yaml
       title: Implement DataFrame Version of AI Primitives Benchmark

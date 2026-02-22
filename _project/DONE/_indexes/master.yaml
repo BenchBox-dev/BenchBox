@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T10:00:58.153977'
-total_items: 539
+generated_at: '2026-02-22T11:44:48.550047'
+total_items: 540
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4581,6 +4581,17 @@ items:
   priority: Medium
   status: Not Started
   estimated_effort: 3 weeks (0.75 FTE ML engineer)
+- id: harmonize-platform-display-names
+  file: DONE/main/active/harmonize-platform-display-names.yaml
+  title: Harmonize platform display names and CLI keys for consistency
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  completed_date: '2026-02-22'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
 - id: dataframe-ai-primitives
   file: DONE/dataframe-benchmarks/completed/dataframe-ai-primitives.yaml
   title: Implement DataFrame Version of AI Primitives Benchmark

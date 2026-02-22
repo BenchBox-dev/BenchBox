@@ -1,0 +1,132 @@
+id: cli-help-driver-version-documentation
+title: "Document driver_version, driver_auto_install, and engine_version in CLI/MCP help"
+worktree: main
+priority: Medium
+status: Completed
+category: Documentation
+
+description: |
+  Three user-facing arguments are missing from the CLI help text and MCP docstrings:
+
+  1. driver_version — valid --platform-option key for all platforms, registered via
+     _register_driver_version_options() in benchbox/cli/platform_defaults.py.
+     Allows pinning the Python driver package to a specific version (e.g. '1.2.0').
+
+  2. driver_auto_install — valid --platform-option key for all platforms (same
+     registration). When true, automatically installs the requested driver version
+     via uv if missing.
+
+  3. engine_version — valid --platform-option key for Athena Spark specifically.
+     Read at adapter construction from config.get("engine_version") in
+     benchbox/platforms/aws/athena_spark_adapter.py:707. Selects the Spark engine
+     version (default: "PySpark engine version 3"). For all other cloud platforms
+     (Snowflake, Redshift, ClickHouse, Databricks, Firebolt, Trino, MotherDuck),
+     engine_version is AUTO-PROBED via SQL queries — it is NOT user-settable on
+     those platforms.
+
+  Currently the --platform-option advanced option is described only as "Platform
+  option in KEY=VALUE form (repeatable)" with no indication of what keys are
+  available. The MCP run_benchmark docstring similarly has no mention of driver or
+  engine version options.
+
+  Additionally, the existing help text should be audited for consistency with the
+  current code — option descriptions, examples, and the CLAUDE.md quick reference
+  table should all reflect the actual CLI and MCP behaviour.
+
+work:
+- id: w1
+  summary: "Audit existing help text in run.py and help.py against actual option list — note any stale, missing, or inaccurate
+    descriptions to fix in w2-w4"
+  status: done
+
+- id: w2
+  summary: "Improve --platform-option help string in run.py (~line 480) to list driver_version, driver_auto_install, and engine_version
+    (Athena Spark) as well-known keys with one-line descriptions"
+  needs: [w1]
+  status: done
+
+- id: w3
+  summary: "Add usage examples to help.py: driver version pinning example and Athena Spark engine_version example; fix any
+    stale descriptions found in w1"
+  needs: [w1]
+  status: done
+
+- id: w4
+  summary: "Update MCP run_benchmark docstring in benchmark.py to mention driver_version and engine_version (Athena Spark)
+    as supported --platform-option keys; update CLAUDE.md CLI Options Summary table"
+  needs: [w2, w3]
+  status: done
+
+metadata:
+  tags: [cli, mcp, help-text, documentation, driver-version, engine-version, platform-option, ux]
+  estimated_effort: Small
+  created_date: "2026-02-22"
+
+files_affected:
+  modified:
+  - benchbox/cli/commands/run.py
+  - benchbox/cli/help.py
+  - benchbox/mcp/tools/benchmark.py
+  - CLAUDE.md
+
+must_preserve:
+- "--help and --help-topic all continue to render without errors (exit code 0)"
+- "All existing --platform-option KEY=VALUE pairs still parse and apply correctly"
+- "BenchBoxCommand.format_options() Core/Options/Advanced grouping is unchanged"
+- "MCP run_benchmark() function signature unchanged — only the docstring is updated"
+
+approach: |
+  Entry point for w2: benchbox/cli/commands/run.py ~line 480 where --platform-option
+  is defined (hidden=True, advanced option). Extend the help string to enumerate the
+  three well-known keys with brief descriptions.
+
+  Entry point for w3: benchbox/cli/help.py — locate EXAMPLES_BY_PLATFORM dict and
+  add examples to appropriate sections:
+  - DuckDB or a generic section: --platform-option driver_version=1.2.0
+      --platform-option driver_auto_install=true
+  - Athena Spark section (or create one): --platform-option engine_version="PySpark engine version 3"
+  Also fix any stale option descriptions identified in w1.
+
+  Entry point for w4: benchbox/mcp/tools/benchmark.py run_benchmark() docstring
+  (~line 151). Add an "Available --platform-option keys" note in the docstring.
+  Then update CLAUDE.md's CLI Options Summary table to add a row or note for
+  driver_version, driver_auto_install, and engine_version (Athena Spark only).
+
+anti_patterns:
+- "DO NOT add --driver-version as a standalone Click option — because driver_version is intentionally a platform option (not
+  universal) — keep it as a --platform-option key"
+- "DO NOT document engine_version as user-settable for Snowflake/Redshift/ClickHouse/ Databricks/Firebolt/Trino/MotherDuck
+  — because on those platforms it is auto-probed via SQL and cannot be targeted — only document it for Athena Spark"
+- "DO NOT change the MCP run_benchmark() function signature — because that would be a breaking API change — only update the
+  docstring"
+
+verification:
+- description: "Help text renders correctly for default --help"
+  command: "uv run benchbox run --help"
+  expected_output: "output is well-formed, exit 0, existing options unchanged"
+- description: "Help topic all shows driver_version, driver_auto_install, engine_version"
+  command: "uv run benchbox run --help-topic all"
+  expected_output: "output contains 'driver_version', 'driver_auto_install', and 'engine_version'"
+- description: "Help topic examples shows driver version and Athena Spark engine_version usage"
+  command: "uv run benchbox run --help-topic examples"
+  expected_output: "output contains at least one --platform-option driver_version example"
+- description: "Fast tests still pass (no regressions)"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+  - benchbox/cli/commands/run.py
+  - benchbox/cli/help.py
+  - benchbox/mcp/tools/benchmark.py
+  - CLAUDE.md
+
+success_metrics:
+- "driver_version, driver_auto_install appear in --help-topic all output as --platform-option keys"
+- "engine_version appears in --help-topic all output, scoped to Athena Spark"
+- "At least one --platform-option driver_version=... example in --help-topic examples"
+- "MCP run_benchmark docstring documents driver_version and engine_version keys"
+- "CLAUDE.md CLI Options Summary table documents all three keys"
+- "All fast tests pass with no regressions"
+
+completed_date: "2026-02-22"
