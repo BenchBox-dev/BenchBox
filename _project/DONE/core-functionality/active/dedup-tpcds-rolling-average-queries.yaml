@@ -2,7 +2,7 @@ id: dedup-tpcds-rolling-average-queries
 title: "Extract shared rolling average helper for TPC-DS Q47/Q57 pandas implementations"
 worktree: core-functionality
 priority: Low
-status: Not Started
+status: Completed
 category: Core Functionality
 description: |
   Group 19 from the duplicate-check report identifies that q47_pandas_impl and
@@ -31,17 +31,17 @@ approach: |
 work:
   - id: w1
     summary: "Create _rolling_average_pandas_impl parameterized helper"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Refactor q47_pandas_impl and q57_pandas_impl to use helper"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Run TPC-DS dataframe query tests"
     needs: [w2]
-    status: pending
+    status: done
 
 files_affected:
   modified:
@@ -67,3 +67,4 @@ metadata:
     - refactoring
   estimated_effort: "1-2 hours"
   created_date: "2026-02-21"
+  completed_date: "2026-02-21"
