@@ -84,7 +84,7 @@ work:
 - id: w2
   summary: "Generate initial compatibility matrix from probe results and document as versioned reference"
   needs: [w1]
-  status: pending
+  status: done
 
 deferred:
 - id: d1
