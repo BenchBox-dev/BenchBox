@@ -1,0 +1,92 @@
+id: pg-mooncake-type-compat-matrix
+title: "Document pg_mooncake data type compatibility matrix with automated probing"
+worktree: platform-expansion
+priority: Low
+status: In Progress
+category: Platform Expansion
+description: |
+  pg_mooncake's columnstore access method silently drops or rejects certain
+  PostgreSQL data types (e.g., SERIAL, arrays, composite types). BenchBox
+  currently inherits all type handling from PostgreSQLAdapter with no
+  pg_mooncake-specific validation — unsupported types fail at CREATE TABLE
+  time with opaque PostgreSQL errors.
+
+  A compatibility matrix would:
+  1. Document which SQL types columnstore supports per pg_mooncake version
+  2. Enable BenchBox to warn or map types before DDL execution
+  3. Guide future benchmark schema design for pg_mooncake
+
+  pg_mooncake is actively evolving; type support changes across releases.
+  The matrix should be version-tagged and ideally generated via automated
+  type probing rather than manually maintained.
+
+  Split from pg-extension-advanced-benchmarking (originally deferred from
+  pg-mooncake-platform-adapter, completed 2026-02-15).
+
+approach: |
+  Create a type probing script that connects to a pg_mooncake instance and
+  attempts CREATE TABLE ... USING columnstore for each standard SQL type.
+  Record success/failure per type per pg_mooncake version. Output a structured
+  YAML/JSON matrix. Optionally add a _map_column_types() override to
+  PgMooncakeAdapter that consults the matrix and emits warnings for
+  unsupported types before DDL execution.
+
+  Reference: PgMooncakeAdapter._add_columnstore_access_method() in
+  benchbox/platforms/pg_mooncake.py already transforms DDL — type mapping
+  would slot in alongside it in create_schema().
+
+metadata:
+  tags:
+  - pg-extensions
+  - pg-mooncake
+  - documentation
+  - type-system
+  - deferred-followup
+  estimated_effort: "Small — 4-8 hours"
+  created_date: "2026-02-21"
+  split_from: pg-extension-advanced-benchmarking
+
+files_affected:
+  modified:
+  - "benchbox/platforms/pg_mooncake.py"
+  added:
+  - "scripts/probe_mooncake_types.py"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/pg_mooncake.py"
+  - "scripts/"
+  - "tests/unit/platforms/test_pg_mooncake_adapter.py"
+
+must_preserve:
+- "Existing PgMooncakeAdapter.create_schema() behavior for supported types"
+- "_add_columnstore_access_method() DDL transformation logic unchanged"
+- "All existing pg_mooncake unit tests pass"
+
+anti_patterns:
+- "DO NOT hardcode type support — because pg_mooncake's supported types change across releases — use version-tagged probing
+  or configuration instead"
+- "DO NOT silently drop unsupported types — because users need to know which columns won't work — emit warnings via logger.warning()"
+
+verification:
+- description: "Existing pg_mooncake tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_pg_mooncake_adapter.py -v"
+  expected_output: "all tests pass"
+- description: "Type probe script runs without error (when pg_mooncake available)"
+  command: "uv run -- python scripts/probe_mooncake_types.py --help"
+  expected_output: "usage information displayed"
+
+work:
+- id: w1
+  summary: "Create type probing script that tests each SQL type against columnstore"
+  status: done
+
+- id: w2
+  summary: "Generate initial compatibility matrix from probe results and document as versioned reference"
+  needs: [w1]
+  status: pending
+
+deferred:
+- id: d1
+  summary: "Add _map_column_types() override to PgMooncakeAdapter that warns on unsupported types"
+  reason: "Depends on matrix stability — defer until matrix covers 2+ pg_mooncake versions"
