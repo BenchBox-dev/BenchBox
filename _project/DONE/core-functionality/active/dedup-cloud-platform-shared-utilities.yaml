@@ -2,7 +2,8 @@ id: dedup-cloud-platform-shared-utilities
 title: "Extract shared cloud platform utilities (session cache validation, credential prompts)"
 worktree: core-functionality
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-02-22"
 category: Core Functionality
 description: |
   Two groups from the duplicate-check report identify shared logic across
@@ -32,28 +33,31 @@ approach: |
 work:
   - id: w1
     summary: "Extract validate_session_cache_control to shared cloud platform mixin"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Refactor Redshift and Snowflake to use shared cache validation"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Extract _prompt_default_output_location to credentials/shared.py"
-    status: pending
+    status: done
 
   - id: w4
     summary: "Refactor BigQuery and Redshift credentials to use shared prompt"
     needs: [w3]
-    status: pending
+    status: done
 
   - id: w5
     summary: "Run platform tests to verify no regressions"
     needs: [w2, w4]
-    status: pending
+    status: done
 
 files_affected:
+  created:
+    - "benchbox/platforms/cloud_shared.py"
+    - "benchbox/platforms/credentials/shared.py"
   modified:
     - "benchbox/platforms/redshift.py"
     - "benchbox/platforms/snowflake.py"
