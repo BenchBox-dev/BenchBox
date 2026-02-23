@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T07:27:00.535773'
-total_items: 543
+generated_at: '2026-02-23T08:16:13.984650'
+total_items: 547
 priorities:
   Critical:
     count: 35
@@ -1104,7 +1104,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 60
+    count: 61
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1402,13 +1402,18 @@ priorities:
       title: Snowpark Connect for Spark Platform
       category: Platform Expansion
       status: Completed
+    - id: surface-driver-version-in-cli-progress-output
+      file: DONE/main/active/surface-driver-version-in-cli-progress-output.yaml
+      title: Surface active driver version in CLI progress output
+      category: Core Functionality
+      status: Completed
     - id: unified-adapter-interface
       file: DONE/core-functionality/planning/unified-adapter-interface.yaml
       title: Unify SQL and DataFrame Adapter Execution Interfaces
       category: Core Functionality
       status: Completed
   Medium:
-    count: 243
+    count: 246
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1865,6 +1870,11 @@ priorities:
       title: Document driver_version, driver_auto_install, and engine_version in CLI/MCP help
       category: Documentation
       status: Completed
+    - id: document-driver-version-selection-behavior
+      file: DONE/main/active/document-driver-version-selection-behavior.yaml
+      title: Document how BenchBox selects driver versions and how to reliably use a specific version
+      category: Documentation
+      status: Completed
     - id: dry-run-feature-completed
       file: DONE/unknown/planning/dry-run-feature-completed.yaml
       title: Dry Run Feature ✅ COMPLETED
@@ -2095,6 +2105,11 @@ priorities:
       file: DONE/unknown/planning/minimize-emoji-usage-completed.yaml
       title: Minimize Emoji Usage ✅ COMPLETED
       category: Code Quality and Documentation
+      status: Completed
+    - id: move-duckdb-to-optional-extras
+      file: DONE/main/active/move-duckdb-to-optional-extras.yaml
+      title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
+      category: Core Functionality
       status: Completed
     - id: multi-region-performance-testing
       file: DONE/enterprise-ops-multi-region/planning/multi-region-performance-testing.yaml
@@ -2360,6 +2375,11 @@ priorities:
       file: DONE/unknown/planning/standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com.yaml
       title: Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED
       category: Core Functionality
+      status: Completed
+    - id: surface-driver-version-options-in-cli-help
+      file: DONE/main/active/surface-driver-version-options-in-cli-help.yaml
+      title: Surface driver_version and driver_auto_install more prominently in CLI help
+      category: Documentation
       status: Completed
     - id: switch-tpc-ds-base-dialect-from-ansi-to-netezza-2
       file: DONE/unknown/planning/switch-tpc-ds-base-dialect-from-ansi-to-netezza-2.yaml

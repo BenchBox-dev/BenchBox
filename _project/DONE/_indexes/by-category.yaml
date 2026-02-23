@@ -1,4 +1,4 @@
-generated_at: '2026-02-23T07:27:00.535643'
+generated_at: '2026-02-23T08:16:13.984501'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 171
+    count: 173
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1020,6 +1020,11 @@ categories:
       title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
       priority: Medium-High
       status: Completed
+    - id: move-duckdb-to-optional-extras
+      file: DONE/main/active/move-duckdb-to-optional-extras.yaml
+      title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
+      priority: Medium
+      status: Completed
     - id: pt-01-ddl-generator-protocol
       file: DONE/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml
       title: 'PT-01: DDL Generator Protocol and Base Implementation'
@@ -1220,6 +1225,11 @@ categories:
       title: Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED
       priority: Medium
       status: Completed
+    - id: surface-driver-version-in-cli-progress-output
+      file: DONE/main/active/surface-driver-version-in-cli-progress-output.yaml
+      title: Surface active driver version in CLI progress output
+      priority: Medium-High
+      status: Completed
     - id: switch-tpc-ds-base-dialect-from-ansi-to-netezza-2
       file: DONE/unknown/planning/switch-tpc-ds-base-dialect-from-ansi-to-netezza-2.yaml
       title: Switch TPC-DS Base Dialect from ANSI to Netezza ✅
@@ -1375,7 +1385,7 @@ categories:
       priority: Medium-High
       status: Completed
   Documentation:
-    count: 12
+    count: 14
     items:
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
@@ -1417,6 +1427,11 @@ categories:
       title: Document driver_version, driver_auto_install, and engine_version in CLI/MCP help
       priority: Medium
       status: Completed
+    - id: document-driver-version-selection-behavior
+      file: DONE/main/active/document-driver-version-selection-behavior.yaml
+      title: Document how BenchBox selects driver versions and how to reliably use a specific version
+      priority: Medium
+      status: Completed
     - id: mcp-landing-page-elevation
       file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
       title: Elevate MCP Feature on Landing Page and Documentation
@@ -1436,6 +1451,11 @@ categories:
       file: DONE/docs-experience/active/comparison-matrix-restructure.yaml
       title: Restructure Platform Comparison Matrix with Grouped Categories
       priority: High
+      status: Completed
+    - id: surface-driver-version-options-in-cli-help
+      file: DONE/main/active/surface-driver-version-options-in-cli-help.yaml
+      title: Surface driver_version and driver_auto_install more prominently in CLI help
+      priority: Medium
       status: Completed
   Documentation and Developer Experience:
     count: 2

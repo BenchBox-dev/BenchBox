@@ -2,7 +2,7 @@ id: surface-driver-version-options-in-cli-help
 title: "Surface driver_version and driver_auto_install more prominently in CLI help"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 description: |
   The --platform-option driver_version=X and --platform-option driver_auto_install=true
   flags are the correct mechanism for testing a specific driver version in BenchBox. However,
@@ -31,27 +31,30 @@ description: |
 category: Documentation
 
 work:
-  - id: w1
-    summary: "Reorder sections in HELP_TOPICS in benchbox/cli/help.py so 'Driver & Version Management' appears early (immediately after basic usage examples)"
-    status: pending
+- id: w1
+  summary: "Reorder sections in HELP_TOPICS in benchbox/cli/help.py so 'Driver & Version Management' appears early (immediately
+    after basic usage examples)"
+  status: done
 
-  - id: w2
-    summary: "Expand the Driver & Version Management section with: (a) uv run --with example, (b) note explaining uv.lock revert behavior and why driver_auto_install is the reliable path"
-    needs: [w1]
-    status: pending
+- id: w2
+  summary: "Expand the Driver & Version Management section with: (a) uv run --with example, (b) note explaining uv.lock revert
+    behavior and why driver_auto_install is the reliable path"
+  needs: [w1]
+  status: done
 
-  - id: w3
-    summary: "Improve --platform-option help string in commands/run.py (lines 485-493) to reference --help-topic examples for the full driver versioning pattern"
-    status: pending
+- id: w3
+  summary: "Improve --platform-option help string in commands/run.py (lines 485-493) to reference --help-topic examples for
+    the full driver versioning pattern"
+  status: done
 
 metadata:
   created_date: "2026-02-23"
   estimated_effort: "Small (1-2 hours)"
   tags:
-    - ux
-    - cli
-    - documentation
-    - driver-versioning
+  - ux
+  - cli
+  - documentation
+  - driver-versioning
 
 impact:
   user_impact: |
@@ -60,9 +63,9 @@ impact:
     X but benchbox used Y" confusion.
 
 must_preserve:
-  - "benchbox run --help output format and all existing option descriptions remain unchanged"
-  - "All existing --help-topic sections remain present (reorder only, no removals)"
-  - "help.py is not a code-logic file — no behavioral changes, only text content"
+- "benchbox run --help output format and all existing option descriptions remain unchanged"
+- "All existing --help-topic sections remain present (reorder only, no removals)"
+- "help.py is not a code-logic file — no behavioral changes, only text content"
 
 approach: |
   All changes are in benchbox/cli/help.py (HELP_TOPICS dict) and the --platform-option
@@ -81,21 +84,23 @@ approach: |
     "uv run --with \"duckdb==1.5.0\" benchbox run --platform duckdb --benchmark tpch"
 
 anti_patterns:
-  - "DO NOT add behavioral logic to help.py — because it is a pure text/data file — keep all changes to string content only"
-  - "DO NOT mention internal implementation details (uv.lock internals, sys.modules) in user-facing help — because it's jargon — describe the observable behavior instead"
+- "DO NOT add behavioral logic to help.py — because it is a pure text/data file — keep all changes to string content only"
+- "DO NOT mention internal implementation details (uv.lock internals, sys.modules) in user-facing help — because it's jargon
+  — describe the observable behavior instead"
 
 verification:
-  - description: "Driver & Version Management section appears near top of help-topic examples output"
-    command: "uv run benchbox run --help-topic examples 2>&1 | grep -n 'Driver'"
-    expected_output: "Driver & Version Management appears within the first 30 lines of output"
-  - description: "uv run --with example is present in the section"
-    command: "uv run benchbox run --help-topic examples 2>&1 | grep 'uv run --with'"
-    expected_output: "Line containing 'uv run --with \"duckdb=='"
-  - description: "No existing help sections were removed"
-    command: "uv run benchbox run --help-topic all 2>&1 | grep -c 'Validation\\|Compression\\|Dry Run\\|Plan Capture'"
-    expected_output: "4 (all sections still present)"
+- description: "Driver & Version Management section appears near top of help-topic examples output"
+  command: "uv run benchbox run --help-topic examples 2>&1 | grep -n 'Driver & Version' | awk -F: '{print $1}' | head -1"
+  expected_output: "A line number less than or equal to 10 (section header within first 10 output lines)"
+- description: "uv run --with example is present in the section"
+  command: "uv run benchbox run --help-topic examples 2>&1 | grep 'uv run --with'"
+  expected_output: "Line containing 'uv run --with \"duckdb=='"
+- description: "No existing help sections were removed"
+  command: "uv run benchbox run --help-topic all 2>&1 | grep -c 'Validation\\|Compression\\|Dry Run\\|Plan Capture'"
+  expected_output: "4 (all sections still present)"
 
 scope_limit:
   only_modify:
-    - "benchbox/cli/help.py"
-    - "benchbox/cli/commands/run.py"
+  - "benchbox/cli/help.py"
+  - "benchbox/cli/commands/run.py"
+completed_date: "2026-02-23"

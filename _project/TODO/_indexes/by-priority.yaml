@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T07:26:59.386451'
-total_items: 34
+generated_at: '2026-02-23T08:16:12.795837'
+total_items: 30
 priorities:
   High:
     count: 2
@@ -15,7 +15,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 6
+    count: 5
     items:
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
@@ -27,11 +27,6 @@ priorities:
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
       category: Core Functionality
       status: In Progress
-    - id: surface-driver-version-in-cli-progress-output
-      file: TODO/main/planning/surface-driver-version-in-cli-progress-output.yaml
-      title: Surface active driver version in CLI progress output
-      category: Core Functionality
-      status: Not Started
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
@@ -48,17 +43,12 @@ priorities:
       category: Blog Revision
       status: In Progress
   Medium:
-    count: 12
+    count: 9
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: document-driver-version-selection-behavior
-      file: TODO/main/planning/document-driver-version-selection-behavior.yaml
-      title: Document how BenchBox selects driver versions and how to reliably use a specific version
-      category: Documentation
       status: Not Started
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
@@ -75,20 +65,10 @@ priorities:
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
       status: Not Started
-    - id: move-duckdb-to-optional-extras
-      file: TODO/main/planning/move-duckdb-to-optional-extras.yaml
-      title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
-      category: Core Functionality
-      status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: surface-driver-version-options-in-cli-help
-      file: TODO/main/planning/surface-driver-version-options-in-cli-help.yaml
-      title: Surface driver_version and driver_auto_install more prominently in CLI help
-      category: Documentation
       status: Not Started
     - id: arm-hyperscaler-comparison-benchmarks
       file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml

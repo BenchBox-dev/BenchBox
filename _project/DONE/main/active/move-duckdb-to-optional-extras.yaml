@@ -2,7 +2,7 @@ id: move-duckdb-to-optional-extras
 title: "Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 description: |
   DuckDB is currently a core (required) dependency in pyproject.toml at line 40:
     "duckdb>=1.4.0"
@@ -37,46 +37,49 @@ description: |
 category: Core Functionality
 
 work:
-  - id: w1
-    summary: "Decide minimum version and install-surface strategy (review pyproject.toml lines 39-46, 59-69, 83-116 for impact on all extras groups)"
-    status: pending
+- id: w1
+  summary: "Decide min version and install-surface strategy (review pyproject.toml lines 39-116); record decision as comment
+    above new duckdb stanza"
+  status: done
 
-  - id: w2
-    summary: "Remove duckdb from core dependencies (pyproject.toml line 40), add to an optional extras group (e.g., 'duckdb' or 'local'), and update 'dev' and 'all' meta-extras accordingly"
-    needs: [w1]
-    status: pending
+- id: w2
+  summary: "Remove duckdb from core dependencies (pyproject.toml line 40), add to an optional extras group (e.g., 'duckdb'
+    or 'local'), and update 'dev' and 'all' meta-extras accordingly"
+  needs: [w1]
+  status: done
 
-  - id: w3
-    summary: "Run uv lock to regenerate uv.lock and verify duckdb is no longer pinned in the core dependency set"
-    needs: [w2]
-    status: pending
+- id: w3
+  summary: "Run uv lock to regenerate uv.lock and verify duckdb is no longer pinned in the core dependency set"
+  needs: [w2]
+  status: done
 
-  - id: w4
-    summary: "Update CI workflows and install commands to include the duckdb extra (e.g., pip install -e .[dev,duckdb] or equivalent)"
-    needs: [w3]
-    status: pending
+- id: w4
+  summary: "Update CI workflows and install commands to include the duckdb extra (e.g., pip install -e .[dev,duckdb] or equivalent)"
+  needs: [w3]
+  status: done
 
-  - id: w5
-    summary: "Update README and getting-started docs to reflect new install instructions (pip install benchbox[duckdb] or benchbox[all])"
-    needs: [w3]
-    status: pending
+- id: w5
+  summary: "Update README and getting-started docs to reflect new install instructions (pip install benchbox[duckdb] or benchbox[all])"
+  needs: [w3]
+  status: done
 
-  - id: w6
-    summary: "Run fast test suite to confirm no breakage from dependency change"
-    needs: [w4]
-    status: pending
+- id: w6
+  summary: "Run fast test suite to confirm no breakage from dependency change"
+  needs: [w4]
+  status: done
 
 deferred:
-  - summary: "Consider whether other core drivers (polars, clickhouse-connect, psycopg2-binary) should similarly be made optional"
-    reason: "Out of scope for this item — focus only on duckdb, which is the platform with the most active version-testing use case"
+- summary: "Consider whether other core drivers (polars, clickhouse-connect, psycopg2-binary) should similarly be made optional"
+  reason: "Out of scope for this item — focus only on duckdb, which is the platform with the most active version-testing use
+    case"
 
 metadata:
   created_date: "2026-02-23"
   estimated_effort: "Small-Medium (2-4 hours including CI update)"
   tags:
-    - packaging
-    - driver-versioning
-    - uv
+  - packaging
+  - driver-versioning
+  - uv
 
 impact:
   user_impact: |
@@ -90,10 +93,11 @@ impact:
     veto on the DuckDB version a user chooses to test.
 
 must_preserve:
-  - "pip install benchbox still results in a working DuckDB benchmark after install (either via an auto-included extra or clear documentation)"
-  - "uv run -- python -m pytest -m fast -q continues to pass (no missing duckdb import)"
-  - "All existing platform adapters continue to load correctly"
-  - "The 'all' extra still installs duckdb"
+- "pip install benchbox still results in a working DuckDB benchmark after install (either via an auto-included extra or clear
+  documentation)"
+- "uv run -- python -m pytest -m fast -q continues to pass (no missing duckdb import)"
+- "All existing platform adapters continue to load correctly"
+- "The 'all' extra still installs duckdb"
 
 approach: |
   Review pyproject.toml lines 39-46 (core deps) and 59-116 (optional extras).
@@ -104,25 +108,29 @@ approach: |
   Regenerate uv.lock with `uv lock` and verify the pin is gone from the core set.
 
 anti_patterns:
-  - "DO NOT remove duckdb from the 'dev' extras group without replacing it — because CI tests import duckdb directly — update dev group at the same time as core"
-  - "DO NOT set an upper bound on the optional duckdb extra (e.g., duckdb>=1.0.0,<2.0) — because that defeats the purpose of allowing dev/future versions — use only a lower bound"
-  - "DO NOT skip updating the install docs — because users will get ImportError with no explanation — update README and getting-started in the same PR"
+- "DO NOT remove duckdb from the 'dev' extras group without replacing it — because CI tests import duckdb directly — update
+  dev group at the same time as core"
+- "DO NOT set an upper bound on the optional duckdb extra (e.g., duckdb>=1.0.0,<2.0) — because that defeats the purpose of
+  allowing dev/future versions — use only a lower bound"
+- "DO NOT skip updating the install docs — because users will get ImportError with no explanation — update README and getting-started
+  in the same PR"
 
 verification:
-  - description: "After removing from core, uv.lock no longer enforces exact duckdb version"
-    command: "grep -A3 '^name = \"duckdb\"' uv.lock"
-    expected_output: "duckdb entry exists in lock but is no longer in the [package] required set"
-  - description: "Full dev install still includes duckdb"
-    command: "uv pip show duckdb"
-    expected_output: "duckdb is installed (version may vary)"
-  - description: "Fast test suite passes after dependency change"
-    command: "uv run -- python -m pytest -m fast -q"
-    expected_output: "All tests pass with 0 failures"
+- description: "After removing from core, uv.lock no longer enforces exact duckdb version"
+  command: "grep -A3 '^name = \"duckdb\"' uv.lock"
+  expected_output: "duckdb entry exists in lock but is no longer in the [package] required set"
+- description: "Full dev install still includes duckdb"
+  command: "uv pip show duckdb"
+  expected_output: "duckdb is installed (version may vary)"
+- description: "Fast test suite passes after dependency change"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "All tests pass with 0 failures"
 
 scope_limit:
   only_modify:
-    - "pyproject.toml"
-    - "uv.lock"
-    - "README.md"
-    - "docs/"
-    - ".github/"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "README.md"
+  - "docs/"
+  - ".github/"
+completed_date: "2026-02-23"

@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T07:27:00.535420'
-total_items: 543
+generated_at: '2026-02-23T08:16:13.984253'
+total_items: 547
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4267,6 +4267,22 @@ items:
   work_total: 4
   work_done: 4
   work_ready: 0
+- id: document-driver-version-selection-behavior
+  file: DONE/main/active/document-driver-version-selection-behavior.yaml
+  title: Document how BenchBox selects driver versions and how to reliably use a specific version
+  worktree: main
+  category: Documentation
+  priority: Medium
+  status: Completed
+  tags:
+  - documentation
+  - driver-versioning
+  - ux
+  estimated_effort: Small (2-3 hours)
+  completed_date: '2026-02-23'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: dry-run-feature-completed
   file: DONE/unknown/planning/dry-run-feature-completed.yaml
   title: Dry Run Feature ✅ COMPLETED
@@ -4781,6 +4797,23 @@ items:
   category: Code Quality and Documentation
   priority: Medium
   status: Completed
+- id: move-duckdb-to-optional-extras
+  file: DONE/main/active/move-duckdb-to-optional-extras.yaml
+  title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - packaging
+  - driver-versioning
+  - uv
+  estimated_effort: Small-Medium (2-4 hours including CI update)
+  completed_date: '2026-02-23'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  deferred_count: 1
 - id: multi-region-performance-testing
   file: DONE/enterprise-ops-multi-region/planning/multi-region-performance-testing.yaml
   title: Multi-Region Performance Testing
@@ -5357,6 +5390,23 @@ items:
   category: Core Functionality
   priority: Medium
   status: Completed
+- id: surface-driver-version-options-in-cli-help
+  file: DONE/main/active/surface-driver-version-options-in-cli-help.yaml
+  title: Surface driver_version and driver_auto_install more prominently in CLI help
+  worktree: main
+  category: Documentation
+  priority: Medium
+  status: Completed
+  tags:
+  - ux
+  - cli
+  - documentation
+  - driver-versioning
+  estimated_effort: Small (1-2 hours)
+  completed_date: '2026-02-23'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: switch-tpc-ds-base-dialect-from-ansi-to-netezza-2
   file: DONE/unknown/planning/switch-tpc-ds-base-dialect-from-ansi-to-netezza-2.yaml
   title: Switch TPC-DS Base Dialect from ANSI to Netezza ✅
@@ -6745,6 +6795,22 @@ items:
   - snowpark
   - pyspark-compatible
   estimated_effort: 1.5 weeks
+- id: surface-driver-version-in-cli-progress-output
+  file: DONE/main/active/surface-driver-version-in-cli-progress-output.yaml
+  title: Surface active driver version in CLI progress output
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - ux
+  - cli
+  - driver-versioning
+  estimated_effort: Small (< 2 hours)
+  completed_date: '2026-02-23'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: unified-adapter-interface
   file: DONE/core-functionality/planning/unified-adapter-interface.yaml
   title: Unify SQL and DataFrame Adapter Execution Interfaces

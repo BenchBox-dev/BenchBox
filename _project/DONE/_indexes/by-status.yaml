@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T07:27:00.535892'
-total_items: 543
+generated_at: '2026-02-23T08:16:13.984785'
+total_items: 547
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 495
+    count: 499
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1029,6 +1029,11 @@ statuses:
       title: Document driver_version, driver_auto_install, and engine_version in CLI/MCP help
       priority: Medium
       category: Documentation
+    - id: document-driver-version-selection-behavior
+      file: DONE/main/active/document-driver-version-selection-behavior.yaml
+      title: Document how BenchBox selects driver versions and how to reliably use a specific version
+      priority: Medium
+      category: Documentation
     - id: pg-mooncake-type-compat-matrix
       file: DONE/platform-expansion/active/pg-mooncake-type-compat-matrix.yaml
       title: Document pg_mooncake data type compatibility matrix with automated probing
@@ -1656,6 +1661,11 @@ statuses:
       title: MotherDuck Platform Adapter
       priority: High
       category: Platform Expansion
+    - id: move-duckdb-to-optional-extras
+      file: DONE/main/active/move-duckdb-to-optional-extras.yaml
+      title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
+      priority: Medium
+      category: Core Functionality
     - id: multi-region-performance-testing
       file: DONE/enterprise-ops-multi-region/planning/multi-region-performance-testing.yaml
       title: Multi-Region Performance Testing
@@ -2201,6 +2211,16 @@ statuses:
       title: Starburst Platform Adapter
       priority: Low
       category: Platform Expansion
+    - id: surface-driver-version-in-cli-progress-output
+      file: DONE/main/active/surface-driver-version-in-cli-progress-output.yaml
+      title: Surface active driver version in CLI progress output
+      priority: Medium-High
+      category: Core Functionality
+    - id: surface-driver-version-options-in-cli-help
+      file: DONE/main/active/surface-driver-version-options-in-cli-help.yaml
+      title: Surface driver_version and driver_auto_install more prominently in CLI help
+      priority: Medium
+      category: Documentation
     - id: switch-tpc-ds-base-dialect-from-ansi-to-netezza-2
       file: DONE/unknown/planning/switch-tpc-ds-base-dialect-from-ansi-to-netezza-2.yaml
       title: Switch TPC-DS Base Dialect from ANSI to Netezza ✅

@@ -1,4 +1,4 @@
-generated_at: '2026-02-23T07:26:59.386439'
+generated_at: '2026-02-23T08:16:12.795826'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -84,36 +84,21 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 4
+    count: 2
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
-    - id: move-duckdb-to-optional-extras
-      file: TODO/main/planning/move-duckdb-to-optional-extras.yaml
-      title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
-      priority: Medium
-      status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/active/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
       priority: Medium-High
       status: In Progress
-    - id: surface-driver-version-in-cli-progress-output
-      file: TODO/main/planning/surface-driver-version-in-cli-progress-output.yaml
-      title: Surface active driver version in CLI progress output
-      priority: Medium-High
-      status: Not Started
   Documentation:
-    count: 4
+    count: 2
     items:
-    - id: document-driver-version-selection-behavior
-      file: TODO/main/planning/document-driver-version-selection-behavior.yaml
-      title: Document how BenchBox selects driver versions and how to reliably use a specific version
-      priority: Medium
-      status: Not Started
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -122,11 +107,6 @@ categories:
     - id: timescaledb-blog-post-edits
       file: TODO/blog-content/planning/timescaledb-blog-post-edits.yaml
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
-      priority: Medium
-      status: Not Started
-    - id: surface-driver-version-options-in-cli-help
-      file: TODO/main/planning/surface-driver-version-options-in-cli-help.yaml
-      title: Surface driver_version and driver_auto_install more prominently in CLI help
       priority: Medium
       status: Not Started
   Platform Expansion:
