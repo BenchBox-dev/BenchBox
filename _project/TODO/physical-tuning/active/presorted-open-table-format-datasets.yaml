@@ -241,7 +241,7 @@ work:
   needs:
   - w8
   - w9
-  status: pending
+  status: done
 - id: w13
   summary: "Implement partition-aware sorting with unit tests"
   needs:
