@@ -2,7 +2,7 @@ id: reenable-comprehensive-ci
 title: "Re-enable comprehensive CI checks (linkcheck, security, coverage)"
 worktree: ci-infrastructure
 priority: High
-status: Not Started
+status: In Progress
 description: |
   After fixing critical CI issues and achieving green builds, re-enable the
   comprehensive quality checks that were temporarily disabled or made non-blocking.
@@ -76,6 +76,35 @@ verification:
 - description: "Existing CI checks still pass"
   command: "make ci-lint && make ci-test"
   expected_output: "all checks pass"
+- description: "Documentation link checking is stable with configured ignores"
+  command: "make docs-linkcheck"
+  expected_output: "linkcheck completes with only expected/allowlisted external failures"
+- description: "Security audit is configured and passing"
+  command: "make security-audit"
+  expected_output: "security audit completes with no untriaged blockers"
+- description: "Docstring coverage threshold is enforced at target level"
+  command: "make docstring-coverage"
+  expected_output: "interrogate passes at configured fail-under threshold"
+- description: "Example reference and syntax validation passes"
+  command: "make docs-validate"
+  expected_output: "example reference and syntax checks pass"
+
+scope_limit:
+  only_modify:
+  - ".github/workflows/docs.yml"
+  - ".github/workflows/test.yml"
+  - "docs/conf.py"
+  - "docs/linkcheck_ignore.txt"
+  - "pyproject.toml"
+  - "Makefile"
+  - ".safety-policy.yml"
+  - "scripts/validate_example_references.py"
+  - "scripts/check_example_syntax.py"
+  do_not_modify:
+  - "benchbox/core/**"
+  - "benchbox/platforms/**"
+  - "tests/live/**"
+  - "_binaries/**"
 
 work:
 - id: w1
@@ -90,15 +119,23 @@ work:
   summary: "Configure sphinx linkcheck_ignore in conf.py"
   needs:
   - w1
+  - w2
   status: pending
 - id: w4
   summary: "Fix or remove genuinely broken links"
+  needs:
+  - w3
   status: pending
 - id: w5
   summary: "Re-enable linkcheck as blocking (or keep as warning)"
+  needs:
+  - w4
+  - w6
   status: pending
 - id: w6
   summary: "Add `make docs-linkcheck` for local testing"
+  needs:
+  - w3
   status: pending
 - id: w7
   summary: "Evaluate security scanning options"
@@ -111,44 +148,71 @@ work:
 - id: w9
   summary: "Choose tool that minimizes false positives"
   needs:
-  - w7
+  - w8
   status: pending
 - id: w10
   summary: "Create security ignore list for false positives"
+  needs:
+  - w9
   status: pending
 - id: w11
   summary: "Re-enable security job as blocking"
+  needs:
+  - w10
+  - w12
+  - w5
   status: pending
 - id: w12
   summary: "Add `make security-audit` for local testing"
+  needs:
+  - w9
   status: pending
 - id: w13
   summary: "Review current coverage threshold (64%)"
   status: pending
 - id: w14
   summary: "Add docstrings to undocumented public APIs"
+  needs:
+  - w13
   status: pending
 - id: w15
   summary: "Update threshold to achievable level"
+  needs:
+  - w13
+  - w14
+  - w16
   status: pending
 - id: w16
   summary: "Configure interrogate ignore patterns for internal modules"
+  needs:
+  - w13
   status: pending
 - id: w17
   summary: "Re-enable docstring-coverage as blocking"
+  needs:
+  - w15
+  - w11
   status: pending
 - id: w18
   summary: "Test validate_example_references.py locally"
-  status: pending
+  status: done
 - id: w19
   summary: "Fix any broken example references"
+  needs:
+  - w18
   status: pending
 - id: w20
   summary: "Test check_example_syntax.py locally"
   status: pending
 - id: w21
   summary: "Fix any syntax errors in examples"
+  needs:
+  - w20
   status: pending
 - id: w22
   summary: "Re-enable example-validation as blocking"
+  needs:
+  - w19
+  - w21
+  - w17
   status: pending
