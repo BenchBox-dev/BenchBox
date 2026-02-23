@@ -120,7 +120,7 @@ work:
   needs:
   - w1
   - w2
-  status: pending
+  status: done
 - id: w4
   summary: "Fix or remove genuinely broken links"
   needs:
