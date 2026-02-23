@@ -1,11 +1,11 @@
 # Pre-Sorted / Pre-Clustered Dataset Generation for Open Table Formats
 #
-# Location: _project/TODO/physical-tuning/planning/presorted-open-table-format-datasets.yaml
+# Location: _project/TODO/physical-tuning/active/presorted-open-table-format-datasets.yaml
 
 id: presorted-open-table-format-datasets
 title: "Support creation of pre-sorted / pre-clustered datasets in open table formats"
 worktree: physical-tuning
-priority: Medium-High
+priority: High
 status: In Progress
 description: |
   Enable BenchBox to generate benchmark datasets (TPC-H, TPC-DS, etc.) that are
@@ -155,6 +155,14 @@ verification:
 - description: "Sorted output is actually sorted"
   command: "uv run -- python -m pytest tests/ -k 'sorted or presorted' -v --tb=short"
   expected_output: "all tests pass"
+- description: "Sorted and unsorted runs preserve identical row counts per TPC-H table"
+  command: "uv run -- python -m pytest tests/integration/core/data_organization/test_presorted_generation.py -k 'row_count_equivalence'
+    -v --tb=short"
+  expected_output: "row_count_equivalence passes for all asserted tables"
+- description: "Sorting key monotonicity is validated on generated Parquet output"
+  command: "uv run -- python -m pytest tests/integration/core/data_organization/test_presorted_generation.py -k 'sortedness_metric
+    or sort_key_monotonic' -v --tb=short"
+  expected_output: "sortedness checks pass with no ordering violations"
 
 scope_limit:
   only_modify:
@@ -164,9 +172,15 @@ scope_limit:
   - "benchbox/core/tpch/generator.py"
   - "benchbox/core/tpcds/generator/__init__.py"
   - "benchbox/cli/commands/run.py"
+  - "benchbox/config/models.py"
+  - "benchbox/config/tuning.py"
+  - "benchbox/platforms/open_table_formats/*.py"
+  - "benchbox/platforms/factory.py"
   - "tests/unit/core/data_organization/test_sorting.py"
   - "tests/unit/core/data_organization/test_clustering.py"
+  - "tests/unit/platforms/open_table_formats/test_*"
   - "tests/integration/core/data_organization/test_presorted_generation.py"
+  - "tests/integration/platforms/open_table_formats/test_*"
   - "docs/guides/data-organization-strategies.md"
   do_not_modify:
   - "benchbox/core/runner.py"
@@ -187,7 +201,7 @@ work:
   summary: "Implement single-column sorting (e.g., by date) with unit tests"
   needs:
   - w2
-  status: pending
+  status: done
 - id: w4
   summary: "Implement multi-column sorting with order specification and unit tests"
   needs:
