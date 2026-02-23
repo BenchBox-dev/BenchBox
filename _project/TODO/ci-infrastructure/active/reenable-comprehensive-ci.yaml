@@ -114,7 +114,7 @@ work:
   summary: "Add docs/linkcheck_ignore.txt with external URLs to skip"
   needs:
   - w1
-  status: pending
+  status: done
 - id: w3
   summary: "Configure sphinx linkcheck_ignore in conf.py"
   needs:
