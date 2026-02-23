@@ -235,7 +235,7 @@ work:
   summary: "Implement Hilbert curve encoding option with unit tests"
   needs:
   - w8
-  status: pending
+  status: done
 - id: w10
   summary: "Support cluster-by columns in tuning config"
   needs:
