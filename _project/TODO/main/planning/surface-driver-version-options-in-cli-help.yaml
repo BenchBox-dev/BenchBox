@@ -1,0 +1,101 @@
+id: surface-driver-version-options-in-cli-help
+title: "Surface driver_version and driver_auto_install more prominently in CLI help"
+worktree: main
+priority: Medium
+status: Not Started
+description: |
+  The --platform-option driver_version=X and --platform-option driver_auto_install=true
+  flags are the correct mechanism for testing a specific driver version in BenchBox. However,
+  they're buried in the help system and not visible from the default --help output.
+
+  Current state:
+    - --help output (benchbox run --help) shows --platform-option with a one-liner:
+      "Well-known keys: driver_version (pin Python driver package version, e.g. '1.2.0'),
+       driver_auto_install (auto-install driver via uv if missing, true/false)"
+    - --help-topic all and --help-topic examples show a "Driver & Version Management"
+      section (help.py lines 289-302) but it's one of ~15 sections, easy to miss
+    - No help text explains the uv.lock / uv run interaction or why manually installing
+      a version via `uv pip install` may not be honored
+
+  Target state:
+    1. Move "Driver & Version Management" to appear near the top of --help-topic examples
+       output (currently it appears after Validation, Plan Capture, Compression, Dry Run)
+    2. Expand the section with a concrete example that addresses the "I installed X but
+       got Y" scenario — include a note that uv run syncs to uv.lock and why
+       --platform-option driver_version + driver_auto_install is the reliable path
+    3. Add a one-line note to the --platform-option help string (run.py lines 485-493)
+       pointing to `--help-topic examples` for the driver versioning pattern
+    4. Add `uv run --with "duckdb==X"` as an alternative in the Driver & Version Management
+       section for users who want a one-off override without modifying the lock file
+
+category: Documentation
+
+work:
+  - id: w1
+    summary: "Reorder sections in HELP_TOPICS in benchbox/cli/help.py so 'Driver & Version Management' appears early (immediately after basic usage examples)"
+    status: pending
+
+  - id: w2
+    summary: "Expand the Driver & Version Management section with: (a) uv run --with example, (b) note explaining uv.lock revert behavior and why driver_auto_install is the reliable path"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Improve --platform-option help string in commands/run.py (lines 485-493) to reference --help-topic examples for the full driver versioning pattern"
+    status: pending
+
+metadata:
+  created_date: "2026-02-23"
+  estimated_effort: "Small (1-2 hours)"
+  tags:
+    - ux
+    - cli
+    - documentation
+    - driver-versioning
+
+impact:
+  user_impact: |
+    Users testing specific driver versions discover the correct workflow from the CLI
+    itself rather than from the result JSON or documentation. Prevents the "I installed
+    X but benchbox used Y" confusion.
+
+must_preserve:
+  - "benchbox run --help output format and all existing option descriptions remain unchanged"
+  - "All existing --help-topic sections remain present (reorder only, no removals)"
+  - "help.py is not a code-logic file — no behavioral changes, only text content"
+
+approach: |
+  All changes are in benchbox/cli/help.py (HELP_TOPICS dict) and the --platform-option
+  help string in benchbox/cli/commands/run.py lines 485-493.
+
+  For help.py: the HELP_TOPICS dict is ordered — move the "Driver & Version Management"
+  key to appear before "Dry Run (Preview)" (currently line 265). Python dicts are
+  insertion-ordered since 3.7, so the rendered order follows dict order.
+
+  For the expanded example content, the new scenario to add:
+    "# uv run syncs your env to uv.lock — use driver_auto_install to reliably switch:"
+    "benchbox run --platform duckdb --benchmark tpch \\"
+    "  --platform-option driver_version=1.5.0 \\"
+    "  --platform-option driver_auto_install=true"
+    "# Or override inline without modifying the lock file:"
+    "uv run --with \"duckdb==1.5.0\" benchbox run --platform duckdb --benchmark tpch"
+
+anti_patterns:
+  - "DO NOT add behavioral logic to help.py — because it is a pure text/data file — keep all changes to string content only"
+  - "DO NOT mention internal implementation details (uv.lock internals, sys.modules) in user-facing help — because it's jargon — describe the observable behavior instead"
+
+verification:
+  - description: "Driver & Version Management section appears near top of help-topic examples output"
+    command: "uv run benchbox run --help-topic examples 2>&1 | grep -n 'Driver'"
+    expected_output: "Driver & Version Management appears within the first 30 lines of output"
+  - description: "uv run --with example is present in the section"
+    command: "uv run benchbox run --help-topic examples 2>&1 | grep 'uv run --with'"
+    expected_output: "Line containing 'uv run --with \"duckdb=='"
+  - description: "No existing help sections were removed"
+    command: "uv run benchbox run --help-topic all 2>&1 | grep -c 'Validation\\|Compression\\|Dry Run\\|Plan Capture'"
+    expected_output: "4 (all sections still present)"
+
+scope_limit:
+  only_modify:
+    - "benchbox/cli/help.py"
+    - "benchbox/cli/commands/run.py"

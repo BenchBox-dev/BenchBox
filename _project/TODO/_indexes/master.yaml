@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T21:20:02.134537'
-total_items: 30
+generated_at: '2026-02-23T07:26:59.386416'
+total_items: 34
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -290,6 +290,21 @@ items:
   work_total: 15
   work_done: 0
   work_ready: 15
+- id: document-driver-version-selection-behavior
+  file: TODO/main/planning/document-driver-version-selection-behavior.yaml
+  title: Document how BenchBox selects driver versions and how to reliably use a specific version
+  worktree: main
+  category: Documentation
+  priority: Medium
+  status: Not Started
+  tags:
+  - documentation
+  - driver-versioning
+  - ux
+  estimated_effort: Small (2-3 hours)
+  work_total: 3
+  work_done: 0
+  work_ready: 1
 - id: influxdb-blog-post-edits
   file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
   title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -344,6 +359,22 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: move-duckdb-to-optional-extras
+  file: TODO/main/planning/move-duckdb-to-optional-extras.yaml
+  title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - packaging
+  - driver-versioning
+  - uv
+  estimated_effort: Small-Medium (2-4 hours including CI update)
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+  deferred_count: 1
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
@@ -363,6 +394,22 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: surface-driver-version-options-in-cli-help
+  file: TODO/main/planning/surface-driver-version-options-in-cli-help.yaml
+  title: Surface driver_version and driver_auto_install more prominently in CLI help
+  worktree: main
+  category: Documentation
+  priority: Medium
+  status: Not Started
+  tags:
+  - ux
+  - cli
+  - documentation
+  - driver-versioning
+  estimated_effort: Small (1-2 hours)
+  work_total: 3
+  work_done: 0
+  work_ready: 2
 - id: arm-hyperscaler-comparison-benchmarks
   file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml
   title: '[ARM Series] Run hyperscaler ARM comparison (Graviton 4 vs Cobalt 100 vs Axion)'
@@ -470,6 +517,21 @@ items:
   work_total: 15
   work_done: 2
   work_ready: 3
+- id: surface-driver-version-in-cli-progress-output
+  file: TODO/main/planning/surface-driver-version-in-cli-progress-output.yaml
+  title: Surface active driver version in CLI progress output
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - ux
+  - cli
+  - driver-versioning
+  estimated_effort: Small (< 2 hours)
+  work_total: 3
+  work_done: 0
+  work_ready: 1
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support

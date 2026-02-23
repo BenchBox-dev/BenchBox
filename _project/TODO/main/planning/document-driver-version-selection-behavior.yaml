@@ -1,0 +1,100 @@
+id: document-driver-version-selection-behavior
+title: "Document how BenchBox selects driver versions and how to reliably use a specific version"
+worktree: main
+priority: Medium
+status: Not Started
+description: |
+  BenchBox's driver version selection logic is non-obvious to users who approach it from
+  the Python packaging angle (e.g., "I installed version X, why didn't it use X?"). The
+  behavior is correct but the interaction with uv.lock and uv run is undocumented.
+
+  Current documentation gaps:
+    1. No explanation of how BenchBox selects a driver version when none is specified
+       (it uses whatever is installed, as reported by importlib.metadata)
+    2. No explanation that `uv run` syncs the environment to uv.lock before launching,
+       which can silently revert manually-installed versions
+    3. No dedicated "How to test a specific driver version" guide — examples exist in
+       --help-topic examples but not in docs/
+    4. The docs/reference/cli/configuration.md driver_version/driver_auto_install entries
+       describe the flags but not the underlying selection algorithm or the uv.lock
+       interaction
+
+  Target: a clear, concise explanation in docs/concepts/ (or docs/usage/) that answers:
+    - How does BenchBox decide which driver version to use?
+    - Why might my manually-installed version not be respected?
+    - How do I reliably benchmark a specific version (including dev/pre-release)?
+    - How do I verify which version actually ran?
+
+  This should reference the result JSON's driver_version_actual field as the source of truth.
+
+category: Documentation
+
+work:
+  - id: w1
+    summary: "Write docs/usage/driver-version-management.md: version selection algorithm, uv.lock revert behavior, three reliable version-pinning patterns, and verifying via result JSON"
+    status: pending
+
+  - id: w2
+    summary: "Update docs/reference/cli/configuration.md driver_version and driver_auto_install entries to cross-link to the new guide"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Add a brief 'Testing a specific version' callout to docs/platforms/duckdb.md that links to the new guide"
+    needs: [w1]
+    status: pending
+
+metadata:
+  created_date: "2026-02-23"
+  estimated_effort: "Small (2-3 hours)"
+  tags:
+    - documentation
+    - driver-versioning
+    - ux
+
+impact:
+  user_impact: |
+    Users testing non-default or pre-release DuckDB versions (or any driver) find the
+    correct workflow without needing to file a bug report or read source code. The
+    result JSON's driver_version_actual field is established as the authoritative
+    version-verification mechanism.
+
+must_preserve:
+  - "No existing documentation files are removed or renamed (only additions and cross-links)"
+  - "docs/ build succeeds: uv run -- python -m sphinx docs/ docs/_build/html -b html"
+
+approach: |
+  New file: docs/usage/driver-version-management.md
+
+  Structure:
+    1. How BenchBox selects a driver version (no pin = use installed, pin = validate/install)
+    2. Why uv run may not respect manually-installed versions (uv.lock sync behavior)
+    3. Three reliable patterns:
+       a. driver_version + driver_auto_install=true (BenchBox manages the install)
+       b. uv run --with "duckdb==X" (inline uv override, no lock mutation)
+       c. uv add "duckdb==X" --allow-prereleases (update the lock file)
+    4. Verifying the actual version used: result JSON platform.client_version and
+       execution.driver_version_actual fields
+
+  Cross-link from: docs/reference/cli/configuration.md, docs/platforms/duckdb.md
+
+anti_patterns:
+  - "DO NOT over-explain uv internals — because most users don't care — describe observable behavior (version was reverted) and the fix, not the mechanism"
+  - "DO NOT create a new top-level docs section for this — because it's a usage guide — place in docs/usage/ alongside existing guides"
+
+verification:
+  - description: "New guide file exists and is non-empty"
+    command: "wc -l docs/usage/driver-version-management.md"
+    expected_output: "File exists with at least 50 lines"
+  - description: "Docs build succeeds with new file"
+    command: "uv run -- python -m sphinx docs/ docs/_build/html -b html -q 2>&1 | tail -5"
+    expected_output: "Build succeeded with 0 errors"
+  - description: "duckdb.md contains cross-link to new guide"
+    command: "grep 'driver-version-management' docs/platforms/duckdb.md"
+    expected_output: "At least one reference to driver-version-management"
+
+scope_limit:
+  only_modify:
+    - "docs/usage/"
+    - "docs/reference/cli/configuration.md"
+    - "docs/platforms/duckdb.md"

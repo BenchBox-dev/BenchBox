@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T21:20:02.134593'
-total_items: 30
+generated_at: '2026-02-23T07:26:59.386461'
+total_items: 34
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Medium-High
       category: Blog Revision
   Not Started:
-    count: 28
+    count: 32
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -57,6 +57,11 @@ statuses:
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
       category: Benchmark Expansion
+    - id: document-driver-version-selection-behavior
+      file: TODO/main/planning/document-driver-version-selection-behavior.yaml
+      title: Document how BenchBox selects driver versions and how to reliably use a specific version
+      priority: Medium
+      category: Documentation
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
@@ -92,6 +97,11 @@ statuses:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       category: Core Functionality
+    - id: move-duckdb-to-optional-extras
+      file: TODO/main/planning/move-duckdb-to-optional-extras.yaml
+      title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
+      priority: Medium
+      category: Core Functionality
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -117,6 +127,16 @@ statuses:
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       priority: Medium
       category: Benchmark Development
+    - id: surface-driver-version-in-cli-progress-output
+      file: TODO/main/planning/surface-driver-version-in-cli-progress-output.yaml
+      title: Surface active driver version in CLI progress output
+      priority: Medium-High
+      category: Core Functionality
+    - id: surface-driver-version-options-in-cli-help
+      file: TODO/main/planning/surface-driver-version-options-in-cli-help.yaml
+      title: Surface driver_version and driver_auto_install more prominently in CLI help
+      priority: Medium
+      category: Documentation
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
