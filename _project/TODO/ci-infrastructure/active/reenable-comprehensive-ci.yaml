@@ -109,7 +109,7 @@ scope_limit:
 work:
 - id: w1
   summary: "Create linkcheck ignore list for known-flaky URLs"
-  status: pending
+  status: done
 - id: w2
   summary: "Add docs/linkcheck_ignore.txt with external URLs to skip"
   needs:
