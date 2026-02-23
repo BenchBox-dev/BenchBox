@@ -136,7 +136,7 @@ work:
   summary: "Add `make docs-linkcheck` for local testing"
   needs:
   - w3
-  status: pending
+  status: done
 - id: w7
   summary: "Evaluate security scanning options"
   status: pending
