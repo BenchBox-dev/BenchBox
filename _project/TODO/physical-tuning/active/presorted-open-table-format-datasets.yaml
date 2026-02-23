@@ -253,7 +253,7 @@ work:
   needs:
   - w7
   - w10
-  status: pending
+  status: done
 # --- Phase 3: Delta Lake and Iceberg integration (w11-w12, w15) ---
 - id: w11
   summary: "Generate sorted Delta Lake tables with OPTIMIZE"
