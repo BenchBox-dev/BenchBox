@@ -125,7 +125,7 @@ work:
   summary: "Fix or remove genuinely broken links"
   needs:
   - w3
-  status: pending
+  status: done
 - id: w5
   summary: "Re-enable linkcheck as blocking (or keep as warning)"
   needs:
