@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T08:16:13.984650'
-total_items: 547
+generated_at: '2026-02-23T08:51:55.424544'
+total_items: 550
 priorities:
   Critical:
     count: 35
@@ -1413,7 +1413,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 246
+    count: 248
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2111,6 +2111,11 @@ priorities:
       title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
       category: Core Functionality
       status: Completed
+    - id: move-remaining-platform-drivers-to-optional-extras
+      file: DONE/main/active/move-remaining-platform-drivers-to-optional-extras.yaml
+      title: Move polars, clickhouse-connect, and psycopg2-binary out of core dependencies into optional extras
+      category: Core Functionality
+      status: Completed
     - id: multi-region-performance-testing
       file: DONE/enterprise-ops-multi-region/planning/multi-region-performance-testing.yaml
       title: Multi-Region Performance Testing
@@ -2335,6 +2340,11 @@ priorities:
       file: DONE/security-hardening/security-audit.yaml
       title: Security Audit
       category: Pre-Release Medium Priority Tasks (Nice-to-Have)
+      status: Completed
+    - id: surface-polars-driver-version-in-cli-output
+      file: DONE/main/active/surface-polars-driver-version-in-cli-output.yaml
+      title: Set driver_package for Polars platform so version appears in CLI run announcement
+      category: Core Functionality
       status: Completed
     - id: simple-cloud-storage-path-support-completed
       file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
@@ -2647,7 +2657,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 21
+    count: 22
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -2663,6 +2673,11 @@ priorities:
       file: DONE/platform-expansion/planning/local-platform-cost-tracking.yaml
       title: Add cost tracking for local/self-hosted platforms
       category: Platform Expansion
+      status: Completed
+    - id: document-driver-versioning-for-polars-clickhouse-postgresql
+      file: DONE/main/active/document-driver-versioning-for-polars-clickhouse-postgresql.yaml
+      title: Add driver version management callouts to Polars, ClickHouse Cloud, and PostgreSQL platform docs
+      category: Documentation
       status: Completed
     - id: pg-mooncake-migration-benchmark
       file: DONE/platform-expansion/active/pg-mooncake-migration-benchmark.yaml

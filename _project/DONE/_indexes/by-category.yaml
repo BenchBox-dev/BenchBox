@@ -1,4 +1,4 @@
-generated_at: '2026-02-23T08:16:13.984501'
+generated_at: '2026-02-23T08:51:55.424414'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 173
+    count: 175
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1025,6 +1025,11 @@ categories:
       title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
       priority: Medium
       status: Completed
+    - id: move-remaining-platform-drivers-to-optional-extras
+      file: DONE/main/active/move-remaining-platform-drivers-to-optional-extras.yaml
+      title: Move polars, clickhouse-connect, and psycopg2-binary out of core dependencies into optional extras
+      priority: Medium
+      status: Completed
     - id: pt-01-ddl-generator-protocol
       file: DONE/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml
       title: 'PT-01: DDL Generator Protocol and Base Implementation'
@@ -1215,6 +1220,11 @@ categories:
       title: Result Output Schema v2.0 Complete Redesign
       priority: High
       status: Completed
+    - id: surface-polars-driver-version-in-cli-output
+      file: DONE/main/active/surface-polars-driver-version-in-cli-output.yaml
+      title: Set driver_package for Polars platform so version appears in CLI run announcement
+      priority: Medium
+      status: Completed
     - id: complexity-generators-pipelines-w14
       file: DONE/core-functionality/active/complexity-generators-pipelines-w14.yaml
       title: Simplify data generator and pipeline loading functions (complexity batch 5)
@@ -1385,7 +1395,7 @@ categories:
       priority: Medium-High
       status: Completed
   Documentation:
-    count: 14
+    count: 15
     items:
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
@@ -1396,6 +1406,11 @@ categories:
       file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
       title: Add dedicated tags for all platforms and benchmarks
       priority: Medium
+      status: Completed
+    - id: document-driver-versioning-for-polars-clickhouse-postgresql
+      file: DONE/main/active/document-driver-versioning-for-polars-clickhouse-postgresql.yaml
+      title: Add driver version management callouts to Polars, ClickHouse Cloud, and PostgreSQL platform docs
+      priority: Low
       status: Completed
     - id: add-sphinx-tags
       file: DONE/docs-experience/active/add-sphinx-tags.yaml

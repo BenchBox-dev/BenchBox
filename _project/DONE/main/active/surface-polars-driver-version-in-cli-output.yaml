@@ -1,0 +1,105 @@
+id: surface-polars-driver-version-in-cli-output
+title: "Set driver_package for Polars platform so version appears in CLI run announcement"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-02-23"
+description: |
+  The Polars platform entry in platform_registry.py has driver_package=None (line 212),
+  which causes ensure_driver_version() to skip version detection entirely. As a result,
+  the "Running ..." announcement line for polars runs never shows a driver version:
+
+    Running tpch on polars at scale 0.1          ← no [driver X.Y.Z] clause
+
+  The fix is a one-line change: set driver_package="polars" in the platform registry.
+  After that change, ensure_driver_version() will detect the installed polars version
+  via importlib.metadata and populate database_config.driver_version_actual, which
+  the announcement line already uses.
+
+  Context: clickhouse-connect (line 306) and psycopg2-binary (line 485) already have
+  driver_package set correctly and already display their versions. This item closes
+  the remaining gap for the polars platform.
+
+  Note: polars runs in DataFrame mode (supports_sql=False, default_mode=dataframe).
+  The driver_package field is used purely for version detection — it is independent
+  of the execution mode.
+
+category: Core Functionality
+
+work:
+- id: w1
+  summary: "Set driver_package=\"polars\" in platform_registry.py at the 'polars' platform entry (line 212); confirm it matches
+    the importlib.metadata package name (it does: the PyPI package name is 'polars')"
+  status: done
+
+- id: w2
+  summary: "Run a quick polars benchmark smoke test and confirm the version appears in the announcement line: grep 'Running.*polars'
+    from output"
+  needs: [w1]
+  status: done
+
+- id: w3
+  summary: "Add a unit test to tests/unit/cli/ verifying that the driver version clause appears for polars runs (follow the
+    pattern in test_run_driver_version_announcement.py)"
+  needs: [w1]
+  status: done
+
+metadata:
+  created_date: "2026-02-23"
+  estimated_effort: "Small (< 1 hour)"
+  tags:
+  - ux
+  - cli
+  - driver-versioning
+  - polars
+
+impact:
+  user_impact: |
+    Polars users will see which polars version is active in the CLI run announcement,
+    consistent with DuckDB, ClickHouse, and PostgreSQL runs. Reduces silent version
+    surprises when uv.lock reverts a manually-installed polars version.
+  technical_debt: |
+    Eliminates a silent inconsistency in platform_registry: all other analytical
+    platforms set driver_package; polars was overlooked.
+
+files_affected:
+  modified:
+  - "benchbox/core/platform_registry.py"
+  - "tests/unit/cli/test_run_driver_version_announcement.py"
+
+must_preserve:
+- "SQLite platform keeps driver_package=None (line 200) — sqlite3 is stdlib, has no importlib.metadata entry"
+- "polars DataFrame execution path continues to work correctly (driver_package is only for version detection)"
+- "All existing fast unit tests pass after the change"
+
+approach: |
+  Single-line change in benchbox/core/platform_registry.py:
+    line 212: "driver_package": None  →  "driver_package": "polars"
+
+  The PyPI package name is "polars" (confirmed: importlib.metadata.version("polars") works).
+  No other files need changes — the announcement line in commands/run.py already handles
+  driver_version_actual from database_config.
+
+  For the unit test, follow the pattern in tests/unit/cli/test_run_driver_version_announcement.py.
+  Specifically, add a test where the mock DatabaseConfig has driver_version_actual="1.36.1"
+  and platform="polars", and assert that the console output contains "[driver 1.36.1]".
+
+anti_patterns:
+- "DO NOT set driver_package for sqlite (line 200) — because sqlite3 is a stdlib module with no PyPI package — it should remain
+  None"
+- "DO NOT modify the DataFrame execution path — because driver_package is only used by ensure_driver_version() for version
+  detection, not execution routing"
+
+verification:
+- description: "Polars run announcement includes driver version"
+  command: "uv run benchbox run --platform polars --benchmark tpch --scale 0.01 --phases power --non-interactive 2>&1 | grep
+    'Running tpch'"
+  expected_output: "Running tpch on polars at scale 0.01 [driver X.Y.Z] (actual version number)"
+- description: "Fast unit tests still pass"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "All tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/platform_registry.py"
+  - "tests/unit/cli/test_run_driver_version_announcement.py"

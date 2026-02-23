@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T08:16:13.984785'
-total_items: 547
+generated_at: '2026-02-23T08:51:55.424673'
+total_items: 550
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 499
+    count: 502
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -528,6 +528,11 @@ statuses:
       file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
       title: Add dedicated tags for all platforms and benchmarks
       priority: Medium
+      category: Documentation
+    - id: document-driver-versioning-for-polars-clickhouse-postgresql
+      file: DONE/main/active/document-driver-versioning-for-polars-clickhouse-postgresql.yaml
+      title: Add driver version management callouts to Polars, ClickHouse Cloud, and PostgreSQL platform docs
+      priority: Low
       category: Documentation
     - id: interactive-wizard-execution-style-selection
       file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml
@@ -1666,6 +1671,11 @@ statuses:
       title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
       priority: Medium
       category: Core Functionality
+    - id: move-remaining-platform-drivers-to-optional-extras
+      file: DONE/main/active/move-remaining-platform-drivers-to-optional-extras.yaml
+      title: Move polars, clickhouse-connect, and psycopg2-binary out of core dependencies into optional extras
+      priority: Medium
+      category: Core Functionality
     - id: multi-region-performance-testing
       file: DONE/enterprise-ops-multi-region/planning/multi-region-performance-testing.yaml
       title: Multi-Region Performance Testing
@@ -2151,6 +2161,11 @@ statuses:
       title: Security Audit
       priority: Medium
       category: Pre-Release Medium Priority Tasks (Nice-to-Have)
+    - id: surface-polars-driver-version-in-cli-output
+      file: DONE/main/active/surface-polars-driver-version-in-cli-output.yaml
+      title: Set driver_package for Polars platform so version appears in CLI run announcement
+      priority: Medium
+      category: Core Functionality
     - id: simple-cloud-storage-path-support-completed
       file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED

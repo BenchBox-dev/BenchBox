@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T08:16:13.984253'
-total_items: 547
+generated_at: '2026-02-23T08:51:55.424178'
+total_items: 550
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2972,6 +2972,24 @@ items:
   - resource-tracking
   estimated_effort: 1-2 days
   completed_date: '2026-01-07'
+- id: document-driver-versioning-for-polars-clickhouse-postgresql
+  file: DONE/main/active/document-driver-versioning-for-polars-clickhouse-postgresql.yaml
+  title: Add driver version management callouts to Polars, ClickHouse Cloud, and PostgreSQL platform docs
+  worktree: main
+  category: Documentation
+  priority: Low
+  status: Completed
+  tags:
+  - documentation
+  - driver-versioning
+  - polars
+  - clickhouse
+  - postgresql
+  estimated_effort: Small (1-2 hours)
+  completed_date: '2026-02-23'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: pg-mooncake-migration-benchmark
   file: DONE/platform-expansion/active/pg-mooncake-migration-benchmark.yaml
   title: Add heap-to-columnstore migration benchmark for pg_mooncake
@@ -4814,6 +4832,24 @@ items:
   work_done: 6
   work_ready: 0
   deferred_count: 1
+- id: move-remaining-platform-drivers-to-optional-extras
+  file: DONE/main/active/move-remaining-platform-drivers-to-optional-extras.yaml
+  title: Move polars, clickhouse-connect, and psycopg2-binary out of core dependencies into optional extras
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - packaging
+  - driver-versioning
+  - polars
+  - clickhouse
+  - postgresql
+  estimated_effort: Small (1-2 hours)
+  completed_date: '2026-02-23'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
 - id: multi-region-performance-testing
   file: DONE/enterprise-ops-multi-region/planning/multi-region-performance-testing.yaml
   title: Multi-Region Performance Testing
@@ -5323,6 +5359,23 @@ items:
   priority: Medium
   status: Completed
   completed_date: '2025-11-27'
+- id: surface-polars-driver-version-in-cli-output
+  file: DONE/main/active/surface-polars-driver-version-in-cli-output.yaml
+  title: Set driver_package for Polars platform so version appears in CLI run announcement
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - ux
+  - cli
+  - driver-versioning
+  - polars
+  estimated_effort: Small (< 1 hour)
+  completed_date: '2026-02-23'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: simple-cloud-storage-path-support-completed
   file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
   title: Simple Cloud Storage Path Support ✅ COMPLETED
