@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T08:51:55.424673'
-total_items: 550
+generated_at: '2026-02-23T18:20:35.491327'
+total_items: 551
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 502
+    count: 503
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2226,6 +2226,11 @@ statuses:
       title: Starburst Platform Adapter
       priority: Low
       category: Platform Expansion
+    - id: presorted-open-table-format-datasets
+      file: DONE/physical-tuning/active/presorted-open-table-format-datasets.yaml
+      title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+      priority: High
+      category: Core Functionality
     - id: surface-driver-version-in-cli-progress-output
       file: DONE/main/active/surface-driver-version-in-cli-progress-output.yaml
       title: Surface active driver version in CLI progress output

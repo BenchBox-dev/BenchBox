@@ -1,4 +1,4 @@
-generated_at: '2026-02-23T08:51:54.302003'
+generated_at: '2026-02-23T18:20:34.313535'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -84,18 +84,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 2
+    count: 1
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
-    - id: presorted-open-table-format-datasets
-      file: TODO/physical-tuning/active/presorted-open-table-format-datasets.yaml
-      title: Support creation of pre-sorted / pre-clustered datasets in open table formats
-      priority: Medium-High
-      status: In Progress
   Documentation:
     count: 2
     items:
@@ -169,10 +164,10 @@ categories:
     count: 1
     items:
     - id: reenable-comprehensive-ci
-      file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
+      file: TODO/ci-infrastructure/active/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: High
-      status: Not Started
+      status: In Progress
   User Experience:
     count: 1
     items:

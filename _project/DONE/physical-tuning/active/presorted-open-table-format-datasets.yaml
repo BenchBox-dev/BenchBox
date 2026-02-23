@@ -6,7 +6,8 @@ id: presorted-open-table-format-datasets
 title: "Support creation of pre-sorted / pre-clustered datasets in open table formats"
 worktree: physical-tuning
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-23"
 description: |
   Enable BenchBox to generate benchmark datasets (TPC-H, TPC-DS, etc.) that are
   pre-sorted or pre-clustered in open table formats like Parquet, Delta Lake,

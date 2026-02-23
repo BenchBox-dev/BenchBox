@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T08:51:55.424178'
-total_items: 550
+generated_at: '2026-02-23T18:20:35.490857'
+total_items: 551
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2583,6 +2583,26 @@ items:
   category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   priority: High
   status: Identified
+- id: presorted-open-table-format-datasets
+  file: DONE/physical-tuning/active/presorted-open-table-format-datasets.yaml
+  title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+  worktree: physical-tuning
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - data-generation
+  - parquet
+  - delta-lake
+  - iceberg
+  - zone-maps
+  - z-order
+  - performance
+  estimated_effort: Large
+  completed_date: '2026-02-23'
+  work_total: 15
+  work_done: 15
+  work_ready: 0
 - id: tco-calculator-cost-forecasting
   file: DONE/cost-intelligence-tco/completed/tco-calculator-cost-forecasting.yaml
   title: TCO Calculator & Cost Forecasting

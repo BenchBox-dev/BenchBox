@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T08:51:54.302017'
-total_items: 30
+generated_at: '2026-02-23T18:20:34.313545'
+total_items: 29
 priorities:
   High:
     count: 2
@@ -10,23 +10,18 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: reenable-comprehensive-ci
-      file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
+      file: TODO/ci-infrastructure/active/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       category: Testing and Quality Assurance
-      status: Not Started
+      status: In Progress
   Medium-High:
-    count: 5
+    count: 4
     items:
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
       status: Not Started
-    - id: presorted-open-table-format-datasets
-      file: TODO/physical-tuning/active/presorted-open-table-format-datasets.yaml
-      title: Support creation of pre-sorted / pre-clustered datasets in open table formats
-      category: Core Functionality
-      status: In Progress
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support

@@ -1,21 +1,21 @@
-generated_at: '2026-02-23T08:51:54.302025'
-total_items: 30
+generated_at: '2026-02-23T18:20:34.313553'
+total_items: 29
 statuses:
   In Progress:
     count: 2
     items:
-    - id: presorted-open-table-format-datasets
-      file: TODO/physical-tuning/active/presorted-open-table-format-datasets.yaml
-      title: Support creation of pre-sorted / pre-clustered datasets in open table formats
-      priority: Medium-High
-      category: Core Functionality
+    - id: reenable-comprehensive-ci
+      file: TODO/ci-infrastructure/active/reenable-comprehensive-ci.yaml
+      title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
+      priority: High
+      category: Testing and Quality Assurance
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'
       priority: Medium-High
       category: Blog Revision
   Not Started:
-    count: 28
+    count: 27
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -102,11 +102,6 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: High
       category: Platform Expansion
-    - id: reenable-comprehensive-ci
-      file: TODO/ci-infrastructure/planning/reenable-comprehensive-ci.yaml
-      title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
-      priority: High
-      category: Testing and Quality Assurance
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

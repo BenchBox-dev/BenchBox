@@ -1,4 +1,4 @@
-generated_at: '2026-02-23T08:51:55.424414'
+generated_at: '2026-02-23T18:20:35.491078'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 175
+    count: 176
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1234,6 +1234,11 @@ categories:
       file: DONE/unknown/planning/standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com.yaml
       title: Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED
       priority: Medium
+      status: Completed
+    - id: presorted-open-table-format-datasets
+      file: DONE/physical-tuning/active/presorted-open-table-format-datasets.yaml
+      title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+      priority: High
       status: Completed
     - id: surface-driver-version-in-cli-progress-output
       file: DONE/main/active/surface-driver-version-in-cli-progress-output.yaml

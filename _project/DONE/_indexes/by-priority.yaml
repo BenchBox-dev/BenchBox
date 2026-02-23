@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T08:51:55.424544'
-total_items: 550
+generated_at: '2026-02-23T18:20:35.491206'
+total_items: 551
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 184
+    count: 185
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -888,6 +888,11 @@ priorities:
       title: Stabilize Optional-Dependency Adapter Tests
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
       status: Identified
+    - id: presorted-open-table-format-datasets
+      file: DONE/physical-tuning/active/presorted-open-table-format-datasets.yaml
+      title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+      category: Core Functionality
+      status: Completed
     - id: tco-calculator-cost-forecasting
       file: DONE/cost-intelligence-tco/completed/tco-calculator-cost-forecasting.yaml
       title: TCO Calculator & Cost Forecasting
