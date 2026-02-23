@@ -206,7 +206,7 @@ work:
   summary: "Implement multi-column sorting with order specification and unit tests"
   needs:
   - w2
-  status: pending
+  status: done
 - id: w5
   summary: "Implement configurable row group size for zone map granularity with unit tests"
   needs:
