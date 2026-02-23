@@ -266,7 +266,7 @@ work:
   needs:
   - w10
   - w14
-  status: pending
+  status: done
 - id: w15
   summary: "Documentation: data organization strategies guide"
   needs:
