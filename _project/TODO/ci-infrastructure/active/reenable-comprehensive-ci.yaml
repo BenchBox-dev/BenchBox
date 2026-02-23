@@ -200,7 +200,7 @@ work:
   summary: "Fix any broken example references"
   needs:
   - w18
-  status: pending
+  status: done
 - id: w20
   summary: "Test check_example_syntax.py locally"
   status: done
