@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T11:44:48.550633'
-total_items: 540
+generated_at: '2026-02-22T21:07:55.170020'
+total_items: 542
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 492
+    count: 494
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1023,6 +1023,11 @@ statuses:
       file: DONE/tpcds-docs/document-stdout-patches.yaml
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
       priority: High
+      category: Documentation
+    - id: cli-help-driver-version-documentation
+      file: DONE/main/active/cli-help-driver-version-documentation.yaml
+      title: Document driver_version, driver_auto_install, and engine_version in CLI/MCP help
+      priority: Medium
       category: Documentation
     - id: pg-mooncake-type-compat-matrix
       file: DONE/platform-expansion/active/pg-mooncake-type-compat-matrix.yaml
@@ -2065,6 +2070,11 @@ statuses:
       file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
       title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
       priority: Medium-High
+      category: Core Functionality
+    - id: bulk-shard-loading-duckdb
+      file: DONE/main/active/bulk-shard-loading-duckdb.yaml
+      title: Replace per-shard INSERT loops with single bulk INSERT for DuckDB handlers
+      priority: High
       category: Core Functionality
     - id: resource-management
       file: DONE/runtime-ops/completed/resource-management.yaml

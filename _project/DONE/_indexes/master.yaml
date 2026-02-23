@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T11:44:48.550047'
-total_items: 540
+generated_at: '2026-02-22T21:07:55.169521'
+total_items: 542
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2477,6 +2477,25 @@ items:
   owners:
   - joe
   estimated_effort: 3-5 days
+- id: bulk-shard-loading-duckdb
+  file: DONE/main/active/bulk-shard-loading-duckdb.yaml
+  title: Replace per-shard INSERT loops with single bulk INSERT for DuckDB handlers
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - data-loading
+  - duckdb
+  - performance
+  - sharding
+  - bulk-insert
+  estimated_effort: Medium
+  completed_date: '2026-02-22'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  deferred_count: 1
 - id: fix-datafusion-read-write-primitives-parity
   file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml
   title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
@@ -4227,6 +4246,27 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Small
+- id: cli-help-driver-version-documentation
+  file: DONE/main/active/cli-help-driver-version-documentation.yaml
+  title: Document driver_version, driver_auto_install, and engine_version in CLI/MCP help
+  worktree: main
+  category: Documentation
+  priority: Medium
+  status: Completed
+  tags:
+  - cli
+  - mcp
+  - help-text
+  - documentation
+  - driver-version
+  - engine-version
+  - platform-option
+  - ux
+  estimated_effort: Small
+  completed_date: '2026-02-22'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: dry-run-feature-completed
   file: DONE/unknown/planning/dry-run-feature-completed.yaml
   title: Dry Run Feature ✅ COMPLETED

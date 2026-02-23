@@ -1,4 +1,4 @@
-generated_at: '2026-02-22T11:44:48.550353'
+generated_at: '2026-02-22T21:07:55.169761'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 169
+    count: 170
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1190,6 +1190,11 @@ categories:
       title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
       priority: Medium-High
       status: Completed
+    - id: bulk-shard-loading-duckdb
+      file: DONE/main/active/bulk-shard-loading-duckdb.yaml
+      title: Replace per-shard INSERT loops with single bulk INSERT for DuckDB handlers
+      priority: High
+      status: Completed
     - id: fix-datafusion-read-write-primitives-parity
       file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml
       title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
@@ -1365,7 +1370,7 @@ categories:
       priority: Medium-High
       status: Completed
   Documentation:
-    count: 11
+    count: 12
     items:
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
@@ -1401,6 +1406,11 @@ categories:
       file: DONE/tpcds-docs/document-stdout-patches.yaml
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
       priority: High
+      status: Completed
+    - id: cli-help-driver-version-documentation
+      file: DONE/main/active/cli-help-driver-version-documentation.yaml
+      title: Document driver_version, driver_auto_install, and engine_version in CLI/MCP help
+      priority: Medium
       status: Completed
     - id: mcp-landing-page-elevation
       file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml

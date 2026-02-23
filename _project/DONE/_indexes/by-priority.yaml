@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T11:44:48.550509'
-total_items: 540
+generated_at: '2026-02-22T21:07:55.169900'
+total_items: 542
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 183
+    count: 184
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -848,6 +848,11 @@ priorities:
       title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
       category: Core Functionality
       status: Completed
+    - id: bulk-shard-loading-duckdb
+      file: DONE/main/active/bulk-shard-loading-duckdb.yaml
+      title: Replace per-shard INSERT loops with single bulk INSERT for DuckDB handlers
+      category: Core Functionality
+      status: Completed
     - id: fix-datafusion-read-write-primitives-parity
       file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml
       title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
@@ -1398,7 +1403,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 242
+    count: 243
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1850,6 +1855,11 @@ priorities:
       title: Document PySpark SQL mode usage
       category: Documentation
       status: Not Started
+    - id: cli-help-driver-version-documentation
+      file: DONE/main/active/cli-help-driver-version-documentation.yaml
+      title: Document driver_version, driver_auto_install, and engine_version in CLI/MCP help
+      category: Documentation
+      status: Completed
     - id: dry-run-feature-completed
       file: DONE/unknown/planning/dry-run-feature-completed.yaml
       title: Dry Run Feature ✅ COMPLETED

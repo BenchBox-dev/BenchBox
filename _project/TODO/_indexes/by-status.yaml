@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T11:44:47.305917'
-total_items: 30
+generated_at: '2026-02-22T21:07:53.969219'
+total_items: 31
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Medium-High
       category: Blog Revision
   Not Started:
-    count: 28
+    count: 29
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -107,6 +107,11 @@ statuses:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: High
       category: Testing and Quality Assurance
+    - id: bulk-shard-loading-clickhouse
+      file: TODO/main/planning/bulk-shard-loading-clickhouse.yaml
+      title: Replace per-shard INSERT loops with glob-pattern bulk INSERT for ClickHouseNativeHandler
+      priority: Medium-High
+      category: Core Functionality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

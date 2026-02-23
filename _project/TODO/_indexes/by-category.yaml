@@ -1,4 +1,4 @@
-generated_at: '2026-02-22T11:44:47.305895'
+generated_at: '2026-02-22T21:07:53.969197'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -84,12 +84,17 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 2
+    count: 3
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
+      status: Not Started
+    - id: bulk-shard-loading-clickhouse
+      file: TODO/main/planning/bulk-shard-loading-clickhouse.yaml
+      title: Replace per-shard INSERT loops with glob-pattern bulk INSERT for ClickHouseNativeHandler
+      priority: Medium-High
       status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/active/presorted-open-table-format-datasets.yaml

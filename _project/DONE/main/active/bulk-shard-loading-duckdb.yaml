@@ -1,0 +1,264 @@
+# Bulk Shard Loading for DuckDB (Framework + Implementation)
+#
+# Location: _project/TODO/main/planning/bulk-shard-loading-duckdb.yaml
+
+id: bulk-shard-loading-duckdb
+title: "Replace per-shard INSERT loops with single bulk INSERT for DuckDB handlers"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-02-22"
+description: |
+  When a benchmark table is generated with parallel>1, its data is split across
+  N shard files (e.g., lineitem.tbl.1, lineitem.tbl.2, ..., lineitem.tbl.N).
+  The base DataLoader._load_file_based_data() currently calls handler.load_table()
+  once per shard in a sequential loop, producing N separate INSERT statements.
+
+  For DuckDB this is inefficient: DuckDB's read_csv() and read_parquet() both
+  accept an array of file paths or a glob pattern and process all files in a
+  single optimised scan, avoiding N round-trips and N separate query plans.
+
+  This TODO adds a load_table_bulk() interface to FileFormatHandler, changes the
+  DataLoader loop to use it, and implements the DuckDB-native multi-file variant
+  for DuckDBNativeHandler (CSV/TBL) and DuckDBParquetHandler.
+
+  Expected improvement (TPC-H SF1, 4-shard lineitem):
+  - Before: 4 × (pragma + COUNT_before + INSERT + COUNT_after) = 16 execute calls
+  - After:  1 × (pragma + COUNT_before + bulk INSERT + COUNT_after) = 4 execute calls
+  - Data transfer and query planning overhead reduced ~75% for sharded tables
+
+  PostgreSQL, SQLite, DataFusion, and other platforms that use DelimitedFileHandler
+  / executemany() are NOT in scope — they have no SQL multi-file primitive.
+
+category: Core Functionality
+
+work:
+- id: w1
+  summary: "Add load_table_bulk() to FileFormatHandler base class with default loop implementation"
+  status: done
+  notes: |
+    Signature: load_table_bulk(table_name, file_paths: list[Path], connection, benchmark, logger) -> int
+    Default: iterate file_paths, call self.load_table() for each, sum results.
+    This makes the interface backward-compatible — all existing handlers auto-inherit
+    correct (if non-bulk) behaviour.
+
+- id: w2
+  summary: "Update DataLoader._load_file_based_data() to call load_table_bulk() for multi-shard tables"
+  needs: [w1]
+  status: done
+  notes: |
+    In the isinstance(file_path_or_paths, list) branch, instead of:
+      for shard_path in file_path_or_paths:
+          rows += self._load_single_file(table_name, shard_path)
+    Do:
+      handler = self.handler_factory(file_path_or_paths[0], ...)
+      total_rows = handler.load_table_bulk(table_name, [Path(p) for p in file_path_or_paths],
+                                           self.connection, self.benchmark, self.adapter.logger)
+    The handler_factory is called once (on the first shard) to select the right handler type.
+    The shard_count display in the log line must still be len(file_path_or_paths).
+
+- id: w3
+  summary: "Implement DuckDBNativeHandler.load_table_bulk() using read_csv([list_of_paths])"
+  needs: [w2]
+  status: done
+  notes: |
+    Key design points:
+    1. Call pragma_table_info once (using connection) to get col_names.
+    2. Detect trailing delimiter on the FIRST shard only (has_trailing_delimiter).
+    3. Build names/columns based on that detection — applies to all shards.
+    4. Build INSERT SQL with array literal:
+         INSERT INTO {table}
+         SELECT {cols} FROM read_csv(['{esc_path1}', '{esc_path2}', ...], delim='|', ...)
+    5. Use before/after COUNT(*) to get inserted row count (same as load_table()).
+    6. Dry-run mode: capture_sql() for each file (or combined) then return 1000*N.
+
+- id: w4
+  summary: "Implement DuckDBParquetHandler.load_table_bulk() using read_parquet([list_of_paths])"
+  needs: [w2]
+  status: done
+  notes: |
+    Simpler than CSV — no pragma or trailing-delimiter detection needed.
+    INSERT INTO {table} SELECT * FROM read_parquet(['{path1}', '{path2}', ...])
+    Use before/after COUNT(*) to get inserted row count.
+    Dry-run: capture_sql() then return 1000*N.
+
+- id: w5
+  summary: "Unit tests for DuckDBNativeHandler.load_table_bulk() — correct row count, SQL shape, dry-run"
+  needs: [w3]
+  status: done
+  notes: |
+    Add to tests/unit/platforms/base/test_trailing_delimiter_loading.py.
+    Test cases:
+    - 3 shards, trailing delimiter: assert array syntax in SQL, single INSERT call, correct row count
+    - 3 shards, no trailing delimiter: assert no _trailing_delimiter_ in SQL
+    - dry-run mode: assert capture_sql called, return value == 3000
+    - single-shard list delegates correctly (same result as load_table())
+    Mock call sequence: [pragma, COUNT_before, INSERT_bulk, COUNT_after]
+
+- id: w6
+  summary: "Unit tests for DuckDBParquetHandler.load_table_bulk() — correct row count, SQL shape, dry-run"
+  needs: [w4]
+  status: done
+  notes: |
+    Add to tests/unit/platforms/base/test_parquet_handlers.py.
+    Test cases:
+    - 2 shards: assert read_parquet([...]) array syntax, 3 execute calls, correct row count
+    - dry-run: assert no connection.execute called, return == 2000
+
+- id: w7
+  summary: "Smoke test: benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases load,power reports correct row
+    counts"
+  needs: [w5, w6]
+  status: done
+  notes: |
+    At SF0.01 parallel=1, tables are single-file — verifies no regression.
+    Add a unit/integration test that exercises DataLoader with a mock multi-shard
+    table and confirms load_table_bulk() was called (not individual load_table()).
+
+deferred:
+- summary: "Bulk loading for DuckDB Delta / Vortex / DuckLake handlers"
+  reason: "Lower volume — Delta tables are typically single files; validate demand before adding complexity"
+
+metadata:
+  tags:
+  - data-loading
+  - duckdb
+  - performance
+  - sharding
+  - bulk-insert
+  estimated_effort: "Medium"
+  created_date: "2026-02-22"
+
+impact:
+  business_value: |
+    Reduces data-loading time for sharded TPC-H / TPC-DS tables on DuckDB. For
+    TPC-H SF1 with 4 shards, eliminates 12 of 16 execute round-trips during the
+    load phase. Directly improves benchmark throughput and reduces wall-clock
+    time for CI runs that exercise the load phase.
+  user_impact: |
+    Users running high-scale (SF >= 1) benchmarks with parallel datagen will see
+    faster load phases. Row count reporting remains accurate thanks to the
+    before/after COUNT(*) fix already applied.
+  technical_debt: |
+    The per-shard loop was the only available design before DuckDB gained
+    multi-file read_csv/read_parquet support. Adding load_table_bulk() to the
+    base class makes the bulk-loading capability explicit and extensible to
+    ClickHouse and other platforms in follow-on work.
+
+files_affected:
+  modified:
+  - "benchbox/platforms/base/data_loading.py"
+  - "tests/unit/platforms/base/test_trailing_delimiter_loading.py"
+  - "tests/unit/platforms/base/test_parquet_handlers.py"
+
+context_sections:
+  "Root Cause Analysis": |
+    DataLoader._load_file_based_data() (data_loading.py:1773-1782) detects
+    multi-shard tables via isinstance(file_path_or_paths, list) but then iterates
+    the list, calling _load_single_file() once per shard.  Each call builds and
+    executes a fresh INSERT...SELECT FROM read_csv(single_path) query.
+
+    DuckDB 1.4.x fully supports:
+      read_csv(['path1', 'path2', 'path3'], ...)      # multi-file CSV
+      read_parquet(['path1', 'path2', ...])            # multi-file Parquet
+    These produce a single logical scan and a single INSERT, which is both faster
+    (one query plan, one transaction) and simpler to trace.
+
+  "Design Decision: load_table_bulk() interface": |
+    Rather than modifying the DataLoader loop signature or adding a special case
+    in _load_file_based_data(), we add load_table_bulk() to FileFormatHandler.
+    The default implementation loops over load_table() for full backward
+    compatibility. DuckDB handlers override with the native multi-file variant.
+
+    This design lets ClickHouse, future RDBMS platforms, etc. opt in to bulk
+    loading independently, and keeps _load_file_based_data() clean.
+
+  "Row Count Accuracy": |
+    The before/after COUNT(*) fix (already committed) is used inside
+    load_table_bulk() as well: COUNT before the bulk INSERT, execute the INSERT,
+    COUNT after. The delta is the exact number of rows added, regardless of how
+    many shards were combined.
+
+must_preserve:
+- "DuckDBNativeHandler.load_table() (single-file path) continues to work unchanged for non-sharded tables"
+- "DuckDBParquetHandler.load_table() continues to work unchanged"
+- "All 12,970 existing fast-suite tests continue to pass"
+- "DataLoader default behaviour (non-DuckDB platforms, single-file tables) is unaffected"
+- "Dry-run mode still captures SQL without executing it"
+- "benchbox run --platform duckdb --benchmark tpch --scale 1 --phases load produces total rows_loaded == 8,661,245 (lineitem
+  6,001,215 + orders 1,500,000 + ...)"
+
+approach: |
+  1. In FileFormatHandler (data_loading.py), add:
+       def load_table_bulk(self, table_name, file_paths, connection, benchmark, logger) -> int:
+           total = 0
+           for path in file_paths:
+               total += self.load_table(table_name, path, connection, benchmark, logger)
+           return total
+
+  2. In DataLoader._load_file_based_data() (lines 1773–1782), replace the
+     for-loop + _load_single_file() pattern with:
+       handler = self.handler_factory(file_path_or_paths[0], self.adapter, self.benchmark)
+       total_rows = handler.load_table_bulk(table_name, [Path(p) for p in file_path_or_paths],
+                                            self.connection, self.benchmark, self.adapter.logger)
+     This calls the factory once to pick the correct handler, then delegates
+     the entire shard list to load_table_bulk().
+
+  3. In DuckDBNativeHandler, override load_table_bulk():
+     a. Call pragma_table_info once to get col_names.
+     b. Detect trailing delimiter on file_paths[0].
+     c. Escape each path: [escape_sql_string_literal(str(p)) for p in file_paths].
+     d. Build array literal: "['" + "', '".join(escaped) + "']".
+     e. Build INSERT SQL using the array literal inside read_csv().
+     f. COUNT before, execute INSERT, COUNT after, return delta.
+
+  4. In DuckDBParquetHandler, override load_table_bulk() similarly:
+     Build INSERT ... SELECT * FROM read_parquet(['p1', 'p2', ...]) and use
+     before/after COUNT(*).
+
+  5. Add tests before touching production code (TDD: write failing tests for
+     load_table_bulk, then implement to make them pass).
+
+anti_patterns:
+- "DO NOT change the load_table() single-file method signatures — because existing tests and non-DuckDB platforms depend on
+  them — only add load_table_bulk() as an override"
+- "DO NOT call pragma_table_info once per shard in load_table_bulk() — because the schema is the same for all shards of a
+  table — call it once for the first path"
+- "DO NOT call has_trailing_delimiter on every shard in load_table_bulk() — because all shards of the same TBL table have
+  the same delimiter pattern — sample only the first path"
+- "DO NOT change _load_single_file() — because it is still used for the single-file (non-list) branch — leave it untouched"
+- "DO NOT use a glob string instead of an explicit path array in load_table_bulk() — because shard files may not be in the
+  same directory or may have non-glob-friendly names — use the explicit list passed in"
+
+verification:
+- description: "All existing fast-suite tests pass after the framework change"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "12970+ passed, 0 failed"
+- description: "New load_table_bulk unit tests pass for DuckDBNativeHandler"
+  command: "uv run -- python -m pytest tests/unit/platforms/base/test_trailing_delimiter_loading.py -v -k bulk"
+  expected_output: "all bulk tests pass, 0 failures"
+- description: "New load_table_bulk unit tests pass for DuckDBParquetHandler"
+  command: "uv run -- python -m pytest tests/unit/platforms/base/test_parquet_handlers.py -v -k bulk"
+  expected_output: "all bulk tests pass, 0 failures"
+- description: "DuckDB TPC-H SF0.01 smoke test completes with correct row counts"
+  command: "uv run -- python -m pytest -m fast -k 'duckdb and load' -v"
+  expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/base/data_loading.py"
+  - "tests/unit/platforms/base/test_trailing_delimiter_loading.py"
+  - "tests/unit/platforms/base/test_parquet_handlers.py"
+  do_not_modify:
+  - "benchbox/platforms/duckdb.py"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/cli/commands/run.py"
+  - "tests/unit/platforms/test_duckdb_adapter.py"
+
+success_metrics:
+- "load_table_bulk() added to FileFormatHandler base class with working default implementation"
+- "DuckDBNativeHandler.load_table_bulk() generates a single INSERT with read_csv([array]) for N shards"
+- "DuckDBParquetHandler.load_table_bulk() generates a single INSERT with read_parquet([array]) for N shards"
+- "DataLoader uses load_table_bulk() for multi-shard tables, not a loop over load_table()"
+- "All 12,970+ fast-suite tests pass after changes"
+- "New unit tests cover: array SQL shape, correct row count delta, dry-run mode, single-shard degenerate case"
