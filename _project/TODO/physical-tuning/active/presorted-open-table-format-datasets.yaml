@@ -219,7 +219,7 @@ work:
   - w4
   - w5
   - w13
-  status: pending
+  status: done
 - id: w7
   summary: "Add CLI option: --data-format parquet-sorted"
   needs:
