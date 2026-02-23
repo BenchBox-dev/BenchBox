@@ -203,7 +203,7 @@ work:
   status: pending
 - id: w20
   summary: "Test check_example_syntax.py locally"
-  status: pending
+  status: done
 - id: w21
   summary: "Fix any syntax errors in examples"
   needs:
