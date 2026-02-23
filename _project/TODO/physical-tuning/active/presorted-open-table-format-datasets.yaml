@@ -247,7 +247,7 @@ work:
   needs:
   - w4
   - w5
-  status: pending
+  status: done
 - id: w14
   summary: "Integration tests verifying sortedness metrics end-to-end"
   needs:
