@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T21:07:55.169521'
-total_items: 542
+generated_at: '2026-02-22T21:20:03.832186'
+total_items: 543
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6695,6 +6695,27 @@ items:
   work_total: 7
   work_done: 7
   work_ready: 0
+- id: bulk-shard-loading-clickhouse
+  file: DONE/main/active/bulk-shard-loading-clickhouse.yaml
+  title: Replace per-shard INSERT loops with glob-pattern bulk INSERT for ClickHouseNativeHandler
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - data-loading
+  - clickhouse
+  - performance
+  - sharding
+  - bulk-insert
+  estimated_effort: Small
+  completed_date: '2026-02-22'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  deferred_count: 3
+  needs:
+  - bulk-shard-loading-duckdb
 - id: simplify-dataframe-extra-naming
   file: DONE/main/active/simplify-dataframe-extra-naming.yaml
   title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'

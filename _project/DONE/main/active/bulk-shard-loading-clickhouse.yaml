@@ -6,7 +6,8 @@ id: bulk-shard-loading-clickhouse
 title: "Replace per-shard INSERT loops with glob-pattern bulk INSERT for ClickHouseNativeHandler"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-02-22"
 description: |
   ClickHouseNativeHandler.load_table() currently processes one shard file per
   call.  For a sharded benchmark table (e.g., lineitem.tbl.1 … lineitem.tbl.10)
@@ -33,7 +34,7 @@ deps:
 work:
 - id: w1
   summary: "Audit ClickHouseNativeHandler: locate load_table() and identify all execute call sites"
-  status: pending
+  status: done
   notes: |
     File: benchbox/platforms/clickhouse/workload.py (and any subclass in clickhouse_cloud.py).
     Confirm the exact SQL pattern used (file(), s3(), or COPY), how file paths are
@@ -42,7 +43,7 @@ work:
 - id: w2
   summary: "Implement ClickHouseNativeHandler.load_table_bulk() using file() glob pattern for self-hosted ClickHouse"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Algorithm:
     1. Derive a glob from the shard list. All shards for a table share a common
@@ -62,7 +63,7 @@ work:
 - id: w3
   summary: "Handle ClickHouse Cloud: verify whether cloud path already bulk-loads; add tests or implement if not"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     ClickHouse Cloud benchmarks upload files to S3 before loading.
     TIME CAP: max 2 hrs. If the audit shows the cloud path already issues a
@@ -75,7 +76,7 @@ work:
 - id: w4
   summary: "Unit tests for ClickHouseNativeHandler.load_table_bulk() — glob SQL, row count, fallback, dry-run"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Test cases:
     - 4 shards in same dir: assert glob pattern in SQL, single execute call, correct row count
@@ -87,7 +88,12 @@ deferred:
 - summary: "Investigate columnar-native bulk loading (ClickHouse Native format instead of CSV)"
   reason: "CSV via file() is sufficient for current benchmarks; Native format has different escaping requirements"
 - summary: "Bulk loading for PostgreSQL COPY FROM PROGRAM or COPY FROM STDIN multi-file"
-  reason: "PostgreSQL COPY is fundamentally single-file per statement; would require UNION ALL construction or a PL/pgSQL wrapper — different scope"
+  reason: "PostgreSQL COPY is fundamentally single-file per statement; would require UNION ALL construction or a PL/pgSQL
+    wrapper — different scope"
+- summary: "Bulk S3/GCS loading for ClickHouse Cloud adapter using s3() glob patterns"
+  reason: "Cloud adapter (_load_data_via_s3, _load_data_via_gcs) has its own per-file upload+insert loop that bypasses DataLoader
+    and ClickHouseNativeHandler entirely. Bulk loading requires restructuring the upload pipeline (upload all first, then
+    single INSERT with s3() glob) — a larger refactor tracked separately."
 
 metadata:
   tags:
@@ -156,9 +162,12 @@ approach: |
      shards in bulk; if so, just add tests.
 
 anti_patterns:
-- "DO NOT concatenate shard CSV files on disk — because that requires temp storage and file I/O — use the glob pattern in SQL instead"
-- "DO NOT hardcode the glob separator as '.' — because shard naming conventions may differ (e.g., _N vs .N) — derive the common prefix programmatically from the actual file names"
-- "DO NOT skip the fallback to per-file loop — because shards may legitimately be in different dirs for re-loaded manifests — the fallback ensures correctness in all cases"
+- "DO NOT concatenate shard CSV files on disk — because that requires temp storage and file I/O — use the glob pattern in
+  SQL instead"
+- "DO NOT hardcode the glob separator as '.' — because shard naming conventions may differ (e.g., _N vs .N) — derive the common
+  prefix programmatically from the actual file names"
+- "DO NOT skip the fallback to per-file loop — because shards may legitimately be in different dirs for re-loaded manifests
+  — the fallback ensures correctness in all cases"
 
 verification:
 - description: "ClickHouse handler unit tests pass"
@@ -173,11 +182,13 @@ verification:
 
 scope_limit:
   only_modify:
-  - "benchbox/platforms/clickhouse/workload.py"
+  - "benchbox/platforms/base/data_loading.py"
   - "benchbox/platforms/clickhouse_cloud.py"
   - "tests/unit/platforms/test_clickhouse_adapter.py"
   do_not_modify:
-  - "benchbox/platforms/base/data_loading.py"
+  - "benchbox/platforms/clickhouse/workload.py"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/cli/commands/run.py"
   - "benchbox/core/runner/runner.py"
   - "benchbox/cli/commands/run.py"
 

@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T21:07:55.169900'
-total_items: 542
+generated_at: '2026-02-22T21:20:03.832610'
+total_items: 543
 priorities:
   Critical:
     count: 35
@@ -1104,7 +1104,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 59
+    count: 60
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1385,6 +1385,11 @@ priorities:
     - id: complexity-dict-dispatch-w14
       file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
       title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
+      category: Core Functionality
+      status: Completed
+    - id: bulk-shard-loading-clickhouse
+      file: DONE/main/active/bulk-shard-loading-clickhouse.yaml
+      title: Replace per-shard INSERT loops with glob-pattern bulk INSERT for ClickHouseNativeHandler
       category: Core Functionality
       status: Completed
     - id: simplify-dataframe-extra-naming

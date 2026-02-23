@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T21:07:53.969210'
-total_items: 31
+generated_at: '2026-02-22T21:20:02.134584'
+total_items: 30
 priorities:
   High:
     count: 2
@@ -15,17 +15,12 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 6
+    count: 5
     items:
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
-      status: Not Started
-    - id: bulk-shard-loading-clickhouse
-      file: TODO/main/planning/bulk-shard-loading-clickhouse.yaml
-      title: Replace per-shard INSERT loops with glob-pattern bulk INSERT for ClickHouseNativeHandler
-      category: Core Functionality
       status: Not Started
     - id: presorted-open-table-format-datasets
       file: TODO/physical-tuning/active/presorted-open-table-format-datasets.yaml

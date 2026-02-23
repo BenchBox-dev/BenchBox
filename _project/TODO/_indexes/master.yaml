@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T21:07:53.969171'
-total_items: 31
+generated_at: '2026-02-22T21:20:02.134537'
+total_items: 30
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -451,26 +451,6 @@ items:
   work_total: 12
   work_done: 0
   work_ready: 12
-- id: bulk-shard-loading-clickhouse
-  file: TODO/main/planning/bulk-shard-loading-clickhouse.yaml
-  title: Replace per-shard INSERT loops with glob-pattern bulk INSERT for ClickHouseNativeHandler
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - data-loading
-  - clickhouse
-  - performance
-  - sharding
-  - bulk-insert
-  estimated_effort: Small
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  deferred_count: 2
-  needs:
-  - bulk-shard-loading-duckdb
 - id: presorted-open-table-format-datasets
   file: TODO/physical-tuning/active/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats

@@ -1,4 +1,4 @@
-generated_at: '2026-02-22T21:07:55.169761'
+generated_at: '2026-02-22T21:20:03.832456'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -401,7 +401,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 170
+    count: 171
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1188,6 +1188,11 @@ categories:
     - id: complexity-dict-dispatch-w14
       file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
       title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
+      priority: Medium-High
+      status: Completed
+    - id: bulk-shard-loading-clickhouse
+      file: DONE/main/active/bulk-shard-loading-clickhouse.yaml
+      title: Replace per-shard INSERT loops with glob-pattern bulk INSERT for ClickHouseNativeHandler
       priority: Medium-High
       status: Completed
     - id: bulk-shard-loading-duckdb

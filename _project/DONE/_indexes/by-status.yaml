@@ -1,5 +1,5 @@
-generated_at: '2026-02-22T21:07:55.170020'
-total_items: 542
+generated_at: '2026-02-22T21:20:03.832747'
+total_items: 543
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 494
+    count: 495
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2069,6 +2069,11 @@ statuses:
     - id: complexity-dict-dispatch-w14
       file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
       title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)
+      priority: Medium-High
+      category: Core Functionality
+    - id: bulk-shard-loading-clickhouse
+      file: DONE/main/active/bulk-shard-loading-clickhouse.yaml
+      title: Replace per-shard INSERT loops with glob-pattern bulk INSERT for ClickHouseNativeHandler
       priority: Medium-High
       category: Core Functionality
     - id: bulk-shard-loading-duckdb
