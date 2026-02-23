@@ -230,7 +230,7 @@ work:
   summary: "Implement Z-order encoding for Parquet with unit tests"
   needs:
   - w4
-  status: pending
+  status: done
 - id: w9
   summary: "Implement Hilbert curve encoding option with unit tests"
   needs:
