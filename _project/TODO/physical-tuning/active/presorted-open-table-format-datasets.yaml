@@ -211,7 +211,7 @@ work:
   summary: "Implement configurable row group size for zone map granularity with unit tests"
   needs:
   - w2
-  status: pending
+  status: done
 - id: w6
   summary: "Integrate with tuning config for sort column and partition specification"
   needs:
