@@ -208,7 +208,7 @@ work:
   summary: "Fix any syntax errors in examples"
   needs:
   - w20
-  status: pending
+  status: done
 - id: w22
   summary: "Re-enable example-validation as blocking"
   needs:
