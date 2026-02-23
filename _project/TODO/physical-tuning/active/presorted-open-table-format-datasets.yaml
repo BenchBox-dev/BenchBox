@@ -224,7 +224,7 @@ work:
   summary: "Add CLI option: --data-format parquet-sorted"
   needs:
   - w6
-  status: pending
+  status: done
 # --- Phase 2: Clustering and partition-aware strategies (w8-w14) ---
 - id: w8
   summary: "Implement Z-order encoding for Parquet with unit tests"
