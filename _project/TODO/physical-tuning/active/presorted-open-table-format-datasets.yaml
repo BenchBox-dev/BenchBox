@@ -260,7 +260,7 @@ work:
   needs:
   - w10
   - w14
-  status: pending
+  status: done
 - id: w12
   summary: "Generate Iceberg tables with sort orders"
   needs:
