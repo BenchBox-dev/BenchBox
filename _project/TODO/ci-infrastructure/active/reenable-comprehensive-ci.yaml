@@ -131,7 +131,7 @@ work:
   needs:
   - w4
   - w6
-  status: pending
+  status: done
 - id: w6
   summary: "Add `make docs-linkcheck` for local testing"
   needs:
