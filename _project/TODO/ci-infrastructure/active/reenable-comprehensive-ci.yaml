@@ -205,7 +205,7 @@ work:
   needs:
   - w15
   - w11
-  status: pending
+  status: done
 - id: w18
   summary: "Test validate_example_references.py locally"
   status: done
