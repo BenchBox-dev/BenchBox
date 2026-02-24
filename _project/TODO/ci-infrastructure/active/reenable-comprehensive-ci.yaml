@@ -174,7 +174,7 @@ work:
   - w10
   - w12
   - w5
-  status: pending
+  status: done
 - id: w12
   summary: "Add `make security-audit` for local testing"
   needs:
