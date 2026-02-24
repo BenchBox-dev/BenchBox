@@ -157,7 +157,7 @@ work:
   summary: "safety vs pip-audit vs GitHub Dependabot"
   needs:
   - w7
-  status: pending
+  status: done
 - id: w9
   summary: "Choose tool that minimizes false positives"
   needs:
