@@ -90,7 +90,7 @@ work:
 - id: w3
   summary: "Add dedicated CI job that installs table-format dependencies and runs marker-selected integration tests"
   needs: [w1, w2]
-  status: pending
+  status: done
 
 - id: w4
   summary: "Document the table-format CI test lane and local execution expectations for contributors"
