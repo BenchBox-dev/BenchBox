@@ -194,7 +194,7 @@ work:
   - w13
   - w14
   - w16
-  status: pending
+  status: done
 - id: w16
   summary: "Configure interrogate ignore patterns for internal modules"
   needs:
