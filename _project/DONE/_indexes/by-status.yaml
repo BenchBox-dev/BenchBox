@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T19:28:17.077498'
-total_items: 553
+generated_at: '2026-02-23T21:15:13.990662'
+total_items: 554
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 505
+    count: 506
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1891,6 +1891,11 @@ statuses:
       title: Presto and Trino Platform Documentation
       priority: High
       category: Documentation and User Experience
+    - id: parallel-test-run-lock
+      file: DONE/ci-infrastructure/active/parallel-test-run-lock.yaml
+      title: Prevent concurrent parallel test runs via fcntl.flock mutex
+      priority: Medium
+      category: CI Infrastructure
     - id: postgresql-first-class-platform
       file: DONE/platform-expansion/active/postgresql-first-class-platform.yaml
       title: Promote PostgreSQL to first-class platform status

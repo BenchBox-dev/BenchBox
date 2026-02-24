@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T19:28:17.077222'
-total_categories: 66
+generated_at: '2026-02-23T21:15:13.990403'
+total_categories: 67
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -172,6 +172,14 @@ categories:
       file: DONE/query-plan-remediation/phase-1-critical-bug-fixes.yaml
       title: 'Query Plan Remediation - Phase 1: Critical Bug Fixes'
       priority: Critical
+      status: Completed
+  CI Infrastructure:
+    count: 1
+    items:
+    - id: parallel-test-run-lock
+      file: DONE/ci-infrastructure/active/parallel-test-run-lock.yaml
+      title: Prevent concurrent parallel test runs via fcntl.flock mutex
+      priority: Medium
       status: Completed
   Code Quality:
     count: 3

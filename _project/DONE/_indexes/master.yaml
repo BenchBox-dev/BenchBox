@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T19:28:17.076973'
-total_items: 553
+generated_at: '2026-02-23T21:15:13.990140'
+total_items: 554
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5174,6 +5174,23 @@ items:
   category: Core Functionality
   priority: Medium
   status: Completed
+- id: parallel-test-run-lock
+  file: DONE/ci-infrastructure/active/parallel-test-run-lock.yaml
+  title: Prevent concurrent parallel test runs via fcntl.flock mutex
+  worktree: ci-infrastructure
+  category: CI Infrastructure
+  priority: Medium
+  status: Completed
+  tags:
+  - test-infrastructure
+  - developer-experience
+  - concurrency
+  - xdist
+  estimated_effort: Small — ~70 lines in conftest.py + 4 lines in Makefile
+  completed_date: '2026-02-23'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
 - id: pyspark-dataframe-adapter
   file: DONE/dataframe-expansion/planning/pyspark-dataframe-adapter.yaml
   title: PySpark DataFrame Adapter Implementation

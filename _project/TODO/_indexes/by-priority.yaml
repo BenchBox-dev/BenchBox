@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T19:28:15.810020'
-total_items: 29
+generated_at: '2026-02-23T21:15:12.777857'
+total_items: 28
 priorities:
   High:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Blog Revision
       status: In Progress
   Medium:
-    count: 10
+    count: 9
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -55,11 +55,6 @@ priorities:
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
       status: Not Started
-    - id: parallel-test-run-lock
-      file: TODO/ci-infrastructure/active/parallel-test-run-lock.yaml
-      title: Prevent concurrent parallel test runs via fcntl.flock mutex
-      category: CI Infrastructure
-      status: In Progress
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

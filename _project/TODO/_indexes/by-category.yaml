@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T19:28:15.810007'
-total_categories: 10
+generated_at: '2026-02-23T21:15:12.777841'
+total_categories: 9
 categories:
   AI/ML Capabilities:
     count: 1
@@ -83,14 +83,6 @@ categories:
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
       priority: Medium
       status: Not Started
-  CI Infrastructure:
-    count: 1
-    items:
-    - id: parallel-test-run-lock
-      file: TODO/ci-infrastructure/active/parallel-test-run-lock.yaml
-      title: Prevent concurrent parallel test runs via fcntl.flock mutex
-      priority: Medium
-      status: In Progress
   Core Functionality:
     count: 1
     items:

@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T19:28:17.077364'
-total_items: 553
+generated_at: '2026-02-23T21:15:13.990537'
+total_items: 554
 priorities:
   Critical:
     count: 35
@@ -1428,7 +1428,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 248
+    count: 249
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2255,6 +2255,11 @@ priorities:
       file: DONE/unknown/planning/pre-compile-tpc-binaries-for-multiple-platforms-completed.yaml
       title: Pre-Compile TPC Binaries for Multiple Platforms ✅ COMPLETED
       category: Core Functionality
+      status: Completed
+    - id: parallel-test-run-lock
+      file: DONE/ci-infrastructure/active/parallel-test-run-lock.yaml
+      title: Prevent concurrent parallel test runs via fcntl.flock mutex
+      category: CI Infrastructure
       status: Completed
     - id: pyspark-dataframe-adapter
       file: DONE/dataframe-expansion/planning/pyspark-dataframe-adapter.yaml
