@@ -127,7 +127,7 @@ work:
 - id: w3
   summary: "Add unit tests for validation and skip-on-failure behavior, then run full verification suite to confirm zero regressions"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Test cases:
     1. Candidate with cpython-312 .so but running cpython-310 → skipped, returns None
