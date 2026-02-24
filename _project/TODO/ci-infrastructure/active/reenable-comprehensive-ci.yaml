@@ -199,7 +199,7 @@ work:
   summary: "Configure interrogate ignore patterns for internal modules"
   needs:
   - w13
-  status: pending
+  status: done
 - id: w17
   summary: "Re-enable docstring-coverage as blocking"
   needs:
