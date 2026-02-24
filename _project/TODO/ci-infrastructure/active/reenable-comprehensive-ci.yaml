@@ -167,7 +167,7 @@ work:
   summary: "Create security ignore list for false positives"
   needs:
   - w9
-  status: pending
+  status: done
 - id: w11
   summary: "Re-enable security job as blocking"
   needs:
