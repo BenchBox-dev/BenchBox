@@ -187,7 +187,7 @@ work:
   summary: "Add docstrings to undocumented public APIs"
   needs:
   - w13
-  status: pending
+  status: done
 - id: w15
   summary: "Update threshold to achievable level"
   needs:
