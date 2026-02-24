@@ -23,16 +23,16 @@ OX_C = OX_RESULTS / "tpch_sf1_duckdb_sql_20260223_141527_a41ee940.json"  # 1.4.4
 
 CHARTS = [
     # (output_name, [result_files], chart_type, no_color)
-    ("percentile_ladder",   [OX_C],              "percentile_ladder",  False),
-    ("cdf_chart",           [OX_C],              "cdf_chart",          False),
-    ("sparkline_table",     [OX_A, OX_B, OX_C], "sparkline_table",    False),
-    ("rank_table",          [OX_A, OX_C],        "rank_table",         False),
-    ("normalized_speedup",  [OX_A, OX_C],        "normalized_speedup", False),
-    # No-color comparison pair using comparison_bar
-    ("comparison_bar_color",   [OX_A, OX_C],     "comparison_bar",     False),
-    ("comparison_bar_nocolor", [OX_A, OX_C],     "comparison_bar",     True),
+    ("percentile_ladder",      [OX_A, OX_B, OX_C], "percentile_ladder",  False),
+    ("cdf_chart",              [OX_A, OX_B, OX_C], "cdf_chart",          False),
+    ("sparkline_table",        [OX_A, OX_B, OX_C], "sparkline_table",    False),
+    ("rank_table",             [OX_A, OX_B, OX_C], "rank_table",         False),
+    ("normalized_speedup",     [OX_A, OX_B, OX_C], "normalized_speedup", False),
+    # No-color comparison pair using comparison_bar (requires exactly 2 runs)
+    ("comparison_bar_color",   [OX_A, OX_C],        "comparison_bar",     False),
+    ("comparison_bar_nocolor", [OX_A, OX_C],        "comparison_bar",     True),
     # Post-run header image: query_histogram from latest DuckDB version
-    ("post_run_chart_v013", [OX_C],              "query_histogram",    False),
+    ("post_run_chart_v013",    [OX_C],              "query_histogram",    False),
 ]
 
 HTML_TEMPLATE = """\
@@ -52,7 +52,7 @@ HTML_TEMPLATE = """\
   pre {{
     font-family: "Fira Code", "Menlo", "JetBrains Mono", "SF Mono", "Consolas", monospace;
     font-size: 13.5px;
-    line-height: 1.55;
+    line-height: 1.0;
     color: #d4d4d4;
     white-space: pre;
   }}
