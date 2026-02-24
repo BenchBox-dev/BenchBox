@@ -179,7 +179,7 @@ work:
   summary: "Add `make security-audit` for local testing"
   needs:
   - w9
-  status: pending
+  status: done
 - id: w13
   summary: "Review current coverage threshold (64%)"
   status: pending
