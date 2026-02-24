@@ -1,13 +1,18 @@
-generated_at: '2026-02-23T21:15:12.777857'
-total_items: 28
+generated_at: '2026-02-24T10:26:28.845637'
+total_items: 29
 priorities:
   High:
-    count: 1
+    count: 2
     items:
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
+      status: Not Started
+    - id: validate-isolated-runtime-importability
+      file: TODO/core-functionality/planning/validate-isolated-runtime-importability.yaml
+      title: Validate isolated runtime importability before treating as cache hit
+      category: Core Functionality
       status: Not Started
   Medium-High:
     count: 4

@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T21:15:12.777868'
-total_items: 28
+generated_at: '2026-02-24T10:26:28.845646'
+total_items: 29
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium-High
       category: Blog Revision
   Not Started:
-    count: 27
+    count: 28
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -112,6 +112,11 @@ statuses:
       title: TigerData Cloud Enhancements
       priority: Low
       category: Platform Expansion
+    - id: validate-isolated-runtime-importability
+      file: TODO/core-functionality/planning/validate-isolated-runtime-importability.yaml
+      title: Validate isolated runtime importability before treating as cache hit
+      priority: High
+      category: Core Functionality
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
