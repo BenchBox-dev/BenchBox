@@ -1,4 +1,4 @@
-generated_at: '2026-02-23T19:11:31.155559'
+generated_at: '2026-02-23T19:28:17.077222'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -2633,7 +2633,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 30
+    count: 31
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2674,6 +2674,11 @@ categories:
     - id: e2e-cli-test-suite
       file: DONE/e2e-cli-tests/e2e-cli-tests/active/e2e-cli-test-suite.yaml
       title: 'E2E CLI Test Suite: Complete Platform Coverage'
+      priority: High
+      status: Completed
+    - id: table-format-integration-ci-coverage
+      file: DONE/ci-infrastructure/active/table-format-integration-ci-coverage.yaml
+      title: Enforce Delta/Iceberg table-format integration coverage in CI
       priority: High
       status: Completed
     - id: coverage-ci-enforcement

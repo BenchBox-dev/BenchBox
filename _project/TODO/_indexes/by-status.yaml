@@ -1,9 +1,14 @@
-generated_at: '2026-02-23T19:11:29.915193'
-total_items: 28
+generated_at: '2026-02-23T19:28:15.810030'
+total_items: 29
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
+    - id: parallel-test-run-lock
+      file: TODO/ci-infrastructure/active/parallel-test-run-lock.yaml
+      title: Prevent concurrent parallel test runs via fcntl.flock mutex
+      priority: Medium
+      category: CI Infrastructure
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'

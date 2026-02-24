@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T19:11:31.155291'
-total_items: 552
+generated_at: '2026-02-23T19:28:17.076973'
+total_items: 553
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1164,6 +1164,24 @@ items:
   - marketing
   - visibility
   estimated_effort: Medium
+- id: table-format-integration-ci-coverage
+  file: DONE/ci-infrastructure/active/table-format-integration-ci-coverage.yaml
+  title: Enforce Delta/Iceberg table-format integration coverage in CI
+  worktree: ci-infrastructure
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - ci
+  - integration-tests
+  - delta-lake
+  - iceberg
+  - data-organization
+  estimated_effort: Small
+  completed_date: '2026-02-24'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: enforce-explicit-query-run-type-across-executions
   file: DONE/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
   title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths

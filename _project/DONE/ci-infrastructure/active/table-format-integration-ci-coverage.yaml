@@ -2,7 +2,8 @@ id: table-format-integration-ci-coverage
 title: "Enforce Delta/Iceberg table-format integration coverage in CI"
 worktree: ci-infrastructure
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-24"
 description: |
   Ensure Delta and Iceberg integration assertions for presorted dataset generation
   are executed consistently in CI rather than being silently skipped when optional

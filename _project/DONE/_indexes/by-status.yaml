@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T19:11:31.155846'
-total_items: 552
+generated_at: '2026-02-23T19:28:17.077498'
+total_items: 553
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 504
+    count: 505
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1089,6 +1089,11 @@ statuses:
       title: Enable SSB ClickHouse Embedded Platform Support
       priority: Medium
       category: Data Quality and Compatibility Issues
+    - id: table-format-integration-ci-coverage
+      file: DONE/ci-infrastructure/active/table-format-integration-ci-coverage.yaml
+      title: Enforce Delta/Iceberg table-format integration coverage in CI
+      priority: High
+      category: Testing and Quality Assurance
     - id: enforce-explicit-query-run-type-across-executions
       file: DONE/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
       title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths

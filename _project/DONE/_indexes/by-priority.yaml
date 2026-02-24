@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T19:11:31.155708'
-total_items: 552
+generated_at: '2026-02-23T19:28:17.077364'
+total_items: 553
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 186
+    count: 187
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -406,6 +406,11 @@ priorities:
       file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
       title: Elevate MCP Feature on Landing Page and Documentation
       category: Documentation
+      status: Completed
+    - id: table-format-integration-ci-coverage
+      file: DONE/ci-infrastructure/active/table-format-integration-ci-coverage.yaml
+      title: Enforce Delta/Iceberg table-format integration coverage in CI
+      category: Testing and Quality Assurance
       status: Completed
     - id: enforce-explicit-query-run-type-across-executions
       file: DONE/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
