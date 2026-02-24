@@ -50,7 +50,7 @@ HTML_TEMPLATE = """\
     min-width: 860px;
   }}
   pre {{
-    font-family: "Menlo", "JetBrains Mono", "SF Mono", "Consolas", monospace;
+    font-family: "Fira Code", "Menlo", "JetBrains Mono", "SF Mono", "Consolas", monospace;
     font-size: 13.5px;
     line-height: 1.55;
     color: #d4d4d4;
