@@ -85,7 +85,7 @@ work:
   summary: "Apply requires_table_formats marker to Delta/Iceberg presorted integration tests while keeping dependency skip
     guards"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Add dedicated CI job that installs table-format dependencies and runs marker-selected integration tests"
