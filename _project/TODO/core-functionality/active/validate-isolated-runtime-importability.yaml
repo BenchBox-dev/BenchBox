@@ -115,7 +115,7 @@ work:
   summary: "Integrate validation into discover_isolated_runtime() — call _validate_runtime_importable() on each candidate
     before returning it; log a warning and continue scanning on validation failure"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     In the loop at runtime_env.py:147-158, after version match is confirmed, call
     the validator. On failure, log a warning like:
