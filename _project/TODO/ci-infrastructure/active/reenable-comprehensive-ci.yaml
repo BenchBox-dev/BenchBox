@@ -56,6 +56,19 @@ files_affected:
 open_questions:
 - "Should TPC-H C-compatible tests be implemented? (Currently broken workflow was removed - separate TODO needed if desired)"
 
+decisions:
+- question: "Which security scanner should gate CI?"
+  answer: "Compared Safety, pip-audit, and Dependabot-only gating. Selected pip-audit for reproducible local+CI runs via uvx
+    and immediate vulnerability DB coverage without platform lock-in."
+  decided: "2026-02-24"
+- question: "How should false positives be managed for security audit?"
+  answer: "Use a comma-separated allowlist variable (PIP_AUDIT_IGNORE_VULNS) in CI/local make target. Keep it empty by default
+    and require explicit documented entries when needed."
+  decided: "2026-02-24"
+- question: "What docstring coverage threshold is now practical?"
+  answer: "Raise interrogate fail-under from 64 to 90 based on current measured 93.1% local coverage."
+  decided: "2026-02-24"
+
 success_metrics:
 - "All comprehensive checks pass consistently"
 - "No false positive failures in CI"
@@ -139,7 +152,7 @@ work:
   status: done
 - id: w7
   summary: "Evaluate security scanning options"
-  status: pending
+  status: done
 - id: w8
   summary: "safety vs pip-audit vs GitHub Dependabot"
   needs:
