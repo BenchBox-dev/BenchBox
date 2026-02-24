@@ -1,4 +1,4 @@
-generated_at: '2026-02-23T18:20:35.491078'
+generated_at: '2026-02-23T19:11:31.155559'
 total_categories: 66
 categories:
   '"Bug Fixes & Reliability"':
@@ -2633,7 +2633,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 29
+    count: 30
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2759,6 +2759,11 @@ categories:
     - id: coverage-per-module-50-remaining-wave-2026-02-10
       file: DONE/main/active/coverage-per-module-50-remaining-wave-2026-02-10.yaml
       title: Raise remaining sub-50% files to >=50% coverage (wave 2026-02-10)
+      priority: High
+      status: Completed
+    - id: reenable-comprehensive-ci
+      file: DONE/ci-infrastructure/active/reenable-comprehensive-ci.yaml
+      title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: High
       status: Completed
     - id: coverage-improvement

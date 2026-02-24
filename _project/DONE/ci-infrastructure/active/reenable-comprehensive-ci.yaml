@@ -2,7 +2,8 @@ id: reenable-comprehensive-ci
 title: "Re-enable comprehensive CI checks (linkcheck, security, coverage)"
 worktree: ci-infrastructure
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-24"
 description: |
   After fixing critical CI issues and achieving green builds, re-enable the
   comprehensive quality checks that were temporarily disabled or made non-blocking.

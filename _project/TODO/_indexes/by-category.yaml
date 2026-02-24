@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T18:20:34.313535'
-total_categories: 10
+generated_at: '2026-02-23T19:11:29.915166'
+total_categories: 9
 categories:
   AI/ML Capabilities:
     count: 1
@@ -160,14 +160,6 @@ categories:
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
       status: Not Started
-  Testing and Quality Assurance:
-    count: 1
-    items:
-    - id: reenable-comprehensive-ci
-      file: TODO/ci-infrastructure/active/reenable-comprehensive-ci.yaml
-      title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
-      priority: High
-      status: In Progress
   User Experience:
     count: 1
     items:

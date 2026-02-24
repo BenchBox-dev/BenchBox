@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T18:20:34.313515'
-total_items: 29
+generated_at: '2026-02-23T19:11:29.915135'
+total_items: 28
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -11,23 +11,6 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
-- id: reenable-comprehensive-ci
-  file: TODO/ci-infrastructure/active/reenable-comprehensive-ci.yaml
-  title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
-  worktree: ci-infrastructure
-  category: Testing and Quality Assurance
-  priority: High
-  status: In Progress
-  tags:
-  - ci
-  - quality
-  - documentation
-  owners:
-  - joe
-  estimated_effort: 1-2 days
-  work_total: 22
-  work_done: 5
-  work_ready: 6
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter

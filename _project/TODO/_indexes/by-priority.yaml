@@ -1,19 +1,14 @@
-generated_at: '2026-02-23T18:20:34.313545'
-total_items: 29
+generated_at: '2026-02-23T19:11:29.915182'
+total_items: 28
 priorities:
   High:
-    count: 2
+    count: 1
     items:
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
       status: Not Started
-    - id: reenable-comprehensive-ci
-      file: TODO/ci-infrastructure/active/reenable-comprehensive-ci.yaml
-      title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
-      category: Testing and Quality Assurance
-      status: In Progress
   Medium-High:
     count: 4
     items:

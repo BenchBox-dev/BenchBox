@@ -1,14 +1,9 @@
-generated_at: '2026-02-23T18:20:34.313553'
-total_items: 29
+generated_at: '2026-02-23T19:11:29.915193'
+total_items: 28
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: reenable-comprehensive-ci
-      file: TODO/ci-infrastructure/active/reenable-comprehensive-ci.yaml
-      title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
-      priority: High
-      category: Testing and Quality Assurance
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
       title: '[DuckDB Version Performance] Run multi-version benchmark suite'

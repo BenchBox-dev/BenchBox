@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T18:20:35.490857'
-total_items: 551
+generated_at: '2026-02-23T19:11:31.155291'
+total_items: 552
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2371,6 +2371,24 @@ items:
   completed_date: '2026-02-10'
   work_total: 12
   work_done: 12
+  work_ready: 0
+- id: reenable-comprehensive-ci
+  file: DONE/ci-infrastructure/active/reenable-comprehensive-ci.yaml
+  title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
+  worktree: ci-infrastructure
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - ci
+  - quality
+  - documentation
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+  completed_date: '2026-02-24'
+  work_total: 22
+  work_done: 22
   work_ready: 0
 - id: rebuild-tpcds-binaries
   file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
