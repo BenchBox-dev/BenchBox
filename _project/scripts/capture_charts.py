@@ -12,27 +12,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent.parent
 RESULTS = ROOT / "benchmark_runs" / "results"
+OX_RESULTS = Path("/Users/joe/Developer/Oxbow/benchmark_runs/results")
 OUT = ROOT / "_blog" / "building-benchbox" / "images"
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
-SF10_A = "tpch_sf10_duckdb_sql_20260220_082306_7ce17eb6.json"
-SF10_B = "tpch_sf10_duckdb_sql_20260220_082331_1dea1e5a.json"
-SF10_C = "tpch_sf10_duckdb_sql_20260220_082357_98034fae.json"
-SF001_DUCK = "tpch_sf001_duckdb_sql_20260223_211334_mcp_b5ff1412.json"
-SF001_FRESH = "tpch_sf001_duckdb_sql_20260223_211442_mcp_daa85cef.json"
+# DuckDB 1.2.2 / 1.3.2 / 1.4.4 at SF=1 (Oxbow project)
+OX_A = OX_RESULTS / "tpch_sf1_duckdb_sql_20260223_140745_f1e6f02e.json"  # 1.2.2
+OX_B = OX_RESULTS / "tpch_sf1_duckdb_sql_20260223_141239_0e852969.json"  # 1.3.2
+OX_C = OX_RESULTS / "tpch_sf1_duckdb_sql_20260223_141527_a41ee940.json"  # 1.4.4
 
 CHARTS = [
     # (output_name, [result_files], chart_type, no_color)
-    ("percentile_ladder",   [SF10_C],                  "percentile_ladder",  False),
-    ("cdf_chart",           [SF10_C],                  "cdf_chart",          False),
-    ("sparkline_table",     [SF10_A, SF10_B, SF10_C],  "sparkline_table",    False),
-    ("rank_table",          [SF10_A, SF10_C],          "rank_table",         False),
-    ("normalized_speedup",  [SF10_B, SF10_C],          "normalized_speedup", False),
+    ("percentile_ladder",   [OX_C],              "percentile_ladder",  False),
+    ("cdf_chart",           [OX_C],              "cdf_chart",          False),
+    ("sparkline_table",     [OX_A, OX_B, OX_C], "sparkline_table",    False),
+    ("rank_table",          [OX_A, OX_C],        "rank_table",         False),
+    ("normalized_speedup",  [OX_A, OX_C],        "normalized_speedup", False),
     # No-color comparison pair using comparison_bar
-    ("comparison_bar_color",   [SF10_B, SF10_C],       "comparison_bar",     False),
-    ("comparison_bar_nocolor", [SF10_B, SF10_C],       "comparison_bar",     True),
-    # Post-run header image: query_histogram from fresh run
-    ("post_run_chart_v013", [SF001_FRESH],             "query_histogram",    False),
+    ("comparison_bar_color",   [OX_A, OX_C],     "comparison_bar",     False),
+    ("comparison_bar_nocolor", [OX_A, OX_C],     "comparison_bar",     True),
+    # Post-run header image: query_histogram from latest DuckDB version
+    ("post_run_chart_v013", [OX_C],              "query_histogram",    False),
 ]
 
 HTML_TEMPLATE = """\
@@ -80,7 +80,7 @@ HTML_TEMPLATE = """\
 
 def run_chart(result_files: list[str], chart_type: str, no_color: bool) -> str:
     """Run benchbox visualize and return raw output (with ANSI if not no_color)."""
-    paths = [str(RESULTS / f) for f in result_files]
+    paths = [str(f) if isinstance(f, Path) else str(RESULTS / f) for f in result_files]
     cmd = ["uv", "run", "benchbox", "visualize", *paths, "--chart-type", chart_type]
     if no_color:
         cmd.append("--no-color")
