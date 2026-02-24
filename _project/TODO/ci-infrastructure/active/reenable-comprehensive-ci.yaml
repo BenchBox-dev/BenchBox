@@ -162,7 +162,7 @@ work:
   summary: "Choose tool that minimizes false positives"
   needs:
   - w8
-  status: pending
+  status: done
 - id: w10
   summary: "Create security ignore list for false positives"
   needs:
