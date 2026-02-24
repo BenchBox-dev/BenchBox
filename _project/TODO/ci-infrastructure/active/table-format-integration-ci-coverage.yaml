@@ -1,0 +1,116 @@
+id: table-format-integration-ci-coverage
+title: "Enforce Delta/Iceberg table-format integration coverage in CI"
+worktree: ci-infrastructure
+priority: High
+status: In Progress
+description: |
+  Ensure Delta and Iceberg integration assertions for presorted dataset generation
+  are executed consistently in CI rather than being silently skipped when optional
+  dependencies are missing.
+
+  The current tests are dependency-gated and can pass in environments that do not
+  install deltalake/pyiceberg, which leaves a regression blind spot for open table
+  format output paths.
+
+  This item adds explicit marker-based selection, a dedicated CI job that installs
+  table-format dependencies, and contributor documentation so coverage is durable
+  and understandable.
+
+category: Testing and Quality Assurance
+
+metadata:
+  tags:
+  - ci
+  - integration-tests
+  - delta-lake
+  - iceberg
+  - data-organization
+  estimated_effort: "Small"
+  created_date: "2026-02-24"
+
+must_preserve:
+- "Default local pytest runs remain lightweight and continue to skip optional table-format tests when extras are not installed"
+- "Existing presorted integration tests for row-count equivalence and sort monotonicity keep current behavior"
+- "Current CI fast/unit jobs remain unchanged in scope and runtime profile"
+
+approach: |
+  Introduce a dedicated marker for table-format-dependent tests, apply it to
+  Delta/Iceberg presorted integration checks, and register the marker in both
+  pytest configuration locations. Then add a focused CI job that installs the
+  required optional dependencies and runs only marker-selected tests.
+
+  Keep dependency-based skip guards in tests for local ergonomics, but ensure at
+  least one required CI path always has dependencies installed so these tests are
+  executed.
+
+anti_patterns:
+- "DO NOT move deltalake/pyiceberg into core runtime dependencies — because BenchBox core should remain minimal — install
+  them in CI via dev group or table-formats extras"
+- "DO NOT remove skip guards from tests — because local environments may intentionally lack optional deps — use marker-scoped
+  CI execution to guarantee coverage"
+- "DO NOT bundle this into unrelated CI jobs — because failures become harder to diagnose — keep a dedicated table-format
+  integration job"
+
+verification:
+- description: "Marker registration is valid and test discovery succeeds"
+  command: "uv run -- python -m pytest --collect-only -q tests/integration/core/data_organization/test_presorted_generation.py
+    -m 'requires_table_formats'"
+  expected_output: "collection succeeds without unknown-marker errors"
+- description: "Table-format integration tests execute in a dependency-enabled environment"
+  command: "uv run -- python -m pytest -q tests/integration/core/data_organization/test_presorted_generation.py -m 'requires_table_formats'"
+  expected_output: "Delta/Iceberg marker-selected tests run (not skipped for missing deps)"
+- description: "Default local test path remains stable"
+  command: "uv run -- python -m pytest -q tests/integration/core/data_organization/test_presorted_generation.py"
+  expected_output: "row-count/sort monotonic tests still pass; marker-gated tests follow dependency availability"
+
+scope_limit:
+  only_modify:
+  - ".github/workflows/test.yml"
+  - "pyproject.toml"
+  - "pytest.ini"
+  - "tests/integration/core/data_organization/test_presorted_generation.py"
+  - "docs/guides/data-organization-strategies.md"
+  - "docs/contributing/testing.md"
+  do_not_modify:
+  - "benchbox/core/"
+  - "benchbox/platforms/"
+  - "benchbox/cli/commands/run.py"
+
+work:
+- id: w1
+  summary: "Define and register requires_table_formats pytest marker in project configs"
+  status: done
+
+- id: w2
+  summary: "Apply requires_table_formats marker to Delta/Iceberg presorted integration tests while keeping dependency skip
+    guards"
+  needs: [w1]
+  status: pending
+
+- id: w3
+  summary: "Add dedicated CI job that installs table-format dependencies and runs marker-selected integration tests"
+  needs: [w1, w2]
+  status: pending
+
+- id: w4
+  summary: "Document the table-format CI test lane and local execution expectations for contributors"
+  needs: [w3]
+  status: pending
+
+- id: w5
+  summary: "Validate marker discovery and run the targeted integration suite with dependency-enabled environment"
+  needs: [w3]
+  status: pending
+
+- id: w6
+  summary: "Document rollout checklist including manual branch-protection update to require the new CI check"
+  needs: [w3]
+  status: pending
+
+deps:
+  needs: []
+
+success_metrics:
+- "A required CI job executes marker-scoped table-format integration tests on every PR"
+- "Delta/Iceberg presorted integration paths are no longer silently untested in CI"
+- "Default local test runs do not require table-format optional dependencies"
