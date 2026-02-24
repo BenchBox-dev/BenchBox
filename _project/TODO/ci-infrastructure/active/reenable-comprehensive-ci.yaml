@@ -182,7 +182,7 @@ work:
   status: done
 - id: w13
   summary: "Review current coverage threshold (64%)"
-  status: pending
+  status: done
 - id: w14
   summary: "Add docstrings to undocumented public APIs"
   needs:
