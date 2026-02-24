@@ -100,7 +100,7 @@ work:
 - id: w5
   summary: "Validate marker discovery and run the targeted integration suite with dependency-enabled environment"
   needs: [w3]
-  status: pending
+  status: done
 
 - id: w6
   summary: "Document rollout checklist including manual branch-protection update to require the new CI check"
