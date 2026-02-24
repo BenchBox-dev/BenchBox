@@ -1,5 +1,5 @@
-generated_at: '2026-02-23T21:15:13.990537'
-total_items: 554
+generated_at: '2026-02-24T10:32:29.036494'
+total_items: 555
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 187
+    count: 188
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -936,6 +936,11 @@ priorities:
     - id: timing-query-contract-unification
       file: DONE/main/active/timing-query-contract-unification.yaml
       title: Unify runtime query timing contract to execution_time_seconds
+      category: Core Functionality
+      status: Completed
+    - id: validate-isolated-runtime-importability
+      file: DONE/core-functionality/active/validate-isolated-runtime-importability.yaml
+      title: Validate isolated runtime importability before treating as cache hit
       category: Core Functionality
       status: Completed
     - id: adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage

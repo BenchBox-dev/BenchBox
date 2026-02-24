@@ -2,7 +2,8 @@ id: validate-isolated-runtime-importability
 title: "Validate isolated runtime importability before treating as cache hit"
 worktree: core-functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-24"
 category: Core Functionality
 description: |
   Bug discovered on 2026-02-24: `driver_auto_install=true` silently fails when a

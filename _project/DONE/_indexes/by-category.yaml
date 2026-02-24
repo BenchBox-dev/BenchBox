@@ -1,4 +1,4 @@
-generated_at: '2026-02-23T21:15:13.990403'
+generated_at: '2026-02-24T10:32:29.036341'
 total_categories: 67
 categories:
   '"Bug Fixes & Reliability"':
@@ -409,7 +409,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 176
+    count: 177
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1281,6 +1281,11 @@ categories:
     - id: timing-query-contract-unification
       file: DONE/main/active/timing-query-contract-unification.yaml
       title: Unify runtime query timing contract to execution_time_seconds
+      priority: High
+      status: Completed
+    - id: validate-isolated-runtime-importability
+      file: DONE/core-functionality/active/validate-isolated-runtime-importability.yaml
+      title: Validate isolated runtime importability before treating as cache hit
       priority: High
       status: Completed
     - id: add-platform-info-to-benchmark-results

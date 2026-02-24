@@ -1,4 +1,4 @@
-generated_at: '2026-02-24T10:26:28.845625'
+generated_at: '2026-02-24T10:32:27.837641'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -84,17 +84,12 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 2
+    count: 1
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
-      status: Not Started
-    - id: validate-isolated-runtime-importability
-      file: TODO/core-functionality/planning/validate-isolated-runtime-importability.yaml
-      title: Validate isolated runtime importability before treating as cache hit
-      priority: High
       status: Not Started
   Documentation:
     count: 2

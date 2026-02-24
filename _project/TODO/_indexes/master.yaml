@@ -1,5 +1,5 @@
-generated_at: '2026-02-24T10:26:28.845601'
-total_items: 29
+generated_at: '2026-02-24T10:32:27.837617'
+total_items: 28
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -11,24 +11,6 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
-- id: validate-isolated-runtime-importability
-  file: TODO/core-functionality/planning/validate-isolated-runtime-importability.yaml
-  title: Validate isolated runtime importability before treating as cache hit
-  worktree: core-functionality
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - runtime-isolation
-  - driver-versioning
-  - correctness
-  - auto-install
-  - abi-compatibility
-  estimated_effort: 1-2 days
-  work_total: 3
-  work_done: 0
-  work_ready: 1
-  deferred_count: 2
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
