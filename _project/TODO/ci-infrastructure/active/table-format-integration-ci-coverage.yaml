@@ -70,7 +70,7 @@ scope_limit:
   - "pytest.ini"
   - "tests/integration/core/data_organization/test_presorted_generation.py"
   - "docs/guides/data-organization-strategies.md"
-  - "docs/contributing/testing.md"
+  - "docs/development/testing.md"
   do_not_modify:
   - "benchbox/core/"
   - "benchbox/platforms/"
@@ -95,7 +95,7 @@ work:
 - id: w4
   summary: "Document the table-format CI test lane and local execution expectations for contributors"
   needs: [w3]
-  status: pending
+  status: done
 
 - id: w5
   summary: "Validate marker discovery and run the targeted integration suite with dependency-enabled environment"
