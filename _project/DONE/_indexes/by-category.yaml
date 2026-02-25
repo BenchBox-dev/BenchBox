@@ -1,4 +1,4 @@
-generated_at: '2026-02-24T10:32:29.036341'
+generated_at: '2026-02-24T21:01:49.718238'
 total_categories: 67
 categories:
   '"Bug Fixes & Reliability"':
@@ -409,7 +409,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 177
+    count: 178
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1112,6 +1112,11 @@ categories:
       file: DONE/unknown/planning/pre-compile-tpc-binaries-for-multiple-platforms-completed.yaml
       title: Pre-Compile TPC Binaries for Multiple Platforms ✅ COMPLETED
       priority: Medium
+      status: Completed
+    - id: propagate-duration-seconds-in-enhanced-results
+      file: DONE/core-functionality/active/propagate-duration-seconds-in-enhanced-results.yaml
+      title: Propagate explicit duration_seconds through enhanced result builders
+      priority: High
       status: Completed
     - id: query-latency-histogram
       file: DONE/main/active/query-latency-histogram.yaml

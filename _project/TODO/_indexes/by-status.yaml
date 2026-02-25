@@ -1,5 +1,5 @@
-generated_at: '2026-02-24T10:32:27.837661'
-total_items: 28
+generated_at: '2026-02-24T21:01:48.411066'
+total_items: 29
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium-High
       category: Blog Revision
   Not Started:
-    count: 27
+    count: 28
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -62,6 +62,11 @@ statuses:
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
       priority: Medium
       category: Documentation
+    - id: emit-datagen-metrics-in-results-json
+      file: TODO/core-functionality/active/emit-datagen-metrics-in-results-json.yaml
+      title: Emit meaningful datagen metrics in results JSON
+      priority: High
+      category: Core Functionality
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics

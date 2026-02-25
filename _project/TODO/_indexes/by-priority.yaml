@@ -1,9 +1,14 @@
-generated_at: '2026-02-24T10:32:27.837653'
-total_items: 28
+generated_at: '2026-02-24T21:01:48.411056'
+total_items: 29
 priorities:
   High:
-    count: 1
+    count: 2
     items:
+    - id: emit-datagen-metrics-in-results-json
+      file: TODO/core-functionality/active/emit-datagen-metrics-in-results-json.yaml
+      title: Emit meaningful datagen metrics in results JSON
+      category: Core Functionality
+      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

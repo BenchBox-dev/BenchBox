@@ -1,5 +1,5 @@
-generated_at: '2026-02-24T10:32:29.036494'
-total_items: 555
+generated_at: '2026-02-24T21:01:49.718409'
+total_items: 556
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 188
+    count: 189
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -762,6 +762,11 @@ priorities:
       file: DONE/platform-expansion/active/postgresql-first-class-platform.yaml
       title: Promote PostgreSQL to first-class platform status
       category: Platform Expansion
+      status: Completed
+    - id: propagate-duration-seconds-in-enhanced-results
+      file: DONE/core-functionality/active/propagate-duration-seconds-in-enhanced-results.yaml
+      title: Propagate explicit duration_seconds through enhanced result builders
+      category: Core Functionality
       status: Completed
     - id: query-plan-cli-visualization
       file: DONE/query-plan-cli/planning/query-plan-cli-visualization.yaml

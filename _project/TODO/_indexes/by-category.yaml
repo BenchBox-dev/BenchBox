@@ -1,4 +1,4 @@
-generated_at: '2026-02-24T10:32:27.837641'
+generated_at: '2026-02-24T21:01:48.411039'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -84,8 +84,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 1
+    count: 2
     items:
+    - id: emit-datagen-metrics-in-results-json
+      file: TODO/core-functionality/active/emit-datagen-metrics-in-results-json.yaml
+      title: Emit meaningful datagen metrics in results JSON
+      priority: High
+      status: Not Started
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation

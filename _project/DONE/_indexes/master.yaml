@@ -1,5 +1,5 @@
-generated_at: '2026-02-24T10:32:29.036094'
-total_items: 555
+generated_at: '2026-02-24T21:01:49.717907'
+total_items: 556
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2209,6 +2209,17 @@ items:
   - oltp-capable
   estimated_effort: 3-5 days
   completed_date: '2025-01-07'
+- id: propagate-duration-seconds-in-enhanced-results
+  file: DONE/core-functionality/active/propagate-duration-seconds-in-enhanced-results.yaml
+  title: Propagate explicit duration_seconds through enhanced result builders
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  completed_date: '2026-02-25'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: query-plan-cli-visualization
   file: DONE/query-plan-cli/planning/query-plan-cli-visualization.yaml
   title: Query Plan CLI & Visualization

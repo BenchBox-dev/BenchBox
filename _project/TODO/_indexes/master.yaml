@@ -1,6 +1,18 @@
-generated_at: '2026-02-24T10:32:27.837617'
-total_items: 28
+generated_at: '2026-02-24T21:01:48.410990'
+total_items: 29
 items:
+- id: emit-datagen-metrics-in-results-json
+  file: TODO/core-functionality/active/emit-datagen-metrics-in-results-json.yaml
+  title: Emit meaningful datagen metrics in results JSON
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  work_total: 5
+  work_done: 1
+  work_ready: 1
+  needs:
+  - propagate-duration-seconds-in-enhanced-results
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes

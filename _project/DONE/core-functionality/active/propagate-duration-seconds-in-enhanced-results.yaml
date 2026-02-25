@@ -2,7 +2,8 @@ id: propagate-duration-seconds-in-enhanced-results
 title: "Propagate explicit duration_seconds through enhanced result builders"
 worktree: core-functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-25"
 description: |
   Data-only benchmark lifecycle paths pass elapsed datagen time as
   `duration_seconds`, but that value is not consumed explicitly by the
@@ -35,7 +36,7 @@ work:
 - id: w4
   summary: "Run targeted and fast-suite verification; confirm no regressions in standard SQL/DataFrame benchmark flows"
   needs: [w3]
-  status: pending
+  status: done
 
 must_preserve:
 - "Do not remove `**kwargs` from create_enhanced_benchmark_result in either implementation path; existing callers pass platform-specific
