@@ -60,7 +60,7 @@ work:
 - id: w5
   summary: "Add tests/unit/core/runner/test_datagen_metrics.py with 5 tests covering duration, phase stats, manifest presence/absence"
   needs: [w3, w4]
-  status: pending
+  status: done
 
 must_preserve:
 - "All existing callers of create_enhanced_benchmark_result() continue to work — duration_seconds was previously silently
