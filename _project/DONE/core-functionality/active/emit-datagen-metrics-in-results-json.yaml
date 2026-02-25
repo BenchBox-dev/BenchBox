@@ -2,7 +2,8 @@ id: emit-datagen-metrics-in-results-json
 title: "Emit meaningful datagen metrics in results JSON"
 worktree: core-functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-02-25"
 description: |
   Successful datagen-only runs (--phases generate) produce results JSON with
   near-zero metrics: run.total_duration_ms is always 0, phases.data_generation

@@ -1,5 +1,5 @@
-generated_at: '2026-02-24T21:01:49.718409'
-total_items: 556
+generated_at: '2026-02-24T21:16:43.011232'
+total_items: 557
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 189
+    count: 190
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -406,6 +406,11 @@ priorities:
       file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
       title: Elevate MCP Feature on Landing Page and Documentation
       category: Documentation
+      status: Completed
+    - id: emit-datagen-metrics-in-results-json
+      file: DONE/core-functionality/active/emit-datagen-metrics-in-results-json.yaml
+      title: Emit meaningful datagen metrics in results JSON
+      category: Core Functionality
       status: Completed
     - id: table-format-integration-ci-coverage
       file: DONE/ci-infrastructure/active/table-format-integration-ci-coverage.yaml

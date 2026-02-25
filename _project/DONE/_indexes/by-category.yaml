@@ -1,4 +1,4 @@
-generated_at: '2026-02-24T21:01:49.718238'
+generated_at: '2026-02-24T21:16:43.011084'
 total_categories: 67
 categories:
   '"Bug Fixes & Reliability"':
@@ -409,7 +409,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 178
+    count: 179
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -670,6 +670,11 @@ categories:
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output
       priority: Medium-High
+      status: Completed
+    - id: emit-datagen-metrics-in-results-json
+      file: DONE/core-functionality/active/emit-datagen-metrics-in-results-json.yaml
+      title: Emit meaningful datagen metrics in results JSON
+      priority: High
       status: Completed
     - id: enforce-explicit-query-run-type-across-executions
       file: DONE/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-02-24T21:01:49.717907'
-total_items: 556
+generated_at: '2026-02-24T21:16:43.010814'
+total_items: 557
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1164,6 +1164,19 @@ items:
   - marketing
   - visibility
   estimated_effort: Medium
+- id: emit-datagen-metrics-in-results-json
+  file: DONE/core-functionality/active/emit-datagen-metrics-in-results-json.yaml
+  title: Emit meaningful datagen metrics in results JSON
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  completed_date: '2026-02-25'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - propagate-duration-seconds-in-enhanced-results
 - id: table-format-integration-ci-coverage
   file: DONE/ci-infrastructure/active/table-format-integration-ci-coverage.yaml
   title: Enforce Delta/Iceberg table-format integration coverage in CI
