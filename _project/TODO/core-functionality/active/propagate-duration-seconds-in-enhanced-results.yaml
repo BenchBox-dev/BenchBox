@@ -30,7 +30,7 @@ work:
 - id: w3
   summary: "Add regression tests proving data-only and minimal-result paths preserve non-zero duration_seconds"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w4
   summary: "Run targeted and fast-suite verification; confirm no regressions in standard SQL/DataFrame benchmark flows"
