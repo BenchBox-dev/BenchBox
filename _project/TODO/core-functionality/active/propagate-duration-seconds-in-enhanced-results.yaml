@@ -25,7 +25,7 @@ work:
 - id: w2
   summary: "Wire explicit duration_seconds to ResultBuilder via set_total_duration() in both builder-population flows"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Add regression tests proving data-only and minimal-result paths preserve non-zero duration_seconds"
