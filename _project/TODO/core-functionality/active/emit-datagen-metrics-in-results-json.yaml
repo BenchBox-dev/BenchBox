@@ -55,7 +55,7 @@ work:
 - id: w4
   summary: "Add _read_datagen_stats_from_manifest() and _flatten_manifest_v2_entries() helpers; merge stats into phase dict"
   needs: [w3]
-  status: pending
+  status: done
 
 - id: w5
   summary: "Add tests/unit/core/runner/test_datagen_metrics.py with 5 tests covering duration, phase stats, manifest presence/absence"
