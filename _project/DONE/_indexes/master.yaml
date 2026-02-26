@@ -1,5 +1,5 @@
-generated_at: '2026-02-24T21:16:43.010814'
-total_items: 557
+generated_at: '2026-02-25T20:17:37.812302'
+total_items: 558
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1547,6 +1547,22 @@ items:
   estimated_effort: Large
   work_total: 7
   work_done: 7
+  work_ready: 0
+- id: fix-load-phase-duration-metrics
+  file: DONE/core-functionality/active/fix-load-phase-duration-metrics.yaml
+  title: Fix load phase duration metrics missing from results JSON
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - results
+  - load-phase
+  - metrics
+  - data-quality
+  estimated_effort: Small
+  work_total: 6
+  work_done: 6
   work_ready: 0
 - id: fix-sharded-dataframe-parquet-bypass
   file: DONE/main/active/fix-sharded-dataframe-parquet-bypass.yaml

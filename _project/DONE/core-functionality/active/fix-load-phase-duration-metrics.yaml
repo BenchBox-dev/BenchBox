@@ -6,7 +6,7 @@ id: fix-load-phase-duration-metrics
 title: "Fix load phase duration metrics missing from results JSON"
 worktree: core-functionality
 priority: High
-status: Not Started
+status: Completed
 category: Core Functionality
 description: |
   The load-only code path (_execute_load_only_mode) has a key mismatch in its
@@ -29,6 +29,7 @@ metadata:
   - data-quality
   estimated_effort: Small
   created_date: "2026-02-25"
+  completed_date: "2026-02-25"
 
 impact:
   business_value: |
@@ -80,13 +81,16 @@ context_sections:
     This is correct by accident, not by design.
 
 must_preserve:
-- "Full SQL run path (run_enhanced_benchmark → ExecutionPhases dataclass) continues working — it uses _create_enhanced_data_loading_phase which is correct"
+- "Full SQL run path (run_enhanced_benchmark → ExecutionPhases dataclass) continues working — it uses _create_enhanced_data_loading_phase
+  which is correct"
 - "summary.data.load_time_ms continues to be populated from set_loading_time()"
 - "tables block continues to include row counts for all tables"
 
 anti_patterns:
-- "DO NOT change the adapter.load_data() return type — because all platform adapters implement it — fix the consumer in runner.py and base_benchmark.py instead"
-- "DO NOT add a third duration storage path — because set_loading_time() feeds summary.data.load_time_ms and set_phase_status() feeds phases.data_loading.duration_ms; both are intentional but they must derive from the same source value (load_time)"
+- "DO NOT change the adapter.load_data() return type — because all platform adapters implement it — fix the consumer in runner.py
+  and base_benchmark.py instead"
+- "DO NOT add a third duration storage path — because set_loading_time() feeds summary.data.load_time_ms and set_phase_status()
+  feeds phases.data_loading.duration_ms; both are intentional but they must derive from the same source value (load_time)"
 
 scope_limit:
   files:
@@ -94,14 +98,19 @@ scope_limit:
   - benchbox/core/base_benchmark.py
   - benchbox/core/results/builder.py
   - benchbox/core/results/schema.py
-  rationale: "Changes are confined to the load-only runner path, the result builder entry point, the builder's table_statistics export, and the JSON export."
+  rationale: "Changes are confined to the load-only runner path, the result builder entry point, the builder's table_statistics
+    export, and the JSON export."
 
 verification:
 - description: "Load-only run produces duration_ms in phases.data_loading"
-  command: "uv run benchbox run --phases load_only --benchmark tpch --scale 0.01 --platform duckdb 2>/dev/null && python3 -c \"import json, glob; f=sorted(glob.glob('benchmark_runs/results/tpch_sf0.01_duckdb_*.json'))[-1]; d=json.load(open(f)); assert d['phases']['data_loading']['duration_ms'] > 0, f'duration_ms missing or zero: {d[\"phases\"][\"data_loading\"]}'; print('PASS: duration_ms =', d['phases']['data_loading']['duration_ms'])\""
+  command: "uv run benchbox run --phases load_only --benchmark tpch --scale 0.01 --platform duckdb 2>/dev/null && python3
+    -c \"import json, glob; f=sorted(glob.glob('benchmark_runs/results/tpch_sf0.01_duckdb_*.json'))[-1]; d=json.load(open(f));
+    assert d['phases']['data_loading']['duration_ms'] > 0, f'duration_ms missing or zero: {d[\"phases\"][\"data_loading\"\
+    ]}'; print('PASS: duration_ms =', d['phases']['data_loading']['duration_ms'])\""
   expected_output: "PASS: duration_ms > 0"
 - description: "Schema creation phase also has duration_ms"
-  command: "python3 -c \"import json, glob; f=sorted(glob.glob('benchmark_runs/results/tpch_sf0.01_duckdb_*.json'))[-1]; d=json.load(open(f)); assert d['phases']['schema_creation'].get('duration_ms') is not None, 'schema_creation missing duration_ms'; print('PASS')\""
+  command: "python3 -c \"import json, glob; f=sorted(glob.glob('benchmark_runs/results/tpch_sf0.01_duckdb_*.json'))[-1]; d=json.load(open(f));
+    assert d['phases']['schema_creation'].get('duration_ms') is not None, 'schema_creation missing duration_ms'; print('PASS')\""
   expected_output: "PASS"
 - description: "Existing tests pass"
   command: "uv run -- python -m pytest -m fast -q"
@@ -110,23 +119,24 @@ verification:
 work:
 - id: w1
   summary: "Fix phases dict keys in _execute_load_only_mode: duration_seconds → duration_ms with seconds-to-ms conversion"
-  status: pending
+  status: done
 - id: w2
   summary: "Stop discarding per_table_timings: pass through to create_enhanced_benchmark_result as kwarg"
-  status: pending
+  status: done
 - id: w3
   summary: "Update create_enhanced_benchmark_result to pass per-table load_time_ms to builder.add_table_stats"
   needs:
   - w2
-  status: pending
+  status: done
 - id: w4
   summary: "Fix truthiness check: change `if kwargs.get('data_loading_time'):` to `is not None`"
-  status: pending
+  status: done
 - id: w5
-  summary: "Fix builder.py:531 table_statistics export to include load_time_ms when non-zero (currently only exports stats.rows, discarding timing)"
+  summary: "Fix builder.py:531 table_statistics export to include load_time_ms when non-zero (currently only exports stats.rows,
+    discarding timing)"
   needs:
   - w3
-  status: pending
+  status: done
 - id: w6
   summary: "Run verification: load-only TPC-H SF0.01 and inspect result JSON for correct duration metrics"
   needs:
@@ -134,4 +144,4 @@ work:
   - w3
   - w4
   - w5
-  status: pending
+  status: done

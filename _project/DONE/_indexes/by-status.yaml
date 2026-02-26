@@ -1,5 +1,5 @@
-generated_at: '2026-02-24T21:16:43.011371'
-total_items: 557
+generated_at: '2026-02-25T20:17:37.812804'
+total_items: 558
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 509
+    count: 510
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1389,6 +1389,11 @@ statuses:
       file: DONE/core-functionality/completed/fix-result-filename-redundancy.yaml
       title: Fix inconsistent result filename generation - remove redundant elements
       priority: Medium
+      category: Core Functionality
+    - id: fix-load-phase-duration-metrics
+      file: DONE/core-functionality/active/fix-load-phase-duration-metrics.yaml
+      title: Fix load phase duration metrics missing from results JSON
+      priority: High
       category: Core Functionality
     - id: fix-sharded-dataframe-parquet-bypass
       file: DONE/main/active/fix-sharded-dataframe-parquet-bypass.yaml

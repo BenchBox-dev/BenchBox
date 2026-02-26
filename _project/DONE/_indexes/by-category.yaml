@@ -1,4 +1,4 @@
-generated_at: '2026-02-24T21:16:43.011084'
+generated_at: '2026-02-25T20:17:37.812547'
 total_categories: 67
 categories:
   '"Bug Fixes & Reliability"':
@@ -409,7 +409,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 179
+    count: 180
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -851,6 +851,11 @@ categories:
       file: DONE/core-functionality/completed/fix-result-filename-redundancy.yaml
       title: Fix inconsistent result filename generation - remove redundant elements
       priority: Medium
+      status: Completed
+    - id: fix-load-phase-duration-metrics
+      file: DONE/core-functionality/active/fix-load-phase-duration-metrics.yaml
+      title: Fix load phase duration metrics missing from results JSON
+      priority: High
       status: Completed
     - id: fix-sharded-dataframe-parquet-bypass
       file: DONE/main/active/fix-sharded-dataframe-parquet-bypass.yaml

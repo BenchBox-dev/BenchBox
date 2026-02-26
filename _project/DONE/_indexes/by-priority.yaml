@@ -1,5 +1,5 @@
-generated_at: '2026-02-24T21:16:43.011232'
-total_items: 557
+generated_at: '2026-02-25T20:17:37.812684'
+total_items: 558
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 190
+    count: 191
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -526,6 +526,11 @@ priorities:
     - id: fix-datagen-layout-and-manifest-hygiene
       file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml
       title: Fix datagen layout, naming normalization, and manifest/cache hygiene
+      category: Core Functionality
+      status: Completed
+    - id: fix-load-phase-duration-metrics
+      file: DONE/core-functionality/active/fix-load-phase-duration-metrics.yaml
+      title: Fix load phase duration metrics missing from results JSON
       category: Core Functionality
       status: Completed
     - id: fix-sharded-dataframe-parquet-bypass
