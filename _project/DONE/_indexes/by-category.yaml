@@ -1,4 +1,4 @@
-generated_at: '2026-02-25T20:17:37.812547'
+generated_at: '2026-02-26T02:14:17.803505'
 total_categories: 67
 categories:
   '"Bug Fixes & Reliability"':
@@ -409,7 +409,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 180
+    count: 181
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -867,6 +867,11 @@ categories:
       title: Harden plan comparison and visualization for unknown operator types
       priority: High
       status: Not Started
+    - id: harmonize-benchmark-runtime-contract-and-base-classes
+      file: DONE/core-functionality/active/harmonize-benchmark-runtime-contract-and-base-classes.yaml
+      title: Harmonize benchmark runtime contract and base classes across all benchmarks
+      priority: High
+      status: Completed
     - id: harmonize-platform-display-names
       file: DONE/main/active/harmonize-platform-display-names.yaml
       title: Harmonize platform display names and CLI keys for consistency

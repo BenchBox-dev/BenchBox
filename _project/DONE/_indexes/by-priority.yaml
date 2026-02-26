@@ -1,5 +1,5 @@
-generated_at: '2026-02-25T20:17:37.812684'
-total_items: 558
+generated_at: '2026-02-26T02:14:17.803634'
+total_items: 559
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 191
+    count: 192
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -563,6 +563,11 @@ priorities:
       title: Harden plan comparison and visualization for unknown operator types
       category: Core Functionality
       status: Not Started
+    - id: harmonize-benchmark-runtime-contract-and-base-classes
+      file: DONE/core-functionality/active/harmonize-benchmark-runtime-contract-and-base-classes.yaml
+      title: Harmonize benchmark runtime contract and base classes across all benchmarks
+      category: Core Functionality
+      status: Completed
     - id: implement-dataframe-result-validation-framework
       file: DONE/dataframe-validation/completed/implement-dataframe-result-validation-framework.yaml
       title: Implement DataFrame Result Validation Framework

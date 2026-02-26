@@ -2,7 +2,7 @@ id: harmonize-benchmark-runtime-contract-and-base-classes
 title: "Harmonize benchmark runtime contract and base classes across all benchmarks"
 worktree: core-functionality
 priority: High
-status: In Progress
+status: Completed
 category: Core Functionality
 description: |
   BenchBox currently has a split benchmark runtime architecture:
@@ -33,6 +33,7 @@ metadata:
   - technical-debt
   estimated_effort: Large
   created_date: "2026-02-26"
+completed_date: "2026-02-26"
 
 impact:
   business_value: |
@@ -193,17 +194,17 @@ work:
 - id: w10
   summary: "Run targeted verification matrix and capture any remaining compatibility failures"
   needs: [w9]
-  status: pending
+  status: done
 
 - id: w11
   summary: "Resolve compatibility failures discovered in verification and re-run affected suites"
   needs: [w10]
-  status: pending
+  status: done
 
 - id: w12
   summary: "Document deprecation/compatibility notes for benchmark-base internals and finalize cleanup boundaries"
   needs: [w11]
-  status: pending
+  status: done
 
 deferred:
 - summary: "Potential removal of top-level wrapper classes in `benchbox/*.py`"

@@ -1,5 +1,5 @@
-generated_at: '2026-02-25T20:17:37.812804'
-total_items: 558
+generated_at: '2026-02-26T02:14:17.803757'
+total_items: 559
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 510
+    count: 511
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1440,6 +1440,11 @@ statuses:
       title: Guard TPC-DS Fractional Scale Defaults
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: harmonize-benchmark-runtime-contract-and-base-classes
+      file: DONE/core-functionality/active/harmonize-benchmark-runtime-contract-and-base-classes.yaml
+      title: Harmonize benchmark runtime contract and base classes across all benchmarks
+      priority: High
+      category: Core Functionality
     - id: harmonize-platform-display-names
       file: DONE/main/active/harmonize-platform-display-names.yaml
       title: Harmonize platform display names and CLI keys for consistency

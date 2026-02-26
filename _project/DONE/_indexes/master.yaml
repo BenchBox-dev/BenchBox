@@ -1,5 +1,5 @@
-generated_at: '2026-02-25T20:17:37.812302'
-total_items: 558
+generated_at: '2026-02-26T02:14:17.803279'
+total_items: 559
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1644,6 +1644,25 @@ items:
   owners:
   - joe
   estimated_effort: Small
+- id: harmonize-benchmark-runtime-contract-and-base-classes
+  file: DONE/core-functionality/active/harmonize-benchmark-runtime-contract-and-base-classes.yaml
+  title: Harmonize benchmark runtime contract and base classes across all benchmarks
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - architecture
+  - benchmark-loader
+  - results
+  - lifecycle
+  - technical-debt
+  estimated_effort: Large
+  completed_date: '2026-02-26'
+  work_total: 12
+  work_done: 12
+  work_ready: 0
+  deferred_count: 1
 - id: implement-dataframe-result-validation-framework
   file: DONE/dataframe-validation/completed/implement-dataframe-result-validation-framework.yaml
   title: Implement DataFrame Result Validation Framework
