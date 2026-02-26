@@ -167,7 +167,7 @@ work:
 - id: w5
   summary: "Add/align minimal-result and validation helper support across canonical runtime base behavior"
   needs: [w3, w4]
-  status: pending
+  status: done
 
 - id: w6
   summary: "Migrate nyctaxi benchmark to the canonical runtime base contract"
