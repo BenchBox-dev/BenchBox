@@ -150,7 +150,7 @@ work:
 - id: w2
   summary: "Extract shared result-construction logic into a single module and add focused unit coverage"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Refactor `benchbox.base.BaseBenchmark` to delegate to shared result-construction logic and close fallback drift
