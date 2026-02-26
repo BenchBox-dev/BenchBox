@@ -172,7 +172,7 @@ work:
 - id: w6
   summary: "Migrate nyctaxi benchmark to the canonical runtime base contract"
   needs: [w5]
-  status: pending
+  status: done
 
 - id: w7
   summary: "Migrate tsbs_devops benchmark to the canonical runtime base contract"
