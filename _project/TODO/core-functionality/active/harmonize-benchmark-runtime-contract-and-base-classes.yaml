@@ -156,7 +156,7 @@ work:
   summary: "Refactor `benchbox.base.BaseBenchmark` to delegate to shared result-construction logic and close fallback drift
     (per_table_timings, zero-duration guard)"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w4
   summary: "Refactor `benchbox.core.base_benchmark.BaseBenchmark` to reuse the same shared result-construction path without
