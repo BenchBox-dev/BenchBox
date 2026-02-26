@@ -188,7 +188,7 @@ work:
   summary: "Add lifecycle regression tests across representative benchmarks for data_only, load_only, setup_only, and standard
     paths"
   needs: [w5, w6, w7, w8]
-  status: pending
+  status: done
 
 - id: w10
   summary: "Run targeted verification matrix and capture any remaining compatibility failures"
