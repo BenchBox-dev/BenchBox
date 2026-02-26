@@ -162,7 +162,7 @@ work:
   summary: "Refactor `benchbox.core.base_benchmark.BaseBenchmark` to reuse the same shared result-construction path without
     duplication"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w5
   summary: "Add/align minimal-result and validation helper support across canonical runtime base behavior"
