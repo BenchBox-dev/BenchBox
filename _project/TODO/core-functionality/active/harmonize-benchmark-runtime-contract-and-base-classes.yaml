@@ -177,7 +177,7 @@ work:
 - id: w7
   summary: "Migrate tsbs_devops benchmark to the canonical runtime base contract"
   needs: [w5]
-  status: pending
+  status: done
 
 - id: w8
   summary: "Unify benchmark loader and benchmark registry benchmark-set definitions and add parity tests"
