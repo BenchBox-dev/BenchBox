@@ -182,7 +182,7 @@ work:
 - id: w8
   summary: "Unify benchmark loader and benchmark registry benchmark-set definitions and add parity tests"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w9
   summary: "Add lifecycle regression tests across representative benchmarks for data_only, load_only, setup_only, and standard
