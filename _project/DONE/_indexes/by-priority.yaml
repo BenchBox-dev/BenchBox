@@ -1,5 +1,5 @@
-generated_at: '2026-02-26T02:14:17.803634'
-total_items: 559
+generated_at: '2026-02-27T09:35:56.463227'
+total_items: 560
 priorities:
   Critical:
     count: 35
@@ -2702,7 +2702,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 22
+    count: 23
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -2803,6 +2803,11 @@ priorities:
       file: DONE/platform-expansion/planning/starburst-platform-adapter.yaml
       title: Starburst Platform Adapter
       category: Platform Expansion
+      status: Completed
+    - id: duckdb-explain-analyze-default
+      file: DONE/core-functionality/active/duckdb-explain-analyze-default.yaml
+      title: Switch DuckDB plan capture to use EXPLAIN ANALYZE by default for actual per-operator timing
+      category: Core Functionality
       status: Completed
     - id: tpc-havoc-query-variant-system-implementation
       file: DONE/benchmark-expansion/completed/tpc-havoc-query-variant-system-implementation.yaml

@@ -1,4 +1,4 @@
-generated_at: '2026-02-26T02:14:17.803505'
+generated_at: '2026-02-27T09:35:56.463084'
 total_categories: 67
 categories:
   '"Bug Fixes & Reliability"':
@@ -409,7 +409,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 181
+    count: 182
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1272,6 +1272,11 @@ categories:
       file: DONE/main/active/surface-driver-version-in-cli-progress-output.yaml
       title: Surface active driver version in CLI progress output
       priority: Medium-High
+      status: Completed
+    - id: duckdb-explain-analyze-default
+      file: DONE/core-functionality/active/duckdb-explain-analyze-default.yaml
+      title: Switch DuckDB plan capture to use EXPLAIN ANALYZE by default for actual per-operator timing
+      priority: Low
       status: Completed
     - id: switch-tpc-ds-base-dialect-from-ansi-to-netezza-2
       file: DONE/unknown/planning/switch-tpc-ds-base-dialect-from-ansi-to-netezza-2.yaml

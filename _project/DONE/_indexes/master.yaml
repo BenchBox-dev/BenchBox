@@ -1,5 +1,5 @@
-generated_at: '2026-02-26T02:14:17.803279'
-total_items: 559
+generated_at: '2026-02-27T09:35:56.462834'
+total_items: 560
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3357,6 +3357,23 @@ items:
   work_done: 21
   work_ready: 3
   deferred_count: 1
+- id: duckdb-explain-analyze-default
+  file: DONE/core-functionality/active/duckdb-explain-analyze-default.yaml
+  title: Switch DuckDB plan capture to use EXPLAIN ANALYZE by default for actual per-operator timing
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Low
+  status: Completed
+  tags:
+  - query-plans
+  - duckdb
+  - plan-capture
+  - performance-analysis
+  estimated_effort: Small
+  completed_date: '2026-02-27'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: tpc-havoc-query-variant-system-implementation
   file: DONE/benchmark-expansion/completed/tpc-havoc-query-variant-system-implementation.yaml
   title: TPC-Havoc Query Variant System Implementation
