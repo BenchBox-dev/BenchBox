@@ -1,7 +1,7 @@
 id: clickhouse-optimizer-analysis-benchmarks
 title: "[ClickHouse Analysis] Run comparative benchmark suite"
 worktree: blog-content
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Blog Revision
 description: |

@@ -1,6 +1,40 @@
-generated_at: '2026-02-27T09:35:55.171975'
+generated_at: '2026-02-28T13:59:12.288706'
 total_items: 28
 items:
+- id: influxdb-blog-post-edits
+  file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
+  title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
+  worktree: blog-content
+  category: Documentation
+  priority: High
+  status: Not Started
+  tags:
+  - blog
+  - influxdb
+  - fdap
+  - editing
+  - platform-deep-dives
+  estimated_effort: Low
+  work_total: 20
+  work_done: 0
+  work_ready: 7
+- id: timescaledb-blog-post-edits
+  file: TODO/blog-content/planning/timescaledb-blog-post-edits.yaml
+  title: Edit TimescaleDB vs PostgreSQL blog post before publication
+  worktree: blog-content
+  category: Documentation
+  priority: High
+  status: Not Started
+  tags:
+  - blog
+  - timescaledb
+  - postgresql
+  - editing
+  - platform-deep-dives
+  estimated_effort: Low
+  work_total: 18
+  work_done: 0
+  work_ready: 7
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -11,6 +45,22 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
+- id: cicd-benchmarking-demo
+  file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
+  title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'
+  worktree: blog-content
+  category: Blog Revision
+  priority: High
+  status: Not Started
+  tags:
+  - cicd
+  - business-of-analytics
+  - regression-detection
+  - demo
+  estimated_effort: 20-30 minutes
+  work_total: 11
+  work_done: 0
+  work_ready: 7
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -273,40 +323,6 @@ items:
   work_total: 15
   work_done: 0
   work_ready: 15
-- id: influxdb-blog-post-edits
-  file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
-  title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
-  worktree: blog-content
-  category: Documentation
-  priority: Medium
-  status: Not Started
-  tags:
-  - blog
-  - influxdb
-  - fdap
-  - editing
-  - platform-deep-dives
-  estimated_effort: Low
-  work_total: 20
-  work_done: 0
-  work_ready: 7
-- id: timescaledb-blog-post-edits
-  file: TODO/blog-content/planning/timescaledb-blog-post-edits.yaml
-  title: Edit TimescaleDB vs PostgreSQL blog post before publication
-  worktree: blog-content
-  category: Documentation
-  priority: Medium
-  status: Not Started
-  tags:
-  - blog
-  - timescaledb
-  - postgresql
-  - editing
-  - platform-deep-dives
-  estimated_effort: Low
-  work_total: 18
-  work_done: 0
-  work_ready: 7
 - id: flight-data-benchmark
   file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
   title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -367,54 +383,6 @@ items:
   work_ready: 22
   needs:
   - arm-graviton-generations-benchmarks
-- id: cicd-benchmarking-demo
-  file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
-  title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium
-  status: Not Started
-  tags:
-  - cicd
-  - business-of-analytics
-  - regression-detection
-  - demo
-  estimated_effort: 20-30 minutes
-  work_total: 11
-  work_done: 0
-  work_ready: 7
-- id: clickhouse-optimizer-analysis-benchmarks
-  file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
-  title: '[ClickHouse Analysis] Run comparative benchmark suite'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium
-  status: Not Started
-  tags:
-  - clickhouse
-  - platform-deep-dives
-  - benchmarking
-  - blog-data
-  estimated_effort: 1-2 hours
-  work_total: 18
-  work_done: 0
-  work_ready: 9
-- id: snowflake-gen2-comparison-benchmarks
-  file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
-  title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
-  worktree: blog-content
-  category: Blog Revision
-  priority: Medium
-  status: Not Started
-  tags:
-  - snowflake
-  - cloud-benchmarking
-  - gen2-comparison
-  - blog-data
-  estimated_effort: 2-4 hours
-  work_total: 25
-  work_done: 0
-  work_ready: 16
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -467,6 +435,22 @@ items:
   work_total: 21
   work_done: 0
   work_ready: 17
+- id: clickhouse-optimizer-analysis-benchmarks
+  file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
+  title: '[ClickHouse Analysis] Run comparative benchmark suite'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - clickhouse
+  - platform-deep-dives
+  - benchmarking
+  - blog-data
+  estimated_effort: 1-2 hours
+  work_total: 18
+  work_done: 0
+  work_ready: 9
 - id: duckdb-version-performance-benchmarks
   file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
   title: '[DuckDB Version Performance] Run multi-version benchmark suite'
@@ -483,3 +467,19 @@ items:
   work_total: 31
   work_done: 10
   work_ready: 20
+- id: snowflake-gen2-comparison-benchmarks
+  file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
+  title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
+  worktree: blog-content
+  category: Blog Revision
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - snowflake
+  - cloud-benchmarking
+  - gen2-comparison
+  - blog-data
+  estimated_effort: 2-4 hours
+  work_total: 25
+  work_done: 0
+  work_ready: 16

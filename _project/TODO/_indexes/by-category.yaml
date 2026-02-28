@@ -1,4 +1,4 @@
-generated_at: '2026-02-27T09:35:55.172000'
+generated_at: '2026-02-28T13:59:12.288726'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -66,12 +66,12 @@ categories:
     - id: cicd-benchmarking-demo
       file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
       title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'
-      priority: Medium
+      priority: High
       status: Not Started
     - id: clickhouse-optimizer-analysis-benchmarks
       file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
       title: '[ClickHouse Analysis] Run comparative benchmark suite'
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: duckdb-version-performance-benchmarks
       file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
@@ -81,7 +81,7 @@ categories:
     - id: snowflake-gen2-comparison-benchmarks
       file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
       title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
-      priority: Medium
+      priority: Medium-High
       status: Not Started
   Core Functionality:
     count: 1
@@ -97,12 +97,12 @@ categories:
     - id: influxdb-blog-post-edits
       file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
       title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
-      priority: Medium
+      priority: High
       status: Not Started
     - id: timescaledb-blog-post-edits
       file: TODO/blog-content/planning/timescaledb-blog-post-edits.yaml
       title: Edit TimescaleDB vs PostgreSQL blog post before publication
-      priority: Medium
+      priority: High
       status: Not Started
   Platform Expansion:
     count: 9

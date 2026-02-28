@@ -1,7 +1,7 @@
 id: timescaledb-blog-post-edits
 title: "Edit TimescaleDB vs PostgreSQL blog post before publication"
 worktree: blog-content
-priority: Medium
+priority: High
 status: Not Started
 description: |
   Action items from blog critique review for the TimescaleDB vs PostgreSQL

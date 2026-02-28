@@ -1,7 +1,7 @@
 id: cicd-benchmarking-demo
 title: "[CI/CD Benchmarking] Add BenchBox regression detection demo"
 worktree: blog-content
-priority: Medium
+priority: High
 status: Not Started
 category: Blog Revision
 description: |

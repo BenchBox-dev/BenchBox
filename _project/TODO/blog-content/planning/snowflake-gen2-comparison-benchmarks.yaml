@@ -1,7 +1,7 @@
 id: snowflake-gen2-comparison-benchmarks
 title: "[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite"
 worktree: blog-content
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Blog Revision
 description: |

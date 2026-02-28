@@ -1,7 +1,7 @@
 id: influxdb-blog-post-edits
 title: "Edit InfluxDB 3.x FDAP Architecture blog post before publication"
 worktree: blog-content
-priority: Medium
+priority: High
 status: Not Started
 description: |
   Action items from blog critique review for the InfluxDB 3.x FDAP Architecture
