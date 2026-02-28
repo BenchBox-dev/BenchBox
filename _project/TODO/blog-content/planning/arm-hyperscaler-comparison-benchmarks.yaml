@@ -37,7 +37,7 @@ metadata:
 impact:
   business_value: |
     First-to-market with reproducible cross-hyperscaler ARM benchmarks.
-    Establishes Oxbow/BenchBox as the source for cloud platform comparisons.
+    Establishes BenchBox as the source for cloud platform comparisons.
     Demonstrates multi-cloud benchmarking capability.
   user_impact: |
     Gives users concrete data for multi-cloud ARM decisions. Provides
