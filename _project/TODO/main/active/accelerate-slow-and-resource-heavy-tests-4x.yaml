@@ -46,7 +46,7 @@ work:
 - id: w5
   summary: "Deduplicate cloud dry-run matrix coverage in tests/e2e/test_cloud_platforms.py while preserving unique assertions"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w6
   summary: "Deduplicate local/dataframe E2E matrix coverage in tests/e2e/test_local_platforms.py and tests/e2e/test_dataframe_platforms.py"
