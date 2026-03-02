@@ -1,6 +1,23 @@
-generated_at: '2026-03-01T19:24:42.998730'
-total_items: 20
+generated_at: '2026-03-02T16:39:17.067495'
+total_items: 21
 items:
+- id: accelerate-slow-and-resource-heavy-tests-4x
+  file: TODO/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
+  title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: In Progress
+  tags:
+  - test-performance
+  - pytest
+  - xdist
+  - e2e
+  - integration
+  estimated_effort: 3-5 days
+  work_total: 16
+  work_done: 1
+  work_ready: 1
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes

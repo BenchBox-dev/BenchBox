@@ -1,5 +1,5 @@
-generated_at: '2026-03-01T19:24:42.998750'
-total_categories: 7
+generated_at: '2026-03-02T16:39:17.067541'
+total_categories: 8
 categories:
   AI/ML Capabilities:
     count: 1
@@ -114,6 +114,14 @@ categories:
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
       status: Not Started
+  Testing and Quality Assurance:
+    count: 1
+    items:
+    - id: accelerate-slow-and-resource-heavy-tests-4x
+      file: TODO/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
+      title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
+      priority: High
+      status: In Progress
   User Experience:
     count: 1
     items:
