@@ -95,7 +95,7 @@ work:
 - id: w14
   summary: "Replace sleep-based waits with deterministic time mocking in tests/unit/monitoring/test_profiler.py and tests/integration/test_throughput_corrections.py"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w15
   summary: "Fix or reclassify current Dask dataframe full-execution failure before finalizing performance baseline"
