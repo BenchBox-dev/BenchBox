@@ -51,7 +51,7 @@ work:
 - id: w6
   summary: "Deduplicate local/dataframe E2E matrix coverage in tests/e2e/test_local_platforms.py and tests/e2e/test_dataframe_platforms.py"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w7
   summary: "Move structural result-validation tests in tests/e2e/test_result_validation.py into fast lane markers"
