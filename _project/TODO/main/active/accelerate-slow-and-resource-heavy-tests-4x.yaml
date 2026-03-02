@@ -36,7 +36,7 @@ work:
 - id: w3
   summary: "Refactor tests/e2e/test_cli_options.py to reuse invocation fixtures and reduce subprocess fan-out"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w4
   summary: "Refactor tests/e2e/test_error_handling.py to reuse invocation fixtures and reduce subprocess fan-out"
