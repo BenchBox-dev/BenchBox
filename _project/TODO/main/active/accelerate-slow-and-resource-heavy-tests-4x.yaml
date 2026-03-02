@@ -90,7 +90,7 @@ work:
 - id: w13
   summary: "Move tests/docs/test_sphinx_warnings.py to dedicated docs/stress lane while preserving docs quality gates"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w14
   summary: "Replace sleep-based waits with deterministic time mocking in tests/unit/monitoring/test_profiler.py and tests/integration/test_throughput_corrections.py"
