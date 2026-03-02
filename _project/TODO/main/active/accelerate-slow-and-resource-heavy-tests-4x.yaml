@@ -73,7 +73,7 @@ work:
   summary: "Optimize tests/unit/benchmarks/test_write_primitives_generator.py using shared TPCH data fixtures and targeted
     mocks"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w11
   summary: "Isolate sqlite full benchmark execution in tests/e2e/test_local_platforms.py into stress lane with equivalent
