@@ -85,7 +85,7 @@ work:
   summary: "Isolate pyspark/dask/modin/cudf full executions in tests/e2e/test_dataframe_platforms.py into stress lane with
     smoke checks"
   needs: [w6]
-  status: pending
+  status: done
 
 - id: w13
   summary: "Move tests/docs/test_sphinx_warnings.py to dedicated docs/stress lane while preserving docs quality gates"
