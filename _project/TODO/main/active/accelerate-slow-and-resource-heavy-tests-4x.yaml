@@ -79,7 +79,7 @@ work:
   summary: "Isolate sqlite full benchmark execution in tests/e2e/test_local_platforms.py into stress lane with equivalent
     smoke checks"
   needs: [w3, w6]
-  status: pending
+  status: done
 
 - id: w12
   summary: "Isolate pyspark/dask/modin/cudf full executions in tests/e2e/test_dataframe_platforms.py into stress lane with
