@@ -1,14 +1,6 @@
-generated_at: '2026-03-02T17:12:18.225920'
-total_items: 21
+generated_at: '2026-03-02T18:33:18.021618'
+total_items: 20
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: accelerate-slow-and-resource-heavy-tests-4x
-      file: TODO/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
-      title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
-      priority: High
-      category: Testing and Quality Assurance
   Not Started:
     count: 20
     items:

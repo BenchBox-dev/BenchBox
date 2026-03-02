@@ -1,5 +1,5 @@
-generated_at: '2026-03-02T17:12:19.418470'
-total_items: 560
+generated_at: '2026-03-02T18:33:19.236713'
+total_items: 561
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 512
+    count: 513
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -368,6 +368,11 @@ statuses:
       title: AWS Glue Managed Spark Platform
       priority: High
       category: Platform Expansion
+    - id: accelerate-slow-and-resource-heavy-tests-4x
+      file: DONE/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
+      title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
+      priority: High
+      category: Testing and Quality Assurance
     - id: ascii-chart-cdf
       file: DONE/core-functionality/active/ascii-chart-cdf.yaml
       title: Add ASCII CDF chart (cumulative distribution of query latency)

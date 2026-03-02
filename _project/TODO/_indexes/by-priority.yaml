@@ -1,14 +1,9 @@
-generated_at: '2026-03-02T17:12:18.225912'
-total_items: 21
+generated_at: '2026-03-02T18:33:18.021610'
+total_items: 20
 priorities:
   High:
-    count: 2
+    count: 1
     items:
-    - id: accelerate-slow-and-resource-heavy-tests-4x
-      file: TODO/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
-      title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
-      category: Testing and Quality Assurance
-      status: In Progress
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

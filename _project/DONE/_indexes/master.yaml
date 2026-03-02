@@ -1,5 +1,5 @@
-generated_at: '2026-03-02T17:12:19.417981'
-total_items: 560
+generated_at: '2026-03-02T18:33:19.236203'
+total_items: 561
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -518,6 +518,24 @@ items:
   - serverless
   estimated_effort: 2 weeks
   completed_date: '2025-12-24'
+- id: accelerate-slow-and-resource-heavy-tests-4x
+  file: DONE/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
+  title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - test-performance
+  - pytest
+  - xdist
+  - e2e
+  - integration
+  estimated_effort: 3-5 days
+  completed_date: '2026-03-02'
+  work_total: 16
+  work_done: 16
+  work_ready: 0
 - id: interactive-wizard-force-regeneration
   file: DONE/ux-improvements/planning/interactive-wizard-force-regeneration.yaml
   title: Add --force option to interactive wizard

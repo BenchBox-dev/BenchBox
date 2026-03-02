@@ -1,5 +1,5 @@
-generated_at: '2026-03-02T17:12:19.418349'
-total_items: 560
+generated_at: '2026-03-02T18:33:19.236576'
+total_items: 561
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 192
+    count: 193
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -201,6 +201,11 @@ priorities:
       file: DONE/platform-expansion/planning/aws-glue-platform.yaml
       title: AWS Glue Managed Spark Platform
       category: Platform Expansion
+      status: Completed
+    - id: accelerate-slow-and-resource-heavy-tests-4x
+      file: DONE/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
+      title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
+      category: Testing and Quality Assurance
       status: Completed
     - id: interactive-wizard-force-regeneration
       file: DONE/ux-improvements/planning/interactive-wizard-force-regeneration.yaml

@@ -1,4 +1,4 @@
-generated_at: '2026-03-02T17:12:19.418216'
+generated_at: '2026-03-02T18:33:19.236434'
 total_categories: 67
 categories:
   '"Bug Fixes & Reliability"':
@@ -2671,12 +2671,17 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 31
+    count: 32
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
       title: '"CLI Test Coverage Enhancement to 80%"'
       priority: Medium
+      status: Completed
+    - id: accelerate-slow-and-resource-heavy-tests-4x
+      file: DONE/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
+      title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
+      priority: High
       status: Completed
     - id: pyspark-sql-tests
       file: DONE/dataframe-expansion/planning/pyspark-sql-tests.yaml
