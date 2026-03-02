@@ -62,7 +62,7 @@ work:
   summary: "Optimize tests/integration/test_tpcds_query_generation.py with reusable fixture setup and fewer full-generate
     paths"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w9
   summary: "Optimize tests/integration/test_tpc_compliance_integration.py heavy loops while preserving compliance assertions"
