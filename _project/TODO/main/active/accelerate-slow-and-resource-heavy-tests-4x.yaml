@@ -100,7 +100,7 @@ work:
 - id: w15
   summary: "Fix or reclassify current Dask dataframe full-execution failure before finalizing performance baseline"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w16
   summary: "Re-profile full suite, verify >=4x reduction against baseline artifact, and document per-file before/after timings"
