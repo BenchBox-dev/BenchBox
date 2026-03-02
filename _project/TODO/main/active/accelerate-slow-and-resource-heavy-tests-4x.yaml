@@ -41,7 +41,7 @@ work:
 - id: w4
   summary: "Refactor tests/e2e/test_error_handling.py to reuse invocation fixtures and reduce subprocess fan-out"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w5
   summary: "Deduplicate cloud dry-run matrix coverage in tests/e2e/test_cloud_platforms.py while preserving unique assertions"
