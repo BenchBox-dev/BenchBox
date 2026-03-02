@@ -1,16 +1,8 @@
-generated_at: '2026-02-28T13:59:12.288745'
-total_items: 28
+generated_at: '2026-03-01T19:24:42.998768'
+total_items: 20
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: duckdb-version-performance-benchmarks
-      file: TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
-      title: '[DuckDB Version Performance] Run multi-version benchmark suite'
-      priority: Medium-High
-      category: Blog Revision
   Not Started:
-    count: 27
+    count: 20
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -52,16 +44,6 @@ statuses:
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
       category: Benchmark Expansion
-    - id: influxdb-blog-post-edits
-      file: TODO/blog-content/planning/influxdb-blog-post-edits.yaml
-      title: Edit InfluxDB 3.x FDAP Architecture blog post before publication
-      priority: High
-      category: Documentation
-    - id: timescaledb-blog-post-edits
-      file: TODO/blog-content/planning/timescaledb-blog-post-edits.yaml
-      title: Edit TimescaleDB vs PostgreSQL blog post before publication
-      priority: High
-      category: Documentation
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -122,28 +104,3 @@ statuses:
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: arm-graviton-generations-benchmarks
-      file: TODO/blog-content/planning/arm-graviton-generations-benchmarks.yaml
-      title: '[ARM Series] Run Graviton generations benchmark suite (G2/G3/G4)'
-      priority: Medium-High
-      category: Blog Revision
-    - id: arm-hyperscaler-comparison-benchmarks
-      file: TODO/blog-content/planning/arm-hyperscaler-comparison-benchmarks.yaml
-      title: '[ARM Series] Run hyperscaler ARM comparison (Graviton 4 vs Cobalt 100 vs Axion)'
-      priority: Medium
-      category: Blog Revision
-    - id: cicd-benchmarking-demo
-      file: TODO/blog-content/planning/cicd-benchmarking-demo.yaml
-      title: '[CI/CD Benchmarking] Add BenchBox regression detection demo'
-      priority: High
-      category: Blog Revision
-    - id: clickhouse-optimizer-analysis-benchmarks
-      file: TODO/blog-content/planning/clickhouse-optimizer-analysis-benchmarks.yaml
-      title: '[ClickHouse Analysis] Run comparative benchmark suite'
-      priority: Medium-High
-      category: Blog Revision
-    - id: snowflake-gen2-comparison-benchmarks
-      file: TODO/blog-content/planning/snowflake-gen2-comparison-benchmarks.yaml
-      title: '[Snowflake Gen2] Run Gen1 vs Gen2 comparative benchmark suite'
-      priority: Medium-High
-      category: Blog Revision
