@@ -67,7 +67,7 @@ work:
 - id: w9
   summary: "Optimize tests/integration/test_tpc_compliance_integration.py heavy loops while preserving compliance assertions"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w10
   summary: "Optimize tests/unit/benchmarks/test_write_primitives_generator.py using shared TPCH data fixtures and targeted
