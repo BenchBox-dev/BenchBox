@@ -1,4 +1,4 @@
-generated_at: '2026-03-02T16:45:23.302127'
+generated_at: '2026-03-02T16:46:15.146654'
 total_items: 21
 items:
 - id: accelerate-slow-and-resource-heavy-tests-4x
@@ -16,8 +16,8 @@ items:
   - integration
   estimated_effort: 3-5 days
   work_total: 16
-  work_done: 5
-  work_ready: 8
+  work_done: 6
+  work_ready: 7
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes

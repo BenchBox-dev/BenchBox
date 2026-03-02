@@ -56,7 +56,7 @@ work:
 - id: w7
   summary: "Move structural result-validation tests in tests/e2e/test_result_validation.py into fast lane markers"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w8
   summary: "Optimize tests/integration/test_tpcds_query_generation.py with reusable fixture setup and fewer full-generate
