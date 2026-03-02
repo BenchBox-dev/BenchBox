@@ -31,7 +31,7 @@ work:
 - id: w2
   summary: "Define default-vs-stress fidelity policy and marker placement for heavy tests"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Refactor tests/e2e/test_cli_options.py to reuse invocation fixtures and reduce subprocess fan-out"
