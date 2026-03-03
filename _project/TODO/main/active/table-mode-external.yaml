@@ -179,7 +179,7 @@ work:
 - id: w12
   summary: "Implement Redshift external table mode DDL path (Spectrum external schema + table)"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     Current: upload to S3 -> COPY INTO native tables.
     External mode: upload to S3, create external schema via Redshift Spectrum,
