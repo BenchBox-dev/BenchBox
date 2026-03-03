@@ -103,7 +103,7 @@ work:
 - id: w5
   summary: "Wire DataFusion and Polars to declare supports_external_tables = True"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     DataFusion already uses CREATE EXTERNAL TABLE / register_parquet() — set flag
     and alias create_external_tables() to existing load path.
