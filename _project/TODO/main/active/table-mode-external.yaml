@@ -89,7 +89,7 @@ work:
 - id: w4
   summary: "Implement DuckDB + MotherDuck external tables with CREATE VIEW over read_parquet()"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Set supports_external_tables = True on DuckDB adapter.
     Implement create_external_tables(): for each table in benchmark schema, find
