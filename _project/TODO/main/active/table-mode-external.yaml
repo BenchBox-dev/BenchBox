@@ -127,7 +127,7 @@ work:
 - id: w7
   summary: "Add Athena unit tests for external mode CTAS bypass behavior"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Add focused mocked tests verifying:
       - external mode skips CTAS conversion path
