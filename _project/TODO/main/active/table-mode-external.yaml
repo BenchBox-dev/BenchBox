@@ -280,7 +280,7 @@ work:
 - id: w14
   summary: "Add tests for --table-mode external across platform categories"
   needs: [w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w17, w18, w19, w20, w21, w22, w23, w24]
-  status: pending
+  status: done
   notes: |
     Unit tests:
       - DuckDB creates VIEWs (not TABLEs) when table_mode='external'
