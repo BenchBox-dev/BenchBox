@@ -199,7 +199,7 @@ work:
 - id: w17
   summary: "Implement Databricks external table mode DDL path (USING PARQUET LOCATION)"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     Current: COPY INTO from UC Volumes or cloud storage into managed tables.
     External mode: CREATE TABLE ... USING PARQUET LOCATION '{cloud_path}'.
