@@ -230,7 +230,7 @@ work:
 - id: w20
   summary: "Add ClickHouse mocked unit tests for S3-engine/view external mode"
   needs: [w19]
-  status: pending
+  status: done
   notes: |
     Assert generated SQL for external mode and unchanged native INSERT path.
     File: tests/unit/platforms/test_clickhouse_cloud_adapter.py
