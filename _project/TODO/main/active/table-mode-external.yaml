@@ -251,7 +251,7 @@ work:
 - id: w22
   summary: "Add Trino/Presto mocked unit tests for Hive external table DDL"
   needs: [w21]
-  status: pending
+  status: done
   notes: |
     Assert external_location wiring, format options, and native-path regression safety.
     Files: tests/unit/platforms/test_trino_adapter.py, tests/unit/platforms/test_presto_adapter.py
