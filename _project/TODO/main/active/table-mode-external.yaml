@@ -63,7 +63,7 @@ work:
 - id: w16
   summary: "Finalize cloud external-mode semantics and validation boundaries"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Resolve and document decision points before routing/platform rollout:
       - Cloud external mode means upload + external registration, no materialization
