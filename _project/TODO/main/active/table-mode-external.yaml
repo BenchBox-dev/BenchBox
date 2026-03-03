@@ -171,7 +171,7 @@ work:
 - id: w11
   summary: "Add BigQuery mocked unit tests for external table SQL/URI generation"
   needs: [w10]
-  status: pending
+  status: done
   notes: |
     Assert GCS URI wiring, external table options, and native-path regression safety.
     File: tests/unit/platforms/test_bigquery_adapter.py
