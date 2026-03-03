@@ -159,7 +159,7 @@ work:
 - id: w10
   summary: "Implement BigQuery external table mode DDL path (external table over GCS)"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     Current: upload Parquet to GCS bucket -> bq load into native tables.
     External mode: upload to GCS, then CREATE EXTERNAL TABLE with
