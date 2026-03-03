@@ -271,7 +271,7 @@ work:
 - id: w24
   summary: "Add Azure Synapse mocked unit tests for PolyBase external mode"
   needs: [w23]
-  status: pending
+  status: done
   notes: |
     Assert external data source/file format/table DDL and native-path regression safety.
     File: tests/unit/platforms/test_azure_synapse_adapter.py
