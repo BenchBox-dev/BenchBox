@@ -1,4 +1,4 @@
-generated_at: '2026-03-03T09:21:27.892588'
+generated_at: '2026-03-03T10:14:34.658844'
 total_categories: 67
 categories:
   '"Bug Fixes & Reliability"':
@@ -409,7 +409,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 182
+    count: 183
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -425,6 +425,11 @@ categories:
       file: DONE/main/active/ascii-chart-visualizations.yaml
       title: ASCII Chart Visualizations for CLI and MCP Server
       priority: Medium-High
+      status: Completed
+    - id: table-mode-external
+      file: DONE/main/active/table-mode-external.yaml
+      title: Add --table-mode external for external table / view-based query execution
+      priority: High
       status: Completed
     - id: ascii-chart-cdf
       file: DONE/core-functionality/active/ascii-chart-cdf.yaml

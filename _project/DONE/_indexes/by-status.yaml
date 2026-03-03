@@ -1,5 +1,5 @@
-generated_at: '2026-03-03T09:21:27.892879'
-total_items: 561
+generated_at: '2026-03-03T10:14:34.659140'
+total_items: 562
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 513
+    count: 514
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -373,6 +373,11 @@ statuses:
       title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
       priority: High
       category: Testing and Quality Assurance
+    - id: table-mode-external
+      file: DONE/main/active/table-mode-external.yaml
+      title: Add --table-mode external for external table / view-based query execution
+      priority: High
+      category: Core Functionality
     - id: ascii-chart-cdf
       file: DONE/core-functionality/active/ascii-chart-cdf.yaml
       title: Add ASCII CDF chart (cumulative distribution of query latency)

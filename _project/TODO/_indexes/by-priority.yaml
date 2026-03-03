@@ -1,14 +1,9 @@
-generated_at: '2026-03-03T09:21:26.453943'
-total_items: 21
+generated_at: '2026-03-03T10:14:33.421393'
+total_items: 20
 priorities:
   High:
-    count: 2
+    count: 1
     items:
-    - id: table-mode-external
-      file: TODO/main/planning/table-mode-external.yaml
-      title: Add --table-mode external for external table / view-based query execution
-      category: Core Functionality
-      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

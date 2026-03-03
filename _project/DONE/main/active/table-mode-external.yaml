@@ -2,7 +2,8 @@ id: table-mode-external
 title: "Add --table-mode external for external table / view-based query execution"
 worktree: main
 priority: High
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-03-03"
 category: "Core Functionality"
 description: |
   BenchBox currently materializes all benchmark data into engine-managed (native) tables:
@@ -299,7 +300,7 @@ work:
 - id: w15
   summary: "Update docs and CLI help for --table-mode"
   needs: [w14]
-  status: pending
+  status: done
   notes: |
     Update CLAUDE.md CLI options table with --table-mode.
     Add --table-mode to benchbox/cli/help.py examples.
