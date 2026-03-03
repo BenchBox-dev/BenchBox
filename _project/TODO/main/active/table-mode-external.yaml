@@ -210,7 +210,7 @@ work:
 - id: w18
   summary: "Add Databricks mocked unit tests for LOCATION-based external tables"
   needs: [w17]
-  status: pending
+  status: done
   notes: |
     Assert LOCATION SQL generation and native-path regression safety.
     File: tests/unit/platforms/test_databricks_adapter.py
