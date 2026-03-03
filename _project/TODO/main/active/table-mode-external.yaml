@@ -114,7 +114,7 @@ work:
 - id: w6
   summary: "Implement Athena external table mode (bypass CTAS materialization)"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     Athena already creates external tables over S3 — it's the native model.
     Current load_data() uploads Parquet to S3 then runs CTAS to optimize/convert.
