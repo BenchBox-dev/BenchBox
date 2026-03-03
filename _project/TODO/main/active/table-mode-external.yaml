@@ -191,7 +191,7 @@ work:
 - id: w13
   summary: "Add Redshift mocked unit tests for Spectrum external schema/table DDL"
   needs: [w12]
-  status: pending
+  status: done
   notes: |
     Assert schema/table DDL generation and native-path regression safety.
     File: tests/unit/platforms/test_redshift_adapter.py
