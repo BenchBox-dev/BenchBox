@@ -259,7 +259,7 @@ work:
 - id: w23
   summary: "Implement Azure Synapse external mode DDL path (PolyBase external tables)"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     Current: COPY INTO from Azure Blob Storage (ADLS).
     External mode: create external data source + file format, then
