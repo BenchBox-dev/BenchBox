@@ -218,7 +218,7 @@ work:
 - id: w19
   summary: "Implement ClickHouse Cloud external mode DDL path (S3 engine or view)"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     Current: INSERT statements via client.
     External mode: CREATE TABLE ... ENGINE = S3('url', 'Parquet') or
