@@ -138,7 +138,7 @@ work:
 - id: w8
   summary: "Implement Snowflake external table mode DDL path (external stage + external table)"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     Current: PUT files to internal stage -> COPY INTO native tables.
     External mode: create named external stage pointing to cloud storage, then
