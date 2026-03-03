@@ -76,7 +76,7 @@ work:
 - id: w3
   summary: "Route load phase through external table creation when --table-mode external"
   needs: [w1, w2, w16]
-  status: pending
+  status: done
   notes: |
     In runner.py load path and _execute_load_only_mode():
     Check options.get('table_mode') == 'external'.
