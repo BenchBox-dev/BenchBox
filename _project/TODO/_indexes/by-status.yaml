@@ -1,9 +1,14 @@
-generated_at: '2026-03-02T18:33:18.021618'
-total_items: 20
+generated_at: '2026-03-03T09:12:17.180906'
+total_items: 21
 statuses:
   Not Started:
-    count: 20
+    count: 21
     items:
+    - id: table-mode-external
+      file: TODO/main/planning/table-mode-external.yaml
+      title: Add --table-mode external for external table / view-based query execution
+      priority: High
+      category: Core Functionality
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
       title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter

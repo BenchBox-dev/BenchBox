@@ -1,4 +1,4 @@
-generated_at: '2026-03-02T18:33:18.021600'
+generated_at: '2026-03-03T09:12:17.180878'
 total_categories: 7
 categories:
   AI/ML Capabilities:
@@ -51,8 +51,13 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 1
+    count: 2
     items:
+    - id: table-mode-external
+      file: TODO/main/planning/table-mode-external.yaml
+      title: Add --table-mode external for external table / view-based query execution
+      priority: High
+      status: Not Started
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation

@@ -1,0 +1,367 @@
+id: table-mode-external
+title: "Add --table-mode external for external table / view-based query execution"
+worktree: main
+priority: High
+status: "Not Started"
+category: "Core Functionality"
+description: |
+  BenchBox currently materializes all benchmark data into engine-managed (native) tables:
+  SQL platforms use CREATE TABLE + INSERT/COPY, while DataFrame platforms (Polars,
+  DataFusion) already scan source files directly. Cloud platforms upload data to object
+  storage and then COPY INTO native tables, discarding the staged format.
+
+  Adding --table-mode gives explicit control over table creation strategy:
+    - native (default): current behavior — CREATE TABLE + INSERT/COPY INTO
+    - external: CREATE VIEW, CREATE EXTERNAL TABLE, or register external data source
+      pointing to source files (local Parquet) or uploaded object storage paths
+
+  External mode unlocks three capabilities:
+    1. True apples-to-apples cross-engine comparisons — all engines read the same files
+    2. Faster iteration by skipping the materialization step
+    3. Benchmarking external table query performance — a real production data lake pattern
+
+  For cloud platforms, data is still uploaded to object storage (S3, GCS, Azure Blob)
+  during the load phase — but instead of COPY INTO native tables, the engine creates
+  external table references pointing at the uploaded Parquet files.
+
+  Platform readiness:
+
+    Already external:  DataFusion (CREATE EXTERNAL TABLE), Polars (scan_parquet)
+    View-based:        DuckDB (CREATE VIEW over read_parquet), MotherDuck (inherits)
+    Cloud — trivial:   Athena (already external tables over S3 — skip CTAS step)
+    Cloud — moderate:  Snowflake (external stages), BigQuery (external tables over GCS),
+                       Redshift (Spectrum), Databricks (LOCATION-based tables),
+                       ClickHouse Cloud (S3 engine), Azure Synapse (PolyBase)
+    Cloud — federated: Trino + Presto (Hive connector external tables)
+    Unsupported:       SQLite, PostgreSQL (no external table mechanism)
+
+  Error if external is requested on a platform that doesn't support it.
+  Incompatible with --tuning tuned (requires materialized tables).
+
+work:
+  # -- Foundation --
+  - id: w1
+    summary: "Add supports_external_tables capability and create_external_tables() to PlatformAdapter base class"
+    status: pending
+    notes: |
+      Add supports_external_tables: bool = False class attribute.
+      Add create_external_tables(benchmark, connection, data_dir) method with
+      default raise NotImplementedError.
+      Follow DriverIsolationCapability pattern for capability declaration.
+      File: benchbox/platforms/base/adapter.py
+
+  - id: w2
+    summary: "Add --table-mode CLI option to benchbox run command"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add as common option (Tier 2) with choices [native, external], default native.
+      Pass through to benchmark_config.options['table_mode'].
+      Validation: error if external + --tuning tuned.
+      File: benchbox/cli/commands/run.py
+
+  - id: w3
+    summary: "Route load phase through external table creation when --table-mode external"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      In runner.py load path and _execute_load_only_mode():
+      Check options.get('table_mode') == 'external'.
+      Validate adapter.supports_external_tables (error with clear message if False).
+      Call adapter.create_external_tables() instead of create_schema() + load_data().
+      For cloud platforms: upload phase still runs, only materialization is skipped.
+      File: benchbox/core/runner/runner.py
+
+  # -- Local engines --
+  - id: w4
+    summary: "Implement DuckDB + MotherDuck external tables with CREATE VIEW over read_parquet()"
+    needs: [w1]
+    status: pending
+    notes: |
+      Set supports_external_tables = True on DuckDB adapter.
+      Implement create_external_tables(): for each table in benchmark schema, find
+      Parquet files in data_dir and execute:
+        CREATE VIEW {table} AS SELECT * FROM read_parquet('{glob}')
+      Return row counts via SELECT COUNT(*) FROM read_parquet(...).
+      MotherDuck inherits from DuckDB — verify it works without additional changes.
+      Also support Delta tables via DuckDB's delta extension read path.
+      Files: benchbox/platforms/duckdb.py, benchbox/platforms/motherduck.py
+
+  - id: w5
+    summary: "Wire DataFusion and Polars to declare supports_external_tables = True"
+    needs: [w1]
+    status: pending
+    notes: |
+      DataFusion already uses CREATE EXTERNAL TABLE / register_parquet() — set flag
+      and alias create_external_tables() to existing load path.
+      Polars already uses pl.scan_parquet() — same treatment.
+      Files: benchbox/platforms/datafusion.py, benchbox/platforms/polars_platform.py
+
+  # -- Cloud platforms --
+  - id: w6
+    summary: "Implement Athena external table mode (bypass CTAS materialization)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Athena already creates external tables over S3 — it's the native model.
+      Current load_data() uploads Parquet to S3 then runs CTAS to optimize/convert.
+      External mode: upload to S3, create external table pointing at uploaded path,
+      skip the CTAS conversion step. Data stays in uploaded Parquet format.
+      Existing _convert_to_external_table() method is prior art for the DDL.
+      Set supports_external_tables = True.
+      File: benchbox/platforms/athena.py
+
+  - id: w7
+    summary: "Implement Snowflake external table mode (external stages)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Current: PUT files to internal stage -> COPY INTO native tables.
+      External mode: create named external stage pointing to cloud storage, then
+      CREATE EXTERNAL TABLE referencing stage path with AUTO_REFRESH = FALSE
+      for benchmark isolation. Requires cloud storage credentials in config.
+      Alternative approach: Snowflake Iceberg Tables for Parquet data on cloud storage.
+      Set supports_external_tables = True.
+      File: benchbox/platforms/snowflake.py
+
+  - id: w8
+    summary: "Implement BigQuery external table mode (external tables over GCS)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Current: upload Parquet to GCS bucket -> bq load into native tables.
+      External mode: upload to GCS, then CREATE EXTERNAL TABLE with
+      OPTIONS(format='PARQUET', uris=['gs://bucket/path/*.parquet']).
+      Uses existing GCS upload infrastructure from load_data().
+      Set supports_external_tables = True.
+      File: benchbox/platforms/bigquery.py
+
+  - id: w9
+    summary: "Implement Redshift external table mode (Spectrum external schema)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Current: upload to S3 -> COPY INTO native tables.
+      External mode: upload to S3, create external schema via Redshift Spectrum
+      backed by Glue Data Catalog or in-place schema, then CREATE EXTERNAL TABLE
+      referencing S3 paths with Parquet format. Requires Spectrum-enabled cluster.
+      Set supports_external_tables = True.
+      File: benchbox/platforms/redshift.py
+
+  - id: w10
+    summary: "Implement Databricks external table mode (LOCATION-based tables)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Current: COPY INTO from UC Volumes or cloud storage into managed tables.
+      External mode: CREATE TABLE ... USING PARQUET LOCATION '{cloud_path}'
+      pointing at uploaded Parquet in UC Volumes, S3, GCS, or ABFSS.
+      Uses existing cloud storage upload infrastructure from load_data().
+      Set supports_external_tables = True.
+      File: benchbox/platforms/databricks/adapter.py
+
+  - id: w11
+    summary: "Implement ClickHouse Cloud external table mode (S3 engine / url function)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Current: INSERT statements via client.
+      External mode: CREATE TABLE ... ENGINE = S3('url', 'Parquet') or
+      CREATE VIEW using s3() / url() table functions over Parquet files.
+      Requires data accessible via S3 or HTTP URL. If no cloud staging configured,
+      error with guidance to set staging_root.
+      Set supports_external_tables = True.
+      File: benchbox/platforms/clickhouse_cloud.py
+
+  - id: w12
+    summary: "Implement Trino + Presto external table mode (Hive connector external tables)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Current: INSERT INTO statements with optional staging_root.
+      External mode: use Hive connector to CREATE TABLE ... WITH (
+        external_location = '{staging_root}/table/', format = 'PARQUET'
+      ). Requires staging_root to be configured (error with guidance if missing).
+      Starburst inherits from Trino — verify it works without changes.
+      Set supports_external_tables = True on both adapters.
+      Files: benchbox/platforms/trino.py, benchbox/platforms/presto.py
+
+  - id: w13
+    summary: "Implement Azure Synapse external table mode (PolyBase external tables)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Current: COPY INTO from Azure Blob Storage (ADLS).
+      External mode: create external data source + external file format, then
+      CREATE EXTERNAL TABLE using PolyBase pointing at ADLS/Azure Blob paths.
+      Alternative: use OPENROWSET with VIEWs for simpler implementation.
+      Uses existing Azure storage upload infrastructure from load_data().
+      Set supports_external_tables = True.
+      File: benchbox/platforms/azure_synapse.py
+
+  # -- Quality --
+  - id: w14
+    summary: "Add tests for --table-mode external across platform categories"
+    needs: [w3, w4, w5, w6]
+    status: pending
+    notes: |
+      Unit tests:
+        - DuckDB creates VIEWs (not TABLEs) when table_mode='external'
+        - Athena skips CTAS step when table_mode='external'
+        - DataFusion/Polars flag declaration works
+      Integration test:
+        - TPC-H SF 0.01 with --table-mode external on DuckDB, verify results match native
+      Error tests:
+        - SQLite + external raises clear error
+        - PostgreSQL + external raises clear error
+        - external + --tuning tuned raises error
+        - Cloud platform without staging_root + external raises guidance error
+      Cloud platform unit tests (mocked):
+        - Snowflake creates external stage + external table SQL
+        - BigQuery creates external table with GCS URI
+        - Redshift creates Spectrum external schema + table
+        - Databricks creates LOCATION-based table
+        - ClickHouse creates S3 engine table
+        - Trino/Presto creates Hive external table with staging_root path
+        - Azure Synapse creates PolyBase external table
+
+  - id: w15
+    summary: "Update docs and CLI help for --table-mode"
+    needs: [w4]
+    status: pending
+    notes: |
+      Update CLAUDE.md CLI options table with --table-mode.
+      Add --table-mode to benchbox/cli/help.py examples.
+      Update docs/guides/platform-comparison.md 'Same Data, Different Engines' section.
+      Update docs/tutorials/comparing-platforms.md 'Shared Parquet Data' section.
+      Document which platforms support external mode and the mechanism used.
+      Add cloud platform examples: --table-mode external on Snowflake, Athena, BigQuery.
+
+deferred:
+  - summary: "Auto-detect external as default when platform already scans files directly"
+    reason: "Start with explicit opt-in; consider making external the default for DataFusion/Polars after user feedback confirms stability"
+  - summary: "External table mode for Spark-based cloud platforms (Athena Spark, EMR Serverless, Dataproc, Glue)"
+    reason: "Spark adapters use DataFrame-style loading with different adapter base class; handle after SQL platform support is stable"
+  - summary: "External table mode for niche SQL platforms (StarRocks, Doris, Databend, Firebolt, Fabric)"
+    reason: "Lower user demand; add platform-by-platform based on user requests"
+
+open_questions:
+  - "How does --table-mode external interact with the generate phase on cloud platforms? Data still needs to reach object storage — should external mode upload-but-skip-materialize automatically, or require a separate upload step?"
+  - "Should external be the default for Athena, since its tables are already external references to S3?"
+  - "For Snowflake, should we use external stages (simpler) or Iceberg Tables (newer, potentially better query performance on Parquet)?"
+  - "Should platforms that require staging_root for external mode validate at CLI parse time or defer to adapter.create_external_tables()?"
+
+metadata:
+  tags:
+    - performance
+    - cli
+    - platform-adapter
+    - cloud-platforms
+  estimated_effort: "1-2 weeks"
+  created_date: "2026-03-03"
+
+impact:
+  business_value: |
+    Enables true apples-to-apples cross-engine benchmarking where all platforms
+    read from the same source files. Critical for cloud platform benchmarking where
+    external tables over object stores are a real production data lake pattern.
+    Eliminates data materialization time for development and testing workflows.
+  user_impact: |
+    Users can benchmark external table query performance — a pattern used in
+    production data lakes and lakehouses. The --table-mode flag gives explicit
+    control over whether data is materialized into native tables or queried
+    in-place. Faster iteration cycles for development and testing.
+  technical_debt: |
+    Aligns DuckDB's behavior with DataFusion and Polars, which already scan files
+    directly. Standardizes external table support across cloud platforms that already
+    have the upload infrastructure. Reduces the conceptual gap between SQL and
+    DataFrame platform loading.
+
+files_affected:
+  modified:
+    - benchbox/platforms/base/adapter.py
+    - benchbox/cli/commands/run.py
+    - benchbox/core/runner/runner.py
+    - benchbox/platforms/duckdb.py
+    - benchbox/platforms/motherduck.py
+    - benchbox/platforms/datafusion.py
+    - benchbox/platforms/polars_platform.py
+    - benchbox/platforms/athena.py
+    - benchbox/platforms/snowflake.py
+    - benchbox/platforms/bigquery.py
+    - benchbox/platforms/redshift.py
+    - benchbox/platforms/databricks/adapter.py
+    - benchbox/platforms/clickhouse_cloud.py
+    - benchbox/platforms/trino.py
+    - benchbox/platforms/presto.py
+    - benchbox/platforms/azure_synapse.py
+    - benchbox/cli/help.py
+    - CLAUDE.md
+    - docs/guides/platform-comparison.md
+    - docs/tutorials/comparing-platforms.md
+
+must_preserve:
+  - "DuckDBAdapter.load_data() continues to work unchanged when table_mode='native' (default)"
+  - "DataFusion and Polars load paths remain unchanged — only adding capability flag"
+  - "All existing benchbox run invocations without --table-mode produce identical results"
+  - "benchbox run --help output format and tier structure remain consistent"
+  - "Cloud platform upload/staging infrastructure remains intact — external mode reuses it"
+  - "Athena, Snowflake, BigQuery, Redshift load_data() paths unchanged in native mode"
+  - "Trino/Presto INSERT-based load path unchanged when staging_root is not configured"
+
+approach: |
+  Follow the existing capability pattern in PlatformAdapter (see DriverIsolationCapability
+  for precedent on class-level capability declarations).
+
+  For DuckDB: CREATE VIEW AS SELECT * FROM read_parquet('{path}/*.parquet'). Reuse data
+  file discovery logic from DataLoader for Parquet glob patterns and Delta detection.
+
+  For cloud platforms: reuse each platform's existing upload/staging infrastructure.
+  The key change is what happens AFTER upload — instead of COPY INTO / CTAS into native
+  tables, create external table references pointing at the uploaded location. Each
+  platform has its own external table DDL:
+    - Snowflake: CREATE EXTERNAL TABLE ... WITH LOCATION = @stage/path
+    - Athena:    CREATE EXTERNAL TABLE ... LOCATION 's3://bucket/path/'
+    - BigQuery:  CREATE EXTERNAL TABLE ... OPTIONS(uris=['gs://...'])
+    - Redshift:  CREATE EXTERNAL TABLE via Spectrum external schema
+    - Databricks: CREATE TABLE ... USING PARQUET LOCATION '{path}'
+    - ClickHouse: CREATE TABLE ... ENGINE = S3('{url}', 'Parquet')
+    - Trino/Presto: CREATE TABLE ... WITH (external_location = '{path}')
+    - Synapse:   CREATE EXTERNAL TABLE via PolyBase external data source
+
+  DataFusion and Polars already implement direct scanning — just declare the capability
+  flag and wire through. No behavioral changes needed.
+
+  The runner.py routing change should be minimal: check the flag, validate the capability,
+  and call the alternate method. Keep existing load paths completely untouched.
+
+  Implementation order: foundation (w1-w3) -> local engines (w4-w5) -> easiest cloud
+  platform (w6 Athena, already external) -> remaining cloud platforms (w7-w13).
+
+anti_patterns:
+  - "DO NOT modify existing load_data() paths — because native mode behavior must be preserved for all platforms — add a parallel create_external_tables() method instead"
+  - "DO NOT skip row count reporting — because downstream result validation depends on table_stats — use SELECT COUNT(*) or metadata queries to get counts without materialization"
+  - "DO NOT make external the default — because tuning, sorted ingestion, and CTAS optimization all require materialized tables — keep native as default, external as opt-in"
+  - "DO NOT bypass cloud upload for cloud platforms — because the engine needs data in object storage to create external tables — reuse existing upload infrastructure, only skip the materialization step"
+
+verification:
+  - description: "Existing fast tests still pass"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "DuckDB external mode produces valid results"
+    command: "benchbox run --platform duckdb --benchmark tpch --scale 0.01 --table-mode external"
+    expected_output: "Benchmark completes successfully with query results"
+  - description: "DuckDB native mode still works (regression check)"
+    command: "benchbox run --platform duckdb --benchmark tpch --scale 0.01 --table-mode native"
+    expected_output: "Benchmark completes successfully with query results"
+  - description: "Unsupported platform gives clear error"
+    command: "benchbox run --platform sqlite --benchmark tpch --scale 0.01 --table-mode external"
+    expected_output: "Error message indicating SQLite does not support external table mode"
+  - description: "Incompatible flag combination gives clear error"
+    command: "benchbox run --platform duckdb --benchmark tpch --table-mode external --tuning tuned"
+    expected_output: "Error message indicating external table mode is incompatible with tuning"
+
+scope_limit:
+  do_not_modify:
+    - benchbox/platforms/base/data_loading.py
+    - benchbox/core/runner/conversion.py
