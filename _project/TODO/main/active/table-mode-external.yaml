@@ -151,7 +151,7 @@ work:
 - id: w9
   summary: "Add Snowflake mocked unit tests for external mode SQL generation"
   needs: [w8]
-  status: pending
+  status: done
   notes: |
     Assert external stage creation, external table SQL, and native path isolation.
     File: tests/unit/platforms/test_snowflake_adapter.py
