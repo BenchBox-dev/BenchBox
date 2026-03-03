@@ -238,7 +238,7 @@ work:
 - id: w21
   summary: "Implement Trino + Presto external mode DDL path (Hive external_location)"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     Current: INSERT INTO statements with optional staging_root.
     External mode: CREATE TABLE ... WITH (
