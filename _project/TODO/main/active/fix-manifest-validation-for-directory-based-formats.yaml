@@ -82,7 +82,7 @@ work:
 - id: w3
   summary: "Fix data_validation.py size checks at lines 498 and 530"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Same fix as w2 but in data_validation.py. Replace fp.stat().st_size with
     _compute_entry_size(fp) at both validation sites (line 498 for table expectations,
