@@ -103,7 +103,7 @@ work:
 - id: w5
   summary: "Set is_directory=True in all directory-based converters"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     In _update_manifest_with_results() (conversion.py:220), detect whether
     output_file.is_dir() and set is_directory=True on the ConvertedFileEntry.
