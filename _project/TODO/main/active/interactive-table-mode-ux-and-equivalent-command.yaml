@@ -51,7 +51,7 @@ work:
   summary: "Add/adjust tests for run flow and preferences persistence in test_cli_data_load_modes.py and test_preferences_coverage.py,
     including explicit CLI precedence for --table-mode"
   needs: [w2, w5]
-  status: pending
+  status: done
 
 - id: w8
   summary: "Run targeted CLI test suite and ruff checks to verify behavior and formatting"
