@@ -1,5 +1,5 @@
-generated_at: '2026-03-04T10:40:52.562248'
-total_categories: 67
+generated_at: '2026-03-04T14:32:42.340331'
+total_categories: 68
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -180,6 +180,14 @@ categories:
       file: DONE/ci-infrastructure/active/parallel-test-run-lock.yaml
       title: Prevent concurrent parallel test runs via fcntl.flock mutex
       priority: Medium
+      status: Completed
+  CLI UX:
+    count: 1
+    items:
+    - id: rename-convert-and-data-format-cli-params
+      file: DONE/main/active/rename-convert-and-data-format-cli-params.yaml
+      title: Rename --convert to --table-format and --data-format to --presort
+      priority: High
       status: Completed
   Code Quality:
     count: 3

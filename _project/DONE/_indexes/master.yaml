@@ -1,5 +1,5 @@
-generated_at: '2026-03-04T10:40:52.562015'
-total_items: 563
+generated_at: '2026-03-04T14:32:42.340041'
+total_items: 564
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2625,6 +2625,23 @@ items:
   owners:
   - joe
   estimated_effort: 3-5 days
+- id: rename-convert-and-data-format-cli-params
+  file: DONE/main/active/rename-convert-and-data-format-cli-params.yaml
+  title: Rename --convert to --table-format and --data-format to --presort
+  worktree: main
+  category: CLI UX
+  priority: High
+  status: Completed
+  tags:
+  - cli
+  - ux
+  - naming
+  - refactor
+  estimated_effort: Medium
+  completed_date: '2026-03-04'
+  work_total: 14
+  work_done: 14
+  work_ready: 0
 - id: bulk-shard-loading-duckdb
   file: DONE/main/active/bulk-shard-loading-duckdb.yaml
   title: Replace per-shard INSERT loops with single bulk INSERT for DuckDB handlers

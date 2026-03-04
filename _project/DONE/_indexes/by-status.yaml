@@ -1,5 +1,5 @@
-generated_at: '2026-03-04T10:40:52.562514'
-total_items: 563
+generated_at: '2026-03-04T14:32:42.340634'
+total_items: 564
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 515
+    count: 516
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2136,6 +2136,11 @@ statuses:
       title: Remove alpha-stage backward compatibility surface across BenchBox
       priority: Critical
       category: Core Functionality
+    - id: rename-convert-and-data-format-cli-params
+      file: DONE/main/active/rename-convert-and-data-format-cli-params.yaml
+      title: Rename --convert to --table-format and --data-format to --presort
+      priority: High
+      category: CLI UX
     - id: complexity-dict-dispatch-w14
       file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
       title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)

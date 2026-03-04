@@ -6,7 +6,8 @@ id: rename-convert-and-data-format-cli-params
 title: "Rename --convert to --table-format and --data-format to --presort"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-04"
 category: CLI UX
 description: |
   Two CLI parameter names on `benchbox run` don't clearly express user intent:
@@ -189,7 +190,7 @@ work:
   needs:
   - w1
   - w4
-  status: pending
+  status: done
 - id: w8
   summary: "Rename --data-format → --presort CLI option, function param, _resolve_data_organization_payload param, and options
     dict keys in cli/commands/run.py"
@@ -198,32 +199,32 @@ work:
   summary: "Rename convert_format → table_format and flag string in cli/dryrun.py"
   needs:
   - w7
-  status: pending
+  status: done
 - id: w10
   summary: "Rename prompt_data_format() → prompt_table_format() in cli/benchmarks.py"
   needs:
   - w7
-  status: pending
+  status: done
 - id: w11
   summary: "Update all test files for Part A (--convert → --table-format): imports, assertions, dict keys, method names"
   needs:
   - w7
-  status: pending
+  status: done
 - id: w12
   summary: "Update test_run_data_organization.py for Part B (--data-format → --presort)"
   needs:
   - w8
-  status: pending
+  status: done
 - id: w13
   summary: "Update documentation: CLAUDE.md, docs/guides/table-formats/*.md, _project/specs/cli/*.md"
   needs:
   - w7
   - w8
-  status: pending
+  status: done
 - id: w14
   summary: "Run verification suite: ruff, tests, stale reference grep checks"
   needs:
   - w11
   - w12
   - w13
-  status: pending
+  status: done
