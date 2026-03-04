@@ -26,7 +26,7 @@ work:
 - id: w2
   summary: "Integrate table mode prompt into interactive run flow with explicit-CLI precedence"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Extend dryrun.generate_cli_command signature and rendering to include --table-mode"
