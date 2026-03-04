@@ -45,7 +45,7 @@ work:
   summary: "Add/adjust tests for prompt behavior and generated command output in test_interactive_dry_run.py, including explicit
     --table-mode rendering expectations"
   needs: [w1, w3, w4]
-  status: pending
+  status: done
 
 - id: w7
   summary: "Add/adjust tests for run flow and preferences persistence in test_cli_data_load_modes.py and test_preferences_coverage.py,
