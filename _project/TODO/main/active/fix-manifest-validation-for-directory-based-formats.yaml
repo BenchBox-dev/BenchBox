@@ -91,7 +91,7 @@ work:
 - id: w4
   summary: "Add is_directory field to ConvertedFileEntry model and manifest serialization"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add optional `is_directory: bool = False` to ConvertedFileEntry in
     benchbox/core/manifest/models.py. Update _manifest_v2_to_dict() in
