@@ -163,7 +163,7 @@ work:
 - id: w2
   summary: "Rename convert_format → table_format, conversion_compression → table_format_compression, conversion_partition_cols
     → table_format_partition_cols in core/schemas.py"
-  status: pending
+  status: done
 - id: w3
   summary: "Rename fields and dict keys in core/results/ (builder.py, schema.py, result_factory.py)"
   needs:
