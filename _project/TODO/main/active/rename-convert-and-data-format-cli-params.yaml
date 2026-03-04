@@ -193,7 +193,7 @@ work:
 - id: w8
   summary: "Rename --data-format → --presort CLI option, function param, _resolve_data_organization_payload param, and options
     dict keys in cli/commands/run.py"
-  status: pending
+  status: done
 - id: w9
   summary: "Rename convert_format → table_format and flag string in cli/dryrun.py"
   needs:
