@@ -35,7 +35,7 @@ work:
 - id: w4
   summary: "Update interactive preview table to show selected table mode and pass value into equivalent command generation"
   needs: [w3]
-  status: pending
+  status: done
 
 - id: w5
   summary: "Persist table_mode in quick-restart save/load path and include mode hint in last-run summary when non-default"
