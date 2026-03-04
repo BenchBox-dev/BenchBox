@@ -30,7 +30,7 @@ work:
 
 - id: w3
   summary: "Extend dryrun.generate_cli_command signature and rendering to include --table-mode"
-  status: pending
+  status: done
 
 - id: w4
   summary: "Update interactive preview table to show selected table mode and pass value into equivalent command generation"
