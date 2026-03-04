@@ -39,7 +39,7 @@ work:
 
 - id: w5
   summary: "Persist table_mode in quick-restart save/load path and include mode hint in last-run summary when non-default"
-  status: pending
+  status: done
 
 - id: w6
   summary: "Add/adjust tests for prompt behavior and generated command output in test_interactive_dry_run.py, including explicit
