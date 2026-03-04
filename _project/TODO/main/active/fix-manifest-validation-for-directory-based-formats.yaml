@@ -71,7 +71,7 @@ work:
 - id: w2
   summary: "Fix _validate_manifest_if_present() in runner.py to use the new helper"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Replace the direct stat().st_size comparison at runner.py:1175-1177 with
     _compute_entry_size(fp). The check becomes:
