@@ -173,17 +173,17 @@ work:
   summary: "Rename convert_format variables and dict key accesses throughout core/runner/runner.py"
   needs:
   - w2
-  status: pending
+  status: done
 - id: w5
   summary: "Rename dict keys in platforms/base/adapter.py run config metadata"
   needs:
   - w2
-  status: pending
+  status: done
 - id: w6
   summary: "Rename variables and update display label in core/visualization/post_run_summary.py"
   needs:
   - w2
-  status: pending
+  status: done
 - id: w7
   summary: "Rename --convert → --table-format CLI option, imports, function params, and all options dict assignments in cli/commands/run.py"
   needs:
