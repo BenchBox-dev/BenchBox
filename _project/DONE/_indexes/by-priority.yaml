@@ -1,5 +1,5 @@
-generated_at: '2026-03-03T10:14:34.658996'
-total_items: 562
+generated_at: '2026-03-04T10:40:52.562381'
+total_items: 563
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 194
+    count: 195
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -468,6 +468,11 @@ priorities:
       title: Expand query plan fingerprint coverage and verification
       category: Core Functionality
       status: Not Started
+    - id: interactive-table-mode-ux-and-equivalent-command
+      file: DONE/main/active/interactive-table-mode-ux-and-equivalent-command.yaml
+      title: Expose interactive table mode selection and include it in equivalent CLI command
+      category: User Experience
+      status: Completed
     - id: pyspark-sql-session-manager
       file: DONE/dataframe-expansion/planning/pyspark-sql-session-manager.yaml
       title: Extract SparkSessionManager for shared PySpark session management

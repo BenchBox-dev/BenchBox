@@ -2,7 +2,7 @@ id: interactive-table-mode-ux-and-equivalent-command
 title: "Expose interactive table mode selection and include it in equivalent CLI command"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: User Experience
 description: |
   Interactive benchmark setup currently does not explicitly surface table mode
@@ -56,7 +56,7 @@ work:
 - id: w8
   summary: "Run targeted CLI test suite and ruff checks to verify behavior and formatting"
   needs: [w6, w7]
-  status: pending
+  status: done
 
 metadata:
   tags:
@@ -143,3 +143,5 @@ success_metrics:
 - "Interactive preview table always shows selected table mode and equivalent command always includes --table-mode for reproducible
   copy/paste"
 - "When --table-mode is provided on CLI, wizard flow does not override it and execution metadata reflects the explicit value"
+
+completed_date: "2026-03-04"

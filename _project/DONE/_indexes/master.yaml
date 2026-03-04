@@ -1,5 +1,5 @@
-generated_at: '2026-03-03T10:14:34.658597'
-total_items: 562
+generated_at: '2026-03-04T10:40:52.562015'
+total_items: 563
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1349,6 +1349,23 @@ items:
   owners:
   - joe
   estimated_effort: Medium
+- id: interactive-table-mode-ux-and-equivalent-command
+  file: DONE/main/active/interactive-table-mode-ux-and-equivalent-command.yaml
+  title: Expose interactive table mode selection and include it in equivalent CLI command
+  worktree: main
+  category: User Experience
+  priority: High
+  status: Completed
+  tags:
+  - interactive-ux
+  - cli
+  - table-mode
+  - reproducibility
+  estimated_effort: Medium
+  completed_date: '2026-03-04'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
 - id: pyspark-sql-session-manager
   file: DONE/dataframe-expansion/planning/pyspark-sql-session-manager.yaml
   title: Extract SparkSessionManager for shared PySpark session management

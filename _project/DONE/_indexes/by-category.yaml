@@ -1,4 +1,4 @@
-generated_at: '2026-03-03T10:14:34.658844'
+generated_at: '2026-03-04T10:40:52.562248'
 total_categories: 67
 categories:
   '"Bug Fixes & Reliability"':
@@ -2876,7 +2876,7 @@ categories:
       priority: High
       status: In Progress
   User Experience:
-    count: 16
+    count: 17
     items:
     - id: interactive-wizard-capture-plans
       file: DONE/ux-improvements/planning/interactive-wizard-capture-plans.yaml
@@ -2956,6 +2956,11 @@ categories:
     - id: error-message-polish
       file: DONE/release-readiness/planning/error-message-polish.yaml
       title: Error Message Polish
+      priority: High
+      status: Completed
+    - id: interactive-table-mode-ux-and-equivalent-command
+      file: DONE/main/active/interactive-table-mode-ux-and-equivalent-command.yaml
+      title: Expose interactive table mode selection and include it in equivalent CLI command
       priority: High
       status: Completed
   User Experience and CLI Enhancement:
