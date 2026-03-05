@@ -1,5 +1,5 @@
-generated_at: '2026-03-04T14:32:42.340634'
-total_items: 564
+generated_at: '2026-03-04T19:23:56.262590'
+total_items: 565
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 516
+    count: 517
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1408,6 +1408,11 @@ statuses:
     - id: fix-load-phase-duration-metrics
       file: DONE/core-functionality/active/fix-load-phase-duration-metrics.yaml
       title: Fix load phase duration metrics missing from results JSON
+      priority: High
+      category: Core Functionality
+    - id: fix-manifest-validation-for-directory-based-formats
+      file: DONE/main/active/fix-manifest-validation-for-directory-based-formats.yaml
+      title: Fix manifest validation for directory-based table formats (Delta, Iceberg, DuckLake)
       priority: High
       category: Core Functionality
     - id: fix-sharded-dataframe-parquet-bypass

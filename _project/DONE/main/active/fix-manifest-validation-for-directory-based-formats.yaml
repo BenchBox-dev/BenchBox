@@ -2,7 +2,8 @@ id: fix-manifest-validation-for-directory-based-formats
 title: "Fix manifest validation for directory-based table formats (Delta, Iceberg, DuckLake)"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-04"
 category: Core Functionality
 description: |
   After converting TPC-H data to Delta format, every subsequent run triggers

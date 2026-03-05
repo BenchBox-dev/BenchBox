@@ -1,5 +1,5 @@
-generated_at: '2026-03-04T14:32:42.340041'
-total_items: 564
+generated_at: '2026-03-04T19:23:56.262036'
+total_items: 565
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1617,6 +1617,25 @@ items:
   work_total: 6
   work_done: 6
   work_ready: 0
+- id: fix-manifest-validation-for-directory-based-formats
+  file: DONE/main/active/fix-manifest-validation-for-directory-based-formats.yaml
+  title: Fix manifest validation for directory-based table formats (Delta, Iceberg, DuckLake)
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - bug
+  - manifest
+  - data-formats
+  - regression
+  owners: []
+  estimated_effort: 1-2 days
+  completed_date: '2026-03-04'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  deferred_count: 2
 - id: fix-sharded-dataframe-parquet-bypass
   file: DONE/main/active/fix-sharded-dataframe-parquet-bypass.yaml
   title: Fix sharded DataFrame Parquet bypass causing Polars date-string failures

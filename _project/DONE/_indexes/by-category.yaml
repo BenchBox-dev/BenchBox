@@ -1,4 +1,4 @@
-generated_at: '2026-03-04T14:32:42.340331'
+generated_at: '2026-03-04T19:23:56.262295'
 total_categories: 68
 categories:
   '"Bug Fixes & Reliability"':
@@ -417,7 +417,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 183
+    count: 184
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -868,6 +868,11 @@ categories:
     - id: fix-load-phase-duration-metrics
       file: DONE/core-functionality/active/fix-load-phase-duration-metrics.yaml
       title: Fix load phase duration metrics missing from results JSON
+      priority: High
+      status: Completed
+    - id: fix-manifest-validation-for-directory-based-formats
+      file: DONE/main/active/fix-manifest-validation-for-directory-based-formats.yaml
+      title: Fix manifest validation for directory-based table formats (Delta, Iceberg, DuckLake)
       priority: High
       status: Completed
     - id: fix-sharded-dataframe-parquet-bypass
