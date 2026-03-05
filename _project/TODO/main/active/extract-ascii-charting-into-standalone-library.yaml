@@ -94,7 +94,7 @@ work:
 - id: w2
   summary: "Write extraction ADR covering boundaries, ownership, and migration strategy"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Explicitly separate concerns:
     - `textcharts` owns: chart primitives, rendering, terminal capabilities, color system
