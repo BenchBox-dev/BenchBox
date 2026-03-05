@@ -113,7 +113,7 @@ work:
 - id: w6
   summary: "Write unit tests for directory-based manifest validation"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Add tests to tests/unit/core/test_runner_manifest_reuse.py:
     1. test_directory_entry_validates_successfully — create a manifest with a
