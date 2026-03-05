@@ -1,5 +1,5 @@
-generated_at: '2026-03-04T19:23:56.262590'
-total_items: 565
+generated_at: '2026-03-05T08:39:10.371173'
+total_items: 566
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 517
+    count: 518
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1661,6 +1661,11 @@ statuses:
       title: MCP Server Comprehensive Improvements
       priority: High
       category: AI Integration
+    - id: provable-cli-command-generation
+      file: DONE/core-functionality/planning/provable-cli-command-generation.yaml
+      title: Make generate_cli_command provably complete — all behavior-affecting CLI params round-trip
+      priority: High
+      category: Core Functionality
     - id: explicit-tuning-file-resolution
       file: DONE/ux-improvements/active/explicit-tuning-file-resolution.yaml
       title: Make tuning file resolution explicit and transparent in CLI

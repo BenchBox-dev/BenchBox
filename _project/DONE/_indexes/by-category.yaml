@@ -1,4 +1,4 @@
-generated_at: '2026-03-04T19:23:56.262295'
+generated_at: '2026-03-05T08:39:10.370650'
 total_categories: 68
 categories:
   '"Bug Fixes & Reliability"':
@@ -417,7 +417,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 184
+    count: 185
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1041,6 +1041,11 @@ categories:
       title: Make DuckDB text plan parsing reliable or fail fast
       priority: Medium
       status: Not Started
+    - id: provable-cli-command-generation
+      file: DONE/core-functionality/planning/provable-cli-command-generation.yaml
+      title: Make generate_cli_command provably complete — all behavior-affecting CLI params round-trip
+      priority: High
+      status: Completed
     - id: explicit-tuning-file-resolution
       file: DONE/ux-improvements/active/explicit-tuning-file-resolution.yaml
       title: Make tuning file resolution explicit and transparent in CLI
