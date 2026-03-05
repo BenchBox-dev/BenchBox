@@ -161,7 +161,7 @@ work:
 - id: w3
   summary: "Scaffold textcharts in-repo package with src layout"
   needs: [w17, w19]
-  status: pending
+  status: done
   notes: |
     Create `packages/textcharts/` with src layout:
       packages/textcharts/
