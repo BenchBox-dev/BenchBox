@@ -79,7 +79,7 @@ work:
 - id: w18
   summary: "Decouple format_scale_factor — the only benchbox import inside ascii/"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     The single coupling point: `base.py:481` does
     `from benchbox.utils.scale_factor import format_scale_factor`.
