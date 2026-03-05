@@ -181,7 +181,7 @@ work:
 - id: w13
   summary: "Define textcharts public API and class naming"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     `textcharts/__init__.py` exports:
     - ChartOptions (renamed from ASCIIChartOptions; original kept as alias)
