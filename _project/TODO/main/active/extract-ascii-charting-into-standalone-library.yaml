@@ -126,7 +126,7 @@ work:
 - id: w17
   summary: "Enforce internal API separation gate with automated boundary check"
   needs: [w16]
-  status: pending
+  status: done
   notes: |
     Gate command (must return zero matches before extraction begins):
     ```
@@ -150,7 +150,7 @@ work:
 - id: w14
   summary: "Eliminate cross-layer dependency cycles before extraction (core visualization must not import MCP helpers)"
   needs: [w16]
-  status: pending
+  status: done
   notes: |
     Guard against regression of historical coupling where core visualization
     imported MCP tooling. Keep shared rendering utilities in neutral
