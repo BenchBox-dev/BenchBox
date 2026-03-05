@@ -141,7 +141,7 @@ work:
 - id: w8
   summary: "Integration test: Delta conversion → subsequent run reuses data"
   needs: [w2, w3, w5, w6]
-  status: pending
+  status: done
   notes: |
     End-to-end test that:
     1. Generates TPC-H data at SF=0.01
