@@ -106,7 +106,7 @@ work:
 - id: w16
   summary: "Create ascii_api.py facade and migrate all external callers"
   needs: [w2, w18]
-  status: pending
+  status: done
   notes: |
     Create `benchbox/core/visualization/ascii_api.py` that re-exports:
     - Everything from `ascii/__init__.py` (chart classes, data models, options, utils)
