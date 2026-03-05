@@ -138,7 +138,7 @@ work:
 - id: w19
   summary: "Create golden-output snapshot tests for all 15 chart types"
   needs: [w18]
-  status: pending
+  status: done
   notes: |
     Create deterministic snapshot tests BEFORE extraction to establish parity baseline.
     - Fixed options: ASCIIChartOptions(use_color=False, use_unicode=True, width=80)
