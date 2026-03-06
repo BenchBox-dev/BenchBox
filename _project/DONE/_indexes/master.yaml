@@ -1,5 +1,5 @@
-generated_at: '2026-03-05T20:12:27.113414'
-total_items: 566
+generated_at: '2026-03-05T20:51:39.564999'
+total_items: 567
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2645,6 +2645,24 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Small
+- id: remediate-coverage-theater
+  file: DONE/main/active/remediate-coverage-theater.yaml
+  title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - quality
+  - coverage
+  - remediation
+  estimated_effort: Large (2-3 weeks)
+  completed_date: '2026-03-05'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  deferred_count: 3
 - id: remove-sql-coupling-from-tpcdi-dataframe-mode
   file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
   title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol

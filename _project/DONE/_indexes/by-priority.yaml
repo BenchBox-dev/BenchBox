@@ -1,5 +1,5 @@
-generated_at: '2026-03-05T20:12:27.113784'
-total_items: 566
+generated_at: '2026-03-05T20:51:39.565405'
+total_items: 567
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 198
+    count: 199
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -898,6 +898,11 @@ priorities:
       title: Register PySpark SQL mode in platform registry
       category: Platform Expansion
       status: Not Started
+    - id: remediate-coverage-theater
+      file: DONE/main/active/remediate-coverage-theater.yaml
+      title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
+      category: Testing & Quality
+      status: Completed
     - id: remove-sql-coupling-from-tpcdi-dataframe-mode
       file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
       title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol

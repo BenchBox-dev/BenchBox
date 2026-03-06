@@ -1,4 +1,4 @@
-generated_at: '2026-03-05T20:12:27.113652'
+generated_at: '2026-03-05T20:51:39.565262'
 total_categories: 68
 categories:
   '"Bug Fixes & Reliability"':
@@ -2686,11 +2686,16 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 1
+    count: 2
     items:
     - id: phase-5-testing-infrastructure
       file: DONE/query-plan-remediation/phase-5-testing-infrastructure.yaml
       title: 'Query Plan Remediation - Phase 5: Testing Infrastructure'
+      priority: High
+      status: Completed
+    - id: remediate-coverage-theater
+      file: DONE/main/active/remediate-coverage-theater.yaml
+      title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
       priority: High
       status: Completed
   Testing and Quality Assurance:

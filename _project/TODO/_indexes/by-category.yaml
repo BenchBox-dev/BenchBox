@@ -1,4 +1,4 @@
-generated_at: '2026-03-05T20:12:25.864745'
+generated_at: '2026-03-05T20:51:38.362310'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -63,6 +63,14 @@ categories:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
+  Feature:
+    count: 1
+    items:
+    - id: open-table-format-gap-analysis
+      file: TODO/main/planning/open-table-format-gap-analysis.yaml
+      title: Close open table format support gaps across all BenchBox platforms
+      priority: Medium-High
+      status: Not Started
   Platform Expansion:
     count: 9
     items:
@@ -119,14 +127,6 @@ categories:
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
       status: Not Started
-  Testing & Quality:
-    count: 1
-    items:
-    - id: remediate-coverage-theater
-      file: TODO/main/active/remediate-coverage-theater.yaml
-      title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
-      priority: High
-      status: In Progress
   User Experience:
     count: 1
     items:

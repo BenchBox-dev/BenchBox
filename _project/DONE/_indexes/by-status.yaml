@@ -1,5 +1,5 @@
-generated_at: '2026-03-05T20:12:27.113909'
-total_items: 566
+generated_at: '2026-03-05T20:51:39.565530'
+total_items: 567
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 518
+    count: 519
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2116,6 +2116,11 @@ statuses:
       title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
       priority: High
       category: Core Functionality
+    - id: remediate-coverage-theater
+      file: DONE/main/active/remediate-coverage-theater.yaml
+      title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
+      priority: High
+      category: Testing & Quality
     - id: remove-excessive-adjective-adverb-usage
       file: DONE/unknown/planning/remove-excessive-adjective-adverb-usage.yaml
       title: Remove Excessive Adjective/Adverb Usage

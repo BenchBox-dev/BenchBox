@@ -1,21 +1,16 @@
-generated_at: '2026-03-05T20:12:25.864763'
+generated_at: '2026-03-05T20:51:38.362327'
 total_items: 22
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
       priority: High
       category: Core Functionality
-    - id: remediate-coverage-theater
-      file: TODO/main/active/remediate-coverage-theater.yaml
-      title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
-      priority: High
-      category: Testing & Quality
   Not Started:
-    count: 20
+    count: 21
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -47,6 +42,11 @@ statuses:
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Low
       category: Platform Expansion
+    - id: open-table-format-gap-analysis
+      file: TODO/main/planning/open-table-format-gap-analysis.yaml
+      title: Close open table format support gaps across all BenchBox platforms
+      priority: Medium-High
+      category: Feature
     - id: cloud-integration-test-infrastructure
       file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
