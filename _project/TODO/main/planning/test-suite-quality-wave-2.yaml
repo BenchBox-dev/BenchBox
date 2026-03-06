@@ -1,0 +1,188 @@
+id: test-suite-quality-wave-2
+title: "Test suite quality wave 2: fix slow fast-suite, strengthen hollow assertions, reduce conftest complexity"
+worktree: main
+priority: Medium-High
+status: Not Started
+description: |
+  Follow-up to remediate-coverage-theater (completed 2026-03-05). That work
+  removed the worst offenders (17 hollow files, enforcement scripts) and added
+  real connection tests. This TODO addresses the remaining systemic issues
+  found in the post-remediation audit:
+
+  Current state (2026-03-06):
+  - 13,350 "fast" tests take 25+ minutes single-threaded (should be <5 min)
+  - 3,350 trivial assertions (isinstance, is not None, len > 0) across suite
+  - 1,605 MagicMock instances across 321 files
+  - Root conftest.py is 746 lines combining unrelated concerns
+  - 9 avoidable time.sleep calls in test_tpc_compliance.py
+
+  This TODO focuses on the three highest-impact improvements:
+  1. Fast suite performance (developer velocity)
+  2. Assertion quality in the top-5 worst files (defect detection)
+  3. Conftest decomposition (maintainability)
+
+category: Testing & Quality
+
+deps:
+  needs: []
+
+work:
+- id: w1
+  summary: "Profile fast suite to identify tests falsely marked fast, and fix markers"
+  status: pending
+  needs: []
+  description: |
+    The "fast" suite (13,350 tests, marker `pytest.mark.fast`) takes 25+ minutes
+    single-threaded. For a "fast" suite, this should be under 5 minutes.
+
+    Steps:
+    1. Run with duration reporting:
+       `uv run -- python -m pytest tests/unit -m fast --durations=50 -n 0 -q 2>&1`
+    2. Identify tests taking >1s each — these are not "fast"
+    3. For each slow test, determine root cause:
+       - Subprocess spawning → re-mark as `medium` or `slow`
+       - Real binary invocation → re-mark as `integration`
+       - Unnecessary sleep → fix (see w3)
+       - Heavy computation → optimize or re-mark
+    4. Re-mark incorrectly-tagged tests with appropriate markers
+    5. Verify fast suite now runs in <5 minutes single-threaded
+
+    Known candidates from audit:
+    - tests/unit/cli/test_cli_power_throughput.py (subprocess, marked slow but may
+      have fast-marked tests that call it)
+    - tests/unit/core/tpcds/test_tpcds_stdout_datagen.py (TPC binary invocation)
+    - tests/unit/core/tpch/test_tpch_stdout_datagen.py (TPC binary invocation)
+
+- id: w2
+  summary: "Strengthen assertions in the 5 worst is-not-None-heavy test files"
+  status: pending
+  needs: []
+  description: |
+    Five files account for 152 trivial `is not None` assertions. For each file,
+    replace weak assertions with value-checking assertions where the function's
+    return type is known.
+
+    Target files (by is-not-None count):
+    1. tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py (35)
+    2. tests/unit/platforms/dataframe/test_pyspark_df.py (33)
+    3. tests/unit/core/cost/test_cloud_platform_costs.py (30)
+    4. tests/unit/core/tpch/test_dataframe_queries.py (27)
+    5. tests/unit/core/aiml_functions/test_aiml_functions_queries.py (27)
+
+    For each file:
+    a. Read the function under test to understand its return type
+    b. Replace `assert X is not None` with specific assertions:
+       - If returns DataFrame: assert column names, row count, or sample values
+       - If returns dict: assert expected keys and value types
+       - If returns numeric: assert range or exact value
+    c. Run the test to confirm it still passes
+    d. If the function genuinely can return None as valid behavior, keep the
+       assertion but add a comment explaining why
+
+    Do NOT change test structure — only strengthen assertions within existing
+    test methods.
+
+- id: w3
+  summary: "Remove 9 avoidable time.sleep calls from test_tpc_compliance.py"
+  status: pending
+  needs: []
+  description: |
+    tests/unit/test_tpc_compliance.py has 9 time.sleep calls simulating query
+    execution timing. These are avoidable — the tests can use mock timing
+    or deterministic time values instead.
+
+    Replace each `time.sleep(X)` with either:
+    - A monkeypatch of `time.perf_counter` returning deterministic values, or
+    - Direct assignment of execution_time values to result dicts
+
+    This removes ~0.45s of unnecessary wait per test run, but more importantly
+    eliminates flaky timing-dependent assertions.
+
+- id: w4
+  summary: "Split root conftest.py into domain-specific conftest files"
+  status: pending
+  needs: [w1]
+  description: |
+    tests/conftest.py is 746 lines combining:
+    - Parallel test locking (benchbox_test_lock fixture + session hooks)
+    - Timeout management (pytest_collection_modifyitems)
+    - Marker-based classification (fast/medium/slow/integration logic)
+    - 70+ fixture definitions across unrelated domains
+    - Custom hooks (pytest_runtest_protocol, etc.)
+
+    Split into:
+    - tests/conftest.py — keep only: session-scoped hooks (locking, timeout,
+      markers) and truly shared fixtures (tmp dirs, common helpers)
+    - tests/unit/conftest.py — unit-test-specific fixtures
+    - tests/unit/platforms/conftest.py — platform adapter fixtures (if any
+      are currently in root)
+    - tests/unit/core/conftest.py — core module fixtures (if any)
+
+    Target: root conftest.py under 200 lines.
+
+    Depends on w1 because marker reclassification may change the
+    pytest_collection_modifyitems logic.
+
+deferred:
+- summary: "Reduce MagicMock density in remaining 67 coverage-named files"
+  reason: "Large effort (~321 files, 1,605 instances). Address incrementally as those modules are touched for other work."
+- summary: "Consolidate platform test file duplication (4 DuckDB files, 4 ClickHouse files)"
+  reason: "Medium effort, low urgency. Current duplication is annoying but not harmful."
+- summary: "Eliminate remaining isinstance assertions (1,361 across suite)"
+  reason: "Many are in non-coverage files and mixed with real assertions. Diminishing returns after w2."
+
+metadata:
+  tags:
+  - testing
+  - quality
+  - performance
+  - developer-experience
+  estimated_effort: "Medium (1-2 weeks)"
+  created_date: "2026-03-06"
+  last_updated: "2026-03-06"
+
+verification:
+  command: |
+    echo "--- fast suite timing ---" && timeout 600 uv run -- python -m pytest tests/unit -m fast --durations=5 -n 0 -q 2>&1 | tail -10 && echo "--- is-not-None count in top 5 ---" && grep -c 'is not None' tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py tests/unit/platforms/dataframe/test_pyspark_df.py tests/unit/core/cost/test_cloud_platform_costs.py tests/unit/core/tpch/test_dataframe_queries.py tests/unit/core/aiml_functions/test_aiml_functions_queries.py 2>&1 && echo "--- sleeps in tpc_compliance ---" && grep -c 'time.sleep' tests/unit/test_tpc_compliance.py && echo "--- conftest size ---" && wc -l tests/conftest.py
+  expected: "Fast suite <5min; is-not-None counts reduced by >50% in each file; 0 sleeps in tpc_compliance; conftest <200 lines"
+
+must_preserve:
+- "All existing tests must continue to pass — marker changes only affect which suite they run in"
+- "tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py must be kept (has real Polars execution)"
+- "Root conftest parallel locking behavior must be preserved across the split"
+- "CI fast suite (make test-fast) must still work with updated markers"
+
+anti_patterns:
+- "DO NOT delete test files in this TODO — because wave 1 already handled deletions and these files have real value — strengthen assertions instead"
+- "DO NOT add new MagicMock usage — because the suite already has 1,605 instances and mock density is a known problem — use real objects or monkeypatch"
+- "DO NOT move fixtures without updating all imports — because conftest.py fixtures are auto-discovered by pytest scope and moving them changes availability — verify each moved fixture's test scope"
+
+scope_limit:
+  include:
+  - "tests/ directory (markers, assertions, conftest, sleep removal)"
+  - "pyproject.toml (marker definitions only)"
+  exclude:
+  - "benchbox/ source code (no production changes)"
+  - "tests/integration/ (do not modify)"
+  - "tests/e2e/ (do not modify)"
+
+impact:
+  business_value: |
+    Fast suite under 5 minutes enables rapid iteration. Stronger assertions
+    catch more bugs during development. Simpler conftest reduces onboarding
+    friction and fixture debugging time.
+  user_impact: |
+    No user-facing changes. Developer experience improves significantly.
+  technical_debt: |
+    Reduces trivial assertions by ~100+ in the worst files. Eliminates
+    timing-dependent test flakiness. Makes conftest maintainable.
+
+files_affected:
+  modified:
+  - "tests/conftest.py (split into smaller files)"
+  - "tests/unit/test_tpc_compliance.py (remove sleeps)"
+  - "5 test files with assertion strengthening"
+  - "Multiple test files with marker corrections"
+  added:
+  - "tests/unit/conftest.py (extracted fixtures)"
+  deleted: []

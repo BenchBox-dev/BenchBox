@@ -1,5 +1,5 @@
-generated_at: '2026-03-06T08:21:09.465270'
-total_items: 24
+generated_at: '2026-03-06T08:41:51.008959'
+total_items: 25
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 23
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -112,6 +112,11 @@ statuses:
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       priority: Medium
       category: Benchmark Development
+    - id: test-suite-quality-wave-2
+      file: TODO/main/planning/test-suite-quality-wave-2.yaml
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen hollow assertions, reduce conftest complexity'
+      priority: Medium-High
+      category: Testing & Quality
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements

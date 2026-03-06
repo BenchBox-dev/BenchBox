@@ -1,5 +1,5 @@
-generated_at: '2026-03-06T08:21:09.465179'
-total_items: 24
+generated_at: '2026-03-06T08:41:51.008922'
+total_items: 25
 items:
 - id: spark-mixin-open-table-format-loading
   file: TODO/main/planning/spark-mixin-open-table-format-loading.yaml
@@ -27,7 +27,7 @@ items:
   - migration
   estimated_effort: Large (2-4 weeks)
   work_total: 22
-  work_done: 18
+  work_done: 19
   work_ready: 1
   deferred_count: 2
 - id: reenable-fireducks-after-upstream-fixes
@@ -382,6 +382,23 @@ items:
   work_total: 12
   work_done: 0
   work_ready: 12
+- id: test-suite-quality-wave-2
+  file: TODO/main/planning/test-suite-quality-wave-2.yaml
+  title: 'Test suite quality wave 2: fix slow fast-suite, strengthen hollow assertions, reduce conftest complexity'
+  worktree: main
+  category: Testing & Quality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - testing
+  - quality
+  - performance
+  - developer-experience
+  estimated_effort: Medium (1-2 weeks)
+  work_total: 4
+  work_done: 0
+  work_ready: 3
+  deferred_count: 3
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support

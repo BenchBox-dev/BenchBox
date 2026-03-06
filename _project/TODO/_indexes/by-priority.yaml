@@ -1,5 +1,5 @@
-generated_at: '2026-03-06T08:21:09.465254'
-total_items: 24
+generated_at: '2026-03-06T08:41:51.008952'
+total_items: 25
 priorities:
   High:
     count: 3
@@ -20,12 +20,17 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 2
+    count: 3
     items:
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
+      status: Not Started
+    - id: test-suite-quality-wave-2
+      file: TODO/main/planning/test-suite-quality-wave-2.yaml
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen hollow assertions, reduce conftest complexity'
+      category: Testing & Quality
       status: Not Started
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
