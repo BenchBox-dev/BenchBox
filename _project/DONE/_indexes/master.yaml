@@ -1,5 +1,5 @@
-generated_at: '2026-03-05T20:51:39.564999'
-total_items: 567
+generated_at: '2026-03-06T08:21:11.607483'
+total_items: 568
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6518,6 +6518,18 @@ items:
   - utilities
   estimated_effort: 2-3 days
   completed_date: '2026-01-25'
+- id: open-table-format-gap-analysis
+  file: DONE/main/active/open-table-format-gap-analysis.yaml
+  title: Close open table format support gaps across all BenchBox platforms
+  worktree: main
+  category: Feature
+  priority: Medium-High
+  status: Completed
+  completed_date: '2026-03-05'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  deferred_count: 6
 - id: cloud-spark-adapter-consolidation
   file: DONE/platform-expansion/active/cloud-spark-adapter-consolidation.yaml
   title: Cloud Spark Adapter Consolidation - Extract Common Patterns

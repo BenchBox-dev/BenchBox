@@ -1,0 +1,107 @@
+id: snowflake-clickhouse-open-table-format-loading
+title: "Add delta/iceberg loading to Snowflake and ClickHouse adapters"
+worktree: main
+priority: Medium
+status: Not Started
+description: |
+  Snowflake and ClickHouse both support open table formats on the platform but their
+  BenchBox adapters only load parquet/CSV.  These platforms were removed from
+  DELTA_CAPABILITY and ICEBERG_CAPABILITY in format_capabilities.py (commit 9be7d5b70)
+  to prevent the fail-fast check from passing when loading would fail.
+
+  Platform mechanisms:
+  - Snowflake: Iceberg Tables (managed + unmanaged) are GA; Delta via external tables
+    with limited support.  Primary path is Iceberg.
+  - ClickHouse: iceberg() table function for Iceberg; Delta not natively supported
+    (would need conversion).  Primary path is Iceberg.
+
+category: Platform Expansion
+
+deps:
+  needs: []
+
+work:
+  - id: w1
+    summary: "Add Iceberg loading to Snowflake adapter"
+    status: pending
+    details: |
+      Extend snowflake.py load_data to detect Iceberg format (metadata/ directory marker)
+      and use Snowflake's Iceberg Tables integration.  This requires external volume
+      setup for staged data.
+
+  - id: w2
+    summary: "Add Iceberg loading to ClickHouse Cloud adapter"
+    status: pending
+    details: |
+      Extend clickhouse_cloud.py load_data to detect Iceberg format and use the
+      iceberg() table function to read from S3/GCS.
+
+  - id: w3
+    summary: "Add Delta loading to Snowflake adapter"
+    needs: [w1]
+    status: pending
+    details: |
+      Research Snowflake Delta Lake support (external tables or Delta Direct) and add
+      loading code if feasible.  Lower priority than Iceberg.
+
+  - id: w4
+    summary: "Re-register Snowflake and ClickHouse in format_capabilities.py"
+    needs: [w1, w2]
+    status: pending
+    details: |
+      After loading code is tested:
+      - Add snowflake back to ICEBERG_CAPABILITY (and DELTA_CAPABILITY if w3 done)
+      - Add clickhouse back to ICEBERG_CAPABILITY only
+      - Update PLATFORM_FORMAT_PREFERENCES to include iceberg (and delta where applicable)
+      - Update test_format_capabilities.py assertions
+
+  - id: w5
+    summary: "Unit tests for Snowflake and ClickHouse format loading"
+    needs: [w1, w2]
+    status: pending
+    details: |
+      Mock-based tests verifying format detection and SQL generation for Iceberg loading
+      on both platforms.
+
+deferred:
+  - id: d1
+    summary: "Integration tests with real Snowflake/ClickHouse instances"
+    reason: "Requires cloud credentials and running instances"
+  - id: d2
+    summary: "ClickHouse Delta support via conversion or external tooling"
+    reason: "ClickHouse lacks native Delta support; would need Parquet conversion layer"
+
+must_preserve:
+  - "Snowflake parquet/CSV COPY INTO loading path must remain unchanged"
+  - "ClickHouse Cloud parquet loading via S3/GCS staging must remain unchanged"
+  - "format_capabilities.py fail-fast check: only re-register after loading code works"
+
+approach: |
+  Snowflake Iceberg: Use CREATE ICEBERG TABLE or ALTER TABLE ... SET TABLE_FORMAT = ICEBERG
+  with external volume pointing to staged data.  Reference Snowflake docs for Iceberg
+  Tables support.
+
+  ClickHouse Iceberg: Use iceberg() table function to read Iceberg data from S3/GCS.
+  Example: SELECT * FROM iceberg('s3://bucket/path/', ...) to create table from Iceberg.
+
+  Delta support for both platforms is lower priority — Iceberg is the primary open table
+  format for both.
+
+anti_patterns:
+  - "DO NOT register platforms in format_capabilities.py before loading code is tested -- because the fail-fast check will pass but load will fail at runtime -- implement and test first"
+  - "DO NOT attempt Delta loading for ClickHouse -- because ClickHouse has no native delta support -- focus on Iceberg only"
+
+verification:
+  - description: "Snowflake and ClickHouse adapter tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v -k 'snowflake or clickhouse' --no-header -q"
+    expected_output: "All tests pass"
+  - description: "Format capabilities tests pass with re-registered platforms"
+    command: "uv run -- python -m pytest tests/unit/platforms/base/test_format_capabilities.py -v --no-header -q"
+    expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/snowflake.py"
+    - "benchbox/platforms/clickhouse_cloud.py"
+    - "benchbox/platforms/base/format_capabilities.py"
+    - "tests/unit/platforms/"

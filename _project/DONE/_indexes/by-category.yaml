@@ -1,5 +1,5 @@
-generated_at: '2026-03-05T20:51:39.565262'
-total_categories: 68
+generated_at: '2026-03-06T08:21:11.607968'
+total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -1655,6 +1655,14 @@ categories:
       file: DONE/enterprise-ops-regression/planning/performance-regression-detection-system.yaml
       title: Performance Regression Detection System
       priority: Medium
+      status: Completed
+  Feature:
+    count: 1
+    items:
+    - id: open-table-format-gap-analysis
+      file: DONE/main/active/open-table-format-gap-analysis.yaml
+      title: Close open table format support gaps across all BenchBox platforms
+      priority: Medium-High
       status: Completed
   Feature Completion:
     count: 2

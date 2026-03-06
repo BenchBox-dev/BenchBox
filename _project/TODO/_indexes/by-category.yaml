@@ -1,5 +1,5 @@
-generated_at: '2026-03-05T20:51:38.362310'
-total_categories: 8
+generated_at: '2026-03-06T08:21:09.465228'
+total_categories: 7
 categories:
   AI/ML Capabilities:
     count: 1
@@ -51,8 +51,13 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 2
+    count: 3
     items:
+    - id: spark-mixin-open-table-format-loading
+      file: TODO/main/planning/spark-mixin-open-table-format-loading.yaml
+      title: Add delta/iceberg/hudi loading to SparkDataLoadMixin and all Spark-based adapters
+      priority: High
+      status: Not Started
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
@@ -63,16 +68,8 @@ categories:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
-  Feature:
-    count: 1
-    items:
-    - id: open-table-format-gap-analysis
-      file: TODO/main/planning/open-table-format-gap-analysis.yaml
-      title: Close open table format support gaps across all BenchBox platforms
-      priority: Medium-High
-      status: Not Started
   Platform Expansion:
-    count: 9
+    count: 11
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -98,6 +95,16 @@ categories:
       file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
       title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
       priority: Low
+      status: Not Started
+    - id: cloud-sql-open-table-format-loading
+      file: TODO/main/planning/cloud-sql-open-table-format-loading.yaml
+      title: Add delta loading to Redshift and BigQuery adapters
+      priority: Medium
+      status: Not Started
+    - id: snowflake-clickhouse-open-table-format-loading
+      file: TODO/main/planning/snowflake-clickhouse-open-table-format-loading.yaml
+      title: Add delta/iceberg loading to Snowflake and ClickHouse adapters
+      priority: Medium
       status: Not Started
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml

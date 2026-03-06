@@ -1,0 +1,89 @@
+id: spark-mixin-open-table-format-loading
+title: "Add delta/iceberg/hudi loading to SparkDataLoadMixin and all Spark-based adapters"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  SparkDataLoadMixin._load_data_spark() (spark_execution_mixin.py:45-151) currently
+  only handles parquet and CSV.  Spark natively supports delta, iceberg, and hudi via
+  spark.read.format("<format>").load(path), but the mixin lacks format detection and
+  routing for these formats.
+
+  This blocks 7 Spark-based platforms from running benchmarks with open table formats:
+  spark, emr-serverless, dataproc, dataproc-serverless, synapse-spark, athena-spark,
+  fabric-spark.
+
+  Once loading code is implemented, re-register synapse-spark in DELTA_CAPABILITY and
+  update PLATFORM_FORMAT_PREFERENCES to include delta where appropriate.
+
+category: Core Functionality
+
+deps:
+  needs: []
+
+work:
+  - id: w1
+    summary: "Add format detection and routing to SparkDataLoadMixin._load_data_spark()"
+    status: pending
+    details: |
+      In spark_execution_mixin.py, extend _load_data_spark() to detect delta/iceberg/hudi
+      directory formats (via _delta_log/, metadata/, .hoodie/ markers) and route to
+      spark.read.format("<fmt>").load(path).  Add SparkTableFormat handling for DELTA,
+      ICEBERG, HUDI alongside existing PARQUET path.
+
+  - id: w2
+    summary: "Add unit tests for Spark format loading (mock-based)"
+    needs: [w1]
+    status: pending
+    details: |
+      Create tests that mock spark.read.format() calls to verify correct format detection
+      and routing for delta, iceberg, and hudi directories. Test that parquet/CSV paths
+      are unaffected.
+
+  - id: w3
+    summary: "Re-register Spark-based platforms in format_capabilities.py"
+    needs: [w2]
+    status: pending
+    details: |
+      After loading code is tested:
+      - Add synapse-spark back to DELTA_CAPABILITY
+      - Update PLATFORM_FORMAT_PREFERENCES for synapse-spark (add delta)
+      - Verify no other Spark platforms were removed (emr-serverless, dataproc, etc.
+        were already registered)
+      - Update test_format_capabilities.py assertions
+
+deferred:
+  - id: d1
+    summary: "Integration test with real Spark session loading delta/iceberg/hudi files"
+    reason: "Requires Spark cluster or local PySpark install with format jars"
+
+must_preserve:
+  - "SparkDataLoadMixin._load_data_spark() parquet and CSV loading paths must continue to work unchanged"
+  - "All existing Spark adapter tests must pass without modification"
+  - "format_capabilities.py fail-fast check: only re-register a platform after loading code is verified working"
+
+approach: |
+  Follow the existing DuckDB pattern (duckdb.py:156-184) for directory detection:
+  - Delta: check for _delta_log/ subdirectory
+  - Iceberg: check for metadata/ subdirectory
+  - Hudi: check for .hoodie/ subdirectory
+  Then use spark.read.format("<format>").load(path) for each detected format.
+  Re-register platforms in format_capabilities.py only after tests confirm loading works.
+
+anti_patterns:
+  - "DO NOT register platforms in format_capabilities.py before loading code is tested -- because the fail-fast check will pass but load will fail at runtime -- implement and test loading first, then register"
+  - "DO NOT add external library dependencies (deltalake, pyiceberg) -- because Spark has native format support via spark.read.format() -- use the native Spark API"
+
+verification:
+  - description: "Spark adapter tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/base/ -v -k 'spark' --no-header -q"
+    expected_output: "All tests pass"
+  - description: "Format capabilities tests pass with updated registrations"
+    command: "uv run -- python -m pytest tests/unit/platforms/base/test_format_capabilities.py -v --no-header -q"
+    expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/spark_execution_mixin.py"
+    - "benchbox/platforms/base/format_capabilities.py"
+    - "tests/unit/platforms/base/"

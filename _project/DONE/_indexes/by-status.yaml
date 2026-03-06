@@ -1,5 +1,5 @@
-generated_at: '2026-03-05T20:51:39.565530'
-total_items: 567
+generated_at: '2026-03-06T08:21:11.608574'
+total_items: 568
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 519
+    count: 520
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -764,6 +764,11 @@ statuses:
       title: Close SQL injection gaps in platform adapter identifier validation
       priority: High
       category: Platform Expansion
+    - id: open-table-format-gap-analysis
+      file: DONE/main/active/open-table-format-gap-analysis.yaml
+      title: Close open table format support gaps across all BenchBox platforms
+      priority: Medium-High
+      category: Feature
     - id: cloud-platform-error-context
       file: DONE/observability-quality/planning/cloud-platform-error-context.yaml
       title: Cloud Platform Error Message Context

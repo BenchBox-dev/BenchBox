@@ -1,9 +1,14 @@
-generated_at: '2026-03-05T20:51:38.362320'
-total_items: 22
+generated_at: '2026-03-06T08:21:09.465254'
+total_items: 24
 priorities:
   High:
-    count: 2
+    count: 3
     items:
+    - id: spark-mixin-open-table-format-loading
+      file: TODO/main/planning/spark-mixin-open-table-format-loading.yaml
+      title: Add delta/iceberg/hudi loading to SparkDataLoadMixin and all Spark-based adapters
+      category: Core Functionality
+      status: Not Started
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
@@ -15,13 +20,8 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 3
+    count: 2
     items:
-    - id: open-table-format-gap-analysis
-      file: TODO/main/planning/open-table-format-gap-analysis.yaml
-      title: Close open table format support gaps across all BenchBox platforms
-      category: Feature
-      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -33,11 +33,21 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 3
+    count: 5
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: cloud-sql-open-table-format-loading
+      file: TODO/main/planning/cloud-sql-open-table-format-loading.yaml
+      title: Add delta loading to Redshift and BigQuery adapters
+      category: Platform Expansion
+      status: Not Started
+    - id: snowflake-clickhouse-open-table-format-loading
+      file: TODO/main/planning/snowflake-clickhouse-open-table-format-loading.yaml
+      title: Add delta/iceberg loading to Snowflake and ClickHouse adapters
       category: Platform Expansion
       status: Not Started
     - id: flight-data-benchmark

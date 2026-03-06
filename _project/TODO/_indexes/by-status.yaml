@@ -1,5 +1,5 @@
-generated_at: '2026-03-05T20:51:38.362327'
-total_items: 22
+generated_at: '2026-03-06T08:21:09.465270'
+total_items: 24
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 21
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -37,16 +37,26 @@ statuses:
       title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
       priority: Low
       category: Platform Expansion
+    - id: cloud-sql-open-table-format-loading
+      file: TODO/main/planning/cloud-sql-open-table-format-loading.yaml
+      title: Add delta loading to Redshift and BigQuery adapters
+      priority: Medium
+      category: Platform Expansion
+    - id: snowflake-clickhouse-open-table-format-loading
+      file: TODO/main/planning/snowflake-clickhouse-open-table-format-loading.yaml
+      title: Add delta/iceberg loading to Snowflake and ClickHouse adapters
+      priority: Medium
+      category: Platform Expansion
+    - id: spark-mixin-open-table-format-loading
+      file: TODO/main/planning/spark-mixin-open-table-format-loading.yaml
+      title: Add delta/iceberg/hudi loading to SparkDataLoadMixin and all Spark-based adapters
+      priority: High
+      category: Core Functionality
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Low
       category: Platform Expansion
-    - id: open-table-format-gap-analysis
-      file: TODO/main/planning/open-table-format-gap-analysis.yaml
-      title: Close open table format support gaps across all BenchBox platforms
-      priority: Medium-High
-      category: Feature
     - id: cloud-integration-test-infrastructure
       file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
