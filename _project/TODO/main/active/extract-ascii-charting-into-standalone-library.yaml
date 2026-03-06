@@ -257,7 +257,7 @@ work:
 - id: w9
   summary: "Run golden-output parity tests and verify byte-identical rendering"
   needs: [w8]
-  status: pending
+  status: done
   notes: |
     Run snapshot tests created in w19 against the extracted textcharts renderers.
     Must produce byte-identical output to pre-extraction baselines.
@@ -267,7 +267,7 @@ work:
 - id: w10
   summary: "Run full quality gate for visualization and integration surfaces"
   needs: [w9]
-  status: pending
+  status: done
 
   # --- Phase C: Packaging and Release ---
 
