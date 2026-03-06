@@ -198,7 +198,7 @@ work:
 - id: w4
   summary: "Copy and port base runtime primitives (options, colors, terminal capabilities, shared helpers)"
   needs: [w13, w14]
-  status: pending
+  status: done
   notes: |
     Copy `ascii/base.py` to `packages/textcharts/src/textcharts/base.py`.
     - Replace all `from benchbox.core.visualization.ascii.base import` with relative imports
@@ -208,7 +208,7 @@ work:
 - id: w5
   summary: "Port foundational chart renderers (bar, line, scatter, heatmap, box, histogram)"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Copy 6 modules to textcharts, rewrite imports:
     `from benchbox.core.visualization.ascii.base import` → `from textcharts.base import`
@@ -217,7 +217,7 @@ work:
 - id: w6
   summary: "Port advanced chart renderers (summary, comparison, diverging, percentile, normalized, stacked, cdf, rank, sparkline)"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Copy remaining 9 modules to textcharts, rewrite imports.
     After this step, all 15 chart types exist in textcharts.
