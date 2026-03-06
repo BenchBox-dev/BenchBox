@@ -9,13 +9,13 @@ description: |
   DELTA_CAPABILITY and ICEBERG_CAPABILITY in format_capabilities.py (commit 9be7d5b70)
   to prevent the fail-fast check from passing when loading would fail.
 
-  Initial prototype work exists for ClickHouse Cloud Iceberg and Snowflake external-table
-  routing, but the implementation gap is not fully closed:
-  - Snowflake Iceberg is not yet wired end-to-end with staging_root/external-volume
-    semantics in a way that BenchBox can safely advertise as usable.
-  - ClickHouse capability registration cannot be safely widened until BenchBox can
-    distinguish ClickHouse Cloud from ClickHouse Local/Server in format selection.
-  - Snowflake Delta remains lower-priority and still requires a real supported path.
+  Completed closure:
+  - Snowflake external Iceberg now maps staging_root into BASE_LOCATION and only
+    advertises support when the required external volume config is present.
+  - ClickHouse capability registration now distinguishes ClickHouse Cloud from
+    ClickHouse Local/Server in format selection.
+  - Snowflake Delta remains external-mode only and is advertised only when the run
+    has the required external-table configuration.
 
 category: Platform Expansion
 

@@ -15,9 +15,13 @@ description: |
   - BigQuery: Delta via BigLake external tables (GA since mid-2024).  Requires BigLake
     connection + external table definition pointing to GCS Delta directory.
 
-  Prototype external-table registration code now exists, but the implementation gap is
-  not fully closed until BenchBox can safely advertise the formats as user-selectable
-  without causing false-positive support in native/default flows.
+  Completed closure:
+  - BenchBox now uses mode-aware format selection so native/default flows remain
+    conservative.
+  - BigQuery Delta is only advertised when the run includes the required BigLake
+    connection configuration.
+  - Redshift Delta is only advertised when the run includes the required Spectrum/IAM
+    configuration.
 
 category: Platform Expansion
 

@@ -102,7 +102,7 @@ work:
 
 - id: w4
   summary: "Replace hollow isinstance assertions in 4 files with behavioral checks"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Four files have 79 hollow isinstance assertions that test guaranteed return
