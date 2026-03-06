@@ -1,0 +1,264 @@
+id: remediate-coverage-theater
+title: "Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives"
+worktree: main
+priority: High
+status: In Progress
+description: |
+  An audit of the test suite (14,765 tests, 68% coverage) found systematic
+  coverage theater — tests that inflate metrics without catching bugs.  The root
+  cause is per-file coverage enforcement (via `test_check_per_file_coverage.py`
+  and `test_check_module_coverage.py`) which incentivised an agent to produce 92
+  coverage-specific test files (`*coverage*.py`, `*wave_remaining*.py`) whose
+  tests mock everything and assert only that mocks behave as configured.
+
+  Key findings:
+  - 79 files named `*coverage*.py` + 13 `*wave_remaining*.py` (92 total)
+  - ~933 tests from these files, mostly mock-verify-mock tautologies
+  - 1,366 `isinstance()` assertions across 295 files (many trivial)
+  - Pattern: mock class -> call method -> assert mock returned what you told it to
+  - Pattern: instantiate dataclass -> assert attributes equal constructor args
+  - Pattern: 300-line fake framework (test_unified_frame_coverage.py) that
+    diverges from real API silently
+  - Estimated meaningful coverage: 30-40% (vs reported 68%)
+
+  This TODO remediates in phases: first remove perverse incentives, then triage
+  the 92 files, then write replacement tests for critical paths.
+
+category: Testing & Quality
+
+gap_analysis:
+  blockers:
+  - gap: "Per-file coverage enforcement scripts create perverse incentive"
+    location: "tests/unit/test_check_per_file_coverage.py, tests/unit/test_check_module_coverage.py"
+    solution: "Delete enforcement scripts; replace with single suite-wide threshold (60%)"
+  - gap: "92 coverage-gap-filling files with hollow tests"
+    location: "tests/unit/**/test_*coverage*.py, tests/unit/**/test_*wave_remaining*.py"
+    solution: "Triage each file: delete, keep, or rewrite (see work units)"
+  important_for_quality:
+  - gap: "Platform adapter tests mock all connections — zero integration testing"
+    location: "tests/unit/platforms/test_motherduck_coverage.py and 14 similar files"
+    solution: "Replace mock-heavy adapter tests with real DuckDB/SQLite connection tests"
+  - gap: "Fake framework pattern in unified_frame_coverage.py (714 lines, 300 lines of fakes)"
+    location: "tests/unit/platforms/dataframe/test_unified_frame_coverage.py"
+    solution: "Delete; replace with real Polars/DataFusion execution tests"
+
+deps:
+  needs: []
+
+work:
+- id: w1
+  summary: "Remove per-file coverage enforcement and replace with suite-wide threshold"
+  status: done
+  needs: []
+  description: |
+    Delete `tests/unit/test_check_per_file_coverage.py` and
+    `tests/unit/test_check_module_coverage.py`.  Also delete the companion
+    coverage-wave planning file
+    `_project/TODO/main/active/coverage-per-module-50-temporary-split-wave-2026-02-09.md`.
+
+    In `pyproject.toml` (or `pytest.ini`/`setup.cfg`), set a single suite-wide
+    coverage threshold of 60%.  This removes the incentive to write hollow tests
+    for individual files.
+
+- id: w2
+  summary: "Triage the 92 coverage/wave_remaining test files into delete/keep/rewrite buckets"
+  status: pending
+  needs: [w1]
+  description: |
+    For each of the 92 files matching `*coverage*.py` or `*wave_remaining*.py`:
+
+    **DELETE** if the file:
+    - Only asserts `isinstance()`, `is not None`, or attribute == constructor arg
+    - Only verifies mock.assert_called() without checking real behavior
+    - Tests import fallback paths (`except ImportError`) that are trivially verified
+    - Has >50% of test lines devoted to mock/fake setup
+
+    **KEEP** if the file:
+    - Executes real queries (e.g., Polars/Pandas DataFrames with actual data)
+    - Tests meaningful error paths with real exceptions
+    - Has assertions on computed values, not just pass-through values
+
+    **REWRITE** if the file:
+    - Covers a critical code path (credentials, connections, config validation)
+      but currently only mocks it
+
+    Create a tracking list: `_project/research/coverage-theater-triage.md` with
+    three columns (file path, verdict, reason).
+
+    Specific files already assessed:
+
+    DELETE candidates (confirmed hollow):
+    - tests/unit/cli/presentation/test_system_presentation_coverage.py (26 lines, 1 test, string-in-output only)
+    - tests/unit/cli/commands/test_tuning_cmd_coverage.py (exit code only)
+    - tests/unit/platforms/test_motherduck_coverage.py (mock connection, assert mock is mock)
+    - tests/unit/platforms/test_azure_synapse_coverage.py (all mocked)
+    - tests/unit/platforms/test_clickhouse_cloud_coverage.py
+    - tests/unit/platforms/test_clickhouse_metadata_coverage.py
+    - tests/unit/platforms/test_cudf_coverage.py (calls methods, no assertions on behavior)
+    - tests/unit/platforms/test_timescaledb_coverage.py
+    - tests/unit/platforms/test_influxdb_adapter_coverage.py
+    - tests/unit/platforms/dataframe/test_modin_df_coverage.py
+    - tests/unit/platforms/dataframe/test_dask_df_coverage.py
+    - tests/unit/platforms/dataframe/test_cudf_df_coverage.py
+    - tests/unit/platforms/dataframe/test_unified_frame_coverage.py (714 lines of fake framework)
+    - tests/unit/platforms/test_platform_adapters_coverage_wave_remaining.py (import fallback only)
+    - tests/unit/core/test_concurrency_joinorder_coverage_wave_remaining.py (dataclass tautology)
+
+    KEEP candidates (has real execution):
+    - tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py (runs real Polars queries)
+    - tests/unit/core/tsbs_devops/test_tsbs_df_queries_coverage.py (if real execution)
+
+    Complete the triage for remaining ~75 files before proceeding to deletion.
+
+- id: w3
+  summary: "Delete files triaged as DELETE and verify suite still passes"
+  status: pending
+  needs: [w2]
+  description: |
+    Delete all files marked DELETE in the triage list.  Run the full test suite
+    and confirm it passes.  Record the new coverage number (expected drop from
+    68% to ~55-60%).  This coverage number is more honest.
+
+    If any file deletion causes test failures elsewhere (e.g., a conftest
+    dependency), fix the dependency rather than keeping the hollow file.
+
+- id: w4
+  summary: "Write behavior-verifying tests for platform adapters (DuckDB, SQLite, DataFusion)"
+  status: pending
+  needs: [w3]
+  description: |
+    The platform adapter layer is the most critical code path and currently has
+    the worst testing (all mocked connections).  Write tests that:
+
+    For DuckDB adapter:
+    - Create a real in-memory DuckDB connection
+    - Execute actual SQL (CREATE TABLE, INSERT, SELECT)
+    - Verify memory_limit is enforced (PRAGMA check)
+    - Test error paths with real malformed SQL
+
+    For SQLite adapter:
+    - Create a real :memory: connection
+    - Test actual query execution and result parsing
+    - Verify table creation with real schemas
+
+    For DataFusion adapter:
+    - Create a real SessionContext
+    - Register real Parquet/CSV files
+    - Execute queries and verify results
+
+    These tests replace the deleted mock-heavy coverage files.  Each test should
+    take <1 second using in-memory databases.  Mark as `@pytest.mark.unit`.
+
+    Do NOT mock the database connection — that is the entire point.
+
+- id: w5
+  summary: "Write file-based credential tests to replace mock CredentialManager tests"
+  status: pending
+  needs: [w3]
+  description: |
+    The credential tests currently mock the entire CredentialManager.  Replace with:
+
+    - Create real credential files in tmp_path (YAML/JSON fixtures)
+    - Load them through real CredentialManager
+    - Verify validation logic catches missing fields, expired tokens, malformed data
+    - Test the CLI `setup --list-platforms` with real (fixture) credential files
+
+    Files to replace:
+    - tests/unit/platforms/credentials/test_snowflake_coverage.py
+    - tests/unit/platforms/credentials/test_databricks_credentials_coverage.py
+    - tests/unit/platforms/credentials/test_bigquery_coverage.py
+    - tests/unit/platforms/credentials/test_redshift_coverage.py
+
+- id: w6
+  summary: "Add mutation testing for critical modules to measure test effectiveness"
+  status: pending
+  needs: [w4]
+  description: |
+    Install `mutmut` or `cosmic-ray` and configure for the 5 most critical modules:
+    - benchbox/platforms/duckdb.py
+    - benchbox/platforms/base/adapter.py
+    - benchbox/core/runner.py
+    - benchbox/core/visualization/chart_generator.py
+    - benchbox/cli/commands/run.py
+
+    Run mutation testing and record the mutation kill rate.  Target: >70% mutation
+    kill rate for these modules.  This becomes the ongoing quality metric instead
+    of line coverage.
+
+    Add a Makefile target: `make mutation-test` that runs against critical modules.
+    Do NOT add to CI initially — run manually during test quality reviews.
+
+deferred:
+- summary: "Rewrite CLI setup tests to use real config files instead of 54 patches"
+  reason: "Lower priority — CLI setup is less critical than platform execution paths"
+- summary: "Rewrite tuning wizard tests to use real UnifiedTuningConfiguration objects"
+  reason: "Lower priority — tuning wizard is user-facing but not on critical path"
+- summary: "Rewrite generator tests to use real TPC binary (integration-level)"
+  reason: "Requires TPC binary availability — harder to test in CI"
+
+metadata:
+  tags:
+  - testing
+  - quality
+  - coverage
+  - remediation
+  estimated_effort: "Large (2-3 weeks)"
+  created_date: "2026-03-05"
+  last_updated: "2026-03-05"
+
+verification:
+  command: |
+    uv run -- python -m pytest -x -q --tb=short 2>&1 | tail -5 && echo "--- coverage files remaining ---" && find tests -name '*coverage*.py' -o -name '*wave_remaining*.py' | wc -l && echo "--- enforcement scripts ---" && ls tests/unit/test_check_per_file_coverage.py tests/unit/test_check_module_coverage.py 2>&1
+  expected: "All tests pass; coverage >= 55%; coverage files < 20; enforcement scripts not found"
+
+must_preserve:
+- "All existing integration tests (tests/integration/) must continue to pass unchanged"
+- "All e2e tests (tests/e2e/) must continue to pass unchanged"
+- "tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py must be kept (has real Polars execution)"
+- "Coverage number may drop — this is expected and correct"
+
+anti_patterns:
+- "DO NOT write replacement tests that mock the database connection — because mock connections are the root cause of the current theater — use real in-memory connections instead"
+- "DO NOT add isinstance/is-not-None assertions as replacements — because these are precisely the hollow assertions being removed — assert on computed values and behavior instead"
+- "DO NOT set per-file coverage thresholds — because this recreates the perverse incentive that caused the theater — use a single suite-wide threshold"
+- "DO NOT keep hollow tests 'just in case' — because false confidence from passing hollow tests is worse than no test at all — delete and replace with real tests"
+
+scope_limit:
+  include:
+  - "tests/ directory"
+  - "pyproject.toml (coverage config only)"
+  - "Makefile (mutation-test target)"
+  exclude:
+  - "benchbox/ source code (no production changes)"
+  - "tests/integration/ (do not modify)"
+  - "tests/e2e/ (do not modify)"
+  - "tests/validation/ (do not modify)"
+  - "tests/performance/ (do not modify)"
+
+impact:
+  business_value: |
+    Transforms test suite from a metric-gaming exercise into actual defect
+    detection.  Enables confident refactoring of platform adapters and
+    credential handling.
+  user_impact: |
+    No user-facing changes.  Coverage number drops but defect escape rate
+    improves.
+  technical_debt: |
+    Removes ~933 hollow tests and 92 coverage-theater files.  Establishes
+    mutation testing as ongoing quality metric.
+
+files_affected:
+  modified:
+  - "pyproject.toml"
+  - "Makefile"
+  deleted:
+  - "tests/unit/test_check_per_file_coverage.py"
+  - "tests/unit/test_check_module_coverage.py"
+  - "_project/TODO/main/active/coverage-per-module-50-temporary-split-wave-2026-02-09.md"
+  - "~60-75 test files from triage DELETE bucket"
+  added:
+  - "_project/research/coverage-theater-triage.md"
+  - "tests/unit/platforms/test_duckdb_real_connection.py"
+  - "tests/unit/platforms/test_sqlite_real_connection.py"
+  - "tests/unit/platforms/test_datafusion_real_connection.py"
+  - "tests/unit/platforms/credentials/test_credential_files.py"
