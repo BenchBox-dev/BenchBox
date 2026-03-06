@@ -1,4 +1,4 @@
-generated_at: '2026-03-06T09:11:32.024231'
+generated_at: '2026-03-06T09:23:30.554677'
 total_items: 23
 priorities:
   High:
@@ -29,7 +29,8 @@ priorities:
       status: Not Started
     - id: test-suite-quality-wave-2
       file: TODO/main/planning/test-suite-quality-wave-2.yaml
-      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen hollow assertions, reduce conftest complexity'
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
+        complexity'
       category: Testing & Quality
       status: Not Started
     - id: vector-search-benchmark-support

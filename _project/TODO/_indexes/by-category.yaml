@@ -1,4 +1,4 @@
-generated_at: '2026-03-06T09:11:32.024220'
+generated_at: '2026-03-06T09:23:30.554667'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -129,7 +129,8 @@ categories:
     items:
     - id: test-suite-quality-wave-2
       file: TODO/main/planning/test-suite-quality-wave-2.yaml
-      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen hollow assertions, reduce conftest complexity'
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
+        complexity'
       priority: Medium-High
       status: Not Started
   User Experience:

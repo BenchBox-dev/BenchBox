@@ -1,4 +1,4 @@
-generated_at: '2026-03-06T09:11:32.024239'
+generated_at: '2026-03-06T09:23:30.554684'
 total_items: 23
 statuses:
   In Progress:
@@ -104,7 +104,8 @@ statuses:
       category: Benchmark Development
     - id: test-suite-quality-wave-2
       file: TODO/main/planning/test-suite-quality-wave-2.yaml
-      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen hollow assertions, reduce conftest complexity'
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
+        complexity'
       priority: Medium-High
       category: Testing & Quality
     - id: tigerdata-cloud-enhancements

@@ -1,4 +1,4 @@
-generated_at: '2026-03-06T09:11:32.024201'
+generated_at: '2026-03-06T09:23:30.554648'
 total_items: 23
 items:
 - id: spark-mixin-open-table-format-loading
@@ -362,7 +362,7 @@ items:
   work_ready: 12
 - id: test-suite-quality-wave-2
   file: TODO/main/planning/test-suite-quality-wave-2.yaml
-  title: 'Test suite quality wave 2: fix slow fast-suite, strengthen hollow assertions, reduce conftest complexity'
+  title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest complexity'
   worktree: main
   category: Testing & Quality
   priority: Medium-High
@@ -372,11 +372,11 @@ items:
   - quality
   - performance
   - developer-experience
-  estimated_effort: Medium (1-2 weeks)
-  work_total: 4
+  estimated_effort: Large (2-3 weeks)
+  work_total: 7
   work_done: 0
   work_ready: 3
-  deferred_count: 3
+  deferred_count: 2
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support
