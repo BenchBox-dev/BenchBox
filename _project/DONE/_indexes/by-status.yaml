@@ -1,5 +1,5 @@
-generated_at: '2026-03-06T09:11:33.266844'
-total_items: 570
+generated_at: '2026-03-06T10:32:35.513432'
+total_items: 571
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 522
+    count: 523
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -539,16 +539,11 @@ statuses:
       title: Add dedicated tags for all platforms and benchmarks
       priority: Medium
       category: Documentation
-    - id: cloud-sql-open-table-format-loading
-      file: DONE/main/active/cloud-sql-open-table-format-loading.yaml
-      title: Add delta loading to Redshift and BigQuery adapters
-      priority: Medium
-      category: Platform Expansion
-    - id: snowflake-clickhouse-open-table-format-loading
-      file: DONE/main/active/snowflake-clickhouse-open-table-format-loading.yaml
-      title: Add delta/iceberg loading to Snowflake and ClickHouse adapters
-      priority: Medium
-      category: Platform Expansion
+    - id: spark-mixin-open-table-format-loading
+      file: DONE/core-functionality/active/spark-mixin-open-table-format-loading.yaml
+      title: Add delta/iceberg/hudi loading to SparkDataLoadMixin and close shared Spark loader gaps
+      priority: High
+      category: Core Functionality
     - id: document-driver-versioning-for-polars-clickhouse-postgresql
       file: DONE/main/active/document-driver-versioning-for-polars-clickhouse-postgresql.yaml
       title: Add driver version management callouts to Polars, ClickHouse Cloud, and PostgreSQL platform docs
@@ -1280,6 +1275,16 @@ statuses:
       title: Finalize Monitoring Module Scope
       priority: Medium
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: cloud-sql-open-table-format-loading
+      file: DONE/platform-expansion/active/cloud-sql-open-table-format-loading.yaml
+      title: Finish Delta loading closure for Redshift and BigQuery adapters
+      priority: Medium
+      category: Platform Expansion
+    - id: snowflake-clickhouse-open-table-format-loading
+      file: DONE/platform-expansion/active/snowflake-clickhouse-open-table-format-loading.yaml
+      title: Finish delta/iceberg loading gaps for Snowflake and ClickHouse adapter modes
+      priority: Medium
+      category: Platform Expansion
     - id: firebolt-cloud-deployment
       file: DONE/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode

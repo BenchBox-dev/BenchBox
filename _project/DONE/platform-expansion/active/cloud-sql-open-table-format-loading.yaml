@@ -1,9 +1,8 @@
 id: cloud-sql-open-table-format-loading
-title: "Add delta loading to Redshift and BigQuery adapters"
+title: "Finish Delta loading closure for Redshift and BigQuery adapters"
 worktree: main
 priority: Medium
 status: Completed
-completed_date: "2026-03-06"
 description: |
   Redshift and BigQuery both support Delta Lake on the platform but their BenchBox
   adapters only load parquet/CSV.  These platforms were removed from DELTA_CAPABILITY
@@ -16,7 +15,9 @@ description: |
   - BigQuery: Delta via BigLake external tables (GA since mid-2024).  Requires BigLake
     connection + external table definition pointing to GCS Delta directory.
 
-  Both require significant cloud service integration beyond simple SQL.
+  Prototype external-table registration code now exists, but the implementation gap is
+  not fully closed until BenchBox can safely advertise the formats as user-selectable
+  without causing false-positive support in native/default flows.
 
 category: Platform Expansion
 
@@ -25,37 +26,36 @@ deps:
 
 work:
   - id: w1
-    summary: "Add Delta loading to Redshift adapter via Spectrum + Glue"
+    summary: "Keep Redshift external Delta registration path and tests green"
     status: done
     details: |
-      Extend redshift.py load_data to detect Delta format (_delta_log/ marker) and
-      register as Glue table + Spectrum external table.  Requires Glue client
-      integration and IAM role configuration.
+      Redshift has a prototype Spectrum-oriented Delta registration path.  Preserve the
+      implementation while the remaining selection/capability work is resolved.
 
   - id: w2
-    summary: "Add Delta loading to BigQuery adapter via BigLake"
+    summary: "Keep BigQuery BigLake Delta registration path and tests green"
     status: done
     details: |
-      Extend bigquery.py load_data to detect Delta format and create BigLake external
-      table with DELTA format type.  Requires BigLake connection resource.
+      BigQuery has a prototype BigLake Delta registration path.  Preserve the
+      implementation while the remaining selection/capability work is resolved.
 
   - id: w3
-    summary: "Re-register Redshift and BigQuery in format_capabilities.py"
+    summary: "Add mode-aware format selection before re-registering Redshift and BigQuery"
     needs: [w1, w2]
     status: done
     details: |
-      After loading code is tested:
-      - Add redshift and bigquery back to DELTA_CAPABILITY
-      - Update PLATFORM_FORMAT_PREFERENCES to include delta
-      - Update test_format_capabilities.py assertions
+      BenchBox should only advertise Delta for Redshift and BigQuery when the selected
+      execution mode and adapter configuration can actually use the external-table path.
+      Until then, keep capability registration conservative.
 
   - id: w4
-    summary: "Unit tests for Redshift and BigQuery Delta loading"
+    summary: "Expand tests to cover final closure criteria for format selection"
     needs: [w1, w2]
     status: done
     details: |
-      Mock-based tests verifying format detection and SQL/API generation for Delta
-      loading on both platforms.
+      Preserve current mock-based Delta registration tests and add coverage for the
+      final mode-aware selection / capability behavior that will determine whether the
+      format can be safely exposed to users.
 
 deferred:
   - id: d1

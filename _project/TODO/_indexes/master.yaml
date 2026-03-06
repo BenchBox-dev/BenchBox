@@ -1,17 +1,6 @@
-generated_at: '2026-03-06T09:23:30.554648'
-total_items: 23
+generated_at: '2026-03-06T10:32:34.234557'
+total_items: 24
 items:
-- id: spark-mixin-open-table-format-loading
-  file: TODO/main/active/spark-mixin-open-table-format-loading.yaml
-  title: Add delta/iceberg/hudi loading to SparkDataLoadMixin and all Spark-based adapters
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  work_total: 3
-  work_done: 2
-  work_ready: 1
-  deferred_count: 1
 - id: extract-ascii-charting-into-standalone-library
   file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
   title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
@@ -302,6 +291,30 @@ items:
   work_total: 15
   work_done: 0
   work_ready: 15
+- id: livy-spark-adapters-open-table-format-loading
+  file: TODO/main/planning/livy-spark-adapters-open-table-format-loading.yaml
+  title: Close open-table-format loading gaps for Livy-based Spark adapters
+  worktree: main
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - spark-mixin-open-table-format-loading
+- id: cloud-spark-job-adapters-open-table-format-loading
+  file: TODO/main/planning/cloud-spark-job-adapters-open-table-format-loading.yaml
+  title: Close open-table-format loading gaps for job-based managed Spark adapters
+  worktree: main
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+  needs:
+  - spark-mixin-open-table-format-loading
 - id: flight-data-benchmark
   file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
   title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -361,12 +374,12 @@ items:
   work_done: 0
   work_ready: 12
 - id: test-suite-quality-wave-2
-  file: TODO/main/planning/test-suite-quality-wave-2.yaml
+  file: TODO/main/active/test-suite-quality-wave-2.yaml
   title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest complexity'
   worktree: main
   category: Testing & Quality
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - testing
   - quality
@@ -374,7 +387,7 @@ items:
   - developer-experience
   estimated_effort: Large (2-3 weeks)
   work_total: 7
-  work_done: 0
+  work_done: 2
   work_ready: 3
   deferred_count: 2
 - id: vector-search-benchmark-support

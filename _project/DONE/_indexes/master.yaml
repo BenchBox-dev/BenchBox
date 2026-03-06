@@ -1,5 +1,5 @@
-generated_at: '2026-03-06T09:11:33.266318'
-total_items: 570
+generated_at: '2026-03-06T10:32:35.512486'
+total_items: 571
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -779,6 +779,17 @@ items:
   - azure-fabric
   - azure-synapse
   estimated_effort: 3-5 days
+- id: spark-mixin-open-table-format-loading
+  file: DONE/core-functionality/active/spark-mixin-open-table-format-loading.yaml
+  title: Add delta/iceberg/hudi loading to SparkDataLoadMixin and close shared Spark loader gaps
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+  deferred_count: 2
 - id: databricks-liquid-clustering-tuning-support
   file: DONE/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml
   title: Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations
@@ -3952,30 +3963,6 @@ items:
   - sphinx-tags
   - discoverability
   estimated_effort: 2-3 hours
-- id: cloud-sql-open-table-format-loading
-  file: DONE/main/active/cloud-sql-open-table-format-loading.yaml
-  title: Add delta loading to Redshift and BigQuery adapters
-  worktree: main
-  category: Platform Expansion
-  priority: Medium
-  status: Completed
-  completed_date: '2026-03-06'
-  work_total: 4
-  work_done: 4
-  work_ready: 0
-  deferred_count: 2
-- id: snowflake-clickhouse-open-table-format-loading
-  file: DONE/main/active/snowflake-clickhouse-open-table-format-loading.yaml
-  title: Add delta/iceberg loading to Snowflake and ClickHouse adapters
-  worktree: main
-  category: Platform Expansion
-  priority: Medium
-  status: Completed
-  completed_date: '2026-03-06'
-  work_total: 5
-  work_done: 5
-  work_ready: 0
-  deferred_count: 2
 - id: interactive-mode-open-table-format-selection
   file: DONE/ux-improvements/planning/interactive-mode-open-table-format-selection.yaml
   title: Add open table format selection to CLI interactive mode
@@ -4843,6 +4830,28 @@ items:
   category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   priority: Medium
   status: Completed
+- id: cloud-sql-open-table-format-loading
+  file: DONE/platform-expansion/active/cloud-sql-open-table-format-loading.yaml
+  title: Finish Delta loading closure for Redshift and BigQuery adapters
+  worktree: main
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  deferred_count: 2
+- id: snowflake-clickhouse-open-table-format-loading
+  file: DONE/platform-expansion/active/snowflake-clickhouse-open-table-format-loading.yaml
+  title: Finish delta/iceberg loading gaps for Snowflake and ClickHouse adapter modes
+  worktree: main
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  deferred_count: 2
 - id: firebolt-mode-validation
   file: DONE/platform-expansion/planning/firebolt-mode-validation.yaml
   title: Firebolt Core/Cloud Mode Validation

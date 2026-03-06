@@ -1,4 +1,4 @@
-generated_at: '2026-03-06T09:11:33.266578'
+generated_at: '2026-03-06T10:32:35.512911'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -417,7 +417,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 185
+    count: 186
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -508,6 +508,11 @@ categories:
       file: DONE/core-functionality/active/complexity-ignore-required-w15.yaml
       title: Add complexity exclusions for 5 functions with inherent required complexity
       priority: Medium
+      status: Completed
+    - id: spark-mixin-open-table-format-loading
+      file: DONE/core-functionality/active/spark-mixin-open-table-format-loading.yaml
+      title: Add delta/iceberg/hudi loading to SparkDataLoadMixin and close shared Spark loader gaps
+      priority: High
       status: Completed
     - id: interactive-wizard-execution-style-selection
       file: DONE/ux-improvements/active/interactive-wizard-execution-style-selection.yaml
@@ -1961,16 +1966,6 @@ categories:
       title: Add cost tracking for local/self-hosted platforms
       priority: Low
       status: Completed
-    - id: cloud-sql-open-table-format-loading
-      file: DONE/main/active/cloud-sql-open-table-format-loading.yaml
-      title: Add delta loading to Redshift and BigQuery adapters
-      priority: Medium
-      status: Completed
-    - id: snowflake-clickhouse-open-table-format-loading
-      file: DONE/main/active/snowflake-clickhouse-open-table-format-loading.yaml
-      title: Add delta/iceberg loading to Snowflake and ClickHouse adapters
-      priority: Medium
-      status: Completed
     - id: pg-mooncake-migration-benchmark
       file: DONE/platform-expansion/active/pg-mooncake-migration-benchmark.yaml
       title: Add heap-to-columnstore migration benchmark for pg_mooncake
@@ -2066,6 +2061,16 @@ categories:
       title: Extract SparkSessionManager for shared PySpark session management
       priority: High
       status: Not Started
+    - id: cloud-sql-open-table-format-loading
+      file: DONE/platform-expansion/active/cloud-sql-open-table-format-loading.yaml
+      title: Finish Delta loading closure for Redshift and BigQuery adapters
+      priority: Medium
+      status: Completed
+    - id: snowflake-clickhouse-open-table-format-loading
+      file: DONE/platform-expansion/active/snowflake-clickhouse-open-table-format-loading.yaml
+      title: Finish delta/iceberg loading gaps for Snowflake and ClickHouse adapter modes
+      priority: Medium
+      status: Completed
     - id: firebolt-cloud-deployment
       file: DONE/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode

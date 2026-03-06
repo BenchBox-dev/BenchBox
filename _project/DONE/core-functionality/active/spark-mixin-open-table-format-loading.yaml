@@ -1,20 +1,22 @@
 id: spark-mixin-open-table-format-loading
-title: "Add delta/iceberg/hudi loading to SparkDataLoadMixin and all Spark-based adapters"
+title: "Add delta/iceberg/hudi loading to SparkDataLoadMixin and close shared Spark loader gaps"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 description: |
   SparkDataLoadMixin._load_data_spark() (spark_execution_mixin.py:45-151) currently
   only handles parquet and CSV.  Spark natively supports delta, iceberg, and hudi via
   spark.read.format("<format>").load(path), but the mixin lacks format detection and
   routing for these formats.
 
-  This blocks 7 Spark-based platforms from running benchmarks with open table formats:
-  spark, emr-serverless, dataproc, dataproc-serverless, synapse-spark, athena-spark,
-  fabric-spark.
+  The shared mixin is only part of the Spark-family implementation story.  Some managed
+  Spark adapters have their own staging/Livy/job-submission load paths and do not
+  currently route through SparkDataLoadMixin.  This item therefore only closes the
+  shared loader gap for adapters that actually use the mixin; remaining adapter-family
+  gaps must be tracked separately.
 
-  Once loading code is implemented, re-register synapse-spark in DELTA_CAPABILITY and
-  update PLATFORM_FORMAT_PREFERENCES to include delta where appropriate.
+  Once mixin-backed loading code is implemented and verified, only the platforms whose
+  runtime actually uses the mixin should be re-registered in format_capabilities.py.
 
 category: Core Functionality
 
@@ -41,21 +43,26 @@ work:
       are unaffected.
 
   - id: w3
-    summary: "Re-register Spark-based platforms in format_capabilities.py"
+    summary: "Re-register only mixin-backed Spark platforms in format_capabilities.py"
     needs: [w2]
-    status: pending
+    status: done
     details: |
       After loading code is tested:
-      - Add synapse-spark back to DELTA_CAPABILITY
-      - Update PLATFORM_FORMAT_PREFERENCES for synapse-spark (add delta)
-      - Verify no other Spark platforms were removed (emr-serverless, dataproc, etc.
-        were already registered)
+      - Audit which adapters actually dispatch to SparkDataLoadMixin at runtime
+      - Re-register only those adapters in DELTA_CAPABILITY / ICEBERG_CAPABILITY /
+        HUDI_CAPABILITY as appropriate
+      - Do NOT re-register managed Spark adapters that still use separate load paths
       - Update test_format_capabilities.py assertions
+      Audit result: the shared mixin is used by SparkAdapter and LakeSailAdapter.
+      Spark remains registered for delta/iceberg/hudi; LakeSail remains parquet-only.
 
 deferred:
   - id: d1
     summary: "Integration test with real Spark session loading delta/iceberg/hudi files"
     reason: "Requires Spark cluster or local PySpark install with format jars"
+  - id: d2
+    summary: "Managed Spark adapter follow-up items"
+    reason: "Athena Spark, Dataproc-family, Synapse Spark, and Fabric Spark require separate non-mixin TODOs"
 
 must_preserve:
   - "SparkDataLoadMixin._load_data_spark() parquet and CSV loading paths must continue to work unchanged"

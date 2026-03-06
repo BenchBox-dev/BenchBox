@@ -1,5 +1,5 @@
-generated_at: '2026-03-06T09:11:33.266718'
-total_items: 570
+generated_at: '2026-03-06T10:32:35.513173'
+total_items: 571
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 199
+    count: 200
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -281,6 +281,11 @@ priorities:
       file: DONE/platform-expansion/active/cloud-platform-cost-estimation.yaml
       title: Add cost estimation support for cloud platforms (Firebolt, Fabric, Synapse)
       category: Platform Expansion
+      status: Completed
+    - id: spark-mixin-open-table-format-loading
+      file: DONE/core-functionality/active/spark-mixin-open-table-format-loading.yaml
+      title: Add delta/iceberg/hudi loading to SparkDataLoadMixin and close shared Spark loader gaps
+      category: Core Functionality
       status: Completed
     - id: databricks-liquid-clustering-tuning-support
       file: DONE/physical-tuning/active/databricks-liquid-clustering-tuning-support.yaml
@@ -1700,16 +1705,6 @@ priorities:
       title: Add dedicated tags for all platforms and benchmarks
       category: Documentation
       status: Completed
-    - id: cloud-sql-open-table-format-loading
-      file: DONE/main/active/cloud-sql-open-table-format-loading.yaml
-      title: Add delta loading to Redshift and BigQuery adapters
-      category: Platform Expansion
-      status: Completed
-    - id: snowflake-clickhouse-open-table-format-loading
-      file: DONE/main/active/snowflake-clickhouse-open-table-format-loading.yaml
-      title: Add delta/iceberg loading to Snowflake and ClickHouse adapters
-      category: Platform Expansion
-      status: Completed
     - id: interactive-mode-open-table-format-selection
       file: DONE/ux-improvements/planning/interactive-mode-open-table-format-selection.yaml
       title: Add open table format selection to CLI interactive mode
@@ -2074,6 +2069,16 @@ priorities:
       file: DONE/observability-quality/completed/finalize-monitoring-module-scope.yaml
       title: Finalize Monitoring Module Scope
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+      status: Completed
+    - id: cloud-sql-open-table-format-loading
+      file: DONE/platform-expansion/active/cloud-sql-open-table-format-loading.yaml
+      title: Finish Delta loading closure for Redshift and BigQuery adapters
+      category: Platform Expansion
+      status: Completed
+    - id: snowflake-clickhouse-open-table-format-loading
+      file: DONE/platform-expansion/active/snowflake-clickhouse-open-table-format-loading.yaml
+      title: Finish delta/iceberg loading gaps for Snowflake and ClickHouse adapter modes
+      category: Platform Expansion
       status: Completed
     - id: firebolt-mode-validation
       file: DONE/platform-expansion/planning/firebolt-mode-validation.yaml

@@ -1,14 +1,9 @@
-generated_at: '2026-03-06T09:23:30.554677'
-total_items: 23
+generated_at: '2026-03-06T10:32:34.234834'
+total_items: 24
 priorities:
   High:
-    count: 3
+    count: 2
     items:
-    - id: spark-mixin-open-table-format-loading
-      file: TODO/main/active/spark-mixin-open-table-format-loading.yaml
-      title: Add delta/iceberg/hudi loading to SparkDataLoadMixin and all Spark-based adapters
-      category: Core Functionality
-      status: In Progress
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
@@ -28,22 +23,32 @@ priorities:
       category: Benchmark Development
       status: Not Started
     - id: test-suite-quality-wave-2
-      file: TODO/main/planning/test-suite-quality-wave-2.yaml
+      file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
         complexity'
       category: Testing & Quality
-      status: Not Started
+      status: In Progress
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 3
+    count: 5
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: livy-spark-adapters-open-table-format-loading
+      file: TODO/main/planning/livy-spark-adapters-open-table-format-loading.yaml
+      title: Close open-table-format loading gaps for Livy-based Spark adapters
+      category: Platform Expansion
+      status: Not Started
+    - id: cloud-spark-job-adapters-open-table-format-loading
+      file: TODO/main/planning/cloud-spark-job-adapters-open-table-format-loading.yaml
+      title: Close open-table-format loading gaps for job-based managed Spark adapters
       category: Platform Expansion
       status: Not Started
     - id: flight-data-benchmark

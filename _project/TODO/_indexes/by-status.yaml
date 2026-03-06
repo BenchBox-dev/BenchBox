@@ -1,21 +1,22 @@
-generated_at: '2026-03-06T09:23:30.554684'
-total_items: 23
+generated_at: '2026-03-06T10:32:34.234942'
+total_items: 24
 statuses:
   In Progress:
     count: 2
     items:
-    - id: spark-mixin-open-table-format-loading
-      file: TODO/main/active/spark-mixin-open-table-format-loading.yaml
-      title: Add delta/iceberg/hudi loading to SparkDataLoadMixin and all Spark-based adapters
-      priority: High
-      category: Core Functionality
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
       priority: High
       category: Core Functionality
+    - id: test-suite-quality-wave-2
+      file: TODO/main/active/test-suite-quality-wave-2.yaml
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
+        complexity'
+      priority: Medium-High
+      category: Testing & Quality
   Not Started:
-    count: 21
+    count: 22
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -46,6 +47,16 @@ statuses:
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Low
+      category: Platform Expansion
+    - id: livy-spark-adapters-open-table-format-loading
+      file: TODO/main/planning/livy-spark-adapters-open-table-format-loading.yaml
+      title: Close open-table-format loading gaps for Livy-based Spark adapters
+      priority: Medium
+      category: Platform Expansion
+    - id: cloud-spark-job-adapters-open-table-format-loading
+      file: TODO/main/planning/cloud-spark-job-adapters-open-table-format-loading.yaml
+      title: Close open-table-format loading gaps for job-based managed Spark adapters
+      priority: Medium
       category: Platform Expansion
     - id: cloud-integration-test-infrastructure
       file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
@@ -102,12 +113,6 @@ statuses:
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       priority: Medium
       category: Benchmark Development
-    - id: test-suite-quality-wave-2
-      file: TODO/main/planning/test-suite-quality-wave-2.yaml
-      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
-        complexity'
-      priority: Medium-High
-      category: Testing & Quality
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
