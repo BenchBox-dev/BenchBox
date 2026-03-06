@@ -2,7 +2,8 @@ id: snowflake-clickhouse-open-table-format-loading
 title: "Add delta/iceberg loading to Snowflake and ClickHouse adapters"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-03-06"
 description: |
   Snowflake and ClickHouse both support open table formats on the platform but their
   BenchBox adapters only load parquet/CSV.  These platforms were removed from
@@ -23,7 +24,7 @@ deps:
 work:
   - id: w1
     summary: "Add Iceberg loading to Snowflake adapter"
-    status: pending
+    status: done
     details: |
       Extend snowflake.py load_data to detect Iceberg format (metadata/ directory marker)
       and use Snowflake's Iceberg Tables integration.  This requires external volume
@@ -31,7 +32,7 @@ work:
 
   - id: w2
     summary: "Add Iceberg loading to ClickHouse Cloud adapter"
-    status: pending
+    status: done
     details: |
       Extend clickhouse_cloud.py load_data to detect Iceberg format and use the
       iceberg() table function to read from S3/GCS.
@@ -39,7 +40,7 @@ work:
   - id: w3
     summary: "Add Delta loading to Snowflake adapter"
     needs: [w1]
-    status: pending
+    status: done
     details: |
       Research Snowflake Delta Lake support (external tables or Delta Direct) and add
       loading code if feasible.  Lower priority than Iceberg.
@@ -47,7 +48,7 @@ work:
   - id: w4
     summary: "Re-register Snowflake and ClickHouse in format_capabilities.py"
     needs: [w1, w2]
-    status: pending
+    status: done
     details: |
       After loading code is tested:
       - Add snowflake back to ICEBERG_CAPABILITY (and DELTA_CAPABILITY if w3 done)
@@ -58,7 +59,7 @@ work:
   - id: w5
     summary: "Unit tests for Snowflake and ClickHouse format loading"
     needs: [w1, w2]
-    status: pending
+    status: done
     details: |
       Mock-based tests verifying format detection and SQL generation for Iceberg loading
       on both platforms.

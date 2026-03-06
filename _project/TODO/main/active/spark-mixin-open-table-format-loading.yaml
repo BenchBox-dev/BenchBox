@@ -2,7 +2,7 @@ id: spark-mixin-open-table-format-loading
 title: "Add delta/iceberg/hudi loading to SparkDataLoadMixin and all Spark-based adapters"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 description: |
   SparkDataLoadMixin._load_data_spark() (spark_execution_mixin.py:45-151) currently
   only handles parquet and CSV.  Spark natively supports delta, iceberg, and hudi via
@@ -24,7 +24,7 @@ deps:
 work:
   - id: w1
     summary: "Add format detection and routing to SparkDataLoadMixin._load_data_spark()"
-    status: pending
+    status: done
     details: |
       In spark_execution_mixin.py, extend _load_data_spark() to detect delta/iceberg/hudi
       directory formats (via _delta_log/, metadata/, .hoodie/ markers) and route to
@@ -34,7 +34,7 @@ work:
   - id: w2
     summary: "Add unit tests for Spark format loading (mock-based)"
     needs: [w1]
-    status: pending
+    status: done
     details: |
       Create tests that mock spark.read.format() calls to verify correct format detection
       and routing for delta, iceberg, and hudi directories. Test that parquet/CSV paths

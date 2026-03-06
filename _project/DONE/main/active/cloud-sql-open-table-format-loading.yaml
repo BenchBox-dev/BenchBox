@@ -2,7 +2,8 @@ id: cloud-sql-open-table-format-loading
 title: "Add delta loading to Redshift and BigQuery adapters"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-03-06"
 description: |
   Redshift and BigQuery both support Delta Lake on the platform but their BenchBox
   adapters only load parquet/CSV.  These platforms were removed from DELTA_CAPABILITY
@@ -25,7 +26,7 @@ deps:
 work:
   - id: w1
     summary: "Add Delta loading to Redshift adapter via Spectrum + Glue"
-    status: pending
+    status: done
     details: |
       Extend redshift.py load_data to detect Delta format (_delta_log/ marker) and
       register as Glue table + Spectrum external table.  Requires Glue client
@@ -33,7 +34,7 @@ work:
 
   - id: w2
     summary: "Add Delta loading to BigQuery adapter via BigLake"
-    status: pending
+    status: done
     details: |
       Extend bigquery.py load_data to detect Delta format and create BigLake external
       table with DELTA format type.  Requires BigLake connection resource.
@@ -41,7 +42,7 @@ work:
   - id: w3
     summary: "Re-register Redshift and BigQuery in format_capabilities.py"
     needs: [w1, w2]
-    status: pending
+    status: done
     details: |
       After loading code is tested:
       - Add redshift and bigquery back to DELTA_CAPABILITY
@@ -51,7 +52,7 @@ work:
   - id: w4
     summary: "Unit tests for Redshift and BigQuery Delta loading"
     needs: [w1, w2]
-    status: pending
+    status: done
     details: |
       Mock-based tests verifying format detection and SQL/API generation for Delta
       loading on both platforms.

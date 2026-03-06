@@ -1,15 +1,15 @@
-generated_at: '2026-03-06T08:41:51.008922'
-total_items: 25
+generated_at: '2026-03-06T09:11:32.024201'
+total_items: 23
 items:
 - id: spark-mixin-open-table-format-loading
-  file: TODO/main/planning/spark-mixin-open-table-format-loading.yaml
+  file: TODO/main/active/spark-mixin-open-table-format-loading.yaml
   title: Add delta/iceberg/hudi loading to SparkDataLoadMixin and all Spark-based adapters
   worktree: main
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   work_total: 3
-  work_done: 0
+  work_done: 2
   work_ready: 1
   deferred_count: 1
 - id: extract-ascii-charting-into-standalone-library
@@ -27,7 +27,7 @@ items:
   - migration
   estimated_effort: Large (2-4 weeks)
   work_total: 22
-  work_done: 19
+  work_done: 20
   work_ready: 1
   deferred_count: 2
 - id: reenable-fireducks-after-upstream-fixes
@@ -302,28 +302,6 @@ items:
   work_total: 15
   work_done: 0
   work_ready: 15
-- id: cloud-sql-open-table-format-loading
-  file: TODO/main/planning/cloud-sql-open-table-format-loading.yaml
-  title: Add delta loading to Redshift and BigQuery adapters
-  worktree: main
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  work_total: 4
-  work_done: 0
-  work_ready: 2
-  deferred_count: 2
-- id: snowflake-clickhouse-open-table-format-loading
-  file: TODO/main/planning/snowflake-clickhouse-open-table-format-loading.yaml
-  title: Add delta/iceberg loading to Snowflake and ClickHouse adapters
-  worktree: main
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  work_total: 5
-  work_done: 0
-  work_ready: 2
-  deferred_count: 2
 - id: flight-data-benchmark
   file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
   title: Flight Data Benchmark - US Aviation On-Time Performance Analytics

@@ -317,7 +317,7 @@ work:
 - id: w20
   summary: "Create GitHub repository for textcharts and push initial release"
   needs: [w21]
-  status: pending
+  status: done
   notes: |
     Initialize ~/Developer/textcharts as a git repo and push to GitHub.
     Steps:

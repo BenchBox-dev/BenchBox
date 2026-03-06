@@ -1,4 +1,4 @@
-generated_at: '2026-03-06T08:21:11.607968'
+generated_at: '2026-03-06T09:11:33.266578'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -1879,7 +1879,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 65
+    count: 67
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -1960,6 +1960,16 @@ categories:
       file: DONE/platform-expansion/planning/local-platform-cost-tracking.yaml
       title: Add cost tracking for local/self-hosted platforms
       priority: Low
+      status: Completed
+    - id: cloud-sql-open-table-format-loading
+      file: DONE/main/active/cloud-sql-open-table-format-loading.yaml
+      title: Add delta loading to Redshift and BigQuery adapters
+      priority: Medium
+      status: Completed
+    - id: snowflake-clickhouse-open-table-format-loading
+      file: DONE/main/active/snowflake-clickhouse-open-table-format-loading.yaml
+      title: Add delta/iceberg loading to Snowflake and ClickHouse adapters
+      priority: Medium
       status: Completed
     - id: pg-mooncake-migration-benchmark
       file: DONE/platform-expansion/active/pg-mooncake-migration-benchmark.yaml

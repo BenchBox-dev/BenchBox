@@ -1,5 +1,5 @@
-generated_at: '2026-03-06T08:21:11.608127'
-total_items: 568
+generated_at: '2026-03-06T09:11:33.266718'
+total_items: 570
 priorities:
   Critical:
     count: 35
@@ -1493,7 +1493,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 249
+    count: 251
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1699,6 +1699,16 @@ priorities:
       file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
       title: Add dedicated tags for all platforms and benchmarks
       category: Documentation
+      status: Completed
+    - id: cloud-sql-open-table-format-loading
+      file: DONE/main/active/cloud-sql-open-table-format-loading.yaml
+      title: Add delta loading to Redshift and BigQuery adapters
+      category: Platform Expansion
+      status: Completed
+    - id: snowflake-clickhouse-open-table-format-loading
+      file: DONE/main/active/snowflake-clickhouse-open-table-format-loading.yaml
+      title: Add delta/iceberg loading to Snowflake and ClickHouse adapters
+      category: Platform Expansion
       status: Completed
     - id: interactive-mode-open-table-format-selection
       file: DONE/ux-improvements/planning/interactive-mode-open-table-format-selection.yaml
