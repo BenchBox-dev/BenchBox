@@ -284,23 +284,74 @@ work:
     Build verification: `cd packages/textcharts && uv build` (sdist + wheel)
 
 - id: w11
-  summary: "Publish first standalone release and switch BenchBox to versioned dependency"
+  summary: "Move textcharts to standalone local directory and verify independent build"
   needs: [w15]
+  status: done
+  notes: |
+    Move packages/textcharts/ out of the BenchBox monorepo into its own
+    project directory (~/Developer/textcharts).
+    Steps:
+    1. Copy packages/textcharts/ to ~/Developer/textcharts/
+    2. Verify standalone build: `cd ~/Developer/textcharts && uv build`
+    3. Verify standalone tests: `cd ~/Developer/textcharts && uv run --group dev -- python -m pytest -q`
+    4. Verify no benchbox imports: `rg "(from|import)\s+benchbox" ~/Developer/textcharts/src/`
+    Gate: sdist + wheel build, all tests pass, zero benchbox imports.
+
+- id: w21
+  summary: "Install textcharts wheel into BenchBox and validate full test suite"
+  needs: [w11]
+  status: done
+  notes: |
+    Replace the in-repo path dependency with a locally-built wheel to prove
+    BenchBox works with textcharts as an external package.
+    Steps:
+    1. Build wheel: `cd ~/Developer/textcharts && uv build`
+    2. Update BenchBox pyproject.toml: replace path dep with wheel install
+       `uv add ~/Developer/textcharts/dist/textcharts-0.1.0-py3-none-any.whl`
+    3. Run full BenchBox test suite: `uv run -- python -m pytest -q`
+    4. Run golden parity: `uv run -- python -m pytest tests/contracts/visualization/ -q`
+    5. Run visualization tests: `uv run -- python -m pytest tests/unit/visualization/ -q`
+    6. Remove packages/textcharts/ from BenchBox (it now lives externally)
+    Gate: all tests pass with wheel-installed textcharts, packages/textcharts/ removed.
+
+- id: w20
+  summary: "Create GitHub repository for textcharts and push initial release"
+  needs: [w21]
   status: pending
   notes: |
-    1. Publish: `uv publish packages/textcharts/dist/*`
-    2. Switch pyproject.toml: `dependencies = ["textcharts>=0.1.0"]`
-    3. Remove path dependency wiring
-    4. Run full test suite to confirm
+    Initialize ~/Developer/textcharts as a git repo and push to GitHub.
+    Steps:
+    1. `cd ~/Developer/textcharts && git init && git add . && git commit -m "Initial commit"`
+    2. Create GitHub repo: `gh repo create joeharris76/textcharts --public --source .`
+    3. Push: `git push -u origin main`
+    4. Set up GitHub Actions CI (.github/workflows/ci.yml):
+       - Lint (ruff check)
+       - Test (pytest)
+       - Publish to PyPI on tag push
+    Gate: repo exists on GitHub, CI passes green on main.
+
+- id: w22
+  summary: "Publish textcharts to PyPI and switch BenchBox to versioned dependency"
+  needs: [w20]
+  status: pending
+  notes: |
+    Publish the first release and switch BenchBox from wheel to PyPI version.
+    Steps:
+    1. Tag release: `cd ~/Developer/textcharts && git tag v0.1.0 && git push --tags`
+    2. Publish: `uv publish dist/*` (or let CI handle it on tag)
+    3. Update BenchBox pyproject.toml: `dependencies = ["textcharts>=0.1.0"]`
+    4. `uv sync && uv run -- python -m pytest -q`
+    Gate: `pip install textcharts` works, BenchBox tests pass with PyPI version.
 
 - id: w12
-  summary: "Deprecate temporary shims and complete documentation migration"
-  needs: [w11]
+  summary: "Deprecate temporary compatibility shims in BenchBox"
+  needs: [w22]
   status: pending
   notes: |
-    After at least one stable BenchBox release with the versioned dependency:
+    After BenchBox runs stable with the PyPI-published textcharts:
     - Add deprecation warnings to `benchbox/core/visualization/ascii/` shim modules
-    - Plan removal for next major BenchBox version
+    - Update CLAUDE.md / AGENTS.md to reference ~/Developer/textcharts
+    - Plan removal of shims for next major BenchBox version
 
 deferred:
 - summary: "Cross-language wrappers (Rust/JS) around the standalone charting library"
