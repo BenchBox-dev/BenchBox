@@ -274,7 +274,7 @@ work:
 - id: w15
   summary: "Complete standalone packaging MVP (metadata, README with chart gallery, py.typed, sdist+wheel)"
   needs: [w10]
-  status: pending
+  status: done
   notes: |
     README should include:
     - Quick start example for each chart type
