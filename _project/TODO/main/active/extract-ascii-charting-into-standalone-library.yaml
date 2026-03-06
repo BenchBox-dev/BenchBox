@@ -226,7 +226,7 @@ work:
 - id: w7
   summary: "Introduce BenchBox compatibility shim so old import paths continue to work"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Replace `benchbox/core/visualization/ascii/` contents with thin re-exports:
     ```python
@@ -244,7 +244,7 @@ work:
 - id: w8
   summary: "Add textcharts as BenchBox path dependency and verify adapter wiring"
   needs: [w7, w13, w14]
-  status: pending
+  status: done
   notes: |
     In BenchBox `pyproject.toml`:
     ```toml
