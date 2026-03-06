@@ -124,7 +124,7 @@ work:
 
 - id: w4
   summary: "Write behavior-verifying tests for platform adapters (DuckDB, SQLite, DataFusion)"
-  status: pending
+  status: done
   needs: [w3]
   description: |
     The platform adapter layer is the most critical code path and currently has
