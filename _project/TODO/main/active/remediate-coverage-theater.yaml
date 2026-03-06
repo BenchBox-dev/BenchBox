@@ -62,7 +62,7 @@ work:
 
 - id: w2
   summary: "Triage the 92 coverage/wave_remaining test files into delete/keep/rewrite buckets"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     For each of the 92 files matching `*coverage*.py` or `*wave_remaining*.py`:
@@ -112,7 +112,7 @@ work:
 
 - id: w3
   summary: "Delete files triaged as DELETE and verify suite still passes"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Delete all files marked DELETE in the triage list.  Run the full test suite
