@@ -1,5 +1,5 @@
-generated_at: '2026-03-05T08:39:09.090450'
-total_categories: 7
+generated_at: '2026-03-05T20:12:25.864745'
+total_categories: 8
 categories:
   AI/ML Capabilities:
     count: 1
@@ -51,8 +51,13 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 1
+    count: 2
     items:
+    - id: extract-ascii-charting-into-standalone-library
+      file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
+      title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
+      priority: High
+      status: In Progress
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
@@ -114,6 +119,14 @@ categories:
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
       status: Not Started
+  Testing & Quality:
+    count: 1
+    items:
+    - id: remediate-coverage-theater
+      file: TODO/main/active/remediate-coverage-theater.yaml
+      title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
+      priority: High
+      status: In Progress
   User Experience:
     count: 1
     items:

@@ -1,6 +1,19 @@
-generated_at: '2026-03-05T08:39:09.090473'
-total_items: 20
+generated_at: '2026-03-05T20:12:25.864763'
+total_items: 22
 statuses:
+  In Progress:
+    count: 2
+    items:
+    - id: extract-ascii-charting-into-standalone-library
+      file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
+      title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
+      priority: High
+      category: Core Functionality
+    - id: remediate-coverage-theater
+      file: TODO/main/active/remediate-coverage-theater.yaml
+      title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
+      priority: High
+      category: Testing & Quality
   Not Started:
     count: 20
     items:

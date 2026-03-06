@@ -1,6 +1,24 @@
-generated_at: '2026-03-05T08:39:09.090421'
-total_items: 20
+generated_at: '2026-03-05T20:12:25.864723'
+total_items: 22
 items:
+- id: extract-ascii-charting-into-standalone-library
+  file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
+  title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: In Progress
+  tags:
+  - ascii-charts
+  - visualization
+  - extraction
+  - library
+  - migration
+  estimated_effort: Large (2-4 weeks)
+  work_total: 19
+  work_done: 17
+  work_ready: 1
+  deferred_count: 2
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -11,6 +29,23 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
+- id: remediate-coverage-theater
+  file: TODO/main/active/remediate-coverage-theater.yaml
+  title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: In Progress
+  tags:
+  - testing
+  - quality
+  - coverage
+  - remediation
+  estimated_effort: Large (2-3 weeks)
+  work_total: 6
+  work_done: 1
+  work_ready: 1
+  deferred_count: 3
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
