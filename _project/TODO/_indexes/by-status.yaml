@@ -1,5 +1,5 @@
-generated_at: '2026-03-07T10:01:46.740604'
-total_items: 24
+generated_at: '2026-03-07T10:30:32.636711'
+total_items: 25
 statuses:
   In Progress:
     count: 2
@@ -128,3 +128,11 @@ statuses:
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
+  Identified:
+    count: 1
+    items:
+    - id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification
+      file: TODO/main/planning/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
+      title: Restore lightweight fast test lane with comprehensive test reclassification
+      priority: High
+      category: Testing & Quality

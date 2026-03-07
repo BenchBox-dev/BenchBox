@@ -1,4 +1,4 @@
-generated_at: '2026-03-07T10:01:46.740581'
+generated_at: '2026-03-07T10:30:32.636693'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -130,8 +130,13 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 1
+    count: 2
     items:
+    - id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification
+      file: TODO/main/planning/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
+      title: Restore lightweight fast test lane with comprehensive test reclassification
+      priority: High
+      status: Identified
     - id: test-suite-quality-wave-2
       file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest

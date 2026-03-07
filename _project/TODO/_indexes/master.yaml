@@ -1,5 +1,5 @@
-generated_at: '2026-03-07T10:01:46.740539'
-total_items: 24
+generated_at: '2026-03-07T10:30:32.636676'
+total_items: 25
 items:
 - id: extract-ascii-charting-into-standalone-library
   file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
@@ -29,6 +29,24 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
+- id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification
+  file: TODO/main/planning/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
+  title: Restore lightweight fast test lane with comprehensive test reclassification
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Identified
+  tags:
+  - testing
+  - pytest
+  - performance
+  - developer-experience
+  - classification
+  estimated_effort: Large
+  work_total: 7
+  work_done: 0
+  work_ready: 1
+  deferred_count: 2
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
