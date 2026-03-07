@@ -1,5 +1,5 @@
-generated_at: '2026-03-07T11:39:10.677469'
-total_items: 572
+generated_at: '2026-03-07T12:05:22.635660'
+total_items: 573
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 524
+    count: 525
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2206,6 +2206,11 @@ statuses:
       title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
       priority: High
       category: Core Functionality
+    - id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification
+      file: DONE/main/active/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
+      title: Restore lightweight fast test lane with comprehensive test reclassification
+      priority: High
+      category: Testing & Quality
     - id: restrict-primary-foreign-key-configuration-to-tuning-yaml-only
       file: DONE/unknown/planning/restrict-primary-foreign-key-configuration-to-tuning-yaml-only.yaml
       title: Restrict Primary/Foreign Key Configuration to tuning.yaml Only

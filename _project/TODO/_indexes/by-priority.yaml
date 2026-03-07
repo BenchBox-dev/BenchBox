@@ -1,8 +1,8 @@
-generated_at: '2026-03-07T11:39:09.498240'
-total_items: 25
+generated_at: '2026-03-07T12:05:21.417309'
+total_items: 24
 priorities:
   High:
-    count: 3
+    count: 2
     items:
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
@@ -14,11 +14,6 @@ priorities:
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
       status: Not Started
-    - id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification
-      file: TODO/main/planning/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
-      title: Restore lightweight fast test lane with comprehensive test reclassification
-      category: Testing & Quality
-      status: Identified
   Medium-High:
     count: 3
     items:

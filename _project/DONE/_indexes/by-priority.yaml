@@ -1,5 +1,5 @@
-generated_at: '2026-03-07T11:39:10.677319'
-total_items: 572
+generated_at: '2026-03-07T12:05:22.635530'
+total_items: 573
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 201
+    count: 202
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -932,6 +932,11 @@ priorities:
       file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml
       title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
       category: Core Functionality
+      status: Completed
+    - id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification
+      file: DONE/main/active/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
+      title: Restore lightweight fast test lane with comprehensive test reclassification
+      category: Testing & Quality
       status: Completed
     - id: comparison-matrix-restructure
       file: DONE/docs-experience/active/comparison-matrix-restructure.yaml

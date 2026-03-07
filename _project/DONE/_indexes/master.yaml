@@ -1,5 +1,5 @@
-generated_at: '2026-03-07T11:39:10.676913'
-total_items: 572
+generated_at: '2026-03-07T12:05:22.635127'
+total_items: 573
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2764,6 +2764,25 @@ items:
   work_total: 7
   work_done: 7
   work_ready: 0
+- id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification
+  file: DONE/main/active/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
+  title: Restore lightweight fast test lane with comprehensive test reclassification
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - pytest
+  - performance
+  - developer-experience
+  - classification
+  estimated_effort: Large
+  completed_date: '2026-03-07'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  deferred_count: 2
 - id: comparison-matrix-restructure
   file: DONE/docs-experience/active/comparison-matrix-restructure.yaml
   title: Restructure Platform Comparison Matrix with Grouped Categories

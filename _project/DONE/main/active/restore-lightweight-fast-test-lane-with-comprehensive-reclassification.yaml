@@ -2,7 +2,7 @@ id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification
 title: "Restore lightweight fast test lane with comprehensive test reclassification"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 description: |
   The current pytest fast lane no longer behaves like a lightweight developer
   suite. On 2026-03-07, `uv run -- python -m pytest -m "fast" --tb=short`
@@ -84,6 +84,7 @@ metadata:
   estimated_effort: "Large"
   created_date: "2026-03-07"
   last_updated: "2026-03-07T12:15:00-05:00"
+completed_date: "2026-03-07"
 
 impact:
   business_value: |

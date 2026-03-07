@@ -1,4 +1,4 @@
-generated_at: '2026-03-07T11:39:10.677177'
+generated_at: '2026-03-07T12:05:22.635399'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -2709,7 +2709,7 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 3
+    count: 4
     items:
     - id: migrate-ascii-chart-tests-to-textcharts
       file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml
@@ -2724,6 +2724,11 @@ categories:
     - id: remediate-coverage-theater
       file: DONE/main/active/remediate-coverage-theater.yaml
       title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
+      priority: High
+      status: Completed
+    - id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification
+      file: DONE/main/active/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
+      title: Restore lightweight fast test lane with comprehensive test reclassification
       priority: High
       status: Completed
   Testing and Quality Assurance:
