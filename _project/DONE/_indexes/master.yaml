@@ -1,5 +1,5 @@
-generated_at: '2026-03-06T11:30:13.153157'
-total_items: 571
+generated_at: '2026-03-07T10:02:00.133845'
+total_items: 572
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2114,6 +2114,25 @@ items:
   category: platform-adapter
   priority: High
   status: Completed
+- id: migrate-ascii-chart-tests-to-textcharts
+  file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml
+  title: Migrate ~290 pure-rendering tests from BenchBox to textcharts library; retain ~65 integration tests
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - textcharts
+  - extraction
+  - migration
+  estimated_effort: Medium (1-2 days)
+  completed_date: '2026-03-07'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - extract-ascii-charting-into-standalone-library
 - id: motherduck-platform-adapter
   file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
   title: MotherDuck Platform Adapter

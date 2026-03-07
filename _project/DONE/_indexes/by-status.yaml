@@ -1,5 +1,5 @@
-generated_at: '2026-03-06T11:30:13.154120'
-total_items: 571
+generated_at: '2026-03-07T10:02:00.134747'
+total_items: 572
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 523
+    count: 524
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1721,6 +1721,11 @@ statuses:
       title: Migrate runtime elapsed and timeout timing to centralized monotonic clock
       priority: Medium-High
       category: Code Quality and Technical Debt
+    - id: migrate-ascii-chart-tests-to-textcharts
+      file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml
+      title: Migrate ~290 pure-rendering tests from BenchBox to textcharts library; retain ~65 integration tests
+      priority: High
+      category: Testing & Quality
     - id: minimize-emoji-usage-completed
       file: DONE/unknown/planning/minimize-emoji-usage-completed.yaml
       title: Minimize Emoji Usage ✅ COMPLETED

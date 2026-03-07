@@ -2,7 +2,8 @@ id: migrate-ascii-chart-tests-to-textcharts
 title: "Migrate ~290 pure-rendering tests from BenchBox to textcharts library; retain ~65 integration tests"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-07"
 description: |
   textcharts was extracted from BenchBox (see extract-ascii-charting-into-standalone-library)
   but ALL test coverage (~360 methods in test_ascii_charts.py) still lives in BenchBox.
@@ -155,7 +156,7 @@ work:
 - id: w4
   summary: "Update textcharts CI to run migrated tests and enforce coverage threshold"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Update ~/Developer/textcharts CI configuration:
     1. Add pytest + pytest-cov to dev dependencies if not present

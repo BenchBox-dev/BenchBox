@@ -1,4 +1,4 @@
-generated_at: '2026-03-06T11:30:13.153587'
+generated_at: '2026-03-07T10:02:00.134403'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -2709,8 +2709,13 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 2
+    count: 3
     items:
+    - id: migrate-ascii-chart-tests-to-textcharts
+      file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml
+      title: Migrate ~290 pure-rendering tests from BenchBox to textcharts library; retain ~65 integration tests
+      priority: High
+      status: Completed
     - id: phase-5-testing-infrastructure
       file: DONE/query-plan-remediation/phase-5-testing-infrastructure.yaml
       title: 'Query Plan Remediation - Phase 5: Testing Infrastructure'

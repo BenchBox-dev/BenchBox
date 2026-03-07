@@ -31,7 +31,7 @@ deps:
 work:
 - id: w1
   summary: "Profile fast suite to identify tests falsely marked fast, and fix markers"
-  status: pending
+  status: done
   needs: []
   description: |
     The "fast" suite (13,350 tests, marker `pytest.mark.fast`) takes 25+ minutes
@@ -135,7 +135,7 @@ work:
 
 - id: w5
   summary: "Consolidate 5 thin platform test files into their main adapter test files"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     Five platform test files are too thin (<200 lines each) to justify standalone
@@ -182,7 +182,7 @@ work:
 
 - id: w6
   summary: "Replace MagicMock with real connections in test_platform_adapters_coverage_wave_remaining.py and test_dataframe_runner.py"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     The top 2 MagicMock-heavy files where real alternatives exist:
@@ -216,7 +216,7 @@ work:
 
 - id: w7
   summary: "Split root conftest.py into domain-specific conftest files"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     tests/conftest.py is 746 lines combining:

@@ -1,4 +1,4 @@
-generated_at: '2026-03-06T11:30:11.806042'
+generated_at: '2026-03-07T10:01:46.740539'
 total_items: 24
 items:
 - id: extract-ascii-charting-into-standalone-library
@@ -387,8 +387,8 @@ items:
   - developer-experience
   estimated_effort: Large (2-3 weeks)
   work_total: 7
-  work_done: 3
-  work_ready: 2
+  work_done: 7
+  work_ready: 0
   deferred_count: 2
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml

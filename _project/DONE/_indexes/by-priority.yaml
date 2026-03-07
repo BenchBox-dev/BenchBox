@@ -1,5 +1,5 @@
-generated_at: '2026-03-06T11:30:13.153861'
-total_items: 571
+generated_at: '2026-03-07T10:02:00.134576'
+total_items: 572
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 200
+    count: 201
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -712,6 +712,11 @@ priorities:
       file: DONE/fabric-platform/planning/fabric-adapter-architecture.yaml
       title: Microsoft Fabric Data Warehouse Adapter Architecture
       category: platform-adapter
+      status: Completed
+    - id: migrate-ascii-chart-tests-to-textcharts
+      file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml
+      title: Migrate ~290 pure-rendering tests from BenchBox to textcharts library; retain ~65 integration tests
+      category: Testing & Quality
       status: Completed
     - id: motherduck-platform-adapter
       file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
