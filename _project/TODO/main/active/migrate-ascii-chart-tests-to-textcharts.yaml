@@ -101,7 +101,7 @@ work:
 - id: w2
   summary: "Split 4 mixed-concern classes: extract test_exporters_* methods, move rendering tests"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     These classes have mostly textcharts tests but contain 1-2 BenchBox exporter methods:
 
@@ -120,7 +120,7 @@ work:
 - id: w3
   summary: "Add shim import smoke tests to BenchBox and verify final state"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Add a small `TestShimImports` class in BenchBox's test_ascii_charts.py that verifies
     the re-export shims still work:
