@@ -1,4 +1,4 @@
-generated_at: '2026-03-07T10:30:32.636676'
+generated_at: '2026-03-07T11:39:09.498210'
 total_items: 25
 items:
 - id: extract-ascii-charting-into-standalone-library
@@ -43,7 +43,7 @@ items:
   - developer-experience
   - classification
   estimated_effort: Large
-  work_total: 7
+  work_total: 8
   work_done: 0
   work_ready: 1
   deferred_count: 2

@@ -39,28 +39,33 @@ work:
     status: pending
 
   - id: w3
-    summary: "Perform comprehensive reclassification of explicit fast-marked tests across unit and integration suites"
+    summary: "Reclassify explicit fast-marked tests in tests/unit using measured runtime and startup behavior"
     needs: [w1]
     status: pending
 
   - id: w4
-    summary: "Replace drifting path exceptions with a maintained classification inventory for medium, slow, stress, and resource-heavy coverage"
-    needs: [w2, w3]
+    summary: "Reclassify explicit fast-marked tests in tests/integration and any remaining non-unit fast coverage"
+    needs: [w1]
     status: pending
 
   - id: w5
-    summary: "Update developer commands and marker-validation tests to match the curated fast-lane contract while keeping parallel execution"
+    summary: "Replace drifting path exceptions with a maintained classification inventory for medium, slow, stress, and resource-heavy coverage"
     needs: [w2, w3, w4]
     status: pending
 
   - id: w6
-    summary: "Add regression guardrails that fail when fast-lane size, composition, or runtime exceed budget"
-    needs: [w4, w5]
+    summary: "Update developer commands and marker-validation tests to match the curated fast-lane contract while keeping parallel execution"
+    needs: [w2, w3, w4, w5]
     status: pending
 
   - id: w7
+    summary: "Add regression guardrails that fail when fast-lane size, composition, or runtime exceed budget"
+    needs: [w5, w6]
+    status: pending
+
+  - id: w8
     summary: "Verify the final fast lane against the historical runtime target and document the new classification boundaries"
-    needs: [w6]
+    needs: [w7]
     status: pending
 
 deferred:
@@ -78,7 +83,7 @@ metadata:
     - classification
   estimated_effort: "Large"
   created_date: "2026-03-07"
-  last_updated: "2026-03-07T10:29:19-05:00"
+  last_updated: "2026-03-07T10:39:00-05:00"
 
 impact:
   business_value: |
@@ -101,7 +106,9 @@ files_affected:
     - tests/unit/
     - tests/integration/
     - scripts/analyze_test_timings.py
-    - _project/scripts/todo_cli.py
+    - tests/unit/test_marker_strategy.py
+    - tests/unit/**/test_*.py
+    - tests/integration/**/test_*.py
   added:
     - _project/TODO/main/planning/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
   removed: []
@@ -149,8 +156,22 @@ verification:
   - description: "Confirm broad unit coverage is still available outside the fast lane"
     command: "uv run -- python -m pytest -m \"unit\" --tb=short --collect-only -q"
     expected_output: "Unit tests remain broadly selectable even after fast-lane pruning."
+  - description: "Confirm the new guardrail fails when fast-lane membership or composition exceeds the defined budget"
+    command: "uv run -- python _project/scripts/timing_policy_check.py --strict"
+    expected_output: "The guardrail check passes in the fixed state and is implemented tightly enough that an over-budget or forbidden fast-lane composition would fail the command."
 
 scope_limit:
+  only_modify:
+    - tests/conftest.py
+    - pytest.ini
+    - Makefile
+    - scripts/analyze_test_timings.py
+    - tests/unit/test_standardized_test_commands.py
+    - tests/unit/test_marker_strategy.py
+    - tests/unit/
+    - tests/integration/
+    - _project/scripts/timing_policy_check.py
+    - _project/config/
   do_not_modify:
     - benchbox/
     - docs/
