@@ -1,0 +1,26 @@
+{
+  "enabled": true,
+  "max_fast_tests": 500,
+  "forbidden_marker_expressions": [
+    "integration",
+    "performance",
+    "slow",
+    "stress",
+    "resource_heavy",
+    "requires_table_formats",
+    "cloud_import",
+    "live_integration",
+    "e2e"
+  ],
+  "forbidden_path_substrings": [
+    "tests/unit/platforms/pyspark/",
+    "tests/unit/platforms/base/cloud_spark/",
+    "tests/unit/platforms/aws/test_athena_spark_",
+    "tests/unit/platforms/azure/test_fabric_spark_",
+    "tests/unit/platforms/azure/test_synapse_spark_",
+    "tests/unit/platforms/test_fabric_spark_adapter.py",
+    "tests/unit/platforms/test_spark_adapter.py",
+    "tests/unit/platforms/base/test_spark_execution_mixin.py",
+    "tests/unit/platforms/dataframe/test_pyspark_maintenance_coverage.py"
+  ]
+}

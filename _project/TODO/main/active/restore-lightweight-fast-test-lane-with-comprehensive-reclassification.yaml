@@ -2,7 +2,7 @@ id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification
 title: "Restore lightweight fast test lane with comprehensive test reclassification"
 worktree: main
 priority: High
-status: Identified
+status: In Progress
 description: |
   The current pytest fast lane no longer behaves like a lightweight developer
   suite. On 2026-03-07, `uv run -- python -m pytest -m "fast" --tb=short`
@@ -31,42 +31,42 @@ deps:
 work:
   - id: w1
     summary: "Capture the current fast-lane baseline, marker census, and startup hot spots"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Change default marker policy so unclassified tests no longer auto-enter the fast lane"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Reclassify explicit fast-marked tests in tests/unit using measured runtime and startup behavior"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w4
     summary: "Reclassify explicit fast-marked tests in tests/integration and any remaining non-unit fast coverage"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w5
     summary: "Replace drifting path exceptions with a maintained classification inventory for medium, slow, stress, and resource-heavy coverage"
     needs: [w2, w3, w4]
-    status: pending
+    status: done
 
   - id: w6
     summary: "Update developer commands and marker-validation tests to match the curated fast-lane contract while keeping parallel execution"
     needs: [w2, w3, w4, w5]
-    status: pending
+    status: done
 
   - id: w7
     summary: "Add regression guardrails that fail when fast-lane size, composition, or runtime exceed budget"
     needs: [w5, w6]
-    status: pending
+    status: done
 
   - id: w8
     summary: "Verify the final fast lane against the historical runtime target and document the new classification boundaries"
     needs: [w7]
-    status: pending
+    status: done
 
 deferred:
   - summary: "Tune xdist worker counts or pytest startup internals after reclassification"
@@ -83,7 +83,7 @@ metadata:
     - classification
   estimated_effort: "Large"
   created_date: "2026-03-07"
-  last_updated: "2026-03-07T10:39:00-05:00"
+  last_updated: "2026-03-07T12:15:00-05:00"
 
 impact:
   business_value: |
@@ -110,7 +110,7 @@ files_affected:
     - tests/unit/**/test_*.py
     - tests/integration/**/test_*.py
   added:
-    - _project/TODO/main/planning/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
+    - _project/TODO/main/active/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
   removed: []
 
 must_preserve:
