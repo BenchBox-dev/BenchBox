@@ -1,5 +1,5 @@
-generated_at: '2026-03-08T21:23:24.416438'
-total_items: 573
+generated_at: '2026-03-09T09:39:25.320559'
+total_items: 574
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 525
+    count: 526
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -373,6 +373,11 @@ statuses:
       title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
       priority: High
       category: Testing and Quality Assurance
+    - id: adapt-benchbox-to-textcharts-neutral-defaults
+      file: DONE/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
+      title: Adapt BenchBox to textcharts neutralized defaults and new APIs
+      priority: Medium-High
+      category: Core Functionality
     - id: table-mode-external
       file: DONE/main/active/table-mode-external.yaml
       title: Add --table-mode external for external table / view-based query execution

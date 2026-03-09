@@ -1,4 +1,4 @@
-generated_at: '2026-03-08T21:23:24.416175'
+generated_at: '2026-03-09T09:39:25.320272'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -417,7 +417,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 186
+    count: 187
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -432,6 +432,11 @@ categories:
     - id: ascii-chart-visualizations
       file: DONE/main/active/ascii-chart-visualizations.yaml
       title: ASCII Chart Visualizations for CLI and MCP Server
+      priority: Medium-High
+      status: Completed
+    - id: adapt-benchbox-to-textcharts-neutral-defaults
+      file: DONE/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
+      title: Adapt BenchBox to textcharts neutralized defaults and new APIs
       priority: Medium-High
       status: Completed
     - id: table-mode-external

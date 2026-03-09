@@ -1,5 +1,5 @@
-generated_at: '2026-03-08T21:23:24.416313'
-total_items: 573
+generated_at: '2026-03-09T09:39:25.320415'
+total_items: 574
 priorities:
   Critical:
     count: 35
@@ -1194,7 +1194,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 62
+    count: 63
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1204,6 +1204,11 @@ priorities:
     - id: ascii-chart-visualizations
       file: DONE/main/active/ascii-chart-visualizations.yaml
       title: ASCII Chart Visualizations for CLI and MCP Server
+      category: Core Functionality
+      status: Completed
+    - id: adapt-benchbox-to-textcharts-neutral-defaults
+      file: DONE/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
+      title: Adapt BenchBox to textcharts neutralized defaults and new APIs
       category: Core Functionality
       status: Completed
     - id: ascii-chart-sparkline-table

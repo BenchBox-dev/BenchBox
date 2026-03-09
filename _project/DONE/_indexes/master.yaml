@@ -1,5 +1,5 @@
-generated_at: '2026-03-08T21:23:24.415907'
-total_items: 573
+generated_at: '2026-03-09T09:39:25.319997'
+total_items: 574
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6290,6 +6290,17 @@ items:
   - rich-library
   estimated_effort: 2-3 weeks
   completed_date: '2026-02-05'
+- id: adapt-benchbox-to-textcharts-neutral-defaults
+  file: DONE/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
+  title: Adapt BenchBox to textcharts neutralized defaults and new APIs
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  completed_date: '2026-03-09'
+  work_total: 7
+  work_done: 2
+  work_ready: 2
 - id: ascii-chart-sparkline-table
   file: DONE/core-functionality/active/ascii-chart-sparkline-table.yaml
   title: Add ASCII Sparkline Table chart (compact multi-metric leaderboard)

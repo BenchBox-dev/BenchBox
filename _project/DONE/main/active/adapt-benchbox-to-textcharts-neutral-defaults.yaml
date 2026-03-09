@@ -2,7 +2,14 @@ id: adapt-benchbox-to-textcharts-neutral-defaults
 title: "Adapt BenchBox to textcharts neutralized defaults and new APIs"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-03-09"
+superseded_by: "align-benchbox-with-textcharts-de-benchboxing"
+completion_notes: |
+  w1 (golden parity) and w4 (value_formatter) done. Remaining work units were
+  blocked on textcharts completing its neutralization. Now that textcharts is
+  fully de-benchboxed, this TODO is superseded by a new one with accurate work
+  units based on the actual API changes.
 description: |
   textcharts has a planned 5-group neutralization pass (see
   `_project/prompts/textcharts-neutralize-defaults.md`). Current status:
