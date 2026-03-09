@@ -1,4 +1,4 @@
-generated_at: '2026-03-08T21:23:23.138587'
+generated_at: '2026-03-08T23:33:32.640982'
 total_items: 25
 priorities:
   High:
@@ -18,10 +18,10 @@ priorities:
     count: 4
     items:
     - id: adapt-benchbox-to-textcharts-neutral-defaults
-      file: TODO/main/planning/adapt-benchbox-to-textcharts-neutral-defaults.yaml
+      file: TODO/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
       title: Adapt BenchBox to textcharts neutralized defaults and new APIs
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

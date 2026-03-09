@@ -1,4 +1,4 @@
-generated_at: '2026-03-08T21:23:23.138559'
+generated_at: '2026-03-08T23:33:32.640955'
 total_items: 25
 items:
 - id: extract-ascii-charting-into-standalone-library
@@ -355,15 +355,15 @@ items:
   work_done: 0
   work_ready: 17
 - id: adapt-benchbox-to-textcharts-neutral-defaults
-  file: TODO/main/planning/adapt-benchbox-to-textcharts-neutral-defaults.yaml
+  file: TODO/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
   title: Adapt BenchBox to textcharts neutralized defaults and new APIs
   worktree: main
   category: Core Functionality
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   work_total: 7
-  work_done: 0
-  work_ready: 1
+  work_done: 2
+  work_ready: 2
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

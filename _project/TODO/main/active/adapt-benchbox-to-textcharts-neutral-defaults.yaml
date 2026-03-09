@@ -2,23 +2,30 @@ id: adapt-benchbox-to-textcharts-neutral-defaults
 title: "Adapt BenchBox to textcharts neutralized defaults and new APIs"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 description: |
-  textcharts completed a 5-group neutralization pass (see
-  `_project/prompts/textcharts-neutralize-defaults.md`) that:
+  textcharts has a planned 5-group neutralization pass (see
+  `_project/prompts/textcharts-neutralize-defaults.md`). Current status:
 
-  1. Changed default labels/titles from benchmark-specific to generic
-  2. Added `value_formatter: Callable[[float], str] | None` to StackedBar and SummaryStats
-  3. Added `lower_is_better: bool = True` to ComparisonBar, DivergingBar, SummaryStats
-  4. Renamed factory functions to generic names (old names deprecated with warnings)
-  5. Made outlier capping configurable via `ASCIIChartOptions.outlier_cap`
+  Completed in textcharts:
+  - Group 2 partial: `value_formatter` added to SummaryStats and StackedBar
+  - Group 2 partial: `_format_metric()` dispatch in SummaryBox
 
-  BenchBox already passes explicit labels/titles at every call site, so group 1
-  should be invisible. But we need to:
-  - Verify no output regressions from default changes (golden tests)
-  - Silence deprecation warnings by migrating to new factory function names
-  - Confirm `value_formatter` and `lower_is_better` don't affect existing behavior
-  - Optionally adopt `value_formatter` for future non-latency metrics
+  NOT yet completed in textcharts (blocked):
+  - Group 1: Default labels/titles still domain-specific
+  - Group 3: `lower_is_better` parameter not added
+  - Group 4: Factory function renames not done (no generic names, no deprecation)
+  - Group 5: Outlier cap not configurable
+
+  BenchBox-side work that CAN proceed now:
+  - Verify `value_formatter` addition doesn't affect existing behavior
+  - Verify golden test parity with current textcharts
+  - Run full test suite to confirm no regressions
+
+  BenchBox-side work BLOCKED on textcharts:
+  - Migrate factory calls to new generic names (Group 4)
+  - Update scatter param names cost→x, performance→y (Group 4)
+  - Update compatibility shim re-exports (Groups 1, 4)
 
   Related: extract-ascii-charting-into-standalone-library (parent extraction TODO)
 
@@ -30,7 +37,7 @@ deps:
 work:
 - id: w1
   summary: "Update textcharts dependency and verify golden test parity"
-  status: pending
+  status: done
   notes: |
     1. Bump textcharts version in pyproject.toml
     2. Run full test suite: `uv run -- python -m pytest -q`
@@ -46,6 +53,7 @@ work:
   summary: "Migrate factory function calls to new generic names"
   needs: [w1]
   status: pending
+  blocked_by: "textcharts Group 4 not yet implemented — old names are still primary, no generic aliases exist"
   notes: |
     textcharts renamed benchmark-specific factory functions and deprecated the old
     names. BenchBox call sites in `ascii_runtime.py` need updating to silence
@@ -74,6 +82,7 @@ work:
   summary: "Update factory function parameter names (scatter cost→x, performance→y)"
   needs: [w2]
   status: pending
+  blocked_by: "textcharts Group 4 not yet implemented — from_points() does not exist yet"
   notes: |
     The renamed `from_points()` in scatter_plot uses `x_label`/`y_label` instead
     of `cost_label`/`performance_label`. Check `_render_scatter` in ascii_runtime.py
@@ -84,7 +93,7 @@ work:
 - id: w4
   summary: "Verify value_formatter has no impact on existing behavior"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     textcharts added `value_formatter: Callable[[float], str] | None = None` to:
     - ASCIIStackedBar.__init__()
@@ -108,20 +117,19 @@ work:
   summary: "Verify lower_is_better has no impact on existing behavior"
   needs: [w1]
   status: pending
+  blocked_by: "textcharts Group 3 not yet implemented — lower_is_better parameter does not exist yet"
   notes: |
-    textcharts added `lower_is_better: bool = True` to:
-    - ComparisonBar.__init__()
-    - DivergingBar.__init__()
-    - SummaryStats dataclass
-
-    BenchBox uses latency (lower is better), so the default True matches perfectly.
-    No code changes needed — just confirm via golden tests and manual inspection
-    that color coding for regression/improvement annotations is unchanged.
+    textcharts has NOT yet added `lower_is_better`. When it does, verify:
+    - ComparisonBar.__init__() default True matches BenchBox latency semantics
+    - DivergingBar.__init__() default True matches BenchBox latency semantics
+    - SummaryStats dataclass default True matches BenchBox latency semantics
+    - Color coding for regression/improvement annotations is unchanged
 
 - id: w6
   summary: "Update compatibility shim re-exports if textcharts added new public names"
-  needs: [w1]
+  needs: [w1, w2]
   status: pending
+  blocked_by: "textcharts Groups 1 and 4 not yet implemented — no new public names to re-export"
   notes: |
     The BenchBox compatibility shim in `benchbox/core/visualization/ascii/__init__.py`
     re-exports textcharts symbols. If textcharts added new public names (e.g.,
@@ -184,5 +192,7 @@ approach: |
   the primary safety net.
 
 anti_patterns:
-- "DO NOT adopt value_formatter or lower_is_better without a concrete use case -- these are available for future use but BenchBox's latency-focused defaults are correct today -- adopt when Power@Size or throughput metrics are added"
-- "DO NOT remove deprecated factory function aliases from the shim -- external callers may still use old names through the BenchBox compatibility layer -- keep re-exports of both old and new names"
+- "DO NOT adopt value_formatter or lower_is_better without a concrete use case -- these are available for future use but BenchBox's
+  latency-focused defaults are correct today -- adopt when Power@Size or throughput metrics are added"
+- "DO NOT remove deprecated factory function aliases from the shim -- external callers may still use old names through the
+  BenchBox compatibility layer -- keep re-exports of both old and new names"
