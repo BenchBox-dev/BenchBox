@@ -2,7 +2,7 @@ id: align-benchbox-with-textcharts-de-benchboxing
 title: "Align BenchBox call sites with textcharts de-benchboxed API"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 description: |
   textcharts completed its full de-benchboxing initiative (5 change groups).
   All changes are backward-compatible — old APIs still work but emit
@@ -30,7 +30,7 @@ deps:
 work:
 - id: w1
   summary: "Bump textcharts version and verify golden test parity"
-  status: pending
+  status: done
   notes: |
     1. Update textcharts version constraint in pyproject.toml
     2. Run: `uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -v`
@@ -176,6 +176,9 @@ approach: |
   optional subject= adoption evaluation. Golden tests are the safety net.
 
 anti_patterns:
-- "DO NOT adopt value_formatter or lower_is_better without a concrete use case -- defaults are correct for latency metrics -- adopt when BenchBox adds throughput or Power@Size chart rendering"
-- "DO NOT remove deprecated factory names from the compatibility shim -- external callers using old BenchBox import paths need both old and new names available"
-- "DO NOT change any explicit title= or metric_label= values in ascii_runtime.py -- they are already correct and the audit confirmed no reliance on defaults"
+- "DO NOT adopt value_formatter or lower_is_better without a concrete use case -- defaults are correct for latency metrics
+  -- adopt when BenchBox adds throughput or Power@Size chart rendering"
+- "DO NOT remove deprecated factory names from the compatibility shim -- external callers using old BenchBox import paths
+  need both old and new names available"
+- "DO NOT change any explicit title= or metric_label= values in ascii_runtime.py -- they are already correct and the audit
+  confirmed no reliance on defaults"
