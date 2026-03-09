@@ -1,4 +1,4 @@
-generated_at: '2026-03-09T09:39:25.320272'
+generated_at: '2026-03-09T18:28:15.234612'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -417,7 +417,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 187
+    count: 188
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -553,6 +553,11 @@ categories:
       file: DONE/core-functionality/active/preexisting-complexity-review-findings.yaml
       title: Address pre-existing issues surfaced by complexity batch 8-10 review
       priority: Medium
+      status: Completed
+    - id: align-benchbox-with-textcharts-de-benchboxing
+      file: DONE/main/active/align-benchbox-with-textcharts-de-benchboxing.yaml
+      title: Align BenchBox call sites with textcharts de-benchboxed API
+      priority: Medium-High
       status: Completed
     - id: dataframe-read-primitives-architecture
       file: DONE/dataframe-benchmarks/active/dataframe-read-primitives-architecture.yaml

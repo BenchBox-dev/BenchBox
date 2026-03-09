@@ -1,5 +1,5 @@
-generated_at: '2026-03-09T09:39:25.320559'
-total_items: 574
+generated_at: '2026-03-09T18:28:15.234861'
+total_items: 575
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 526
+    count: 527
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -634,6 +634,11 @@ statuses:
       title: Advanced Cost Analysis Framework - Multi-Region & Pricing Models
       priority: High
       category: Cost Intelligence
+    - id: align-benchbox-with-textcharts-de-benchboxing
+      file: DONE/main/active/align-benchbox-with-textcharts-de-benchboxing.yaml
+      title: Align BenchBox call sites with textcharts de-benchboxed API
+      priority: Medium-High
+      category: Core Functionality
     - id: athena-spark-platform
       file: DONE/platform-expansion/planning/athena-spark-platform.yaml
       title: Amazon Athena for Apache Spark Platform

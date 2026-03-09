@@ -1,5 +1,5 @@
-generated_at: '2026-03-09T09:41:55.095647'
-total_items: 25
+generated_at: '2026-03-09T18:28:14.038205'
+total_items: 24
 statuses:
   In Progress:
     count: 2
@@ -16,7 +16,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 23
+    count: 22
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -48,11 +48,6 @@ statuses:
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Low
       category: Platform Expansion
-    - id: align-benchbox-with-textcharts-de-benchboxing
-      file: TODO/main/planning/align-benchbox-with-textcharts-de-benchboxing.yaml
-      title: Align BenchBox call sites with textcharts de-benchboxed API
-      priority: Medium-High
-      category: Core Functionality
     - id: livy-spark-adapters-open-table-format-loading
       file: TODO/main/planning/livy-spark-adapters-open-table-format-loading.yaml
       title: Close open-table-format loading gaps for Livy-based Spark adapters

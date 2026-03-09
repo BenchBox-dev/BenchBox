@@ -2,7 +2,8 @@ id: align-benchbox-with-textcharts-de-benchboxing
 title: "Align BenchBox call sites with textcharts de-benchboxed API"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-03-09"
 description: |
   textcharts completed its full de-benchboxing initiative (5 change groups).
   All changes are backward-compatible — old APIs still work but emit
@@ -51,7 +52,7 @@ work:
 - id: w2
   summary: "Rename 5 deprecated factory function calls in ascii_runtime.py"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     These are the ONLY deprecated factory calls in production code. Each is
     imported from a submodule inside a render function. Update both the import
@@ -74,7 +75,7 @@ work:
 - id: w3
   summary: "Remove 3 unused deprecated imports in test_ascii_charts.py"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Three deprecated factory functions are imported but never called in
     `tests/unit/visualization/ascii/test_ascii_charts.py`:
@@ -88,7 +89,7 @@ work:
 - id: w5
   summary: "Evaluate adopting subject= parameter for cleaner title composition"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     textcharts added `subject: str | None = None` to all chart constructors.
     When set, the title is composed as f"{subject} {default_title}".
@@ -126,7 +127,7 @@ work:
 - id: w6
   summary: "Final lint + deprecation warning gate"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Final gate after w2 (factory renames) and w3 (dead import removal):
     1. `uv run ruff check benchbox/core/visualization/ tests/unit/visualization/` — lint clean

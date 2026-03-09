@@ -1,5 +1,5 @@
-generated_at: '2026-03-09T09:39:25.319997'
-total_items: 574
+generated_at: '2026-03-09T18:28:15.234352'
+total_items: 575
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6543,6 +6543,17 @@ items:
   - joe
   estimated_effort: 3-5 days
   completed_date: '2026-01-28'
+- id: align-benchbox-with-textcharts-de-benchboxing
+  file: DONE/main/active/align-benchbox-with-textcharts-de-benchboxing.yaml
+  title: Align BenchBox call sites with textcharts de-benchboxed API
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  completed_date: '2026-03-09'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
 - id: emr-serverless-platform
   file: DONE/platform-expansion/planning/emr-serverless-platform.yaml
   title: Amazon EMR Serverless Platform

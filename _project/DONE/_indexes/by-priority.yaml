@@ -1,5 +1,5 @@
-generated_at: '2026-03-09T09:39:25.320415'
-total_items: 574
+generated_at: '2026-03-09T18:28:15.234736'
+total_items: 575
 priorities:
   Critical:
     count: 35
@@ -1194,7 +1194,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 63
+    count: 64
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1280,6 +1280,11 @@ priorities:
     - id: mcp-visualization-tools
       file: DONE/mcp-integration/mcp-visualization-tools.yaml
       title: Add visualization tools to MCP server
+      category: Core Functionality
+      status: Completed
+    - id: align-benchbox-with-textcharts-de-benchboxing
+      file: DONE/main/active/align-benchbox-with-textcharts-de-benchboxing.yaml
+      title: Align BenchBox call sites with textcharts de-benchboxed API
       category: Core Functionality
       status: Completed
     - id: emr-serverless-platform
