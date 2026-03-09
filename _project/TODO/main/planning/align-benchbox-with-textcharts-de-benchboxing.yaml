@@ -40,6 +40,13 @@ work:
        fixtures that construct charts without explicit labels/titles.
        Regenerate with `--update-golden` after visual inspection.
     5. Run full test suite: `uv run -- python -m pytest -q`
+    6. Verify new parameter defaults match BenchBox semantics:
+       - `lower_is_better: bool = True` on ASCIIComparisonBar, ASCIIDivergingBar,
+         SummaryStats — default True correct for latency (lower = better).
+       - `outlier_cap: float | None = None` on ASCIIChartOptions — None means
+         auto P95×2 capping, unchanged behavior.
+       - Visual spot-check: comparison_bar and diverging_bar golden output
+         shows correct green (improvement) / red (regression) colors.
 
 - id: w2
   summary: "Rename 5 deprecated factory function calls in ascii_runtime.py"
@@ -78,23 +85,6 @@ work:
 
     Remove these dead imports. Run lint to confirm: `uv run ruff check tests/`
 
-- id: w4
-  summary: "Verify lower_is_better and outlier_cap defaults match BenchBox semantics"
-  needs: [w1]
-  status: pending
-  notes: |
-    textcharts added two new parameters with defaults that should match BenchBox:
-
-    1. `lower_is_better: bool = True` on ASCIIComparisonBar, ASCIIDivergingBar,
-       and SummaryStats. BenchBox measures latency (lower = better), so the
-       default True is correct. No code changes needed.
-
-    2. `outlier_cap: float | None = None` on ASCIIChartOptions. None means
-       auto P95×2 capping — unchanged behavior. No code changes needed.
-
-    Verification: golden tests pass (from w1) + visual spot-check of
-    comparison_bar and diverging_bar output for correct green/red colors.
-
 - id: w5
   summary: "Evaluate adopting subject= parameter for cleaner title composition"
   needs: [w2]
@@ -124,19 +114,24 @@ work:
       (e.g., "Cost vs Performance" doesn't compose with "Scatter Plot")
     - Keep explicit title= for dynamic titles (f-strings with platform names)
 
-    This is an OPTIONAL improvement — skip if the benefit is marginal.
+    Done criteria: Adopt subject= if 5+ of the ~14 call sites compose cleanly.
+    If fewer than 5 compose well, skip — the consistency benefit is too small
+    to justify a mixed approach (some subject=, some title=). Document the
+    evaluation result either way in a commit message or code comment.
+
+    Scope: ascii_runtime.py constructor calls only. Do NOT touch MCP dispatch
+    or exporters.py — those pass title= from external input and must remain
+    explicit.
 
 - id: w6
-  summary: "Run full verification suite"
-  needs: [w2, w3, w4]
+  summary: "Final lint + deprecation warning gate"
+  needs: [w2, w3]
   status: pending
   notes: |
-    Final verification after all changes:
-    1. `uv run -- python -m pytest -q` — full suite
-    2. `uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -v` — golden parity
-    3. `uv run -- python -W error::DeprecationWarning -m pytest tests/unit/visualization/ -q` — zero deprecation warnings
-    4. `uv run ruff check benchbox/core/visualization/` — lint clean
-    5. `uv run ruff check tests/unit/visualization/` — test lint clean
+    Final gate after w2 (factory renames) and w3 (dead import removal):
+    1. `uv run ruff check benchbox/core/visualization/ tests/unit/visualization/` — lint clean
+    2. `uv run -- python -W error::DeprecationWarning -m pytest tests/unit/visualization/ -q` — zero deprecation warnings
+    Note: full suite and golden parity already verified in w1 and w2.
 
 verification:
 - description: "Golden snapshot parity maintained"
@@ -158,6 +153,7 @@ scope_limit:
   - "benchbox/core/visualization/ascii_api.py"
   - "benchbox/core/visualization/ascii/__init__.py"
   - "benchbox/core/visualization/exporters.py"
+  - "benchbox/mcp/tools/visualization.py"
   - "tests/unit/visualization/"
   - "tests/contracts/visualization/"
   - "tests/fixtures/golden/ascii/"

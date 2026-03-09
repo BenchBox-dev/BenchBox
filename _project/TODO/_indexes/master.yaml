@@ -1,4 +1,4 @@
-generated_at: '2026-03-09T09:39:24.077496'
+generated_at: '2026-03-09T09:41:55.095610'
 total_items: 25
 items:
 - id: extract-ascii-charting-into-standalone-library
@@ -361,7 +361,7 @@ items:
   category: Core Functionality
   priority: Medium-High
   status: Not Started
-  work_total: 6
+  work_total: 5
   work_done: 0
   work_ready: 1
 - id: nyc-taxi-benchmark-expansion
