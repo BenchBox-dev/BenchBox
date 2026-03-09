@@ -1,4 +1,4 @@
-generated_at: '2026-03-07T12:05:21.417298'
+generated_at: '2026-03-08T21:23:23.138577'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -51,8 +51,13 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 2
+    count: 3
     items:
+    - id: adapt-benchbox-to-textcharts-neutral-defaults
+      file: TODO/main/planning/adapt-benchbox-to-textcharts-neutral-defaults.yaml
+      title: Adapt BenchBox to textcharts neutralized defaults and new APIs
+      priority: Medium-High
+      status: Not Started
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout

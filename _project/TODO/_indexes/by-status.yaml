@@ -1,5 +1,5 @@
-generated_at: '2026-03-07T12:05:21.417316'
-total_items: 24
+generated_at: '2026-03-08T21:23:23.138595'
+total_items: 25
 statuses:
   In Progress:
     count: 2
@@ -16,8 +16,13 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 22
+    count: 23
     items:
+    - id: adapt-benchbox-to-textcharts-neutral-defaults
+      file: TODO/main/planning/adapt-benchbox-to-textcharts-neutral-defaults.yaml
+      title: Adapt BenchBox to textcharts neutralized defaults and new APIs
+      priority: Medium-High
+      category: Core Functionality
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
       title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
