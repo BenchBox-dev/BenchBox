@@ -1,4 +1,4 @@
-generated_at: '2026-03-10T08:30:24.410056'
+generated_at: '2026-03-10T08:36:18.794786'
 total_items: 25
 items:
 - id: extract-ascii-charting-into-standalone-library
@@ -32,9 +32,9 @@ items:
   - breaking-change
   - visualization
   estimated_effort: 2-3 hours
-  work_total: 3
+  work_total: 2
   work_done: 0
-  work_ready: 1
+  work_ready: 2
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes

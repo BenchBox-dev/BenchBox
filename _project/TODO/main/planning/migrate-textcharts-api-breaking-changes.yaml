@@ -10,15 +10,15 @@ description: |
   - 2 deprecated re-export aliases removed from __init__.py
 
   BenchBox imports textcharts via wildcard shims in
-  benchbox/core/visualization/ascii/*.py, which auto-adapt. But 9 files
+  benchbox/core/visualization/ascii/*.py, which auto-adapt. But 10 files
   reference the old ASCII*-prefixed names directly in imports, type
   annotations, instantiations, isinstance checks, and string literals.
-  These will raise ImportError when textcharts is upgraded.
+  These will raise ImportError or test failures when textcharts is upgraded.
 
   This is a mechanical find-and-replace — no behavioral changes, no
   constructor signature changes, byte-identical rendering output.
 
-  Scope: 6 source files (~66 references) + 3 test files (~130 references).
+  Scope: 6 source files (~66 references) + 4 test files (~133 references).
   No factory function changes needed (BenchBox doesn't use any deprecated
   factory functions).
 
@@ -38,6 +38,7 @@ files_affected:
   - "tests/contracts/visualization/test_ascii_golden_output.py"
   - "tests/unit/visualization/test_nocolor_rendering.py"
   - "tests/unit/visualization/ascii/test_ascii_charts.py"
+  - "tests/unit/core/visualization/test_post_run_summary.py"
 
 work:
 - id: w1
@@ -68,36 +69,24 @@ work:
     rename class name references.
 
 - id: w2
-  summary: "Rename ASCII*-prefixed classes in 3 test files — test_ascii_golden_output.py, test_nocolor_rendering.py, test_ascii_charts.py"
-  needs: [w1]
+  summary: "Rename ASCII*-prefixed classes in 4 test files and run full verification — test_ascii_golden_output.py, test_nocolor_rendering.py, test_ascii_charts.py, test_post_run_summary.py"
   status: pending
   notes: |
     Same rename map as w1. These test files import from
-    benchbox.core.visualization.ascii.* submodules. After w1 lands, the
-    shim modules only export the new names, so test imports must match.
+    benchbox.core.visualization.ascii.* submodules. Independent of w1 —
+    the shim modules export whatever textcharts exports (wildcard imports),
+    so both work units fix consumer-side references and can run in parallel.
 
     test_ascii_charts.py has monkey-patching of runtime.ASCIIBarChart —
     update to runtime.BarChart.
 
-    test_post_run_summary.py has string references in mock paths like
+    test_post_run_summary.py:266 has a mock path string
     "benchbox.core.visualization.post_run_summary.ASCIISummaryBox.render"
-    — update to use new class name.
+    — update to SummaryBox. Lines 659/677 have docstring references.
 
-- id: w3
-  summary: "Run full test suite, verify no ImportError or broken references, confirm byte-identical golden snapshots"
-  needs: [w1, w2]
-  status: pending
-  notes: |
-    Verification commands:
-      python -c "from textcharts import BarChart, ChartOptions, histogram_from_data; print('OK')"
-      uv run -- python -m pytest tests/unit/visualization/ -v
-      uv run -- python -m pytest tests/contracts/visualization/ -v
-      uv run -- python -m pytest -m fast -q
-
-    Search for any remaining ASCII*-prefixed class references:
-      grep -rn "ASCII[A-Z]" benchbox/ tests/ --include="*.py"
-
-    Golden snapshots should be byte-identical (rendering unchanged).
+    After all renames, run the verification commands from the verification
+    section to confirm no remaining old references and golden snapshots
+    are byte-identical.
 
 must_preserve:
 - "All 16 chart types render identically before and after migration"
@@ -145,6 +134,7 @@ scope_limit:
   - "tests/contracts/visualization/test_ascii_golden_output.py"
   - "tests/unit/visualization/test_nocolor_rendering.py"
   - "tests/unit/visualization/ascii/test_ascii_charts.py"
+  - "tests/unit/core/visualization/test_post_run_summary.py"
   exclude:
   - "benchbox/core/visualization/ascii/*.py (shim modules — wildcard imports auto-adapt)"
   - "textcharts library itself (upstream, not our code)"
