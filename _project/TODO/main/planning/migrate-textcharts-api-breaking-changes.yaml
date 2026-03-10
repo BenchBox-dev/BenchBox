@@ -1,0 +1,161 @@
+id: migrate-textcharts-api-breaking-changes
+title: "Migrate BenchBox imports to textcharts new API — rename ASCII*-prefixed classes to unprefixed names"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  The textcharts library has removed all backward-compatibility stubs:
+  - 17 ASCII*-prefixed class names removed (e.g. ASCIIBarChart -> BarChart)
+  - 13 deprecated factory functions removed (not used in BenchBox — no action)
+  - 2 deprecated re-export aliases removed from __init__.py
+
+  BenchBox imports textcharts via wildcard shims in
+  benchbox/core/visualization/ascii/*.py, which auto-adapt. But 9 files
+  reference the old ASCII*-prefixed names directly in imports, type
+  annotations, instantiations, isinstance checks, and string literals.
+  These will raise ImportError when textcharts is upgraded.
+
+  This is a mechanical find-and-replace — no behavioral changes, no
+  constructor signature changes, byte-identical rendering output.
+
+  Scope: 6 source files (~66 references) + 3 test files (~130 references).
+  No factory function changes needed (BenchBox doesn't use any deprecated
+  factory functions).
+
+category: Core Functionality
+
+deps:
+  needs: []
+
+files_affected:
+  modified:
+  - "benchbox/core/visualization/ascii_runtime.py"
+  - "benchbox/core/visualization/exporters.py"
+  - "benchbox/core/visualization/post_run_summary.py"
+  - "benchbox/core/visualization/chart_generator.py"
+  - "benchbox/cli/commands/visualize.py"
+  - "benchbox/mcp/tools/visualization.py"
+  - "tests/contracts/visualization/test_ascii_golden_output.py"
+  - "tests/unit/visualization/test_nocolor_rendering.py"
+  - "tests/unit/visualization/ascii/test_ascii_charts.py"
+
+work:
+- id: w1
+  summary: "Rename ASCII*-prefixed classes in 6 source files — ascii_runtime.py, exporters.py, post_run_summary.py, chart_generator.py, visualize.py, mcp/visualization.py"
+  status: pending
+  notes: |
+    Class rename map (only the names actually used in BenchBox source):
+      ASCIIChartOptions -> ChartOptions
+      ASCIIBarChart -> BarChart
+      ASCIIBoxPlot -> BoxPlot
+      ASCIIComparisonBar -> ComparisonBar
+      ASCIIDivergingBar -> DivergingBar
+      ASCIIHeatmap -> Heatmap
+      ASCIIQueryHistogram -> Histogram
+      ASCIILineChart -> LineChart
+      ASCIINormalizedSpeedup -> NormalizedSpeedup
+      ASCIIPercentileLadder -> PercentileLadder
+      ASCIIRankTable -> RankTable
+      ASCIIScatterPlot -> ScatterPlot
+      ASCIISparklineTable -> SparklineTable
+      ASCIIStackedBar -> StackedBar
+      ASCIISummaryBox -> SummaryBox
+      ASCIICDFChart -> CDFChart
+
+    Update imports, instantiations, type annotations, and docstring
+    references. Preserve all string literals that refer to "ASCII" as a
+    rendering mode concept (e.g. "ASCII charts", "ascii_api") — only
+    rename class name references.
+
+- id: w2
+  summary: "Rename ASCII*-prefixed classes in 3 test files — test_ascii_golden_output.py, test_nocolor_rendering.py, test_ascii_charts.py"
+  needs: [w1]
+  status: pending
+  notes: |
+    Same rename map as w1. These test files import from
+    benchbox.core.visualization.ascii.* submodules. After w1 lands, the
+    shim modules only export the new names, so test imports must match.
+
+    test_ascii_charts.py has monkey-patching of runtime.ASCIIBarChart —
+    update to runtime.BarChart.
+
+    test_post_run_summary.py has string references in mock paths like
+    "benchbox.core.visualization.post_run_summary.ASCIISummaryBox.render"
+    — update to use new class name.
+
+- id: w3
+  summary: "Run full test suite, verify no ImportError or broken references, confirm byte-identical golden snapshots"
+  needs: [w1, w2]
+  status: pending
+  notes: |
+    Verification commands:
+      python -c "from textcharts import BarChart, ChartOptions, histogram_from_data; print('OK')"
+      uv run -- python -m pytest tests/unit/visualization/ -v
+      uv run -- python -m pytest tests/contracts/visualization/ -v
+      uv run -- python -m pytest -m fast -q
+
+    Search for any remaining ASCII*-prefixed class references:
+      grep -rn "ASCII[A-Z]" benchbox/ tests/ --include="*.py"
+
+    Golden snapshots should be byte-identical (rendering unchanged).
+
+must_preserve:
+- "All 16 chart types render identically before and after migration"
+- "benchbox.core.visualization.ascii.* import paths continue to work (wildcard shim)"
+- "ascii_api.py facade continues to re-export all chart classes"
+- "render_ascii_chart_from_results() function signature unchanged"
+- "MCP visualization tool produces identical output"
+
+approach: |
+  Mechanical find-and-replace per the rename map. Each file: update import
+  lines first, then update all usages in function bodies. The
+  benchbox/core/visualization/ascii/*.py shim modules use wildcard imports
+  from textcharts and need no changes — they auto-adapt.
+
+  Process each source file independently. Run lint after each file to catch
+  import errors immediately. Commit per work unit.
+
+anti_patterns:
+- "DO NOT rename string literals like 'ASCII charts' or 'ascii_api' — only rename class name references like ASCIIBarChart — because these are descriptive terms, not code symbols"
+- "DO NOT change constructor signatures or add/remove parameters — because the API is identical, only names changed"
+- "DO NOT modify the ascii/*.py shim modules — because wildcard imports auto-adapt to the new names"
+
+verification:
+- description: "All visualization tests pass"
+  command: "uv run -- python -m pytest tests/unit/visualization/ tests/contracts/visualization/ -v"
+  expected_output: "all tests pass, 0 failures"
+- description: "Golden snapshot tests produce identical output"
+  command: "uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -v"
+  expected_output: "all tests pass, snapshots match"
+- description: "No remaining ASCII*-prefixed class references"
+  command: "grep -rn 'ASCII[A-Z]' benchbox/ tests/ --include='*.py' | grep -v 'ascii_api\\|ASCII chart\\|ASCII-only\\|ASCII tree\\|ASCII art\\|# ASCII'"
+  expected_output: "no output (all references migrated)"
+- description: "Smoke tests pass"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all tests pass"
+
+scope_limit:
+  include:
+  - "benchbox/core/visualization/ascii_runtime.py"
+  - "benchbox/core/visualization/exporters.py"
+  - "benchbox/core/visualization/post_run_summary.py"
+  - "benchbox/core/visualization/chart_generator.py"
+  - "benchbox/cli/commands/visualize.py"
+  - "benchbox/mcp/tools/visualization.py"
+  - "tests/contracts/visualization/test_ascii_golden_output.py"
+  - "tests/unit/visualization/test_nocolor_rendering.py"
+  - "tests/unit/visualization/ascii/test_ascii_charts.py"
+  exclude:
+  - "benchbox/core/visualization/ascii/*.py (shim modules — wildcard imports auto-adapt)"
+  - "textcharts library itself (upstream, not our code)"
+  - "Any behavioral changes, constructor signatures, or rendering logic"
+
+metadata:
+  tags:
+  - textcharts
+  - migration
+  - breaking-change
+  - visualization
+  estimated_effort: "2-3 hours"
+  created_date: "2026-03-10"
+  related_to: extract-ascii-charting-into-standalone-library
