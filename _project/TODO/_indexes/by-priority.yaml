@@ -1,19 +1,14 @@
-generated_at: '2026-03-10T08:36:18.794833'
-total_items: 25
+generated_at: '2026-03-10T08:48:03.808221'
+total_items: 24
 priorities:
   High:
-    count: 3
+    count: 2
     items:
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
       category: Core Functionality
       status: In Progress
-    - id: migrate-textcharts-api-breaking-changes
-      file: TODO/main/planning/migrate-textcharts-api-breaking-changes.yaml
-      title: Migrate BenchBox imports to textcharts new API — rename ASCII*-prefixed classes to unprefixed names
-      category: Core Functionality
-      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

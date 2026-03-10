@@ -1,5 +1,5 @@
-generated_at: '2026-03-10T08:30:25.566372'
-total_items: 575
+generated_at: '2026-03-10T08:48:11.102251'
+total_items: 576
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 202
+    count: 203
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -712,6 +712,11 @@ priorities:
       file: DONE/fabric-platform/planning/fabric-adapter-architecture.yaml
       title: Microsoft Fabric Data Warehouse Adapter Architecture
       category: platform-adapter
+      status: Completed
+    - id: migrate-textcharts-api-breaking-changes
+      file: DONE/main/active/migrate-textcharts-api-breaking-changes.yaml
+      title: Migrate BenchBox imports to textcharts new API — rename ASCII*-prefixed classes to unprefixed names
+      category: Core Functionality
       status: Completed
     - id: migrate-ascii-chart-tests-to-textcharts
       file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml

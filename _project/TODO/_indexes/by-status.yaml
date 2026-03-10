@@ -1,5 +1,5 @@
-generated_at: '2026-03-10T08:36:18.794841'
-total_items: 25
+generated_at: '2026-03-10T08:48:03.808242'
+total_items: 24
 statuses:
   In Progress:
     count: 2
@@ -16,7 +16,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 23
+    count: 22
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -92,11 +92,6 @@ statuses:
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
-      category: Core Functionality
-    - id: migrate-textcharts-api-breaking-changes
-      file: TODO/main/planning/migrate-textcharts-api-breaking-changes.yaml
-      title: Migrate BenchBox imports to textcharts new API — rename ASCII*-prefixed classes to unprefixed names
-      priority: High
       category: Core Functionality
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml

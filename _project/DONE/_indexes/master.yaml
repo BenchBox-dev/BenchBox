@@ -1,5 +1,5 @@
-generated_at: '2026-03-10T08:30:25.566004'
-total_items: 575
+generated_at: '2026-03-10T08:48:11.101292'
+total_items: 576
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2114,6 +2114,23 @@ items:
   category: platform-adapter
   priority: High
   status: Completed
+- id: migrate-textcharts-api-breaking-changes
+  file: DONE/main/active/migrate-textcharts-api-breaking-changes.yaml
+  title: Migrate BenchBox imports to textcharts new API — rename ASCII*-prefixed classes to unprefixed names
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - textcharts
+  - migration
+  - breaking-change
+  - visualization
+  estimated_effort: 2-3 hours
+  completed_date: '2026-03-10'
+  work_total: 2
+  work_done: 2
+  work_ready: 0
 - id: migrate-ascii-chart-tests-to-textcharts
   file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml
   title: Migrate ~290 pure-rendering tests from BenchBox to textcharts library; retain ~65 integration tests

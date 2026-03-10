@@ -2,7 +2,8 @@ id: migrate-textcharts-api-breaking-changes
 title: "Migrate BenchBox imports to textcharts new API — rename ASCII*-prefixed classes to unprefixed names"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-03-10"
 description: |
   The textcharts library has removed all backward-compatibility stubs:
   - 17 ASCII*-prefixed class names removed (e.g. ASCIIBarChart -> BarChart)
@@ -43,7 +44,7 @@ files_affected:
 work:
 - id: w1
   summary: "Rename ASCII*-prefixed classes in 6 source files — ascii_runtime.py, exporters.py, post_run_summary.py, chart_generator.py, visualize.py, mcp/visualization.py"
-  status: pending
+  status: done
   notes: |
     Class rename map (only the names actually used in BenchBox source):
       ASCIIChartOptions -> ChartOptions
@@ -70,7 +71,7 @@ work:
 
 - id: w2
   summary: "Rename ASCII*-prefixed classes in 4 test files and run full verification — test_ascii_golden_output.py, test_nocolor_rendering.py, test_ascii_charts.py, test_post_run_summary.py"
-  status: pending
+  status: done
   notes: |
     Same rename map as w1. These test files import from
     benchbox.core.visualization.ascii.* submodules. Independent of w1 —

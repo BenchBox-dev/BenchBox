@@ -1,4 +1,4 @@
-generated_at: '2026-03-10T08:30:25.566245'
+generated_at: '2026-03-10T08:48:11.102066'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -417,7 +417,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 188
+    count: 189
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1070,6 +1070,11 @@ categories:
       file: DONE/core-functionality/active/complexity-ignores-w14.yaml
       title: Mark required-complexity functions as approved ignores in pyproject.toml
       priority: Medium-High
+      status: Completed
+    - id: migrate-textcharts-api-breaking-changes
+      file: DONE/main/active/migrate-textcharts-api-breaking-changes.yaml
+      title: Migrate BenchBox imports to textcharts new API — rename ASCII*-prefixed classes to unprefixed names
+      priority: High
       status: Completed
     - id: migrate-clickhouse-firebolt-deployment
       file: DONE/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
