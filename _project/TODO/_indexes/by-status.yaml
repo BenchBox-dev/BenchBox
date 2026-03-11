@@ -1,12 +1,22 @@
-generated_at: '2026-03-10T08:48:03.808242'
-total_items: 24
+generated_at: '2026-03-11T10:43:35.108172'
+total_items: 26
 statuses:
   In Progress:
-    count: 2
+    count: 4
     items:
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
+      priority: High
+      category: Core Functionality
+    - id: manifest-table-name-collision-detection
+      file: TODO/main/active/manifest-table-name-collision-detection.yaml
+      title: Invalidate manifest reuse when untracked directories collide with table names
+      priority: High
+      category: Core Functionality
+    - id: loud-loader-failures-for-contaminated-data
+      file: TODO/main/active/loud-loader-failures-for-contaminated-data.yaml
+      title: Raise DataLoadingError instead of silent zero-row loads in SQL/file loader
       priority: High
       category: Core Functionality
     - id: test-suite-quality-wave-2

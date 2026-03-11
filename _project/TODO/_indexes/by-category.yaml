@@ -1,4 +1,4 @@
-generated_at: '2026-03-10T08:48:03.808190'
+generated_at: '2026-03-11T10:43:35.108148'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -51,7 +51,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 2
+    count: 4
     items:
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
@@ -63,6 +63,16 @@ categories:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
+    - id: manifest-table-name-collision-detection
+      file: TODO/main/active/manifest-table-name-collision-detection.yaml
+      title: Invalidate manifest reuse when untracked directories collide with table names
+      priority: High
+      status: In Progress
+    - id: loud-loader-failures-for-contaminated-data
+      file: TODO/main/active/loud-loader-failures-for-contaminated-data.yaml
+      title: Raise DataLoadingError instead of silent zero-row loads in SQL/file loader
+      priority: High
+      status: In Progress
   Platform Expansion:
     count: 11
     items:
