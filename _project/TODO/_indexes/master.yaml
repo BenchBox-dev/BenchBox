@@ -1,5 +1,5 @@
-generated_at: '2026-03-11T10:43:35.108120'
-total_items: 26
+generated_at: '2026-03-11T18:16:12.430042'
+total_items: 24
 items:
 - id: extract-ascii-charting-into-standalone-library
   file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
@@ -19,29 +19,6 @@ items:
   work_done: 20
   work_ready: 1
   deferred_count: 2
-- id: manifest-table-name-collision-detection
-  file: TODO/main/active/manifest-table-name-collision-detection.yaml
-  title: Invalidate manifest reuse when untracked directories collide with table names
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  work_total: 7
-  work_done: 5
-  work_ready: 1
-  deferred_count: 1
-  needs:
-  - loud-loader-failures-for-contaminated-data
-- id: loud-loader-failures-for-contaminated-data
-  file: TODO/main/active/loud-loader-failures-for-contaminated-data.yaml
-  title: Raise DataLoadingError instead of silent zero-row loads in SQL/file loader
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  work_total: 6
-  work_done: 4
-  work_ready: 1
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes

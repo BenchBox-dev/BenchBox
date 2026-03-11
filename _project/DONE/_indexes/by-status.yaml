@@ -1,5 +1,5 @@
-generated_at: '2026-03-11T10:43:36.498583'
-total_items: 576
+generated_at: '2026-03-11T18:16:13.687505'
+total_items: 578
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 528
+    count: 530
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1681,6 +1681,11 @@ statuses:
       title: Integration Test Suite Cleanup - Remove Placeholder and Failing Tests
       priority: High
       category: Testing and Quality Assurance
+    - id: manifest-table-name-collision-detection
+      file: DONE/main/active/manifest-table-name-collision-detection.yaml
+      title: Invalidate manifest reuse when untracked directories collide with table names
+      priority: High
+      category: Core Functionality
     - id: logging-standardization
       file: DONE/observability-quality/active/logging-standardization.yaml
       title: Logging Standardization
@@ -2076,6 +2081,11 @@ statuses:
       title: Quick-Start Tutorials
       priority: High
       category: Documentation and User Experience
+    - id: loud-loader-failures-for-contaminated-data
+      file: DONE/main/active/loud-loader-failures-for-contaminated-data.yaml
+      title: Raise DataLoadingError instead of silent zero-row loads in SQL/file loader
+      priority: High
+      category: Core Functionality
     - id: coverage-per-module-50-temporary-split
       file: DONE/main/active/coverage-per-module-50-temporary-split.yaml
       title: Raise benchbox/ per-module coverage to >=50% with temporary split

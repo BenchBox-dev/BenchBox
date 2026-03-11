@@ -1,5 +1,5 @@
-generated_at: '2026-03-11T10:43:36.498021'
-total_items: 576
+generated_at: '2026-03-11T18:16:13.687009'
+total_items: 578
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2055,6 +2055,20 @@ items:
   category: Testing and Quality Assurance
   priority: High
   status: Completed
+- id: manifest-table-name-collision-detection
+  file: DONE/main/active/manifest-table-name-collision-detection.yaml
+  title: Invalidate manifest reuse when untracked directories collide with table names
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  completed_date: '2026-03-11'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  deferred_count: 1
+  needs:
+  - loud-loader-failures-for-contaminated-data
 - id: mcp-server-comprehensive-improvements
   file: DONE/mcp-integration/active/mcp-server-comprehensive-improvements.yaml
   title: MCP Server Comprehensive Improvements
@@ -2527,6 +2541,17 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 3-5 days
   completed_date: '2025-12-12'
+- id: loud-loader-failures-for-contaminated-data
+  file: DONE/main/active/loud-loader-failures-for-contaminated-data.yaml
+  title: Raise DataLoadingError instead of silent zero-row loads in SQL/file loader
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  completed_date: '2026-03-11'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: coverage-per-module-50-temporary-split
   file: DONE/main/active/coverage-per-module-50-temporary-split.yaml
   title: Raise benchbox/ per-module coverage to >=50% with temporary split

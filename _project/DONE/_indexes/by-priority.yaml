@@ -1,5 +1,5 @@
-generated_at: '2026-03-11T10:43:36.498432'
-total_items: 576
+generated_at: '2026-03-11T18:16:13.687379'
+total_items: 578
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 203
+    count: 205
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -693,6 +693,11 @@ priorities:
       title: Integration Test Suite Cleanup - Remove Placeholder and Failing Tests
       category: Testing and Quality Assurance
       status: Completed
+    - id: manifest-table-name-collision-detection
+      file: DONE/main/active/manifest-table-name-collision-detection.yaml
+      title: Invalidate manifest reuse when untracked directories collide with table names
+      category: Core Functionality
+      status: Completed
     - id: mcp-server-comprehensive-improvements
       file: DONE/mcp-integration/active/mcp-server-comprehensive-improvements.yaml
       title: MCP Server Comprehensive Improvements
@@ -862,6 +867,11 @@ priorities:
       file: DONE/docs-experience/completed/quick-start-tutorials.yaml
       title: Quick-Start Tutorials
       category: Documentation and User Experience
+      status: Completed
+    - id: loud-loader-failures-for-contaminated-data
+      file: DONE/main/active/loud-loader-failures-for-contaminated-data.yaml
+      title: Raise DataLoadingError instead of silent zero-row loads in SQL/file loader
+      category: Core Functionality
       status: Completed
     - id: coverage-per-module-50-temporary-split
       file: DONE/main/active/coverage-per-module-50-temporary-split.yaml

@@ -2,7 +2,8 @@ id: manifest-table-name-collision-detection
 title: "Invalidate manifest reuse when untracked directories collide with table names"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-11"
 description: |
   The datagen manifest validation (_validate_manifest_if_present in runner.py)
   only checks that its own recorded files exist with correct sizes. It has no
@@ -48,11 +49,13 @@ work:
   - id: w6
     summary: "Add narrow DataFrame recovery/guard in _get_source_files(): if a directory path is encountered, prefer colocated manifest file entries; otherwise raise clear ValueError"
     needs: [w5]
-    status: pending
+    status: done
+    note: "w5 verification confirmed manifest validation catches contamination before DataFrame code runs. Guard not needed."
   - id: w7
     summary: "Add DataFrame regression tests: directory path falls back to manifest file entries when available, otherwise raises clearly"
     needs: [w6]
-    status: pending
+    status: done
+    note: "Skipped because w6 was not needed."
 
 deferred:
   - summary: "Self-healing cleanup in file-based generators if regeneration still leaves stale directories"

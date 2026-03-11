@@ -2,7 +2,8 @@ id: loud-loader-failures-for-contaminated-data
 title: "Raise DataLoadingError instead of silent zero-row loads in SQL/file loader"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-11"
 description: |
   The shared SQL/file loader at data_loading.py silently records 0 rows when
   manifest-listed shard paths don't exist as files on disk (line 1972-1976).
@@ -42,11 +43,11 @@ work:
   - id: w5
     summary: "Fail fast for missing single-file inputs when the path came from explicit manifest or benchmark table mappings instead of warn+return-0"
     needs: [w3]
-    status: pending
+    status: done
   - id: w6
     summary: "Add regression coverage for missing explicit single-file inputs while preserving legitimate loading behavior"
     needs: [w5]
-    status: pending
+    status: done
 
 verification:
   - description: "Loader regression tests pass"

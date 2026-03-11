@@ -1,4 +1,4 @@
-generated_at: '2026-03-11T10:43:36.498299'
+generated_at: '2026-03-11T18:16:13.687252'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -417,7 +417,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 189
+    count: 191
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1051,6 +1051,11 @@ categories:
       title: Integrate stdout datagen with compression and format pipelines
       priority: High
       status: Completed
+    - id: manifest-table-name-collision-detection
+      file: DONE/main/active/manifest-table-name-collision-detection.yaml
+      title: Invalidate manifest reuse when untracked directories collide with table names
+      priority: High
+      status: Completed
     - id: duckdb-text-plan-reliability
       file: DONE/query-plan-remediation/planning/duckdb-text-plan-reliability.yaml
       title: Make DuckDB text plan parsing reliable or fail fast
@@ -1204,6 +1209,11 @@ categories:
     - id: query-plan-platform-adapter-integration
       file: DONE/query-plan-adapters/planning/query-plan-platform-adapter-integration.yaml
       title: Query Plan Platform Adapter Integration
+      priority: High
+      status: Completed
+    - id: loud-loader-failures-for-contaminated-data
+      file: DONE/main/active/loud-loader-failures-for-contaminated-data.yaml
+      title: Raise DataLoadingError instead of silent zero-row loads in SQL/file loader
       priority: High
       status: Completed
     - id: rebuild-tpcds-binaries
