@@ -61,15 +61,20 @@ cost_benefit_analysis:
 files_affected:
   modified:
   - "benchbox/core/publishing/"
-  - "benchbox/core/results/"
-  - "benchbox/cli/commands/"
+  - "benchbox/core/results/exporter.py"
+  - "benchbox/core/results/models.py"
+  - "benchbox/core/results/filenames.py"
+  - "benchbox/cli/commands/results.py"
   - "tests/unit/core/publishing/"
-  - "tests/unit/cli/commands/"
-  - "tests/unit/"
-  - "docs/"
+  - "tests/unit/cli/commands/test_results.py"
+  - "tests/unit/test_results_exporter.py"
+  - "tests/unit/core/results/test_exporter_timing_contract.py"
+  - "tests/unit/core/results/test_serialization_limits.py"
+  - "tests/unit/cli/test_run_export_consistency.py"
+  - "docs/architecture/"
   - "pyproject.toml"
   added:
-  - "docs/architecture/"
+  - "_project/TODO/main/planning/"
 
 work:
 - id: w1
@@ -85,30 +90,33 @@ work:
   status: pending
 
 - id: w3
-  summary: "Prepare a decision memo choosing retain-internal, extract, or prune"
+  summary: "Map current usage into supported-user, internal-only, or unused cases and capture the evidence"
   needs: [w2]
+  status: pending
+  notes: |
+    Make the eventual disposition evidence-based by separating documented user
+    workflows from repo-internal helpers and unused code paths.
+
+- id: w4
+  summary: "Prepare a decision memo choosing retain-internal, extract, or prune"
+  needs: [w3]
   status: pending
   notes: |
     The memo should include evidence of use, affected commands, migration risk,
     and the expected maintenance burden for each path.
 
-- id: w4
-  summary: "If pruning is selected, remove dead paths and any stale docs or tests with a narrow compatibility note"
-  needs: [w3]
-  status: pending
-  notes: |
-    Execute this step only if the audit proves there are no supported users.
-
 - id: w5
-  summary: "If extraction is selected, define the package boundary and keep BenchBox-facing adapters local"
-  needs: [w3]
+  summary: "Create the selected follow-up implementation artifact and record the rejected alternatives explicitly"
+  needs: [w4]
   status: pending
   notes: |
-    Execute this step only if there is a demonstrated reuse case or active owner.
+    If the decision is prune or extract, create a dedicated implementation TODO
+    with file scope and verification. If the decision is retain-internal,
+    publish an ownership note and review trigger instead of starting extraction.
 
 - id: w6
   summary: "Validate that results export, artifact handling, and related documentation still match the chosen path"
-  needs: [w4, w5]
+  needs: [w5]
   status: pending
 
 must_preserve:
@@ -138,13 +146,18 @@ verification:
 scope_limit:
   only_modify:
   - "benchbox/core/publishing/"
-  - "benchbox/core/results/"
-  - "benchbox/cli/commands/"
+  - "benchbox/core/results/exporter.py"
+  - "benchbox/core/results/models.py"
+  - "benchbox/core/results/filenames.py"
+  - "benchbox/cli/commands/results.py"
   - "tests/unit/core/publishing/"
-  - "tests/unit/core/results/"
-  - "tests/unit/cli/commands/"
-  - "tests/unit/"
-  - "docs/"
+  - "tests/unit/core/results/test_exporter_timing_contract.py"
+  - "tests/unit/core/results/test_serialization_limits.py"
+  - "tests/unit/cli/commands/test_results.py"
+  - "tests/unit/cli/test_run_export_consistency.py"
+  - "tests/unit/test_results_exporter.py"
+  - "docs/architecture/"
+  - "_project/TODO/main/planning/"
   - "pyproject.toml"
   do_not_touch:
   - "Benchmark execution logic"

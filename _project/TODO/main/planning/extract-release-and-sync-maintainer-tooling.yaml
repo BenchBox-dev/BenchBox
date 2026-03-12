@@ -67,16 +67,17 @@ cost_benefit_analysis:
 files_affected:
   modified:
   - "benchbox/release/"
-  - "benchbox/cli/"
   - "benchbox/__init__.py"
   - "pyproject.toml"
   - "tests/unit/release/"
-  - "tests/unit/cli/"
-  - "docs/"
-  - ".github/"
+  - "tests/unit/cli/test_cli_package_exports.py"
+  - "tests/unit/test_cli_documentation.py"
+  - "docs/development/development.md"
+  - ".github/workflows/"
   added:
   - "benchbox_maintainer/"
   - "docs/contributor/"
+  - "tests/contracts/packaging/"
 
 work:
 - id: w1
@@ -120,6 +121,10 @@ work:
   summary: "Add regression tests proving default installs no longer depend on maintainer tooling"
   needs: [w4]
   status: pending
+  notes: |
+    Add contract tests for both installation profiles: default BenchBox install
+    must not expose maintainer-only entry points, and the chosen maintainer
+    installation path must restore them explicitly.
 
 - id: w7
   summary: "Remove stale public references and close the migration with release notes"
@@ -149,18 +154,25 @@ verification:
 - description: "Release and sync behavior remains valid through the explicit maintainer tooling path"
   command: "uv run -- python -m pytest tests/unit/release/test_workflow.py tests/unit/release/test_release_sync_unit.py tests/unit/test_release_sync.py -q"
   expected_output: "All tests pass"
+- description: "Packaging contract tests prove the default install omits maintainer-only scripts while the maintainer profile restores them"
+  command: "uv run -- python -m pytest tests/contracts/packaging/test_default_install_profile.py tests/contracts/packaging/test_maintainer_install_profile.py -q"
+  expected_output: "All tests pass"
 
 scope_limit:
   only_modify:
   - "benchbox/release/"
-  - "benchbox/cli/"
   - "benchbox/__init__.py"
   - "pyproject.toml"
   - "tests/unit/release/"
-  - "tests/unit/cli/"
-  - "docs/"
-  - ".github/"
+  - "tests/unit/cli/test_cli_package_exports.py"
+  - "tests/unit/test_cli_documentation.py"
+  - "tests/contracts/packaging/"
+  - "docs/contributor/"
+  - "docs/development/development.md"
+  - ".github/workflows/"
+  - "benchbox_maintainer/"
   do_not_touch:
   - "Benchmark query implementations"
+  - "Non-maintainer benchbox CLI commands"
   - "Platform adapters unrelated to import-boundary cleanup"
   - "Result schemas or benchmark execution semantics"

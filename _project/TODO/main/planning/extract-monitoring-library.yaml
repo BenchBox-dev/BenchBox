@@ -63,16 +63,21 @@ cost_benefit_analysis:
 files_affected:
   modified:
   - "benchbox/monitoring/"
-  - "benchbox/cli/"
-  - "benchbox/mcp/"
+  - "benchbox/core/runner/"
+  - "benchbox/cli/progress.py"
+  - "benchbox/cli/commands/report.py"
+  - "benchbox/mcp/observability.py"
+  - "benchbox/mcp/tools/benchmark.py"
   - "tests/unit/monitoring/"
-  - "tests/unit/cli/"
-  - "tests/unit/mcp/"
+  - "tests/unit/cli/commands/test_cli_report.py"
+  - "tests/unit/cli/test_progress.py"
+  - "tests/unit/mcp/test_observability.py"
+  - "tests/unit/mcp/test_mcp_results_and_analytics.py"
   - "pyproject.toml"
-  - "docs/"
+  - "docs/architecture/"
   added:
   - "benchbox_monitoring/"
-  - "docs/architecture/"
+  - "tests/contracts/monitoring/"
 
 work:
 - id: w1
@@ -91,7 +96,7 @@ work:
     reports outside BenchBox while retaining only thin adapters locally.
 
 - id: w3
-  summary: "Prototype the package boundary inside the repo with import-contract tests before any external extraction"
+  summary: "Prototype the package boundary inside the repo with import-contract tests and frozen monitoring-contract fixtures before any external extraction"
   needs: [w2]
   status: pending
   notes: |
@@ -141,17 +146,28 @@ verification:
 - description: "CLI and MCP observability integrations still work against the preserved monitoring contract"
   command: "uv run -- python -m pytest tests/unit/cli/commands/test_cli_report.py tests/unit/mcp/test_observability.py tests/unit/mcp/test_mcp_results_and_analytics.py -q"
   expected_output: "All tests pass"
+- description: "Frozen monitoring contract tests preserve serialized reports and import boundaries across the extraction seam"
+  command: "uv run -- python -m pytest tests/contracts/monitoring/test_monitoring_report_contract.py tests/contracts/monitoring/test_monitoring_import_boundary.py -q"
+  expected_output: "All tests pass"
 
 scope_limit:
   only_modify:
   - "benchbox/monitoring/"
-  - "benchbox/cli/"
-  - "benchbox/mcp/"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/core/runner/dataframe_runner.py"
+  - "benchbox/cli/progress.py"
+  - "benchbox/cli/commands/report.py"
+  - "benchbox/mcp/observability.py"
+  - "benchbox/mcp/tools/benchmark.py"
   - "tests/unit/monitoring/"
-  - "tests/unit/cli/"
-  - "tests/unit/mcp/"
+  - "tests/unit/cli/commands/test_cli_report.py"
+  - "tests/unit/cli/test_progress.py"
+  - "tests/unit/mcp/test_observability.py"
+  - "tests/unit/mcp/test_mcp_results_and_analytics.py"
+  - "tests/contracts/monitoring/"
   - "pyproject.toml"
-  - "docs/"
+  - "docs/architecture/"
+  - "benchbox_monitoring/"
   do_not_touch:
   - "Benchmark query definitions"
   - "Platform adapter execution semantics unrelated to monitoring hooks"

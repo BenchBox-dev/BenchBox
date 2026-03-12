@@ -62,16 +62,18 @@ cost_benefit_analysis:
 files_affected:
   modified:
   - "benchbox/mcp/"
-  - "benchbox/cli/"
   - "benchbox/__init__.py"
   - "pyproject.toml"
   - "tests/unit/mcp/"
-  - "tests/unit/cli/"
+  - "tests/unit/cli/test_cli_package_exports.py"
+  - "tests/unit/test_cli_documentation.py"
+  - "tests/unit/cli/test_new_commands.py"
   - "docs/guides/mcp-integration.md"
-  - "docs/"
+  - ".github/workflows/"
   added:
   - "benchbox_mcp/"
   - "docs/contributor/"
+  - "tests/contracts/packaging/"
 
 work:
 - id: w1
@@ -98,7 +100,7 @@ work:
     installed, named, and documented.
 
 - id: w4
-  summary: "Prototype a core-only install and an MCP-enabled install in the same repository"
+  summary: "Prototype a core-only install and an MCP-enabled install in the same repository with clean-install contract tests"
   needs: [w3]
   status: pending
 
@@ -139,17 +141,24 @@ verification:
 - description: "Core package-export and CLI coverage still pass without implicit MCP dependencies"
   command: "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py tests/unit/test_cli_documentation.py tests/unit/cli/test_new_commands.py -q"
   expected_output: "All tests pass"
+- description: "Packaging contract tests prove the core install imports cleanly without MCP and the explicit MCP install restores server entry points"
+  command: "uv run -- python -m pytest tests/contracts/packaging/test_core_install_profile.py tests/contracts/packaging/test_mcp_install_profile.py -q"
+  expected_output: "All tests pass"
 
 scope_limit:
   only_modify:
   - "benchbox/mcp/"
-  - "benchbox/cli/"
   - "benchbox/__init__.py"
   - "pyproject.toml"
   - "tests/unit/mcp/"
-  - "tests/unit/cli/"
+  - "tests/unit/cli/test_cli_package_exports.py"
+  - "tests/unit/test_cli_documentation.py"
+  - "tests/unit/cli/test_new_commands.py"
+  - "tests/contracts/packaging/"
   - "docs/guides/mcp-integration.md"
-  - "docs/"
+  - "docs/contributor/"
+  - ".github/workflows/"
+  - "benchbox_mcp/"
   do_not_touch:
   - "Core benchmark implementations unrelated to import-boundary cleanup"
   - "Non-MCP CLI commands except where packaging or wiring changes require small shims"

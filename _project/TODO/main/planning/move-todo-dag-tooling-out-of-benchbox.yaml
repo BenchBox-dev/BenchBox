@@ -63,13 +63,14 @@ cost_benefit_analysis:
 
 files_affected:
   modified:
-  - "_project/scripts/"
+  - "_project/scripts/todo_cli.py"
+  - "_project/scripts/validate_todo.py"
+  - "_project/scripts/generate_indexes.py"
   - "_project/TODO_SCHEMA.yaml"
   - "_project/TODO_ENTRY_TEMPLATE.yaml"
-  - "_project/"
-  - ".codex/skills/"
+  - ".codex/skills/todo/"
+  - ".codex/skills/project-todo-sync/"
   - "AGENTS.md"
-  - "docs/"
   - "pyproject.toml"
   added:
   - "devtools/"
@@ -137,21 +138,31 @@ anti_patterns:
 
 verification:
 - description: "TODO schema validation still passes through the local command path"
-  command: "uv run _project/scripts/validate_todo.py"
+  command: "uv run _project/scripts/validate_todo.py _project/TODO"
   expected_output: "Exit code 0"
-- description: "TODO graph and indexes remain valid through the migrated wrapper path"
-  command: "uv run _project/scripts/generate_indexes.py && uv run _project/scripts/todo_cli.py check-graph"
-  expected_output: "Exit code 0 for both commands"
+- description: "DONE items still validate through the local command path after wrapper changes"
+  command: "uv run _project/scripts/validate_todo.py _project/DONE"
+  expected_output: "Exit code 0"
+- description: "TODO graph validation still passes through the migrated wrapper path"
+  command: "uv run _project/scripts/todo_cli.py check-graph"
+  expected_output: "Exit code 0"
+- description: "Index generation still succeeds through the migrated wrapper path"
+  command: "uv run _project/scripts/generate_indexes.py"
+  expected_output: "Exit code 0"
 
 scope_limit:
   only_modify:
-  - "_project/scripts/"
+  - "_project/scripts/todo_cli.py"
+  - "_project/scripts/validate_todo.py"
+  - "_project/scripts/generate_indexes.py"
   - "_project/TODO_SCHEMA.yaml"
   - "_project/TODO_ENTRY_TEMPLATE.yaml"
-  - ".codex/skills/"
+  - ".codex/skills/todo/"
+  - ".codex/skills/project-todo-sync/"
   - "AGENTS.md"
-  - "docs/"
+  - "docs/contributor/"
   - "pyproject.toml"
+  - "devtools/"
   do_not_touch:
   - "Benchmark runtime code under `benchbox/`"
   - "User-facing CLI behavior unrelated to contributor tooling"
