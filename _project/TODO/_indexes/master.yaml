@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T08:28:36.090667'
+generated_at: '2026-03-12T08:30:52.362103'
 total_items: 25
 items:
 - id: extract-ascii-charting-into-standalone-library
@@ -337,14 +337,14 @@ items:
   work_ready: 17
 - id: reduce-cyclomatic-complexity-violations
   file: TODO/main/planning/reduce-cyclomatic-complexity-violations.yaml
-  title: Reduce cyclomatic complexity violations from 10 to 5 (ignore inherent, refactor rest)
+  title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)
   worktree: main
   category: Code Quality
   priority: Medium
   status: Not Started
   work_total: 7
   work_done: 0
-  work_ready: 6
+  work_ready: 7
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

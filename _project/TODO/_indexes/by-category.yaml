@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T08:28:36.090698'
+generated_at: '2026-03-12T08:30:52.362138'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -55,7 +55,7 @@ categories:
     items:
     - id: reduce-cyclomatic-complexity-violations
       file: TODO/main/planning/reduce-cyclomatic-complexity-violations.yaml
-      title: Reduce cyclomatic complexity violations from 10 to 5 (ignore inherent, refactor rest)
+      title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)
       priority: Medium
       status: Not Started
   Core Functionality:

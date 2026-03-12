@@ -1,5 +1,5 @@
 id: reduce-cyclomatic-complexity-violations
-title: "Reduce cyclomatic complexity violations from 10 to 5 (ignore inherent, refactor rest)"
+title: "Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)"
 worktree: main
 priority: Medium
 status: Not Started
@@ -69,7 +69,6 @@ work:
 
   - id: w7
     summary: "Refactor _load_file_based_data (CC=18) — extract sharded loading to helper method"
-    needs: [w2, w3, w4, w5, w6]
     status: pending
     note: |
       Currently a WARN (CC=18, threshold 20). Extract sharded file loading
@@ -105,9 +104,9 @@ approach: |
   w7: Optional cleanup — only if w2-w6 are done and fast suite is green.
 
 anti_patterns:
-  - "DO NOT change public API signatures — these are all internal functions"
-  - "DO NOT add new abstractions (base classes, protocols) — use simple extraction"
-  - "DO NOT move code to new files — keep helpers in the same module"
+  - "DO NOT change public API signatures — because these are all internal functions and callers should not need updating"
+  - "DO NOT add new abstractions (base classes, protocols) — because extraction alone achieves the CC target without introducing coupling between unrelated modules"
+  - "DO NOT move code to new files — because the helpers share private state with the parent function and moving them would require exposing internal details"
 
 scope_limit:
   only_modify:

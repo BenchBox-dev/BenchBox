@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T08:28:36.090712'
+generated_at: '2026-03-12T08:30:52.362153'
 total_items: 25
 priorities:
   High:
@@ -58,7 +58,7 @@ priorities:
       status: Not Started
     - id: reduce-cyclomatic-complexity-violations
       file: TODO/main/planning/reduce-cyclomatic-complexity-violations.yaml
-      title: Reduce cyclomatic complexity violations from 10 to 5 (ignore inherent, refactor rest)
+      title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)
       category: Code Quality
       status: Not Started
     - id: stackoverflow-benchmark
