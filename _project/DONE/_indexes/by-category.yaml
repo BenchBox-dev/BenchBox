@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T09:59:58.507345'
+generated_at: '2026-03-12T11:54:45.799862'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -241,7 +241,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 34
+    count: 36
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -277,6 +277,11 @@ categories:
       file: DONE/core-functionality/active/complexity-check-triage-and-remediation.yaml
       title: 'Complexity check follow-up: triage intended complexity and remediate accidental complexity'
       priority: High
+      status: Completed
+    - id: dedup-wave2-dataframe-platform
+      file: DONE/core-functionality/active/dedup-wave2-dataframe-platform.yaml
+      title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
+      priority: Medium
       status: Completed
     - id: consolidate-duplicate-code
       file: DONE/core-functionality/active/consolidate-duplicate-code.yaml
@@ -341,6 +346,11 @@ categories:
     - id: platform-adapter-and-core-module-code-consolidation
       file: DONE/unknown/planning/platform-adapter-and-core-module-code-consolidation.yaml
       title: Platform Adapter and Core Module Code Consolidation
+      priority: Medium
+      status: Completed
+    - id: reduce-cc13-complexity-ceiling
+      file: DONE/main/active/reduce-cc13-complexity-ceiling.yaml
+      title: Reduce CC=13 complexity ceiling and lower warn threshold to 13
       priority: Medium
       status: Completed
     - id: remove-tpc-di-streaming-code-and-delegate-to-databases-completed

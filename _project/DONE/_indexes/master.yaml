@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:59:58.507039'
-total_items: 584
+generated_at: '2026-03-12T11:54:45.799606'
+total_items: 586
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4399,6 +4399,25 @@ items:
   category: Bug Fixes
   priority: Medium
   status: Completed
+- id: dedup-wave2-dataframe-platform
+  file: DONE/core-functionality/active/dedup-wave2-dataframe-platform.yaml
+  title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  - dataframe
+  estimated_effort: 3-4 hours
+  completed_date: '2026-03-12'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  needs:
+  - dedup-wave2-ignore-rules
 - id: consolidate-result-normalization
   file: DONE/core-functionality/active/consolidate-result-normalization.yaml
   title: Consolidate Duplicated Result JSON Normalization Logic
@@ -5664,6 +5683,18 @@ items:
   work_total: 9
   work_done: 9
   work_ready: 0
+- id: reduce-cc13-complexity-ceiling
+  file: DONE/main/active/reduce-cc13-complexity-ceiling.yaml
+  title: Reduce CC=13 complexity ceiling and lower warn threshold to 13
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  completed_date: '2026-03-12'
+  work_total: 14
+  work_done: 14
+  work_ready: 0
+  deferred_count: 1
 - id: complexity-cli-prompts-w15
   file: DONE/core-functionality/active/complexity-cli-prompts-w15.yaml
   title: Reduce complexity in CLI prompt and command functions (complexity batch 8)

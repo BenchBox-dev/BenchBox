@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:59:58.507500'
-total_items: 584
+generated_at: '2026-03-12T11:54:45.799998'
+total_items: 586
 priorities:
   Critical:
     count: 35
@@ -1548,7 +1548,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 254
+    count: 256
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1894,6 +1894,11 @@ priorities:
       file: DONE/unknown/planning/connection-parameter-conflicts-in-tpc-test-methods.yaml
       title: Connection Parameter Conflicts in TPC Test Methods
       category: Bug Fixes
+      status: Completed
+    - id: dedup-wave2-dataframe-platform
+      file: DONE/core-functionality/active/dedup-wave2-dataframe-platform.yaml
+      title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
+      category: Code Quality and Technical Debt
       status: Completed
     - id: consolidate-result-normalization
       file: DONE/core-functionality/active/consolidate-result-normalization.yaml
@@ -2430,6 +2435,11 @@ priorities:
       file: DONE/main/active/reduce-cc14-complexity-cluster.yaml
       title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
       category: Code Quality
+      status: Completed
+    - id: reduce-cc13-complexity-ceiling
+      file: DONE/main/active/reduce-cc13-complexity-ceiling.yaml
+      title: Reduce CC=13 complexity ceiling and lower warn threshold to 13
+      category: Code Quality and Technical Debt
       status: Completed
     - id: complexity-cli-prompts-w15
       file: DONE/core-functionality/active/complexity-cli-prompts-w15.yaml

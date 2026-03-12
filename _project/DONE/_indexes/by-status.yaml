@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:59:58.507650'
-total_items: 584
+generated_at: '2026-03-12T11:54:45.800135'
+total_items: 586
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 536
+    count: 538
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -874,6 +874,11 @@ statuses:
       title: Connection Parameter Conflicts in TPC Test Methods
       priority: Medium
       category: Bug Fixes
+    - id: dedup-wave2-dataframe-platform
+      file: DONE/core-functionality/active/dedup-wave2-dataframe-platform.yaml
+      title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: consolidate-result-normalization
       file: DONE/core-functionality/active/consolidate-result-normalization.yaml
       title: Consolidate Duplicated Result JSON Normalization Logic
@@ -2146,6 +2151,11 @@ statuses:
       title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
       priority: Medium
       category: Code Quality
+    - id: reduce-cc13-complexity-ceiling
+      file: DONE/main/active/reduce-cc13-complexity-ceiling.yaml
+      title: Reduce CC=13 complexity ceiling and lower warn threshold to 13
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: complexity-cli-prompts-w15
       file: DONE/core-functionality/active/complexity-cli-prompts-w15.yaml
       title: Reduce complexity in CLI prompt and command functions (complexity batch 8)
