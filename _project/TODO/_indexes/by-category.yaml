@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T15:33:11.812271'
+generated_at: '2026-03-12T15:47:07.090509'
 total_categories: 12
 categories:
   AI/ML Capabilities:
@@ -10,22 +10,17 @@ categories:
       priority: Medium-High
       status: Not Started
   Architecture:
-    count: 3
+    count: 2
     items:
     - id: isolate-experimental-core-subsystems
       file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
-      title: Classify and isolate experimental core subsystems that are outside the supported benchmark surface
+      title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
       priority: High
       status: Not Started
-    - id: extract-or-prune-publishing-subsystem
-      file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
-      title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
+    - id: prune-publishing-subsystem
+      file: TODO/main/planning/prune-publishing-subsystem.yaml
+      title: Prune the dead publishing and permalink subsystem
       priority: High
-      status: Not Started
-    - id: extract-monitoring-library
-      file: TODO/main/planning/extract-monitoring-library.yaml
-      title: Evaluate and extract the generic monitoring stack into a standalone library boundary
-      priority: Medium
       status: Not Started
   Benchmark Development:
     count: 6
@@ -69,13 +64,8 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 4
+    count: 3
     items:
-    - id: dedup-wave3-ignore-rules
-      file: TODO/core-functionality/planning/dedup-wave3-ignore-rules.yaml
-      title: Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage
-      priority: Medium-High
-      status: Not Started
     - id: dedup-wave3-sql-platform-adapters
       file: TODO/core-functionality/planning/dedup-wave3-sql-platform-adapters.yaml
       title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
@@ -104,17 +94,22 @@ categories:
   Maintainer Tooling:
     count: 1
     items:
-    - id: extract-release-and-sync-maintainer-tooling
-      file: TODO/main/planning/extract-release-and-sync-maintainer-tooling.yaml
-      title: Extract maintainer-only release, sync, and content-validation tooling from the installable product
+    - id: remove-release-tooling-from-wheel
+      file: TODO/main/planning/remove-release-tooling-from-wheel.yaml
+      title: Remove maintainer-only release tooling from the default install surface
       priority: High
       status: Not Started
   Packaging:
-    count: 1
+    count: 2
     items:
-    - id: split-mcp-into-separate-distribution
-      file: TODO/main/planning/split-mcp-into-separate-distribution.yaml
-      title: Split the MCP server surface into a separate distribution with an explicit dependency boundary
+    - id: gate-monitoring-behind-optional-extra
+      file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
+      title: Gate monitoring behind a benchbox[monitoring] optional extra
+      priority: Medium
+      status: Not Started
+    - id: formalize-mcp-internal-apis
+      file: TODO/main/planning/formalize-mcp-internal-apis.yaml
+      title: Promote 3 internal MCP API references to public exports
       priority: Medium
       status: Not Started
   Platform Expansion:

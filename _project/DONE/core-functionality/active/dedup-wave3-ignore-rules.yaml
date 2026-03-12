@@ -2,7 +2,8 @@ id: dedup-wave3-ignore-rules
 title: "Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage"
 worktree: core-functionality
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-03-12"
 category: "Code Quality and Technical Debt"
 description: |
   The `make duplicate-check-verbose` report (2026-03-12, post wave-2) shows 344
@@ -182,7 +183,7 @@ work:
 
 - id: w5
   summary: "Run make duplicate-check to confirm check still passes with new threshold"
-  status: pending
+  status: done
   needs: [w4]
 
 files_affected:

@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T15:33:11.812295'
-total_items: 32
+generated_at: '2026-03-12T15:47:07.090533'
+total_items: 31
 statuses:
   In Progress:
     count: 2
@@ -16,7 +16,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 30
+    count: 29
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -43,21 +43,11 @@ statuses:
       title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
       priority: Low
       category: Platform Expansion
-    - id: dedup-wave3-ignore-rules
-      file: TODO/core-functionality/planning/dedup-wave3-ignore-rules.yaml
-      title: Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage
-      priority: Medium-High
-      category: Code Quality and Technical Debt
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Low
       category: Platform Expansion
-    - id: isolate-experimental-core-subsystems
-      file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
-      title: Classify and isolate experimental core subsystems that are outside the supported benchmark surface
-      priority: High
-      category: Architecture
     - id: livy-spark-adapters-open-table-format-loading
       file: TODO/main/planning/livy-spark-adapters-open-table-format-loading.yaml
       title: Close open-table-format loading gaps for Livy-based Spark adapters
@@ -85,26 +75,11 @@ statuses:
         output, registries'
       priority: Medium
       category: Code Quality and Technical Debt
-    - id: extract-or-prune-publishing-subsystem
-      file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
-      title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
-      priority: High
-      category: Architecture
     - id: deferred-dataframe-benchmark-implementations
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
       category: Benchmark Expansion
-    - id: extract-monitoring-library
-      file: TODO/main/planning/extract-monitoring-library.yaml
-      title: Evaluate and extract the generic monitoring stack into a standalone library boundary
-      priority: Medium
-      category: Architecture
-    - id: extract-release-and-sync-maintainer-tooling
-      file: TODO/main/planning/extract-release-and-sync-maintainer-tooling.yaml
-      title: Extract maintainer-only release, sync, and content-validation tooling from the installable product
-      priority: High
-      category: Maintainer Tooling
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -115,6 +90,11 @@ statuses:
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
       category: Supporting Infrastructure
+    - id: gate-monitoring-behind-optional-extra
+      file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
+      title: Gate monitoring behind a benchbox[monitoring] optional extra
+      priority: Medium
+      category: Packaging
     - id: geospatial-primitives-benchmark
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
       title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
@@ -130,26 +110,41 @@ statuses:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       category: Core Functionality
+    - id: isolate-experimental-core-subsystems
+      file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
+      title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
+      priority: High
+      category: Architecture
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       priority: Medium-High
       category: Benchmark Development
+    - id: formalize-mcp-internal-apis
+      file: TODO/main/planning/formalize-mcp-internal-apis.yaml
+      title: Promote 3 internal MCP API references to public exports
+      priority: Medium
+      category: Packaging
+    - id: prune-publishing-subsystem
+      file: TODO/main/planning/prune-publishing-subsystem.yaml
+      title: Prune the dead publishing and permalink subsystem
+      priority: High
+      category: Architecture
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       priority: High
       category: Platform Expansion
+    - id: remove-release-tooling-from-wheel
+      file: TODO/main/planning/remove-release-tooling-from-wheel.yaml
+      title: Remove maintainer-only release tooling from the default install surface
+      priority: High
+      category: Maintainer Tooling
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
       priority: Low
       category: User Experience
-    - id: split-mcp-into-separate-distribution
-      file: TODO/main/planning/split-mcp-into-separate-distribution.yaml
-      title: Split the MCP server surface into a separate distribution with an explicit dependency boundary
-      priority: Medium
-      category: Packaging
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

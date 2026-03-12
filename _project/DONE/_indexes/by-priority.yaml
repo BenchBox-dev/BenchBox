@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T12:28:39.473538'
-total_items: 587
+generated_at: '2026-03-12T15:47:08.496404'
+total_items: 588
 priorities:
   Critical:
     count: 35
@@ -1214,7 +1214,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 66
+    count: 67
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1280,6 +1280,11 @@ priorities:
     - id: dedup-wave2-ignore-rules
       file: DONE/core-functionality/active/dedup-wave2-ignore-rules.yaml
       title: Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage
+      category: Code Quality and Technical Debt
+      status: Completed
+    - id: dedup-wave3-ignore-rules
+      file: DONE/core-functionality/active/dedup-wave3-ignore-rules.yaml
+      title: Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage
       category: Code Quality and Technical Debt
       status: Completed
     - id: dedup-ignore-rules-boilerplate
