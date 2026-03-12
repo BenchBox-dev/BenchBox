@@ -2,7 +2,7 @@ id: dedup-wave3-ignore-rules
 title: "Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage"
 worktree: core-functionality
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: "Code Quality and Technical Debt"
 description: |
   The `make duplicate-check-verbose` report (2026-03-12, post wave-2) shows 344
@@ -139,83 +139,88 @@ approach: |
   After adding, run `make duplicate-check-verbose` and lower threshold.
 
 work:
-  - id: w1
-    summary: "Add ignore rules for wave-2 residual wrappers: G1, G6, G19"
-    status: pending
-    notes: |
-      These are thin wrappers left over after wave-2 extractions. The underlying
-      logic was already consolidated; the structural match is the delegation pattern.
-      G1: generate_*_dimension scoped to tpcdi/generator/sql.py.
-      G6: get_all_create_table_sql scoped to amplab/schema.py, read_primitives/schema.py, ssb/schema.py.
-      G19: get_dataframe_*_manager scoped to primitives dataframe_operations.py files.
+- id: w1
+  summary: "Add ignore rules for wave-2 residual wrappers: G1, G6, G19"
+  status: done
+  notes: |
+    These are thin wrappers left over after wave-2 extractions. The underlying
+    logic was already consolidated; the structural match is the delegation pattern.
+    G1: generate_*_dimension scoped to tpcdi/generator/sql.py.
+    G6: get_all_create_table_sql scoped to amplab/schema.py, read_primitives/schema.py, ssb/schema.py.
+    G19: get_dataframe_*_manager scoped to primitives dataframe_operations.py files.
 
-  - id: w2
-    summary: "Add ignore rules for AST false positives: G3, G22"
-    status: pending
-    notes: |
-      These are structurally similar AST hashes across unrelated functions.
-      G3: classify_error scoped to tpcdi/etl/error_recovery.py; check date_add/date_sub
-      coverage in existing rules, extend path_contains if needed.
-      G22: calculate_official_metrics, execute_operation scoped to false-positive paths;
-      check overlap with existing rules first.
+- id: w2
+  summary: "Add ignore rules for AST false positives: G3, G22"
+  status: pending
+  notes: |
+    These are structurally similar AST hashes across unrelated functions.
+    G3: classify_error scoped to tpcdi/etl/error_recovery.py; check date_add/date_sub
+    coverage in existing rules, extend path_contains if needed.
+    G22: calculate_official_metrics, execute_operation scoped to false-positive paths;
+    check overlap with existing rules first.
 
-  - id: w3
-    summary: "Add ignore rules for intentional boilerplate patterns: G2, G5, G7, G8, G9, G20, G21, G27"
-    status: pending
-    notes: |
-      G2: H2O.db aggregation query impls scoped to read_primitives/dataframe_queries.py.
-      G5: primitives catalog methods scoped to queries.py and operations.py files.
-      G7: capability checks scoped to metadata_primitives/ddl.py.
-      G8: extend existing facade rule with generate_data, get_all_aliases, get_benchmark_info.
-      G9: extend existing TPC-DI rule (line 1005) with get_queries_by_category.
-      G20: domain validators scoped to tpcdi/etl/validation.py.
-      G21: extend existing __init__ rule with new file paths.
-      G27: extend existing Q62/Q99/Q38/Q87 rule with q26/q7_expression_impl.
+- id: w3
+  summary: "Add ignore rules for intentional boilerplate patterns: G2, G5, G7, G8, G9, G20, G21, G27"
+  status: pending
+  notes: |
+    G2: H2O.db aggregation query impls scoped to read_primitives/dataframe_queries.py.
+    G5: primitives catalog methods scoped to queries.py and operations.py files.
+    G7: capability checks scoped to metadata_primitives/ddl.py.
+    G8: extend existing facade rule with generate_data, get_all_aliases, get_benchmark_info.
+    G9: extend existing TPC-DI rule (line 1005) with get_queries_by_category.
+    G20: domain validators scoped to tpcdi/etl/validation.py.
+    G21: extend existing __init__ rule with new file paths.
+    G27: extend existing Q62/Q99/Q38/Q87 rule with q26/q7_expression_impl.
 
-  - id: w4
-    summary: "Run make duplicate-check-verbose, verify groups suppressed, rebaseline threshold"
-    status: pending
-    needs: [w1, w2, w3]
-    notes: |
-      Verify each targeted function name no longer appears in the report.
-      Rebaseline threshold: threshold = ceil(actual * 1.10).
+- id: w4
+  summary: "Run make duplicate-check-verbose, verify groups suppressed, rebaseline threshold"
+  status: pending
+  needs: [w1, w2, w3]
+  notes: |
+    Verify each targeted function name no longer appears in the report.
+    Rebaseline threshold: threshold = ceil(actual * 1.10).
 
-  - id: w5
-    summary: "Run make duplicate-check to confirm check still passes with new threshold"
-    status: pending
-    needs: [w4]
+- id: w5
+  summary: "Run make duplicate-check to confirm check still passes with new threshold"
+  status: pending
+  needs: [w4]
 
 files_affected:
   modified:
-    - "pyproject.toml"
+  - "pyproject.toml"
 
 verification:
-  - description: "Duplicate check passes at lowered threshold"
-    command: "make duplicate-check"
-    expected_output: "PASS"
-  - description: "Suppressed groups no longer appear in verbose output"
-    command: "make duplicate-check-verbose 2>&1 | grep -c 'generate_company_dimension\\|supports_acl_introspection\\|validate_customer_tier\\|q26_expression'"
-    expected_output: "0"
+- description: "Duplicate check passes at lowered threshold"
+  command: "make duplicate-check"
+  expected_output: "PASS"
+- description: "Suppressed groups no longer appear in verbose output"
+  command: "make duplicate-check-verbose 2>&1 | grep -c 'generate_company_dimension\\|supports_acl_introspection\\|validate_customer_tier\\\
+    |q26_expression'"
+  expected_output: "0"
 
 scope_limit:
   only_modify:
-    - "pyproject.toml"
+  - "pyproject.toml"
 
 must_preserve:
-  - "Existing ignore_rules entries remain intact"
-  - "Threshold only lowered, never raised beyond current value"
-  - "make duplicate-check still passes in CI"
+- "Existing ignore_rules entries remain intact"
+- "Threshold only lowered, never raised beyond current value"
+- "make duplicate-check still passes in CI"
 
 anti_patterns:
-  - "DO NOT add overly broad function name ignores — because broad ignores mask future real duplicates that should be consolidated, defeating the purpose of the checker — always scope with path_contains"
-  - "DO NOT duplicate existing rules — because multiple rules matching the same function create maintenance burden when paths change and make it unclear which rule is authoritative — extend existing rules by adding function names or paths"
-  - "DO NOT ignore groups that are genuine consolidation candidates — because the wave-3 consolidation TODOs (sql-platform-adapters, core-and-dataframe) target groups where extraction will reduce real maintenance cost — check the companion TODOs before classifying a group as ignore"
+- "DO NOT add overly broad function name ignores — because broad ignores mask future real duplicates that should be consolidated,
+  defeating the purpose of the checker — always scope with path_contains"
+- "DO NOT duplicate existing rules — because multiple rules matching the same function create maintenance burden when paths
+  change and make it unclear which rule is authoritative — extend existing rules by adding function names or paths"
+- "DO NOT ignore groups that are genuine consolidation candidates — because the wave-3 consolidation TODOs (sql-platform-adapters,
+  core-and-dataframe) target groups where extraction will reduce real maintenance cost — check the companion TODOs before
+  classifying a group as ignore"
 
 metadata:
   tags:
-    - code-quality
-    - duplicate-check
-    - ignore-rules
-    - wave-3
+  - code-quality
+  - duplicate-check
+  - ignore-rules
+  - wave-3
   estimated_effort: "1-2 hours"
   created_date: "2026-03-12"
