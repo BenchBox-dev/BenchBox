@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T08:52:18.369440'
-total_items: 579
+generated_at: '2026-03-12T09:17:11.829537'
+total_items: 580
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5615,6 +5615,17 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 5-7 days
+- id: reduce-cc14-complexity-cluster
+  file: DONE/main/active/reduce-cc14-complexity-cluster.yaml
+  title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
+  worktree: main
+  category: Code Quality
+  priority: Medium
+  status: Completed
+  completed_date: '2026-03-12'
+  work_total: 9
+  work_done: 9
+  work_ready: 0
 - id: complexity-cli-prompts-w15
   file: DONE/core-functionality/active/complexity-cli-prompts-w15.yaml
   title: Reduce complexity in CLI prompt and command functions (complexity batch 8)

@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T08:52:18.369875'
-total_items: 579
+generated_at: '2026-03-12T09:17:11.830050'
+total_items: 580
 priorities:
   Critical:
     count: 35
@@ -1533,7 +1533,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 252
+    count: 253
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2405,6 +2405,11 @@ priorities:
       file: DONE/query-plan-remediation/phase-8-documentation-usability.yaml
       title: 'Query Plan Remediation - Phase 8: Documentation & Usability'
       category: Documentation
+      status: Completed
+    - id: reduce-cc14-complexity-cluster
+      file: DONE/main/active/reduce-cc14-complexity-cluster.yaml
+      title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
+      category: Code Quality
       status: Completed
     - id: complexity-cli-prompts-w15
       file: DONE/core-functionality/active/complexity-cli-prompts-w15.yaml

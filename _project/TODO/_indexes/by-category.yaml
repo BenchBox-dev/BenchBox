@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:16:40.130158'
-total_categories: 10
+generated_at: '2026-03-12T09:17:10.289280'
+total_categories: 9
 categories:
   AI/ML Capabilities:
     count: 1
@@ -50,14 +50,6 @@ categories:
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
       status: Not Started
-  Code Quality:
-    count: 1
-    items:
-    - id: reduce-cc14-complexity-cluster
-      file: TODO/main/active/reduce-cc14-complexity-cluster.yaml
-      title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
-      priority: Medium
-      status: In Progress
   Code Quality and Technical Debt:
     count: 4
     items:

@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:16:40.130172'
-total_items: 30
+generated_at: '2026-03-12T09:17:10.289293'
+total_items: 29
 priorities:
   High:
     count: 2
@@ -44,7 +44,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 9
+    count: 8
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -82,11 +82,6 @@ priorities:
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
       status: Not Started
-    - id: reduce-cc14-complexity-cluster
-      file: TODO/main/active/reduce-cc14-complexity-cluster.yaml
-      title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
-      category: Code Quality
-      status: In Progress
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

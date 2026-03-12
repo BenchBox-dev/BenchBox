@@ -1,19 +1,14 @@
-generated_at: '2026-03-12T09:16:40.130184'
-total_items: 30
+generated_at: '2026-03-12T09:17:10.289303'
+total_items: 29
 statuses:
   In Progress:
-    count: 3
+    count: 2
     items:
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
       priority: High
       category: Core Functionality
-    - id: reduce-cc14-complexity-cluster
-      file: TODO/main/active/reduce-cc14-complexity-cluster.yaml
-      title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
-      priority: Medium
-      category: Code Quality
     - id: test-suite-quality-wave-2
       file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest

@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T08:52:18.370018'
-total_items: 579
+generated_at: '2026-03-12T09:17:11.830201'
+total_items: 580
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 531
+    count: 532
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2121,6 +2121,11 @@ statuses:
       title: Rebuild TPC-H binaries with stdout fix for all platforms
       priority: High
       category: Core Functionality
+    - id: reduce-cc14-complexity-cluster
+      file: DONE/main/active/reduce-cc14-complexity-cluster.yaml
+      title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
+      priority: Medium
+      category: Code Quality
     - id: complexity-cli-prompts-w15
       file: DONE/core-functionality/active/complexity-cli-prompts-w15.yaml
       title: Reduce complexity in CLI prompt and command functions (complexity batch 8)
