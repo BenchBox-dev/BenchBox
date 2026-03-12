@@ -1,5 +1,5 @@
-generated_at: '2026-03-11T18:16:12.430095'
-total_items: 24
+generated_at: '2026-03-12T08:28:36.090720'
+total_items: 25
 statuses:
   In Progress:
     count: 2
@@ -16,7 +16,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 22
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -103,6 +103,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: High
       category: Platform Expansion
+    - id: reduce-cyclomatic-complexity-violations
+      file: TODO/main/planning/reduce-cyclomatic-complexity-violations.yaml
+      title: Reduce cyclomatic complexity violations from 10 to 5 (ignore inherent, refactor rest)
+      priority: Medium
+      category: Code Quality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

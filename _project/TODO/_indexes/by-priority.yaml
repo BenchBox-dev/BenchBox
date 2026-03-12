@@ -1,5 +1,5 @@
-generated_at: '2026-03-11T18:16:12.430085'
-total_items: 24
+generated_at: '2026-03-12T08:28:36.090712'
+total_items: 25
 priorities:
   High:
     count: 2
@@ -34,7 +34,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 5
+    count: 6
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -55,6 +55,11 @@ priorities:
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
+      status: Not Started
+    - id: reduce-cyclomatic-complexity-violations
+      file: TODO/main/planning/reduce-cyclomatic-complexity-violations.yaml
+      title: Reduce cyclomatic complexity violations from 10 to 5 (ignore inherent, refactor rest)
+      category: Code Quality
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml

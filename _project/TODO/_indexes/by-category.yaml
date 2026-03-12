@@ -1,5 +1,5 @@
-generated_at: '2026-03-11T18:16:12.430070'
-total_categories: 8
+generated_at: '2026-03-12T08:28:36.090698'
+total_categories: 9
 categories:
   AI/ML Capabilities:
     count: 1
@@ -49,6 +49,14 @@ categories:
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
+      status: Not Started
+  Code Quality:
+    count: 1
+    items:
+    - id: reduce-cyclomatic-complexity-violations
+      file: TODO/main/planning/reduce-cyclomatic-complexity-violations.yaml
+      title: Reduce cyclomatic complexity violations from 10 to 5 (ignore inherent, refactor rest)
+      priority: Medium
       status: Not Started
   Core Functionality:
     count: 2

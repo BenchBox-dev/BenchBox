@@ -1,0 +1,120 @@
+id: reduce-cyclomatic-complexity-violations
+title: "Reduce cyclomatic complexity violations from 10 to 5 (ignore inherent, refactor rest)"
+worktree: main
+priority: Medium
+status: Not Started
+description: |
+  `make complexity-check` reports 10 functions exceeding CC=20 and 1 warning at CC=18.
+  After evaluating each function, 5 have inherent complexity (validation, parsing,
+  registration patterns) and should be added to exclude_functions with rationale.
+  The remaining 6 are refactorable with straightforward extraction patterns.
+
+  Goal: reduce FAIL count from 10 to 0 so `make complexity-check` passes.
+
+category: Code Quality
+
+deps:
+  needs: []
+
+work:
+  - id: w1
+    summary: "Add 5 inherent-complexity functions to exclude_functions in pyproject.toml"
+    status: pending
+    note: |
+      Functions to exclude with rationale:
+      - auto_register_platforms (CC=41): 41 independent try/except platform registrations
+      - load_ai_catalog (CC=29): per-field YAML validation with distinct rules per field
+      - load_write_primitives_catalog (CC=25): per-field YAML validation (same pattern)
+      - _extract_operator_info (CC=23): query plan parser dispatching on operator type
+      - _validate_manifest_if_present (CC=23): multi-layer manifest validation — recently
+        expanded for contamination detection; extraction would scatter tightly coupled
+        validation logic across helpers without reducing real complexity
+
+  - id: w2
+    summary: "Refactor render_ascii_chart (CC=43) — replace elif chain with chart-type registry"
+    status: pending
+    note: |
+      12 elif branches dispatch on chart_type string. Extract a dict mapping
+      chart_type -> (DataClass, renderer_fn) and collapse to a single lookup.
+      Target CC: ~8.
+
+  - id: w3
+    summary: "Refactor _build_duckdb_external_scan_expression (CC=23) — extract per-format handlers"
+    status: pending
+    note: |
+      5 format branches (Delta, Iceberg, Vortex, Parquet, text). Extract each to
+      a private method (_handle_delta_source, etc.) and call sequentially.
+      Target CC: ~6.
+
+  - id: w4
+    summary: "Refactor display_interactive_preview (CC=22) — data-driven table row construction"
+    status: pending
+    note: |
+      Most branches are simple if-present-add-row guards. Replace with a list of
+      (label, value, condition) tuples and a single loop. Target CC: ~8.
+
+  - id: w5
+    summary: "Refactor validate_column_types (CC=22) — extract per-tuning-type validators"
+    status: pending
+    note: |
+      4 independent validation blocks (partitioning, clustering, distribution, sorting)
+      follow the same pattern. Extract shared logic into a helper. Target CC: ~8.
+
+  - id: w6
+    summary: "Refactor apply_driver_metadata (CC=21) — consolidate repeated getattr/setattr chains"
+    status: pending
+    note: |
+      Data marshalling with ~8 fields each checked 2-4 times. Define a metadata
+      field list and iterate. Target CC: ~6.
+
+  - id: w7
+    summary: "Refactor _load_file_based_data (CC=18) — extract sharded loading to helper method"
+    needs: [w2, w3, w4, w5, w6]
+    status: pending
+    note: |
+      Currently a WARN (CC=18, threshold 20). Extract sharded file loading
+      (categorization + handler dispatch) to _load_sharded_table(). Optional
+      but prevents future growth from pushing it over threshold. Target CC: ~8.
+
+verification:
+  - description: "Complexity check passes"
+    command: "make complexity-check"
+    expected_output: "0 functions exceed max complexity of 20; no new warnings"
+  - description: "No regressions in fast suite"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "All fast tests pass"
+  - description: "Lint passes"
+    command: "uv run ruff check ."
+    expected_output: "All checks passed"
+
+must_preserve:
+  - "All refactored functions must produce identical behavior — no semantic changes"
+  - "Existing tests must continue to pass without modification"
+  - "exclude_functions entries must include CC score and rationale comment"
+
+approach: |
+  w1: Add entries to pyproject.toml [tool.complexity] exclude_functions following
+  the existing format with CC score and rationale comment.
+
+  w2-w6: For each refactoring:
+  1. Read function and its callers/tests
+  2. Extract helper methods (private, same module)
+  3. Run focused tests + lint after each extraction
+  4. Verify CC reduced via: uv run -- python scripts/check_complexity.py 2>&1 | grep function_name
+
+  w7: Optional cleanup — only if w2-w6 are done and fast suite is green.
+
+anti_patterns:
+  - "DO NOT change public API signatures — these are all internal functions"
+  - "DO NOT add new abstractions (base classes, protocols) — use simple extraction"
+  - "DO NOT move code to new files — keep helpers in the same module"
+
+scope_limit:
+  only_modify:
+    - "pyproject.toml"
+    - "benchbox/core/visualization/exporters.py"
+    - "benchbox/platforms/duckdb.py"
+    - "benchbox/cli/dryrun.py"
+    - "benchbox/core/tuning/validation.py"
+    - "benchbox/core/results/driver_metadata.py"
+    - "benchbox/platforms/base/data_loading.py"
