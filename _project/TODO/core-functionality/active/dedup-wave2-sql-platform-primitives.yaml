@@ -147,7 +147,7 @@ work:
 - id: w10
   summary: "Run primitives and benchmark tests: pytest -k 'primitive or amplab or clickbench or h2odb or ssb or tpcds'"
   needs: [w3, w4, w6, w7, w8]
-  status: pending
+  status: done
 
 - id: w11
   summary: "Run full test suite to verify no regressions: make test-all"
