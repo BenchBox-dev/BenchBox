@@ -133,7 +133,7 @@ work:
 
 - id: w7
   summary: "Extract get_entry_by_id into core/primitives_utils.py, refactor 4 lookup methods"
-  status: pending
+  status: done
 
 - id: w8
   summary: "Extract aggregation_groupby_impl helper in read_primitives/dataframe_queries.py"
