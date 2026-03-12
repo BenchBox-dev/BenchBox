@@ -1,14 +1,19 @@
-generated_at: '2026-03-12T09:02:30.492481'
-total_items: 29
+generated_at: '2026-03-12T09:16:40.130184'
+total_items: 30
 statuses:
   In Progress:
-    count: 2
+    count: 3
     items:
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
       priority: High
       category: Core Functionality
+    - id: reduce-cc14-complexity-cluster
+      file: TODO/main/active/reduce-cc14-complexity-cluster.yaml
+      title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
+      priority: Medium
+      category: Code Quality
     - id: test-suite-quality-wave-2
       file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
@@ -114,6 +119,11 @@ statuses:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       category: Core Functionality
+    - id: migrate-remaining-ascii-charts-to-textcharts
+      file: TODO/main/planning/migrate-remaining-ascii-charts-to-textcharts.yaml
+      title: Migrate remaining custom ASCII chart functions to textcharts library
+      priority: Medium-High
+      category: Core Functionality
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -124,11 +134,6 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: High
       category: Platform Expansion
-    - id: reduce-cc14-complexity-cluster
-      file: TODO/main/active/reduce-cc14-complexity-cluster.yaml
-      title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
-      priority: Medium
-      category: Code Quality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

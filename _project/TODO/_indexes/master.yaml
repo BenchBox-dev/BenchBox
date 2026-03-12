@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:02:30.492429'
-total_items: 29
+generated_at: '2026-03-12T09:16:40.130127'
+total_items: 30
 items:
 - id: extract-ascii-charting-into-standalone-library
   file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
@@ -396,10 +396,10 @@ items:
   worktree: main
   category: Code Quality
   priority: Medium
-  status: Not Started
+  status: In Progress
   work_total: 9
-  work_done: 0
-  work_ready: 1
+  work_done: 9
+  work_ready: 0
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
@@ -434,6 +434,25 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
+- id: migrate-remaining-ascii-charts-to-textcharts
+  file: TODO/main/planning/migrate-remaining-ascii-charts-to-textcharts.yaml
+  title: Migrate remaining custom ASCII chart functions to textcharts library
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - textcharts
+  - monitoring
+  - visualization
+  - migration
+  estimated_effort: Small (2-4 hours)
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  deferred_count: 2
+  needs:
+  - extract-ascii-charting-into-standalone-library
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:02:30.492472'
-total_items: 29
+generated_at: '2026-03-12T09:16:40.130172'
+total_items: 30
 priorities:
   High:
     count: 2
@@ -15,12 +15,17 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 4
+    count: 5
     items:
     - id: dedup-wave2-ignore-rules
       file: TODO/core-functionality/active/dedup-wave2-ignore-rules.yaml
       title: Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage
       category: Code Quality and Technical Debt
+      status: Not Started
+    - id: migrate-remaining-ascii-charts-to-textcharts
+      file: TODO/main/planning/migrate-remaining-ascii-charts-to-textcharts.yaml
+      title: Migrate remaining custom ASCII chart functions to textcharts library
+      category: Core Functionality
       status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
@@ -81,7 +86,7 @@ priorities:
       file: TODO/main/active/reduce-cc14-complexity-cluster.yaml
       title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
       category: Code Quality
-      status: Not Started
+      status: In Progress
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
