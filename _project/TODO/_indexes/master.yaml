@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T09:54:13.453158'
+generated_at: '2026-03-12T09:59:57.148850'
 total_items: 26
 items:
 - id: reenable-fireducks-after-upstream-fixes
@@ -303,7 +303,7 @@ items:
   worktree: core-functionality
   category: Code Quality and Technical Debt
   priority: Medium
-  status: Not Started
+  status: In Progress
   tags:
   - code-quality
   - duplicate-check
@@ -361,9 +361,10 @@ items:
   category: Code Quality and Technical Debt
   priority: Medium
   status: Not Started
-  work_total: 9
+  work_total: 14
   work_done: 0
   work_ready: 1
+  deferred_count: 1
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

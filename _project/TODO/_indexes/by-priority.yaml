@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T09:54:13.453202'
+generated_at: '2026-03-12T09:59:57.148905'
 total_items: 26
 priorities:
   High:
@@ -50,7 +50,7 @@ priorities:
       file: TODO/core-functionality/active/dedup-wave2-dataframe-platform.yaml
       title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
       category: Code Quality and Technical Debt
-      status: Not Started
+      status: In Progress
     - id: dedup-wave2-sql-platform-primitives
       file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
       title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager

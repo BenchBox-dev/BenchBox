@@ -1,9 +1,14 @@
-generated_at: '2026-03-12T09:54:13.453211'
+generated_at: '2026-03-12T09:59:57.148917'
 total_items: 26
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
+    - id: dedup-wave2-dataframe-platform
+      file: TODO/core-functionality/active/dedup-wave2-dataframe-platform.yaml
+      title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: test-suite-quality-wave-2
       file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
@@ -11,7 +16,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 25
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -58,11 +63,6 @@ statuses:
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
       priority: Low
       category: Platform Expansion
-    - id: dedup-wave2-dataframe-platform
-      file: TODO/core-functionality/active/dedup-wave2-dataframe-platform.yaml
-      title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: dedup-wave2-sql-platform-primitives
       file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
       title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager

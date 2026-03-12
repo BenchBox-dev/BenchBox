@@ -50,21 +50,12 @@ work:
       - _convert_to_logical_operator (core/query_plans/parsers/duckdb.py:542) — operator-type dispatch with per-type extraction
       - _harmonize_duckdb_operator (core/query_plans/parsers/duckdb.py:627) — 1:1 operator type mapping
 
-      REFACTORABLE (11):
-      - _compare_plans (cli/commands/compare.py:1224) — interleaved concerns separable into helpers
-      - _run_platform_comparison (cli/commands/compare_dataframes.py:299) — sequential logic splittable into named steps
-      - create_config (cli/database.py:383) — repeated option/override merging consolidatable
-      - _generate_head_to_head (core/analysis/comparison.py:615) — win/tie calculation extractable to helper
-      - _generate_insights (core/analysis/comparison.py:779) — if/elif chain convertible to dispatch dict
-      - _get_source_files (core/dataframe/data_loader.py:919) — three-source resolution unifiable with iterator
-      - _get_pyarrow_types (core/dataframe/data_loader.py:1337) — fallback logic consolidatable
-      - run_benchmark (core/metadata_primitives/benchmark.py:420) — linear loop splittable into selection + iteration
-      - generate_comparison_report (core/pg_extension_comparison.py:29) — section generation convertible to dispatch
-      - generate_plan_comparison_summary (core/query_plans/comparison.py:576) — extraction separable from assembly
-      - calculate_rankings (core/results/database.py:622) — metric-based SQL convertible to config dispatch
+      REFACTORABLE (11): see w3-w13 for individual work units.
 
-      Remaining 67 functions must be classified during implementation.
+      Remaining 67 functions must be classified during this work unit.
       Use classification-matrix format from _project/analysis/complexity/.
+      After classification, add new work units for any additional refactorables
+      discovered beyond the 11 already broken out in w3-w13.
 
   - id: w2
     summary: "Add inherent-complexity CC=13 exclusions to pyproject.toml"
@@ -77,75 +68,171 @@ work:
       # --- Required complexity at CC=13 (YYYY-MM-DD evaluation, wave 3) ---
 
   - id: w3
-    summary: "Refactor benchbox/core analysis and comparison functions (CC 13-><=10)"
+    summary: "Refactor _compare_plans (CC 13->~6) — extract execution map builder"
     status: pending
     needs: [w2]
     note: |
-      Target functions in core/analysis/, core/pg_extension_comparison.py,
-      core/query_plans/comparison.py, core/results/.
-      Patterns: dict dispatch, helper extraction, section builder dispatch.
+      File: benchbox/cli/commands/compare.py:1224
+      Pattern: Two identical loops (lines 1268-1276) extract executions from
+      baseline and current results into dicts. Then a third loop compares
+      common queries with plan/performance extraction.
+      Approach: Extract _build_execution_map(results) -> dict[str, Execution]
+      to deduplicate the two loops. Main function becomes: build maps ->
+      intersect -> compare.
 
   - id: w4
-    summary: "Refactor benchbox/core dataframe and metadata functions (CC 13-><=10)"
+    summary: "Refactor _run_platform_comparison (CC 13->~6) — extract output writer"
     status: pending
     needs: [w2]
     note: |
-      Target functions in core/dataframe/, core/metadata_primitives/.
-      Patterns: source iterator, multi-source resolver, phase separation.
+      File: benchbox/cli/commands/compare_dataframes.py:299
+      Pattern: Three output format branches (text/json/markdown) with
+      duplicated mkdir+write+print logic in json and markdown branches.
+      Approach: Extract _write_comparison_output(content, output_dir,
+      filename) to consolidate the repeated directory creation and file
+      writing. Main function becomes: run -> summarize -> dispatch format.
 
   - id: w5
-    summary: "Refactor benchbox/core remaining modules (CC 13-><=10)"
+    summary: "Refactor create_config (CC 13->~6) — data-driven driver option sync"
     status: pending
     needs: [w2]
     note: |
-      Target functions in core/dryrun.py, core/tpc*, core/tuning/,
-      core/visualization/, core/write_primitives/, core/cost/,
-      core/manifest/, core/results/, core/ssb/.
-      Patterns: helper extraction, data-driven generation.
+      File: benchbox/cli/database.py:383
+      Pattern: 8 sequential `if config.X: config.options["X"] = config.X`
+      guards (lines 442-455) syncing driver resolution fields to options dict.
+      Approach: Define _DRIVER_OPTION_FIELDS = ["driver_version",
+      "driver_version_resolved", ...] and replace 8 guards with a loop:
+      for field in _DRIVER_OPTION_FIELDS: val = getattr(config, field);
+      if val: config.options[field] = val.
 
   - id: w6
-    summary: "Refactor benchbox/platforms functions (CC 13-><=10)"
+    summary: "Refactor _generate_head_to_head (CC 13->~7) — extract pair scoring"
     status: pending
     needs: [w2]
     note: |
-      Target functions in platforms/: adapter_factory, athena, azure_synapse,
-      base/, bigquery, clickhouse/, dataframe/, duckdb, fabric_warehouse,
-      lakesail, polars_platform, starrocks/.
-      Patterns: strategy extraction, platform dispatch simplification.
+      File: benchbox/core/analysis/comparison.py:615
+      Pattern: Inner loop (lines 637-652) calculates wins/ties/ratios for
+      a platform pair; outer logic determines winner and builds insights.
+      Approach: Extract _score_platform_pair(query_comparisons, platform_a,
+      platform_b, threshold) -> (wins_a, wins_b, ties, ratios). Main
+      function becomes: iterate pairs -> score -> determine winner -> build
+      HeadToHeadComparison.
 
   - id: w7
-    summary: "Refactor benchbox/cli functions (CC 13-><=10)"
+    summary: "Refactor _generate_insights (CC 13->~5) — extract per-section generators"
     status: pending
     needs: [w2]
     note: |
-      Target functions in cli/: commands/compare*.py, database.py,
-      exceptions.py, help.py, output.py, platform.py, preferences.py.
-      Patterns: named step extraction, error handler consolidation.
+      File: benchbox/core/analysis/comparison.py:779
+      Pattern: Four independent insight sections (overall winner, win rate,
+      consistency, cost) each with distinct data access and formatting logic.
+      Approach: Extract _insight_overall_winner(rankings),
+      _insight_win_rates(rankings), _insight_consistency(results),
+      _insight_cost(cost_analysis) as private helpers returning list[str].
+      Main function becomes: concatenate all section outputs.
 
   - id: w8
-    summary: "Refactor benchbox/utils, monitoring, release, mcp functions (CC 13-><=10)"
+    summary: "Refactor _get_source_files (CC 13->~7) — extract table path resolution"
     status: pending
     needs: [w2]
     note: |
-      Target functions in utils/ (8), monitoring/ (3), release/ (2), mcp/ (1).
-      Patterns: validation consolidation, data-driven section building.
+      File: benchbox/core/dataframe/data_loader.py:919
+      Pattern: Identical dict->Path conversion block duplicated at lines
+      934-939 (benchmark.tables) and 948-953 (benchmark._impl.tables).
+      Approach: Extract _resolve_table_paths(tables_dict) ->
+      dict[str, list[Path]] to deduplicate. Main function becomes:
+      try benchmark.tables -> try data_dir -> try _impl.tables -> validate.
 
   - id: w9
+    summary: "Refactor _get_pyarrow_types (CC 13->~6) — extract per-source type extraction"
+    status: pending
+    needs: [w2]
+    note: |
+      File: benchbox/core/dataframe/data_loader.py:1337
+      Pattern: Two independent try/except blocks extracting Arrow types
+      from different schema sources (get_schema() and tpch.schema.TABLES)
+      with identical inner column mapping logic.
+      Approach: Extract _extract_arrow_types(columns_iterable, type_getter)
+      -> dict[str, str] to deduplicate the per-column mapping loop.
+
+  - id: w10
+    summary: "Refactor run_benchmark (CC 13->~6) — extract query selection and category summary"
+    status: pending
+    needs: [w2]
+    note: |
+      File: benchbox/core/metadata_primitives/benchmark.py:420
+      Pattern: Query selection logic (lines 441-452) with 4-way dispatch
+      (query_ids/categories/dialect/all), and category summary aggregation
+      (lines 472-499) with manual dict accumulation.
+      Approach: Extract _select_queries_to_run(query_ids, categories,
+      dialect) -> list[str] and _build_category_summary(results) -> dict.
+
+  - id: w11
+    summary: "Refactor generate_comparison_report (CC 13->~5) — extract metric section formatter"
+    status: pending
+    needs: [w2]
+    note: |
+      File: benchbox/core/pg_extension_comparison.py:29
+      Pattern: Three repeated section blocks (overall, loading, summary)
+      each following identical structure: get baseline/extension values,
+      compute ratio, format 4 lines.
+      Approach: Extract _format_metric_section(title, baseline_val,
+      extension_val, baseline_name, extension_name) -> list[str] for the
+      repeated baseline/extension/ratio pattern.
+
+  - id: w12
+    summary: "Refactor generate_plan_comparison_summary (CC 13->~7) — extract execution map builder"
+    status: pending
+    needs: [w2]
+    note: |
+      File: benchbox/core/query_plans/comparison.py:576
+      Pattern: Duplicate execution extraction loops (lines 601-610), same
+      pattern as _compare_plans (w3). Both iterate phases.values() ->
+      queries -> first-seen-per-query_id.
+      Approach: Extract _build_execution_map(results) as a module-level
+      helper (shared with _compare_plans if in same module, or duplicated
+      locally). Main function becomes: build maps -> iterate common queries.
+
+  - id: w13
+    summary: "Refactor calculate_rankings (CC 13->~7) — extract metric config to dict"
+    status: pending
+    needs: [w2]
+    note: |
+      File: benchbox/core/results/database.py:622
+      Pattern: if/elif chain (lines 650-662) mapping metric name to SQL
+      column expression and sort order, plus duplicated query structure for
+      current and previous period.
+      Approach: Define _METRIC_CONFIG = {"geometric_mean":
+      ("geometric_mean_ms", "ASC"), "power_at_size": ("power_at_size",
+      "DESC"), "cost_efficiency": ("total_cost / NULLIF(...)", "ASC")}.
+      Replace if/elif with dict lookup + .get() default.
+
+  - id: w14
     summary: "Lower warn threshold from 15 to 13 in pyproject.toml"
     status: pending
-    needs: [w3, w4, w5, w6, w7, w8]
+    needs: [w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13]
     note: |
       Once all CC=13 functions are either excluded or refactored to <=12,
       update pyproject.toml: warn_complexity = 13.
       Verify: make complexity-check shows 0 warnings and 0 failures.
+
+deferred:
+  - id: d1
+    summary: "Add work units for additional refactorables discovered during w1 classification"
+    reason: |
+      The 11 refactorable functions in w3-w13 come from the top-20 sample.
+      w1 will classify the remaining 67 CC=13 functions, likely identifying
+      ~25-35 more refactorables. Each should be added as an individual work
+      unit following the w3-w13 format (one function per unit, with file path,
+      pattern, and approach). w14 needs-edges must be updated to include them.
 
 verification:
   - description: "Complexity check passes with no functions at CC>=13"
     command: "make complexity-check"
     expected_output: "PASSED: all functions within complexity limit"
   - description: "No non-excluded CC>=13 functions remain"
-    command: "uv run -- python scripts/check_complexity.py 2>&1 | head -5"
-    expected_output: "Top functions should be CC <=12"
+    command: "uv run -- python -c \"import ast, tomllib; from pathlib import Path; excludes=set(tomllib.load(open('pyproject.toml','rb')).get('tool',{}).get('benchbox',{}).get('complexity',{}).get('exclude_functions',[])); cc13=[1 for f in Path('benchbox').rglob('*.py') for n in ast.walk(ast.parse(f.read_text())) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and f'{f}:{n.name}' not in excludes and sum(1 for c in ast.walk(n) if isinstance(c,(ast.If,ast.While,ast.For,ast.ExceptHandler)))>=12]; print(f'{len(cc13)} functions at CC>=13')\""
+    expected_output: "0 functions at CC>=13"
   - description: "No regressions in fast suite"
     command: "uv run -- python -m pytest -m fast -q"
     expected_output: "All fast tests pass"
@@ -158,38 +245,42 @@ must_preserve:
   - "Existing tests must continue to pass without modification"
   - "exclude_functions entries must include CC score and rationale comment"
   - "Excluded functions from prior complexity waves remain untouched"
-  - "No new abstractions (base classes, protocols) — extraction alone achieves the target"
 
 approach: |
   w1: Read each CC=13 function, classify per guidelines in prior waves
   (reduce-cyclomatic-complexity-violations, reduce-cc14-complexity-cluster).
-  Record in classification-matrix format.
+  Record in classification-matrix format. After classification, add new
+  work units for any additional refactorables beyond w3-w13.
 
   w2: Batch-add inherent entries to pyproject.toml under new section header.
 
-  w3-w8: For each refactoring:
+  w3-w13: For each refactoring:
   1. Read the function and its callers/tests
   2. Extract private helper methods in the same module
   3. Run focused tests + lint after each extraction
   4. Verify CC reduced via: uv run -- python scripts/check_complexity.py 2>&1 | grep function_name
-  5. Commit per work unit (may batch multiple refactorings per commit within a work unit)
+  5. Commit per work unit
 
-  w9: Update warn_complexity threshold and verify.
+  w14: Update warn_complexity threshold and verify.
 
 anti_patterns:
   - "DO NOT change public API signatures — because all targets are internal functions"
   - "DO NOT add new abstractions (base classes, protocols) — because extraction alone achieves the CC target"
   - "DO NOT move code to new files — because helpers share private state with the parent function"
   - "DO NOT refactor functions classified as inherent — because their complexity reflects domain reality; use exclude_functions instead"
-  - "DO NOT lower max_complexity below 13 — because the exclude list handles inherent complexity above that threshold"
+  - "DO NOT lower max_complexity (currently 20) — because the exclude list handles inherent complexity above the warn threshold; only warn_complexity should decrease as the ceiling drops"
 
 scope_limit:
   only_modify:
     - "pyproject.toml"
-    - "benchbox/cli/"
-    - "benchbox/core/"
-    - "benchbox/platforms/"
-    - "benchbox/utils/"
-    - "benchbox/monitoring/"
-    - "benchbox/release/"
-    - "benchbox/mcp/"
+    - "benchbox/cli/commands/compare.py"
+    - "benchbox/cli/commands/compare_dataframes.py"
+    - "benchbox/cli/database.py"
+    - "benchbox/core/analysis/comparison.py"
+    - "benchbox/core/dataframe/data_loader.py"
+    - "benchbox/core/metadata_primitives/benchmark.py"
+    - "benchbox/core/pg_extension_comparison.py"
+    - "benchbox/core/query_plans/comparison.py"
+    - "benchbox/core/results/database.py"
+    # Additional files will be added after w1 classification identifies
+    # further refactoring targets from the remaining 67 functions.
