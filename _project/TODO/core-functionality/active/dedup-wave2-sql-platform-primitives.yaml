@@ -125,7 +125,7 @@ work:
 
 - id: w5
   summary: "Extract execute_sql_query shared implementation for Doris and PostgreSQL"
-  status: pending
+  status: done
 
 - id: w6
   summary: "Extract _get_dataframe_manager generic factory in core/dataframe_manager_factory.py"
