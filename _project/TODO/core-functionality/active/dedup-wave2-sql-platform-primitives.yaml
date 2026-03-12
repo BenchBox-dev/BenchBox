@@ -113,7 +113,7 @@ work:
 
 - id: w2
   summary: "Extract _validate_catalog_exists into presto_trino_utils.py, update both platforms"
-  status: pending
+  status: done
 
 - id: w3
   summary: "Extract get_queries_with_translation helper, refactor amplab/clickbench/h2odb/ssb"
