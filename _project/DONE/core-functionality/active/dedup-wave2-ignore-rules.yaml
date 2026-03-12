@@ -2,7 +2,8 @@ id: dedup-wave2-ignore-rules
 title: "Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage"
 worktree: core-functionality
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-03-12"
 category: "Code Quality and Technical Debt"
 description: |
   The `make duplicate-check-verbose` report (2026-03-12) shows 363 duplicate groups /
@@ -86,17 +87,33 @@ approach: |
 work:
   - id: w1
     summary: "Add all new ignore rules to pyproject.toml [tool.benchbox.duplicates]"
-    status: pending
+    status: done
+    notes: |
+      Added 3 global ignore_function_names (G5: to_dict, get_etl_config, get_performance_config).
+      Extended 4 existing rules (G17: window funcs in protocol stubs, G26: cast_date/cast_string
+      with context.py, G29: get_row_count + pandas_family.py, G22: facade __init__ for
+      datavault/tpcds/tpch). Added 6 new path-scoped rules (G2, G6/G19/G30, G14, G21, G25, G27).
+      Note: G26 original approach assumed cast_date/cast_string at file_parsers.py and
+      ddl_generator.py, but those files contain parse_file and supports_tuning_type respectively
+      (structural false positives — different abstract method stubs sharing same AST hash).
+      Fixed to target context.py where cast_date/cast_string actually live.
 
   - id: w2
     summary: "Run make duplicate-check-verbose, verify groups suppressed, rebaseline threshold"
     needs: [w1]
-    status: pending
+    status: done
+    notes: |
+      Before: 366 groups, 519 instances, 9,371 duplicated lines.
+      After: 349 groups, 476 instances, 8,614 duplicated lines.
+      Reduction: 17 groups, 43 instances, 757 lines.
+      Threshold rebaselined: 10,284 → 9,476 (ceil(8614 * 1.10)).
+      All targeted function names verified absent from report output.
 
   - id: w3
     summary: "Run make duplicate-check to confirm check still passes with new threshold"
     needs: [w2]
-    status: pending
+    status: done
+    notes: "PASS: 8614 duplicated lines within threshold of 9476"
 
 files_affected:
   modified:

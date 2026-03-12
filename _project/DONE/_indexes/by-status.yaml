@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:43:39.062118'
-total_items: 582
+generated_at: '2026-03-12T09:45:30.923761'
+total_items: 583
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 534
+    count: 535
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -574,6 +574,11 @@ statuses:
       title: Add heap-to-columnstore migration benchmark for pg_mooncake
       priority: Low
       category: Platform Expansion
+    - id: dedup-wave2-ignore-rules
+      file: DONE/core-functionality/active/dedup-wave2-ignore-rules.yaml
+      title: Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage
+      priority: Medium-High
+      category: Code Quality and Technical Debt
     - id: dedup-ignore-rules-boilerplate
       file: DONE/core-functionality/active/dedup-ignore-rules-boilerplate.yaml
       title: Add ignore rules for 17 boilerplate duplicate groups identified by duplicate-check

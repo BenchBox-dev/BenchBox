@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:43:39.061970'
-total_items: 582
+generated_at: '2026-03-12T09:45:30.923622'
+total_items: 583
 priorities:
   Critical:
     count: 35
@@ -1214,7 +1214,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 65
+    count: 66
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1276,6 +1276,11 @@ priorities:
       file: DONE/main/greyscale-ascii-visualization-fallbacks.yaml
       title: Add greyscale fallback rendering for ASCII visualizations
       category: Core Functionality
+      status: Completed
+    - id: dedup-wave2-ignore-rules
+      file: DONE/core-functionality/active/dedup-wave2-ignore-rules.yaml
+      title: Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage
+      category: Code Quality and Technical Debt
       status: Completed
     - id: dedup-ignore-rules-boilerplate
       file: DONE/core-functionality/active/dedup-ignore-rules-boilerplate.yaml

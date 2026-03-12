@@ -1,14 +1,9 @@
-generated_at: '2026-03-12T09:43:37.702997'
-total_items: 28
+generated_at: '2026-03-12T09:45:29.486373'
+total_items: 27
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: dedup-wave2-ignore-rules
-      file: TODO/core-functionality/active/dedup-wave2-ignore-rules.yaml
-      title: Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage
-      priority: Medium-High
-      category: Code Quality and Technical Debt
     - id: test-suite-quality-wave-2
       file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest

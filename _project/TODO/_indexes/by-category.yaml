@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T09:43:37.702973'
+generated_at: '2026-03-12T09:45:29.486347'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -51,13 +51,8 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 5
+    count: 4
     items:
-    - id: dedup-wave2-ignore-rules
-      file: TODO/core-functionality/active/dedup-wave2-ignore-rules.yaml
-      title: Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage
-      priority: Medium-High
-      status: In Progress
     - id: dedup-wave2-dataframe-platform
       file: TODO/core-functionality/active/dedup-wave2-dataframe-platform.yaml
       title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
