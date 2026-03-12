@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T15:47:07.090478'
-total_items: 31
+generated_at: '2026-03-12T17:28:26.870737'
+total_items: 30
 items:
 - id: isolate-experimental-core-subsystems
   file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
@@ -344,13 +344,13 @@ items:
   needs:
   - spark-mixin-open-table-format-loading
 - id: dedup-wave3-sql-platform-adapters
-  file: TODO/core-functionality/planning/dedup-wave3-sql-platform-adapters.yaml
+  file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
   title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing, table
     extraction'
   worktree: core-functionality
   category: Code Quality and Technical Debt
   priority: Medium
-  status: Not Started
+  status: In Progress
   tags:
   - code-quality
   - duplicate-check
@@ -364,13 +364,13 @@ items:
   needs:
   - dedup-wave3-ignore-rules
 - id: dedup-wave3-core-and-dataframe
-  file: TODO/core-functionality/planning/dedup-wave3-core-and-dataframe.yaml
+  file: TODO/core-functionality/active/dedup-wave3-core-and-dataframe.yaml
   title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text output,
     registries'
   worktree: core-functionality
   category: Code Quality and Technical Debt
   priority: Medium
-  status: Not Started
+  status: In Progress
   tags:
   - code-quality
   - duplicate-check
@@ -436,16 +436,6 @@ items:
   work_total: 2
   work_done: 0
   work_ready: 1
-- id: reduce-cc12-complexity-ceiling
-  file: TODO/main/active/reduce-cc12-complexity-ceiling.yaml
-  title: Reduce CC=12 complexity ceiling — exclude 12 inherent, refactor 8, lower warn to 12
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: In Progress
-  work_total: 10
-  work_done: 1
-  work_ready: 8
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

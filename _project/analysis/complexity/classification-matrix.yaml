@@ -2922,3 +2922,311 @@ functions:
   classification: simplify_now
   rationale: "Repetitive range checks (scale factor min/max, total time min/max, per-query time min/max) with identical check-and-append-error pattern."
   refactor_strategy: "Define _VALIDATION_RULES list of (attr, min_val, max_val, label) tuples. Replace repeated range checks with a single validation loop."
+
+# --- WAVE 4B FOLLOW-UP (2026-03-12; additional CC=12 functions from --top 200 scan) ---
+
+- key: "benchbox/core/tpcds/c_tools.py:_clean_sql"
+  file: "benchbox/core/tpcds/c_tools.py"
+  line: 580
+  function: "_clean_sql"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/core"
+  classification: ignore_with_rationale
+  rationale: "TPC-DS SQL cleanup combines vendor-specific syntax rewrites (SQL Server, DB2, Oracle), interval normalization, rollup/window fixes, and template cleanup. The branches represent distinct SQL dialect families rather than one reusable decision table."
+
+- key: "benchbox/core/tpcds/dataframe_queries/rollup_helper.py:expand_rollup_pandas"
+  file: "benchbox/core/tpcds/dataframe_queries/rollup_helper.py"
+  line: 118
+  function: "expand_rollup_pandas"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/core"
+  classification: ignore_with_rationale
+  rationale: "ROLLUP expansion must switch between grouped levels and the grand-total case, while also handling pandas-family adapter semantics and Dask scalar materialization. The branches mirror real execution modes of the operation."
+
+- key: "benchbox/core/tpcds/generator/streaming.py:_generate_parent_table_with_children"
+  file: "benchbox/core/tpcds/generator/streaming.py"
+  line: 113
+  function: "_generate_parent_table_with_children"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/core"
+  classification: ignore_with_rationale
+  rationale: "Streaming generation of parent/child tables coordinates subprocess execution, per-table compression, manifest bookkeeping, missing-table cleanup, and verbose reporting. The branching follows the required data-generation workflow."
+
+- key: "benchbox/core/tpcds_obt/query_conversion.py:_rewrite_columns"
+  file: "benchbox/core/tpcds_obt/query_conversion.py"
+  line: 693
+  function: "_rewrite_columns"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/core"
+  classification: ignore_with_rationale
+  rationale: "OBT column rewriting must distinguish unqualified identifiers, dimension-role prefixes, fact-column mapping, and final alias placement on the OBT table. The branches encode SQL semantic differences, not boilerplate control flow."
+
+- key: "benchbox/core/tpch/generator.py:_generate_local"
+  file: "benchbox/core/tpch/generator.py"
+  line: 794
+  function: "_generate_local"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/core"
+  classification: ignore_with_rationale
+  rationale: "TPC-H local generation orchestrates directory validation, reuse checks, stale-artifact pruning, bundled-sample fallback, and streaming-vs-file generation completion. The control flow reflects the generation lifecycle."
+
+- key: "benchbox/core/tpch/maintenance_test.py:run_maintenance_test"
+  file: "benchbox/core/tpch/maintenance_test.py"
+  line: 103
+  function: "run_maintenance_test"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/core"
+  classification: ignore_with_rationale
+  rationale: "TPC-H maintenance testing follows the specification-required RF1/RF2 pair sequence with interval waits, per-operation accounting, and optional integrity validation. The branching is driven by the benchmark protocol."
+
+- key: "benchbox/core/tpch/power_test.py:__init__"
+  file: "benchbox/core/tpch/power_test.py"
+  line: 85
+  function: "__init__"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/core"
+  classification: ignore_with_rationale
+  rationale: "Initialization must reconcile user-provided seeds, official answer-set defaults, stream-specific validation limits, and verbosity warnings. Those branches are part of the TPC-H validation contract."
+
+- key: "benchbox/platforms/adapter_factory.py:get_adapter"
+  file: "benchbox/platforms/adapter_factory.py"
+  line: 61
+  function: "get_adapter"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "The unified adapter factory must validate platform existence, mode support, deployment support, and final SQL/DataFrame dispatch in one place. The decision tree is the public platform-resolution contract."
+
+- key: "benchbox/platforms/base/adapter.py:_create_enhanced_data_generation_phase"
+  file: "benchbox/platforms/base/adapter.py"
+  line: 2283
+  function: "_create_enhanced_data_generation_phase"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "Enhanced phase creation defensively handles heterogeneous benchmark table containers, malformed iterables, per-table success/failure accounting, and aggregate status synthesis. The complexity comes from compatibility and error-reporting requirements."
+
+- key: "benchbox/platforms/clickhouse/tuning.py:generate_tuning_clause"
+  file: "benchbox/platforms/clickhouse/tuning.py"
+  line: 385
+  function: "generate_tuning_clause"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "ClickHouse tuning has distinct semantics for partitioning, clustering, ordering, and distribution logging, with ordering precedence and duplicate elimination required by the engine. The branches mirror engine-specific DDL rules."
+
+- key: "benchbox/platforms/databend/adapter.py:_insert_files_batched"
+  file: "benchbox/platforms/databend/adapter.py"
+  line: 425
+  function: "_insert_files_batched"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "Databend batch loading interleaves delimiter safety, file iteration, row-shape validation, SQL escaping, and flush-boundary execution. The branches are part of the loading protocol rather than abstractable business rules."
+
+- key: "benchbox/platforms/databricks/credentials.py:setup_databricks_credentials"
+  file: "benchbox/platforms/databricks/credentials.py"
+  line: 18
+  function: "setup_databricks_credentials"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "Interactive Databricks setup must combine existing defaults, optional SDK auto-detection, secure token prompting, optional catalog/schema defaults, and validation feedback. The branching is inherent to the credential workflow."
+
+- key: "benchbox/platforms/dataframe/benchmark_mixin.py:_get_tpcds_queries"
+  file: "benchbox/platforms/dataframe/benchmark_mixin.py"
+  line: 1139
+  function: "_get_tpcds_queries"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "TPC-DS DataFrame query resolution must handle query-manager presence, stream permutation generation, variant lookup, and optional parity fallback. Those branches are driven by benchmark semantics and registry availability."
+
+- key: "benchbox/platforms/datafusion.py:create_connection"
+  file: "benchbox/platforms/datafusion.py"
+  line: 332
+  function: "create_connection"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "DataFusion connection setup must branch across runtime API variants, working-directory locking, memory/disk spill configuration, and session-option wiring. The complexity reflects version-dependent platform setup."
+
+- key: "benchbox/platforms/duckdb.py:validate_platform_capabilities"
+  file: "benchbox/platforms/duckdb.py"
+  line: 1302
+  function: "validate_platform_capabilities"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "Capability validation performs independent driver-availability, version-compatibility, and memory-setting checks before assembling a structured ValidationResult. The branches correspond to separate validation rules."
+
+- key: "benchbox/platforms/fabric_warehouse.py:load_data"
+  file: "benchbox/platforms/fabric_warehouse.py"
+  line: 808
+  function: "load_data"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "Fabric Warehouse loading combines benchmark/manifest table discovery, OneLake COPY ingestion, direct INSERT fallback, and special handling for read-only Lakehouse endpoints. The branches are platform-specific loading semantics."
+
+- key: "benchbox/platforms/firebolt.py:_load_data_via_s3"
+  file: "benchbox/platforms/firebolt.py"
+  line: 844
+  function: "_load_data_via_s3"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "Firebolt S3 staging must resolve AWS credentials, upload staged files, choose CSV/TSV ingest mode, and account for per-file load results. The workflow is inherently tied to Firebolt's external-table ingestion path."
+
+- key: "benchbox/platforms/postgresql.py:validate_platform_capabilities"
+  file: "benchbox/platforms/postgresql.py"
+  line: 773
+  function: "validate_platform_capabilities"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "Capability validation performs independent psycopg2 availability, version parsing, and work_mem checks before building structured validation details. The branches correspond to separate validator rules."
+
+- key: "benchbox/platforms/redshift.py:__init__"
+  file: "benchbox/platforms/redshift.py"
+  line: 63
+  function: "__init__"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "Redshift initialization has to validate dependency combinations, normalize staging configuration, and set connection/WLM defaults while preserving serverless and provisioned semantics. The branches come from platform configuration requirements."
+
+- key: "benchbox/platforms/starburst.py:_configure_starburst_defaults"
+  file: "benchbox/platforms/starburst.py"
+  line: 80
+  function: "_configure_starburst_defaults"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: ignore_with_rationale
+  rationale: "Starburst Galaxy configuration must merge environment defaults, role-qualified usernames, TLS defaults, and required-auth validation messages. The branches are the platform's configuration contract."
+
+- key: "benchbox/utils/format_converters/delta_converter.py:convert"
+  file: "benchbox/utils/format_converters/delta_converter.py"
+  line: 39
+  function: "convert"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/utils"
+  classification: ignore_with_rationale
+  rationale: "Delta conversion is a linear pipeline: dependency import, schema validation, table read, output-path setup, Delta writer configuration, and result reporting. Each branch guards a distinct conversion stage."
+
+- key: "benchbox/utils/format_converters/vortex_converter.py:convert"
+  file: "benchbox/utils/format_converters/vortex_converter.py"
+  line: 147
+  function: "convert"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/utils"
+  classification: ignore_with_rationale
+  rationale: "Vortex conversion is a staged pipeline covering schema validation, source ingestion, output writing, row-count validation, cleanup of partial outputs, and result metadata. The branches reflect distinct failure-handling stages."
+
+- key: "benchbox/utils/runtime_env.py:discover_isolated_runtime"
+  file: "benchbox/utils/runtime_env.py"
+  line: 165
+  function: "discover_isolated_runtime"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/utils"
+  classification: ignore_with_rationale
+  rationale: "Isolated runtime discovery must scan candidate roots, locate Python executables across OS layouts, inspect site-packages, and reject ABI-mismatched environments. The branches are filesystem- and runtime-compatibility driven."
+
+- key: "benchbox/utils/runtime_env.py:ensure_driver_version"
+  file: "benchbox/utils/runtime_env.py"
+  line: 331
+  function: "ensure_driver_version"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/utils"
+  classification: ignore_with_rationale
+  rationale: "Driver resolution must reconcile no-package platforms, current-env matches, isolated runtime reuse, auto-install policy, and fallback error reporting. The branching is the contract for deterministic driver selection."
+
+- key: "benchbox/core/tpcdi/etl/sql_backend.py:_build_safe_where_clause"
+  file: "benchbox/core/tpcdi/etl/sql_backend.py"
+  line: 174
+  function: "_build_safe_where_clause"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/core"
+  classification: simplify_now
+  rationale: "The function mixed two independent validation paths: parameterized dict conditions and raw SQL-string validation. Splitting the two flows removes accidental branching without changing the security rules."
+  refactor_strategy: "Extract _build_parameterized_where_clause(), _validate_sql_where_clause(), and _validate_where_clause_identifiers(). Keep the public helper as a thin dispatcher."
+
+- key: "benchbox/core/tpcdi/etl/transformations.py:_apply_vectorized_conversions"
+  file: "benchbox/core/tpcdi/etl/transformations.py"
+  line: 129
+  function: "_apply_vectorized_conversions"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/core"
+  classification: simplify_now
+  rationale: "Three conversion families (datetime, numeric, string) repeated the same 'collect columns → try vectorized path → fallback to per-column conversion' structure. The branching was mostly duplicated scaffolding."
+  refactor_strategy: "Add shared helpers for collecting vectorized columns and applying conversion groups, with small family-specific converter helpers."
+
+- key: "benchbox/core/visualization/ascii_runtime.py:_extract_phase_timings_ms"
+  file: "benchbox/core/visualization/ascii_runtime.py"
+  line: 587
+  function: "_extract_phase_timings_ms"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/core"
+  classification: simplify_now
+  rationale: "Candidate-source discovery and per-phase normalization were interleaved in one loop nest. Extracting the source iterator and entry normalizer removes duplicated conditionals."
+  refactor_strategy: "Split into _phase_timing_candidates() and _normalize_phase_timing_entry(), leaving the main function as a simple first-match selector."
+
+- key: "benchbox/mcp/tools/analytics.py:_extract_plan_summary"
+  file: "benchbox/mcp/tools/analytics.py"
+  line: 751
+  function: "_extract_plan_summary"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/mcp"
+  classification: simplify_now
+  rationale: "Recursive traversal and metric accumulation were fused in one closure. Separating node-metric updates from traversal removes incidental branching while keeping a single walk."
+  refactor_strategy: "Keep the recursive walker but extract _update_plan_summary(summary, node) for the per-node accounting rules."
+
+- key: "benchbox/core/tpcds_obt/query_conversion.py:_map_identifier_default"
+  file: "benchbox/core/tpcds_obt/query_conversion.py"
+  line: 1020
+  function: "_map_identifier_default"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/core"
+  classification: simplify_now
+  rationale: "The function was a straight prefix-dispatch chain plus a small channel fallback table. Converting the fixed prefixes to dictionaries removes accidental branching."
+  refactor_strategy: "Replace the repeated startswith() chain with _IDENTIFIER_DEFAULT_FACT_TABLES and _CHANNEL_FACT_TABLES lookups."
+
+- key: "benchbox/platforms/databricks/adapter.py:_get_remote_file_uris_from_manifest"
+  file: "benchbox/platforms/databricks/adapter.py"
+  line: 1004
+  function: "_get_remote_file_uris_from_manifest"
+  score: 12
+  band: ceiling
+  module_family: "benchbox/platforms"
+  classification: simplify_now
+  rationale: "Manifest URI construction mixed per-table iteration with sharded-name wildcard inference and alignment checks. Pulling the pattern logic into helpers removes local nesting without changing manifest behavior."
+  refactor_strategy: "Extract _manifest_pattern_for_name() and _detect_manifest_wildcard(). Leave the public helper as table iteration plus fallback selection."

@@ -1,12 +1,19 @@
-generated_at: '2026-03-12T15:47:07.090533'
-total_items: 31
+generated_at: '2026-03-12T17:28:26.870787'
+total_items: 30
 statuses:
   In Progress:
-    count: 2
+    count: 3
     items:
-    - id: reduce-cc12-complexity-ceiling
-      file: TODO/main/active/reduce-cc12-complexity-ceiling.yaml
-      title: Reduce CC=12 complexity ceiling — exclude 12 inherent, refactor 8, lower warn to 12
+    - id: dedup-wave3-sql-platform-adapters
+      file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
+      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
+        table extraction'
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: dedup-wave3-core-and-dataframe
+      file: TODO/core-functionality/active/dedup-wave3-core-and-dataframe.yaml
+      title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text
+        output, registries'
       priority: Medium
       category: Code Quality and Technical Debt
     - id: test-suite-quality-wave-2
@@ -16,7 +23,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 29
+    count: 27
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -63,18 +70,6 @@ statuses:
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
       priority: Low
       category: Platform Expansion
-    - id: dedup-wave3-sql-platform-adapters
-      file: TODO/core-functionality/planning/dedup-wave3-sql-platform-adapters.yaml
-      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
-        table extraction'
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: dedup-wave3-core-and-dataframe
-      file: TODO/core-functionality/planning/dedup-wave3-core-and-dataframe.yaml
-      title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text
-        output, registries'
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: deferred-dataframe-benchmark-implementations
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks

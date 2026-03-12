@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T15:47:08.495986'
-total_items: 588
+generated_at: '2026-03-12T17:28:28.310530'
+total_items: 589
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5702,6 +5702,17 @@ items:
   completed_date: '2026-03-12'
   work_total: 9
   work_done: 9
+  work_ready: 0
+- id: reduce-cc12-complexity-ceiling
+  file: DONE/main/active/reduce-cc12-complexity-ceiling.yaml
+  title: Reduce CC=12 complexity ceiling — exclude 12 inherent, refactor 8, lower warn to 12
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  completed_date: '2026-03-12'
+  work_total: 10
+  work_done: 10
   work_ready: 0
 - id: reduce-cc13-complexity-ceiling
   file: DONE/main/active/reduce-cc13-complexity-ceiling.yaml

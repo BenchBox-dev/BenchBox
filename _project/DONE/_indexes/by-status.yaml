@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T15:47:08.496543'
-total_items: 588
+generated_at: '2026-03-12T17:28:28.311097'
+total_items: 589
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 540
+    count: 541
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2162,6 +2162,11 @@ statuses:
       title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
       priority: Medium
       category: Code Quality
+    - id: reduce-cc12-complexity-ceiling
+      file: DONE/main/active/reduce-cc12-complexity-ceiling.yaml
+      title: Reduce CC=12 complexity ceiling — exclude 12 inherent, refactor 8, lower warn to 12
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: reduce-cc13-complexity-ceiling
       file: DONE/main/active/reduce-cc13-complexity-ceiling.yaml
       title: Reduce CC=13 complexity ceiling and lower warn threshold to 13
