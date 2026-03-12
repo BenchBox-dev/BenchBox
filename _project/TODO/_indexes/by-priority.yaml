@@ -1,17 +1,17 @@
-generated_at: '2026-03-12T15:03:16.517858'
-total_items: 34
+generated_at: '2026-03-12T15:33:11.812285'
+total_items: 32
 priorities:
   High:
-    count: 6
+    count: 4
     items:
     - id: isolate-experimental-core-subsystems
       file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
       title: Classify and isolate experimental core subsystems that are outside the supported benchmark surface
       category: Architecture
       status: Not Started
-    - id: extract-monitoring-library
-      file: TODO/main/planning/extract-monitoring-library.yaml
-      title: Evaluate and extract the generic monitoring stack into a standalone library boundary
+    - id: extract-or-prune-publishing-subsystem
+      file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
+      title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
       category: Architecture
       status: Not Started
     - id: extract-release-and-sync-maintainer-tooling
@@ -19,20 +19,10 @@ priorities:
       title: Extract maintainer-only release, sync, and content-validation tooling from the installable product
       category: Maintainer Tooling
       status: Not Started
-    - id: extract-query-plan-harmonization-library
-      file: TODO/main/planning/extract-query-plan-harmonization-library.yaml
-      title: Extract query-plan normalization, diffing, and rendering into a reusable library boundary
-      category: Architecture
-      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
-      status: Not Started
-    - id: split-mcp-into-separate-distribution
-      file: TODO/main/planning/split-mcp-into-separate-distribution.yaml
-      title: Split the MCP server surface into a separate distribution with an explicit dependency boundary
-      category: Packaging
       status: Not Started
   Medium-High:
     count: 4
@@ -88,9 +78,9 @@ priorities:
         output, registries'
       category: Code Quality and Technical Debt
       status: Not Started
-    - id: extract-or-prune-publishing-subsystem
-      file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
-      title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
+    - id: extract-monitoring-library
+      file: TODO/main/planning/extract-monitoring-library.yaml
+      title: Evaluate and extract the generic monitoring stack into a standalone library boundary
       category: Architecture
       status: Not Started
     - id: flight-data-benchmark
@@ -98,16 +88,16 @@ priorities:
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
       status: Not Started
-    - id: move-todo-dag-tooling-out-of-benchbox
-      file: TODO/main/planning/move-todo-dag-tooling-out-of-benchbox.yaml
-      title: Move the repo-local TODO DAG tooling into shared contributor infrastructure without breaking local workflows
-      category: Supporting Infrastructure
-      status: Not Started
     - id: reduce-cc12-complexity-ceiling
       file: TODO/main/active/reduce-cc12-complexity-ceiling.yaml
-      title: Reduce CC=12 complexity ceiling — exclude 6 inherent, refactor 14, lower warn to 12
+      title: Reduce CC=12 complexity ceiling — exclude 12 inherent, refactor 8, lower warn to 12
       category: Code Quality and Technical Debt
       status: In Progress
+    - id: split-mcp-into-separate-distribution
+      file: TODO/main/planning/split-mcp-into-separate-distribution.yaml
+      title: Split the MCP server surface into a separate distribution with an explicit dependency boundary
+      category: Packaging
+      status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

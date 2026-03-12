@@ -198,26 +198,38 @@ files_affected:
 verification:
   - description: "Primitives benchmark tests pass"
     command: "uv run -- python -m pytest tests/ -v -k 'primitive or transaction or write_prim'"
-    expected_output: "all tests pass"
+    expected_output: "exit code 0, no failures"
   - description: "TPC official benchmark tests pass"
     command: "uv run -- python -m pytest tests/ -v -k 'official or audit'"
-    expected_output: "all tests pass"
+    expected_output: "exit code 0, no failures"
   - description: "DataFrame platform tests pass"
     command: "uv run -- python -m pytest tests/ -v -k 'dataframe or unified_frame or datafusion'"
-    expected_output: "all tests pass"
+    expected_output: "exit code 0, no failures"
   - description: "CLI command tests pass"
     command: "uv run -- python -m pytest tests/ -v -k 'qphh or metrics'"
-    expected_output: "all tests pass"
-  - description: "Duplicate check shows reduction"
-    command: "make duplicate-check-verbose 2>&1 | head -5"
-    expected_output: "duplicated lines lower than pre-wave3 count"
+    expected_output: "exit code 0, no failures"
+  - description: "Duplicate check shows reduction for targeted groups"
+    command: "make duplicate-check-verbose 2>&1 | grep -c '_table_exists\\|_rank_by_geometric_mean\\|generate_audit_trail\\|cast_float64\\|_format_text_output\\|list_clickbench_queries'"
+    expected_output: "0"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/"
+    - "benchbox/core/transaction_primitives/benchmark.py"
+    - "benchbox/core/write_primitives/benchmark.py"
+    - "benchbox/core/primitives_benchmark_utils.py"
+    - "benchbox/core/analysis/ranking.py"
+    - "benchbox/core/tpcds/official_benchmark.py"
+    - "benchbox/core/tpch/official_benchmark.py"
+    - "benchbox/core/tpc_patterns.py"
+    - "benchbox/core/tpcdi/loader.py"
+    - "benchbox/core/clickbench/dataframe_queries/registry.py"
+    - "benchbox/core/nyctaxi/dataframe_queries/registry.py"
+    - "benchbox/core/ssb/dataframe_queries/registry.py"
+    - "benchbox/core/tpcds/dataframe_queries/registry.py"
     - "benchbox/platforms/dataframe/unified_frame.py"
     - "benchbox/platforms/dataframe/datafusion_df.py"
-    - "benchbox/cli/commands/"
+    - "benchbox/cli/commands/calculate_qphh.py"
+    - "benchbox/cli/commands/metrics.py"
     - "tests/"
 
 must_preserve:
@@ -232,11 +244,11 @@ must_preserve:
   - "Registry query listings return identical dictionaries"
 
 anti_patterns:
-  - "DO NOT change public method signatures — only extract internal dispatch logic"
-  - "DO NOT use getattr-based dynamic dispatch for _apply_cast — pass explicit type strings, not Python type objects, to maintain IDE navigability"
-  - "DO NOT merge transaction_primitives and write_primitives benchmark modules — only share the specific duplicated helper functions"
-  - "DO NOT create abstract base classes for the registries — a simple shared function with module_path parameter is sufficient"
-  - "DO NOT combine the ranking refactor with any changes to the ranking algorithm itself — only extract the shared scaffolding"
+  - "DO NOT change public method signatures — because callers across 20+ platform adapters and benchmark modules depend on the current signatures; changing them silently breaks the contract without a test failure — only extract internal dispatch logic"
+  - "DO NOT use getattr-based dynamic dispatch for _apply_cast — because explicit type strings preserve IDE navigability and static analysis across the 3 cast methods — pass string literals like 'float64', not Python type objects"
+  - "DO NOT merge transaction_primitives and write_primitives benchmark modules — because they represent distinct TPC benchmark categories with independent evolution paths; a merge couples unrelated feature work — only share the specific _table_exists and get_create_tables_sql helper functions"
+  - "DO NOT create abstract base classes for the registries — because 4 registries with a 14-line shared pattern doesn't justify the cognitive overhead of an ABC; contributors adding a new benchmark would need to understand the class hierarchy instead of copying a simple function call — use a plain shared function"
+  - "DO NOT combine the ranking refactor with ranking algorithm changes — because the ranking algorithms are validated against TPC official QphH formulas; mixing structural refactoring with logic changes makes regressions harder to isolate — only extract the shared scaffolding, keep metric computation untouched"
 
 metadata:
   tags:

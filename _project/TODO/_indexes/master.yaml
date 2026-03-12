@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T15:03:16.517806'
-total_items: 34
+generated_at: '2026-03-12T15:33:11.812238'
+total_items: 32
 items:
 - id: isolate-experimental-core-subsystems
   file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
@@ -17,20 +17,20 @@ items:
   work_total: 7
   work_done: 0
   work_ready: 1
-- id: extract-monitoring-library
-  file: TODO/main/planning/extract-monitoring-library.yaml
-  title: Evaluate and extract the generic monitoring stack into a standalone library boundary
+- id: extract-or-prune-publishing-subsystem
+  file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
+  title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
   worktree: main
   category: Architecture
   priority: High
   status: Not Started
   tags:
   - architecture
-  - extraction
-  - monitoring
+  - publishing
+  - cleanup
   - scope-review
-  estimated_effort: Large
-  work_total: 7
+  estimated_effort: Small
+  work_total: 4
   work_done: 0
   work_ready: 1
 - id: extract-release-and-sync-maintainer-tooling
@@ -49,22 +49,6 @@ items:
   work_total: 7
   work_done: 0
   work_ready: 1
-- id: extract-query-plan-harmonization-library
-  file: TODO/main/planning/extract-query-plan-harmonization-library.yaml
-  title: Extract query-plan normalization, diffing, and rendering into a reusable library boundary
-  worktree: main
-  category: Architecture
-  priority: High
-  status: Not Started
-  tags:
-  - architecture
-  - extraction
-  - query-plans
-  - scope-review
-  estimated_effort: Large
-  work_total: 7
-  work_done: 0
-  work_ready: 1
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -73,22 +57,6 @@ items:
   priority: High
   status: Not Started
   work_total: 4
-  work_done: 0
-  work_ready: 1
-- id: split-mcp-into-separate-distribution
-  file: TODO/main/planning/split-mcp-into-separate-distribution.yaml
-  title: Split the MCP server surface into a separate distribution with an explicit dependency boundary
-  worktree: main
-  category: Packaging
-  priority: High
-  status: Not Started
-  tags:
-  - architecture
-  - packaging
-  - mcp
-  - scope-review
-  estimated_effort: Large
-  work_total: 7
   work_done: 0
   work_ready: 1
 - id: bodo-jit-and-mpi-support
@@ -418,20 +386,20 @@ items:
   work_ready: 8
   needs:
   - dedup-wave3-ignore-rules
-- id: extract-or-prune-publishing-subsystem
-  file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
-  title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
+- id: extract-monitoring-library
+  file: TODO/main/planning/extract-monitoring-library.yaml
+  title: Evaluate and extract the generic monitoring stack into a standalone library boundary
   worktree: main
   category: Architecture
   priority: Medium
   status: Not Started
   tags:
   - architecture
-  - publishing
-  - cleanup
+  - extraction
+  - monitoring
   - scope-review
-  estimated_effort: Small to Medium
-  work_total: 6
+  estimated_effort: Medium
+  work_total: 7
   work_done: 0
   work_ready: 1
 - id: flight-data-benchmark
@@ -454,33 +422,32 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: move-todo-dag-tooling-out-of-benchbox
-  file: TODO/main/planning/move-todo-dag-tooling-out-of-benchbox.yaml
-  title: Move the repo-local TODO DAG tooling into shared contributor infrastructure without breaking local workflows
-  worktree: main
-  category: Supporting Infrastructure
-  priority: Medium
-  status: Not Started
-  tags:
-  - contributor-tooling
-  - todo
-  - infrastructure
-  - scope-review
-  estimated_effort: Medium
-  work_total: 7
-  work_done: 0
-  work_ready: 1
 - id: reduce-cc12-complexity-ceiling
   file: TODO/main/active/reduce-cc12-complexity-ceiling.yaml
-  title: Reduce CC=12 complexity ceiling — exclude 6 inherent, refactor 14, lower warn to 12
+  title: Reduce CC=12 complexity ceiling — exclude 12 inherent, refactor 8, lower warn to 12
   worktree: main
   category: Code Quality and Technical Debt
   priority: Medium
   status: In Progress
-  work_total: 16
+  work_total: 10
+  work_done: 1
+  work_ready: 8
+- id: split-mcp-into-separate-distribution
+  file: TODO/main/planning/split-mcp-into-separate-distribution.yaml
+  title: Split the MCP server surface into a separate distribution with an explicit dependency boundary
+  worktree: main
+  category: Packaging
+  priority: Medium
+  status: Not Started
+  tags:
+  - architecture
+  - packaging
+  - mcp
+  - scope-review
+  estimated_effort: Large
+  work_total: 7
   work_done: 0
   work_ready: 1
-  deferred_count: 1
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
@@ -513,9 +480,9 @@ items:
   - ignore-rules
   - wave-3
   estimated_effort: 1-2 hours
-  work_total: 3
+  work_total: 5
   work_done: 0
-  work_ready: 1
+  work_ready: 3
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

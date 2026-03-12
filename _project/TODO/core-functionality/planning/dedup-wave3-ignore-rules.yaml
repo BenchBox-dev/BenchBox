@@ -140,26 +140,50 @@ approach: |
 
 work:
   - id: w1
-    summary: "Add all new ignore rules to pyproject.toml [tool.benchbox.duplicates]"
+    summary: "Add ignore rules for wave-2 residual wrappers: G1, G6, G19"
     status: pending
     notes: |
-      Add 13 groups worth of rules. For groups that overlap with existing rules,
-      extend the existing rule rather than creating a duplicate entry. For new
-      groups, add new entries following the established pattern with comments
-      referencing the wave-3 group number.
+      These are thin wrappers left over after wave-2 extractions. The underlying
+      logic was already consolidated; the structural match is the delegation pattern.
+      G1: generate_*_dimension scoped to tpcdi/generator/sql.py.
+      G6: get_all_create_table_sql scoped to amplab/schema.py, read_primitives/schema.py, ssb/schema.py.
+      G19: get_dataframe_*_manager scoped to primitives dataframe_operations.py files.
 
   - id: w2
+    summary: "Add ignore rules for AST false positives: G3, G22"
+    status: pending
+    notes: |
+      These are structurally similar AST hashes across unrelated functions.
+      G3: classify_error scoped to tpcdi/etl/error_recovery.py; check date_add/date_sub
+      coverage in existing rules, extend path_contains if needed.
+      G22: calculate_official_metrics, execute_operation scoped to false-positive paths;
+      check overlap with existing rules first.
+
+  - id: w3
+    summary: "Add ignore rules for intentional boilerplate patterns: G2, G5, G7, G8, G9, G20, G21, G27"
+    status: pending
+    notes: |
+      G2: H2O.db aggregation query impls scoped to read_primitives/dataframe_queries.py.
+      G5: primitives catalog methods scoped to queries.py and operations.py files.
+      G7: capability checks scoped to metadata_primitives/ddl.py.
+      G8: extend existing facade rule with generate_data, get_all_aliases, get_benchmark_info.
+      G9: extend existing TPC-DI rule (line 1005) with get_queries_by_category.
+      G20: domain validators scoped to tpcdi/etl/validation.py.
+      G21: extend existing __init__ rule with new file paths.
+      G27: extend existing Q62/Q99/Q38/Q87 rule with q26/q7_expression_impl.
+
+  - id: w4
     summary: "Run make duplicate-check-verbose, verify groups suppressed, rebaseline threshold"
     status: pending
-    needs: [w1]
+    needs: [w1, w2, w3]
     notes: |
       Verify each targeted function name no longer appears in the report.
       Rebaseline threshold: threshold = ceil(actual * 1.10).
 
-  - id: w3
+  - id: w5
     summary: "Run make duplicate-check to confirm check still passes with new threshold"
     status: pending
-    needs: [w2]
+    needs: [w4]
 
 files_affected:
   modified:
@@ -183,9 +207,9 @@ must_preserve:
   - "make duplicate-check still passes in CI"
 
 anti_patterns:
-  - "DO NOT add overly broad function name ignores — always scope with path_contains"
-  - "DO NOT duplicate existing rules — extend them by adding function names or paths"
-  - "DO NOT ignore groups that are genuine consolidation candidates (see wave3 consolidation TODOs)"
+  - "DO NOT add overly broad function name ignores — because broad ignores mask future real duplicates that should be consolidated, defeating the purpose of the checker — always scope with path_contains"
+  - "DO NOT duplicate existing rules — because multiple rules matching the same function create maintenance burden when paths change and make it unclear which rule is authoritative — extend existing rules by adding function names or paths"
+  - "DO NOT ignore groups that are genuine consolidation candidates — because the wave-3 consolidation TODOs (sql-platform-adapters, core-and-dataframe) target groups where extraction will reduce real maintenance cost — check the companion TODOs before classifying a group as ignore"
 
 metadata:
   tags:

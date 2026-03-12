@@ -174,10 +174,10 @@ files_affected:
 verification:
   - description: "Platform adapter tests pass"
     command: "uv run -- python -m pytest tests/ -v -k 'firebolt or presto or trino or athena or azure or clickhouse or redshift or spark or lakesail'"
-    expected_output: "all tests pass"
+    expected_output: "exit code 0, no failures"
   - description: "Duplicate check shows reduction for targeted groups"
     command: "make duplicate-check-verbose 2>&1 | grep -c 'apply_table_tunings\\|_build_lakesail_config\\|_wait_for_statement\\|_extract_table_name'"
-    expected_output: "0 or reduced counts"
+    expected_output: "0"
 
 scope_limit:
   only_modify:
@@ -195,11 +195,11 @@ must_preserve:
   - "_extract_table_name returns identical table name strings from DDL"
 
 anti_patterns:
-  - "DO NOT create a deep inheritance hierarchy for platform adapters — use standalone utility functions or thin mixins"
-  - "DO NOT merge Presto and Trino into a single adapter class — only share specific utilities via presto_trino_utils.py"
-  - "DO NOT merge Fabric and Synapse Spark adapters — only share the execution/wait logic"
-  - "DO NOT over-generalize the tuning utility — only consolidate the specific 3 platforms that are identical, not all platform tuning"
-  - "DO NOT use *args/**kwargs for the config builder — keep explicit parameters for type safety"
+  - "DO NOT create a deep inheritance hierarchy for platform adapters — because platform adapters are frequently added/modified by contributors unfamiliar with the class hierarchy; utility functions are easier to discover and compose than deep class chains — use standalone utility functions or thin mixins"
+  - "DO NOT merge Presto and Trino into a single adapter class — because they diverge on features (Trino adds fault-tolerant execution, Presto has different auth) and a merged class would accumulate platform-specific branches — only share specific utilities via presto_trino_utils.py"
+  - "DO NOT merge Fabric and Synapse Spark adapters — because Fabric has workspace-scoped Lakehouse/Warehouse semantics that Synapse lacks; only the Livy execution layer is shared — extract only _execute_statement and _wait_for_statement"
+  - "DO NOT over-generalize the tuning utility — because other platforms (BigQuery, Snowflake, DuckDB) use radically different tuning mechanisms (clustering, micro-partitions, pragmas) and a universal abstraction would be leaky — only consolidate the specific 3 platforms (firebolt, lakesail, presto) that are 97% identical"
+  - "DO NOT use *args/**kwargs for the config builder — because explicit parameters preserve type safety and IDE navigability across the 2 consuming adapters — keep explicit parameters matching the current signatures"
 
 metadata:
   tags:

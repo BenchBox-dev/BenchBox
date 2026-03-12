@@ -1,12 +1,12 @@
-generated_at: '2026-03-12T15:03:16.517868'
-total_items: 34
+generated_at: '2026-03-12T15:33:11.812295'
+total_items: 32
 statuses:
   In Progress:
     count: 2
     items:
     - id: reduce-cc12-complexity-ceiling
       file: TODO/main/active/reduce-cc12-complexity-ceiling.yaml
-      title: Reduce CC=12 complexity ceiling — exclude 6 inherent, refactor 14, lower warn to 12
+      title: Reduce CC=12 complexity ceiling — exclude 12 inherent, refactor 8, lower warn to 12
       priority: Medium
       category: Code Quality and Technical Debt
     - id: test-suite-quality-wave-2
@@ -16,7 +16,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 32
+    count: 30
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -88,7 +88,7 @@ statuses:
     - id: extract-or-prune-publishing-subsystem
       file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
       title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
-      priority: Medium
+      priority: High
       category: Architecture
     - id: deferred-dataframe-benchmark-implementations
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
@@ -98,18 +98,13 @@ statuses:
     - id: extract-monitoring-library
       file: TODO/main/planning/extract-monitoring-library.yaml
       title: Evaluate and extract the generic monitoring stack into a standalone library boundary
-      priority: High
+      priority: Medium
       category: Architecture
     - id: extract-release-and-sync-maintainer-tooling
       file: TODO/main/planning/extract-release-and-sync-maintainer-tooling.yaml
       title: Extract maintainer-only release, sync, and content-validation tooling from the installable product
       priority: High
       category: Maintainer Tooling
-    - id: extract-query-plan-harmonization-library
-      file: TODO/main/planning/extract-query-plan-harmonization-library.yaml
-      title: Extract query-plan normalization, diffing, and rendering into a reusable library boundary
-      priority: High
-      category: Architecture
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -135,11 +130,6 @@ statuses:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       category: Core Functionality
-    - id: move-todo-dag-tooling-out-of-benchbox
-      file: TODO/main/planning/move-todo-dag-tooling-out-of-benchbox.yaml
-      title: Move the repo-local TODO DAG tooling into shared contributor infrastructure without breaking local workflows
-      priority: Medium
-      category: Supporting Infrastructure
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -158,7 +148,7 @@ statuses:
     - id: split-mcp-into-separate-distribution
       file: TODO/main/planning/split-mcp-into-separate-distribution.yaml
       title: Split the MCP server surface into a separate distribution with an explicit dependency boundary
-      priority: High
+      priority: Medium
       category: Packaging
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
