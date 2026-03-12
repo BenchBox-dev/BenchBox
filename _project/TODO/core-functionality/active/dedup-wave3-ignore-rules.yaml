@@ -151,7 +151,7 @@ work:
 
 - id: w2
   summary: "Add ignore rules for AST false positives: G3, G22"
-  status: pending
+  status: done
   notes: |
     These are structurally similar AST hashes across unrelated functions.
     G3: classify_error scoped to tpcdi/etl/error_recovery.py; check date_add/date_sub
