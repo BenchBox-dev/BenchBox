@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T12:28:38.215671'
-total_categories: 11
+generated_at: '2026-03-12T14:56:55.346202'
+total_categories: 12
 categories:
   AI/ML Capabilities:
     count: 1
@@ -72,6 +72,14 @@ categories:
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
+      status: Not Started
+  Code Quality and Technical Debt:
+    count: 1
+    items:
+    - id: reduce-cc12-complexity-ceiling
+      file: TODO/main/planning/reduce-cc12-complexity-ceiling.yaml
+      title: Reduce CC=12 complexity ceiling — exclude 6 inherent, refactor 14, lower warn to 12
+      priority: Medium
       status: Not Started
   Core Functionality:
     count: 1

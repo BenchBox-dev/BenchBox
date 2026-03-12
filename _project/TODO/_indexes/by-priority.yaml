@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T12:28:38.215683'
-total_items: 30
+generated_at: '2026-03-12T14:56:55.346221'
+total_items: 31
 priorities:
   High:
     count: 6
@@ -54,7 +54,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 7
+    count: 8
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -85,6 +85,11 @@ priorities:
       file: TODO/main/planning/move-todo-dag-tooling-out-of-benchbox.yaml
       title: Move the repo-local TODO DAG tooling into shared contributor infrastructure without breaking local workflows
       category: Supporting Infrastructure
+      status: Not Started
+    - id: reduce-cc12-complexity-ceiling
+      file: TODO/main/planning/reduce-cc12-complexity-ceiling.yaml
+      title: Reduce CC=12 complexity ceiling — exclude 6 inherent, refactor 14, lower warn to 12
+      category: Code Quality and Technical Debt
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
