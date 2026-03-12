@@ -1,18 +1,18 @@
 id: reduce-cc12-complexity-ceiling
-title: "Reduce CC=12 complexity ceiling — exclude 6 inherent, refactor 14, lower warn to 12"
+title: "Reduce CC=12 complexity ceiling — exclude 12 inherent, refactor 8, lower warn to 12"
 worktree: main
 priority: Medium
-status: Not Started
+status: In Progress
 description: |
-  Wave 4 of the complexity ratchet. After waves 1-3 (CC≥20, CC=14, CC=13), the
+  Wave 4 of the complexity ratchet. After waves 1-3 (CC>=20, CC=14, CC=13), the
   current ceiling is CC=12 with 20 functions at that level and warn_complexity=13.
 
-  Preliminary classification (to be verified in w1):
-  - 6 inherent: domain-driven branching (TPC spec validation, measurement protocols,
-    mode dispatch, analytical pattern detection, data loading sequences)
-  - 14 refactorable: dict dispatch, helper extraction, data-driven config, dedup
+  Classification (verified in w1):
+  - 12 inherent: sequential workflows, platform/operator dispatch, measurement protocols,
+    deprecated CLI wrappers, mode-dependent execution paths
+  - 8 refactorable: dict dispatch, helper extraction, data-driven config, dedup
 
-  Goal: no non-excluded function at CC≥12, then lower warn_complexity from 13 to 12.
+  Goal: no non-excluded function at CC>=12, then lower warn_complexity from 13 to 12.
 
 category: Code Quality and Technical Debt
 
@@ -22,213 +22,113 @@ deps:
 work:
   - id: w1
     summary: "Classify all 20 CC=12 functions and exclude inherent complexity"
-    status: pending
+    status: done
     note: |
-      Read each function and its callers. Confirm or reclassify each preliminary
-      classification, then batch-add all confirmed inherent functions to
-      exclude_functions in pyproject.toml.
-
-      Preliminary INHERENT (6):
-      - run_official (cli/commands/run_official.py:75) — TPC spec validation with 3 orthogonal constraints
-      - _generate_query_highlights (core/analysis/insights.py:447) — two distinct analytical patterns
-      - _benchmark_query (core/dataframe/benchmark_suite.py:583) — measurement protocol with warmup/timing/memory interleave
-      - _run_df_query (core/dataframe/benchmark_suite.py:1165) — benchmark sequencing (load → warmup → time)
-      - _load_data (core/read_primitives/benchmark.py:483) — safe data loading with compatibility/schema/table/commit ordering
-      - _execute_load_only_mode (core/runner/runner.py:331) — external vs native table mode dispatch
-
-      Preliminary REFACTORABLE (14):
-      - _output_summary_text (cli/commands/compare_plans.py:338) — dedup text/rich renderers
-      - convert (cli/commands/convert.py:134) — consolidate error handling into validators
-      - validate_config (cli/config.py:359) — dict dispatch for 10 repeated guards
-      - generate_cli_command (cli/dryrun.py:30) — extend existing _VALUE_PARAMS pattern to all params
-      - format_last_run_summary (cli/preferences.py:232) — field loop + extract _format_relative_time
-      - _run_simple_wizard (cli/tuning.py:307) — extract platform feature enable loop
-      - calculate_confidence_interval (core/analysis/statistics.py:163) — T_CRITICAL_VALUES lookup table
-      - get_summary (core/dataframe/benchmark_suite.py:685) — extract speedup/winner helpers
-      - run_dataframe_benchmark (core/metadata_primitives/benchmark.py:1282) — data-driven op dispatch
-      - execute_complex_type_introspection (core/metadata_primitives/dataframe_operations.py:1617) — platform dispatch dict
-      - detect_antipatterns (core/query_plans/insights.py:173) — table-driven rule checks
-      - _parse_json_node (core/query_plans/parsers/duckdb.py:241) — operator dispatch dict
-      - validate_power_test_results (core/tpc_metrics.py:120) — table-driven validation rules
-      - parse_file (core/tpcdi/etl/customer_mgmt_processor.py:194) — action type dispatch dict
-
-      Steps:
-      1. Read each function, classify per prior wave guidelines
-      2. Record in _project/analysis/complexity/classification-matrix.yaml
-      3. Batch-add confirmed inherent functions to pyproject.toml exclude_functions
-         under: # --- Required complexity at CC=12 (YYYY-MM-DD evaluation, wave 4) ---
-      4. If any reclassifications occur, adjust subsequent work units accordingly
+      Verified all 20 functions. Reclassified 7 preliminary-refactorable as inherent
+      (convert, _run_simple_wizard, run_dataframe_benchmark, execute_complex_type_introspection,
+      detect_antipatterns, _parse_json_node, parse_file) and 1 preliminary-inherent as
+      refactorable (_generate_query_highlights). Added 12 exclusions to pyproject.toml
+      under wave 4 header. Updated classification-matrix.yaml with all 20 entries.
 
   - id: w2
-    summary: "Refactor _output_summary_text (CC 12->~6) — dedup text and Rich renderers"
+    summary: "Refactor _output_summary_text (CC 12->~6) — extract Rich rendering path"
     status: pending
     needs: [w1]
     note: |
       File: benchbox/cli/commands/compare_plans.py:338
-      Pattern: Duplicated text building logic (lines ~340-362) and Rich rendering
-      (lines ~381-417) produce the same data in two formats.
-      Approach: Extract normalized data structure once, pass to separate
-      _format_text() and _format_rich() helpers.
+      Pattern: Builds identical data in two formats (text string + Rich console) with
+      duplicated conditional structure (plans_changed > 0, unchanged filter, regressions).
+      Approach: Extract _render_summary_rich(summary, regressions) to separate the Rich
+      console rendering. Main function becomes text-only + dispatch.
 
   - id: w3
-    summary: "Refactor convert (CC 12->~7) — consolidate error handling into validators"
-    status: pending
-    needs: [w1]
-    note: |
-      File: benchbox/cli/commands/convert.py:134
-      Pattern: Sequential error handling, logging config, and path validation
-      create defensive nesting around a linear core (load → validate → convert → summarize).
-      Approach: Move validation/error handling into _validate_convert_inputs() helper.
-
-  - id: w4
-    summary: "Refactor validate_config (CC 12->~5) — dict dispatch for repeated guards"
+    summary: "Refactor validate_config (CC 12->~5) — data-driven validation rules"
     status: pending
     needs: [w1]
     note: |
       File: benchbox/cli/config.py:359
-      Pattern: 10 identical check-and-print guards varying only by config key and message.
-      Approach: Define _VALIDATION_RULES = [(key, min_value, error_msg), ...] and
-      replace 10 guards with a single loop over the rules list.
+      Pattern: 10 identical 'get key → check threshold → print error → return False' guards.
+      Approach: Define _VALIDATION_RULES = [(key_path, default, check_fn, error_msg), ...]
+      and replace 10 guards with a single validation loop.
 
-  - id: w5
+  - id: w4
     summary: "Refactor generate_cli_command (CC 12->~6) — extend data-driven param pattern"
     status: pending
     needs: [w1]
     note: |
       File: benchbox/cli/dryrun.py:30
       Pattern: 20+ parameter combinations with 3 recurring patterns (list flags,
-      scalar params, boolean flags). _VALUE_PARAMS at line ~103 already handles
-      some scalars.
-      Approach: Extend _VALUE_PARAMS to cover all param types; replace per-param
-      conditionals with a loop.
+      scalar params, boolean flags). _VALUE_PARAMS partially extracted.
+      Approach: Add _BOOL_PARAMS and _LIST_PARAMS alongside existing _VALUE_PARAMS.
+      Replace per-param conditionals with 3 loops.
 
-  - id: w6
+  - id: w5
     summary: "Refactor format_last_run_summary (CC 12->~6) — extract field loop and time formatter"
     status: pending
     needs: [w1]
     note: |
       File: benchbox/cli/preferences.py:232
-      Pattern: Sequential conditional branches for each config field (tuning →
-      phases → concurrency → timestamp) with identical get-format-append logic.
+      Pattern: Sequential conditional branches for each config field with identical
+      get-format-append logic.
       Approach: Define field list with format lambdas; loop once. Extract
       _format_relative_time() for timestamp delta logic.
 
-  - id: w7
-    summary: "Refactor _run_simple_wizard (CC 12->~6) — extract platform feature enable loop"
-    status: pending
-    needs: [w1]
-    note: |
-      File: benchbox/cli/tuning.py:307
-      Pattern: 4 platform-specific feature gates (Databricks, Snowflake, BigQuery,
-      Redshift) with identical structure: confirm → enable → print.
-      Approach: Define _PLATFORM_FEATURES = [(name, config_key, description), ...]
-      and loop with shared _enable_platform_feature_interactive() helper.
-
-  - id: w8
+  - id: w6
     summary: "Refactor calculate_confidence_interval (CC 12->~5) — t-critical lookup table"
     status: pending
     needs: [w1]
     note: |
       File: benchbox/core/analysis/statistics.py:163
-      Pattern: Nested if/elif for confidence_level × sample_size → t-critical value
+      Pattern: Nested if/elif for confidence_level x sample_size -> t-critical value
       creates 9 branches from 2 dimensions.
-      Approach: Replace with T_CRITICAL_VALUES dict keyed by (confidence_level, n_range);
-      use bisect or direct lookup.
+      Approach: Replace with _T_CRITICAL dict keyed by confidence_level, containing
+      sorted (n_threshold, t_value) tuples. Use linear scan for lookup.
 
-  - id: w9
-    summary: "Refactor get_summary (CC 12->~7) — extract speedup and winner helpers"
+  - id: w7
+    summary: "Refactor _generate_query_highlights (CC 12->~6) — extract gap and surprise helpers"
+    status: pending
+    needs: [w1]
+    note: |
+      File: benchbox/core/analysis/insights.py:447
+      Pattern: Two independent analysis sections (performance gap detection lines 458-470,
+      surprising ranking shifts lines 472-490) with no shared state between them.
+      Approach: Extract _find_gap_highlights(query_comparisons, threshold) and
+      _find_surprising_win_highlights(query_comparisons, rankings). Main function
+      concatenates both results.
+
+  - id: w8
+    summary: "Refactor get_summary (CC 12->~7) — extract speedup matrix and winner helpers"
     status: pending
     needs: [w1]
     note: |
       File: benchbox/core/dataframe/benchmark_suite.py:685
-      Pattern: Nested loops for geomean calculation, speedup matrix building, and
-      query winner detection with repeated dict lookups.
-      Approach: Extract _build_speedup_matrix(results) and _find_query_winners(results)
-      helpers. Main function becomes: aggregate → build matrix → find winners → format.
+      Pattern: Two distinct computation blocks — speedup matrix via O(n^2) platform pairs
+      (lines 704-711), query winners via triple-nested result scan (lines 720-729).
+      Approach: Extract _build_speedup_matrix(platforms, geomeans) and
+      _find_query_winners(results). Main function becomes: compute geomeans -> build
+      matrix -> find winners -> construct ComparisonSummary.
 
-  - id: w10
-    summary: "Refactor run_dataframe_benchmark (CC 12->~6) — data-driven op category dispatch"
-    status: pending
-    needs: [w1]
-    note: |
-      File: benchbox/core/metadata_primitives/benchmark.py:1282
-      Pattern: Branching on operation categories (schema_ops vs catalog_ops) with
-      duplicated timing/result-tracking in each branch.
-      Approach: Define op-type → handler mapping dict; extract common
-      _execute_and_track(op, handler) for the shared timing/result pattern.
-
-  - id: w11
-    summary: "Refactor execute_complex_type_introspection (CC 12->~6) — platform dispatch dict"
-    status: pending
-    needs: [w1]
-    note: |
-      File: benchbox/core/metadata_primitives/dataframe_operations.py:1617
-      Pattern: Three near-identical platform branches (Polars, Spark, Pandas) each
-      calling a helper and collecting results.
-      Approach: Define _TYPE_ANALYZERS = {"polars": _analyze_polars_type, ...};
-      replace if-elif chain with dict lookup + uniform result collection.
-
-  - id: w12
-    summary: "Refactor detect_antipatterns (CC 12->~5) — table-driven rule checks"
-    status: pending
-    needs: [w1]
-    note: |
-      File: benchbox/core/query_plans/insights.py:173
-      Pattern: Multiple independent checks (cross-join, join conditions, depth,
-      multiple scans) each creating PlanInsight objects with repetitive structure.
-      Approach: Define _ANTIPATTERN_RULES list of (check_fn, severity, description)
-      tuples; iterate once and apply uniformly.
-
-  - id: w13
-    summary: "Refactor _parse_json_node (CC 12->~6) — operator dispatch dict"
-    status: pending
-    needs: [w1]
-    note: |
-      File: benchbox/core/query_plans/parsers/duckdb.py:241
-      Pattern: elif chain mapping operator types to kwarg extraction logic
-      (SCAN → table_name, FILTER → filter_expressions, etc.).
-      Approach: Define _OPERATOR_EXTRACTORS = {OperatorType.SCAN: _extract_scan_kwargs, ...};
-      replace elif chain with dict.get() lookup.
-
-  - id: w14
+  - id: w9
     summary: "Refactor validate_power_test_results (CC 12->~6) — table-driven validation rules"
     status: pending
     needs: [w1]
     note: |
       File: benchbox/core/tpc_metrics.py:120
-      Pattern: Repetitive range checks (scale factor, time, per-query time),
-      benchmark-specific counts, and manual error message construction.
-      Approach: Define _VALIDATION_RULES = [{"field": ..., "min": ..., "max": ...,
-      "msg": ...}, ...]; loop once with generic _check_range() helper.
+      Pattern: Repetitive range checks (scale factor min/max, total time min/max,
+      per-query time min/max) with identical check-and-append-error pattern.
+      Approach: Define _VALIDATION_RULES = [(attr, min_val, max_val, label), ...].
+      Replace repeated range checks with a single validation loop.
 
-  - id: w15
-    summary: "Refactor parse_file (CC 12->~6) — action type dispatch dict"
-    status: pending
-    needs: [w1]
-    note: |
-      File: benchbox/core/tpcdi/etl/customer_mgmt_processor.py:194
-      Pattern: if-elif chain on action_type (NEW/UPDCUST → customer, ADDACCT → account,
-      INACT → inactivate) dispatching to dedicated helpers.
-      Approach: Define _ACTION_HANDLERS = {"NEW": _handle_customer, "ADDACCT":
-      _handle_account, ...}; replace if-elif with dict lookup.
-
-  - id: w16
+  - id: w10
     summary: "Lower warn threshold from 13 to 12 in pyproject.toml"
     status: pending
-    needs: [w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15]
+    needs: [w2, w3, w4, w5, w6, w7, w8, w9]
     note: |
-      Once all CC=12 functions are either excluded or refactored to ≤11,
+      Once all CC=12 functions are either excluded or refactored to <=11,
       update pyproject.toml: warn_complexity = 12.
       Verify: make complexity-check shows 0 warnings and 0 failures.
 
-deferred:
-  - id: d1
-    summary: "Reassess work units after w1 classification verification"
-    reason: |
-      The 14 refactorable functions come from preliminary classification based on
-      code reading. w1 may reclassify some as inherent (reducing refactoring scope)
-      or identify additional refactoring targets missed by the automated scan.
-      Update w2-w15 and w16 needs-edges accordingly.
+deferred: []
 
 verification:
   - description: "Complexity check passes with no functions at CC>=12"
@@ -248,23 +148,21 @@ must_preserve:
   - "All refactored functions must produce identical behavior — no semantic changes"
   - "Existing tests must continue to pass without modification"
   - "exclude_functions entries must include CC score and rationale comment"
-  - "Excluded functions from prior complexity waves (CC≥20, CC=14, CC=13) remain untouched"
+  - "Excluded functions from prior complexity waves (CC>=20, CC=14, CC=13) remain untouched"
 
 approach: |
-  w1: Read each CC=12 function, classify per guidelines established in prior waves
-  (reduce-cyclomatic-complexity-violations, reduce-cc14-complexity-cluster,
-  reduce-cc13-complexity-ceiling). Record in classification-matrix format.
-  Reclassify if preliminary assessment was wrong. Then batch-add confirmed
-  inherent entries to pyproject.toml under new section header.
+  w1: Read each CC=12 function, classify per guidelines established in prior waves.
+  Record in classification-matrix format. Batch-add confirmed inherent entries to
+  pyproject.toml under new section header. (DONE: 12 inherent, 8 refactorable)
 
-  w2-w15: For each refactoring:
+  w2-w9: For each refactoring:
   1. Read the function and its callers/tests
   2. Extract private helper methods or define data-driven config in the same module
   3. Run focused tests + lint after each extraction
   4. Verify CC reduced via: uv run -- python scripts/check_complexity.py 2>&1 | grep function_name
   5. Commit per work unit
 
-  w16: Update warn_complexity threshold and verify.
+  w10: Update warn_complexity threshold and verify.
 
 anti_patterns:
   - "DO NOT change public API signatures — because all targets are internal or private functions"
@@ -279,17 +177,10 @@ scope_limit:
     - "pyproject.toml"
     - "_project/analysis/complexity/classification-matrix.yaml"
     - "benchbox/cli/commands/compare_plans.py"
-    - "benchbox/cli/commands/convert.py"
     - "benchbox/cli/config.py"
     - "benchbox/cli/dryrun.py"
     - "benchbox/cli/preferences.py"
-    - "benchbox/cli/tuning.py"
     - "benchbox/core/analysis/statistics.py"
+    - "benchbox/core/analysis/insights.py"
     - "benchbox/core/dataframe/benchmark_suite.py"
-    - "benchbox/core/metadata_primitives/benchmark.py"
-    - "benchbox/core/metadata_primitives/dataframe_operations.py"
-    - "benchbox/core/query_plans/insights.py"
-    - "benchbox/core/query_plans/parsers/duckdb.py"
     - "benchbox/core/tpc_metrics.py"
-    - "benchbox/core/tpcdi/etl/customer_mgmt_processor.py"
-    # w1 may add files if reclassification discovers additional targets.
