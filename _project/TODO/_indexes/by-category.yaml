@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T17:28:26.870764'
+generated_at: '2026-03-12T17:41:11.869404'
 total_categories: 12
 categories:
   AI/ML Capabilities:
@@ -79,12 +79,17 @@ categories:
       priority: Medium
       status: In Progress
   Core Functionality:
-    count: 1
+    count: 2
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
+      status: Not Started
+    - id: productize-result-publishing-and-artifact-sharing
+      file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
+      title: Productize result publishing and artifact sharing workflow
+      priority: Medium-High
       status: Not Started
   Maintainer Tooling:
     count: 1

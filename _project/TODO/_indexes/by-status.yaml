@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T17:28:26.870787'
-total_items: 30
+generated_at: '2026-03-12T17:41:11.869429'
+total_items: 31
 statuses:
   In Progress:
     count: 3
@@ -23,7 +23,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 27
+    count: 28
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -115,6 +115,11 @@ statuses:
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       priority: Medium-High
       category: Benchmark Development
+    - id: productize-result-publishing-and-artifact-sharing
+      file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
+      title: Productize result publishing and artifact sharing workflow
+      priority: Medium-High
+      category: Core Functionality
     - id: formalize-mcp-internal-apis
       file: TODO/main/planning/formalize-mcp-internal-apis.yaml
       title: Promote 3 internal MCP API references to public exports
