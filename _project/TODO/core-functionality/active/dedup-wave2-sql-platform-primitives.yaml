@@ -2,7 +2,7 @@ id: dedup-wave2-sql-platform-primitives
 title: "Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager factories"
 worktree: core-functionality
 priority: Medium
-status: Not Started
+status: In Progress
 category: "Code Quality and Technical Debt"
 description: |
   Wave-2 duplicate-check triage (2026-03-12) identifies 8 consolidation-worthy
@@ -107,127 +107,130 @@ deps:
   needs: [dedup-wave2-ignore-rules]
 
 work:
-  - id: w1
-    summary: "Extract _add_postgres_compatible_arguments helper, refactor TimescaleDB to use it"
-    status: pending
+- id: w1
+  summary: "Extract _add_postgres_compatible_arguments helper, refactor TimescaleDB to use it"
+  status: done
 
-  - id: w2
-    summary: "Extract _validate_catalog_exists into presto_trino_utils.py, update both platforms"
-    status: pending
+- id: w2
+  summary: "Extract _validate_catalog_exists into presto_trino_utils.py, update both platforms"
+  status: pending
 
-  - id: w3
-    summary: "Extract get_queries_with_translation helper, refactor amplab/clickbench/h2odb/ssb"
-    status: pending
+- id: w3
+  summary: "Extract get_queries_with_translation helper, refactor amplab/clickbench/h2odb/ssb"
+  status: pending
 
-  - id: w4
-    summary: "Extract _generate_returns_from_sale base method in tpcds/maintenance_operations.py"
-    status: pending
+- id: w4
+  summary: "Extract _generate_returns_from_sale base method in tpcds/maintenance_operations.py"
+  status: pending
 
-  - id: w5
-    summary: "Extract execute_sql_query shared implementation for Doris and PostgreSQL"
-    status: pending
+- id: w5
+  summary: "Extract execute_sql_query shared implementation for Doris and PostgreSQL"
+  status: pending
 
-  - id: w6
-    summary: "Extract _get_dataframe_manager generic factory in core/dataframe_manager_factory.py"
-    status: pending
+- id: w6
+  summary: "Extract _get_dataframe_manager generic factory in core/dataframe_manager_factory.py"
+  status: pending
 
-  - id: w7
-    summary: "Extract get_entry_by_id into core/primitives_utils.py, refactor 4 lookup methods"
-    status: pending
+- id: w7
+  summary: "Extract get_entry_by_id into core/primitives_utils.py, refactor 4 lookup methods"
+  status: pending
 
-  - id: w8
-    summary: "Extract aggregation_groupby_impl helper in read_primitives/dataframe_queries.py"
-    status: pending
+- id: w8
+  summary: "Extract aggregation_groupby_impl helper in read_primitives/dataframe_queries.py"
+  status: pending
 
-  - id: w9
-    summary: "Run platform-specific tests: pytest -k 'postgres or timescale or presto or trino or doris'"
-    needs: [w1, w2, w5]
-    status: pending
+- id: w9
+  summary: "Run platform-specific tests: pytest -k 'postgres or timescale or presto or trino or doris'"
+  needs: [w1, w2, w5]
+  status: pending
 
-  - id: w10
-    summary: "Run primitives and benchmark tests: pytest -k 'primitive or amplab or clickbench or h2odb or ssb or tpcds'"
-    needs: [w3, w4, w6, w7, w8]
-    status: pending
+- id: w10
+  summary: "Run primitives and benchmark tests: pytest -k 'primitive or amplab or clickbench or h2odb or ssb or tpcds'"
+  needs: [w3, w4, w6, w7, w8]
+  status: pending
 
-  - id: w11
-    summary: "Run full test suite to verify no regressions: make test-all"
-    needs: [w9, w10]
-    status: pending
+- id: w11
+  summary: "Run full test suite to verify no regressions: make test-all"
+  needs: [w9, w10]
+  status: pending
 
 files_affected:
   modified:
-    - "benchbox/platforms/postgresql.py"
-    - "benchbox/platforms/timescaledb.py"
-    - "benchbox/platforms/presto.py"
-    - "benchbox/platforms/trino.py"
-    - "benchbox/platforms/doris.py"
-    - "benchbox/core/amplab/benchmark.py"
-    - "benchbox/core/clickbench/benchmark.py"
-    - "benchbox/core/h2odb/benchmark.py"
-    - "benchbox/core/ssb/benchmark.py"
-    - "benchbox/core/tpcds/maintenance_operations.py"
-    - "benchbox/core/metadata_primitives/dataframe_operations.py"
-    - "benchbox/core/transaction_primitives/dataframe_operations.py"
-    - "benchbox/core/write_primitives/dataframe_operations.py"
-    - "benchbox/core/ai_primitives/queries.py"
-    - "benchbox/core/metadata_primitives/queries.py"
-    - "benchbox/core/transaction_primitives/operations.py"
-    - "benchbox/core/write_primitives/operations.py"
-    - "benchbox/core/read_primitives/dataframe_queries.py"
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/timescaledb.py"
+  - "benchbox/platforms/presto.py"
+  - "benchbox/platforms/trino.py"
+  - "benchbox/platforms/doris.py"
+  - "benchbox/core/amplab/benchmark.py"
+  - "benchbox/core/clickbench/benchmark.py"
+  - "benchbox/core/h2odb/benchmark.py"
+  - "benchbox/core/ssb/benchmark.py"
+  - "benchbox/core/tpcds/maintenance_operations.py"
+  - "benchbox/core/metadata_primitives/dataframe_operations.py"
+  - "benchbox/core/transaction_primitives/dataframe_operations.py"
+  - "benchbox/core/write_primitives/dataframe_operations.py"
+  - "benchbox/core/ai_primitives/queries.py"
+  - "benchbox/core/metadata_primitives/queries.py"
+  - "benchbox/core/transaction_primitives/operations.py"
+  - "benchbox/core/write_primitives/operations.py"
+  - "benchbox/core/read_primitives/dataframe_queries.py"
   created:
-    - "benchbox/platforms/presto_trino_utils.py"
-    - "benchbox/core/query_utils.py"
-    - "benchbox/core/dataframe_manager_factory.py"
-    - "benchbox/core/primitives_utils.py"
+  - "benchbox/platforms/presto_trino_utils.py"
+  - "benchbox/core/query_utils.py"
+  - "benchbox/core/dataframe_manager_factory.py"
+  - "benchbox/core/primitives_utils.py"
 
 verification:
-  - description: "PostgreSQL and TimescaleDB platform tests pass"
-    command: "uv run -- python -m pytest tests/ -v -k 'postgres or timescale'"
-    expected_output: "all tests pass"
-  - description: "Presto and Trino platform tests pass"
-    command: "uv run -- python -m pytest tests/ -v -k 'presto or trino'"
-    expected_output: "all tests pass"
-  - description: "TPC-DS maintenance operations tests pass"
-    command: "uv run -- python -m pytest tests/ -v -k 'maintenance or tpcds'"
-    expected_output: "all tests pass"
-  - description: "Primitives layer tests pass"
-    command: "uv run -- python -m pytest tests/ -v -k 'primitive'"
-    expected_output: "all tests pass"
-  - description: "Duplicate check shows reduction"
-    command: "make duplicate-check-verbose 2>&1 | head -5"
-    expected_output: "duplicated lines lower than previous"
+- description: "PostgreSQL and TimescaleDB platform tests pass"
+  command: "uv run -- python -m pytest tests/ -v -k 'postgres or timescale'"
+  expected_output: "all tests pass"
+- description: "Presto and Trino platform tests pass"
+  command: "uv run -- python -m pytest tests/ -v -k 'presto or trino'"
+  expected_output: "all tests pass"
+- description: "TPC-DS maintenance operations tests pass"
+  command: "uv run -- python -m pytest tests/ -v -k 'maintenance or tpcds'"
+  expected_output: "all tests pass"
+- description: "Primitives layer tests pass"
+  command: "uv run -- python -m pytest tests/ -v -k 'primitive'"
+  expected_output: "all tests pass"
+- description: "Duplicate check shows reduction"
+  command: "make duplicate-check-verbose 2>&1 | head -5"
+  expected_output: "duplicated lines lower than previous"
 
 scope_limit:
   only_modify:
-    - "benchbox/platforms/postgresql.py"
-    - "benchbox/platforms/timescaledb.py"
-    - "benchbox/platforms/presto.py"
-    - "benchbox/platforms/trino.py"
-    - "benchbox/platforms/doris.py"
-    - "benchbox/platforms/presto_trino_utils.py"
-    - "benchbox/core/"
-    - "tests/"
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/timescaledb.py"
+  - "benchbox/platforms/presto.py"
+  - "benchbox/platforms/trino.py"
+  - "benchbox/platforms/doris.py"
+  - "benchbox/platforms/presto_trino_utils.py"
+  - "benchbox/core/"
+  - "tests/"
 
 must_preserve:
-  - "TimescaleDB CLI args include all PostgreSQL-compatible params plus chunk_interval and compression"
-  - "Presto/Trino catalog validation error messages contain platform-specific name"
-  - "execute_query return format identical for Doris and PostgreSQL (timing, validation, error dict)"
-  - "TPC-DS returns generation: catalog returns use CR_* columns, web returns use WR_* columns"
-  - "Manager factory dispatch maps identical platform names to identical manager classes"
-  - "get_entry_by_id raises ValueError with sorted available keys in error message"
+- "TimescaleDB CLI args include all PostgreSQL-compatible params plus chunk_interval and compression"
+- "Presto/Trino catalog validation error messages contain platform-specific name"
+- "execute_query return format identical for Doris and PostgreSQL (timing, validation, error dict)"
+- "TPC-DS returns generation: catalog returns use CR_* columns, web returns use WR_* columns"
+- "Manager factory dispatch maps identical platform names to identical manager classes"
+- "get_entry_by_id raises ValueError with sorted available keys in error message"
 
 anti_patterns:
-  - "DO NOT create a PostgreSQL base class that TimescaleDB inherits for ALL methods — only share the CLI argument helper, not the full adapter"
-  - "DO NOT merge Presto and Trino into a single adapter — only share the catalog validation utility"
-  - "DO NOT use *args/**kwargs in the returns generation helper — use explicit field_mapping and channel_fields parameters for type safety"
-  - "DO NOT create an abstract base for all SQL platforms' execute_query — only consolidate the specific Doris/PostgreSQL pair that is byte-for-byte identical"
+- "DO NOT create a PostgreSQL base class that TimescaleDB inherits for ALL methods — only share the CLI argument helper, not
+  the full adapter"
+- "DO NOT merge Presto and Trino into a single adapter — only share the catalog validation utility"
+- "DO NOT use *args/**kwargs in the returns generation helper — use explicit field_mapping and channel_fields parameters for
+  type safety"
+- "DO NOT create an abstract base for all SQL platforms' execute_query — only consolidate the specific Doris/PostgreSQL pair
+  that is byte-for-byte identical"
 
 metadata:
   tags:
-    - code-quality
-    - duplicate-check
-    - refactoring
-    - platforms
-    - primitives
+  - code-quality
+  - duplicate-check
+  - refactoring
+  - platforms
+  - primitives
   estimated_effort: "4-6 hours"
   created_date: "2026-03-12"
