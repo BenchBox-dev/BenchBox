@@ -142,7 +142,7 @@ work:
 - id: w9
   summary: "Run platform-specific tests: pytest -k 'postgres or timescale or presto or trino or doris'"
   needs: [w1, w2, w5]
-  status: pending
+  status: done
 
 - id: w10
   summary: "Run primitives and benchmark tests: pytest -k 'primitive or amplab or clickbench or h2odb or ssb or tpcds'"
