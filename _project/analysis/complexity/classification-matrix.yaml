@@ -1,12 +1,14 @@
 # Complexity Classification Matrix
-# Generated: 2026-02-20, updated 2026-03-12 (wave 4: CC=12 classification)
+# Generated: 2026-02-20, updated 2026-03-12 (wave 4 + wave 4b CC=12 classification)
 # Baseline from: scripts/check_complexity.py --no-fail --top 200
-# Thresholds: warn >= 15, fail > 20 (original); warn >= 13 (current)
+# Thresholds: warn >= 15, fail > 20 at baseline; warn >= 12 current
 # Pre-existing excludes from pyproject.toml are omitted (already triaged)
-# Classification completed: 2026-02-20 (w3/w4/w5/w6), 2026-03-12 (wave 4)
+# Classification completed: 2026-02-20 (w3/w4/w5/w6), 2026-03-12 (wave 4 and wave 4b)
+# Metadata below keeps the original scan totals; classification_summary reflects current matrix rows.
 
 metadata:
   generated_date: "2026-02-20"
+  updated_date: "2026-03-12"
   total_functions_scanned: 4907
   flagged_count: 176
   failure_count: 70
@@ -16,8 +18,8 @@ metadata:
   pre_excluded_functions:
   - "benchbox/cli/commands/run.py:run (score 258, Click dispatch)"
   classification_summary:
-    simplify_now: 34
-    ignore_with_rationale: 33
+    simplify_now: 48
+    ignore_with_rationale: 116
     defer_with_owner: 3
     pending: 106
 
