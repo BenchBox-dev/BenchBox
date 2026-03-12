@@ -1,26 +1,30 @@
 id: reduce-cc13-complexity-ceiling
-title: "Reduce CC=13 complexity ceiling — evaluate 87 functions, exclude inherent, refactor the rest"
+title: "Reduce CC=13 complexity ceiling and lower warn threshold to 13"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-03-12"
 description: |
-  After waves 1 (CC>=20) and 2 (CC=14), the complexity ceiling sits at CC=13
-  with 87 non-excluded functions at that level. This wave evaluates each function,
-  excludes those with inherent domain-driven complexity, and refactors the rest
-  to CC<=10 using extraction and data-driven patterns.
+  Completed on 2026-03-12.
 
-  Current state from `make complexity-check`:
-  - Top 20 functions: all at CC=13
-  - 87 non-excluded functions at CC=13 across 7 modules
-  - Distribution: core (47), platforms (16), cli (10), utils (8), monitoring (3),
-    release (2), mcp (1)
+  Live scope at start:
+  - 63 non-excluded functions at CC=13
+  - warn threshold at 15, so CC=13 sat below the ratchet but still defined the ceiling
 
-  Preliminary classification of the top-20 (sample):
-  - ~45% inherent (type dispatch, platform semantics, spec-driven, interactive wizards)
-  - ~55% refactorable (extractable helpers, dict dispatch, consolidated validation)
+  Outcome:
+  - Refactored 16 accidental-complexity functions below CC=13 using helper extraction
+    and data-driven configuration patterns
+  - Classified the remaining 47 CC=13 functions as inherent validator/serializer,
+    spec-orchestrator, or platform-semantic complexity
+  - Added narrow function-level exclusions in `pyproject.toml` with matching rows in
+    `_project/analysis/complexity/classification-matrix.yaml`
+  - Lowered `warn_complexity` from 15 to 13
 
-  Goal: lower the non-excluded complexity ceiling from 13 to <=12, then lower
-  the warn threshold from 15 to 13 in pyproject.toml.
+  Final state:
+  - Worst non-excluded function complexity: CC=12
+  - `make complexity-check`: 0 warnings, 0 failures
+  - `.venv/bin/python -m ruff check .`: passed
+  - `.venv/bin/python -m pytest -m fast -q`: passed
 
 category: Code Quality and Technical Debt
 
@@ -30,7 +34,7 @@ deps:
 work:
   - id: w1
     summary: "Classify all 87 CC=13 functions as inherent or refactorable"
-    status: pending
+    status: done
     note: |
       Desk review of each function. For each, record:
       - Classification: INHERENT or REFACTORABLE
@@ -59,7 +63,7 @@ work:
 
   - id: w2
     summary: "Add inherent-complexity CC=13 exclusions to pyproject.toml"
-    status: pending
+    status: done
     needs: [w1]
     note: |
       Batch-add all inherent-complexity functions to exclude_functions
@@ -69,7 +73,7 @@ work:
 
   - id: w3
     summary: "Refactor _compare_plans (CC 13->~6) — extract execution map builder"
-    status: pending
+    status: done
     needs: [w2]
     note: |
       File: benchbox/cli/commands/compare.py:1224
@@ -82,7 +86,7 @@ work:
 
   - id: w4
     summary: "Refactor _run_platform_comparison (CC 13->~6) — extract output writer"
-    status: pending
+    status: done
     needs: [w2]
     note: |
       File: benchbox/cli/commands/compare_dataframes.py:299
@@ -94,7 +98,7 @@ work:
 
   - id: w5
     summary: "Refactor create_config (CC 13->~6) — data-driven driver option sync"
-    status: pending
+    status: done
     needs: [w2]
     note: |
       File: benchbox/cli/database.py:383
@@ -107,7 +111,7 @@ work:
 
   - id: w6
     summary: "Refactor _generate_head_to_head (CC 13->~7) — extract pair scoring"
-    status: pending
+    status: done
     needs: [w2]
     note: |
       File: benchbox/core/analysis/comparison.py:615
@@ -120,7 +124,7 @@ work:
 
   - id: w7
     summary: "Refactor _generate_insights (CC 13->~5) — extract per-section generators"
-    status: pending
+    status: done
     needs: [w2]
     note: |
       File: benchbox/core/analysis/comparison.py:779
@@ -133,7 +137,7 @@ work:
 
   - id: w8
     summary: "Refactor _get_source_files (CC 13->~7) — extract table path resolution"
-    status: pending
+    status: done
     needs: [w2]
     note: |
       File: benchbox/core/dataframe/data_loader.py:919
@@ -145,7 +149,7 @@ work:
 
   - id: w9
     summary: "Refactor _get_pyarrow_types (CC 13->~6) — extract per-source type extraction"
-    status: pending
+    status: done
     needs: [w2]
     note: |
       File: benchbox/core/dataframe/data_loader.py:1337
@@ -157,7 +161,7 @@ work:
 
   - id: w10
     summary: "Refactor run_benchmark (CC 13->~6) — extract query selection and category summary"
-    status: pending
+    status: done
     needs: [w2]
     note: |
       File: benchbox/core/metadata_primitives/benchmark.py:420
@@ -169,7 +173,7 @@ work:
 
   - id: w11
     summary: "Refactor generate_comparison_report (CC 13->~5) — extract metric section formatter"
-    status: pending
+    status: done
     needs: [w2]
     note: |
       File: benchbox/core/pg_extension_comparison.py:29
@@ -182,7 +186,7 @@ work:
 
   - id: w12
     summary: "Refactor generate_plan_comparison_summary (CC 13->~7) — extract execution map builder"
-    status: pending
+    status: done
     needs: [w2]
     note: |
       File: benchbox/core/query_plans/comparison.py:576
@@ -195,7 +199,7 @@ work:
 
   - id: w13
     summary: "Refactor calculate_rankings (CC 13->~7) — extract metric config to dict"
-    status: pending
+    status: done
     needs: [w2]
     note: |
       File: benchbox/core/results/database.py:622
@@ -209,7 +213,7 @@ work:
 
   - id: w14
     summary: "Lower warn threshold from 15 to 13 in pyproject.toml"
-    status: pending
+    status: done
     needs: [w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13]
     note: |
       Once all CC=13 functions are either excluded or refactored to <=12,
