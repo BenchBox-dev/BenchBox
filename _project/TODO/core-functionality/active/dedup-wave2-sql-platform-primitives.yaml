@@ -1,0 +1,233 @@
+id: dedup-wave2-sql-platform-primitives
+title: "Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager factories"
+worktree: core-functionality
+priority: Medium
+status: Not Started
+category: "Code Quality and Technical Debt"
+description: |
+  Wave-2 duplicate-check triage (2026-03-12) identifies 8 consolidation-worthy
+  groups across SQL platform adapters and the primitives layer. These are
+  parallel implementations where platforms with shared heritage or identical
+  dispatch patterns can share a base implementation.
+
+  Targets (report rank → dup lines):
+
+  G8 (60 dup lines): add_cli_arguments in postgresql.py:67 and
+      timescaledb.py:77. TimescaleDB is a PostgreSQL extension; both
+      platforms share identical connection arguments (host, port, database,
+      username, password, schema, work_mem, maintenance_work_mem).
+      Only argument prefix (--postgres-* vs --timescale-*) and
+      TimescaleDB-specific additions (chunk_interval, compression) differ.
+
+  G9 (60 dup lines): _validate_catalog_exists in presto.py:401 and
+      trino.py:515. Byte-for-byte identical except for error message
+      strings ("Presto" vs "Trino"). Textbook mixin candidate.
+
+  G11 (57 dup lines): get_queries in amplab/benchmark.py:103,
+      clickbench/benchmark.py:79, h2odb/benchmark.py:103,
+      ssb/benchmark.py:109. All follow identical pattern: fetch queries
+      from query_manager → optionally translate dialect → return dict.
+
+  G12 (57 dup lines): _generate_catalog_returns_from_sale and
+      _generate_web_returns_from_sale in tpcds/maintenance_operations.py
+      :985 and :1043. Identical structure (11 mapped fields + 3
+      random/calculated), differing only by tuple field names and
+      column prefixes (CR_* vs WR_*).
+
+  G13 (57 dup lines): execute_query in doris.py:819 and
+      postgresql.py:548. Virtually identical: execute via cursor →
+      measure time → validate row count → build result with
+      _build_query_result_with_validation.
+
+  G18 (54 dup lines): get_dataframe_metadata_manager,
+      get_dataframe_transaction_manager, get_dataframe_write_manager
+      in metadata_primitives/dataframe_operations.py:1775,
+      transaction_primitives/dataframe_operations.py:1202,
+      write_primitives/dataframe_operations.py:874. Identical factory
+      dispatch: normalize platform_name → check df_platforms tuple →
+      instantiate manager class.
+
+  G24 (51 dup lines): get_operation/get_query_entry in
+      ai_primitives/queries.py:47, metadata_primitives/queries.py:46,
+      transaction_primitives/operations.py:54,
+      write_primitives/operations.py:54. Identical lookup pattern:
+      try entries[id] → except KeyError → raise ValueError with
+      available keys.
+
+  G28 (50 dup lines): aggregation_distinct_groupby_pandas_impl,
+      aggregation_groupby_large_pandas_impl,
+      aggregation_groupby_small_pandas_impl in
+      read_primitives/dataframe_queries.py (lines 1363-2661).
+      6 instances of identical groupby→agg→sort pattern varying only
+      in column names and cardinality.
+
+approach: |
+  1. G8 — PostgreSQL/TimescaleDB CLI args:
+     Extract `_add_postgres_compatible_arguments(parser, prefix)` as
+     a static/module-level function in postgresql.py. TimescaleDB calls
+     this with prefix='timescale' then adds its own arguments.
+     Alternatively, TimescaleDB can inherit and call super().
+
+  2. G9 — Presto/Trino catalog validation:
+     Extract `_validate_catalog_exists(connection, catalog, platform_name)`
+     as a standalone function in benchbox/platforms/presto_trino_utils.py.
+     Both platforms import and call it with their platform name.
+
+  3. G11 — Benchmark get_queries:
+     Extract a `get_queries_with_translation(query_manager, dialect,
+     translate_fn)` utility in benchbox/core/query_utils.py or as a
+     mixin method. All 4 benchmarks call this helper.
+
+  4. G12 — TPC-DS returns generation:
+     Extract `_generate_returns_from_sale(sale_record, field_mapping,
+     channel_specific_fields)` parameterized helper. Catalog and web
+     variants become thin wrappers passing their column mappings.
+
+  5. G13 — SQL execute_query:
+     Extract `execute_sql_query(cursor, query, timeout, validator, ...)`
+     into benchbox/platforms/base/sql_execution.py or as a mixin.
+     Doris and PostgreSQL delegate to this shared implementation.
+
+  6. G18 — DataFrame manager factories:
+     Extract `_get_dataframe_manager(platform_name, manager_class,
+     supported_platforms, spark_session=None)` into
+     benchbox/core/dataframe_manager_factory.py. Each factory function
+     becomes a one-liner calling this generic dispatcher.
+
+  7. G24 — Operation/query lookup:
+     Extract `get_entry_by_id(entries, entry_id, entry_type_name)` into
+     benchbox/core/primitives_utils.py. All 4 lookup methods delegate.
+
+  8. G28 — H2O.db aggregation queries:
+     Extract `aggregation_groupby_impl(ctx, table_name, group_cols,
+     agg_specs)` parameterized helper within read_primitives/
+     dataframe_queries.py. Each variant passes its column names.
+
+deps:
+  needs: [dedup-wave2-ignore-rules]
+
+work:
+  - id: w1
+    summary: "Extract _add_postgres_compatible_arguments helper, refactor TimescaleDB to use it"
+    status: pending
+
+  - id: w2
+    summary: "Extract _validate_catalog_exists into presto_trino_utils.py, update both platforms"
+    status: pending
+
+  - id: w3
+    summary: "Extract get_queries_with_translation helper, refactor amplab/clickbench/h2odb/ssb"
+    status: pending
+
+  - id: w4
+    summary: "Extract _generate_returns_from_sale base method in tpcds/maintenance_operations.py"
+    status: pending
+
+  - id: w5
+    summary: "Extract execute_sql_query shared implementation for Doris and PostgreSQL"
+    status: pending
+
+  - id: w6
+    summary: "Extract _get_dataframe_manager generic factory in core/dataframe_manager_factory.py"
+    status: pending
+
+  - id: w7
+    summary: "Extract get_entry_by_id into core/primitives_utils.py, refactor 4 lookup methods"
+    status: pending
+
+  - id: w8
+    summary: "Extract aggregation_groupby_impl helper in read_primitives/dataframe_queries.py"
+    status: pending
+
+  - id: w9
+    summary: "Run platform-specific tests: pytest -k 'postgres or timescale or presto or trino or doris'"
+    needs: [w1, w2, w5]
+    status: pending
+
+  - id: w10
+    summary: "Run primitives and benchmark tests: pytest -k 'primitive or amplab or clickbench or h2odb or ssb or tpcds'"
+    needs: [w3, w4, w6, w7, w8]
+    status: pending
+
+  - id: w11
+    summary: "Run full test suite to verify no regressions: make test-all"
+    needs: [w9, w10]
+    status: pending
+
+files_affected:
+  modified:
+    - "benchbox/platforms/postgresql.py"
+    - "benchbox/platforms/timescaledb.py"
+    - "benchbox/platforms/presto.py"
+    - "benchbox/platforms/trino.py"
+    - "benchbox/platforms/doris.py"
+    - "benchbox/core/amplab/benchmark.py"
+    - "benchbox/core/clickbench/benchmark.py"
+    - "benchbox/core/h2odb/benchmark.py"
+    - "benchbox/core/ssb/benchmark.py"
+    - "benchbox/core/tpcds/maintenance_operations.py"
+    - "benchbox/core/metadata_primitives/dataframe_operations.py"
+    - "benchbox/core/transaction_primitives/dataframe_operations.py"
+    - "benchbox/core/write_primitives/dataframe_operations.py"
+    - "benchbox/core/ai_primitives/queries.py"
+    - "benchbox/core/metadata_primitives/queries.py"
+    - "benchbox/core/transaction_primitives/operations.py"
+    - "benchbox/core/write_primitives/operations.py"
+    - "benchbox/core/read_primitives/dataframe_queries.py"
+  created:
+    - "benchbox/platforms/presto_trino_utils.py"
+    - "benchbox/core/query_utils.py"
+    - "benchbox/core/dataframe_manager_factory.py"
+    - "benchbox/core/primitives_utils.py"
+
+verification:
+  - description: "PostgreSQL and TimescaleDB platform tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k 'postgres or timescale'"
+    expected_output: "all tests pass"
+  - description: "Presto and Trino platform tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k 'presto or trino'"
+    expected_output: "all tests pass"
+  - description: "TPC-DS maintenance operations tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k 'maintenance or tpcds'"
+    expected_output: "all tests pass"
+  - description: "Primitives layer tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k 'primitive'"
+    expected_output: "all tests pass"
+  - description: "Duplicate check shows reduction"
+    command: "make duplicate-check-verbose 2>&1 | head -5"
+    expected_output: "duplicated lines lower than previous"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/postgresql.py"
+    - "benchbox/platforms/timescaledb.py"
+    - "benchbox/platforms/presto.py"
+    - "benchbox/platforms/trino.py"
+    - "benchbox/platforms/doris.py"
+    - "benchbox/platforms/presto_trino_utils.py"
+    - "benchbox/core/"
+    - "tests/"
+
+must_preserve:
+  - "TimescaleDB CLI args include all PostgreSQL-compatible params plus chunk_interval and compression"
+  - "Presto/Trino catalog validation error messages contain platform-specific name"
+  - "execute_query return format identical for Doris and PostgreSQL (timing, validation, error dict)"
+  - "TPC-DS returns generation: catalog returns use CR_* columns, web returns use WR_* columns"
+  - "Manager factory dispatch maps identical platform names to identical manager classes"
+  - "get_entry_by_id raises ValueError with sorted available keys in error message"
+
+anti_patterns:
+  - "DO NOT create a PostgreSQL base class that TimescaleDB inherits for ALL methods — only share the CLI argument helper, not the full adapter"
+  - "DO NOT merge Presto and Trino into a single adapter — only share the catalog validation utility"
+  - "DO NOT use *args/**kwargs in the returns generation helper — use explicit field_mapping and channel_fields parameters for type safety"
+  - "DO NOT create an abstract base for all SQL platforms' execute_query — only consolidate the specific Doris/PostgreSQL pair that is byte-for-byte identical"
+
+metadata:
+  tags:
+    - code-quality
+    - duplicate-check
+    - refactoring
+    - platforms
+    - primitives
+  estimated_effort: "4-6 hours"
+  created_date: "2026-03-12"

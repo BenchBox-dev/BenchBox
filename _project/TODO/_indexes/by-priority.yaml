@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T08:30:52.362153'
-total_items: 25
+generated_at: '2026-03-12T08:36:11.731998'
+total_items: 29
 priorities:
   High:
     count: 2
@@ -15,8 +15,13 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 3
+    count: 4
     items:
+    - id: dedup-wave2-ignore-rules
+      file: TODO/core-functionality/active/dedup-wave2-ignore-rules.yaml
+      title: Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage
+      category: Code Quality and Technical Debt
+      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -34,7 +39,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 6
+    count: 9
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -51,16 +56,32 @@ priorities:
       title: Close open-table-format loading gaps for job-based managed Spark adapters
       category: Platform Expansion
       status: Not Started
+    - id: dedup-wave2-dataframe-platform
+      file: TODO/core-functionality/active/dedup-wave2-dataframe-platform.yaml
+      title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
+      category: Code Quality and Technical Debt
+      status: Not Started
+    - id: dedup-wave2-sql-platform-primitives
+      file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
+      title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
+        factories'
+      category: Code Quality and Technical Debt
+      status: Not Started
+    - id: dedup-wave2-generator-schema-utils
+      file: TODO/core-functionality/active/dedup-wave2-generator-schema-utils.yaml
+      title: Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators
+      category: Code Quality and Technical Debt
+      status: Not Started
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
       status: Not Started
     - id: reduce-cyclomatic-complexity-violations
-      file: TODO/main/planning/reduce-cyclomatic-complexity-violations.yaml
+      file: TODO/main/active/reduce-cyclomatic-complexity-violations.yaml
       title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)
       category: Code Quality
-      status: Not Started
+      status: In Progress
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

@@ -1,0 +1,173 @@
+id: dedup-wave2-generator-schema-utils
+title: "Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators"
+worktree: core-functionality
+priority: Medium
+status: Not Started
+category: "Code Quality and Technical Debt"
+description: |
+  Wave-2 duplicate-check triage (2026-03-12) identifies 4 consolidation-worthy
+  groups in the benchmark generator and schema layers. These are parallel
+  implementations that can be centralized into shared core utilities.
+
+  Targets (report rank → dup lines):
+
+  G1 (108 dup lines): TPC-DI dimension generators in core/tpcdi/generator/sql.py
+      4 methods (generate_company_dimension, generate_customer_dimension,
+      generate_security_dimension, generate_account_dimension) at lines 266, 303,
+      332, 410. All share identical structure: compute scaled row count → build
+      parameterized INSERT SELECT with CROSS JOINs → call _generate_table().
+      Only column lists and join specs differ.
+      NOTE: Prior TODO dedup-tpcdi-dimension-generator (completed 2026-02-21)
+      already extracted _generate_table(). These 4 methods still share the
+      inner SQL construction pattern that was NOT part of that extraction.
+
+  G3 (60 dup lines): _write_manifest across 4 generators
+      amplab/generator.py:390, clickbench/generator.py:383,
+      h2odb/generator.py:299, joinorder/generator.py:635.
+      All follow identical logic: check empty table_paths → create
+      DataGenerationManifest → iterate table_paths adding entries → manifest.write().
+      Only the benchmark_name string differs.
+
+  G4 (60 dup lines): get_all_create_table_sql in 3 schema modules
+      amplab/schema.py:107, read_primitives/schema.py:117, ssb/schema.py:175.
+      All iterate a table_order list, call get_create_table_sql per table,
+      collect and join SQL. Differs only in table ordering and the
+      per-table SQL function called.
+
+  G20 (52 dup lines): generate_data in 3 TPC-DI source format classes
+      core/tpcdi/etl/sources.py:67, :128, :189 (CSVSourceFormat,
+      XMLSourceFormat, FixedWidthSourceFormat). All extract scale_factor
+      and output_dir from kwargs, init TPCDISourceDataGenerator, call
+      format-specific _generate_*_data method.
+
+approach: |
+  1. G1 — TPC-DI dimension SQL pattern:
+     Extract a `_build_dimension_insert_sql(table_name, num_records,
+     column_specs, lookup_join_specs)` helper in sql.py that constructs
+     the INSERT SELECT with CROSS JOINs. Each generate_* method reduces
+     to: compute count, call _build_dimension_insert_sql, pass result
+     to _generate_table.
+
+  2. G3 — Manifest writing:
+     Extract `write_generator_manifest(output_dir, benchmark_name,
+     scale_factor, table_paths, compression_metadata, ...)` into
+     benchbox/core/manifest_utils.py (new file). Each generator's
+     _write_manifest becomes a one-liner calling this utility.
+
+  3. G4 — Schema SQL collection:
+     Extract `collect_create_table_sql(get_single_table_fn, table_order,
+     dialect, enable_pks, enable_fks)` into benchbox/core/schema_utils.py
+     (new file). Each benchmark's get_all_create_table_sql becomes a
+     thin wrapper passing its table order and per-table function.
+
+  4. G20 — TPC-DI source data generation:
+     Extract a `_generate_source_data(self, gen_method_name, **kwargs)`
+     base method in the SourceDataFormat ABC. Each subclass reduces to
+     `return self._generate_source_data('_generate_oltp_data', **kwargs)`.
+
+deps:
+  needs: [dedup-wave2-ignore-rules]
+
+work:
+  - id: w1
+    summary: "Extract _build_dimension_insert_sql helper and refactor 4 TPC-DI dimension generators"
+    status: pending
+
+  - id: w2
+    summary: "Run TPC-DI tests to verify dimension generation unchanged"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Extract write_generator_manifest utility into benchbox/core/manifest_utils.py"
+    status: pending
+
+  - id: w4
+    summary: "Refactor amplab, clickbench, h2odb, joinorder generators to use shared manifest writer"
+    needs: [w3]
+    status: pending
+
+  - id: w5
+    summary: "Run generator tests: pytest -k 'amplab or clickbench or h2odb or joinorder'"
+    needs: [w4]
+    status: pending
+
+  - id: w6
+    summary: "Extract collect_create_table_sql into benchbox/core/schema_utils.py"
+    status: pending
+
+  - id: w7
+    summary: "Refactor amplab, read_primitives, ssb schema modules to use shared helper"
+    needs: [w6]
+    status: pending
+
+  - id: w8
+    summary: "Extract _generate_source_data base method in TPC-DI SourceDataFormat ABC"
+    status: pending
+
+  - id: w9
+    summary: "Run full test suite to verify no regressions: make test-all"
+    needs: [w2, w5, w7, w8]
+    status: pending
+
+files_affected:
+  modified:
+    - "benchbox/core/tpcdi/generator/sql.py"
+    - "benchbox/core/amplab/generator.py"
+    - "benchbox/core/clickbench/generator.py"
+    - "benchbox/core/h2odb/generator.py"
+    - "benchbox/core/joinorder/generator.py"
+    - "benchbox/core/amplab/schema.py"
+    - "benchbox/core/read_primitives/schema.py"
+    - "benchbox/core/ssb/schema.py"
+    - "benchbox/core/tpcdi/etl/sources.py"
+  created:
+    - "benchbox/core/manifest_utils.py"
+    - "benchbox/core/schema_utils.py"
+
+verification:
+  - description: "TPC-DI dimension generation tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k tpcdi"
+    expected_output: "all tests pass"
+  - description: "Generator manifest tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k 'amplab or clickbench or h2odb or joinorder'"
+    expected_output: "all tests pass"
+  - description: "Schema SQL generation tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k 'schema or create_table'"
+    expected_output: "all tests pass"
+  - description: "Duplicate check shows reduction"
+    command: "make duplicate-check-verbose 2>&1 | head -5"
+    expected_output: "duplicated lines lower than 9326"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpcdi/"
+    - "benchbox/core/amplab/"
+    - "benchbox/core/clickbench/"
+    - "benchbox/core/h2odb/"
+    - "benchbox/core/joinorder/"
+    - "benchbox/core/read_primitives/schema.py"
+    - "benchbox/core/ssb/schema.py"
+    - "benchbox/core/manifest_utils.py"
+    - "benchbox/core/schema_utils.py"
+    - "tests/"
+
+must_preserve:
+  - "DataGenerationManifest format and content identical after refactor"
+  - "Generated SQL for TPC-DI dimensions byte-for-byte identical"
+  - "get_all_create_table_sql output identical across all 3 schema modules"
+  - "TPC-DI source data generation produces same files and content"
+
+anti_patterns:
+  - "DO NOT over-generalize the manifest writer — it should accept the same parameters the current implementations use, not invent new abstractions"
+  - "DO NOT change the _generate_table helper from the prior dedup — the new work targets the SQL construction step above it"
+  - "DO NOT create a deep inheritance hierarchy for source formats — a simple base method with a method_name parameter is sufficient"
+
+metadata:
+  tags:
+    - code-quality
+    - duplicate-check
+    - refactoring
+    - generators
+  estimated_effort: "3-4 hours"
+  created_date: "2026-03-12"

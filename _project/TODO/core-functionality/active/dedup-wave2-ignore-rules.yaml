@@ -1,0 +1,128 @@
+id: dedup-wave2-ignore-rules
+title: "Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage"
+worktree: core-functionality
+priority: Medium-High
+status: Not Started
+category: "Code Quality and Technical Debt"
+description: |
+  The `make duplicate-check-verbose` report (2026-03-12) shows 363 duplicate groups /
+  9,326 duplicated lines (threshold 10,284). Wave-2 triage of the top-30 groups
+  identifies 12 groups that are intentional boilerplate, protocol conformance, or
+  TPC-DS spec-mandated query patterns. These should be suppressed via ignore_rules
+  to reduce noise and focus the checker on genuine consolidation targets.
+
+  Groups to mark as ignored (by report rank):
+
+  G2  (60 lines): supports_operation/is_setup/sql — protocol operation support
+      methods across ai_primitives, metadata_primitives, transaction_primitives,
+      write_primitives dataframe_operations modules and datafusion_df/pyspark_df.
+
+  G5  (60 lines): to_dict/get_etl_config/get_performance_config — dataclass-to-dict
+      conversion methods on distinct config/artifact classes. Acceptable boilerplate.
+
+  G6  (60 lines): q62_expression_impl/q99_expression_impl — TPC-DS Q62 and Q99
+      are spec-mandated structurally similar delivery-time bucketing queries
+      against different channels (web vs catalog).
+
+  G14 (55 lines): compress_file/decompress_file/open_for_read — protocol stubs
+      in context.py and protocols.py matching canonical impls in compression.py.
+
+  G17 (54 lines): window_dense_rank/window_rank/window_row_number —
+      Protocol/ABC abstract method stubs in core/dataframe/context.py.
+
+  G19 (54 lines): q38_expression_impl/q87_expression_impl — TPC-DS spec pair
+      using INTERSECT/EXCEPT patterns with 3-channel sales data.
+
+  G21 (52 lines): union_sales_channels_pandas/union_returns_channels_pandas —
+      domain-specific channel union operations in tpcds channel_helper.py.
+
+  G22 (52 lines): __init__ on facade classes (datavault.py, tpcds.py, tpch.py) —
+      API surface conformance constructors.
+
+  G25 (51 lines): create_sample_test_results/get_extended_table_order — AST
+      false positive; different purposes but similar nested dict/list structure.
+
+  G26 (50 lines): cast_date/cast_string/col — partially covered by existing rule;
+      extend path_contains to include tpcdi/tools/file_parsers.py and
+      core/tuning/ddl_generator.py.
+
+  G27 (50 lines): get_stream_info/get_table_info/get_table_tuning — thin
+      delegation methods on facade classes.
+
+  G29 (50 lines): _detect_format/col/get_row_count — extend existing rule to
+      add get_row_count for platform adapters; partially already covered.
+
+  G30 (49 lines): q62_pandas_impl/q99_pandas_impl — pandas implementations
+      of the same TPC-DS Q62/Q99 spec pair.
+
+  After adding rules, rebaseline: threshold = ceil(actual * 1.10).
+
+approach: |
+  Add entries to the existing ignore_rules list in pyproject.toml under
+  [tool.benchbox.duplicates]. Follow the established pattern.
+
+  Strategy:
+  1. For G2: Add supports_operation, is_setup to ignore_rules scoped to
+     primitives dataframe_operations modules and platform dataframe adapters.
+  2. For G5: Add to_dict, get_etl_config, get_performance_config as global
+     ignore_function_names (they're structural coincidences across unrelated classes).
+  3. For G6, G19, G30: Add TPC-DS query function names scoped to
+     tpcds/dataframe_queries/ paths.
+  4. For G14: Already partially covered. Add compress_file/decompress_file/
+     open_for_read scoped to core/dataframe/ and utils/compression.py.
+  5. For G17: Extend existing protocol stubs rule to include window_dense_rank,
+     window_rank, window_row_number for context.py.
+  6. For G21: Add channel helper functions scoped to channel_helper.py.
+  7. For G22: Add __init__ to existing facade rule (lines 801-809).
+  8. For G25: Add both function names scoped to their specific files.
+  9. For G26: Extend existing cast_date/cast_string path_contains with
+     file_parsers.py and ddl_generator.py.
+  10. For G27: Add get_stream_info/get_table_info/get_table_tuning scoped
+      to facade files.
+  11. For G29: Add get_row_count to existing dataframe adapter rule (line 847).
+
+  After adding, run `make duplicate-check-verbose` and lower threshold.
+
+work:
+  - id: w1
+    summary: "Add all new ignore rules to pyproject.toml [tool.benchbox.duplicates]"
+    status: pending
+
+  - id: w2
+    summary: "Run make duplicate-check-verbose, verify groups suppressed, rebaseline threshold"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Run make duplicate-check to confirm check still passes with new threshold"
+    needs: [w2]
+    status: pending
+
+files_affected:
+  modified:
+    - "pyproject.toml"
+
+verification:
+  - description: "Duplicate check passes at lowered threshold"
+    command: "make duplicate-check"
+    expected_output: "PASS"
+  - description: "Suppressed groups no longer appear in verbose output"
+    command: "make duplicate-check-verbose 2>&1 | grep -c 'supports_operation\\|union_sales_channels\\|q62_expression'"
+    expected_output: "0"
+
+scope_limit:
+  only_modify:
+    - "pyproject.toml"
+
+must_preserve:
+  - "Existing ignore_rules entries remain intact"
+  - "Threshold only lowered, never raised beyond current value"
+  - "make duplicate-check still passes in CI"
+
+metadata:
+  tags:
+    - code-quality
+    - duplicate-check
+    - ignore-rules
+  estimated_effort: "1-2 hours"
+  created_date: "2026-03-12"
