@@ -117,7 +117,7 @@ work:
 
 - id: w3
   summary: "Extract get_queries_with_translation helper, refactor amplab/clickbench/h2odb/ssb"
-  status: pending
+  status: done
 
 - id: w4
   summary: "Extract _generate_returns_from_sale base method in tpcds/maintenance_operations.py"
