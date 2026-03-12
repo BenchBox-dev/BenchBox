@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T14:56:55.346202'
+generated_at: '2026-03-12T15:01:24.019806'
 total_categories: 12
 categories:
   AI/ML Capabilities:
@@ -74,8 +74,25 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 1
+    count: 4
     items:
+    - id: dedup-wave3-ignore-rules
+      file: TODO/core-functionality/planning/dedup-wave3-ignore-rules.yaml
+      title: Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage
+      priority: Medium-High
+      status: Not Started
+    - id: dedup-wave3-sql-platform-adapters
+      file: TODO/core-functionality/planning/dedup-wave3-sql-platform-adapters.yaml
+      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
+        table extraction'
+      priority: Medium
+      status: Not Started
+    - id: dedup-wave3-core-and-dataframe
+      file: TODO/core-functionality/planning/dedup-wave3-core-and-dataframe.yaml
+      title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text
+        output, registries'
+      priority: Medium
+      status: Not Started
     - id: reduce-cc12-complexity-ceiling
       file: TODO/main/planning/reduce-cc12-complexity-ceiling.yaml
       title: Reduce CC=12 complexity ceiling — exclude 6 inherent, refactor 14, lower warn to 12

@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T14:56:55.346230'
-total_items: 31
+generated_at: '2026-03-12T15:01:24.019833'
+total_items: 34
 statuses:
   In Progress:
     count: 1
@@ -11,7 +11,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 30
+    count: 33
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -38,6 +38,11 @@ statuses:
       title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
       priority: Low
       category: Platform Expansion
+    - id: dedup-wave3-ignore-rules
+      file: TODO/core-functionality/planning/dedup-wave3-ignore-rules.yaml
+      title: Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage
+      priority: Medium-High
+      category: Code Quality and Technical Debt
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
@@ -63,6 +68,18 @@ statuses:
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
       priority: Low
       category: Platform Expansion
+    - id: dedup-wave3-sql-platform-adapters
+      file: TODO/core-functionality/planning/dedup-wave3-sql-platform-adapters.yaml
+      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
+        table extraction'
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: dedup-wave3-core-and-dataframe
+      file: TODO/core-functionality/planning/dedup-wave3-core-and-dataframe.yaml
+      title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text
+        output, registries'
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: extract-or-prune-publishing-subsystem
       file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
       title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem

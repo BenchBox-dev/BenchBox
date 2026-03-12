@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T14:56:55.346145'
-total_items: 31
+generated_at: '2026-03-12T15:01:24.019758'
+total_items: 34
 items:
 - id: isolate-experimental-core-subsystems
   file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
@@ -377,6 +377,47 @@ items:
   work_ready: 1
   needs:
   - spark-mixin-open-table-format-loading
+- id: dedup-wave3-sql-platform-adapters
+  file: TODO/core-functionality/planning/dedup-wave3-sql-platform-adapters.yaml
+  title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing, table
+    extraction'
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Not Started
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  - platforms
+  - wave-3
+  estimated_effort: 4-6 hours
+  work_total: 9
+  work_done: 0
+  work_ready: 0
+  needs:
+  - dedup-wave3-ignore-rules
+- id: dedup-wave3-core-and-dataframe
+  file: TODO/core-functionality/planning/dedup-wave3-core-and-dataframe.yaml
+  title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text output,
+    registries'
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Not Started
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  - core
+  - dataframe
+  - wave-3
+  estimated_effort: 4-6 hours
+  work_total: 10
+  work_done: 0
+  work_ready: 0
+  needs:
+  - dedup-wave3-ignore-rules
 - id: extract-or-prune-publishing-subsystem
   file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
   title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
@@ -436,7 +477,7 @@ items:
   category: Code Quality and Technical Debt
   priority: Medium
   status: Not Started
-  work_total: 17
+  work_total: 16
   work_done: 0
   work_ready: 1
   deferred_count: 1
@@ -459,6 +500,22 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: dedup-wave3-ignore-rules
+  file: TODO/core-functionality/planning/dedup-wave3-ignore-rules.yaml
+  title: Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - code-quality
+  - duplicate-check
+  - ignore-rules
+  - wave-3
+  estimated_effort: 1-2 hours
+  work_total: 3
+  work_done: 0
+  work_ready: 0
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

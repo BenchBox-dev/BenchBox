@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T14:56:55.346221'
-total_items: 31
+generated_at: '2026-03-12T15:01:24.019824'
+total_items: 34
 priorities:
   High:
     count: 6
@@ -35,8 +35,13 @@ priorities:
       category: Packaging
       status: Not Started
   Medium-High:
-    count: 3
+    count: 4
     items:
+    - id: dedup-wave3-ignore-rules
+      file: TODO/core-functionality/planning/dedup-wave3-ignore-rules.yaml
+      title: Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage
+      category: Code Quality and Technical Debt
+      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -54,7 +59,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 8
+    count: 10
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -70,6 +75,18 @@ priorities:
       file: TODO/main/planning/cloud-spark-job-adapters-open-table-format-loading.yaml
       title: Close open-table-format loading gaps for job-based managed Spark adapters
       category: Platform Expansion
+      status: Not Started
+    - id: dedup-wave3-sql-platform-adapters
+      file: TODO/core-functionality/planning/dedup-wave3-sql-platform-adapters.yaml
+      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
+        table extraction'
+      category: Code Quality and Technical Debt
+      status: Not Started
+    - id: dedup-wave3-core-and-dataframe
+      file: TODO/core-functionality/planning/dedup-wave3-core-and-dataframe.yaml
+      title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text
+        output, registries'
+      category: Code Quality and Technical Debt
       status: Not Started
     - id: extract-or-prune-publishing-subsystem
       file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
