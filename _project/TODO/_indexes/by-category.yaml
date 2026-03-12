@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T17:41:11.869404'
+generated_at: '2026-03-12T19:45:47.872322'
 total_categories: 12
 categories:
   AI/ML Capabilities:
@@ -10,16 +10,11 @@ categories:
       priority: Medium-High
       status: Not Started
   Architecture:
-    count: 2
+    count: 1
     items:
     - id: isolate-experimental-core-subsystems
       file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
       title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
-      priority: High
-      status: Not Started
-    - id: prune-publishing-subsystem
-      file: TODO/main/planning/prune-publishing-subsystem.yaml
-      title: Prune the dead publishing and permalink subsystem
       priority: High
       status: Not Started
   Benchmark Development:
@@ -64,18 +59,12 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 2
+    count: 1
     items:
     - id: dedup-wave3-sql-platform-adapters
       file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
       title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
         table extraction'
-      priority: Medium
-      status: In Progress
-    - id: dedup-wave3-core-and-dataframe
-      file: TODO/core-functionality/active/dedup-wave3-core-and-dataframe.yaml
-      title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text
-        output, registries'
       priority: Medium
       status: In Progress
   Core Functionality:

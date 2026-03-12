@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T17:41:11.869375'
-total_items: 31
+generated_at: '2026-03-12T19:45:47.872302'
+total_items: 29
 items:
 - id: isolate-experimental-core-subsystems
   file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
@@ -14,21 +14,6 @@ items:
   - scope-review
   estimated_effort: Medium
   work_total: 4
-  work_done: 0
-  work_ready: 1
-- id: prune-publishing-subsystem
-  file: TODO/main/planning/prune-publishing-subsystem.yaml
-  title: Prune the dead publishing and permalink subsystem
-  worktree: main
-  category: Architecture
-  priority: High
-  status: Not Started
-  tags:
-  - architecture
-  - cleanup
-  - scope-review
-  estimated_effort: Small
-  work_total: 1
   work_done: 0
   work_ready: 1
 - id: reenable-fireducks-after-upstream-fixes
@@ -361,27 +346,6 @@ items:
   work_total: 9
   work_done: 0
   work_ready: 7
-  needs:
-  - dedup-wave3-ignore-rules
-- id: dedup-wave3-core-and-dataframe
-  file: TODO/core-functionality/active/dedup-wave3-core-and-dataframe.yaml
-  title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text output,
-    registries'
-  worktree: core-functionality
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: In Progress
-  tags:
-  - code-quality
-  - duplicate-check
-  - refactoring
-  - core
-  - dataframe
-  - wave-3
-  estimated_effort: 4-6 hours
-  work_total: 10
-  work_done: 0
-  work_ready: 8
   needs:
   - dedup-wave3-ignore-rules
 - id: flight-data-benchmark

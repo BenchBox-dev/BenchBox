@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T17:28:28.310530'
-total_items: 589
+generated_at: '2026-03-12T18:02:52.691872'
+total_items: 590
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4454,6 +4454,28 @@ items:
   work_ready: 0
   needs:
   - dedup-wave2-ignore-rules
+- id: dedup-wave3-core-and-dataframe
+  file: DONE/core-functionality/active/dedup-wave3-core-and-dataframe.yaml
+  title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text output,
+    registries'
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  - core
+  - dataframe
+  - wave-3
+  estimated_effort: 4-6 hours
+  completed_date: '2026-03-12'
+  work_total: 10
+  work_done: 10
+  work_ready: 0
+  needs:
+  - dedup-wave3-ignore-rules
 - id: dedup-wave2-generator-schema-utils
   file: DONE/core-functionality/active/dedup-wave2-generator-schema-utils.yaml
   title: Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators

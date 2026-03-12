@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T17:28:28.310810'
+generated_at: '2026-03-12T18:02:52.692132'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -241,7 +241,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 39
+    count: 40
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -292,6 +292,12 @@ categories:
       file: DONE/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
       title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
         factories'
+      priority: Medium
+      status: Completed
+    - id: dedup-wave3-core-and-dataframe
+      file: DONE/core-functionality/active/dedup-wave3-core-and-dataframe.yaml
+      title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text
+        output, registries'
       priority: Medium
       status: Completed
     - id: consolidate-duplicate-code

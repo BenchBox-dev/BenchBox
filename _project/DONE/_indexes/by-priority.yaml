@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T17:28:28.310955'
-total_items: 589
+generated_at: '2026-03-12T18:02:52.692265'
+total_items: 590
 priorities:
   Critical:
     count: 35
@@ -1553,7 +1553,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 258
+    count: 259
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1914,6 +1914,12 @@ priorities:
       file: DONE/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
       title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
         factories'
+      category: Code Quality and Technical Debt
+      status: Completed
+    - id: dedup-wave3-core-and-dataframe
+      file: DONE/core-functionality/active/dedup-wave3-core-and-dataframe.yaml
+      title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text
+        output, registries'
       category: Code Quality and Technical Debt
       status: Completed
     - id: dedup-wave2-generator-schema-utils

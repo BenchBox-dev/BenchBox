@@ -2,7 +2,8 @@ id: dedup-wave3-core-and-dataframe
 title: "Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text output, registries"
 worktree: core-functionality
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-03-12"
 category: "Code Quality and Technical Debt"
 description: |
   Wave-3 duplicate-check triage (2026-03-12, post wave-2) identifies 9
@@ -113,7 +114,7 @@ deps:
 work:
   - id: w1
     summary: "Extract shared _table_exists and _get_create_tables_sql into primitives_benchmark_utils.py"
-    status: pending
+    status: done
     notes: |
       Both functions are in transaction_primitives/benchmark.py and
       write_primitives/benchmark.py. Consider placing in core/ alongside
@@ -121,59 +122,62 @@ work:
 
   - id: w2
     summary: "Extract _rank_by_metric parameterized helper in ranking.py"
-    status: pending
+    status: done
     notes: |
       Single-file refactor. Both ranking methods reduce to one-liners
       passing different metric functions.
 
   - id: w3
     summary: "Extract generate_audit_trail into shared TPC utility"
-    status: pending
+    status: done
     notes: |
       Both tpcds and tpch official benchmarks use identical audit trail logic.
       Benchmark name and metadata fields passed as parameters.
 
   - id: w4
     summary: "Extract _apply_cast helper in unified_frame.py, refactor 3 cast methods"
-    status: pending
+    status: done
     notes: |
       Follows the same pattern as wave-2's _extract_date_part.
       Multi-platform dispatch (PySpark -> DataFusion -> Polars).
 
   - id: w5
     summary: "Extract _load_data base method in tpcdi/loader.py, refactor load_dimension/fact_data"
-    status: pending
+    status: done
     notes: |
       Single-file refactor. Both loading methods differ by data type and
       validation rules.
 
   - id: w6
     summary: "Extract _datafusion_window_rank helper in datafusion_df.py, refactor 3 window methods"
-    status: pending
+    status: done
     notes: |
       Follows the same pattern as wave-2's _polars_window_rank.
       Rank method parameter differs (rank/dense_rank/row_number).
 
   - id: w7
-    summary: "Extract format_text_table utility, refactor calculate_qphh and metrics CLI commands"
-    status: pending
+    summary: "Remove duplicate QphH text formatter from calculate_qphh and keep metrics as the single formatter"
+    status: done
     notes: |
-      Both CLI commands format tabular text output with identical logic.
+      The deprecated calculate_qphh command already delegates output emission to
+      metrics.py. Removing the dead local helper eliminates the duplicate
+      formatting implementation without changing runtime behavior.
 
   - id: w8
-    summary: "Extract list_benchmark_queries registry utility, refactor 4 dataframe registries"
-    status: pending
+    summary: "Collapse 4 registry list wrappers to shared QueryRegistry.list_queries bindings"
+    status: done
     notes: |
-      Identical listing pattern across clickbench, nyctaxi, ssb, tpcds registries.
+      Each registry now exports the bound QueryRegistry.list_queries method
+      instead of maintaining an identical wrapper function.
 
   - id: w9
     summary: "Run targeted tests: pytest -k 'primitive or ranking or audit or cast or tpcdi or dataframe or cli or registry'"
-    status: pending
+    status: done
     needs: [w1, w2, w3, w4, w5, w6, w7, w8]
 
   - id: w10
     summary: "Run full test suite to verify no regressions: make test-all"
-    status: pending
+    status: done
     needs: [w9]
 
 files_affected:
@@ -181,13 +185,13 @@ files_affected:
     - "benchbox/core/transaction_primitives/benchmark.py"
     - "benchbox/core/write_primitives/benchmark.py"
     - "benchbox/core/analysis/ranking.py"
+    - "benchbox/core/tpc_patterns.py"
     - "benchbox/core/tpcds/official_benchmark.py"
     - "benchbox/core/tpch/official_benchmark.py"
     - "benchbox/core/tpcdi/loader.py"
     - "benchbox/platforms/dataframe/unified_frame.py"
     - "benchbox/platforms/dataframe/datafusion_df.py"
     - "benchbox/cli/commands/calculate_qphh.py"
-    - "benchbox/cli/commands/metrics.py"
     - "benchbox/core/clickbench/dataframe_queries/registry.py"
     - "benchbox/core/nyctaxi/dataframe_queries/registry.py"
     - "benchbox/core/ssb/dataframe_queries/registry.py"

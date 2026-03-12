@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T17:28:28.311097'
-total_items: 589
+generated_at: '2026-03-12T18:02:52.692386'
+total_items: 590
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 541
+    count: 542
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -905,6 +905,12 @@ statuses:
       title: Consolidate benchmark name detection to use normalize_benchmark_id()
       priority: Low
       category: Code Quality
+    - id: dedup-wave3-core-and-dataframe
+      file: DONE/core-functionality/active/dedup-wave3-core-and-dataframe.yaml
+      title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text
+        output, registries'
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: consolidate-duplicate-code
       file: DONE/core-functionality/active/consolidate-duplicate-code.yaml
       title: Consolidate duplicate code identified by AST structural clone detection

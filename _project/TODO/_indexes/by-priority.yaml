@@ -1,17 +1,12 @@
-generated_at: '2026-03-12T17:41:11.869419'
-total_items: 31
+generated_at: '2026-03-12T19:45:47.872335'
+total_items: 29
 priorities:
   High:
-    count: 4
+    count: 3
     items:
     - id: isolate-experimental-core-subsystems
       file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
       title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
-      category: Architecture
-      status: Not Started
-    - id: prune-publishing-subsystem
-      file: TODO/main/planning/prune-publishing-subsystem.yaml
-      title: Prune the dead publishing and permalink subsystem
       category: Architecture
       status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
@@ -49,7 +44,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 9
+    count: 8
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -70,12 +65,6 @@ priorities:
       file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
       title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
         table extraction'
-      category: Code Quality and Technical Debt
-      status: In Progress
-    - id: dedup-wave3-core-and-dataframe
-      file: TODO/core-functionality/active/dedup-wave3-core-and-dataframe.yaml
-      title: 'Consolidate core, CLI, and DataFrame duplicates: primitives, rankings, audit trails, casts, window funcs, text
-        output, registries'
       category: Code Quality and Technical Debt
       status: In Progress
     - id: flight-data-benchmark
