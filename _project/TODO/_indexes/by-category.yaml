@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:59:57.148889'
-total_categories: 9
+generated_at: '2026-03-12T11:38:46.700587'
+total_categories: 12
 categories:
   AI/ML Capabilities:
     count: 1
@@ -8,6 +8,29 @@ categories:
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
       priority: Medium-High
+      status: Not Started
+  Architecture:
+    count: 4
+    items:
+    - id: isolate-experimental-core-subsystems
+      file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
+      title: Classify and isolate experimental core subsystems that are outside the supported benchmark surface
+      priority: High
+      status: Not Started
+    - id: extract-or-prune-publishing-subsystem
+      file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
+      title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
+      priority: Medium
+      status: Not Started
+    - id: extract-monitoring-library
+      file: TODO/main/planning/extract-monitoring-library.yaml
+      title: Evaluate and extract the generic monitoring stack into a standalone library boundary
+      priority: High
+      status: Not Started
+    - id: extract-query-plan-harmonization-library
+      file: TODO/main/planning/extract-query-plan-harmonization-library.yaml
+      title: Extract query-plan normalization, diffing, and rendering into a reusable library boundary
+      priority: High
       status: Not Started
   Benchmark Development:
     count: 6
@@ -51,24 +74,14 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 3
+    count: 1
     items:
-    - id: dedup-wave2-dataframe-platform
-      file: TODO/core-functionality/active/dedup-wave2-dataframe-platform.yaml
-      title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
-      priority: Medium
-      status: In Progress
     - id: dedup-wave2-sql-platform-primitives
       file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
       title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
         factories'
       priority: Medium
-      status: Not Started
-    - id: reduce-cc13-complexity-ceiling
-      file: TODO/main/active/reduce-cc13-complexity-ceiling.yaml
-      title: Reduce CC=13 complexity ceiling — evaluate 87 functions, exclude inherent, refactor the rest
-      priority: Medium
-      status: Not Started
+      status: In Progress
   Core Functionality:
     count: 1
     items:
@@ -76,6 +89,22 @@ categories:
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
+      status: Not Started
+  Maintainer Tooling:
+    count: 1
+    items:
+    - id: extract-release-and-sync-maintainer-tooling
+      file: TODO/main/planning/extract-release-and-sync-maintainer-tooling.yaml
+      title: Extract maintainer-only release, sync, and content-validation tooling from the installable product
+      priority: High
+      status: Not Started
+  Packaging:
+    count: 1
+    items:
+    - id: split-mcp-into-separate-distribution
+      file: TODO/main/planning/split-mcp-into-separate-distribution.yaml
+      title: Split the MCP server surface into a separate distribution with an explicit dependency boundary
+      priority: High
       status: Not Started
   Platform Expansion:
     count: 11
@@ -136,12 +165,17 @@ categories:
       priority: Low
       status: Not Started
   Supporting Infrastructure:
-    count: 1
+    count: 2
     items:
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
+      status: Not Started
+    - id: move-todo-dag-tooling-out-of-benchbox
+      file: TODO/main/planning/move-todo-dag-tooling-out-of-benchbox.yaml
+      title: Move the repo-local TODO DAG tooling into shared contributor infrastructure without breaking local workflows
+      priority: Medium
       status: Not Started
   Testing & Quality:
     count: 1

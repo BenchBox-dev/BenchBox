@@ -1,12 +1,13 @@
-generated_at: '2026-03-12T09:59:57.148917'
-total_items: 26
+generated_at: '2026-03-12T11:38:46.700613'
+total_items: 31
 statuses:
   In Progress:
     count: 2
     items:
-    - id: dedup-wave2-dataframe-platform
-      file: TODO/core-functionality/active/dedup-wave2-dataframe-platform.yaml
-      title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
+    - id: dedup-wave2-sql-platform-primitives
+      file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
+      title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
+        factories'
       priority: Medium
       category: Code Quality and Technical Debt
     - id: test-suite-quality-wave-2
@@ -16,7 +17,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 24
+    count: 29
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -48,6 +49,11 @@ statuses:
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Low
       category: Platform Expansion
+    - id: isolate-experimental-core-subsystems
+      file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
+      title: Classify and isolate experimental core subsystems that are outside the supported benchmark surface
+      priority: High
+      category: Architecture
     - id: livy-spark-adapters-open-table-format-loading
       file: TODO/main/planning/livy-spark-adapters-open-table-format-loading.yaml
       title: Close open-table-format loading gaps for Livy-based Spark adapters
@@ -63,17 +69,31 @@ statuses:
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
       priority: Low
       category: Platform Expansion
-    - id: dedup-wave2-sql-platform-primitives
-      file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
-      title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
-        factories'
+    - id: extract-or-prune-publishing-subsystem
+      file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
+      title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
       priority: Medium
-      category: Code Quality and Technical Debt
+      category: Architecture
     - id: deferred-dataframe-benchmark-implementations
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
       category: Benchmark Expansion
+    - id: extract-monitoring-library
+      file: TODO/main/planning/extract-monitoring-library.yaml
+      title: Evaluate and extract the generic monitoring stack into a standalone library boundary
+      priority: High
+      category: Architecture
+    - id: extract-release-and-sync-maintainer-tooling
+      file: TODO/main/planning/extract-release-and-sync-maintainer-tooling.yaml
+      title: Extract maintainer-only release, sync, and content-validation tooling from the installable product
+      priority: High
+      category: Maintainer Tooling
+    - id: extract-query-plan-harmonization-library
+      file: TODO/main/planning/extract-query-plan-harmonization-library.yaml
+      title: Extract query-plan normalization, diffing, and rendering into a reusable library boundary
+      priority: High
+      category: Architecture
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -99,6 +119,11 @@ statuses:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       category: Core Functionality
+    - id: move-todo-dag-tooling-out-of-benchbox
+      file: TODO/main/planning/move-todo-dag-tooling-out-of-benchbox.yaml
+      title: Move the repo-local TODO DAG tooling into shared contributor infrastructure without breaking local workflows
+      priority: Medium
+      category: Supporting Infrastructure
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -109,16 +134,16 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: High
       category: Platform Expansion
-    - id: reduce-cc13-complexity-ceiling
-      file: TODO/main/active/reduce-cc13-complexity-ceiling.yaml
-      title: Reduce CC=13 complexity ceiling — evaluate 87 functions, exclude inherent, refactor the rest
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
       priority: Low
       category: User Experience
+    - id: split-mcp-into-separate-distribution
+      file: TODO/main/planning/split-mcp-into-separate-distribution.yaml
+      title: Split the MCP server surface into a separate distribution with an explicit dependency boundary
+      priority: High
+      category: Packaging
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

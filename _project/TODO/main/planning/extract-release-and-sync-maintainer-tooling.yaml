@@ -1,0 +1,166 @@
+id: extract-release-and-sync-maintainer-tooling
+title: "Extract maintainer-only release, sync, and content-validation tooling from the installable product"
+worktree: main
+priority: High
+status: Not Started
+category: Maintainer Tooling
+description: |
+  BenchBox currently ships maintainer-oriented release automation, repository
+  sync flows, and content validation in the installable package. Those features
+  are orthogonal to the primary product goal of benchmarking OLAP systems and
+  make the public surface area larger than it needs to be.
+
+  This item plans a controlled extraction of `benchbox.release` and the
+  `benchbox-sync` console entry point into maintainer-only tooling while keeping
+  release workflows operational and preserving the public `benchbox` CLI.
+
+metadata:
+  tags:
+  - architecture
+  - packaging
+  - maintainer-tooling
+  - scope-review
+  estimated_effort: "Medium"
+  created_date: "2026-03-12"
+  source_review: "Orthogonal functionality review finding #1"
+
+impact:
+  user_impact: |
+    Reduces user confusion by removing or hiding commands that are not part of
+    benchmark execution, comparison, or reporting. Default installs should
+    become easier to explain and less likely to expose unsupported workflows.
+  maintainer_impact: |
+    Maintainers will need an explicit installation and invocation path for
+    release/sync tooling. That is a short-term workflow change, but it creates a
+    clearer separation between product code and repo-management code.
+  packaging_impact: |
+    Console scripts, extras, and potentially dependency groups will change.
+    This may require a separate distribution or a repo-local maintainer package.
+  regression_risk: |
+    Moderate. Hidden imports or CI jobs may currently rely on the existing
+    module layout. An import audit and compatibility shim are required before
+    any code is moved.
+
+justification: |
+  The current layout makes maintainership workflows look like end-user product
+  features. That adds cognitive load, raises the chance of accidental support
+  expectations, and makes packaging boundaries harder to reason about. This is a
+  high-leverage cleanup because it clarifies what BenchBox is for without
+  changing the benchmark engine itself.
+
+cost_benefit_analysis:
+  expected_benefits: |
+    High. The package boundary becomes easier to understand, default installs
+    can stay focused on benchmarking, and maintainer-only dependencies can be
+    isolated from end users. This also makes future extraction of other
+    orthogonal tooling simpler because there will already be a maintainer-tools
+    pattern in the repo.
+  expected_costs: |
+    Medium. Packaging, docs, CI, and internal workflows will need coordinated
+    updates. There is also migration cost if any internal scripts or tests
+    assume the current import paths.
+  recommendation: |
+    Proceed, but only after completing a full dependency and call-site audit.
+    Favor a same-repo maintainer package or explicit dev-only entry point before
+    considering a separate repository.
+
+files_affected:
+  modified:
+  - "benchbox/release/"
+  - "benchbox/cli/"
+  - "benchbox/__init__.py"
+  - "pyproject.toml"
+  - "tests/unit/release/"
+  - "tests/unit/cli/"
+  - "docs/"
+  - ".github/"
+  added:
+  - "benchbox_maintainer/"
+  - "docs/contributor/"
+
+work:
+- id: w1
+  summary: "Audit every public exposure point for release/sync/content-validation tooling"
+  status: pending
+  notes: |
+    Inventory console scripts, extras, imports, docs references, CI jobs, and
+    any runtime code that imports `benchbox.release` transitively.
+
+- id: w2
+  summary: "Document the minimum supported maintainer workflow and select the target isolation model"
+  needs: [w1]
+  status: pending
+  notes: |
+    Compare three options: repo-local dev scripts, same-repo `benchbox-maintainer`
+    distribution, or a separate package. Choose the smallest option that
+    isolates user installs without fragmenting maintainership.
+
+- id: w3
+  summary: "Design a compatibility plan for `benchbox-sync` and any existing import paths"
+  needs: [w2]
+  status: pending
+  notes: |
+    Decide whether to keep a thin compatibility wrapper for one release or to
+    migrate all internal callers in a single change. Include rollback criteria.
+
+- id: w4
+  summary: "Move maintainer-only code behind the chosen package or tooling boundary"
+  needs: [w3]
+  status: pending
+  notes: |
+    Keep benchmark-facing imports clean. The move is complete only when default
+    package installs no longer expose maintainer-only entry points implicitly.
+
+- id: w5
+  summary: "Update CI, contributor docs, and local automation to use the explicit maintainer path"
+  needs: [w4]
+  status: pending
+
+- id: w6
+  summary: "Add regression tests proving default installs no longer depend on maintainer tooling"
+  needs: [w4]
+  status: pending
+
+- id: w7
+  summary: "Remove stale public references and close the migration with release notes"
+  needs: [w5, w6]
+  status: pending
+
+must_preserve:
+- "Public `benchbox` CLI behavior and startup characteristics for default installs"
+- "Current maintainer release and sync workflows until replacement commands and docs exist"
+- "Ability to run release/content-validation checks in CI through an explicit maintainer install path"
+
+approach: |
+  Start with a strict import audit. Do not move code until it is proven that the
+  benchmark runtime and end-user CLI do not depend on it. Prefer introducing a
+  maintainer-only package boundary inside the same repository first, because it
+  minimizes coordination cost while still shrinking the user-facing product.
+
+anti_patterns:
+- "DO NOT remove `benchbox-sync` before a replacement command and migration note exist, because that would break maintainer automation with no fallback"
+- "DO NOT leave hidden imports from benchmark runtime into maintainer-only modules, because that preserves coupling while making failures harder to diagnose"
+- "DO NOT solve this by widening default dependency groups, because the goal is to shrink the installable product surface"
+
+verification:
+- description: "Public CLI and package-export coverage still pass without maintainer-only exposure in the default install path"
+  command: "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py tests/unit/test_cli_documentation.py -q"
+  expected_output: "All tests pass"
+- description: "Release and sync behavior remains valid through the explicit maintainer tooling path"
+  command: "uv run -- python -m pytest tests/unit/release/test_workflow.py tests/unit/release/test_release_sync_unit.py tests/unit/test_release_sync.py -q"
+  expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/release/"
+  - "benchbox/cli/"
+  - "benchbox/__init__.py"
+  - "pyproject.toml"
+  - "tests/unit/release/"
+  - "tests/unit/cli/"
+  - "docs/"
+  - ".github/"
+  do_not_touch:
+  - "Benchmark query implementations"
+  - "Platform adapters unrelated to import-boundary cleanup"
+  - "Result schemas or benchmark execution semantics"

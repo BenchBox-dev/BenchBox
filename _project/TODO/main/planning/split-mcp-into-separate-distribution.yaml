@@ -1,0 +1,161 @@
+id: split-mcp-into-separate-distribution
+title: "Split the MCP server surface into a separate distribution with an explicit dependency boundary"
+worktree: main
+priority: High
+status: Not Started
+category: Packaging
+description: |
+  BenchBox's MCP support has its own optional extra, entry point, server
+  bootstrap, prompts, tool registry, tests, and user documentation. That is a
+  distinct product surface with a different dependency and release profile from
+  the core benchmarking engine.
+
+  This item plans a split into a separate distribution, such as
+  `benchbox-mcp`, while preserving the ability for users to install and run MCP
+  features intentionally and without destabilizing the core package.
+
+metadata:
+  tags:
+  - architecture
+  - packaging
+  - mcp
+  - scope-review
+  estimated_effort: "Large"
+  created_date: "2026-03-12"
+  source_review: "Orthogonal functionality review finding #5"
+
+impact:
+  user_impact: |
+    Core users should get a slimmer installation story. MCP users may need a
+    more explicit install command, but they should gain clearer documentation
+    and expectations around what is part of the MCP product surface.
+  maintainer_impact: |
+    Maintainers will manage an additional package boundary and release contract.
+    In return, core changes and MCP changes can evolve with clearer ownership.
+  packaging_impact: |
+    High. Entry points, extras, dependency groups, docs, and tests all need to
+    respect the new split. There may also be import-cycle cleanup required.
+  regression_risk: |
+    High. MCP touches schemas, analytics tools, execution flows, and benchmark
+    integrations. Breaking the dependency direction between MCP and core is the
+    main technical risk.
+
+justification: |
+  MCP is large enough to be treated as a separate distribution rather than a
+  sidecar hidden inside the main package. Doing so clarifies BenchBox's scope,
+  reduces default package complexity, and lets MCP-specific dependencies evolve
+  without distorting the core product.
+
+cost_benefit_analysis:
+  expected_benefits: |
+    Medium-high. Core installs become cleaner, MCP ownership becomes explicit,
+    and users can understand the product split more easily. The separation also
+    makes future MCP-specific features less likely to leak into core by default.
+  expected_costs: |
+    Medium-high. Packaging, tests, docs, and backward compatibility need
+    coordination. If there are import cycles, those seams must be redesigned.
+  recommendation: |
+    Proceed after proving the dependency direction can be made one-way:
+    `benchbox-mcp` may depend on BenchBox core, but core must not require MCP.
+    Use a same-repo multi-distribution layout before considering a repo split.
+
+files_affected:
+  modified:
+  - "benchbox/mcp/"
+  - "benchbox/cli/"
+  - "benchbox/__init__.py"
+  - "pyproject.toml"
+  - "tests/unit/mcp/"
+  - "tests/unit/cli/"
+  - "docs/guides/mcp-integration.md"
+  - "docs/"
+  added:
+  - "benchbox_mcp/"
+  - "docs/contributor/"
+
+work:
+- id: w1
+  summary: "Audit MCP-specific dependencies, entry points, docs, and imports into core BenchBox modules"
+  status: pending
+  notes: |
+    Identify every dependency edge so the split is based on observed coupling,
+    not assumptions.
+
+- id: w2
+  summary: "Break any import cycles so MCP depends on core, never the reverse"
+  needs: [w1]
+  status: pending
+  notes: |
+    Introduce interface seams or utility relocation only where required to
+    enforce a one-way dependency graph.
+
+- id: w3
+  summary: "Define the multi-distribution packaging model and migration path for current users"
+  needs: [w2]
+  status: pending
+  notes: |
+    Decide how `benchbox mcp` and any standalone MCP entry point should be
+    installed, named, and documented.
+
+- id: w4
+  summary: "Prototype a core-only install and an MCP-enabled install in the same repository"
+  needs: [w3]
+  status: pending
+
+- id: w5
+  summary: "Move MCP code, metadata, and docs behind the new package boundary with compatibility shims where necessary"
+  needs: [w4]
+  status: pending
+
+- id: w6
+  summary: "Update tests and release automation to validate both install profiles"
+  needs: [w5]
+  status: pending
+
+- id: w7
+  summary: "Close the split with deprecation notes, support boundaries, and contributor guidance"
+  needs: [w6]
+  status: pending
+
+must_preserve:
+- "Core benchmark execution remains installable and usable without MCP extras"
+- "Explicit MCP installs retain current benchmark-tool behavior and schema semantics"
+- "No core import path requires MCP modules at import time after the split"
+
+approach: |
+  Start by enforcing the dependency direction in-repo. Once MCP cleanly depends
+  on core and not vice versa, package it separately inside the same repository.
+  Keep compatibility wrappers only where they reduce migration pain materially.
+
+anti_patterns:
+- "DO NOT split packaging before fixing import direction, because a packaging split alone will not solve runtime coupling"
+- "DO NOT make core import MCP conditionally at startup, because that preserves the architectural ambiguity and can create brittle optional-import failures"
+- "DO NOT change MCP schemas or prompt contracts during the split, because users will experience packaging work as a feature regression"
+
+verification:
+- description: "MCP server, execution, schema, and resource tests pass through the separated dependency boundary"
+  command: "uv run -- python -m pytest tests/unit/mcp/test_mcp_server.py tests/unit/mcp/test_mcp_main_module.py tests/unit/mcp/test_mcp_tool_handlers.py tests/unit/mcp/test_resources.py tests/unit/mcp/test_schemas.py tests/unit/mcp/test_execution.py -q"
+  expected_output: "All tests pass"
+- description: "Core package-export and CLI coverage still pass without implicit MCP dependencies"
+  command: "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py tests/unit/test_cli_documentation.py tests/unit/cli/test_new_commands.py -q"
+  expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/mcp/"
+  - "benchbox/cli/"
+  - "benchbox/__init__.py"
+  - "pyproject.toml"
+  - "tests/unit/mcp/"
+  - "tests/unit/cli/"
+  - "docs/guides/mcp-integration.md"
+  - "docs/"
+  do_not_touch:
+  - "Core benchmark implementations unrelated to import-boundary cleanup"
+  - "Non-MCP CLI commands except where packaging or wiring changes require small shims"
+  - "Result-format semantics unrelated to MCP transport"
+
+success_metrics:
+- "Core BenchBox can be installed and imported without MCP dependencies present"
+- "MCP can be installed explicitly and run against the same benchmark engine with passing coverage"
+- "Contributor docs describe the split in fewer than two pages with no ambiguous ownership zones"

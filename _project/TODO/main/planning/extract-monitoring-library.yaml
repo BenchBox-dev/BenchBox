@@ -1,0 +1,163 @@
+id: extract-monitoring-library
+title: "Evaluate and extract the generic monitoring stack into a standalone library boundary"
+worktree: main
+priority: High
+status: Not Started
+category: Architecture
+description: |
+  The `benchbox.monitoring` package already resembles a reusable library. It
+  contains generic resource sampling, performance metrics, history tracking, and
+  reporting logic with only a relatively small amount of BenchBox-specific
+  adaptation around execution metadata.
+
+  This item plans a staged extraction of the monitoring stack into a standalone
+  library boundary while keeping BenchBox's runtime semantics, report formats,
+  and performance characteristics stable.
+
+metadata:
+  tags:
+  - architecture
+  - extraction
+  - monitoring
+  - scope-review
+  estimated_effort: "Large"
+  created_date: "2026-03-12"
+  source_review: "Orthogonal functionality review finding #3"
+
+impact:
+  user_impact: |
+    BenchBox users should see no change in monitoring behavior if the extraction
+    is done correctly. The main user-facing benefit is a cleaner product scope
+    and potentially a reusable monitoring library for adjacent projects.
+  maintainer_impact: |
+    Maintainers will gain a sharper ownership boundary but will also need to
+    manage API versioning between BenchBox and the extracted library.
+  packaging_impact: |
+    A new distribution, compatibility shims, and explicit dependency pinning are
+    likely required. This adds release-management overhead.
+  regression_risk: |
+    High. Monitoring touches execution timing, resource sampling, reporting, and
+    some MCP or CLI observability flows. Any extraction that changes data shape
+    or import timing could create subtle regressions.
+
+justification: |
+  This is the cleanest library candidate in the codebase after text-based chart
+  rendering. It is cohesive, broadly reusable, and only lightly coupled to the
+  core benchmark engine. If extracted carefully, it reduces the conceptual size
+  of BenchBox without sacrificing capability.
+
+cost_benefit_analysis:
+  expected_benefits: |
+    High strategic value. The monitoring stack can be reused outside BenchBox,
+    the core project becomes easier to navigate, and ownership boundaries become
+    more defensible. It also creates a concrete pattern for future extractions.
+  expected_costs: |
+    High execution cost. The work needs package design, versioning, migration
+    shims, docs, and a robust compatibility test suite. Release coordination
+    also becomes more complex.
+  recommendation: |
+    Proceed only if the goal is true reuse or sharper product boundaries, not
+    just directory cleanup. Prototype the boundary inside the repo first, then
+    extract only after the API contract is demonstrated to be stable.
+
+files_affected:
+  modified:
+  - "benchbox/monitoring/"
+  - "benchbox/cli/"
+  - "benchbox/mcp/"
+  - "tests/unit/monitoring/"
+  - "tests/unit/cli/"
+  - "tests/unit/mcp/"
+  - "pyproject.toml"
+  - "docs/"
+  added:
+  - "benchbox_monitoring/"
+  - "docs/architecture/"
+
+work:
+- id: w1
+  summary: "Map every symbol in `benchbox.monitoring` to either generic library logic or BenchBox-specific adaptation"
+  status: pending
+  notes: |
+    Identify the exact seams around execution metadata, result integration, and
+    any CLI or MCP-specific helpers.
+
+- id: w2
+  summary: "Define the extracted library API, ownership boundary, and versioning policy"
+  needs: [w1]
+  status: pending
+  notes: |
+    The proposed boundary should keep generic profilers, performance models, and
+    reports outside BenchBox while retaining only thin adapters locally.
+
+- id: w3
+  summary: "Prototype the package boundary inside the repo with import-contract tests before any external extraction"
+  needs: [w2]
+  status: pending
+  notes: |
+    Treat this as a dress rehearsal. The boundary is not ready until BenchBox
+    can consume it internally without semantic drift.
+
+- id: w4
+  summary: "Measure compatibility against current report schemas, timing semantics, and resource-sampling behavior"
+  needs: [w3]
+  status: pending
+
+- id: w5
+  summary: "Prepare migration shims and dependency wiring for BenchBox consumers"
+  needs: [w4]
+  status: pending
+
+- id: w6
+  summary: "Split release and documentation responsibilities between BenchBox and the extracted library"
+  needs: [w5]
+  status: pending
+
+- id: w7
+  summary: "Finalize extraction only after contract tests prove parity and packaging friction is acceptable"
+  needs: [w6]
+  status: pending
+
+must_preserve:
+- "Current monitoring outputs and report semantics used by BenchBox CLI and MCP flows"
+- "Existing timing policy and sampling behavior unless an explicit versioned schema change is approved"
+- "No added daemon, service, or network requirement for local benchmark runs"
+
+approach: |
+  Use an internal-first extraction strategy. First define a clean API boundary
+  and make BenchBox consume it as if it were external. Only then decide whether
+  to publish a standalone package. Keep BenchBox-specific execution adapters
+  local unless there is a strong reuse case for generalizing them.
+
+anti_patterns:
+- "DO NOT extract code before identifying BenchBox-specific assumptions, because hidden coupling will reappear as compatibility bugs"
+- "DO NOT change report schemas or timing keys during the packaging move, because users will experience extraction work as a runtime regression"
+- "DO NOT create a circular dependency between BenchBox and the extracted library, because that defeats the architectural goal"
+
+verification:
+- description: "Monitoring unit tests continue to pass across performance, profiler, report, and bottleneck modules"
+  command: "uv run -- python -m pytest tests/unit/monitoring/test_performance_monitoring.py tests/unit/monitoring/test_profiler.py tests/unit/monitoring/test_monitoring_report.py tests/unit/monitoring/test_bottleneck.py -q"
+  expected_output: "All tests pass"
+- description: "CLI and MCP observability integrations still work against the preserved monitoring contract"
+  command: "uv run -- python -m pytest tests/unit/cli/commands/test_cli_report.py tests/unit/mcp/test_observability.py tests/unit/mcp/test_mcp_results_and_analytics.py -q"
+  expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/monitoring/"
+  - "benchbox/cli/"
+  - "benchbox/mcp/"
+  - "tests/unit/monitoring/"
+  - "tests/unit/cli/"
+  - "tests/unit/mcp/"
+  - "pyproject.toml"
+  - "docs/"
+  do_not_touch:
+  - "Benchmark query definitions"
+  - "Platform adapter execution semantics unrelated to monitoring hooks"
+  - "Result schema keys without an explicit compatibility plan"
+
+success_metrics:
+- "BenchBox can consume the extracted monitoring boundary with no CLI or MCP behavior change in covered tests"
+- "At least 80 percent of monitoring-package code is generic and no longer imports benchmark-specific modules"
+- "Maintainers can describe the ownership split in one short architecture note without caveats"

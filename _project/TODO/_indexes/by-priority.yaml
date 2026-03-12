@@ -1,13 +1,38 @@
-generated_at: '2026-03-12T09:59:57.148905'
-total_items: 26
+generated_at: '2026-03-12T11:38:46.700603'
+total_items: 31
 priorities:
   High:
-    count: 1
+    count: 6
     items:
+    - id: isolate-experimental-core-subsystems
+      file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
+      title: Classify and isolate experimental core subsystems that are outside the supported benchmark surface
+      category: Architecture
+      status: Not Started
+    - id: extract-monitoring-library
+      file: TODO/main/planning/extract-monitoring-library.yaml
+      title: Evaluate and extract the generic monitoring stack into a standalone library boundary
+      category: Architecture
+      status: Not Started
+    - id: extract-release-and-sync-maintainer-tooling
+      file: TODO/main/planning/extract-release-and-sync-maintainer-tooling.yaml
+      title: Extract maintainer-only release, sync, and content-validation tooling from the installable product
+      category: Maintainer Tooling
+      status: Not Started
+    - id: extract-query-plan-harmonization-library
+      file: TODO/main/planning/extract-query-plan-harmonization-library.yaml
+      title: Extract query-plan normalization, diffing, and rendering into a reusable library boundary
+      category: Architecture
+      status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
+      status: Not Started
+    - id: split-mcp-into-separate-distribution
+      file: TODO/main/planning/split-mcp-into-separate-distribution.yaml
+      title: Split the MCP server surface into a separate distribution with an explicit dependency boundary
+      category: Packaging
       status: Not Started
   Medium-High:
     count: 3
@@ -46,26 +71,26 @@ priorities:
       title: Close open-table-format loading gaps for job-based managed Spark adapters
       category: Platform Expansion
       status: Not Started
-    - id: dedup-wave2-dataframe-platform
-      file: TODO/core-functionality/active/dedup-wave2-dataframe-platform.yaml
-      title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: dedup-wave2-sql-platform-primitives
       file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
       title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
         factories'
       category: Code Quality and Technical Debt
+      status: In Progress
+    - id: extract-or-prune-publishing-subsystem
+      file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
+      title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
+      category: Architecture
       status: Not Started
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
       status: Not Started
-    - id: reduce-cc13-complexity-ceiling
-      file: TODO/main/active/reduce-cc13-complexity-ceiling.yaml
-      title: Reduce CC=13 complexity ceiling — evaluate 87 functions, exclude inherent, refactor the rest
-      category: Code Quality and Technical Debt
+    - id: move-todo-dag-tooling-out-of-benchbox
+      file: TODO/main/planning/move-todo-dag-tooling-out-of-benchbox.yaml
+      title: Move the repo-local TODO DAG tooling into shared contributor infrastructure without breaking local workflows
+      category: Supporting Infrastructure
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml

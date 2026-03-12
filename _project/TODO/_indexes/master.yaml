@@ -1,6 +1,70 @@
-generated_at: '2026-03-12T09:59:57.148850'
-total_items: 26
+generated_at: '2026-03-12T11:38:46.700553'
+total_items: 31
 items:
+- id: isolate-experimental-core-subsystems
+  file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
+  title: Classify and isolate experimental core subsystems that are outside the supported benchmark surface
+  worktree: main
+  category: Architecture
+  priority: High
+  status: Not Started
+  tags:
+  - architecture
+  - experimental
+  - benchmark-scope
+  - scope-review
+  estimated_effort: Medium
+  work_total: 7
+  work_done: 0
+  work_ready: 1
+- id: extract-monitoring-library
+  file: TODO/main/planning/extract-monitoring-library.yaml
+  title: Evaluate and extract the generic monitoring stack into a standalone library boundary
+  worktree: main
+  category: Architecture
+  priority: High
+  status: Not Started
+  tags:
+  - architecture
+  - extraction
+  - monitoring
+  - scope-review
+  estimated_effort: Large
+  work_total: 7
+  work_done: 0
+  work_ready: 1
+- id: extract-release-and-sync-maintainer-tooling
+  file: TODO/main/planning/extract-release-and-sync-maintainer-tooling.yaml
+  title: Extract maintainer-only release, sync, and content-validation tooling from the installable product
+  worktree: main
+  category: Maintainer Tooling
+  priority: High
+  status: Not Started
+  tags:
+  - architecture
+  - packaging
+  - maintainer-tooling
+  - scope-review
+  estimated_effort: Medium
+  work_total: 7
+  work_done: 0
+  work_ready: 1
+- id: extract-query-plan-harmonization-library
+  file: TODO/main/planning/extract-query-plan-harmonization-library.yaml
+  title: Extract query-plan normalization, diffing, and rendering into a reusable library boundary
+  worktree: main
+  category: Architecture
+  priority: High
+  status: Not Started
+  tags:
+  - architecture
+  - extraction
+  - query-plans
+  - scope-review
+  estimated_effort: Large
+  work_total: 7
+  work_done: 0
+  work_ready: 1
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -9,6 +73,22 @@ items:
   priority: High
   status: Not Started
   work_total: 4
+  work_done: 0
+  work_ready: 1
+- id: split-mcp-into-separate-distribution
+  file: TODO/main/planning/split-mcp-into-separate-distribution.yaml
+  title: Split the MCP server surface into a separate distribution with an explicit dependency boundary
+  worktree: main
+  category: Packaging
+  priority: High
+  status: Not Started
+  tags:
+  - architecture
+  - packaging
+  - mcp
+  - scope-review
+  estimated_effort: Large
+  work_total: 7
   work_done: 0
   work_ready: 1
 - id: bodo-jit-and-mpi-support
@@ -297,9 +377,9 @@ items:
   work_ready: 1
   needs:
   - spark-mixin-open-table-format-loading
-- id: dedup-wave2-dataframe-platform
-  file: TODO/core-functionality/active/dedup-wave2-dataframe-platform.yaml
-  title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
+- id: dedup-wave2-sql-platform-primitives
+  file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
+  title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager factories'
   worktree: core-functionality
   category: Code Quality and Technical Debt
   priority: Medium
@@ -308,32 +388,30 @@ items:
   - code-quality
   - duplicate-check
   - refactoring
-  - dataframe
-  estimated_effort: 3-4 hours
-  work_total: 6
-  work_done: 0
-  work_ready: 4
-  needs:
-  - dedup-wave2-ignore-rules
-- id: dedup-wave2-sql-platform-primitives
-  file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
-  title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager factories'
-  worktree: core-functionality
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: Not Started
-  tags:
-  - code-quality
-  - duplicate-check
-  - refactoring
   - platforms
   - primitives
   estimated_effort: 4-6 hours
   work_total: 11
-  work_done: 0
-  work_ready: 8
+  work_done: 8
+  work_ready: 2
   needs:
   - dedup-wave2-ignore-rules
+- id: extract-or-prune-publishing-subsystem
+  file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
+  title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem
+  worktree: main
+  category: Architecture
+  priority: Medium
+  status: Not Started
+  tags:
+  - architecture
+  - publishing
+  - cleanup
+  - scope-review
+  estimated_effort: Small to Medium
+  work_total: 6
+  work_done: 0
+  work_ready: 1
 - id: flight-data-benchmark
   file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
   title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -354,17 +432,22 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: reduce-cc13-complexity-ceiling
-  file: TODO/main/active/reduce-cc13-complexity-ceiling.yaml
-  title: Reduce CC=13 complexity ceiling — evaluate 87 functions, exclude inherent, refactor the rest
+- id: move-todo-dag-tooling-out-of-benchbox
+  file: TODO/main/planning/move-todo-dag-tooling-out-of-benchbox.yaml
+  title: Move the repo-local TODO DAG tooling into shared contributor infrastructure without breaking local workflows
   worktree: main
-  category: Code Quality and Technical Debt
+  category: Supporting Infrastructure
   priority: Medium
   status: Not Started
-  work_total: 14
+  tags:
+  - contributor-tooling
+  - todo
+  - infrastructure
+  - scope-review
+  estimated_effort: Medium
+  work_total: 7
   work_done: 0
   work_ready: 1
-  deferred_count: 1
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

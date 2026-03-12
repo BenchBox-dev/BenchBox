@@ -1,0 +1,167 @@
+id: isolate-experimental-core-subsystems
+title: "Classify and isolate experimental core subsystems that are outside the supported benchmark surface"
+worktree: main
+priority: High
+status: Not Started
+category: Architecture
+description: |
+  BenchBox contains several substantial subsystems under `benchbox/core` that do
+  not align with the documented public benchmark surface, including NL2SQL,
+  AIML/functions-oriented logic, and multi-region orchestration code. Their
+  current placement makes them look productized even though they are not part of
+  the supported benchmark registry.
+
+  This item plans a clear disposition for each subsystem: move it under an
+  explicit experimental namespace, extract it, or remove it until a supported
+  product direction exists.
+
+metadata:
+  tags:
+  - architecture
+  - experimental
+  - benchmark-scope
+  - scope-review
+  estimated_effort: "Medium"
+  created_date: "2026-03-12"
+  source_review: "Orthogonal functionality review finding #2"
+
+impact:
+  user_impact: |
+    Users should gain a clearer understanding of what BenchBox supports today.
+    Public registries, top-level exports, and docs will better match actual
+    product commitments.
+  maintainer_impact: |
+    Maintainers will need to explicitly own the status of each subsystem and
+    decide whether it is a prototype, a long-term experiment, or removal
+    candidate. That reduces ambiguity but requires deliberate review.
+  packaging_impact: |
+    Public exports, optional extras, and documentation may need tightening if
+    experimental code currently leaks into package metadata or discoverability.
+  regression_risk: |
+    Moderate. There may be undocumented imports, tests, or local research
+    workflows depending on current paths. A call-site audit and compatibility
+    policy are required before moving modules.
+
+justification: |
+  Experimental code is not inherently bad, but placing it under the same core
+  namespace as supported benchmarks blurs the line between shipped product and
+  research prototypes. The result is higher maintenance cost, more confusing API
+  boundaries, and a larger review surface for unrelated work.
+
+cost_benefit_analysis:
+  expected_benefits: |
+    Medium-high. The benchmark registry, package exports, and code layout become
+    more coherent. This reduces surprise for contributors and makes future
+    product decisions easier because unsupported experiments stop masquerading as
+    core runtime.
+  expected_costs: |
+    Medium. Module moves can ripple into tests, docs, and internal notebooks or
+    scripts. If hidden consumers exist, compatibility wrappers or deprecation
+    aliases may be needed temporarily.
+  recommendation: |
+    Proceed with a classification pass first. Avoid immediate deletion. The best
+    outcome is usually to introduce an explicit `benchbox.experimental`
+    namespace, then remove or extract code only after usage is understood.
+
+files_affected:
+  modified:
+  - "benchbox/core/nl2sql/"
+  - "benchbox/core/aiml_functions/"
+  - "benchbox/core/multiregion/"
+  - "benchbox/core/benchmark_registry.py"
+  - "benchbox/__init__.py"
+  - "tests/unit/"
+  - "docs/"
+  added:
+  - "benchbox/experimental/"
+  - "docs/experimental/"
+
+work:
+- id: w1
+  summary: "Audit imports, tests, docs, and generated artifacts for NL2SQL, AIML functions, and multi-region code"
+  status: pending
+  notes: |
+    Determine whether each subsystem has any public CLI path, registry exposure,
+    or non-test consumer inside the repository.
+
+- id: w2
+  summary: "Define a subsystem status rubric covering supported, experimental, extracted, and removal-candidate states"
+  needs: [w1]
+  status: pending
+  notes: |
+    The rubric should consider user demand, test coverage, documentation
+    quality, runtime coupling, and ownership.
+
+- id: w3
+  summary: "Assign a disposition to each subsystem and document the rationale"
+  needs: [w2]
+  status: pending
+  notes: |
+    Produce an explicit decision for NL2SQL, AIML functions, and multi-region
+    independently rather than assuming one answer fits all three.
+
+- id: w4
+  summary: "Move retained experiments under a clearly non-public namespace or separate package boundary"
+  needs: [w3]
+  status: pending
+  notes: |
+    If a subsystem is kept, it should live under `benchbox.experimental` or an
+    equivalent explicit boundary with limited exports.
+
+- id: w5
+  summary: "Remove or deprecate unsupported top-level exports, registry entries, and docs references"
+  needs: [w4]
+  status: pending
+
+- id: w6
+  summary: "Add guard tests preventing unsupported experiments from re-entering the public registry accidentally"
+  needs: [w5]
+  status: pending
+
+- id: w7
+  summary: "Publish a short architecture note describing the supported surface versus experimental surface"
+  needs: [w5]
+  status: pending
+
+must_preserve:
+- "Current supported benchmark registry behavior for documented benchmarks"
+- "Any retained experimental subsystem remains importable through an explicit, clearly labeled opt-in path"
+- "No silent behavior changes to standard benchmark execution while namespaces are being cleaned up"
+
+approach: |
+  Separate classification from movement. First prove what is used and what is
+  exposed. Then introduce a clean namespace boundary for any subsystem that
+  remains in-repo. If hidden consumers exist, prefer a narrow deprecation alias
+  over an abrupt delete.
+
+anti_patterns:
+- "DO NOT move experimental modules into a new location before auditing import sites, because hidden consumers will be harder to repair after the fact"
+- "DO NOT add experimental subsystems to public registries just to avoid refactoring, because that converts an organization problem into a product-commitment problem"
+- "DO NOT delete code based only on lack of documentation, because repo-local research usage may still exist and needs to be evaluated explicitly"
+
+verification:
+- description: "Supported benchmark API and registry-facing tests continue to pass"
+  command: "uv run -- python -m pytest tests/unit/test_standardized_benchmark_apis.py tests/unit/tpch/test_api_compatibility.py tests/unit/cli/test_benchmark_selection.py -q"
+  expected_output: "All tests pass"
+- description: "Public package export coverage still reflects only supported surfaces"
+  command: "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py tests/unit/test_cli_documentation.py -q"
+  expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/nl2sql/"
+  - "benchbox/core/aiml_functions/"
+  - "benchbox/core/multiregion/"
+  - "benchbox/core/benchmark_registry.py"
+  - "benchbox/__init__.py"
+  - "tests/unit/"
+  - "docs/"
+  do_not_touch:
+  - "Documented benchmark query logic"
+  - "Platform adapter implementations"
+  - "Benchmark result schemas"
+
+open_questions:
+- "Do any external examples or unpublished notebooks import these modules directly?"
+- "Should multi-region execution live with platform orchestration instead of benchmark definitions if it is retained?"
+- "Is there a shared experimental policy that should be applied to future prototype subsystems?"
