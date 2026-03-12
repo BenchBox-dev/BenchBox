@@ -298,7 +298,7 @@ open_questions:
 - "Should the supported CLI surface be a top-level `benchbox publish` command or a `benchbox results` subcommand family?"
 - "Should durable publication metadata live beside result bundles, under `benchmark_runs/published/`, or in a separate indexed store?"
 - "Should cloud publishing support launch only for directly addressable/public roots first, with private resolver workflows deferred?"
-- "If this work proceeds, should `prune-publishing-subsystem` be superseded or narrowed to prototype-only leftovers?"
+- "Which prototype-only surfaces should be deleted outright once the supported publishing flow lands?"
 
 commits:
 - "97138d3a5"
