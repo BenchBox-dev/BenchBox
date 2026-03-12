@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:31:12.200724'
-total_items: 581
+generated_at: '2026-03-12T09:40:36.782161'
+total_items: 582
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7135,6 +7135,24 @@ items:
   work_total: 13
   work_done: 13
   work_ready: 0
+- id: migrate-remaining-ascii-charts-to-textcharts
+  file: DONE/main/active/migrate-remaining-ascii-charts-to-textcharts.yaml
+  title: Migrate remaining custom ASCII chart functions to textcharts library
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - textcharts
+  - monitoring
+  - visualization
+  - migration
+  estimated_effort: Small (2-4 hours)
+  completed_date: '2026-03-12'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+  deferred_count: 2
 - id: timing-runtime-wide-monotonic-migration
   file: DONE/main/active/timing-runtime-wide-monotonic-migration.yaml
   title: Migrate runtime elapsed and timeout timing to centralized monotonic clock

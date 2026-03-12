@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:31:10.897981'
-total_items: 28
+generated_at: '2026-03-12T09:40:35.386157'
+total_items: 27
 priorities:
   High:
     count: 1
@@ -10,17 +10,12 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 5
+    count: 4
     items:
     - id: dedup-wave2-ignore-rules
       file: TODO/core-functionality/active/dedup-wave2-ignore-rules.yaml
       title: Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage
       category: Code Quality and Technical Debt
-      status: Not Started
-    - id: migrate-remaining-ascii-charts-to-textcharts
-      file: TODO/main/active/migrate-remaining-ascii-charts-to-textcharts.yaml
-      title: Migrate remaining custom ASCII chart functions to textcharts library
-      category: Core Functionality
       status: In Progress
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml

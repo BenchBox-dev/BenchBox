@@ -2,7 +2,8 @@ id: migrate-remaining-ascii-charts-to-textcharts
 title: "Migrate remaining custom ASCII chart functions to textcharts library"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-03-12"
 description: |
   The textcharts extraction (extract-ascii-charting-into-standalone-library) successfully
   migrated all 16 visualization chart types. However, two modules still contain custom
@@ -32,8 +33,7 @@ description: |
 category: Core Functionality
 
 deps:
-  needs:
-  - extract-ascii-charting-into-standalone-library
+  needs: []
 
 gap_analysis:
   blockers:
@@ -53,7 +53,7 @@ gap_analysis:
 work:
 - id: w1
   summary: "Replace generate_ascii_chart() internals with textcharts LineChart via adapter"
-  status: pending
+  status: done
   notes: |
     Two changes in `benchbox/monitoring/report.py`, committed together:
 
@@ -93,7 +93,7 @@ work:
 - id: w2
   summary: "Update monitoring tests for textcharts LineChart output format"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     File: `tests/unit/monitoring/test_monitoring_report.py`
 
@@ -132,7 +132,7 @@ work:
 - id: w3
   summary: "Add color/unicode/theme passthrough to ResourceReporter chart generation"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Now that monitoring uses textcharts, expose color/unicode options:
 

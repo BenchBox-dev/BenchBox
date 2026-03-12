@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:31:10.897926'
-total_items: 28
+generated_at: '2026-03-12T09:40:35.386112'
+total_items: 27
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -397,7 +397,7 @@ items:
   worktree: core-functionality
   category: Code Quality and Technical Debt
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - code-quality
   - duplicate-check
@@ -406,23 +406,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
-- id: migrate-remaining-ascii-charts-to-textcharts
-  file: TODO/main/active/migrate-remaining-ascii-charts-to-textcharts.yaml
-  title: Migrate remaining custom ASCII chart functions to textcharts library
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - textcharts
-  - monitoring
-  - visualization
-  - migration
-  estimated_effort: Small (2-4 hours)
-  work_total: 3
-  work_done: 0
-  work_ready: 1
-  deferred_count: 2
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

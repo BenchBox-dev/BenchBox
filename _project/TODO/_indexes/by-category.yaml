@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T09:31:10.897966'
+generated_at: '2026-03-12T09:40:35.386142'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -57,7 +57,7 @@ categories:
       file: TODO/core-functionality/active/dedup-wave2-ignore-rules.yaml
       title: Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage
       priority: Medium-High
-      status: Not Started
+      status: In Progress
     - id: dedup-wave2-dataframe-platform
       file: TODO/core-functionality/active/dedup-wave2-dataframe-platform.yaml
       title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
@@ -75,18 +75,13 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 2
+    count: 1
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
-    - id: migrate-remaining-ascii-charts-to-textcharts
-      file: TODO/main/active/migrate-remaining-ascii-charts-to-textcharts.yaml
-      title: Migrate remaining custom ASCII chart functions to textcharts library
-      priority: Medium-High
-      status: In Progress
   Platform Expansion:
     count: 11
     items:

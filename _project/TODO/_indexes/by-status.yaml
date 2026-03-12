@@ -1,14 +1,14 @@
-generated_at: '2026-03-12T09:31:10.897991'
-total_items: 28
+generated_at: '2026-03-12T09:40:35.386166'
+total_items: 27
 statuses:
   In Progress:
     count: 2
     items:
-    - id: migrate-remaining-ascii-charts-to-textcharts
-      file: TODO/main/active/migrate-remaining-ascii-charts-to-textcharts.yaml
-      title: Migrate remaining custom ASCII chart functions to textcharts library
+    - id: dedup-wave2-ignore-rules
+      file: TODO/core-functionality/active/dedup-wave2-ignore-rules.yaml
+      title: Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage
       priority: Medium-High
-      category: Core Functionality
+      category: Code Quality and Technical Debt
     - id: test-suite-quality-wave-2
       file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
@@ -16,7 +16,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 26
+    count: 25
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -43,11 +43,6 @@ statuses:
       title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
       priority: Low
       category: Platform Expansion
-    - id: dedup-wave2-ignore-rules
-      file: TODO/core-functionality/active/dedup-wave2-ignore-rules.yaml
-      title: Add ignore rules for 12 boilerplate duplicate groups from wave-2 triage
-      priority: Medium-High
-      category: Code Quality and Technical Debt
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features

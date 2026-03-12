@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:31:12.201162'
-total_items: 581
+generated_at: '2026-03-12T09:40:36.782650'
+total_items: 582
 priorities:
   Critical:
     count: 35
@@ -1214,7 +1214,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 64
+    count: 65
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1465,6 +1465,11 @@ priorities:
     - id: migrate-remaining-print-leaks-to-emit
       file: DONE/main/active/migrate-remaining-print-leaks-to-emit.yaml
       title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
+      category: Core Functionality
+      status: Completed
+    - id: migrate-remaining-ascii-charts-to-textcharts
+      file: DONE/main/active/migrate-remaining-ascii-charts-to-textcharts.yaml
+      title: Migrate remaining custom ASCII chart functions to textcharts library
       category: Core Functionality
       status: Completed
     - id: timing-runtime-wide-monotonic-migration

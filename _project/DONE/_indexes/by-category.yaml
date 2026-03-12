@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T09:31:12.200990'
+generated_at: '2026-03-12T09:40:36.782491'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -427,7 +427,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 192
+    count: 193
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1104,6 +1104,11 @@ categories:
     - id: migrate-remaining-print-leaks-to-emit
       file: DONE/main/active/migrate-remaining-print-leaks-to-emit.yaml
       title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
+      priority: Medium-High
+      status: Completed
+    - id: migrate-remaining-ascii-charts-to-textcharts
+      file: DONE/main/active/migrate-remaining-ascii-charts-to-textcharts.yaml
+      title: Migrate remaining custom ASCII chart functions to textcharts library
       priority: Medium-High
       status: Completed
     - id: move-duckdb-to-optional-extras
