@@ -121,7 +121,7 @@ work:
 
 - id: w4
   summary: "Extract _generate_returns_from_sale base method in tpcds/maintenance_operations.py"
-  status: pending
+  status: done
 
 - id: w5
   summary: "Extract execute_sql_query shared implementation for Doris and PostgreSQL"
