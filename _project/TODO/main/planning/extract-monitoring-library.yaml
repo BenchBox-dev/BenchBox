@@ -24,6 +24,10 @@ metadata:
   created_date: "2026-03-12"
   source_review: "Orthogonal functionality review finding #3"
 
+future_state:
+  readme: "docs/design/future-state/extract-monitoring-library/README.md"
+  proposed_library_name: "runwatch"
+
 impact:
   user_impact: |
     BenchBox users should see no change in monitoring behavior if the extraction

@@ -25,6 +25,10 @@ metadata:
   created_date: "2026-03-12"
   source_review: "Orthogonal functionality review finding #2"
 
+future_state:
+  readme: "docs/design/future-state/isolate-experimental-core-subsystems/README.md"
+  proposed_library_name: "benchbox-experimental"
+
 impact:
   user_impact: |
     Users should gain a clearer understanding of what BenchBox supports today.

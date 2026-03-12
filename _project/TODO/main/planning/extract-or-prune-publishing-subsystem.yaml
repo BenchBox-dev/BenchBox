@@ -23,6 +23,10 @@ metadata:
   created_date: "2026-03-12"
   source_review: "Orthogonal functionality review finding #6"
 
+future_state:
+  readme: "docs/design/future-state/extract-or-prune-publishing-subsystem/README.md"
+  proposed_library_name: "artifactlinks"
+
 impact:
   user_impact: |
     Likely low if the subsystem is truly unused by the main runtime. If it is

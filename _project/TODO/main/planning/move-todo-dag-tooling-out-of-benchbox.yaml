@@ -23,6 +23,10 @@ metadata:
   created_date: "2026-03-12"
   source_review: "Orthogonal functionality review finding #7"
 
+future_state:
+  readme: "docs/design/future-state/move-todo-dag-tooling-out-of-benchbox/README.md"
+  proposed_library_name: "todo-dag"
+
 impact:
   user_impact: |
     No end-user product impact is expected because the tooling is contributor

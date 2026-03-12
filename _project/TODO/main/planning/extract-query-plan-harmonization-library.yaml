@@ -24,6 +24,10 @@ metadata:
   created_date: "2026-03-12"
   source_review: "Orthogonal functionality review finding #4"
 
+future_state:
+  readme: "docs/design/future-state/extract-query-plan-harmonization-library/README.md"
+  proposed_library_name: "sqlplankit"
+
 impact:
   user_impact: |
     If done correctly, users will keep the same compare-plans, show-plan, and
