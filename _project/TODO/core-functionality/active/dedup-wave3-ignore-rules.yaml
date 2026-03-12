@@ -174,7 +174,7 @@ work:
 
 - id: w4
   summary: "Run make duplicate-check-verbose, verify groups suppressed, rebaseline threshold"
-  status: pending
+  status: done
   needs: [w1, w2, w3]
   notes: |
     Verify each targeted function name no longer appears in the report.
