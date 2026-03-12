@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T15:01:24.019758'
+generated_at: '2026-03-12T15:03:16.517806'
 total_items: 34
 items:
 - id: isolate-experimental-core-subsystems
@@ -394,7 +394,7 @@ items:
   estimated_effort: 4-6 hours
   work_total: 9
   work_done: 0
-  work_ready: 0
+  work_ready: 7
   needs:
   - dedup-wave3-ignore-rules
 - id: dedup-wave3-core-and-dataframe
@@ -415,7 +415,7 @@ items:
   estimated_effort: 4-6 hours
   work_total: 10
   work_done: 0
-  work_ready: 0
+  work_ready: 8
   needs:
   - dedup-wave3-ignore-rules
 - id: extract-or-prune-publishing-subsystem
@@ -471,12 +471,12 @@ items:
   work_done: 0
   work_ready: 1
 - id: reduce-cc12-complexity-ceiling
-  file: TODO/main/planning/reduce-cc12-complexity-ceiling.yaml
+  file: TODO/main/active/reduce-cc12-complexity-ceiling.yaml
   title: Reduce CC=12 complexity ceiling — exclude 6 inherent, refactor 14, lower warn to 12
   worktree: main
   category: Code Quality and Technical Debt
   priority: Medium
-  status: Not Started
+  status: In Progress
   work_total: 16
   work_done: 0
   work_ready: 1
@@ -515,7 +515,7 @@ items:
   estimated_effort: 1-2 hours
   work_total: 3
   work_done: 0
-  work_ready: 0
+  work_ready: 1
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
