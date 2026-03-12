@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T09:45:29.486347'
+generated_at: '2026-03-12T09:54:13.453187'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -51,7 +51,7 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 4
+    count: 3
     items:
     - id: dedup-wave2-dataframe-platform
       file: TODO/core-functionality/active/dedup-wave2-dataframe-platform.yaml
@@ -62,11 +62,6 @@ categories:
       file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
       title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
         factories'
-      priority: Medium
-      status: Not Started
-    - id: dedup-wave2-generator-schema-utils
-      file: TODO/core-functionality/active/dedup-wave2-generator-schema-utils.yaml
-      title: Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators
       priority: Medium
       status: Not Started
     - id: reduce-cc13-complexity-ceiling

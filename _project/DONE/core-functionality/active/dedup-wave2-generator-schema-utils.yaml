@@ -2,7 +2,8 @@ id: dedup-wave2-generator-schema-utils
 title: "Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators"
 worktree: core-functionality
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-03-12"
 category: "Code Quality and Technical Debt"
 description: |
   Wave-2 duplicate-check triage (2026-03-12) identifies 4 consolidation-worthy
@@ -71,44 +72,45 @@ deps:
 work:
   - id: w1
     summary: "Extract _build_dimension_insert_sql helper and refactor 4 TPC-DI dimension generators"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Run TPC-DI tests to verify dimension generation unchanged"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Extract write_generator_manifest utility into benchbox/core/manifest_utils.py"
-    status: pending
+    status: done
 
   - id: w4
     summary: "Refactor amplab, clickbench, h2odb, joinorder generators to use shared manifest writer"
     needs: [w3]
-    status: pending
+    status: done
 
   - id: w5
     summary: "Run generator tests: pytest -k 'amplab or clickbench or h2odb or joinorder'"
     needs: [w4]
-    status: pending
+    status: done
 
   - id: w6
     summary: "Extract collect_create_table_sql into benchbox/core/schema_utils.py"
-    status: pending
+    status: done
 
   - id: w7
     summary: "Refactor amplab, read_primitives, ssb schema modules to use shared helper"
     needs: [w6]
-    status: pending
+    status: done
 
   - id: w8
     summary: "Extract _generate_source_data base method in TPC-DI SourceDataFormat ABC"
-    status: pending
+    status: done
 
   - id: w9
     summary: "Run full test suite to verify no regressions: make test-all"
     needs: [w2, w5, w7, w8]
-    status: pending
+    status: done
+    notes: "1442 tests pass. Duplicate lines: 8614→8464 (-150)."
 
 files_affected:
   modified:

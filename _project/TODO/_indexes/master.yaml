@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:45:29.486308'
-total_items: 27
+generated_at: '2026-03-12T09:54:13.453158'
+total_items: 26
 items:
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -332,24 +332,6 @@ items:
   work_total: 11
   work_done: 0
   work_ready: 8
-  needs:
-  - dedup-wave2-ignore-rules
-- id: dedup-wave2-generator-schema-utils
-  file: TODO/core-functionality/active/dedup-wave2-generator-schema-utils.yaml
-  title: Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators
-  worktree: core-functionality
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: Not Started
-  tags:
-  - code-quality
-  - duplicate-check
-  - refactoring
-  - generators
-  estimated_effort: 3-4 hours
-  work_total: 9
-  work_done: 0
-  work_ready: 4
   needs:
   - dedup-wave2-ignore-rules
 - id: flight-data-benchmark

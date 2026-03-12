@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:45:29.486373'
-total_items: 27
+generated_at: '2026-03-12T09:54:13.453211'
+total_items: 26
 statuses:
   In Progress:
     count: 1
@@ -11,7 +11,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 26
+    count: 25
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -67,11 +67,6 @@ statuses:
       file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
       title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
         factories'
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: dedup-wave2-generator-schema-utils
-      file: TODO/core-functionality/active/dedup-wave2-generator-schema-utils.yaml
-      title: Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators
       priority: Medium
       category: Code Quality and Technical Debt
     - id: deferred-dataframe-benchmark-implementations

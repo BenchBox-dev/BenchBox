@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:45:30.923761'
-total_items: 583
+generated_at: '2026-03-12T09:54:14.781535'
+total_items: 584
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 535
+    count: 536
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -899,6 +899,11 @@ statuses:
       title: Consolidate file format detection to handle compressed and sharded files
       priority: Medium-High
       category: Code Quality
+    - id: dedup-wave2-generator-schema-utils
+      file: DONE/core-functionality/active/dedup-wave2-generator-schema-utils.yaml
+      title: Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: run-official-command-consolidation
       file: DONE/ux-improvements/active/run-official-command-consolidation.yaml
       title: Consolidate run-official into run --official flag
