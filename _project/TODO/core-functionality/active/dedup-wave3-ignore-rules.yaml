@@ -161,7 +161,7 @@ work:
 
 - id: w3
   summary: "Add ignore rules for intentional boilerplate patterns: G2, G5, G7, G8, G9, G20, G21, G27"
-  status: pending
+  status: done
   notes: |
     G2: H2O.db aggregation query impls scoped to read_primitives/dataframe_queries.py.
     G5: primitives catalog methods scoped to queries.py and operations.py files.
