@@ -137,7 +137,7 @@ work:
 
 - id: w8
   summary: "Extract aggregation_groupby_impl helper in read_primitives/dataframe_queries.py"
-  status: pending
+  status: done
 
 - id: w9
   summary: "Run platform-specific tests: pytest -k 'postgres or timescale or presto or trino or doris'"
