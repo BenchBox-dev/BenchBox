@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T11:54:45.799606'
-total_items: 586
+generated_at: '2026-03-12T12:20:06.510957'
+total_items: 587
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4434,6 +4434,26 @@ items:
   - claude-code
   estimated_effort: 2-3 days
   completed_date: '2026-01-28'
+- id: dedup-wave2-sql-platform-primitives
+  file: DONE/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
+  title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager factories'
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  - platforms
+  - primitives
+  estimated_effort: 4-6 hours
+  completed_date: '2026-03-12'
+  work_total: 11
+  work_done: 11
+  work_ready: 0
+  needs:
+  - dedup-wave2-ignore-rules
 - id: dedup-wave2-generator-schema-utils
   file: DONE/core-functionality/active/dedup-wave2-generator-schema-utils.yaml
   title: Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators

@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T11:54:44.464034'
-total_categories: 12
+generated_at: '2026-03-12T12:20:05.202307'
+total_categories: 11
 categories:
   AI/ML Capabilities:
     count: 1
@@ -73,15 +73,6 @@ categories:
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
       status: Not Started
-  Code Quality and Technical Debt:
-    count: 1
-    items:
-    - id: dedup-wave2-sql-platform-primitives
-      file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
-      title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
-        factories'
-      priority: Medium
-      status: In Progress
   Core Functionality:
     count: 1
     items:

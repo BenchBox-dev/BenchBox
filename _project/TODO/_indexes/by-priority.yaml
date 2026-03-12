@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T11:54:44.464048'
-total_items: 31
+generated_at: '2026-03-12T12:20:05.202321'
+total_items: 30
 priorities:
   High:
     count: 6
@@ -54,7 +54,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 8
+    count: 7
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -71,12 +71,6 @@ priorities:
       title: Close open-table-format loading gaps for job-based managed Spark adapters
       category: Platform Expansion
       status: Not Started
-    - id: dedup-wave2-sql-platform-primitives
-      file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
-      title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
-        factories'
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: extract-or-prune-publishing-subsystem
       file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
       title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem

@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T11:54:45.800135'
-total_items: 586
+generated_at: '2026-03-12T12:20:06.511487'
+total_items: 587
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 538
+    count: 539
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -884,6 +884,12 @@ statuses:
       title: Consolidate Duplicated Result JSON Normalization Logic
       priority: Medium
       category: Core Functionality
+    - id: dedup-wave2-sql-platform-primitives
+      file: DONE/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
+      title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
+        factories'
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: consolidate-tpc-delimiter-detection
       file: DONE/core-functionality/consolidate-tpc-delimiter-detection.yaml
       title: Consolidate TPC delimiter detection to use get_delimiter_for_file()

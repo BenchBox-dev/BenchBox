@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T11:54:44.464006'
-total_items: 31
+generated_at: '2026-03-12T12:20:05.202280'
+total_items: 30
 items:
 - id: isolate-experimental-core-subsystems
   file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
@@ -377,25 +377,6 @@ items:
   work_ready: 1
   needs:
   - spark-mixin-open-table-format-loading
-- id: dedup-wave2-sql-platform-primitives
-  file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
-  title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager factories'
-  worktree: core-functionality
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: In Progress
-  tags:
-  - code-quality
-  - duplicate-check
-  - refactoring
-  - platforms
-  - primitives
-  estimated_effort: 4-6 hours
-  work_total: 11
-  work_done: 8
-  work_ready: 2
-  needs:
-  - dedup-wave2-ignore-rules
 - id: extract-or-prune-publishing-subsystem
   file: TODO/main/planning/extract-or-prune-publishing-subsystem.yaml
   title: Decide whether to extract, retain, or prune the generic publishing and permalink subsystem

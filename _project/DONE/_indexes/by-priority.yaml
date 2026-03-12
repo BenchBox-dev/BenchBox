@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T11:54:45.799998'
-total_items: 586
+generated_at: '2026-03-12T12:20:06.511348'
+total_items: 587
 priorities:
   Critical:
     count: 35
@@ -1548,7 +1548,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 256
+    count: 257
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1904,6 +1904,12 @@ priorities:
       file: DONE/core-functionality/active/consolidate-result-normalization.yaml
       title: Consolidate Duplicated Result JSON Normalization Logic
       category: Core Functionality
+      status: Completed
+    - id: dedup-wave2-sql-platform-primitives
+      file: DONE/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
+      title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
+        factories'
+      category: Code Quality and Technical Debt
       status: Completed
     - id: dedup-wave2-generator-schema-utils
       file: DONE/core-functionality/active/dedup-wave2-generator-schema-utils.yaml

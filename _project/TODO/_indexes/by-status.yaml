@@ -1,15 +1,9 @@
-generated_at: '2026-03-12T11:54:44.464058'
-total_items: 31
+generated_at: '2026-03-12T12:20:05.202330'
+total_items: 30
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: dedup-wave2-sql-platform-primitives
-      file: TODO/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
-      title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
-        factories'
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: test-suite-quality-wave-2
       file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest

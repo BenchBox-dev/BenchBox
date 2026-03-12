@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T11:54:45.799862'
+generated_at: '2026-03-12T12:20:06.511219'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -241,7 +241,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 36
+    count: 37
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -281,6 +281,12 @@ categories:
     - id: dedup-wave2-dataframe-platform
       file: DONE/core-functionality/active/dedup-wave2-dataframe-platform.yaml
       title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
+      priority: Medium
+      status: Completed
+    - id: dedup-wave2-sql-platform-primitives
+      file: DONE/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
+      title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
+        factories'
       priority: Medium
       status: Completed
     - id: consolidate-duplicate-code
