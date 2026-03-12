@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T08:52:16.939020'
-total_items: 28
+generated_at: '2026-03-12T09:02:30.492481'
+total_items: 29
 statuses:
   In Progress:
     count: 2
@@ -16,7 +16,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 26
+    count: 27
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -124,6 +124,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: High
       category: Platform Expansion
+    - id: reduce-cc14-complexity-cluster
+      file: TODO/main/active/reduce-cc14-complexity-cluster.yaml
+      title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
+      priority: Medium
+      category: Code Quality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T08:52:16.938974'
-total_items: 28
+generated_at: '2026-03-12T09:02:30.492429'
+total_items: 29
 items:
 - id: extract-ascii-charting-into-standalone-library
   file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
@@ -390,6 +390,16 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: reduce-cc14-complexity-cluster
+  file: TODO/main/active/reduce-cc14-complexity-cluster.yaml
+  title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
+  worktree: main
+  category: Code Quality
+  priority: Medium
+  status: Not Started
+  work_total: 9
+  work_done: 0
+  work_ready: 1
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
