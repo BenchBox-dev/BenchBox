@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T09:40:35.386142'
+generated_at: '2026-03-12T09:43:37.702973'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -51,7 +51,7 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 4
+    count: 5
     items:
     - id: dedup-wave2-ignore-rules
       file: TODO/core-functionality/active/dedup-wave2-ignore-rules.yaml
@@ -72,6 +72,11 @@ categories:
     - id: dedup-wave2-generator-schema-utils
       file: TODO/core-functionality/active/dedup-wave2-generator-schema-utils.yaml
       title: Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators
+      priority: Medium
+      status: Not Started
+    - id: reduce-cc13-complexity-ceiling
+      file: TODO/main/active/reduce-cc13-complexity-ceiling.yaml
+      title: Reduce CC=13 complexity ceiling — evaluate 87 functions, exclude inherent, refactor the rest
       priority: Medium
       status: Not Started
   Core Functionality:

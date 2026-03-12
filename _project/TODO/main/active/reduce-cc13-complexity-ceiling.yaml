@@ -1,0 +1,195 @@
+id: reduce-cc13-complexity-ceiling
+title: "Reduce CC=13 complexity ceiling — evaluate 87 functions, exclude inherent, refactor the rest"
+worktree: main
+priority: Medium
+status: Not Started
+description: |
+  After waves 1 (CC>=20) and 2 (CC=14), the complexity ceiling sits at CC=13
+  with 87 non-excluded functions at that level. This wave evaluates each function,
+  excludes those with inherent domain-driven complexity, and refactors the rest
+  to CC<=10 using extraction and data-driven patterns.
+
+  Current state from `make complexity-check`:
+  - Top 20 functions: all at CC=13
+  - 87 non-excluded functions at CC=13 across 7 modules
+  - Distribution: core (47), platforms (16), cli (10), utils (8), monitoring (3),
+    release (2), mcp (1)
+
+  Preliminary classification of the top-20 (sample):
+  - ~45% inherent (type dispatch, platform semantics, spec-driven, interactive wizards)
+  - ~55% refactorable (extractable helpers, dict dispatch, consolidated validation)
+
+  Goal: lower the non-excluded complexity ceiling from 13 to <=12, then lower
+  the warn threshold from 15 to 13 in pyproject.toml.
+
+category: Code Quality and Technical Debt
+
+deps:
+  needs: []
+
+work:
+  - id: w1
+    summary: "Classify all 87 CC=13 functions as inherent or refactorable"
+    status: pending
+    note: |
+      Desk review of each function. For each, record:
+      - Classification: INHERENT or REFACTORABLE
+      - Rationale (1 sentence)
+      - If refactorable: strategy (extraction, dict dispatch, consolidation)
+
+      Preliminary classifications for the top-20 from `make complexity-check`:
+
+      INHERENT (9):
+      - prompt_table_format (cli/benchmarks.py:1292) — interactive wizard with platform-aware format selection
+      - parse (cli/composite_params.py:106) — per-field validation with distinct rules per key
+      - create_sample_unified_tuning_config (cli/config.py:746) — platform-specific branching reflecting genuine API differences
+      - setup_platforms (cli/platform.py:839) — interactive wizard with step-by-step prompts and action dispatch
+      - check_sufficient_memory (core/dataframe/capabilities.py:385) — GPU vs CPU memory type dispatch
+      - _extract_queries (core/dryrun.py:386) — spec-driven branching (execution modes x test types)
+      - execute_get_schema (core/metadata_primitives/dataframe_operations.py:719) — per-platform schema extraction (Polars/Pandas/Spark/DataFusion)
+      - _convert_to_logical_operator (core/query_plans/parsers/duckdb.py:542) — operator-type dispatch with per-type extraction
+      - _harmonize_duckdb_operator (core/query_plans/parsers/duckdb.py:627) — 1:1 operator type mapping
+
+      REFACTORABLE (11):
+      - _compare_plans (cli/commands/compare.py:1224) — interleaved concerns separable into helpers
+      - _run_platform_comparison (cli/commands/compare_dataframes.py:299) — sequential logic splittable into named steps
+      - create_config (cli/database.py:383) — repeated option/override merging consolidatable
+      - _generate_head_to_head (core/analysis/comparison.py:615) — win/tie calculation extractable to helper
+      - _generate_insights (core/analysis/comparison.py:779) — if/elif chain convertible to dispatch dict
+      - _get_source_files (core/dataframe/data_loader.py:919) — three-source resolution unifiable with iterator
+      - _get_pyarrow_types (core/dataframe/data_loader.py:1337) — fallback logic consolidatable
+      - run_benchmark (core/metadata_primitives/benchmark.py:420) — linear loop splittable into selection + iteration
+      - generate_comparison_report (core/pg_extension_comparison.py:29) — section generation convertible to dispatch
+      - generate_plan_comparison_summary (core/query_plans/comparison.py:576) — extraction separable from assembly
+      - calculate_rankings (core/results/database.py:622) — metric-based SQL convertible to config dispatch
+
+      Remaining 67 functions must be classified during implementation.
+      Use classification-matrix format from _project/analysis/complexity/.
+
+  - id: w2
+    summary: "Add inherent-complexity CC=13 exclusions to pyproject.toml"
+    status: pending
+    needs: [w1]
+    note: |
+      Batch-add all inherent-complexity functions to exclude_functions
+      following existing format: "file:function",  # CC — rationale
+      Group under a new section header:
+      # --- Required complexity at CC=13 (YYYY-MM-DD evaluation, wave 3) ---
+
+  - id: w3
+    summary: "Refactor benchbox/core analysis and comparison functions (CC 13-><=10)"
+    status: pending
+    needs: [w2]
+    note: |
+      Target functions in core/analysis/, core/pg_extension_comparison.py,
+      core/query_plans/comparison.py, core/results/.
+      Patterns: dict dispatch, helper extraction, section builder dispatch.
+
+  - id: w4
+    summary: "Refactor benchbox/core dataframe and metadata functions (CC 13-><=10)"
+    status: pending
+    needs: [w2]
+    note: |
+      Target functions in core/dataframe/, core/metadata_primitives/.
+      Patterns: source iterator, multi-source resolver, phase separation.
+
+  - id: w5
+    summary: "Refactor benchbox/core remaining modules (CC 13-><=10)"
+    status: pending
+    needs: [w2]
+    note: |
+      Target functions in core/dryrun.py, core/tpc*, core/tuning/,
+      core/visualization/, core/write_primitives/, core/cost/,
+      core/manifest/, core/results/, core/ssb/.
+      Patterns: helper extraction, data-driven generation.
+
+  - id: w6
+    summary: "Refactor benchbox/platforms functions (CC 13-><=10)"
+    status: pending
+    needs: [w2]
+    note: |
+      Target functions in platforms/: adapter_factory, athena, azure_synapse,
+      base/, bigquery, clickhouse/, dataframe/, duckdb, fabric_warehouse,
+      lakesail, polars_platform, starrocks/.
+      Patterns: strategy extraction, platform dispatch simplification.
+
+  - id: w7
+    summary: "Refactor benchbox/cli functions (CC 13-><=10)"
+    status: pending
+    needs: [w2]
+    note: |
+      Target functions in cli/: commands/compare*.py, database.py,
+      exceptions.py, help.py, output.py, platform.py, preferences.py.
+      Patterns: named step extraction, error handler consolidation.
+
+  - id: w8
+    summary: "Refactor benchbox/utils, monitoring, release, mcp functions (CC 13-><=10)"
+    status: pending
+    needs: [w2]
+    note: |
+      Target functions in utils/ (8), monitoring/ (3), release/ (2), mcp/ (1).
+      Patterns: validation consolidation, data-driven section building.
+
+  - id: w9
+    summary: "Lower warn threshold from 15 to 13 in pyproject.toml"
+    status: pending
+    needs: [w3, w4, w5, w6, w7, w8]
+    note: |
+      Once all CC=13 functions are either excluded or refactored to <=12,
+      update pyproject.toml: warn_complexity = 13.
+      Verify: make complexity-check shows 0 warnings and 0 failures.
+
+verification:
+  - description: "Complexity check passes with no functions at CC>=13"
+    command: "make complexity-check"
+    expected_output: "PASSED: all functions within complexity limit"
+  - description: "No non-excluded CC>=13 functions remain"
+    command: "uv run -- python scripts/check_complexity.py 2>&1 | head -5"
+    expected_output: "Top functions should be CC <=12"
+  - description: "No regressions in fast suite"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "All fast tests pass"
+  - description: "Lint passes"
+    command: "uv run ruff check ."
+    expected_output: "All checks passed"
+
+must_preserve:
+  - "All refactored functions must produce identical behavior — no semantic changes"
+  - "Existing tests must continue to pass without modification"
+  - "exclude_functions entries must include CC score and rationale comment"
+  - "Excluded functions from prior complexity waves remain untouched"
+  - "No new abstractions (base classes, protocols) — extraction alone achieves the target"
+
+approach: |
+  w1: Read each CC=13 function, classify per guidelines in prior waves
+  (reduce-cyclomatic-complexity-violations, reduce-cc14-complexity-cluster).
+  Record in classification-matrix format.
+
+  w2: Batch-add inherent entries to pyproject.toml under new section header.
+
+  w3-w8: For each refactoring:
+  1. Read the function and its callers/tests
+  2. Extract private helper methods in the same module
+  3. Run focused tests + lint after each extraction
+  4. Verify CC reduced via: uv run -- python scripts/check_complexity.py 2>&1 | grep function_name
+  5. Commit per work unit (may batch multiple refactorings per commit within a work unit)
+
+  w9: Update warn_complexity threshold and verify.
+
+anti_patterns:
+  - "DO NOT change public API signatures — because all targets are internal functions"
+  - "DO NOT add new abstractions (base classes, protocols) — because extraction alone achieves the CC target"
+  - "DO NOT move code to new files — because helpers share private state with the parent function"
+  - "DO NOT refactor functions classified as inherent — because their complexity reflects domain reality; use exclude_functions instead"
+  - "DO NOT lower max_complexity below 13 — because the exclude list handles inherent complexity above that threshold"
+
+scope_limit:
+  only_modify:
+    - "pyproject.toml"
+    - "benchbox/cli/"
+    - "benchbox/core/"
+    - "benchbox/platforms/"
+    - "benchbox/utils/"
+    - "benchbox/monitoring/"
+    - "benchbox/release/"
+    - "benchbox/mcp/"

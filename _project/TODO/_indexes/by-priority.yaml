@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:40:35.386157'
-total_items: 27
+generated_at: '2026-03-12T09:43:37.702988'
+total_items: 28
 priorities:
   High:
     count: 1
@@ -34,7 +34,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 8
+    count: 9
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -71,6 +71,11 @@ priorities:
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
+      status: Not Started
+    - id: reduce-cc13-complexity-ceiling
+      file: TODO/main/active/reduce-cc13-complexity-ceiling.yaml
+      title: Reduce CC=13 complexity ceiling — evaluate 87 functions, exclude inherent, refactor the rest
+      category: Code Quality and Technical Debt
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml

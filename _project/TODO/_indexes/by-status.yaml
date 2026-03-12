@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:40:35.386166'
-total_items: 27
+generated_at: '2026-03-12T09:43:37.702997'
+total_items: 28
 statuses:
   In Progress:
     count: 2
@@ -16,7 +16,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 25
+    count: 26
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -119,6 +119,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: High
       category: Platform Expansion
+    - id: reduce-cc13-complexity-ceiling
+      file: TODO/main/active/reduce-cc13-complexity-ceiling.yaml
+      title: Reduce CC=13 complexity ceiling — evaluate 87 functions, exclude inherent, refactor the rest
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
