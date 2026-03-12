@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T09:20:32.407598'
+generated_at: '2026-03-12T09:31:12.200990'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -427,7 +427,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 191
+    count: 192
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -764,6 +764,11 @@ categories:
       file: DONE/core-functionality/active/dedup-query-catalog-base.yaml
       title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
       priority: Medium
+      status: Completed
+    - id: extract-ascii-charting-into-standalone-library
+      file: DONE/main/active/extract-ascii-charting-into-standalone-library.yaml
+      title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
+      priority: High
       status: Completed
     - id: dedup-tpcds-constants-empty-results
       file: DONE/core-functionality/active/dedup-tpcds-constants-empty-results.yaml

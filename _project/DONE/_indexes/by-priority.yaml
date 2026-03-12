@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:20:32.407751'
-total_items: 580
+generated_at: '2026-03-12T09:31:12.201162'
+total_items: 581
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 205
+    count: 206
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -477,6 +477,11 @@ priorities:
       file: DONE/main/active/interactive-table-mode-ux-and-equivalent-command.yaml
       title: Expose interactive table mode selection and include it in equivalent CLI command
       category: User Experience
+      status: Completed
+    - id: extract-ascii-charting-into-standalone-library
+      file: DONE/main/active/extract-ascii-charting-into-standalone-library.yaml
+      title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
+      category: Core Functionality
       status: Completed
     - id: pyspark-sql-session-manager
       file: DONE/dataframe-expansion/planning/pyspark-sql-session-manager.yaml

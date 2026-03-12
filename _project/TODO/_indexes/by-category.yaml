@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T09:20:31.034870'
+generated_at: '2026-03-12T09:31:10.897966'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -75,23 +75,18 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 3
+    count: 2
     items:
-    - id: extract-ascii-charting-into-standalone-library
-      file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
-      title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
-      priority: High
-      status: In Progress
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       status: Not Started
     - id: migrate-remaining-ascii-charts-to-textcharts
-      file: TODO/main/planning/migrate-remaining-ascii-charts-to-textcharts.yaml
+      file: TODO/main/active/migrate-remaining-ascii-charts-to-textcharts.yaml
       title: Migrate remaining custom ASCII chart functions to textcharts library
       priority: Medium-High
-      status: Not Started
+      status: In Progress
   Platform Expansion:
     count: 11
     items:

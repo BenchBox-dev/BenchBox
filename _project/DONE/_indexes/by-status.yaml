@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:20:32.407895'
-total_items: 580
+generated_at: '2026-03-12T09:31:12.201315'
+total_items: 581
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 532
+    count: 533
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1234,6 +1234,11 @@ statuses:
       file: DONE/core-functionality/active/dedup-query-catalog-base.yaml
       title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin
       priority: Medium
+      category: Core Functionality
+    - id: extract-ascii-charting-into-standalone-library
+      file: DONE/main/active/extract-ascii-charting-into-standalone-library.yaml
+      title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
+      priority: High
       category: Core Functionality
     - id: dedup-tpcds-constants-empty-results
       file: DONE/core-functionality/active/dedup-tpcds-constants-empty-results.yaml

@@ -1,14 +1,9 @@
-generated_at: '2026-03-12T09:20:31.034886'
-total_items: 29
+generated_at: '2026-03-12T09:31:10.897981'
+total_items: 28
 priorities:
   High:
-    count: 2
+    count: 1
     items:
-    - id: extract-ascii-charting-into-standalone-library
-      file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
-      title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
-      category: Core Functionality
-      status: In Progress
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
@@ -23,10 +18,10 @@ priorities:
       category: Code Quality and Technical Debt
       status: Not Started
     - id: migrate-remaining-ascii-charts-to-textcharts
-      file: TODO/main/planning/migrate-remaining-ascii-charts-to-textcharts.yaml
+      file: TODO/main/active/migrate-remaining-ascii-charts-to-textcharts.yaml
       title: Migrate remaining custom ASCII chart functions to textcharts library
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T09:20:32.407304'
-total_items: 580
+generated_at: '2026-03-12T09:31:12.200724'
+total_items: 581
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1377,6 +1377,25 @@ items:
   work_total: 8
   work_done: 8
   work_ready: 0
+- id: extract-ascii-charting-into-standalone-library
+  file: DONE/main/active/extract-ascii-charting-into-standalone-library.yaml
+  title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - ascii-charts
+  - visualization
+  - extraction
+  - library
+  - migration
+  estimated_effort: Large (2-4 weeks)
+  completed_date: '2026-03-12'
+  work_total: 22
+  work_done: 22
+  work_ready: 0
+  deferred_count: 2
 - id: pyspark-sql-session-manager
   file: DONE/dataframe-expansion/planning/pyspark-sql-session-manager.yaml
   title: Extract SparkSessionManager for shared PySpark session management

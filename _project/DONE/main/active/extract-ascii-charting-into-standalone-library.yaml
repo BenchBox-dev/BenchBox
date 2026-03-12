@@ -2,7 +2,8 @@ id: extract-ascii-charting-into-standalone-library
 title: "Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-12"
 description: |
   BenchBox currently owns a mature ASCII charting implementation (15 chart types,
   595-line base module, zero external dependencies) under
@@ -333,7 +334,7 @@ work:
 - id: w22
   summary: "Publish textcharts to PyPI and switch BenchBox to versioned dependency"
   needs: [w20]
-  status: pending
+  status: done
   notes: |
     Publish the first release and switch BenchBox from wheel to PyPI version.
     Steps:
@@ -346,7 +347,7 @@ work:
 - id: w12
   summary: "Deprecate temporary compatibility shims in BenchBox"
   needs: [w22]
-  status: pending
+  status: done
   notes: |
     After BenchBox runs stable with the PyPI-published textcharts:
     - Add deprecation warnings to `benchbox/core/visualization/ascii/` shim modules
