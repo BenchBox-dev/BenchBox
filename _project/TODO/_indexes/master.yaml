@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T09:17:10.289249'
+generated_at: '2026-03-12T09:20:31.034833'
 total_items: 29
 items:
 - id: extract-ascii-charting-into-standalone-library
@@ -437,7 +437,7 @@ items:
   - visualization
   - migration
   estimated_effort: Small (2-4 hours)
-  work_total: 5
+  work_total: 3
   work_done: 0
   work_ready: 1
   deferred_count: 2

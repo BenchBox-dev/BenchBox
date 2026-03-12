@@ -42,17 +42,22 @@ gap_analysis:
     solution: "Replace internal rendering with textcharts LineChart; keep ResourceChart as wrapper for API stability"
   - gap: "`ResourceChart.render()` assembles title + chart_lines; callers expect this interface"
     location: "benchbox/monitoring/report.py:29-39"
-    solution: "Store rendered textcharts output in chart_lines or add a `rendered: str` field"
+    solution: "Split `LineChart.render()` output via `.split('\\n')` to populate `chart_lines: list[str]`"
+  - gap: "`height` parameter accepted by `generate_ascii_chart()` but textcharts auto-sizes by default"
+    location: "benchbox/monitoring/report.py:78"
+    solution: "`ChartOptions` has `height: int | None` — pass it through. `ResourceChart.height` remains accurate."
   - gap: "Tests assert `*` character presence and `time` axis label — textcharts uses different characters"
     location: "tests/unit/monitoring/test_monitoring_report.py:108-172"
     solution: "Update assertions to match textcharts LineChart output format (box-drawing chars, axis labels)"
 
 work:
 - id: w1
-  summary: "Create adapter function to convert monitoring time series to textcharts LineChart"
+  summary: "Replace generate_ascii_chart() internals with textcharts LineChart via adapter"
   status: pending
   notes: |
-    Add a new function in `benchbox/monitoring/report.py`:
+    Two changes in `benchbox/monitoring/report.py`, committed together:
+
+    **A. Add adapter function** `_series_to_line_chart()`:
     ```python
     def _series_to_line_chart(
         series: list[float],
@@ -64,34 +69,30 @@ work:
     ```
     Conversion logic:
     1. Convert `list[float]` → `list[LinePoint]` with series="value", x=index, y=value
-    2. Create `ChartOptions(width=width, use_color=False, use_unicode=True)`
+    2. Create `ChartOptions(width=width, height=height, use_color=False, use_unicode=True)`
     3. Construct `LineChart(points, title=title, y_label=unit, options=options)`
     4. Return `chart.render()`
 
-    Import: `from textcharts.line_chart import LineChart, LinePoint`
-    Import: `from textcharts.base import ChartOptions`
+    Imports to add:
+    - `from textcharts.line_chart import LineChart, LinePoint`
+    - `from textcharts.base import ChartOptions`
 
-- id: w2
-  summary: "Replace generate_ascii_chart() internals with textcharts LineChart delegation"
-  needs: [w1]
-  status: pending
-  notes: |
-    Modify `generate_ascii_chart()` (report.py:75-121) to:
+    **B. Rewire `generate_ascii_chart()`** (report.py:75-121):
     1. Handle empty series edge case (return "(no data)" chart — unchanged)
     2. Call `_series_to_line_chart()` for actual rendering
-    3. Populate `ResourceChart` with rendered output in `chart_lines`
+    3. Split rendered string via `.split('\n')` to populate `chart_lines: list[str]`
     4. Preserve `min_value` / `max_value` on the returned `ResourceChart`
 
     Keep the `ResourceChart` dataclass and `generate_ascii_chart()` signature UNCHANGED
     to avoid breaking `ResourceReporter.generate_report()` and downstream callers.
 
-    Delete the now-dead helper functions:
+    **C. Delete dead helpers:**
     - `_resample_to_width()` (lines 42-48)
     - `_build_chart_grid()` (lines 51-72)
 
-- id: w3
+- id: w2
   summary: "Update monitoring tests for textcharts LineChart output format"
-  needs: [w2]
+  needs: [w1]
   status: pending
   notes: |
     File: `tests/unit/monitoring/test_monitoring_report.py`
@@ -115,30 +116,22 @@ work:
     - `TestResourceReporterEdgeCases` (l.338-372): edge cases
     - `TestReportIntegration` (l.375-431): integration test
 
-- id: w4
-  summary: "Verify resource monitoring text report rendering end-to-end"
-  needs: [w3]
-  status: pending
-  notes: |
-    Run full test suite for monitoring module:
-    ```
-    uv run -- python -m pytest tests/unit/monitoring/test_monitoring_report.py -v
-    ```
-    Also verify the rendered output looks reasonable by running:
+    **Post-edit verification** — confirm rendered output is structurally valid:
     ```python
     from benchbox.monitoring.report import generate_ascii_chart
     chart = generate_ascii_chart(
         [30, 50, 70, 90, 85, 60, 40, 30, 50, 80],
         title="CPU Utilization", unit="%", width=60, height=10
     )
-    print(chart.render())
+    r = chart.render()
+    assert "CPU Utilization" in r and len(r) > 50
     ```
     Confirm: title present, y-axis labels present, line connects data points,
     unit label present, reasonable dimensions.
 
-- id: w5
+- id: w3
   summary: "Add color/unicode/theme passthrough to ResourceReporter chart generation"
-  needs: [w4]
+  needs: [w2]
   status: pending
   notes: |
     Now that monitoring uses textcharts, expose color/unicode options:
@@ -237,6 +230,9 @@ verification:
 - description: "Full monitoring integration test passes"
   command: "uv run -- python -m pytest tests/unit/monitoring/ -v"
   expected_output: "All tests pass"
+- description: "Rendered chart is structurally valid (has title, axes, data, reasonable size)"
+  command: "uv run -- python -c \"from benchbox.monitoring.report import generate_ascii_chart; c = generate_ascii_chart([10,50,90], title='T', unit='%'); r = c.render(); assert 'T' in r and len(r) > 50, f'Bad render: {r[:100]}'\""
+  expected_output: "No assertion error — chart contains title and has substantial content"
 
 scope_limit:
   only_modify:
