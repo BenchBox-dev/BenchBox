@@ -1,183 +1,149 @@
-id: extract-monitoring-library
-title: "Evaluate and extract the generic monitoring stack into a standalone library boundary"
+id: gate-monitoring-behind-optional-extra
+title: "Gate monitoring behind a benchbox[monitoring] optional extra"
 worktree: main
-priority: High
+priority: Medium
 status: Not Started
-category: Architecture
+category: Packaging
 description: |
-  The `benchbox.monitoring` package already resembles a reusable library. It
-  contains generic resource sampling, performance metrics, history tracking, and
-  reporting logic with only a relatively small amount of BenchBox-specific
-  adaptation around execution metadata.
+  The `benchbox.monitoring` package (~2,000 lines) ships in the installable
+  wheel and is auto-enabled by the runner. It has only one external dependency
+  (`benchbox.utils.clock.mono_time`) and integrates with 3 core files
+  (runner.py, dataframe_runner.py, progress.py).
 
-  This item plans a staged extraction of the monitoring stack into a standalone
-  library boundary while keeping BenchBox's runtime semantics, report formats,
-  and performance characteristics stable.
+  The coupling is light, but monitoring ships to all users even though it is
+  not required for core benchmarking. The proportionate fix is to:
+
+  1. Add `prune benchbox/monitoring` to MANIFEST.in (exclude from default
+     wheel).
+  2. Add a `monitoring` optional extra in pyproject.toml that re-includes it.
+  3. Make the runner's monitoring import conditional (graceful degradation
+     when monitoring is not installed).
+
+  A full standalone `runwatch` package is not justified for ~2,000 lines with
+  one consumer.
 
 metadata:
   tags:
   - architecture
-  - extraction
+  - packaging
   - monitoring
   - scope-review
-  estimated_effort: "Large"
+  estimated_effort: "Small"
   created_date: "2026-03-12"
   source_review: "Orthogonal functionality review finding #3"
 
 future_state:
-  readme: "docs/design/future-state/extract-monitoring-library/README.md"
-  proposed_library_name: "runwatch"
+  readme: "docs/design/future-state/gate-monitoring-behind-optional-extra/README.md"
 
 impact:
   user_impact: |
-    BenchBox users should see no change in monitoring behavior if the extraction
-    is done correctly. The main user-facing benefit is a cleaner product scope
-    and potentially a reusable monitoring library for adjacent projects.
+    Default installs become slightly smaller. Users who want monitoring
+    install `benchbox[monitoring]`. Benchmark execution works identically
+    without monitoring — reports simply omit resource/timing detail.
   maintainer_impact: |
-    Maintainers will gain a sharper ownership boundary but will also need to
-    manage API versioning between BenchBox and the extracted library.
+    Monitoring code stays in the repo and is testable from source. The only
+    change is that the wheel excludes it by default.
   packaging_impact: |
-    A new distribution, compatibility shims, and explicit dependency pinning are
-    likely required. This adds release-management overhead.
+    One MANIFEST.in line, one pyproject.toml extra, conditional imports in
+    3 runner files. No new packages.
   regression_risk: |
-    High. Monitoring touches execution timing, resource sampling, reporting, and
-    some MCP or CLI observability flows. Any extraction that changes data shape
-    or import timing could create subtle regressions.
+    Low. The runner already has a no-monitoring fallback path (monitoring
+    can be disabled via config). Making the import conditional is a small
+    extension of this existing pattern.
 
 justification: |
-  This is the cleanest library candidate in the codebase after text-based chart
-  rendering. It is cohesive, broadly reusable, and only lightly coupled to the
-  core benchmark engine. If extracted carefully, it reduces the conceptual size
-  of BenchBox without sacrificing capability.
+  Monitoring is orthogonal to core benchmarking. Gating it behind an optional
+  extra is the minimum viable change that cleans up the default install
+  without the overhead of a standalone package.
 
 cost_benefit_analysis:
   expected_benefits: |
-    High strategic value. The monitoring stack can be reused outside BenchBox,
-    the core project becomes easier to navigate, and ownership boundaries become
-    more defensible. It also creates a concrete pattern for future extractions.
+    Moderate. Default wheel shrinks, install surface narrows, monitoring
+    ownership boundary becomes explicit via the optional extra.
   expected_costs: |
-    High execution cost. The work needs package design, versioning, migration
-    shims, docs, and a robust compatibility test suite. Release coordination
-    also becomes more complex.
+    Small. MANIFEST.in edit, pyproject.toml extra, conditional imports in
+    3 files, test updates for the gated import path.
   recommendation: |
-    Proceed only if the goal is true reuse or sharper product boundaries, not
-    just directory cleanup. Prototype the boundary inside the repo first, then
-    extract only after the API contract is demonstrated to be stable.
+    Proceed when convenient. A standalone extraction should only happen if
+    a second consumer materializes or the internal boundary has been stable
+    for multiple releases.
 
 files_affected:
   modified:
-  - "benchbox/monitoring/"
-  - "benchbox/core/runner/"
-  - "benchbox/cli/progress.py"
-  - "benchbox/cli/commands/report.py"
-  - "benchbox/mcp/observability.py"
-  - "benchbox/mcp/tools/benchmark.py"
-  - "tests/unit/monitoring/"
-  - "tests/unit/cli/commands/test_cli_report.py"
-  - "tests/unit/cli/test_progress.py"
-  - "tests/unit/mcp/test_observability.py"
-  - "tests/unit/mcp/test_mcp_results_and_analytics.py"
+  - "MANIFEST.in"
   - "pyproject.toml"
-  - "docs/architecture/"
-  added:
-  - "benchbox_monitoring/"
-  - "tests/contracts/monitoring/"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/core/runner/dataframe_runner.py"
+  - "benchbox/cli/progress.py"
+  - "tests/unit/monitoring/"
 
 work:
 - id: w1
-  summary: "Map every symbol in `benchbox.monitoring` to either generic library logic or BenchBox-specific adaptation"
+  summary: "Exclude monitoring from wheel and add optional extra"
   status: pending
   notes: |
-    Identify the exact seams around execution metadata, result integration, and
-    any CLI or MCP-specific helpers.
+    In MANIFEST.in: add `prune benchbox/monitoring` to exclude from wheel.
+    In pyproject.toml: add `monitoring = []` optional extra (no external
+    deps needed, this just controls wheel inclusion).
+    Note: MANIFEST.in prune may need a setuptools override or a different
+    mechanism to conditionally include based on extras. Investigate the
+    right packaging approach.
 
 - id: w2
-  summary: "Define the extracted library API, ownership boundary, and versioning policy"
+  summary: "Make monitoring imports conditional in runner and progress"
   needs: [w1]
   status: pending
   notes: |
-    The proposed boundary should keep generic profilers, performance models, and
-    reports outside BenchBox while retaining only thin adapters locally.
+    In runner.py, dataframe_runner.py, and progress.py: wrap monitoring
+    imports in try/except ImportError. Fall back to a no-op stub when
+    monitoring is not installed. This extends the existing monitoring-disabled
+    config path.
 
 - id: w3
-  summary: "Prototype the package boundary inside the repo with import-contract tests and frozen monitoring-contract fixtures before any external extraction"
+  summary: "Update tests to cover both with-monitoring and without-monitoring paths"
   needs: [w2]
   status: pending
   notes: |
-    Treat this as a dress rehearsal. The boundary is not ready until BenchBox
-    can consume it internally without semantic drift.
-
-- id: w4
-  summary: "Measure compatibility against current report schemas, timing semantics, and resource-sampling behavior"
-  needs: [w3]
-  status: pending
-
-- id: w5
-  summary: "Prepare migration shims and dependency wiring for BenchBox consumers"
-  needs: [w4]
-  status: pending
-
-- id: w6
-  summary: "Split release and documentation responsibilities between BenchBox and the extracted library"
-  needs: [w5]
-  status: pending
-
-- id: w7
-  summary: "Finalize extraction only after contract tests prove parity and packaging friction is acceptable"
-  needs: [w6]
-  status: pending
+    Ensure monitoring tests still pass from source checkout. Add a test
+    that verifies core benchmark execution works when monitoring is not
+    importable (mock the ImportError path).
 
 must_preserve:
-- "Current monitoring outputs and report semantics used by BenchBox CLI and MCP flows"
-- "Existing timing policy and sampling behavior unless an explicit versioned schema change is approved"
-- "No added daemon, service, or network requirement for local benchmark runs"
+- "Core benchmark execution works without monitoring installed"
+- "Monitoring behavior unchanged when benchbox[monitoring] is installed"
+- "Existing monitoring test coverage runs from source checkout"
+- "No added daemon, service, or network requirement for local runs"
 
 approach: |
-  Use an internal-first extraction strategy. First define a clean API boundary
-  and make BenchBox consume it as if it were external. Only then decide whether
-  to publish a standalone package. Keep BenchBox-specific execution adapters
-  local unless there is a strong reuse case for generalizing them.
+  MANIFEST.in exclusion + optional extra + conditional imports. No new
+  packages, no extraction, no compatibility shims.
 
 anti_patterns:
-- "DO NOT extract code before identifying BenchBox-specific assumptions, because hidden coupling will reappear as compatibility bugs"
-- "DO NOT change report schemas or timing keys during the packaging move, because users will experience extraction work as a runtime regression"
-- "DO NOT create a circular dependency between BenchBox and the extracted library, because that defeats the architectural goal"
+- "DO NOT create a standalone runwatch package — ~2,000 lines with one consumer does not justify a separate distribution"
+- "DO NOT change report schemas or timing keys as part of this work"
+- "DO NOT remove monitoring source code from the repo — it stays for development, just excluded from the default wheel"
 
 verification:
-- description: "Monitoring unit tests continue to pass across performance, profiler, report, and bottleneck modules"
-  command: "uv run -- python -m pytest tests/unit/monitoring/test_performance_monitoring.py tests/unit/monitoring/test_profiler.py tests/unit/monitoring/test_monitoring_report.py tests/unit/monitoring/test_bottleneck.py -q"
+- description: "Monitoring unit tests still pass from source checkout"
+  command: "uv run -- python -m pytest tests/unit/monitoring/ -q"
   expected_output: "All tests pass"
-- description: "CLI and MCP observability integrations still work against the preserved monitoring contract"
-  command: "uv run -- python -m pytest tests/unit/cli/commands/test_cli_report.py tests/unit/mcp/test_observability.py tests/unit/mcp/test_mcp_results_and_analytics.py -q"
+- description: "CLI and MCP observability integrations still work"
+  command: "uv run -- python -m pytest tests/unit/cli/commands/test_cli_report.py tests/unit/mcp/test_observability.py -q"
   expected_output: "All tests pass"
-- description: "Frozen monitoring contract tests preserve serialized reports and import boundaries across the extraction seam"
-  command: "uv run -- python -m pytest tests/contracts/monitoring/test_monitoring_report_contract.py tests/contracts/monitoring/test_monitoring_import_boundary.py -q"
+- description: "Core benchmark execution tests pass (monitoring not required)"
+  command: "uv run -- python -m pytest tests/unit/core/runner/ -q"
   expected_output: "All tests pass"
 
 scope_limit:
   only_modify:
-  - "benchbox/monitoring/"
+  - "MANIFEST.in"
+  - "pyproject.toml"
   - "benchbox/core/runner/runner.py"
   - "benchbox/core/runner/dataframe_runner.py"
   - "benchbox/cli/progress.py"
-  - "benchbox/cli/commands/report.py"
-  - "benchbox/mcp/observability.py"
-  - "benchbox/mcp/tools/benchmark.py"
   - "tests/unit/monitoring/"
-  - "tests/unit/cli/commands/test_cli_report.py"
-  - "tests/unit/cli/test_progress.py"
-  - "tests/unit/mcp/test_observability.py"
-  - "tests/unit/mcp/test_mcp_results_and_analytics.py"
-  - "tests/contracts/monitoring/"
-  - "pyproject.toml"
-  - "docs/architecture/"
-  - "benchbox_monitoring/"
   do_not_touch:
+  - "benchbox/monitoring/ source code (stays in repo, just excluded from default wheel)"
   - "Benchmark query definitions"
-  - "Platform adapter execution semantics unrelated to monitoring hooks"
-  - "Result schema keys without an explicit compatibility plan"
-
-success_metrics:
-- "BenchBox can consume the extracted monitoring boundary with no CLI or MCP behavior change in covered tests"
-- "At least 80 percent of monitoring-package code is generic and no longer imports benchmark-specific modules"
-- "Maintainers can describe the ownership split in one short architecture note without caveats"
+  - "Platform adapters"
+  - "Result schema keys"
