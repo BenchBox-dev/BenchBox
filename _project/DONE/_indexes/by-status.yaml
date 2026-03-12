@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T08:28:37.522227'
-total_items: 578
+generated_at: '2026-03-12T08:52:18.370018'
+total_items: 579
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 530
+    count: 531
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2221,6 +2221,11 @@ statuses:
       title: Replace per-shard INSERT loops with single bulk INSERT for DuckDB handlers
       priority: High
       category: Core Functionality
+    - id: reduce-cyclomatic-complexity-violations
+      file: DONE/main/active/reduce-cyclomatic-complexity-violations.yaml
+      title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)
+      priority: Medium
+      category: Code Quality
     - id: resource-management
       file: DONE/runtime-ops/completed/resource-management.yaml
       title: Resource Management

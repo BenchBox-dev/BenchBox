@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T08:28:37.521657'
-total_items: 578
+generated_at: '2026-03-12T08:52:18.369440'
+total_items: 579
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5719,6 +5719,17 @@ items:
   category: Code Quality and Technical Debt
   priority: Medium
   status: Completed
+- id: reduce-cyclomatic-complexity-violations
+  file: DONE/main/active/reduce-cyclomatic-complexity-violations.yaml
+  title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)
+  worktree: main
+  category: Code Quality
+  priority: Medium
+  status: Completed
+  completed_date: '2026-03-12'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: resource-management
   file: DONE/runtime-ops/completed/resource-management.yaml
   title: Resource Management

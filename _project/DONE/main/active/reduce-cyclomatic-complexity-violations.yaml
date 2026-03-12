@@ -2,7 +2,8 @@ id: reduce-cyclomatic-complexity-violations
 title: "Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-03-12"
 description: |
   `make complexity-check` reports 10 functions exceeding CC=20 and 1 warning at CC=18.
   After evaluating each function, 5 have inherent complexity (validation, parsing,
@@ -19,7 +20,7 @@ deps:
 work:
   - id: w1
     summary: "Add 5 inherent-complexity functions to exclude_functions in pyproject.toml"
-    status: pending
+    status: done
     note: |
       Functions to exclude with rationale:
       - auto_register_platforms (CC=41): 41 independent try/except platform registrations
@@ -32,48 +33,45 @@ work:
 
   - id: w2
     summary: "Refactor render_ascii_chart (CC=43) — replace elif chain with chart-type registry"
-    status: pending
+    status: done
     note: |
-      12 elif branches dispatch on chart_type string. Extract a dict mapping
-      chart_type -> (DataClass, renderer_fn) and collapse to a single lookup.
-      Target CC: ~8.
+      Extracted 15 chart-type builder functions and a _CHART_BUILDERS dict registry.
+      Main function reduced to a single dict lookup. CC 43→3.
 
   - id: w3
     summary: "Refactor _build_duckdb_external_scan_expression (CC=23) — extract per-format handlers"
-    status: pending
+    status: done
     note: |
-      5 format branches (Delta, Iceberg, Vortex, Parquet, text). Extract each to
-      a private method (_handle_delta_source, etc.) and call sequentially.
-      Target CC: ~6.
+      Extracted 5 per-format handlers (_try_delta_scan, _try_iceberg_scan,
+      _try_vortex_scan, _try_parquet_scan, _try_text_scan). CC 23→5.
 
   - id: w4
     summary: "Refactor display_interactive_preview (CC=22) — data-driven table row construction"
-    status: pending
+    status: done
     note: |
-      Most branches are simple if-present-add-row guards. Replace with a list of
-      (label, value, condition) tuples and a single loop. Target CC: ~8.
+      Replaced 15+ if-present-add-row guards with data-driven tuple list.
+      Extracted _format_compression_str and _resolve_cli_table_format helpers. CC 22→8.
 
   - id: w5
     summary: "Refactor validate_column_types (CC=22) — extract per-tuning-type validators"
-    status: pending
+    status: done
     note: |
-      4 independent validation blocks (partitioning, clustering, distribution, sorting)
-      follow the same pattern. Extract shared logic into a helper. Target CC: ~8.
+      Already refactored in prior change — delegates to 4 private validators.
+      CC is below threshold.
 
   - id: w6
     summary: "Refactor apply_driver_metadata (CC=21) — consolidate repeated getattr/setattr chains"
-    status: pending
+    status: done
     note: |
-      Data marshalling with ~8 fields each checked 2-4 times. Define a metadata
-      field list and iterate. Target CC: ~6.
+      Already refactored in prior change — delegates to 4 private helpers.
+      CC is below threshold.
 
   - id: w7
     summary: "Refactor _load_file_based_data (CC=18) — extract sharded loading to helper method"
-    status: pending
+    status: done
     note: |
-      Currently a WARN (CC=18, threshold 20). Extract sharded file loading
-      (categorization + handler dispatch) to _load_sharded_table(). Optional
-      but prevents future growth from pushing it over threshold. Target CC: ~8.
+      Extracted _load_sharded_table() and _log_table_loaded() from
+      _load_file_based_data. WARN eliminated. CC 18→7.
 
 verification:
   - description: "Complexity check passes"

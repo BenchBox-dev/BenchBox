@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T08:28:37.521945'
+generated_at: '2026-03-12T08:52:18.369734'
 total_categories: 69
 categories:
   '"Bug Fixes & Reliability"':
@@ -190,7 +190,7 @@ categories:
       priority: High
       status: Completed
   Code Quality:
-    count: 3
+    count: 4
     items:
     - id: consolidate-tpc-delimiter-detection
       file: DONE/core-functionality/consolidate-tpc-delimiter-detection.yaml
@@ -206,6 +206,11 @@ categories:
       file: DONE/core-functionality/consolidate-file-format-detection.yaml
       title: Consolidate file format detection to handle compressed and sharded files
       priority: Medium-High
+      status: Completed
+    - id: reduce-cyclomatic-complexity-violations
+      file: DONE/main/active/reduce-cyclomatic-complexity-violations.yaml
+      title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)
+      priority: Medium
       status: Completed
   Code Quality and Documentation:
     count: 4

@@ -1,19 +1,14 @@
-generated_at: '2026-03-12T08:36:11.732008'
-total_items: 29
+generated_at: '2026-03-12T08:52:16.939020'
+total_items: 28
 statuses:
   In Progress:
-    count: 3
+    count: 2
     items:
     - id: extract-ascii-charting-into-standalone-library
       file: TODO/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
       priority: High
       category: Core Functionality
-    - id: reduce-cyclomatic-complexity-violations
-      file: TODO/main/active/reduce-cyclomatic-complexity-violations.yaml
-      title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)
-      priority: Medium
-      category: Code Quality
     - id: test-suite-quality-wave-2
       file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest

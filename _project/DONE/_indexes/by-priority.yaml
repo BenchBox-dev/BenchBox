@@ -1,5 +1,5 @@
-generated_at: '2026-03-12T08:28:37.522076'
-total_items: 578
+generated_at: '2026-03-12T08:52:18.369875'
+total_items: 579
 priorities:
   Critical:
     count: 35
@@ -1533,7 +1533,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 251
+    count: 252
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2450,6 +2450,11 @@ priorities:
       file: DONE/unknown/planning/remove-tpc-h-parallel-file-merging-anti-pattern.yaml
       title: Remove TPC-H Parallel File Merging Anti-Pattern
       category: Code Quality and Technical Debt
+      status: Completed
+    - id: reduce-cyclomatic-complexity-violations
+      file: DONE/main/active/reduce-cyclomatic-complexity-violations.yaml
+      title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)
+      category: Code Quality
       status: Completed
     - id: resource-management
       file: DONE/runtime-ops/completed/resource-management.yaml
