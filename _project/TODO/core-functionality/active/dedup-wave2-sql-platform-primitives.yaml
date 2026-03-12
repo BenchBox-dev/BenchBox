@@ -129,7 +129,7 @@ work:
 
 - id: w6
   summary: "Extract _get_dataframe_manager generic factory in core/dataframe_manager_factory.py"
-  status: pending
+  status: done
 
 - id: w7
   summary: "Extract get_entry_by_id into core/primitives_utils.py, refactor 4 lookup methods"
