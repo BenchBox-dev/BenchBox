@@ -1,8 +1,8 @@
-generated_at: '2026-03-23T14:54:38.774250'
-total_items: 28
+generated_at: '2026-03-23T14:55:42.318846'
+total_items: 27
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
     - id: dedup-wave3-sql-platform-adapters
       file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
@@ -10,11 +10,6 @@ statuses:
         table extraction'
       priority: Medium-High
       category: Code Quality and Technical Debt
-    - id: formalize-mcp-internal-apis
-      file: TODO/main/active/formalize-mcp-internal-apis.yaml
-      title: Promote 3 internal MCP API references to public exports
-      priority: Medium-High
-      category: Packaging
   Not Started:
     count: 26
     items:

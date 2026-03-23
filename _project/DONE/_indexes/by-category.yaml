@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T14:54:39.991683'
-total_categories: 69
+generated_at: '2026-03-23T14:55:43.572917'
+total_categories: 70
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -1848,6 +1848,14 @@ categories:
       file: DONE/unknown/completed/harmonize-cli-verbosity-flow.yaml
       title: ✅ Harmonize CLI Verbosity Flow
       priority: High
+      status: Completed
+  Packaging:
+    count: 1
+    items:
+    - id: formalize-mcp-internal-apis
+      file: DONE/main/active/formalize-mcp-internal-apis.yaml
+      title: Promote 3 internal MCP API references to public exports
+      priority: Medium-High
       status: Completed
   Performance:
     count: 1

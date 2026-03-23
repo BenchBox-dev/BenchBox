@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T14:54:39.991439'
-total_items: 591
+generated_at: '2026-03-23T14:55:43.572651'
+total_items: 592
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7421,6 +7421,23 @@ items:
   - polish
   estimated_effort: 4-6 days
   completed_date: '2026-02-06'
+- id: formalize-mcp-internal-apis
+  file: DONE/main/active/formalize-mcp-internal-apis.yaml
+  title: Promote 3 internal MCP API references to public exports
+  worktree: main
+  category: Packaging
+  priority: Medium-High
+  status: Completed
+  tags:
+  - architecture
+  - packaging
+  - mcp
+  - scope-review
+  estimated_effort: Small
+  completed_date: '2026-03-23'
+  work_total: 2
+  work_done: 2
+  work_ready: 0
 - id: remove-polars-sql-mode
   file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml
   title: Remove Polars SQL mode support - DataFrame only

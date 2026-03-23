@@ -2,7 +2,8 @@ id: formalize-mcp-internal-apis
 title: "Promote 3 internal MCP API references to public exports"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-03-23"
 category: Packaging
 description: |
   BenchBox's MCP server consumes 23+ core APIs. Most are already public, but
@@ -74,7 +75,7 @@ files_affected:
 work:
 - id: w1
   summary: "Add 3 public re-exports and update MCP imports"
-  status: pending
+  status: done
   notes: |
     Re-export TPCH_DATAFRAME_QUERIES, TPCDS_DATAFRAME_QUERIES, and
     DATAFRAME_PLATFORMS from a public API surface (e.g. benchbox/__init__.py
@@ -84,7 +85,7 @@ work:
 - id: w2
   summary: "Add a test asserting the 3 symbols are public exports"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add assertions in test_cli_package_exports.py (or a new test) that
     verify the 3 symbols are importable from the public location.

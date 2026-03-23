@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T14:54:38.774240'
-total_items: 28
+generated_at: '2026-03-23T14:55:42.318838'
+total_items: 27
 priorities:
   High:
     count: 2
@@ -15,7 +15,7 @@ priorities:
       category: Maintainer Tooling
       status: Not Started
   Medium-High:
-    count: 5
+    count: 4
     items:
     - id: dedup-wave3-sql-platform-adapters
       file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
@@ -33,11 +33,6 @@ priorities:
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
       status: Not Started
-    - id: formalize-mcp-internal-apis
-      file: TODO/main/active/formalize-mcp-internal-apis.yaml
-      title: Promote 3 internal MCP API references to public exports
-      category: Packaging
-      status: In Progress
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support

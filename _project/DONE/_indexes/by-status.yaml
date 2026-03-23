@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T14:54:39.991968'
-total_items: 591
+generated_at: '2026-03-23T14:55:43.573177'
+total_items: 592
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 543
+    count: 544
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2023,6 +2023,11 @@ statuses:
       title: Prevent concurrent parallel test runs via fcntl.flock mutex
       priority: Medium
       category: CI Infrastructure
+    - id: formalize-mcp-internal-apis
+      file: DONE/main/active/formalize-mcp-internal-apis.yaml
+      title: Promote 3 internal MCP API references to public exports
+      priority: Medium-High
+      category: Packaging
     - id: postgresql-first-class-platform
       file: DONE/platform-expansion/active/postgresql-first-class-platform.yaml
       title: Promote PostgreSQL to first-class platform status

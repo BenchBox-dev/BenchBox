@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T14:54:39.991823'
-total_items: 591
+generated_at: '2026-03-23T14:55:43.573054'
+total_items: 592
 priorities:
   Critical:
     count: 35
@@ -1220,7 +1220,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 67
+    count: 68
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1522,6 +1522,11 @@ priorities:
       file: DONE/core-functionality/active/ascii-chart-polish-and-ux-refinements.yaml
       title: 'Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers'
       category: Core Functionality
+      status: Completed
+    - id: formalize-mcp-internal-apis
+      file: DONE/main/active/formalize-mcp-internal-apis.yaml
+      title: Promote 3 internal MCP API references to public exports
+      category: Packaging
       status: Completed
     - id: remove-polars-sql-mode
       file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml

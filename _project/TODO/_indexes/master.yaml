@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T14:54:38.774189'
-total_items: 28
+generated_at: '2026-03-23T14:55:42.318795'
+total_items: 27
 items:
 - id: isolate-experimental-core-subsystems
   file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
@@ -441,22 +441,6 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 3
-- id: formalize-mcp-internal-apis
-  file: TODO/main/active/formalize-mcp-internal-apis.yaml
-  title: Promote 3 internal MCP API references to public exports
-  worktree: main
-  category: Packaging
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - architecture
-  - packaging
-  - mcp
-  - scope-review
-  estimated_effort: Small
-  work_total: 2
-  work_done: 0
-  work_ready: 1
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support
