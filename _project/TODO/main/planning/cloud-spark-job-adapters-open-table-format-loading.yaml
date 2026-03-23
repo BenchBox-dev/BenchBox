@@ -1,7 +1,7 @@
 id: cloud-spark-job-adapters-open-table-format-loading
 title: "Close open-table-format loading gaps for job-based managed Spark adapters"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 description: |
   Several managed Spark adapters do not use SparkDataLoadMixin for data loading and

@@ -1,7 +1,7 @@
 id: productize-result-publishing-and-artifact-sharing
 title: "Productize result publishing and artifact sharing workflow"
 worktree: main
-priority: Medium-High
+priority: High
 status: Not Started
 category: Core Functionality
 description: |

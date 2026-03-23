@@ -1,6 +1,41 @@
-generated_at: '2026-03-23T16:14:04.885785'
+generated_at: '2026-03-23T16:17:56.160825'
 total_items: 24
 items:
+- id: gate-monitoring-behind-optional-extra
+  file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
+  title: Gate monitoring behind a benchbox[monitoring] optional extra
+  worktree: main
+  category: Packaging
+  priority: High
+  status: Not Started
+  tags:
+  - architecture
+  - packaging
+  - monitoring
+  - scope-review
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+- id: productize-result-publishing-and-artifact-sharing
+  file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
+  title: Productize result publishing and artifact sharing workflow
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - publishing
+  - results
+  - artifact-management
+  - sharing
+  - follow-up
+  - scope-review
+  estimated_effort: Large
+  work_total: 10
+  work_done: 0
+  work_ready: 1
+  deferred_count: 3
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -263,30 +298,6 @@ items:
   work_total: 15
   work_done: 0
   work_ready: 15
-- id: livy-spark-adapters-open-table-format-loading
-  file: TODO/main/planning/livy-spark-adapters-open-table-format-loading.yaml
-  title: Close open-table-format loading gaps for Livy-based Spark adapters
-  worktree: main
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - spark-mixin-open-table-format-loading
-- id: cloud-spark-job-adapters-open-table-format-loading
-  file: TODO/main/planning/cloud-spark-job-adapters-open-table-format-loading.yaml
-  title: Close open-table-format loading gaps for job-based managed Spark adapters
-  worktree: main
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  work_total: 6
-  work_done: 0
-  work_ready: 1
-  needs:
-  - spark-mixin-open-table-format-loading
 - id: flight-data-benchmark
   file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
   title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -336,22 +347,30 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: gate-monitoring-behind-optional-extra
-  file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
-  title: Gate monitoring behind a benchbox[monitoring] optional extra
+- id: livy-spark-adapters-open-table-format-loading
+  file: TODO/main/planning/livy-spark-adapters-open-table-format-loading.yaml
+  title: Close open-table-format loading gaps for Livy-based Spark adapters
   worktree: main
-  category: Packaging
+  category: Platform Expansion
   priority: Medium-High
   status: Not Started
-  tags:
-  - architecture
-  - packaging
-  - monitoring
-  - scope-review
-  estimated_effort: Small
-  work_total: 3
+  work_total: 5
   work_done: 0
   work_ready: 1
+  needs:
+  - spark-mixin-open-table-format-loading
+- id: cloud-spark-job-adapters-open-table-format-loading
+  file: TODO/main/planning/cloud-spark-job-adapters-open-table-format-loading.yaml
+  title: Close open-table-format loading gaps for job-based managed Spark adapters
+  worktree: main
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+  needs:
+  - spark-mixin-open-table-format-loading
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -371,25 +390,6 @@ items:
   work_total: 12
   work_done: 0
   work_ready: 12
-- id: productize-result-publishing-and-artifact-sharing
-  file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
-  title: Productize result publishing and artifact sharing workflow
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - publishing
-  - results
-  - artifact-management
-  - sharing
-  - follow-up
-  - scope-review
-  estimated_effort: Large
-  work_total: 10
-  work_done: 0
-  work_ready: 1
-  deferred_count: 3
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support

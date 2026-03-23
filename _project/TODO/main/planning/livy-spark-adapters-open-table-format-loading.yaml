@@ -1,7 +1,7 @@
 id: livy-spark-adapters-open-table-format-loading
 title: "Close open-table-format loading gaps for Livy-based Spark adapters"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 description: |
   Synapse Spark and Fabric Spark use their own Livy/session-driven data-loading flows
