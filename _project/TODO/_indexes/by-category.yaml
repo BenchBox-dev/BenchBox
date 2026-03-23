@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:48:04.348145'
-total_categories: 10
+generated_at: '2026-03-23T15:50:45.930012'
+total_categories: 9
 categories:
   AI/ML Capabilities:
     count: 1
@@ -9,14 +9,6 @@ categories:
       title: Vector Search Benchmark Support
       priority: Medium-High
       status: Not Started
-  Architecture:
-    count: 1
-    items:
-    - id: isolate-experimental-core-subsystems
-      file: TODO/main/active/isolate-experimental-core-subsystems.yaml
-      title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
-      priority: High
-      status: In Progress
   Benchmark Development:
     count: 6
     items:

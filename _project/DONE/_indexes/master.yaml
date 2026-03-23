@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:48:05.642212'
-total_items: 593
+generated_at: '2026-03-23T15:50:47.253369'
+total_items: 594
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2222,6 +2222,22 @@ items:
   work_done: 21
   work_ready: 0
   deferred_count: 4
+- id: isolate-experimental-core-subsystems
+  file: DONE/main/active/isolate-experimental-core-subsystems.yaml
+  title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
+  worktree: main
+  category: Architecture
+  priority: High
+  status: Completed
+  tags:
+  - architecture
+  - experimental
+  - scope-review
+  estimated_effort: Medium
+  completed_date: '2026-03-23'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: nyc-taxi-olap-benchmark-core-implementation
   file: DONE/benchmark-expansion/active/nyc-taxi-olap-benchmark-core-implementation.yaml
   title: NYC Taxi OLAP Benchmark (Core Implementation)

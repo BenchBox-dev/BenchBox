@@ -1,14 +1,9 @@
-generated_at: '2026-03-23T15:48:04.348171'
-total_items: 26
+generated_at: '2026-03-23T15:50:45.930032'
+total_items: 25
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: isolate-experimental-core-subsystems
-      file: TODO/main/active/isolate-experimental-core-subsystems.yaml
-      title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
-      priority: High
-      category: Architecture
     - id: test-suite-quality-wave-2
       file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest

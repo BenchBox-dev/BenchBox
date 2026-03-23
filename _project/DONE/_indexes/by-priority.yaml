@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:48:05.642615'
-total_items: 593
+generated_at: '2026-03-23T15:50:47.253758'
+total_items: 594
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 208
+    count: 209
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -743,6 +743,11 @@ priorities:
       file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
       title: MotherDuck Platform Adapter
       category: Platform Expansion
+      status: Completed
+    - id: isolate-experimental-core-subsystems
+      file: DONE/main/active/isolate-experimental-core-subsystems.yaml
+      title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
+      category: Architecture
       status: Completed
     - id: nyc-taxi-olap-benchmark-core-implementation
       file: DONE/benchmark-expansion/active/nyc-taxi-olap-benchmark-core-implementation.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:48:05.642466'
-total_categories: 71
+generated_at: '2026-03-23T15:50:47.253621'
+total_categories: 72
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -112,6 +112,14 @@ categories:
       file: DONE/ai-ml-nl2sql/completed/natural-language-to-sql-testing-framework.yaml
       title: Natural Language to SQL Testing Framework
       priority: Medium
+      status: Completed
+  Architecture:
+    count: 1
+    items:
+    - id: isolate-experimental-core-subsystems
+      file: DONE/main/active/isolate-experimental-core-subsystems.yaml
+      title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
+      priority: High
       status: Completed
   Benchmark Correctness and Validation:
     count: 1

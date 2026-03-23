@@ -2,7 +2,8 @@ id: isolate-experimental-core-subsystems
 title: "Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-03-23"
 category: Architecture
 description: |
   Five subsystems live under `benchbox/core/` but are not in the supported
@@ -93,7 +94,7 @@ files_affected:
 work:
 - id: w1
   summary: "Create benchbox/experimental/ and move the 5 subsystem directories"
-  status: pending
+  status: done
   notes: |
     mkdir -p benchbox/experimental/
     git mv benchbox/core/{nl2sql,aiml_functions,multiregion,gpu,concurrency} benchbox/experimental/
@@ -103,7 +104,7 @@ work:
 - id: w2
   summary: "Update all internal imports across the 5 subsystems and cudf.py"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Replace `from benchbox.core.{subsystem}` with
     `from benchbox.experimental.{subsystem}` in:
@@ -114,7 +115,7 @@ work:
 - id: w3
   summary: "Update test imports and paths"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Update tests/unit/core/{nl2sql,aiml_functions,gpu,multiregion}/ imports
     to reference the new experimental paths.
@@ -122,7 +123,7 @@ work:
 - id: w4
   summary: "Add a guard test preventing experimental modules from appearing in the public registry"
   needs: [w3]
-  status: pending
+  status: done
 
 must_preserve:
 - "Supported benchmark registry and CLI behavior unchanged"
@@ -140,13 +141,15 @@ anti_patterns:
 
 verification:
 - description: "Supported benchmark API and registry tests still pass"
-  command: "uv run -- python -m pytest tests/unit/test_standardized_benchmark_apis.py tests/unit/tpch/test_api_compatibility.py tests/unit/cli/test_benchmark_selection.py -q"
+  command: "uv run -- python -m pytest tests/unit/test_standardized_benchmark_apis.py tests/unit/tpch/test_api_compatibility.py
+    tests/unit/cli/test_benchmark_selection.py -q"
   expected_output: "All tests pass"
 - description: "Public exports reflect only supported surfaces"
   command: "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py tests/unit/test_cli_documentation.py -q"
   expected_output: "All tests pass"
 - description: "No experimental subsystem imports remain under benchbox/core/"
-  command: "grep -r 'from benchbox.core.\\(nl2sql\\|aiml_functions\\|multiregion\\|gpu\\|concurrency\\)' benchbox/ --include='*.py' | grep -v __pycache__"
+  command: "grep -r 'from benchbox.core.\\(nl2sql\\|aiml_functions\\|multiregion\\|gpu\\|concurrency\\)' benchbox/ --include='*.py'
+    | grep -v __pycache__"
   expected_output: "No output (zero matches)"
 - description: "Experimental modules are importable from the new namespace"
   command: "uv run -- python -c 'from benchbox.experimental import nl2sql, aiml_functions, multiregion, gpu, concurrency'"

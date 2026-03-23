@@ -2,8 +2,7 @@ id: test-suite-quality-wave-2
 title: "Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest complexity"
 worktree: main
 priority: High
-status: Completed
-completed_date: "2026-03-23"
+status: In Progress
 description: |
   Follow-up to remediate-coverage-theater (completed 2026-03-05). That work
   removed the worst offenders (17 hollow files, enforcement scripts) and added
@@ -183,7 +182,7 @@ work:
 
 - id: w6
   summary: "Replace MagicMock with real connections in test_platform_adapters_coverage_wave_remaining.py and test_dataframe_runner.py"
-  status: done
+  status: in-progress
   needs: [w2]
   description: |
     The top 2 MagicMock-heavy files where real alternatives exist:
@@ -217,7 +216,7 @@ work:
 
 - id: w7
   summary: "Split root conftest.py into domain-specific conftest files"
-  status: done
+  status: in-progress
   needs: [w1]
   description: |
     tests/conftest.py is 746 lines combining:
@@ -259,7 +258,7 @@ metadata:
 
 verification:
   command: |
-    echo "--- fast suite timing ---" && timeout 600 uv run -- python -m pytest tests/unit -m fast --durations=5 -n 0 -q 2>&1 | tail -10 && echo "--- is-not-None count in top 5 ---" && grep -c 'is not None' tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py tests/unit/platforms/dataframe/test_pyspark_df.py tests/unit/core/cost/test_cloud_platform_costs.py tests/unit/core/tpch/test_dataframe_queries.py tests/unit/core/aiml_functions/test_aiml_functions_queries.py 2>&1 && echo "--- sleeps in tpc_compliance ---" && grep -c 'time.sleep' tests/unit/test_tpc_compliance.py && echo "--- conftest size ---" && wc -l tests/conftest.py && echo "--- hollow isinstance (4 files) ---" && grep -c 'assert isinstance' tests/validation/test_parameter_compliance.py tests/unit/tpch/test_api_compatibility.py tests/unit/test_tpcds_enhanced.py 2>&1 && echo "--- thin files deleted ---" && ls tests/unit/platforms/test_clickhouse_metadata_coverage.py tests/unit/platforms/test_bigquery_case_normalization.py tests/unit/platforms/test_bigquery_staging_root.py tests/unit/platforms/test_timescaledb_coverage.py 2>&1 && echo "--- MagicMock in top 2 ---" && grep -c 'MagicMock' tests/unit/platforms/test_platform_adapters_coverage_wave_remaining.py tests/unit/core/runner/test_dataframe_runner.py 2>&1
+    echo "--- fast suite timing ---" && timeout 600 uv run -- python -m pytest tests/unit -m fast --durations=5 -n 0 -q 2>&1 | tail -10 && echo "--- is-not-None count in top 5 ---" && grep -c 'is not None' tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py tests/unit/platforms/dataframe/test_pyspark_df.py tests/unit/core/cost/test_cloud_platform_costs.py tests/unit/core/tpch/test_dataframe_queries.py tests/unit/core/aiml_functions/test_aiml_functions_queries.py 2>&1 && echo "--- sleeps in tpc_compliance ---" && grep -c 'time.sleep' tests/unit/test_tpc_compliance.py && echo "--- conftest size ---" && wc -l tests/conftest.py && echo "--- hollow isinstance (4 files) ---" && grep -c 'assert isinstance' tests/validation/test_parameter_compliance.py tests/unit/tpch/test_api_compatibility.py tests/integration/tpch/test_tpch_benchmark.py tests/unit/test_tpcds_enhanced.py 2>&1 && echo "--- thin files deleted ---" && ls tests/unit/platforms/test_clickhouse_metadata_coverage.py tests/unit/platforms/test_bigquery_case_normalization.py tests/unit/platforms/test_bigquery_staging_root.py tests/unit/platforms/test_timescaledb_coverage.py 2>&1 && echo "--- MagicMock in top 2 ---" && grep -c 'MagicMock' tests/unit/platforms/test_platform_adapters_coverage_wave_remaining.py tests/unit/core/runner/test_dataframe_runner.py 2>&1
   expected: "Fast suite <10min; is-not-None counts reduced >50%; 0 sleeps in tpc_compliance; conftest <200 lines; hollow isinstance
     reduced >50%; thin files not found (deleted); MagicMock counts reduced by 35-55"
 

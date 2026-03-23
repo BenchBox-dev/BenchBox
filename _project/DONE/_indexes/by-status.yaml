@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:48:05.642758'
-total_items: 593
+generated_at: '2026-03-23T15:50:47.253889'
+total_items: 594
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 545
+    count: 546
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1804,6 +1804,11 @@ statuses:
       title: MotherDuck Platform Adapter
       priority: High
       category: Platform Expansion
+    - id: isolate-experimental-core-subsystems
+      file: DONE/main/active/isolate-experimental-core-subsystems.yaml
+      title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
+      priority: High
+      category: Architecture
     - id: move-duckdb-to-optional-extras
       file: DONE/main/active/move-duckdb-to-optional-extras.yaml
       title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
