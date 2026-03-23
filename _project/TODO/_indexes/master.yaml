@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T16:53:16.903033'
-total_items: 25
+generated_at: '2026-03-23T17:00:29.897527'
+total_items: 26
 items:
 - id: fix-coverage-theater
   file: TODO/main/active/fix-coverage-theater.yaml
@@ -34,9 +34,9 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
-- id: test-coverage-to-80-percent
-  file: TODO/main/planning/test-coverage-to-80-percent.yaml
-  title: Increase test coverage from 66% to 80% with meaningful tests
+- id: non-dataframe-test-coverage
+  file: TODO/main/planning/non-dataframe-test-coverage.yaml
+  title: Increase core, CLI, platform, and utils test coverage to 80%
   worktree: main
   category: Testing & Quality
   priority: High
@@ -45,11 +45,14 @@ items:
   - testing
   - coverage
   - quality
-  estimated_effort: Large (3-4 weeks across phases)
-  work_total: 5
+  - core
+  - cli
+  - platforms
+  estimated_effort: Large (3-4 weeks across work units)
+  work_total: 13
   work_done: 0
-  work_ready: 1
-  deferred_count: 3
+  work_ready: 8
+  deferred_count: 4
   needs:
   - fix-coverage-theater
 - id: productize-result-publishing-and-artifact-sharing
@@ -72,12 +75,12 @@ items:
   work_ready: 1
   deferred_count: 3
 - id: platform-live-integration-tests
-  file: TODO/main/planning/platform-live-integration-tests.yaml
+  file: TODO/main/active/platform-live-integration-tests.yaml
   title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
   worktree: main
   category: Testing & Quality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - testing
   - integration
@@ -86,7 +89,7 @@ items:
   - quality
   estimated_effort: Large (2-3 weeks)
   work_total: 8
-  work_done: 0
+  work_done: 1
   work_ready: 2
   deferred_count: 4
 - id: bodo-jit-and-mpi-support
@@ -400,6 +403,25 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: dataframe-test-coverage
+  file: TODO/main/planning/dataframe-test-coverage.yaml
+  title: Increase DataFrame subsystem test coverage with behavioral tests
+  worktree: main
+  category: Testing & Quality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - testing
+  - coverage
+  - dataframe
+  - quality
+  estimated_effort: Large (2-3 weeks)
+  work_total: 10
+  work_done: 0
+  work_ready: 4
+  deferred_count: 4
+  needs:
+  - fix-coverage-theater
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

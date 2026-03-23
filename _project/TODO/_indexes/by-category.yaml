@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T16:53:16.903064'
+generated_at: '2026-03-23T17:00:29.897547'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -128,23 +128,28 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 3
+    count: 4
     items:
     - id: fix-coverage-theater
       file: TODO/main/active/fix-coverage-theater.yaml
       title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
       priority: High
       status: Not Started
-    - id: test-coverage-to-80-percent
-      file: TODO/main/planning/test-coverage-to-80-percent.yaml
-      title: Increase test coverage from 66% to 80% with meaningful tests
+    - id: dataframe-test-coverage
+      file: TODO/main/planning/dataframe-test-coverage.yaml
+      title: Increase DataFrame subsystem test coverage with behavioral tests
+      priority: Medium-High
+      status: Not Started
+    - id: non-dataframe-test-coverage
+      file: TODO/main/planning/non-dataframe-test-coverage.yaml
+      title: Increase core, CLI, platform, and utils test coverage to 80%
       priority: High
       status: Not Started
     - id: platform-live-integration-tests
-      file: TODO/main/planning/platform-live-integration-tests.yaml
+      file: TODO/main/active/platform-live-integration-tests.yaml
       title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
       priority: High
-      status: Not Started
+      status: In Progress
   User Experience:
     count: 1
     items:

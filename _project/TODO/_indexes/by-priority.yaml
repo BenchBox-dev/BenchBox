@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T16:53:16.903081'
-total_items: 25
+generated_at: '2026-03-23T17:00:29.897557'
+total_items: 26
 priorities:
   High:
     count: 5
@@ -14,9 +14,9 @@ priorities:
       title: Gate monitoring behind a benchbox[monitoring] optional extra
       category: Packaging
       status: Not Started
-    - id: test-coverage-to-80-percent
-      file: TODO/main/planning/test-coverage-to-80-percent.yaml
-      title: Increase test coverage from 66% to 80% with meaningful tests
+    - id: non-dataframe-test-coverage
+      file: TODO/main/planning/non-dataframe-test-coverage.yaml
+      title: Increase core, CLI, platform, and utils test coverage to 80%
       category: Testing & Quality
       status: Not Started
     - id: productize-result-publishing-and-artifact-sharing
@@ -25,13 +25,18 @@ priorities:
       category: Core Functionality
       status: Not Started
     - id: platform-live-integration-tests
-      file: TODO/main/planning/platform-live-integration-tests.yaml
+      file: TODO/main/active/platform-live-integration-tests.yaml
       title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
       category: Testing & Quality
-      status: Not Started
+      status: In Progress
   Medium-High:
-    count: 2
+    count: 3
     items:
+    - id: dataframe-test-coverage
+      file: TODO/main/planning/dataframe-test-coverage.yaml
+      title: Increase DataFrame subsystem test coverage with behavioral tests
+      category: Testing & Quality
+      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
