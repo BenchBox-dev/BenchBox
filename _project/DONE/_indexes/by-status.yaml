@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T16:17:57.505026'
-total_items: 595
+generated_at: '2026-03-23T16:36:06.833892'
+total_items: 597
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 547
+    count: 549
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -794,6 +794,16 @@ statuses:
       title: Close open table format support gaps across all BenchBox platforms
       priority: Medium-High
       category: Feature
+    - id: livy-spark-adapters-open-table-format-loading
+      file: DONE/main/active/livy-spark-adapters-open-table-format-loading.yaml
+      title: Close open-table-format loading gaps for Livy-based Spark adapters
+      priority: Medium-High
+      category: Platform Expansion
+    - id: cloud-spark-job-adapters-open-table-format-loading
+      file: DONE/main/active/cloud-spark-job-adapters-open-table-format-loading.yaml
+      title: Close open-table-format loading gaps for job-based managed Spark adapters
+      priority: Medium-High
+      category: Platform Expansion
     - id: cloud-platform-error-context
       file: DONE/observability-quality/planning/cloud-platform-error-context.yaml
       title: Cloud Platform Error Message Context

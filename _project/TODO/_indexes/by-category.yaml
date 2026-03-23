@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T16:17:56.160860'
+generated_at: '2026-03-23T16:36:05.463927'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -72,7 +72,7 @@ categories:
       priority: High
       status: Not Started
   Platform Expansion:
-    count: 11
+    count: 9
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -103,16 +103,6 @@ categories:
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Low
-      status: Not Started
-    - id: livy-spark-adapters-open-table-format-loading
-      file: TODO/main/planning/livy-spark-adapters-open-table-format-loading.yaml
-      title: Close open-table-format loading gaps for Livy-based Spark adapters
-      priority: Medium-High
-      status: Not Started
-    - id: cloud-spark-job-adapters-open-table-format-loading
-      file: TODO/main/planning/cloud-spark-job-adapters-open-table-format-loading.yaml
-      title: Close open-table-format loading gaps for job-based managed Spark adapters
-      priority: Medium-High
       status: Not Started
     - id: cloud-integration-test-infrastructure
       file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml

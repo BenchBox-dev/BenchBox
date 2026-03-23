@@ -2,7 +2,8 @@ id: cloud-spark-job-adapters-open-table-format-loading
 title: "Close open-table-format loading gaps for job-based managed Spark adapters"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-03-23"
 description: |
   Several managed Spark adapters do not use SparkDataLoadMixin for data loading and
   therefore are not covered by spark-mixin-open-table-format-loading.
@@ -26,27 +27,27 @@ deps:
 work:
   - id: w1
     summary: "Audit each adapter's actual load path and supported remote table-registration mechanism"
-    status: pending
+    status: done
   - id: w2
     summary: "Implement Delta/Iceberg/Hudi loading or explicit per-format rejection for emr-serverless"
     needs: [w1]
-    status: pending
+    status: done
   - id: w3
     summary: "Implement Delta/Iceberg/Hudi loading or explicit per-format rejection for dataproc and dataproc-serverless"
     needs: [w1]
-    status: pending
+    status: done
   - id: w4
     summary: "Implement Delta/Iceberg loading or explicit per-format rejection for athena-spark"
     needs: [w1]
-    status: pending
+    status: done
   - id: w5
     summary: "Re-register only the adapters with verified end-to-end support in format_capabilities.py"
     needs: [w2, w3, w4]
-    status: pending
+    status: done
   - id: w6
     summary: "Add adapter-specific unit tests covering remote registration SQL/config generation"
     needs: [w2, w3, w4]
-    status: pending
+    status: done
 
 must_preserve:
   - "Existing parquet/native loading paths for all four adapters"

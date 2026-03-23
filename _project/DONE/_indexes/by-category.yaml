@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T16:17:57.504741'
+generated_at: '2026-03-23T16:36:06.833591'
 total_categories: 72
 categories:
   '"Bug Fixes & Reliability"':
@@ -2001,7 +2001,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 67
+    count: 69
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2147,6 +2147,16 @@ categories:
       file: DONE/platform-expansion/planning/platform-adapter-sql-injection-gaps.yaml
       title: Close SQL injection gaps in platform adapter identifier validation
       priority: High
+      status: Completed
+    - id: livy-spark-adapters-open-table-format-loading
+      file: DONE/main/active/livy-spark-adapters-open-table-format-loading.yaml
+      title: Close open-table-format loading gaps for Livy-based Spark adapters
+      priority: Medium-High
+      status: Completed
+    - id: cloud-spark-job-adapters-open-table-format-loading
+      file: DONE/main/active/cloud-spark-job-adapters-open-table-format-loading.yaml
+      title: Close open-table-format loading gaps for job-based managed Spark adapters
+      priority: Medium-High
       status: Completed
     - id: modin-cudf-dask-production-ready
       file: DONE/dataframe-expansion/planning/modin-cudf-dask-production-ready.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T16:17:57.504486'
-total_items: 595
+generated_at: '2026-03-23T16:36:06.833318'
+total_items: 597
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6914,6 +6914,32 @@ items:
   work_done: 7
   work_ready: 0
   deferred_count: 6
+- id: livy-spark-adapters-open-table-format-loading
+  file: DONE/main/active/livy-spark-adapters-open-table-format-loading.yaml
+  title: Close open-table-format loading gaps for Livy-based Spark adapters
+  worktree: main
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  completed_date: '2026-03-23'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - spark-mixin-open-table-format-loading
+- id: cloud-spark-job-adapters-open-table-format-loading
+  file: DONE/main/active/cloud-spark-job-adapters-open-table-format-loading.yaml
+  title: Close open-table-format loading gaps for job-based managed Spark adapters
+  worktree: main
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  completed_date: '2026-03-23'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  needs:
+  - spark-mixin-open-table-format-loading
 - id: cloud-spark-adapter-consolidation
   file: DONE/platform-expansion/active/cloud-spark-adapter-consolidation.yaml
   title: Cloud Spark Adapter Consolidation - Extract Common Patterns

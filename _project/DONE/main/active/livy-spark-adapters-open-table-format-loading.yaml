@@ -2,7 +2,8 @@ id: livy-spark-adapters-open-table-format-loading
 title: "Close open-table-format loading gaps for Livy-based Spark adapters"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-03-23"
 description: |
   Synapse Spark and Fabric Spark use their own Livy/session-driven data-loading flows
   rather than SparkDataLoadMixin, so they remain outside the scope of the shared Spark
@@ -22,23 +23,23 @@ deps:
 work:
   - id: w1
     summary: "Audit Synapse Spark and Fabric Spark load_data implementations and remote table DDL capabilities"
-    status: pending
+    status: done
   - id: w2
     summary: "Implement Delta loading for synapse-spark if the current staging/session model supports it"
     needs: [w1]
-    status: pending
+    status: done
   - id: w3
     summary: "Implement Delta loading for fabric-spark if the current OneLake/Livy model supports it"
     needs: [w1]
-    status: pending
+    status: done
   - id: w4
     summary: "Re-register only adapters with verified end-to-end support in format_capabilities.py"
     needs: [w2, w3]
-    status: pending
+    status: done
   - id: w5
     summary: "Add mock-based tests for generated table DDL and remote execution flow"
     needs: [w2, w3]
-    status: pending
+    status: done
 
 must_preserve:
   - "Current parquet loading paths for synapse-spark and fabric-spark"

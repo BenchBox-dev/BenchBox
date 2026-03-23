@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T16:17:56.160825'
-total_items: 24
+generated_at: '2026-03-23T16:36:05.463897'
+total_items: 22
 items:
 - id: gate-monitoring-behind-optional-extra
   file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
@@ -347,30 +347,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: livy-spark-adapters-open-table-format-loading
-  file: TODO/main/planning/livy-spark-adapters-open-table-format-loading.yaml
-  title: Close open-table-format loading gaps for Livy-based Spark adapters
-  worktree: main
-  category: Platform Expansion
-  priority: Medium-High
-  status: Not Started
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - spark-mixin-open-table-format-loading
-- id: cloud-spark-job-adapters-open-table-format-loading
-  file: TODO/main/planning/cloud-spark-job-adapters-open-table-format-loading.yaml
-  title: Close open-table-format loading gaps for job-based managed Spark adapters
-  worktree: main
-  category: Platform Expansion
-  priority: Medium-High
-  status: Not Started
-  work_total: 6
-  work_done: 0
-  work_ready: 1
-  needs:
-  - spark-mixin-open-table-format-loading
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
