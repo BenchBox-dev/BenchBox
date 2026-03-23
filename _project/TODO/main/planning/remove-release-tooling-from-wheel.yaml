@@ -92,15 +92,6 @@ work:
     to expect its absence in default installs. CI release jobs that use
     `benchbox-sync` should switch to `uv run -- python -m benchbox.release.sync`.
 
-- id: w3
-  summary: "Verify default install no longer exposes maintainer tooling"
-  needs: [w2]
-  status: pending
-  notes: |
-    Build a wheel, install it in an isolated venv, and confirm `benchbox-sync`
-    is not on PATH and `import benchbox.release` fails (module excluded from
-    wheel).
-
 must_preserve:
 - "Public `benchbox` CLI behavior for default installs"
 - "Ability to run release/sync from the source checkout via `uv run`"
@@ -112,7 +103,7 @@ approach: |
 
 anti_patterns:
 - "DO NOT create a separate benchbox-maintainer package for this level of decoupling — it is over-engineered"
-- "DO NOT remove benchbox/release/ source code from the repo — it stays for maintainer use, just excluded from the wheel"
+- "DO NOT remove benchbox/release/ source code from the repo — because maintainers need it for release automation from the source checkout — exclude from wheel only"
 
 verification:
 - description: "Public CLI and package-export tests still pass"
@@ -122,8 +113,11 @@ verification:
   command: "uv run -- python -m pytest tests/unit/release/test_workflow.py tests/unit/release/test_release_sync_unit.py tests/unit/test_release_sync.py -q"
   expected_output: "All tests pass"
 - description: "benchbox-sync is not installed as a console script in a clean wheel install"
-  command: "uv build --wheel && uv pip install dist/benchbox-*.whl --quiet && which benchbox-sync"
+  command: "uv venv /tmp/benchbox-wheel-test && uv build --wheel && uv pip install --python /tmp/benchbox-wheel-test dist/benchbox-*.whl --quiet && /tmp/benchbox-wheel-test/bin/benchbox-sync --help; rm -rf /tmp/benchbox-wheel-test"
   expected_output: "benchbox-sync not found (exit code 1)"
+- description: "benchbox.release is excluded from the wheel"
+  command: "uv build --wheel && python -m zipfile -l dist/benchbox-*.whl | grep release"
+  expected_output: "No output (zero matches)"
 
 scope_limit:
   only_modify:

@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T15:28:19.744151'
+generated_at: '2026-03-23T15:32:58.259773'
 total_items: 27
 items:
 - id: dedup-wave3-sql-platform-adapters
@@ -49,7 +49,7 @@ items:
   - maintainer-tooling
   - scope-review
   estimated_effort: Small
-  work_total: 3
+  work_total: 2
   work_done: 0
   work_ready: 1
 - id: bodo-jit-and-mpi-support

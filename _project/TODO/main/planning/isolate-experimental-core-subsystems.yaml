@@ -75,6 +75,7 @@ files_affected:
   - "tests/unit/core/aiml_functions/"
   - "tests/unit/core/gpu/"
   - "tests/unit/core/multiregion/"
+  - "tests/unit/core/concurrency/"
   moved:
   - from: "benchbox/core/nl2sql/"
     to: "benchbox/experimental/nl2sql/"
@@ -164,6 +165,7 @@ scope_limit:
   - "tests/unit/core/aiml_functions/"
   - "tests/unit/core/gpu/"
   - "tests/unit/core/multiregion/"
+  - "tests/unit/core/concurrency/"
   do_not_touch:
   - "Supported benchmark query logic"
   - "Platform adapters other than cudf.py"
