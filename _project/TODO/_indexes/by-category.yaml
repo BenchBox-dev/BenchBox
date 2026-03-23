@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T14:55:42.318824'
+generated_at: '2026-03-23T15:28:19.744179'
 total_categories: 11
 categories:
   AI/ML Capabilities:
@@ -65,7 +65,7 @@ categories:
       file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
       title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
         table extraction'
-      priority: Medium-High
+      priority: High
       status: In Progress
   Core Functionality:
     count: 2
@@ -94,7 +94,7 @@ categories:
     - id: gate-monitoring-behind-optional-extra
       file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
       title: Gate monitoring behind a benchbox[monitoring] optional extra
-      priority: Medium
+      priority: Medium-High
       status: Not Started
   Platform Expansion:
     count: 11

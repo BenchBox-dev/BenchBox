@@ -1,9 +1,15 @@
-generated_at: '2026-03-23T14:55:42.318838'
+generated_at: '2026-03-23T15:28:19.744194'
 total_items: 27
 priorities:
   High:
-    count: 2
+    count: 3
     items:
+    - id: dedup-wave3-sql-platform-adapters
+      file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
+      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
+        table extraction'
+      category: Code Quality and Technical Debt
+      status: In Progress
     - id: isolate-experimental-core-subsystems
       file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
       title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
@@ -17,12 +23,11 @@ priorities:
   Medium-High:
     count: 4
     items:
-    - id: dedup-wave3-sql-platform-adapters
-      file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
-      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
-        table extraction'
-      category: Code Quality and Technical Debt
-      status: In Progress
+    - id: gate-monitoring-behind-optional-extra
+      file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
+      title: Gate monitoring behind a benchbox[monitoring] optional extra
+      category: Packaging
+      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -39,7 +44,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 7
+    count: 6
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -60,11 +65,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
-      status: Not Started
-    - id: gate-monitoring-behind-optional-extra
-      file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
-      title: Gate monitoring behind a benchbox[monitoring] optional extra
-      category: Packaging
       status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml

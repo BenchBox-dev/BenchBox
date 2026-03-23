@@ -1,6 +1,26 @@
-generated_at: '2026-03-23T14:55:42.318795'
+generated_at: '2026-03-23T15:28:19.744151'
 total_items: 27
 items:
+- id: dedup-wave3-sql-platform-adapters
+  file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
+  title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing, table
+    extraction'
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: High
+  status: In Progress
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  - platforms
+  - wave-3
+  estimated_effort: 4-6 hours
+  work_total: 9
+  work_done: 0
+  work_ready: 7
+  needs:
+  - dedup-wave3-ignore-rules
 - id: isolate-experimental-core-subsystems
   file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
   title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
@@ -338,22 +358,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: gate-monitoring-behind-optional-extra
-  file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
-  title: Gate monitoring behind a benchbox[monitoring] optional extra
-  worktree: main
-  category: Packaging
-  priority: Medium
-  status: Not Started
-  tags:
-  - architecture
-  - packaging
-  - monitoring
-  - scope-review
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 1
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -383,26 +387,22 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: dedup-wave3-sql-platform-adapters
-  file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
-  title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing, table
-    extraction'
-  worktree: core-functionality
-  category: Code Quality and Technical Debt
+- id: gate-monitoring-behind-optional-extra
+  file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
+  title: Gate monitoring behind a benchbox[monitoring] optional extra
+  worktree: main
+  category: Packaging
   priority: Medium-High
-  status: In Progress
+  status: Not Started
   tags:
-  - code-quality
-  - duplicate-check
-  - refactoring
-  - platforms
-  - wave-3
-  estimated_effort: 4-6 hours
-  work_total: 9
+  - architecture
+  - packaging
+  - monitoring
+  - scope-review
+  estimated_effort: Small
+  work_total: 3
   work_done: 0
-  work_ready: 7
-  needs:
-  - dedup-wave3-ignore-rules
+  work_ready: 1
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

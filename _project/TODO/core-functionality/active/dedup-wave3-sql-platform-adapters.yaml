@@ -1,7 +1,7 @@
 id: dedup-wave3-sql-platform-adapters
 title: "Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing, table extraction"
 worktree: core-functionality
-priority: Medium-High
+priority: High
 status: In Progress
 category: "Code Quality and Technical Debt"
 description: |
@@ -44,10 +44,14 @@ description: |
       parsing utilities duplicated across platforms. These extract bucket
       and path from gs:// and s3:// URLs using the same regex/split logic.
 
-  G26 (44 dup lines): _extract_table_name across 5 platforms:
-      lakesail.py:504, presto.py:913, redshift.py:1692, spark.py:539,
-      trino.py:913. Identical SQL table name extraction from CREATE TABLE
-      or similar DDL statements.
+  G26 (44 dup lines): _extract_table_name across 6 platforms:
+      firebolt.py:1063, lakesail.py:504, presto.py:913, redshift.py:1692,
+      spark.py:539, trino.py:913. Identical SQL table name extraction from
+      CREATE TABLE with shared regex pattern (IF NOT EXISTS variant) and
+      try/except/pass structure. 4 additional platforms (azure_synapse:1102,
+      athena:1176, fabric_warehouse:1223, questdb:437) have platform-specific
+      regex variants (bracket-quoting, EXTERNAL TABLE, schema-qualified names,
+      quote-handling) and are excluded from this consolidation.
 
 approach: |
   1. G11 -- apply_table_tunings:
@@ -88,8 +92,12 @@ approach: |
 
   7. G26 -- Table name extraction:
      Extract `extract_table_name(sql_statement)` into
-     benchbox/platforms/base/sql_utils.py. All 5 platforms delegate to
-     this shared utility.
+     benchbox/platforms/base/sql_utils.py. All 6 identical platforms
+     (firebolt, lakesail, presto, redshift, spark, trino) delegate to
+     this shared utility. The 4 divergent platforms (azure_synapse, athena,
+     fabric_warehouse, questdb) retain their platform-specific implementations
+     due to different regex patterns for bracket-quoting, EXTERNAL TABLE
+     support, schema-qualified names, and quote-handling respectively.
 
 deps:
   needs: [dedup-wave3-ignore-rules]
@@ -138,10 +146,13 @@ work:
       Consider a unified parser supporting both.
 
   - id: w7
-    summary: "Extract extract_table_name utility, refactor 5 platform adapters"
+    summary: "Extract extract_table_name utility, refactor 6 platform adapters"
     status: pending
     notes: |
-      Same SQL parsing logic across lakesail, presto, redshift, spark, trino.
+      Same SQL parsing logic across firebolt, lakesail, presto, redshift, spark, trino.
+      All 6 use identical regex (IF NOT EXISTS variant) and try/except/pass structure.
+      4 divergent platforms (azure_synapse, athena, fabric_warehouse, questdb) have
+      platform-specific regex and are excluded — different enough to not consolidate.
 
   - id: w8
     summary: "Run platform-specific tests: pytest -k 'firebolt or lakesail or presto or trino or azure or spark or athena or clickhouse or redshift'"

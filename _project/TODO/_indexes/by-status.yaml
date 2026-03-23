@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T14:55:42.318846'
+generated_at: '2026-03-23T15:28:19.744204'
 total_items: 27
 statuses:
   In Progress:
@@ -8,7 +8,7 @@ statuses:
       file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
       title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
         table extraction'
-      priority: Medium-High
+      priority: High
       category: Code Quality and Technical Debt
   Not Started:
     count: 26
@@ -76,7 +76,7 @@ statuses:
     - id: gate-monitoring-behind-optional-extra
       file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
       title: Gate monitoring behind a benchbox[monitoring] optional extra
-      priority: Medium
+      priority: Medium-High
       category: Packaging
     - id: geospatial-primitives-benchmark
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml

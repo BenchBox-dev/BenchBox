@@ -1,7 +1,7 @@
 id: gate-monitoring-behind-optional-extra
 title: "Gate monitoring behind a benchbox[monitoring] optional extra"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Packaging
 description: |
