@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T19:45:47.872344'
+generated_at: '2026-03-23T11:24:05.223510'
 total_items: 29
 statuses:
   In Progress:
@@ -8,13 +8,13 @@ statuses:
       file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
       title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
         table extraction'
-      priority: Medium
+      priority: Medium-High
       category: Code Quality and Technical Debt
     - id: test-suite-quality-wave-2
       file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
         complexity'
-      priority: Medium-High
+      priority: High
       category: Testing & Quality
   Not Started:
     count: 27
@@ -117,12 +117,12 @@ statuses:
     - id: formalize-mcp-internal-apis
       file: TODO/main/planning/formalize-mcp-internal-apis.yaml
       title: Promote 3 internal MCP API references to public exports
-      priority: Medium
+      priority: Medium-High
       category: Packaging
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
-      priority: High
+      priority: Medium
       category: Platform Expansion
     - id: remove-release-tooling-from-wheel
       file: TODO/main/planning/remove-release-tooling-from-wheel.yaml

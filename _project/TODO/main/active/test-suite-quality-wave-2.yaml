@@ -1,7 +1,7 @@
 id: test-suite-quality-wave-2
 title: "Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest complexity"
 worktree: main
-priority: Medium-High
+priority: High
 status: In Progress
 description: |
   Follow-up to remediate-coverage-theater (completed 2026-03-05). That work

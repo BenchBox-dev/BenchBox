@@ -1,7 +1,7 @@
 id: dedup-wave3-sql-platform-adapters
 title: "Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing, table extraction"
 worktree: core-functionality
-priority: Medium
+priority: Medium-High
 status: In Progress
 category: "Code Quality and Technical Debt"
 description: |

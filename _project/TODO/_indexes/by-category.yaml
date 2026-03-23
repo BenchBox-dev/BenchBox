@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T19:45:47.872322'
+generated_at: '2026-03-23T11:24:05.223458'
 total_categories: 12
 categories:
   AI/ML Capabilities:
@@ -65,7 +65,7 @@ categories:
       file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
       title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
         table extraction'
-      priority: Medium
+      priority: Medium-High
       status: In Progress
   Core Functionality:
     count: 2
@@ -99,7 +99,7 @@ categories:
     - id: formalize-mcp-internal-apis
       file: TODO/main/planning/formalize-mcp-internal-apis.yaml
       title: Promote 3 internal MCP API references to public exports
-      priority: Medium
+      priority: Medium-High
       status: Not Started
   Platform Expansion:
     count: 11
@@ -152,7 +152,7 @@ categories:
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
-      priority: High
+      priority: Medium
       status: Not Started
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
@@ -174,7 +174,7 @@ categories:
       file: TODO/main/active/test-suite-quality-wave-2.yaml
       title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
         complexity'
-      priority: Medium-High
+      priority: High
       status: In Progress
   User Experience:
     count: 1

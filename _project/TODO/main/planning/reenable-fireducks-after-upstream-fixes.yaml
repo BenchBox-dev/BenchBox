@@ -1,7 +1,7 @@
 id: reenable-fireducks-after-upstream-fixes
 title: "Re-enable FireDucks after upstream stability fixes"
 worktree: main
-priority: High
+priority: Medium
 status: Not Started
 description: |
   FireDucks support is intentionally disabled due to runtime instability in local

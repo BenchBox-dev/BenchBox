@@ -1,4 +1,4 @@
-generated_at: '2026-03-12T19:45:47.872335'
+generated_at: '2026-03-23T11:24:05.223489'
 total_items: 29
 priorities:
   High:
@@ -9,19 +9,26 @@ priorities:
       title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
       category: Architecture
       status: Not Started
-    - id: reenable-fireducks-after-upstream-fixes
-      file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
-      title: Re-enable FireDucks after upstream stability fixes
-      category: Platform Expansion
-      status: Not Started
     - id: remove-release-tooling-from-wheel
       file: TODO/main/planning/remove-release-tooling-from-wheel.yaml
       title: Remove maintainer-only release tooling from the default install surface
       category: Maintainer Tooling
       status: Not Started
+    - id: test-suite-quality-wave-2
+      file: TODO/main/active/test-suite-quality-wave-2.yaml
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
+        complexity'
+      category: Testing & Quality
+      status: In Progress
   Medium-High:
-    count: 4
+    count: 5
     items:
+    - id: dedup-wave3-sql-platform-adapters
+      file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
+      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
+        table extraction'
+      category: Code Quality and Technical Debt
+      status: In Progress
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -32,19 +39,18 @@ priorities:
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
       status: Not Started
-    - id: test-suite-quality-wave-2
-      file: TODO/main/active/test-suite-quality-wave-2.yaml
-      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
-        complexity'
-      category: Testing & Quality
-      status: In Progress
+    - id: formalize-mcp-internal-apis
+      file: TODO/main/planning/formalize-mcp-internal-apis.yaml
+      title: Promote 3 internal MCP API references to public exports
+      category: Packaging
+      status: Not Started
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 8
+    count: 7
     items:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
@@ -61,12 +67,6 @@ priorities:
       title: Close open-table-format loading gaps for job-based managed Spark adapters
       category: Platform Expansion
       status: Not Started
-    - id: dedup-wave3-sql-platform-adapters
-      file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
-      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
-        table extraction'
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -77,10 +77,10 @@ priorities:
       title: Gate monitoring behind a benchbox[monitoring] optional extra
       category: Packaging
       status: Not Started
-    - id: formalize-mcp-internal-apis
-      file: TODO/main/planning/formalize-mcp-internal-apis.yaml
-      title: Promote 3 internal MCP API references to public exports
-      category: Packaging
+    - id: reenable-fireducks-after-upstream-fixes
+      file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
+      title: Re-enable FireDucks after upstream stability fixes
+      category: Platform Expansion
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml

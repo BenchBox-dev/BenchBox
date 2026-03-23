@@ -1,7 +1,7 @@
 id: formalize-mcp-internal-apis
 title: "Promote 3 internal MCP API references to public exports"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Packaging
 description: |
