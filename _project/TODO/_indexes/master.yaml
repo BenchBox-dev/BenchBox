@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T16:53:03.911664'
+generated_at: '2026-03-23T16:53:16.903033'
 total_items: 25
 items:
 - id: fix-coverage-theater
@@ -85,10 +85,10 @@ items:
   - docker
   - quality
   estimated_effort: Large (2-3 weeks)
-  work_total: 6
+  work_total: 8
   work_done: 0
-  work_ready: 3
-  deferred_count: 3
+  work_ready: 2
+  deferred_count: 4
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
