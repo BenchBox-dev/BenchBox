@@ -20,6 +20,11 @@ description: |
   ~72% to ~82%. Combined with DataFrame TODO and coverage scope changes,
   this reaches the 80% overall target.
 
+  Note: TPC-DI ETL (transformations.py 1,053 miss + batch.py 882 miss = 1,935
+  stmts) is deferred due to high effort and niche usage. This caps core_logic
+  at ~79% even if all other core files hit 85%. The overall 80% target is still
+  achievable because other categories (utils, local platforms) will exceed 85%.
+
   All core/local/utils work is testable with real engines (DuckDB, DataFusion).
   CLI is testable via Click CliRunner. Cloud platforms test SQL generation and
   config logic without credentials.
@@ -74,27 +79,34 @@ work:
     - Batch size calculation: chunk sizing based on file size and memory
 
 - id: w3
-  summary: "Test TPC-H generator and TPC-DS runner"
+  summary: "Test TPC-H generator"
   status: pending
   needs: []
   description: |
     core/tpch/generator.py: 578 stmts, 198 miss (65.7%).
     Target: push to 80% (~85 stmts gained).
+
     - Test data generation config: scale factors, table selection, output paths
     - Test file output: correct table names, file counts per scale factor
     - Test dbgen binary detection and invocation (mock subprocess for binary)
     - Test Python-native generation fallback
     - Test parallel generation coordination
 
+- id: w4
+  summary: "Test TPC-DS benchmark runner"
+  status: pending
+  needs: []
+  description: |
     core/tpcds/benchmark/runner.py: 673 stmts, 235 miss (65.1%).
     Target: push to 80% (~100 stmts gained).
+
     - Test query stream permutation (deterministic for given seed)
     - Test result collection: timing, row counts, error capture
     - Test multi-stream throughput orchestration
     - Test qualification queries vs benchmark queries distinction
     - Use mock connection that returns fake query results
 
-- id: w4
+- id: w5
   summary: "Test platform_registry.py operations"
   status: pending
   needs: []
@@ -112,59 +124,79 @@ work:
     - Listing: all platforms, with capabilities matrix
     - Error paths: unknown platform, invalid registration payload
 
-- id: w5
-  summary: "Test write_primitives and primitives generator_base"
+- id: w6
+  summary: "Test write_primitives benchmark operations"
   status: pending
   needs: []
   description: |
     core/write_primitives/benchmark.py: 483 stmts, 254 miss (47.4%).
     Target: push to 70% (~110 stmts gained).
+
     - Test INSERT operations against DuckDB (real connection)
     - Test COPY operations with temp Parquet/CSV files
     - Test bulk load paths: batch sizing, commit behavior
     - Test result reporting: rows written, timing, throughput
     - Test error handling: constraint violations, type mismatches
 
+- id: w7
+  summary: "Test primitives generator_base"
+  status: pending
+  needs: []
+  description: |
     core/primitives/generator_base.py: 493 stmts, 155 miss (68.6%).
     Target: push to 82% (~70 stmts gained).
+
     - Test data generation patterns: random, sequential, cyclic
     - Test type generators: int, float, string, date, timestamp
     - Test cardinality control: distinct value counts
     - Test null injection: configurable null percentage
     - Test output formats: CSV, Parquet
 
-- id: w6
-  summary: "Test dryrun.py and joinorder/coffeeshop generators"
+- id: w8
+  summary: "Test dryrun.py preview rendering"
   status: pending
   needs: []
   description: |
     core/dryrun.py: 551 stmts, 162 miss (70.6%).
     Target: push to 82% (~65 stmts gained).
+
     - Test dry-run output rendering (table format, JSON, summary)
     - Test config resolution preview
     - Test platform capability checking
     - Test estimated resource calculations
     - Test dry-run for each benchmark type
 
+- id: w9
+  summary: "Test joinorder generator"
+  status: pending
+  needs: []
+  description: |
     core/joinorder/generator.py: 213 stmts, 169 miss (20.7%).
     Target: push to 65% (~95 stmts gained).
+
     - Test join-order schema generation
     - Test relationship graph construction
     - Test data generation with referential integrity
     - Test parametrized cardinalities
 
+- id: w10
+  summary: "Test coffeeshop generator"
+  status: pending
+  needs: []
+  description: |
     core/coffeeshop/generator.py: 227 stmts, 139 miss (38.8%).
     Target: push to 70% (~70 stmts gained).
+
     - Test coffeeshop schema (orders, products, customers)
     - Test data generation with correct foreign key relationships
     - Test configurable parameters (date ranges, product counts)
 
-- id: w7
-  summary: "Test local platform adapters: DataFusion, DuckDB, Polars SQL"
+- id: w11
+  summary: "Test local platform adapters: DataFusion + write transformer"
   status: pending
   needs: [w1]
   description: |
-    All three engines run in-process — fully testable with real connections.
+    In-process engines — fully testable with real connections.
 
     platforms/datafusion.py: 701 stmts, 215 miss (69.3%).
     Target: push to 82% (~90 stmts gained).
@@ -174,6 +206,17 @@ work:
     - External table support: Parquet file registration
     - Write operations: CREATE TABLE AS SELECT
 
+    platforms/datafusion_write_transformer.py: 58 stmts, 58 miss (0.0%).
+    Target: full coverage (~58 stmts gained).
+    - It's 58 statements — test all paths with real DataFusion
+
+    Follow pattern of tests/unit/platforms/test_datafusion_real_connection.py.
+
+- id: w12
+  summary: "Test local platform adapters: DuckDB + Polars SQL"
+  status: pending
+  needs: [w1]
+  description: |
     platforms/duckdb.py: 694 stmts, 186 miss (73.2%).
     Target: push to 82% (~60 stmts gained).
     - Plan capture: EXPLAIN ANALYZE parsing
@@ -182,27 +225,19 @@ work:
     - Extensions: loading and version detection
     - Sorted loading: ORDER BY during COPY
 
-    platforms/datafusion_write_transformer.py: 58 stmts, 58 miss (0.0%).
-    Target: full coverage (~58 stmts gained).
-    - It's 58 statements — test all paths with real DataFusion
-
     platforms/polars_platform.py: 296 stmts, 125 miss (57.8%).
     Target: push to 78% (~60 stmts gained).
     - Polars SQL context operations
     - Table registration from LazyFrames
     - Result conversion from Polars to dicts
 
-    Existing tests: tests/unit/platforms/test_duckdb_real_connection.py,
-    test_datafusion_real_connection.py, test_sqlite_real_connection.py — follow
-    the same real-connection pattern.
+    Follow patterns of tests/unit/platforms/test_duckdb_real_connection.py.
 
-- id: w8
-  summary: "Test utils: compilation, execution, validation, dependency"
+- id: w13
+  summary: "Test utils: tpc_compilation + execution_manager"
   status: pending
   needs: []
   description: |
-    Pure utility functions — highest test quality ROI (deterministic, fast).
-
     utils/tpc_compilation.py: 345 stmts, 126 miss (63.5%).
     Target: push to 82% (~65 stmts gained).
     - Binary detection: find dbgen/dsqgen/dsdgen on PATH and in _binaries/
@@ -216,6 +251,11 @@ work:
     - Timeout handling: configurable timeout with clean abort
     - Retry logic: configurable retry count with backoff
 
+- id: w14
+  summary: "Test utils: data_validation + dependency_validation"
+  status: pending
+  needs: []
+  description: |
     utils/data_validation.py: 320 stmts, 85 miss (73.4%).
     Target: push to 85% (~35 stmts gained).
     - Parametrized valid/invalid inputs for each validation rule
@@ -228,6 +268,11 @@ work:
     - Test version checking: meets/doesn't meet minimum
     - Test optional vs required dependency distinction
 
+- id: w15
+  summary: "Test utils: verbosity + timeout_manager"
+  status: pending
+  needs: []
+  description: |
     utils/verbosity.py: 179 stmts, 66 miss (63.1%).
     Target: push to 80% (~30 stmts gained).
     - Test verbosity levels propagate to logging/output
@@ -240,13 +285,11 @@ work:
     - Test cancellation cleans up resources
     - Test nested timeouts
 
-- id: w9
-  summary: "Test CLI commands via CliRunner: run, compare, benchmarks, config"
+- id: w16
+  summary: "Test CLI commands via CliRunner: run + compare"
   status: pending
   needs: []
   description: |
-    All CLI commands are testable via Click's CliRunner (no real execution needed).
-
     cli/commands/run.py: 1,125 stmts, 429 miss (61.9%).
     Target: push to 75% (~150 stmts gained).
     - Option parsing: --platform, --benchmark, --scale, --queries, --phases
@@ -261,6 +304,11 @@ work:
     - Table formatting: column alignment, sorting
     - Multiple run comparison: 2-way and 3-way
 
+- id: w17
+  summary: "Test CLI commands via CliRunner: benchmarks + config"
+  status: pending
+  needs: []
+  description: |
     cli/benchmarks.py: 758 stmts, 229 miss (69.8%).
     Target: push to 80% (~80 stmts gained).
     - Benchmark listing output format
@@ -273,10 +321,10 @@ work:
     - Default values
     - Environment variable override
 
-- id: w10
-  summary: "Test CLI commands: onboarding, df_tuning, platform, output"
+- id: w18
+  summary: "Test CLI commands: onboarding + df_tuning"
   status: pending
-  needs: [w9]
+  needs: [w16]
   description: |
     cli/onboarding.py: 192 stmts, 168 miss (12.5%).
     Target: push to 65% (~100 stmts gained).
@@ -290,6 +338,11 @@ work:
     - Tuning config validation
     - Engine-specific tuning suggestions
 
+- id: w19
+  summary: "Test CLI commands: platform + output + dryrun"
+  status: pending
+  needs: [w16]
+  description: |
     cli/platform.py: 492 stmts, 178 miss (63.8%).
     Target: push to 78% (~70 stmts gained).
     - Platform listing: all, by category, with details
@@ -301,7 +354,6 @@ work:
     - Output formatting: tables, JSON, YAML
     - Color/no-color mode
     - Progress indicators
-    - Verbosity-dependent output
 
     cli/dryrun.py: 486 stmts, 186 miss (61.7%).
     Target: push to 78% (~80 stmts gained).
@@ -309,15 +361,12 @@ work:
     - Preview format: table, JSON, summary
     - Resource estimation display
 
-- id: w11
-  summary: "Test cloud platform SQL generation and config validation"
+- id: w20
+  summary: "Test cloud platform SQL generation: Redshift + Snowflake"
   status: pending
   needs: [w1]
   description: |
-    Cloud adapters have significant logic that's testable without credentials:
-    SQL dialect generation, COPY command building, config validation.
-
-    Test SQL generation (assert on SQL strings, NOT mock.called):
+    Test SQL generation logic — assert on SQL strings, NOT mock.called.
 
     platforms/redshift.py (627 miss, 38.3%). Target: +200 stmts.
     - COPY FROM S3 command generation: table, s3 path, IAM role, format
@@ -325,23 +374,33 @@ work:
     - CREATE TABLE with dist/sort keys
     - Type mapping: Redshift-specific types (SUPER, GEOMETRY)
 
-    platforms/databricks/adapter.py (618 miss, 40.3%). Target: +200 stmts.
-    - Unity Catalog: three-level naming (catalog.schema.table)
-    - COPY INTO generation: from cloud storage with format options
-    - Delta table operations: OPTIMIZE, VACUUM, Z-ORDER
-    - Config validation: cluster vs SQL warehouse settings
+    platforms/snowflake.py (405 miss, 44.5%). Target: +150 stmts.
+    - COPY INTO generation: from stage, file format
+    - Stage management: CREATE STAGE DDL
+    - Warehouse config: size, auto-suspend, scaling
 
+- id: w21
+  summary: "Test cloud platform SQL generation: BigQuery + Databricks"
+  status: pending
+  needs: [w1]
+  description: |
     platforms/bigquery.py (514 miss, 38.7%). Target: +180 stmts.
     - Query transformation: BQ-specific SQL syntax
     - Dataset/table naming: project.dataset.table
     - Partitioning/clustering DDL generation
     - LOAD job config construction
 
-    platforms/snowflake.py (405 miss, 44.5%). Target: +150 stmts.
-    - COPY INTO generation: from stage, file format
-    - Stage management: CREATE STAGE DDL
-    - Warehouse config: size, auto-suspend, scaling
+    platforms/databricks/adapter.py (618 miss, 40.3%). Target: +200 stmts.
+    - Unity Catalog: three-level naming (catalog.schema.table)
+    - COPY INTO generation: from cloud storage with format options
+    - Delta table operations: OPTIMIZE, VACUUM, Z-ORDER
+    - Config validation: cluster vs SQL warehouse settings
 
+- id: w22
+  summary: "Test cloud platform SQL generation: Athena + Azure Synapse"
+  status: pending
+  needs: [w1]
+  description: |
     platforms/athena.py (360 miss, 44.7%). Target: +120 stmts.
     - External table DDL: SerDe, storage format, location
     - CTAS generation: format, compression, partitioning
@@ -353,7 +412,7 @@ work:
     - External data source DDL
     - Polybase vs COPY command selection
 
-- id: w12
+- id: w23
   summary: "Test cloud credential resolution and validation"
   status: pending
   needs: []
@@ -373,15 +432,29 @@ work:
     For each: parametrize with valid configs, missing required fields,
     partial configs with env var fallback. Assert on resolved config dicts.
 
-- id: w13
-  summary: "Ratchet fail_under and align CI coverage config"
+- id: w24
+  summary: "Ratchet fail_under to 70 (intermediate gate)"
   status: pending
-  needs: [w1, w7, w8, w9, w11]
+  needs: [w1, w13, w14, w15, w16]
   description: |
-    After coverage work lands, update thresholds and alignment:
+    After the first batch of work lands (base adapter, utils, initial CLI),
+    coverage should be above 70%. Ratchet the threshold:
 
-    1. Ratchet pyproject.toml [tool.coverage.report] fail_under from 60 to 80
-       (or incrementally: 70 after first batch, 75 after second, 80 after all)
+    1. Update pyproject.toml [tool.coverage.report] fail_under from 60 to 70
+    2. Run full coverage report to verify >= 70%
+    3. Commit the threshold change
+
+    This creates an intermediate gate that prevents coverage from regressing
+    while the remaining work continues.
+
+- id: w25
+  summary: "Ratchet fail_under to 80 and align CI coverage config"
+  status: pending
+  needs: [w24, w11, w12, w20, w21, w22]
+  description: |
+    After all coverage work lands:
+
+    1. Ratchet pyproject.toml [tool.coverage.report] fail_under from 70 to 80
     2. Align .coveragerc_core source to match pyproject.toml (full `benchbox`
        package) or explicitly document the CI-only-core policy
     3. Verify CI pipeline uses the correct coverage config
@@ -399,7 +472,7 @@ deferred:
   reason: "Requires Spark session mocking which is fragile. Better covered by
     platform-live-integration-tests TODO with real Spark clusters."
 - summary: "Remaining cloud platform adapters (firebolt, questdb, trino, etc.)"
-  reason: "The top 6 cloud adapters in w11 cover the most-used platforms.
+  reason: "The top 6 cloud adapters in w20-w22 cover the most-used platforms.
     Remaining adapters can be covered incrementally after the 80% target."
 
 metadata:

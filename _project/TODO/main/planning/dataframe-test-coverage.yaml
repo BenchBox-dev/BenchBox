@@ -26,39 +26,81 @@ deps:
 
 work:
 - id: w1
-  summary: "Test unified_frame.py core operations with Polars and Pandas"
+  summary: "Exclude low-ROI bulk queries from coverage scope (quick win: +4pp)"
+  status: pending
+  needs: []
+  description: |
+    Do this first — it immediately boosts the overall coverage number by ~4
+    percentage points by removing 5,742 untestable statements from the denominator.
+
+    Add coverage.run.omit entries in pyproject.toml for mechanical bulk that
+    cannot be meaningfully tested without full benchmark infrastructure:
+
+    - core/tpcds/dataframe_queries/queries.py (4,449 stmts, 6.9% coverage)
+      99 TPC-DS queries — too many to test individually, require full-scale
+      TPC-DS data generator which only works at SF>=1.
+    - core/datavault/dataframe_queries/queries.py (831 stmts, 12.3%)
+      Low-usage benchmark, mechanical translations.
+    - core/nyctaxi/dataframe_queries/queries.py (462 stmts, 18.0%)
+      Requires NYC Taxi dataset which is large and external.
+
+    Also add the TPC-DS rollup_helper.py (117 stmts) and channel_helper.py
+    (114 stmts) to the exclusion — they're TPC-DS support code.
+
+    Update pyproject.toml [tool.coverage.run] omit list.
+
+- id: w2
+  summary: "Test unified_frame.py: column, filter, and sort operations"
   status: pending
   needs: []
   description: |
     unified_frame.py is the largest gap: 1,633 stmts, 607 missing (62.8%).
-    It's the abstraction layer over Polars/Pandas/DuckDB DataFrames.
 
-    Target: push to 85% (~365 stmts gained).
-
-    Test with real Polars and Pandas DataFrames (both available locally):
+    This unit covers the basic data manipulation operations (~120 stmts gained):
     - Column operations: select, rename, drop, reorder, cast types
-    - Filtering: where, filter, null handling
-    - Aggregation: group_by + agg (sum, count, avg, min, max)
-    - Joins: inner, left, cross — assert on result schema and row counts
+    - Filtering: where, filter, null handling (is_null, is_not_null)
     - Sorting: order_by with ascending/descending, nulls first/last
     - Type coercion: date/timestamp/decimal handling across engines
-    - Window functions: row_number, rank, sum over partition
-    - Expression building: literal, column ref, binary ops, case/when
-    - Error paths: invalid column names, type mismatches, empty frames
 
-    Use parametrized tests with @pytest.mark.parametrize over both engines:
+    Use parametrized tests across both engines:
     ```python
     @pytest.mark.parametrize("engine", ["polars", "pandas"])
-    def test_group_by_sum(engine, sample_frame):
-        result = sample_frame.group_by("category").agg(sum("amount"))
-        assert set(result.columns) == {"category", "amount"}
-        assert result.row_count() == expected_groups
+    def test_filter_null_handling(engine, sample_frame):
+        result = sample_frame.filter(col("value").is_not_null())
+        assert result.row_count() == expected_non_null
     ```
 
     Existing tests: tests/unit/platforms/dataframe/test_unified_frame.py and
     test_unified_frame_coverage.py — audit what's already covered before adding.
 
-- id: w2
+- id: w3
+  summary: "Test unified_frame.py: aggregation, joins, and window functions"
+  status: pending
+  needs: []
+  description: |
+    Second batch of unified_frame operations (~130 stmts gained):
+    - Aggregation: group_by + agg (sum, count, avg, min, max)
+    - Joins: inner, left, cross — assert on result schema and row counts
+    - Window functions: row_number, rank, sum over partition
+
+    Parametrize across Polars and Pandas. Assert on specific result values,
+    not just column existence. Use small DataFrames (5-10 rows) with known
+    expected results for each operation.
+
+- id: w4
+  summary: "Test unified_frame.py: expression building and error paths"
+  status: pending
+  needs: []
+  description: |
+    Third batch of unified_frame operations (~115 stmts gained):
+    - Expression building: literal, column ref, binary ops, case/when
+    - Error paths: invalid column names, type mismatches, empty frames
+    - Edge cases: zero-row DataFrames, single-column, duplicate column names
+
+    For error paths, use pytest.raises with match strings to verify
+    specific error messages, not just exception types.
+
+- id: w5
   summary: "Test DataFrame benchmark_suite.py orchestration lifecycle"
   status: pending
   needs: []
@@ -81,10 +123,10 @@ work:
     Use Polars as the test engine (fastest, no external deps).
     Use TPC-H SF=0.01 as test benchmark (smallest, well-understood).
 
-- id: w3
+- id: w6
   summary: "Test DataFrame platform adapters: expression_family + pandas_family + benchmark_mixin"
   status: pending
-  needs: [w1]
+  needs: [w2]
   description: |
     Three mid-coverage adapter files that form the engine abstraction:
 
@@ -114,10 +156,10 @@ work:
 
     Combined target: ~250 stmts gained.
 
-- id: w4
+- id: w7
   summary: "Test datafusion_df.py and polars_df.py adapter operations"
   status: pending
-  needs: [w1]
+  needs: [w2]
   description: |
     These adapters wrap real in-process engines — fully testable locally.
 
@@ -137,10 +179,10 @@ work:
 
     Combined target: ~160 stmts gained.
 
-- id: w5
+- id: w8
   summary: "Test dataframe_runner.py lifecycle with real engines"
   status: pending
-  needs: [w2]
+  needs: [w5]
   description: |
     dataframe_runner.py: 331 stmts, 165 miss (50.2%). The DataFrame-specific
     benchmark runner — orchestrates engine setup, query execution, result collection.
@@ -155,7 +197,7 @@ work:
     - Cleanup: engine teardown, resource release
     - Error paths: missing tables, invalid queries, engine failures
 
-- id: w6
+- id: w9
   summary: "Test DF core framework: data_loader, profiling, tuning, context"
   status: pending
   needs: []
@@ -187,10 +229,10 @@ work:
 
     Combined target: ~180 stmts gained.
 
-- id: w7
+- id: w10
   summary: "Test TPC-H dataframe queries against known results at SF=0.01"
   status: pending
-  needs: [w1, w5]
+  needs: [w2, w8]
   description: |
     core/tpch/dataframe_queries.py: 737 stmts, 269 miss (63.5%).
     TPC-H is the most-used benchmark — these queries are worth testing properly.
@@ -211,58 +253,43 @@ work:
     Reference: tests/unit/core/ssb/test_ssb_dataframe_queries.py likely has
     a pattern to follow for this.
 
-- id: w8
-  summary: "Test SSB and read_primitives dataframe queries"
+- id: w11
+  summary: "Test SSB dataframe queries"
   status: pending
-  needs: [w1, w6]
+  needs: [w2, w9]
   description: |
-    SSB queries: 419 stmts, 192 miss (54.2%). Push to 75% (~85 stmts gained).
+    core/ssb/dataframe_queries/queries.py: 419 stmts, 192 miss (54.2%).
+    Target: push to 75% (~85 stmts gained).
+
     - 13 queries total — test each returns correct columns
     - Spot-check Q1.1 and Q4.3 with known aggregation values
     - Use existing SSB test patterns in tests/unit/core/ssb/
+    - Create a session-scoped fixture with SSB test data (4 tables, ~10 rows each)
 
+- id: w12
+  summary: "Test read_primitives and transaction_primitives dataframe operations"
+  status: pending
+  needs: [w2, w9]
+  description: |
     read_primitives dataframe queries: 1,872 stmts, 785 miss (58.1%).
     Push to 70% (~225 stmts gained).
     - These are generic DataFrame operations (scan, filter, aggregate, join)
     - Test the most common operations with parametrized inputs
     - Use simple test DataFrames (3-5 rows) that exercise each code path
+    - Parametrize across Polars and Pandas
 
     transaction_primitives dataframe ops: 372 stmts, 176 miss (52.7%).
     Push to 70% (~65 stmts gained).
     - Test transaction-style operations: insert, update, delete, merge
     - Use Polars DataFrames for test execution
+    - Assert on row counts and data integrity after each operation
 
-    Combined target: ~375 stmts gained.
+    Combined target: ~290 stmts gained.
 
-- id: w9
-  summary: "Exclude low-ROI bulk queries from coverage scope"
-  status: pending
-  needs: []
-  description: |
-    Add coverage.run.omit entries in pyproject.toml for mechanical bulk that
-    cannot be meaningfully tested without full benchmark infrastructure:
-
-    - core/tpcds/dataframe_queries/queries.py (4,449 stmts, 6.9% coverage)
-      99 TPC-DS queries — too many to test individually, require full-scale
-      TPC-DS data generator which only works at SF>=1.
-    - core/datavault/dataframe_queries/queries.py (831 stmts, 12.3%)
-      Low-usage benchmark, mechanical translations.
-    - core/nyctaxi/dataframe_queries/queries.py (462 stmts, 18.0%)
-      Requires NYC Taxi dataset which is large and external.
-
-    These 5,742 statements at ~10% coverage drag the overall number down by
-    ~4 percentage points. Excluding them makes the 80% target reflect code
-    that's actually worth testing.
-
-    Also add the TPC-DS rollup_helper.py (117 stmts) and channel_helper.py
-    (114 stmts) to the exclusion — they're TPC-DS support code.
-
-    Update pyproject.toml [tool.coverage.run] omit list.
-
-- id: w10
+- id: w13
   summary: "Test pyspark_df and lakesail_df adapter stubs"
   status: pending
-  needs: [w3]
+  needs: [w6]
   description: |
     These adapters require external engines (Spark, LakeSail server) but their
     configuration, validation, and SQL generation logic is locally testable.
@@ -316,8 +343,8 @@ metadata:
 
 verification:
   command: |
-    uv run -- python -m pytest tests/unit/platforms/dataframe/ tests/unit/core/dataframe/ tests/unit/core/ssb/ -m fast -n auto -q --no-header --tb=line 2>&1 | tail -3
-  expected: "All DataFrame-related tests pass"
+    uv run -- python -m pytest tests/unit/platforms/dataframe/ tests/unit/core/dataframe/ tests/unit/core/ssb/ -m fast -n auto -q --no-header --tb=line -o "addopts=" -p pytest_cov --cov=benchbox/platforms/dataframe --cov=benchbox/core/dataframe --cov=benchbox/core/tpch/dataframe_queries.py --cov-report=term 2>&1 | grep -E "^(TOTAL|benchbox)" | tail -10
+  expected: "DF platform coverage >= 78%; DF core coverage >= 82%; all tests pass"
 
 must_preserve:
 - "Existing DataFrame tests must continue to pass — new tests are additive"

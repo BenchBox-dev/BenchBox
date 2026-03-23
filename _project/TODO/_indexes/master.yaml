@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T17:00:29.897527'
+generated_at: '2026-03-23T17:23:16.168133'
 total_items: 26
 items:
 - id: fix-coverage-theater
@@ -14,9 +14,9 @@ items:
   - coverage
   - technical-debt
   estimated_effort: Medium (3-5 days)
-  work_total: 5
+  work_total: 6
   work_done: 0
-  work_ready: 5
+  work_ready: 6
   deferred_count: 2
 - id: gate-monitoring-behind-optional-extra
   file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
@@ -49,9 +49,9 @@ items:
   - cli
   - platforms
   estimated_effort: Large (3-4 weeks across work units)
-  work_total: 13
+  work_total: 25
   work_done: 0
-  work_ready: 8
+  work_ready: 15
   deferred_count: 4
   needs:
   - fix-coverage-theater
@@ -89,8 +89,8 @@ items:
   - quality
   estimated_effort: Large (2-3 weeks)
   work_total: 8
-  work_done: 1
-  work_ready: 2
+  work_done: 7
+  work_ready: 1
   deferred_count: 4
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -416,9 +416,9 @@ items:
   - dataframe
   - quality
   estimated_effort: Large (2-3 weeks)
-  work_total: 10
+  work_total: 13
   work_done: 0
-  work_ready: 4
+  work_ready: 6
   deferred_count: 4
   needs:
   - fix-coverage-theater
