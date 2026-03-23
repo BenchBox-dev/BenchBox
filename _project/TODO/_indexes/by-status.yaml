@@ -1,8 +1,8 @@
-generated_at: '2026-03-23T16:46:33.955964'
-total_items: 23
+generated_at: '2026-03-23T16:53:03.911704'
+total_items: 25
 statuses:
   Not Started:
-    count: 23
+    count: 25
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -44,6 +44,11 @@ statuses:
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
       category: Benchmark Expansion
+    - id: fix-coverage-theater
+      file: TODO/main/active/fix-coverage-theater.yaml
+      title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
+      priority: High
+      category: Testing & Quality
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -74,6 +79,11 @@ statuses:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       category: Core Functionality
+    - id: test-coverage-to-80-percent
+      file: TODO/main/planning/test-coverage-to-80-percent.yaml
+      title: Increase test coverage from 66% to 80% with meaningful tests
+      priority: High
+      category: Testing & Quality
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

@@ -1,0 +1,152 @@
+id: fix-coverage-theater
+title: "Fix coverage theater: replace fake assertions with real behavioral tests"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  Audit found ~30-35% of "coverage wave" tests inflate metrics without validating behavior.
+  14 `assert True` instances always pass. 77+ `hasattr()`-only checks verify attributes exist
+  but never call them. 81 trivial `.columns` assertions exercise code without checking output.
+  Import-only tests get coverage credit for importing modules. Mock dispatch tests verify
+  mocks were called, not that behavior is correct.
+
+  This must be fixed BEFORE adding new coverage — otherwise the 80% target is built on
+  a foundation of tests that protect nothing. Net statement gain is ~0, but test suite
+  integrity improves dramatically.
+
+  Current coverage: 66.4% (79,444 / 115,498 statements).
+
+category: Testing & Quality
+
+deps:
+  needs: []
+
+work:
+- id: w1
+  summary: "Kill all `assert True` statements (14 instances across 9 files)"
+  status: pending
+  needs: []
+  description: |
+    Replace every `assert True` with a real assertion. Known locations:
+
+    - tests/unit/test_error_handling.py (~3 instances, lines 223-226+) — assert on
+      specific exception types, error messages, or state changes instead of try/except
+      with `assert True` in both branches.
+    - tests/unit/cli/test_cli_execution.py (~2 instances) — assert on CLI exit codes,
+      output content, or error messages.
+    - tests/unit/test_release_infrastructure.py (~2 instances) — assert on release
+      validation output or artifact state.
+    - 6 other files (~7 instances) — grep for `assert True` across tests/.
+
+    For each: read the test intent, determine what SHOULD be asserted, replace.
+    Every test should fail if the code under test breaks.
+
+- id: w2
+  summary: "Upgrade hasattr-only checks to behavioral assertions (~20 tests)"
+  status: pending
+  needs: []
+  description: |
+    Tests that only do `assert hasattr(obj, 'method')` prove the attribute exists
+    but not that it works. For each:
+    1. Call the method with minimal valid inputs
+    2. Assert on the return value, side effects, or raised exceptions
+
+    Priority files:
+    - tests/unit/test_base_advanced.py (lines 146-151) — test concrete implementations
+      of generate_data, get_queries, etc. with real inputs
+    - tests/unit/test_circular_imports.py — if testing API surface, call the functions
+    - tests/unit/test_connection_interface_consistency.py — test connection methods work
+
+- id: w3
+  summary: "Deepen mock dispatch tests in coverage files"
+  status: pending
+  needs: []
+  description: |
+    Mock dispatch tests verify `mock.assert_called_once()` — this proves wiring
+    but not behavior. For each mock dispatch test:
+    1. Assert on ARGUMENTS passed to the mocked method (correct SQL, correct paths)
+    2. Where feasible, test with a real lightweight implementation instead of mocking
+
+    Priority file:
+    - tests/unit/platforms/test_clickhouse_cloud_coverage.py (lines 299-336) —
+      33 mocks across 39 tests. Focus on tests where the mock replaces logic
+      that could be tested with ClickHouse Local mode instead.
+
+- id: w4
+  summary: "Fix trivial `.columns` and `is not None` assertions in dataframe query tests"
+  status: pending
+  needs: []
+  description: |
+    tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py has 81 tests
+    that only assert `result.columns` is truthy. Upgrade to:
+    1. Assert specific column names (e.g., `assert "revenue" in result.columns`)
+    2. Assert column count matches expected schema
+    3. Where possible, assert on row count or sample values with test data
+
+    Also check for `assert result is not None` patterns across test files and
+    replace with assertions on actual content.
+
+- id: w5
+  summary: "Convert import-only tests to behavioral tests"
+  status: pending
+  needs: []
+  description: |
+    tests/unit/platforms/test_platform_adapters_coverage_wave_remaining.py (lines 42-99)
+    imports modules and asserts `isinstance(AVAILABLE, bool)`. Convert these to:
+    1. Test that the adapter class can be instantiated (even if connection fails)
+    2. Test that config validation works (accepts valid config, rejects invalid)
+    3. Test SQL dialect methods return well-formed SQL strings
+
+    Apply same pattern to any other import-only tests found via:
+    `grep -rn "isinstance.*bool" tests/unit/`
+
+deferred:
+- summary: "Rename files with 'coverage' in the name to describe what they test"
+  reason: "Lower priority cosmetic change. Test names should describe behavior
+    (e.g., test_clickhouse_cloud_dispatch.py) not metrics they serve. Do after
+    the assertion quality is fixed."
+- summary: "Add mutation testing to detect tests that never fail"
+  reason: "mutmut or cosmic-ray can find tests that pass regardless of code changes.
+    Useful as a second pass after fixing known theater, but expensive to run."
+
+metadata:
+  tags:
+  - testing
+  - quality
+  - coverage
+  - technical-debt
+  estimated_effort: "Medium (3-5 days)"
+  created_date: "2026-03-23"
+  last_updated: "2026-03-23"
+
+verification:
+  command: |
+    echo "--- assert True count ---" && grep -rn "assert True" tests/ | grep -v __pycache__ | wc -l && echo "--- hasattr-only tests ---" && grep -rn "assert hasattr" tests/ | grep -v __pycache__ | wc -l && echo "--- test suite passes ---" && uv run -- python -m pytest -m fast -q --tb=line 2>&1 | tail -3
+  expected: "assert True count = 0; hasattr-only count reduced significantly; all fast tests pass"
+
+must_preserve:
+- "Total test count must not decrease — upgrade tests, don't delete them"
+- "Coverage percentage must not drop — assertions are being improved, not removed"
+- "All existing test markers (fast, unit, etc.) must be preserved"
+
+anti_patterns:
+- "DO NOT just delete failing tests — because the goal is to make tests meaningful, not to remove them — fix the assertion to test real behavior"
+- "DO NOT replace `assert True` with `assert result is not None` — because that's still trivial — assert on specific values, types, or state"
+- "DO NOT add `# pragma: no cover` to bypass coverage on code that should be tested — because this TODO is about fixing test quality, not hiding gaps"
+
+scope_limit:
+  include:
+  - "tests/ (test files only)"
+  exclude:
+  - "benchbox/ source code (no production changes in this TODO)"
+  - "pytest.ini, pyproject.toml (no config changes)"
+
+impact:
+  business_value: |
+    Transforms coverage metric from vanity number into genuine safety signal.
+    After this, when coverage says 66%, it means 66% of the code is actually
+    verified to work correctly.
+  technical_debt: |
+    Eliminates the "coverage wave" anti-pattern where tests were written to hit
+    targets rather than validate behavior. Establishes quality baseline for
+    the coverage-to-80% effort that follows.

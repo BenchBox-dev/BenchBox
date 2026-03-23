@@ -1,6 +1,23 @@
-generated_at: '2026-03-23T16:46:33.955914'
-total_items: 23
+generated_at: '2026-03-23T16:53:03.911664'
+total_items: 25
 items:
+- id: fix-coverage-theater
+  file: TODO/main/active/fix-coverage-theater.yaml
+  title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Not Started
+  tags:
+  - testing
+  - quality
+  - coverage
+  - technical-debt
+  estimated_effort: Medium (3-5 days)
+  work_total: 5
+  work_done: 0
+  work_ready: 5
+  deferred_count: 2
 - id: gate-monitoring-behind-optional-extra
   file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
   title: Gate monitoring behind a benchbox[monitoring] optional extra
@@ -17,6 +34,24 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
+- id: test-coverage-to-80-percent
+  file: TODO/main/planning/test-coverage-to-80-percent.yaml
+  title: Increase test coverage from 66% to 80% with meaningful tests
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Not Started
+  tags:
+  - testing
+  - coverage
+  - quality
+  estimated_effort: Large (3-4 weeks across phases)
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  deferred_count: 3
+  needs:
+  - fix-coverage-theater
 - id: productize-result-publishing-and-artifact-sharing
   file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
   title: Productize result publishing and artifact sharing workflow

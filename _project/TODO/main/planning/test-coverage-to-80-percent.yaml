@@ -1,0 +1,242 @@
+id: test-coverage-to-80-percent
+title: "Increase test coverage from 66% to 80% with meaningful tests"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  Current coverage: 66.4% (79,444 / 115,498 statements). Target: 80%.
+  Gap: 12,954 statements need coverage. Plan targets ~14,500 for margin.
+
+  Coverage is measured against full `benchbox` package (pyproject.toml config).
+  The CI config (.coveragerc_core) only measures benchbox/core — this discrepancy
+  should be resolved as part of this work.
+
+  Key insight: 12,180 statements are dataframe query implementations (mechanical
+  SQL-to-DataFrame translations) at 36.6% coverage. These inflate the denominator
+  disproportionately. TPC-DS alone has 4,449 statements at 6.9% coverage. Strategy:
+  test the most-used query sets (TPC-H, SSB) and exclude or pragma-cover the
+  mechanical bulk (TPC-DS 99-query set, datavault).
+
+  All new tests must follow quality constraints: real behavioral assertions,
+  mocks only at system boundaries, parametrized with realistic inputs.
+
+  Ratchet `fail_under` from 60 → 70 → 75 → 80 as phases land.
+
+category: Testing & Quality
+
+deps:
+  needs:
+  - fix-coverage-theater
+
+work:
+- id: w1
+  summary: "Phase 1: Core logic gaps (~5,000 stmts)"
+  status: pending
+  needs: []
+  description: |
+    Highest-ROI work. All testable locally, protects the core product.
+
+    Priority targets (by missing statements):
+    - platforms/base/adapter.py (673 miss, 68.7%) — test _collect_system_info,
+      _execute_with_retry, error paths. Use DuckDB adapter as concrete impl.
+    - core/dataframe/benchmark_suite.py (396 miss, 28.6%) — test suite
+      orchestration with Polars/Pandas, phase transitions.
+    - platforms/base/data_loading.py (300 miss, 64.7%) — test format detection,
+      file discovery, loading dispatch with temp files.
+    - core/write_primitives/benchmark.py (254 miss, 47.4%) — test write ops
+      against DuckDB: INSERT, COPY, bulk load paths.
+    - core/tpcdi/benchmark.py (252 miss, 73.8%) — lifecycle, config validation.
+    - core/tpcds/benchmark/runner.py (235 miss, 65.1%) — query stream
+      permutation, result collection, timing.
+    - core/tpch/generator.py (198 miss, 65.7%) — data gen config, file output.
+    - core/runner/dataframe_runner.py (165 miss, 50.2%) — DataFrame runner
+      lifecycle with Polars.
+    - core/dryrun.py (162 miss, 70.6%) — dry-run output formatting.
+    - core/primitives/generator_base.py (155 miss, 68.6%) — primitive data gen.
+    - core/platform_registry.py (151 miss, 70.0%) — registration, lookup,
+      validation, conflict detection.
+    - core/tpcdi/etl/scd_processor.py (291 miss, 24.4%) — SCD Type 1/2
+      processing with DataFrame fixtures.
+    - core/joinorder/generator.py (169 miss, 20.7%) — join-order data gen.
+    - core/coffeeshop/generator.py (139 miss, 38.8%) — coffeeshop data gen.
+    - Plus ~410 files with <100 miss each — push each to 85%+.
+
+    After this phase: ~70.7% coverage. Ratchet fail_under to 70.
+
+- id: w2
+  summary: "Phase 2: Local platforms + utils (~2,500 stmts)"
+  status: pending
+  needs: [w1]
+  description: |
+    Fully testable locally — no credentials, no mocks for core paths.
+
+    Local platforms:
+    - platforms/datafusion.py (215 miss, 69.3%) — real DataFusion connection
+      tests (in-process engine).
+    - platforms/duckdb.py (186 miss, 73.2%) — expand real-connection tests:
+      plan capture, external tables, compression.
+    - platforms/polars_platform.py (125 miss, 57.8%) — real Polars tests.
+    - platforms/datafusion_write_transformer.py (58 miss, 0%) — full coverage,
+      it's small and local.
+
+    Utils:
+    - utils/tpc_compilation.py (126 miss, 63.5%) — compilation detection,
+      binary discovery, version parsing.
+    - utils/execution_manager.py (89 miss, 69.7%) — execution tracking,
+      timeout handling, retry logic.
+    - utils/data_validation.py (85 miss, 73.4%) — validation rules with
+      parametrized good/bad inputs.
+    - utils/dependency_validation.py (83 miss, 21.7%) — dependency checking
+      with mocked importlib.
+    - utils/cloud_storage.py (81 miss, 72.6%) — local filesystem paths;
+      mock cloud providers.
+    - utils/verbosity.py (66 miss, 63.1%) — verbosity level propagation.
+    - Remaining utils <50 miss — push to 90%+ (pure functions).
+
+    After this phase: ~72.9% coverage.
+
+- id: w3
+  summary: "Phase 3: CLI + DataFrame platforms (~3,500 stmts)"
+  status: pending
+  needs: [w1]
+  description: |
+    CLI testable via Click's CliRunner. DataFrame platforms partially testable.
+
+    CLI (top files):
+    - cli/commands/run.py (429 miss) — CliRunner tests for option parsing,
+      validation, error messages.
+    - cli/commands/compare.py (264 miss) — comparison output with fixture
+      result files.
+    - cli/benchmarks.py (229 miss) — benchmark listing, info display.
+    - cli/dryrun.py (186 miss) — dry-run rendering, preview output.
+    - cli/platform.py (178 miss) — platform listing, info, validation.
+    - cli/onboarding.py (168 miss, 12.5%) — onboarding flow steps.
+    - cli/commands/df_tuning.py (155 miss, 18.0%) — tuning param display.
+    - cli/config.py (155 miss) — config parsing, defaults, override.
+    - cli/output.py (152 miss) — output formatting.
+
+    DataFrame platforms:
+    - platforms/dataframe/unified_frame.py (607 miss, 62.8%) — test with
+      Polars + Pandas: column ops, type coercion, aggregation.
+    - platforms/dataframe/expression_family.py (146 miss) — expression translation.
+    - platforms/dataframe/benchmark_mixin.py (134 miss) — mixin methods.
+
+    After this phase: ~75.9% coverage. Ratchet fail_under to 75.
+
+- id: w4
+  summary: "Phase 4: Strategic cloud platform coverage (~2,000 stmts)"
+  status: pending
+  needs: [w2]
+  description: |
+    Requires mocking but must test REAL LOGIC: SQL dialect generation, config
+    validation, connection string building — not just "mock was called."
+
+    Top targets:
+    - platforms/redshift.py (627 miss, 38.3%) — SQL gen, COPY command building.
+    - platforms/databricks/adapter.py (618 miss, 40.3%) — config validation,
+      SQL dialect, Unity Catalog logic.
+    - platforms/bigquery.py (514 miss, 38.7%) — query transformation,
+      dataset/table naming, partitioning.
+    - platforms/snowflake.py (405 miss, 44.5%) — staging, COPY INTO gen.
+    - platforms/athena.py (360 miss, 44.7%) — Glue catalog, S3 path building.
+    - platforms/azure_synapse.py (319 miss, 54.0%) — CTAS gen, distribution.
+    - platforms/credentials/*.py (~500 miss) — credential resolution, env var
+      fallback, validation.
+
+    Quality constraint: every cloud adapter test must assert on generated SQL
+    strings, config dicts, or connection parameters — NOT on mock.called.
+
+    After this phase: ~77.7% coverage.
+
+- id: w5
+  summary: "Phase 5: Targeted dataframe queries + coverage config cleanup (~1,500 stmts)"
+  status: pending
+  needs: [w3]
+  description: |
+    Don't blanket-test all 12,180 dataframe query statements. Targeted approach:
+
+    Test the most-used benchmarks:
+    - core/tpch/dataframe_queries.py (737 stmts, 63.5%) — push to 85%.
+      Test with Polars against known TPC-H results at SF=0.01.
+    - core/ssb/dataframe_queries/queries.py (419 stmts, 54.2%) — push to 75%.
+    - core/read_primitives/dataframe_queries.py (1,872 stmts, 58.1%) — push to 70%.
+
+    Exclude low-ROI bulk:
+    - core/tpcds/dataframe_queries/queries.py (4,449 stmts, 6.9%) — add to
+      coverage.run.omit in pyproject.toml. 99 queries is too many to test
+      meaningfully without a full TPC-DS data generator.
+    - core/datavault/dataframe_queries/queries.py (831 stmts, 12.3%) — same
+      treatment, low usage benchmark.
+
+    Coverage config alignment:
+    - Align CI (.coveragerc_core) to measure full `benchbox` package, matching
+      pyproject.toml. Or explicitly document that CI only tracks core.
+    - Ratchet fail_under to 80 in pyproject.toml.
+    - Add coverage.run.omit for TPC-DS and datavault dataframe queries.
+
+    After this phase: ~80% coverage.
+
+deferred:
+- summary: "TPC-DI ETL coverage (transformations.py 1,053 miss, batch.py 882 miss)"
+  reason: "TPC-DI ETL is 1,935 missing statements but requires complex DataFrame
+    fixtures simulating CDC, SCD, and batch processing. High effort, low user
+    impact since TPC-DI is a niche benchmark. Cover after 80% is reached."
+- summary: "Experimental module coverage (723 miss, 75.3%)"
+  reason: "Experimental code changes frequently and may be removed. Testing it
+    to 80% is wasted effort if the modules are restructured. Cover after
+    modules graduate from experimental."
+- summary: "Cloud Spark staging/session coverage (base/cloud_spark/ 175 miss)"
+  reason: "Requires Spark session mocking which is fragile. Better covered by
+    the platform-live-integration-tests TODO with real Spark."
+
+metadata:
+  tags:
+  - testing
+  - coverage
+  - quality
+  estimated_effort: "Large (3-4 weeks across phases)"
+  created_date: "2026-03-23"
+  last_updated: "2026-03-23"
+  coverage_baseline:
+    date: "2026-03-23"
+    total_stmts: 115498
+    covered_stmts: 79444
+    coverage_pct: 68.8
+    fail_under: 60
+
+verification:
+  command: |
+    uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" -n auto --strict-markers --tb=short -o "addopts=" -p pytest_cov --cov=benchbox --cov-report=term -q --no-header 2>&1 | grep -E "^(TOTAL|Required|WARNING)" | head -5
+  expected: "TOTAL line shows >= 80% coverage; no WARNING about below threshold"
+
+must_preserve:
+- "All existing tests must continue to pass — new tests are additive"
+- "Test suite speed: `make test-fast` must complete in < 60 seconds"
+- "No `assert True`, `assert result is not None`, or `hasattr`-only assertions in new tests"
+- "Coverage config in pyproject.toml remains the source of truth for local dev"
+
+anti_patterns:
+- "DO NOT write import-only tests — because importing a module is not testing it — every test must call a function and assert on its output"
+- "DO NOT use `assert result is not None` as the sole assertion — because non-None doesn't mean correct — assert on specific values, types, shapes, or error messages"
+- "DO NOT mock internal methods to test dispatchers — because you're testing mock wiring not behavior — use real lightweight implementations (DuckDB, Polars, DataFusion) wherever possible"
+- "DO NOT add tests just to hit line coverage — because a test that can never fail is worse than no test — every test should fail if the code under test is broken"
+- "DO NOT put 'coverage' in test filenames — because test names should describe what they verify — name after the behavior being tested"
+
+scope_limit:
+  include:
+  - "tests/ (new and modified test files)"
+  - "pyproject.toml (coverage config, fail_under ratchet)"
+  - ".coveragerc_core (CI coverage scope alignment)"
+  exclude:
+  - "benchbox/ source code (no production changes)"
+  - "pytest.ini (no changes to default test config)"
+
+impact:
+  business_value: |
+    80% coverage with behavioral assertions provides genuine regression
+    protection. Catches bugs before they reach users. Reduces manual testing
+    burden for releases.
+  technical_debt: |
+    Closes the largest quality gap in the project. Establishes coverage
+    ratcheting that prevents regression. Aligns CI and local coverage
+    measurement.
