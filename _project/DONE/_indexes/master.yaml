@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T15:39:31.230606'
+generated_at: '2026-03-23T15:48:05.642212'
 total_items: 593
 items:
 - id: interactive-wizard-dry-run-support
@@ -1065,6 +1065,27 @@ items:
   - test-cleanup
   - maintainability
   estimated_effort: Large
+- id: dedup-wave3-sql-platform-adapters
+  file: DONE/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
+  title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing, table
+    extraction'
+  worktree: core-functionality
+  category: Code Quality and Technical Debt
+  priority: High
+  status: Completed
+  tags:
+  - code-quality
+  - duplicate-check
+  - refactoring
+  - platforms
+  - wave-3
+  estimated_effort: 4-6 hours
+  completed_date: '2026-03-23'
+  work_total: 9
+  work_done: 9
+  work_ready: 0
+  needs:
+  - dedup-wave3-ignore-rules
 - id: cost-optimization-engine-automated-recommendations
   file: DONE/cost-intelligence-optimizer/planning/cost-optimization-engine-automated-recommendations.yaml
   title: Cost Optimization Engine - Automated Recommendations
@@ -2979,24 +3000,6 @@ items:
   category: Testing and Quality Assurance
   priority: High
   status: Completed
-- id: test-suite-quality-wave-2
-  file: DONE/main/active/test-suite-quality-wave-2.yaml
-  title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest complexity'
-  worktree: main
-  category: Testing & Quality
-  priority: High
-  status: Completed
-  tags:
-  - testing
-  - quality
-  - performance
-  - developer-experience
-  estimated_effort: Large (2-3 weeks)
-  completed_date: '2026-03-23'
-  work_total: 7
-  work_done: 7
-  work_ready: 0
-  deferred_count: 2
 - id: trino-platform-adapter
   file: DONE/platform-expansion-trino/completed/trino-platform-adapter.yaml
   title: Trino Platform Adapter

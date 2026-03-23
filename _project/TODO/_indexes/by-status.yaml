@@ -1,17 +1,22 @@
-generated_at: '2026-03-23T15:39:29.883160'
+generated_at: '2026-03-23T15:48:04.348171'
 total_items: 26
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
-    - id: dedup-wave3-sql-platform-adapters
-      file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
-      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
-        table extraction'
+    - id: isolate-experimental-core-subsystems
+      file: TODO/main/active/isolate-experimental-core-subsystems.yaml
+      title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
       priority: High
-      category: Code Quality and Technical Debt
+      category: Architecture
+    - id: test-suite-quality-wave-2
+      file: TODO/main/active/test-suite-quality-wave-2.yaml
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
+        complexity'
+      priority: High
+      category: Testing & Quality
   Not Started:
-    count: 25
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -93,11 +98,6 @@ statuses:
       title: Implement on-demand download of TPC answer files for validation
       priority: Low
       category: Core Functionality
-    - id: isolate-experimental-core-subsystems
-      file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
-      title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
-      priority: High
-      category: Architecture
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

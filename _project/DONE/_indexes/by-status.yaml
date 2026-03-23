@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T15:39:31.231251'
+generated_at: '2026-03-23T15:48:05.642758'
 total_items: 593
 statuses:
   In Progress:
@@ -889,6 +889,12 @@ statuses:
       title: Consolidate Duplicated Result JSON Normalization Logic
       priority: Medium
       category: Core Functionality
+    - id: dedup-wave3-sql-platform-adapters
+      file: DONE/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
+      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
+        table extraction'
+      priority: High
+      category: Code Quality and Technical Debt
     - id: dedup-wave2-sql-platform-primitives
       file: DONE/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
       title: 'Consolidate SQL platform adapters and primitives: PostgreSQL family, Presto/Trino, query execution, manager
@@ -2508,12 +2514,6 @@ statuses:
       title: Test Suite Reliability ✅ COMPLETED
       priority: Medium
       category: Testing and Quality Assurance
-    - id: test-suite-quality-wave-2
-      file: DONE/main/active/test-suite-quality-wave-2.yaml
-      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
-        complexity'
-      priority: High
-      category: Testing & Quality
     - id: timescaledb-cloud-deployment
       file: DONE/platform-expansion/active/timescaledb-cloud-deployment.yaml
       title: TigerData Cloud Deployment Mode

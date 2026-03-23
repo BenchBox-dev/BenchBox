@@ -2,7 +2,8 @@ id: dedup-wave3-sql-platform-adapters
 title: "Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing, table extraction"
 worktree: core-functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-23"
 category: "Code Quality and Technical Debt"
 description: |
   Wave-3 duplicate-check triage (2026-03-12, post wave-2) identifies 7
@@ -126,28 +127,28 @@ work:
 
   - id: w4
     summary: "Extract Azure Spark _execute_statement and _wait_for_statement into spark_execution_utils.py"
-    status: pending
+    status: done
     notes: |
       Two functions, both identical between Fabric and Synapse adapters.
       Both use the same Livy session API.
 
   - id: w5
     summary: "Extract get_sql_query_plan utility, refactor 5 platform adapters"
-    status: pending
+    status: done
     notes: |
       Verbatim identical across athena, azure_synapse, firebolt, presto, trino.
       Standard EXPLAIN -> fetchall -> join pattern.
 
   - id: w6
     summary: "Extract parse_cloud_url utility, refactor clickhouse_cloud and firebolt"
-    status: pending
+    status: done
     notes: |
       URL parsing for s3:// and gs:// schemes.
       Consider a unified parser supporting both.
 
   - id: w7
     summary: "Extract extract_table_name utility, refactor 6 platform adapters"
-    status: pending
+    status: done
     notes: |
       Same SQL parsing logic across firebolt, lakesail, presto, redshift, spark, trino.
       All 6 use identical regex (IF NOT EXISTS variant) and try/except/pass structure.
@@ -156,12 +157,12 @@ work:
 
   - id: w8
     summary: "Run platform-specific tests: pytest -k 'firebolt or lakesail or presto or trino or azure or spark or athena or clickhouse or redshift'"
-    status: pending
+    status: done
     needs: [w1, w2, w3, w4, w5, w6, w7]
 
   - id: w9
     summary: "Run full test suite to verify no regressions: make test-all"
-    status: pending
+    status: done
     needs: [w8]
 
 files_affected:

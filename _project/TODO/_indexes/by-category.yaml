@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T15:39:29.883136'
+generated_at: '2026-03-23T15:48:04.348145'
 total_categories: 10
 categories:
   AI/ML Capabilities:
@@ -13,10 +13,10 @@ categories:
     count: 1
     items:
     - id: isolate-experimental-core-subsystems
-      file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
+      file: TODO/main/active/isolate-experimental-core-subsystems.yaml
       title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
       priority: High
-      status: Not Started
+      status: In Progress
   Benchmark Development:
     count: 6
     items:
@@ -58,15 +58,6 @@ categories:
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
       status: Not Started
-  Code Quality and Technical Debt:
-    count: 1
-    items:
-    - id: dedup-wave3-sql-platform-adapters
-      file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
-      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
-        table extraction'
-      priority: High
-      status: In Progress
   Core Functionality:
     count: 2
     items:
@@ -154,6 +145,15 @@ categories:
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
       status: Not Started
+  Testing & Quality:
+    count: 1
+    items:
+    - id: test-suite-quality-wave-2
+      file: TODO/main/active/test-suite-quality-wave-2.yaml
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
+        complexity'
+      priority: High
+      status: In Progress
   User Experience:
     count: 1
     items:

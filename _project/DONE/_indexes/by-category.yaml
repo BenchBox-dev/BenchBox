@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T15:39:31.230935'
+generated_at: '2026-03-23T15:48:05.642466'
 total_categories: 71
 categories:
   '"Bug Fixes & Reliability"':
@@ -241,7 +241,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 40
+    count: 41
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -287,6 +287,12 @@ categories:
       file: DONE/core-functionality/active/dedup-wave2-dataframe-platform.yaml
       title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'
       priority: Medium
+      status: Completed
+    - id: dedup-wave3-sql-platform-adapters
+      file: DONE/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
+      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
+        table extraction'
+      priority: High
       status: Completed
     - id: dedup-wave2-sql-platform-primitives
       file: DONE/core-functionality/active/dedup-wave2-sql-platform-primitives.yaml
@@ -2812,7 +2818,7 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 5
+    count: 4
     items:
     - id: migrate-ascii-chart-tests-to-textcharts
       file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml
@@ -2832,12 +2838,6 @@ categories:
     - id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification
       file: DONE/main/active/restore-lightweight-fast-test-lane-with-comprehensive-reclassification.yaml
       title: Restore lightweight fast test lane with comprehensive test reclassification
-      priority: High
-      status: Completed
-    - id: test-suite-quality-wave-2
-      file: DONE/main/active/test-suite-quality-wave-2.yaml
-      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
-        complexity'
       priority: High
       status: Completed
   Testing and Quality Assurance:

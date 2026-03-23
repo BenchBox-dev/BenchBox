@@ -1,20 +1,20 @@
-generated_at: '2026-03-23T15:39:29.883153'
+generated_at: '2026-03-23T15:48:04.348161'
 total_items: 26
 priorities:
   High:
     count: 2
     items:
-    - id: dedup-wave3-sql-platform-adapters
-      file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
-      title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing,
-        table extraction'
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: isolate-experimental-core-subsystems
-      file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
+      file: TODO/main/active/isolate-experimental-core-subsystems.yaml
       title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
       category: Architecture
-      status: Not Started
+      status: In Progress
+    - id: test-suite-quality-wave-2
+      file: TODO/main/active/test-suite-quality-wave-2.yaml
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
+        complexity'
+      category: Testing & Quality
+      status: In Progress
   Medium-High:
     count: 4
     items:

@@ -1,33 +1,13 @@
-generated_at: '2026-03-23T15:39:29.883101'
+generated_at: '2026-03-23T15:48:04.348113'
 total_items: 26
 items:
-- id: dedup-wave3-sql-platform-adapters
-  file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
-  title: 'Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing, table
-    extraction'
-  worktree: core-functionality
-  category: Code Quality and Technical Debt
-  priority: High
-  status: In Progress
-  tags:
-  - code-quality
-  - duplicate-check
-  - refactoring
-  - platforms
-  - wave-3
-  estimated_effort: 4-6 hours
-  work_total: 9
-  work_done: 3
-  work_ready: 4
-  needs:
-  - dedup-wave3-ignore-rules
 - id: isolate-experimental-core-subsystems
-  file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
+  file: TODO/main/active/isolate-experimental-core-subsystems.yaml
   title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
   worktree: main
   category: Architecture
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - architecture
   - experimental
@@ -36,6 +16,23 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
+- id: test-suite-quality-wave-2
+  file: TODO/main/active/test-suite-quality-wave-2.yaml
+  title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest complexity'
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: In Progress
+  tags:
+  - testing
+  - quality
+  - performance
+  - developer-experience
+  estimated_effort: Large (2-3 weeks)
+  work_total: 7
+  work_done: 5
+  work_ready: 0
+  deferred_count: 2
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
