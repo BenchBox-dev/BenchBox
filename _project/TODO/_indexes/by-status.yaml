@@ -1,8 +1,8 @@
-generated_at: '2026-03-23T16:36:05.463951'
-total_items: 22
+generated_at: '2026-03-23T16:46:33.955964'
+total_items: 23
 statuses:
   Not Started:
-    count: 22
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -89,6 +89,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Medium
       category: Platform Expansion
+    - id: platform-live-integration-tests
+      file: TODO/main/planning/platform-live-integration-tests.yaml
+      title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
+      priority: High
+      category: Testing & Quality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

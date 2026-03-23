@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T16:36:05.463927'
-total_categories: 8
+generated_at: '2026-03-23T16:46:33.955940'
+total_categories: 9
 categories:
   AI/ML Capabilities:
     count: 1
@@ -126,6 +126,14 @@ categories:
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
+      status: Not Started
+  Testing & Quality:
+    count: 1
+    items:
+    - id: platform-live-integration-tests
+      file: TODO/main/planning/platform-live-integration-tests.yaml
+      title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
+      priority: High
       status: Not Started
   User Experience:
     count: 1

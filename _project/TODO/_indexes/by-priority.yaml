@@ -1,8 +1,8 @@
-generated_at: '2026-03-23T16:36:05.463942'
-total_items: 22
+generated_at: '2026-03-23T16:46:33.955956'
+total_items: 23
 priorities:
   High:
-    count: 2
+    count: 3
     items:
     - id: gate-monitoring-behind-optional-extra
       file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
@@ -13,6 +13,11 @@ priorities:
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
+      status: Not Started
+    - id: platform-live-integration-tests
+      file: TODO/main/planning/platform-live-integration-tests.yaml
+      title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
+      category: Testing & Quality
       status: Not Started
   Medium-High:
     count: 2

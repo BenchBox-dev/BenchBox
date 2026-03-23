@@ -1,0 +1,264 @@
+id: platform-live-integration-tests
+title: "Real integration testing for all data platforms: Docker-local and cloud-live"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  Current state: 17 platform adapters have only stub-based smoke tests that verify
+  adapter wiring (method call order, SQL patterns) but cannot catch real issues like
+  SQL dialect incompatibility, auth failures, data type mismatches, or query execution
+  bugs. Only 3 platforms (Snowflake, BigQuery, Databricks) have live integration tests,
+  and those never run in CI. LakeSail has zero CI coverage (no stub, only live tests
+  that skip without a running server).
+
+  Goal: Every platform adapter has real integration tests that execute actual queries
+  against a real database engine. Two tiers:
+
+  Tier 1 — Docker-local (8 platforms): ClickHouse (server mode), Trino, Presto,
+  PostgreSQL, StarRocks, Doris, Databend, InfluxDB. These can run locally via Docker
+  compose with no cloud credentials. Tests should be runnable with a single
+  `make test-docker-<platform>` command.
+
+  Tier 2 — Cloud-live (3 platforms): Redshift, Athena (SQL), Athena Spark. These
+  require cloud credentials and follow the existing Snowflake/BigQuery/Databricks
+  live test pattern with env-var gating.
+
+  Additionally: LakeSail needs a stub for CI coverage (matching all other platforms),
+  and existing Docker compose files (Doris, Databend) should be leveraged.
+
+category: Testing & Quality
+
+deps:
+  needs: []
+
+work:
+- id: w1
+  summary: "Docker compose files + Makefile targets for 6 missing platforms"
+  status: pending
+  needs: []
+  description: |
+    Create docker-compose.yml files for platforms that don't have them yet.
+    Existing: Doris (docker/doris/), Databend (docker/databend/).
+
+    New compose files needed:
+    1. docker/clickhouse/docker-compose.yml — clickhouse/clickhouse-server image,
+       ports 9000 (native), 8123 (HTTP). Single node, no auth for testing.
+    2. docker/trino/docker-compose.yml — trinodb/trino image, port 8080.
+       Memory connector for TPC-H tables (Trino has built-in tpch connector).
+    3. docker/presto/docker-compose.yml — prestodb/presto image, port 8080.
+       Memory connector with tpch catalog.
+    4. docker/postgresql/docker-compose.yml — postgres:16 image, port 5432.
+       Default user/password/db for testing.
+    5. docker/starrocks/docker-compose.yml — starrocks/allin1-ubuntu image,
+       ports 9030 (MySQL), 8040 (HTTP Stream Load).
+    6. docker/influxdb/docker-compose.yml — influxdb:2.7 image, port 8086.
+       Auto-setup with org/bucket/token for testing.
+
+    Add Makefile targets:
+    - `test-docker-up-<platform>`: docker compose up -d --wait
+    - `test-docker-down-<platform>`: docker compose down -v
+    - `test-docker-<platform>`: up + run tests + down
+    - `test-docker-all`: all Docker platforms
+    - `test-docker-up-all` / `test-docker-down-all`: lifecycle helpers
+
+    Add pytest marker `docker_integration` to pyproject.toml.
+
+- id: w2
+  summary: "Create LakeSail stub in common.py for CI coverage"
+  status: pending
+  needs: []
+  description: |
+    LakeSail is the only platform without a stub — it gets zero CI coverage.
+
+    Create install_lakesail_stub() in tests/integration/platforms/common.py:
+    - Mock pyspark.sql.SparkSession with .builder.remote().config().getOrCreate() chain
+    - Mock SparkSession.sql(query) returning fake DataFrame with .collect()
+    - Mock SparkSession.catalog.listDatabases(), listTables()
+    - Mock SparkSession.read.csv() and DataFrame.write.saveAsTable()
+    - Mock SparkSession.version property and .stop()
+    - The adapter uses SparkDataLoadMixin and SparkQueryExecutionMixin from
+      benchbox.platforms.base.spark_execution_mixin — stub must satisfy that interface
+
+    Create tests/integration/platforms/test_lakesail_stub_smoke.py:
+    - Follow pattern of test_trino_smoke.py / test_presto_smoke.py
+    - Use run_smoke_benchmark() helper where possible
+    - Mark with platform_smoke + integration + fast
+
+    Rename existing test_lakesail_smoke.py → test_lakesail_live.py
+    (it requires a running server, so it's a live test, not a smoke test).
+
+- id: w3
+  summary: "DBAPI live tests: ClickHouse server, Trino, Presto, PostgreSQL"
+  status: pending
+  needs: [w1]
+  description: |
+    These 4 platforms use standard DBAPI 2.0 connections. Create live integration
+    tests following the existing Snowflake/BigQuery/Databricks pattern.
+
+    For each platform, create tests/integration/platforms/test_<platform>_live.py:
+    - pytestmark with docker_integration + live_integration + live_<platform>
+    - Skip if connection env vars not set OR Docker service not reachable
+    - Fixture: create adapter with real connection config
+    - Tests:
+      a. Connection: connect + SELECT 1 + close
+      b. Platform info: get_platform_info returns correct engine + version
+      c. Schema: create_schema + verify table exists + drop
+      d. Data load: load TPC-H lineitem at scale 0.01 (2-3 files)
+      e. Query execution: run TPC-H Q1 + Q6, verify row counts
+      f. Cleanup: drop tables + close
+
+    Env var patterns (matching Docker compose defaults):
+    - ClickHouse: CLICKHOUSE_HOST=localhost, CLICKHOUSE_PORT=9000
+    - Trino: TRINO_HOST=localhost, TRINO_PORT=8080, TRINO_CATALOG=memory
+    - Presto: PRESTO_HOST=localhost, PRESTO_PORT=8080, PRESTO_CATALOG=memory
+    - PostgreSQL: POSTGRES_HOST=localhost, POSTGRES_PORT=5432, POSTGRES_USER=benchbox,
+      POSTGRES_PASSWORD=benchbox, POSTGRES_DB=benchbox_test
+
+- id: w4
+  summary: "MySQL-protocol live tests: StarRocks, Doris"
+  status: pending
+  needs: [w1]
+  description: |
+    StarRocks and Doris both use MySQL protocol (pymysql) + HTTP Stream Load.
+    Create live integration tests for each.
+
+    For each platform, create tests/integration/platforms/test_<platform>_live.py:
+    - Same test structure as w3
+    - Additional: test HTTP Stream Load path (both platforms use HTTP for bulk data)
+    - StarRocks: ports 9030 (MySQL) + 8040 (HTTP)
+    - Doris: ports 9030 (MySQL) + 8030 (HTTP)
+    - Doris already has docker/doris/docker-compose.yml — verify it works
+
+- id: w5
+  summary: "Special-protocol live tests: Databend, InfluxDB"
+  status: pending
+  needs: [w1]
+  description: |
+    Databend uses HTTP/DSN protocol (databend-driver), InfluxDB uses FlightSQL.
+
+    Databend:
+    - Already has docker/databend/docker-compose.yml (with MinIO for S3 storage)
+    - DSN: databend://root:@localhost:8000/default
+    - Test: connection, schema CRUD, data load via COPY INTO from stage, query execution
+
+    InfluxDB:
+    - Uses influxdb3-python or flightsql-dbapi
+    - Docker compose with auto-setup (org, bucket, token)
+    - Test: connection, write data (line protocol), query via FlightSQL, verify results
+    - InfluxDB is time-series so TPC-H doesn't directly apply — use TSBS-DevOps
+      benchmark tables or custom time-series test data
+
+- id: w6
+  summary: "Cloud live tests: Redshift, Athena SQL"
+  status: pending
+  needs: []
+  description: |
+    Create live integration tests for the remaining cloud platforms that don't have
+    them, following the Snowflake/BigQuery/Databricks pattern.
+
+    Redshift: tests/integration/platforms/test_redshift_live.py
+    - Env vars: REDSHIFT_HOST, REDSHIFT_PORT, REDSHIFT_USER, REDSHIFT_PASSWORD,
+      REDSHIFT_DATABASE, REDSHIFT_S3_BUCKET, REDSHIFT_IAM_ROLE
+    - Test: connection, schema CRUD, COPY from S3, query execution, cleanup
+    - Mark: live_integration + live_redshift
+
+    Athena SQL: tests/integration/platforms/test_athena_live.py
+    - Env vars: ATHENA_REGION, ATHENA_S3_OUTPUT, ATHENA_S3_DATA_BUCKET,
+      ATHENA_WORKGROUP, ATHENA_DATABASE
+    - Test: connection, external table creation, query execution, cost tracking
+    - Mark: live_integration + live_athena
+
+    Add Makefile targets: test-live-redshift, test-live-athena.
+
+deferred:
+- summary: "CI pipeline for Docker-based integration tests"
+  reason: "Requires GitHub Actions with Docker compose support (services or
+    docker compose in workflow). Design after local Docker tests are proven stable.
+    Could use scheduled runs (nightly) rather than per-PR."
+- summary: "Athena Spark, EMR Serverless, GCP Dataproc live tests"
+  reason: "These Spark-on-cloud platforms require significant cloud infrastructure
+    (clusters, IAM roles, S3/GCS staging). Lower priority — the Spark execution
+    path is partially covered by PySpark/LakeSail local tests."
+- summary: "ClickHouse Cloud live tests"
+  reason: "ClickHouse server mode covers the query execution path. Cloud mode
+    adds HTTPS transport + auth but the SQL layer is identical. Add when
+    ClickHouse Cloud credentials are available."
+
+metadata:
+  tags:
+  - testing
+  - integration
+  - platforms
+  - docker
+  - quality
+  estimated_effort: "Large (2-3 weeks)"
+  created_date: "2026-03-23"
+  last_updated: "2026-03-23"
+
+verification:
+  command: |
+    echo "--- stub coverage ---" && ls tests/integration/platforms/test_*_smoke.py tests/integration/platforms/test_*_stub_smoke.py 2>&1 | wc -l && echo "--- live test files ---" && ls tests/integration/platforms/test_*_live.py 2>&1 | wc -l && echo "--- docker compose files ---" && find docker/ -name 'docker-compose*.yml' -o -name 'docker-compose*.yaml' 2>&1 | wc -l && echo "--- Makefile docker targets ---" && grep -c 'test-docker' Makefile && echo "--- LakeSail stub ---" && grep -c 'install_lakesail_stub' tests/integration/platforms/common.py
+  expected: "Stub count includes LakeSail; live test count >= 11 (3 existing + 8 Docker); docker compose >= 8; Makefile has docker targets; LakeSail stub exists"
+
+must_preserve:
+- "Existing stub-based smoke tests must continue to pass — live tests are additive, not replacement"
+- "Existing live tests (Snowflake, BigQuery, Databricks) must not be modified"
+- "Docker compose files must not require persistent state — use volumes that are cleaned up on down -v"
+- "All live tests must skip gracefully when their service is unreachable — no hard failures in CI"
+- "run_smoke_benchmark() helper in common.py must remain backward compatible"
+
+anti_patterns:
+- "DO NOT make Docker a hard requirement for running the test suite — because developers must be able to run `make test-fast` without Docker — Docker tests are opt-in via `make test-docker-*`"
+- "DO NOT store credentials or secrets in docker-compose files — because compose files are committed to git — use environment variables with documented defaults for local dev"
+- "DO NOT duplicate adapter testing logic — because each adapter already has unit + stub tests — live tests should focus on real query execution, data loading, and result correctness, not re-test adapter wiring"
+
+scope_limit:
+  include:
+  - "tests/integration/platforms/ (new live test files)"
+  - "tests/integration/platforms/common.py (LakeSail stub only)"
+  - "docker/ (compose files)"
+  - "Makefile (docker targets)"
+  - "pyproject.toml (docker_integration marker)"
+  exclude:
+  - "benchbox/ source code (no production changes)"
+  - "tests/unit/ (do not modify unit tests)"
+  - "Existing live test files (test_snowflake_live.py, test_bigquery_live.py, test_databricks_live.py)"
+
+impact:
+  business_value: |
+    Catches real integration bugs before they reach users. Current stub-only
+    testing missed issues like: wrong SQL dialect for target engine, staging/upload
+    failures, data type mapping errors, auth flow bugs. Docker-local tests can
+    run in CI for free (no cloud costs).
+  user_impact: |
+    No user-facing changes. Higher confidence that platform adapters work
+    correctly against real database engines.
+  technical_debt: |
+    Eliminates the largest testing gap in the project. Every platform adapter
+    will have at least one level of real integration testing. LakeSail gets
+    CI coverage for the first time.
+
+files_affected:
+  modified:
+  - "tests/integration/platforms/common.py (add install_lakesail_stub)"
+  - "Makefile (add docker targets)"
+  - "pyproject.toml (add docker_integration marker)"
+  added:
+  - "docker/clickhouse/docker-compose.yml"
+  - "docker/trino/docker-compose.yml"
+  - "docker/presto/docker-compose.yml"
+  - "docker/postgresql/docker-compose.yml"
+  - "docker/starrocks/docker-compose.yml"
+  - "docker/influxdb/docker-compose.yml"
+  - "tests/integration/platforms/test_lakesail_stub_smoke.py"
+  - "tests/integration/platforms/test_clickhouse_live.py"
+  - "tests/integration/platforms/test_trino_live.py"
+  - "tests/integration/platforms/test_presto_live.py"
+  - "tests/integration/platforms/test_postgresql_live.py"
+  - "tests/integration/platforms/test_starrocks_live.py"
+  - "tests/integration/platforms/test_doris_live.py"
+  - "tests/integration/platforms/test_databend_live.py"
+  - "tests/integration/platforms/test_influxdb_live.py"
+  - "tests/integration/platforms/test_redshift_live.py"
+  - "tests/integration/platforms/test_athena_live.py"
+  deleted: []

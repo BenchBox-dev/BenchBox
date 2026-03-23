@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T16:36:05.463897'
-total_items: 22
+generated_at: '2026-03-23T16:46:33.955914'
+total_items: 23
 items:
 - id: gate-monitoring-behind-optional-extra
   file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
@@ -35,6 +35,24 @@ items:
   work_total: 10
   work_done: 0
   work_ready: 1
+  deferred_count: 3
+- id: platform-live-integration-tests
+  file: TODO/main/planning/platform-live-integration-tests.yaml
+  title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Not Started
+  tags:
+  - testing
+  - integration
+  - platforms
+  - docker
+  - quality
+  estimated_effort: Large (2-3 weeks)
+  work_total: 6
+  work_done: 0
+  work_ready: 3
   deferred_count: 3
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
