@@ -1,15 +1,6 @@
-generated_at: '2026-03-23T15:50:45.930032'
-total_items: 25
+generated_at: '2026-03-23T16:14:04.885843'
+total_items: 24
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: test-suite-quality-wave-2
-      file: TODO/main/active/test-suite-quality-wave-2.yaml
-      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
-        complexity'
-      priority: High
-      category: Testing & Quality
   Not Started:
     count: 24
     items:

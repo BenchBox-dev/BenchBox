@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:50:47.253369'
-total_items: 594
+generated_at: '2026-03-23T16:14:06.115646'
+total_items: 595
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3016,6 +3016,24 @@ items:
   category: Testing and Quality Assurance
   priority: High
   status: Completed
+- id: test-suite-quality-wave-2
+  file: DONE/main/active/test-suite-quality-wave-2.yaml
+  title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest complexity'
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - quality
+  - performance
+  - developer-experience
+  estimated_effort: Large (2-3 weeks)
+  completed_date: '2026-03-23'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  deferred_count: 2
 - id: trino-platform-adapter
   file: DONE/platform-expansion-trino/completed/trino-platform-adapter.yaml
   title: Trino Platform Adapter

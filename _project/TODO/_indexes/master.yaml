@@ -1,23 +1,6 @@
-generated_at: '2026-03-23T15:50:45.929990'
-total_items: 25
+generated_at: '2026-03-23T16:14:04.885785'
+total_items: 24
 items:
-- id: test-suite-quality-wave-2
-  file: TODO/main/active/test-suite-quality-wave-2.yaml
-  title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest complexity'
-  worktree: main
-  category: Testing & Quality
-  priority: High
-  status: In Progress
-  tags:
-  - testing
-  - quality
-  - performance
-  - developer-experience
-  estimated_effort: Large (2-3 weeks)
-  work_total: 7
-  work_done: 5
-  work_ready: 0
-  deferred_count: 2
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter

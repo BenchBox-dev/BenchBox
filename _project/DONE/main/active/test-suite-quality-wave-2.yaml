@@ -2,7 +2,8 @@ id: test-suite-quality-wave-2
 title: "Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest complexity"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-23"
 description: |
   Follow-up to remediate-coverage-theater (completed 2026-03-05). That work
   removed the worst offenders (17 hollow files, enforcement scripts) and added
@@ -182,7 +183,7 @@ work:
 
 - id: w6
   summary: "Replace MagicMock with real connections in test_platform_adapters_coverage_wave_remaining.py and test_dataframe_runner.py"
-  status: in-progress
+  status: done
   needs: [w2]
   description: |
     The top 2 MagicMock-heavy files where real alternatives exist:
@@ -216,7 +217,7 @@ work:
 
 - id: w7
   summary: "Split root conftest.py into domain-specific conftest files"
-  status: in-progress
+  status: done
   needs: [w1]
   description: |
     tests/conftest.py is 746 lines combining:

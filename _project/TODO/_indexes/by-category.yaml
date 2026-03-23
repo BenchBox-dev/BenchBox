@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:50:45.930012'
-total_categories: 9
+generated_at: '2026-03-23T16:14:04.885816'
+total_categories: 8
 categories:
   AI/ML Capabilities:
     count: 1
@@ -137,15 +137,6 @@ categories:
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
       status: Not Started
-  Testing & Quality:
-    count: 1
-    items:
-    - id: test-suite-quality-wave-2
-      file: TODO/main/active/test-suite-quality-wave-2.yaml
-      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
-        complexity'
-      priority: High
-      status: In Progress
   User Experience:
     count: 1
     items:

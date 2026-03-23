@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:50:47.253889'
-total_items: 594
+generated_at: '2026-03-23T16:14:06.116217'
+total_items: 595
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 546
+    count: 547
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2519,6 +2519,12 @@ statuses:
       title: Test Suite Reliability ✅ COMPLETED
       priority: Medium
       category: Testing and Quality Assurance
+    - id: test-suite-quality-wave-2
+      file: DONE/main/active/test-suite-quality-wave-2.yaml
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
+        complexity'
+      priority: High
+      category: Testing & Quality
     - id: timescaledb-cloud-deployment
       file: DONE/platform-expansion/active/timescaledb-cloud-deployment.yaml
       title: TigerData Cloud Deployment Mode

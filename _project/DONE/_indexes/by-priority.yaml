@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:50:47.253758'
-total_items: 594
+generated_at: '2026-03-23T16:14:06.116093'
+total_items: 595
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 209
+    count: 210
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -1023,6 +1023,12 @@ priorities:
       file: DONE/observability-quality/active/coverage-improvement.yaml
       title: Test Infrastructure & Coverage Improvement
       category: Testing and Quality Assurance
+      status: Completed
+    - id: test-suite-quality-wave-2
+      file: DONE/main/active/test-suite-quality-wave-2.yaml
+      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
+        complexity'
+      category: Testing & Quality
       status: Completed
     - id: trino-platform-adapter
       file: DONE/platform-expansion-trino/completed/trino-platform-adapter.yaml
