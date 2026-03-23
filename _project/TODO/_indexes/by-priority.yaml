@@ -1,8 +1,8 @@
-generated_at: '2026-03-23T15:32:58.259808'
-total_items: 27
+generated_at: '2026-03-23T15:39:29.883153'
+total_items: 26
 priorities:
   High:
-    count: 3
+    count: 2
     items:
     - id: dedup-wave3-sql-platform-adapters
       file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
@@ -14,11 +14,6 @@ priorities:
       file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
       title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
       category: Architecture
-      status: Not Started
-    - id: remove-release-tooling-from-wheel
-      file: TODO/main/planning/remove-release-tooling-from-wheel.yaml
-      title: Remove maintainer-only release tooling from the default install surface
-      category: Maintainer Tooling
       status: Not Started
   Medium-High:
     count: 4

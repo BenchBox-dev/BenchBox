@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:32:58.259816'
-total_items: 27
+generated_at: '2026-03-23T15:39:29.883160'
+total_items: 26
 statuses:
   In Progress:
     count: 1
@@ -11,7 +11,7 @@ statuses:
       priority: High
       category: Code Quality and Technical Debt
   Not Started:
-    count: 26
+    count: 25
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -113,11 +113,6 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Medium
       category: Platform Expansion
-    - id: remove-release-tooling-from-wheel
-      file: TODO/main/planning/remove-release-tooling-from-wheel.yaml
-      title: Remove maintainer-only release tooling from the default install surface
-      priority: High
-      category: Maintainer Tooling
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

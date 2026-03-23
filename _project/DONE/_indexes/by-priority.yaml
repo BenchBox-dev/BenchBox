@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:32:59.521784'
-total_items: 592
+generated_at: '2026-03-23T15:39:31.231103'
+total_items: 593
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 207
+    count: 208
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -937,6 +937,11 @@ priorities:
       file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
       title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
       category: Core Functionality
+      status: Completed
+    - id: remove-release-tooling-from-wheel
+      file: DONE/main/active/remove-release-tooling-from-wheel.yaml
+      title: Remove maintainer-only release tooling from the default install surface
+      category: Maintainer Tooling
       status: Completed
     - id: rename-convert-and-data-format-cli-params
       file: DONE/main/active/rename-convert-and-data-format-cli-params.yaml

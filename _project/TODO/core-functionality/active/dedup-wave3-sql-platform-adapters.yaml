@@ -2,7 +2,7 @@ id: dedup-wave3-sql-platform-adapters
 title: "Consolidate SQL platform adapter duplicates: tuning, config, schema, Azure Spark, query plans, URL parsing, table extraction"
 worktree: core-functionality
 priority: High
-status: Ready
+status: In Progress
 category: "Code Quality and Technical Debt"
 description: |
   Wave-3 duplicate-check triage (2026-03-12, post wave-2) identifies 7
@@ -105,21 +105,21 @@ deps:
 work:
   - id: w1
     summary: "Extract _apply_table_tunings_base into shared module, refactor firebolt/lakesail/presto"
-    status: pending
+    status: done
     notes: |
       97% identical across platforms. Only ImportError handling differs.
       Use a platform_name parameter for log messages.
 
   - id: w2
     summary: "Extract _build_azure_compatible_config utility, refactor lakesail and azure_synapse"
-    status: pending
+    status: done
     notes: |
       Both build connection configs from the same parameters.
       Keep platform-specific defaults as post-build overrides.
 
   - id: w3
     summary: "Add create_schema to presto_trino_utils.py, refactor both platforms"
-    status: pending
+    status: done
     notes: |
       Extends the existing wave-2 shared module.
       Byte-for-byte identical logic.

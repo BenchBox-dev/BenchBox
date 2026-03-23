@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:32:59.521905'
-total_items: 592
+generated_at: '2026-03-23T15:39:31.231251'
+total_items: 593
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 544
+    count: 545
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2263,6 +2263,11 @@ statuses:
       title: Remove alpha-stage backward compatibility surface across BenchBox
       priority: Critical
       category: Core Functionality
+    - id: remove-release-tooling-from-wheel
+      file: DONE/main/active/remove-release-tooling-from-wheel.yaml
+      title: Remove maintainer-only release tooling from the default install surface
+      priority: High
+      category: Maintainer Tooling
     - id: rename-convert-and-data-format-cli-params
       file: DONE/main/active/rename-convert-and-data-format-cli-params.yaml
       title: Rename --convert to --table-format and --data-format to --presort

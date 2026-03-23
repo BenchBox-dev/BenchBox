@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:32:58.259773'
-total_items: 27
+generated_at: '2026-03-23T15:39:29.883101'
+total_items: 26
 items:
 - id: dedup-wave3-sql-platform-adapters
   file: TODO/core-functionality/active/dedup-wave3-sql-platform-adapters.yaml
@@ -17,8 +17,8 @@ items:
   - wave-3
   estimated_effort: 4-6 hours
   work_total: 9
-  work_done: 0
-  work_ready: 7
+  work_done: 3
+  work_ready: 4
   needs:
   - dedup-wave3-ignore-rules
 - id: isolate-experimental-core-subsystems
@@ -34,22 +34,6 @@ items:
   - scope-review
   estimated_effort: Medium
   work_total: 4
-  work_done: 0
-  work_ready: 1
-- id: remove-release-tooling-from-wheel
-  file: TODO/main/planning/remove-release-tooling-from-wheel.yaml
-  title: Remove maintainer-only release tooling from the default install surface
-  worktree: main
-  category: Maintainer Tooling
-  priority: High
-  status: Not Started
-  tags:
-  - architecture
-  - packaging
-  - maintainer-tooling
-  - scope-review
-  estimated_effort: Small
-  work_total: 2
   work_done: 0
   work_ready: 1
 - id: bodo-jit-and-mpi-support

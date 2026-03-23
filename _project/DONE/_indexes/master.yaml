@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:32:59.521357'
-total_items: 592
+generated_at: '2026-03-23T15:39:31.230606'
+total_items: 593
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2771,6 +2771,23 @@ items:
   owners:
   - joe
   estimated_effort: 3-5 days
+- id: remove-release-tooling-from-wheel
+  file: DONE/main/active/remove-release-tooling-from-wheel.yaml
+  title: Remove maintainer-only release tooling from the default install surface
+  worktree: main
+  category: Maintainer Tooling
+  priority: High
+  status: Completed
+  tags:
+  - architecture
+  - packaging
+  - maintainer-tooling
+  - scope-review
+  estimated_effort: Small
+  completed_date: '2026-03-23'
+  work_total: 2
+  work_done: 2
+  work_ready: 0
 - id: rename-convert-and-data-format-cli-params
   file: DONE/main/active/rename-convert-and-data-format-cli-params.yaml
   title: Rename --convert to --table-format and --data-format to --presort

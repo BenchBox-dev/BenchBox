@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:32:58.259797'
-total_categories: 11
+generated_at: '2026-03-23T15:39:29.883136'
+total_categories: 10
 categories:
   AI/ML Capabilities:
     count: 1
@@ -79,14 +79,6 @@ categories:
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
       priority: Medium-High
-      status: Not Started
-  Maintainer Tooling:
-    count: 1
-    items:
-    - id: remove-release-tooling-from-wheel
-      file: TODO/main/planning/remove-release-tooling-from-wheel.yaml
-      title: Remove maintainer-only release tooling from the default install surface
-      priority: High
       status: Not Started
   Packaging:
     count: 1

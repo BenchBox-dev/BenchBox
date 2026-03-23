@@ -2,7 +2,8 @@ id: remove-release-tooling-from-wheel
 title: "Remove maintainer-only release tooling from the default install surface"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-03-23"
 category: Maintainer Tooling
 description: |
   BenchBox ships `benchbox/release/` (~2,300 lines) and the `benchbox-sync`
@@ -74,7 +75,7 @@ files_affected:
 work:
 - id: w1
   summary: "Remove benchbox-sync entry point and exclude benchbox/release/ from the wheel"
-  status: pending
+  status: done
   notes: |
     In pyproject.toml: remove `benchbox-sync = "benchbox.release.sync:main"`
     from `[project.scripts]`.
@@ -86,7 +87,7 @@ work:
 - id: w2
   summary: "Update tests and CI to reflect the removed entry point"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Any test asserting `benchbox-sync` is an installed script should be updated
     to expect its absence in default installs. CI release jobs that use
@@ -103,17 +104,20 @@ approach: |
 
 anti_patterns:
 - "DO NOT create a separate benchbox-maintainer package for this level of decoupling — it is over-engineered"
-- "DO NOT remove benchbox/release/ source code from the repo — because maintainers need it for release automation from the source checkout — exclude from wheel only"
+- "DO NOT remove benchbox/release/ source code from the repo — because maintainers need it for release automation from the
+  source checkout — exclude from wheel only"
 
 verification:
 - description: "Public CLI and package-export tests still pass"
   command: "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py tests/unit/test_cli_documentation.py -q"
   expected_output: "All tests pass"
 - description: "Release and sync tests still pass from source checkout"
-  command: "uv run -- python -m pytest tests/unit/release/test_workflow.py tests/unit/release/test_release_sync_unit.py tests/unit/test_release_sync.py -q"
+  command: "uv run -- python -m pytest tests/unit/release/test_workflow.py tests/unit/release/test_release_sync_unit.py tests/unit/test_release_sync.py
+    -q"
   expected_output: "All tests pass"
 - description: "benchbox-sync is not installed as a console script in a clean wheel install"
-  command: "uv venv /tmp/benchbox-wheel-test && uv build --wheel && uv pip install --python /tmp/benchbox-wheel-test dist/benchbox-*.whl --quiet && /tmp/benchbox-wheel-test/bin/benchbox-sync --help; rm -rf /tmp/benchbox-wheel-test"
+  command: "uv venv /tmp/benchbox-wheel-test && uv build --wheel && uv pip install --python /tmp/benchbox-wheel-test dist/benchbox-*.whl
+    --quiet && /tmp/benchbox-wheel-test/bin/benchbox-sync --help; rm -rf /tmp/benchbox-wheel-test"
   expected_output: "benchbox-sync not found (exit code 1)"
 - description: "benchbox.release is excluded from the wheel"
   command: "uv build --wheel && python -m zipfile -l dist/benchbox-*.whl | grep release"

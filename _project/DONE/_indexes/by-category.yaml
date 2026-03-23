@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T15:32:59.521651'
-total_categories: 70
+generated_at: '2026-03-23T15:39:31.230935'
+total_categories: 71
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -1776,6 +1776,14 @@ categories:
       file: DONE/unknown/planning/copyright-and-license-declaration-updates-completed.yaml
       title: Copyright and License Declaration Updates ✅ COMPLETED
       priority: Medium
+      status: Completed
+  Maintainer Tooling:
+    count: 1
+    items:
+    - id: remove-release-tooling-from-wheel
+      file: DONE/main/active/remove-release-tooling-from-wheel.yaml
+      title: Remove maintainer-only release tooling from the default install surface
+      priority: High
       status: Completed
   Marketing Content Enablement:
     count: 3
