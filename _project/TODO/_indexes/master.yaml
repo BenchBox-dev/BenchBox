@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T11:24:05.223394'
-total_items: 29
+generated_at: '2026-03-23T14:54:38.774189'
+total_items: 28
 items:
 - id: isolate-experimental-core-subsystems
   file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
@@ -32,23 +32,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
-- id: test-suite-quality-wave-2
-  file: TODO/main/active/test-suite-quality-wave-2.yaml
-  title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest complexity'
-  worktree: main
-  category: Testing & Quality
-  priority: High
-  status: In Progress
-  tags:
-  - testing
-  - quality
-  - performance
-  - developer-experience
-  estimated_effort: Large (2-3 weeks)
-  work_total: 7
-  work_done: 7
-  work_ready: 0
-  deferred_count: 2
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -459,12 +442,12 @@ items:
   work_ready: 1
   deferred_count: 3
 - id: formalize-mcp-internal-apis
-  file: TODO/main/planning/formalize-mcp-internal-apis.yaml
+  file: TODO/main/active/formalize-mcp-internal-apis.yaml
   title: Promote 3 internal MCP API references to public exports
   worktree: main
   category: Packaging
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - architecture
   - packaging

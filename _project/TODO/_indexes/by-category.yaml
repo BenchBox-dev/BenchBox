@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T11:24:05.223458'
-total_categories: 12
+generated_at: '2026-03-23T14:54:38.774222'
+total_categories: 11
 categories:
   AI/ML Capabilities:
     count: 1
@@ -97,10 +97,10 @@ categories:
       priority: Medium
       status: Not Started
     - id: formalize-mcp-internal-apis
-      file: TODO/main/planning/formalize-mcp-internal-apis.yaml
+      file: TODO/main/active/formalize-mcp-internal-apis.yaml
       title: Promote 3 internal MCP API references to public exports
       priority: Medium-High
-      status: Not Started
+      status: In Progress
   Platform Expansion:
     count: 11
     items:
@@ -167,15 +167,6 @@ categories:
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
       status: Not Started
-  Testing & Quality:
-    count: 1
-    items:
-    - id: test-suite-quality-wave-2
-      file: TODO/main/active/test-suite-quality-wave-2.yaml
-      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
-        complexity'
-      priority: High
-      status: In Progress
   User Experience:
     count: 1
     items:

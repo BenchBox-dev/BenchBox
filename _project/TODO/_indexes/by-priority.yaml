@@ -1,8 +1,8 @@
-generated_at: '2026-03-23T11:24:05.223489'
-total_items: 29
+generated_at: '2026-03-23T14:54:38.774240'
+total_items: 28
 priorities:
   High:
-    count: 3
+    count: 2
     items:
     - id: isolate-experimental-core-subsystems
       file: TODO/main/planning/isolate-experimental-core-subsystems.yaml
@@ -14,12 +14,6 @@ priorities:
       title: Remove maintainer-only release tooling from the default install surface
       category: Maintainer Tooling
       status: Not Started
-    - id: test-suite-quality-wave-2
-      file: TODO/main/active/test-suite-quality-wave-2.yaml
-      title: 'Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest
-        complexity'
-      category: Testing & Quality
-      status: In Progress
   Medium-High:
     count: 5
     items:
@@ -40,10 +34,10 @@ priorities:
       category: Core Functionality
       status: Not Started
     - id: formalize-mcp-internal-apis
-      file: TODO/main/planning/formalize-mcp-internal-apis.yaml
+      file: TODO/main/active/formalize-mcp-internal-apis.yaml
       title: Promote 3 internal MCP API references to public exports
       category: Packaging
-      status: Not Started
+      status: In Progress
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support

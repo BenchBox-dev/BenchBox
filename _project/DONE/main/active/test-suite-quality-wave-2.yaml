@@ -2,7 +2,8 @@ id: test-suite-quality-wave-2
 title: "Test suite quality wave 2: fix slow fast-suite, strengthen assertions, consolidate test files, reduce conftest complexity"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-23"
 description: |
   Follow-up to remediate-coverage-theater (completed 2026-03-05). That work
   removed the worst offenders (17 hollow files, enforcement scripts) and added
