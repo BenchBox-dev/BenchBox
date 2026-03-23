@@ -1,8 +1,8 @@
-generated_at: '2026-03-23T17:23:16.168163'
-total_items: 26
+generated_at: '2026-03-23T17:24:47.627341'
+total_items: 25
 priorities:
   High:
-    count: 5
+    count: 4
     items:
     - id: fix-coverage-theater
       file: TODO/main/active/fix-coverage-theater.yaml
@@ -24,11 +24,6 @@ priorities:
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
       status: Not Started
-    - id: platform-live-integration-tests
-      file: TODO/main/active/platform-live-integration-tests.yaml
-      title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
-      category: Testing & Quality
-      status: In Progress
   Medium-High:
     count: 3
     items:

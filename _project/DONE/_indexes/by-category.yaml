@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T16:36:06.833591'
+generated_at: '2026-03-23T17:24:48.860387'
 total_categories: 72
 categories:
   '"Bug Fixes & Reliability"':
@@ -2836,7 +2836,7 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 5
+    count: 6
     items:
     - id: migrate-ascii-chart-tests-to-textcharts
       file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml
@@ -2846,6 +2846,11 @@ categories:
     - id: phase-5-testing-infrastructure
       file: DONE/query-plan-remediation/phase-5-testing-infrastructure.yaml
       title: 'Query Plan Remediation - Phase 5: Testing Infrastructure'
+      priority: High
+      status: Completed
+    - id: platform-live-integration-tests
+      file: DONE/main/active/platform-live-integration-tests.yaml
+      title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
       priority: High
       status: Completed
     - id: remediate-coverage-theater

@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T16:36:06.833318'
-total_items: 597
+generated_at: '2026-03-23T17:24:48.860136'
+total_items: 598
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2685,6 +2685,25 @@ items:
   work_total: 22
   work_done: 22
   work_ready: 0
+- id: platform-live-integration-tests
+  file: DONE/main/active/platform-live-integration-tests.yaml
+  title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - integration
+  - platforms
+  - docker
+  - quality
+  estimated_effort: Large (2-3 weeks)
+  completed_date: '2026-03-23'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  deferred_count: 4
 - id: rebuild-tpcds-binaries
   file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
   title: Rebuild TPC-DS binaries with stdout fix for all platforms

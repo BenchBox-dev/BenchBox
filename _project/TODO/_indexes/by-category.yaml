@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T17:23:16.168152'
+generated_at: '2026-03-23T17:24:47.627326'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -128,7 +128,7 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 4
+    count: 3
     items:
     - id: fix-coverage-theater
       file: TODO/main/active/fix-coverage-theater.yaml
@@ -145,11 +145,6 @@ categories:
       title: Increase core, CLI, platform, and utils test coverage to 80%
       priority: High
       status: Not Started
-    - id: platform-live-integration-tests
-      file: TODO/main/active/platform-live-integration-tests.yaml
-      title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
-      priority: High
-      status: In Progress
   User Experience:
     count: 1
     items:

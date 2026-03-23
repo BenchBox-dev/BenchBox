@@ -2,7 +2,8 @@ id: platform-live-integration-tests
 title: "Real integration testing for all data platforms: Docker-local and cloud-live"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-03-23"
 description: |
   Current state: 17 platform adapters have only stub-based smoke tests that verify
   adapter wiring (method call order, SQL patterns) but cannot catch real issues like
@@ -42,7 +43,7 @@ deps:
 work:
 - id: w1
   summary: "Docker compose files for 6 missing platforms"
-  status: pending
+  status: done
   needs: []
   description: |
     Create docker-compose.yml files for platforms that don't have them yet.
@@ -67,7 +68,7 @@ work:
 
 - id: w2
   summary: "Makefile targets + pytest marker for Docker integration testing"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     Add test runner infrastructure for Docker-based integration tests.
@@ -92,7 +93,7 @@ work:
 
 - id: w3
   summary: "Create LakeSail stub in common.py for CI coverage"
-  status: pending
+  status: done
   needs: []
   description: |
     LakeSail is the only platform without a stub — it gets zero CI coverage.
@@ -116,7 +117,7 @@ work:
 
 - id: w4
   summary: "Docker live tests: ClickHouse server + PostgreSQL"
-  status: pending
+  status: done
   needs: [w1, w2]
   description: |
     These 2 platforms have straightforward DBAPI connections with no special
@@ -140,7 +141,7 @@ work:
 
 - id: w5
   summary: "Docker live tests: Trino + Presto"
-  status: pending
+  status: done
   needs: [w1, w2]
   description: |
     Trino and Presto require catalog/connector configuration (memory connector
@@ -158,7 +159,7 @@ work:
 
 - id: w6
   summary: "Docker live tests: StarRocks + Doris"
-  status: pending
+  status: done
   needs: [w1, w2]
   description: |
     StarRocks and Doris both use MySQL protocol (pymysql) + HTTP Stream Load.
@@ -172,7 +173,7 @@ work:
 
 - id: w7
   summary: "Docker live tests: Databend + InfluxDB"
-  status: pending
+  status: done
   needs: [w1, w2]
   description: |
     Databend uses HTTP/DSN protocol (databend-driver), InfluxDB uses FlightSQL.
@@ -191,7 +192,7 @@ work:
 
 - id: w8
   summary: "Cloud live tests: Redshift + Athena SQL"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Create live integration tests for the remaining cloud platforms that don't have

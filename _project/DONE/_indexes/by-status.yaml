@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T16:36:06.833892'
-total_items: 597
+generated_at: '2026-03-23T17:24:48.860659'
+total_items: 598
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 549
+    count: 550
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2179,6 +2179,11 @@ statuses:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: High
       category: Testing and Quality Assurance
+    - id: platform-live-integration-tests
+      file: DONE/main/active/platform-live-integration-tests.yaml
+      title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
+      priority: High
+      category: Testing & Quality
     - id: rebuild-tpcds-binaries
       file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
       title: Rebuild TPC-DS binaries with stdout fix for all platforms

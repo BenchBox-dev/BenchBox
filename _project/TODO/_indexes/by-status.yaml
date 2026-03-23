@@ -1,14 +1,6 @@
-generated_at: '2026-03-23T17:23:16.168170'
-total_items: 26
+generated_at: '2026-03-23T17:24:47.627350'
+total_items: 25
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: platform-live-integration-tests
-      file: TODO/main/active/platform-live-integration-tests.yaml
-      title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
-      priority: High
-      category: Testing & Quality
   Not Started:
     count: 25
     items:

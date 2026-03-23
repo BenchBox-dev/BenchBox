@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T17:23:16.168133'
-total_items: 26
+generated_at: '2026-03-23T17:24:47.627295'
+total_items: 25
 items:
 - id: fix-coverage-theater
   file: TODO/main/active/fix-coverage-theater.yaml
@@ -74,24 +74,6 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 3
-- id: platform-live-integration-tests
-  file: TODO/main/active/platform-live-integration-tests.yaml
-  title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
-  worktree: main
-  category: Testing & Quality
-  priority: High
-  status: In Progress
-  tags:
-  - testing
-  - integration
-  - platforms
-  - docker
-  - quality
-  estimated_effort: Large (2-3 weeks)
-  work_total: 8
-  work_done: 7
-  work_ready: 1
-  deferred_count: 4
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter

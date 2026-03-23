@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T16:36:06.833753'
-total_items: 597
+generated_at: '2026-03-23T17:24:48.860529'
+total_items: 598
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 210
+    count: 211
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -908,6 +908,11 @@ priorities:
       file: DONE/ci-infrastructure/active/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       category: Testing and Quality Assurance
+      status: Completed
+    - id: platform-live-integration-tests
+      file: DONE/main/active/platform-live-integration-tests.yaml
+      title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
+      category: Testing & Quality
       status: Completed
     - id: rebuild-tpcds-binaries
       file: DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml
