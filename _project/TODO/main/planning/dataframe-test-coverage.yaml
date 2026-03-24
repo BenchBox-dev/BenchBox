@@ -2,7 +2,7 @@ id: dataframe-test-coverage
 title: "Increase DataFrame subsystem test coverage with behavioral tests"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 description: |
   The DataFrame subsystem spans three layers totaling 21,643 statements at 50.7%
   coverage — the single largest coverage gap in the project.
@@ -27,7 +27,7 @@ deps:
 work:
 - id: w1
   summary: "Exclude low-ROI bulk queries from coverage scope (quick win: +4pp)"
-  status: pending
+  status: done
   needs: []
   description: |
     Do this first — it immediately boosts the overall coverage number by ~4
@@ -51,7 +51,7 @@ work:
 
 - id: w2
   summary: "Test unified_frame.py: column, filter, and sort operations"
-  status: pending
+  status: done
   needs: []
   description: |
     unified_frame.py is the largest gap: 1,633 stmts, 607 missing (62.8%).
@@ -75,7 +75,7 @@ work:
 
 - id: w3
   summary: "Test unified_frame.py: aggregation, joins, and window functions"
-  status: pending
+  status: done
   needs: []
   description: |
     Second batch of unified_frame operations (~130 stmts gained):
@@ -89,7 +89,7 @@ work:
 
 - id: w4
   summary: "Test unified_frame.py: expression building and error paths"
-  status: pending
+  status: done
   needs: []
   description: |
     Third batch of unified_frame operations (~115 stmts gained):
@@ -102,7 +102,7 @@ work:
 
 - id: w5
   summary: "Test DataFrame benchmark_suite.py orchestration lifecycle"
-  status: pending
+  status: done
   needs: []
   description: |
     benchmark_suite.py: 555 stmts, 396 missing (28.6%). This is the main
@@ -125,7 +125,7 @@ work:
 
 - id: w6
   summary: "Test DataFrame platform adapters: expression_family + pandas_family + benchmark_mixin"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Three mid-coverage adapter files that form the engine abstraction:
@@ -199,7 +199,7 @@ work:
 
 - id: w9
   summary: "Test DF core framework: data_loader, profiling, tuning, context"
-  status: pending
+  status: done
   needs: []
   description: |
     Core framework files that support the DataFrame subsystem:
@@ -311,19 +311,15 @@ work:
 
 deferred:
 - summary: "ClickBench dataframe queries (446 stmts, 30.5%)"
-  reason: "ClickBench uses a single wide table with specific data patterns.
-    Testing requires the ClickBench dataset or representative fixtures.
-    Lower priority — push after main targets are hit."
+  reason: "ClickBench uses a single wide table with specific data patterns. Testing requires the ClickBench dataset or representative
+    fixtures. Lower priority — push after main targets are hit."
 - summary: "AI primitives dataframe operations (385 stmts, 68.3%)"
-  reason: "Already at reasonable coverage. Experimental benchmark type.
-    Cover when AI primitives benchmark stabilizes."
+  reason: "Already at reasonable coverage. Experimental benchmark type. Cover when AI primitives benchmark stabilizes."
 - summary: "Coffeeshop dataframe queries (254 stmts, 61.8%)"
-  reason: "Small benchmark with straightforward queries. Already >60%.
-    Low ROI for the effort to build test fixtures."
+  reason: "Small benchmark with straightforward queries. Already >60%. Low ROI for the effort to build test fixtures."
 - summary: "Iceberg/Delta Lake/Hudi maintenance operations"
-  reason: "Table format maintenance (compaction, optimization, vacuum)
-    requires real table format infrastructure. Better covered by the
-    platform-live-integration-tests TODO."
+  reason: "Table format maintenance (compaction, optimization, vacuum) requires real table format infrastructure. Better covered
+    by the platform-live-integration-tests TODO."
 
 metadata:
   tags:
@@ -353,10 +349,14 @@ must_preserve:
 - "Polars and Pandas must remain the only required test engines — no pyspark/dask in fast tests"
 
 anti_patterns:
-- "DO NOT test DataFrame queries by asserting only `.columns` is truthy — because truthy check passes for any non-empty sequence — assert specific column names and types"
-- "DO NOT mock the DataFrame engine to test query logic — because you're testing mock behavior not real execution — use real Polars/Pandas with small test data"
-- "DO NOT create one giant test fixture for all queries — because shared mutable state causes flaky tests — use function-scoped fixtures or session-scoped immutable data"
-- "DO NOT test TPC-DS queries individually — because there are 99 of them and the effort vastly exceeds the value — exclude from scope and test framework instead"
+- "DO NOT test DataFrame queries by asserting only `.columns` is truthy — because truthy check passes for any non-empty sequence
+  — assert specific column names and types"
+- "DO NOT mock the DataFrame engine to test query logic — because you're testing mock behavior not real execution — use real
+  Polars/Pandas with small test data"
+- "DO NOT create one giant test fixture for all queries — because shared mutable state causes flaky tests — use function-scoped
+  fixtures or session-scoped immutable data"
+- "DO NOT test TPC-DS queries individually — because there are 99 of them and the effort vastly exceeds the value — exclude
+  from scope and test framework instead"
 
 scope_limit:
   include:

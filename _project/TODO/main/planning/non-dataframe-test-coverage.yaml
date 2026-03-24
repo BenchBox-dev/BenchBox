@@ -2,7 +2,7 @@ id: non-dataframe-test-coverage
 title: "Increase core, CLI, platform, and utils test coverage to 80%"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 description: |
   Non-DataFrame coverage gaps across 4 categories totaling ~11,500 missing
   statements. These are higher ROI than DataFrame queries because they protect
@@ -38,7 +38,7 @@ deps:
 work:
 - id: w1
   summary: "Test base adapter concrete methods via DuckDB"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/base/adapter.py: 2,147 stmts, 673 miss (68.7%).
@@ -108,7 +108,7 @@ work:
 
 - id: w5
   summary: "Test platform_registry.py operations"
-  status: pending
+  status: done
   needs: []
   description: |
     core/platform_registry.py: 504 stmts, 151 miss (70.0%).
@@ -154,7 +154,7 @@ work:
 
 - id: w8
   summary: "Test dryrun.py preview rendering"
-  status: pending
+  status: done
   needs: []
   description: |
     core/dryrun.py: 551 stmts, 162 miss (70.6%).
@@ -193,7 +193,7 @@ work:
 
 - id: w11
   summary: "Test local platform adapters: DataFusion + write transformer"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     In-process engines — fully testable with real connections.
@@ -235,7 +235,7 @@ work:
 
 - id: w13
   summary: "Test utils: tpc_compilation + execution_manager"
-  status: pending
+  status: done
   needs: []
   description: |
     utils/tpc_compilation.py: 345 stmts, 126 miss (63.5%).
@@ -253,7 +253,7 @@ work:
 
 - id: w14
   summary: "Test utils: data_validation + dependency_validation"
-  status: pending
+  status: done
   needs: []
   description: |
     utils/data_validation.py: 320 stmts, 85 miss (73.4%).
@@ -270,7 +270,7 @@ work:
 
 - id: w15
   summary: "Test utils: verbosity + timeout_manager"
-  status: pending
+  status: done
   needs: []
   description: |
     utils/verbosity.py: 179 stmts, 66 miss (63.1%).
@@ -287,7 +287,7 @@ work:
 
 - id: w16
   summary: "Test CLI commands via CliRunner: run + compare"
-  status: pending
+  status: done
   needs: []
   description: |
     cli/commands/run.py: 1,125 stmts, 429 miss (61.9%).
@@ -462,18 +462,17 @@ work:
 
 deferred:
 - summary: "TPC-DI ETL coverage (transformations.py 1,053 miss, batch.py 882 miss)"
-  reason: "TPC-DI ETL is 1,935 missing statements but requires complex DataFrame
-    fixtures simulating CDC, SCD, and batch processing. High effort, niche benchmark.
-    Cover after 80% overall target is reached."
+  reason: "TPC-DI ETL is 1,935 missing statements but requires complex DataFrame fixtures simulating CDC, SCD, and batch processing.
+    High effort, niche benchmark. Cover after 80% overall target is reached."
 - summary: "Experimental module coverage (723 miss, 75.3%)"
-  reason: "Experimental code changes frequently. Testing to 80% is wasted effort
-    if modules are restructured. Cover after modules graduate from experimental."
+  reason: "Experimental code changes frequently. Testing to 80% is wasted effort if modules are restructured. Cover after
+    modules graduate from experimental."
 - summary: "Cloud Spark staging/session coverage (base/cloud_spark/ 175 miss)"
-  reason: "Requires Spark session mocking which is fragile. Better covered by
-    platform-live-integration-tests TODO with real Spark clusters."
+  reason: "Requires Spark session mocking which is fragile. Better covered by platform-live-integration-tests TODO with real
+    Spark clusters."
 - summary: "Remaining cloud platform adapters (firebolt, questdb, trino, etc.)"
-  reason: "The top 6 cloud adapters in w20-w22 cover the most-used platforms.
-    Remaining adapters can be covered incrementally after the 80% target."
+  reason: "The top 6 cloud adapters in w20-w22 cover the most-used platforms. Remaining adapters can be covered incrementally
+    after the 80% target."
 
 metadata:
   tags:
@@ -507,11 +506,16 @@ must_preserve:
 - "Cloud adapter tests must not require real credentials — mock at connection boundary only"
 
 anti_patterns:
-- "DO NOT write import-only tests — because importing a module is not testing it — every test must call a function and assert on its output"
-- "DO NOT mock internal methods to test dispatchers — because you're testing mock wiring not behavior — use real DuckDB/DataFusion/Polars wherever possible"
-- "DO NOT add tests just to hit line coverage — because a test that can never fail is worse than no test — every test should fail if the code under test is broken"
-- "DO NOT test cloud SQL generation by asserting mock.called — because that doesn't verify SQL correctness — assert the generated SQL string contains expected clauses"
-- "DO NOT put 'coverage' in test filenames — because test names should describe what they verify — name after the behavior being tested"
+- "DO NOT write import-only tests — because importing a module is not testing it — every test must call a function and assert
+  on its output"
+- "DO NOT mock internal methods to test dispatchers — because you're testing mock wiring not behavior — use real DuckDB/DataFusion/Polars
+  wherever possible"
+- "DO NOT add tests just to hit line coverage — because a test that can never fail is worse than no test — every test should
+  fail if the code under test is broken"
+- "DO NOT test cloud SQL generation by asserting mock.called — because that doesn't verify SQL correctness — assert the generated
+  SQL string contains expected clauses"
+- "DO NOT put 'coverage' in test filenames — because test names should describe what they verify — name after the behavior
+  being tested"
 
 scope_limit:
   include:
