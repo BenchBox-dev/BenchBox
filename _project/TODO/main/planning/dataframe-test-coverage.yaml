@@ -288,7 +288,7 @@ work:
 
 - id: w13
   summary: "Test pyspark_df and lakesail_df adapter stubs"
-  status: pending
+  status: done
   needs: [w6]
   description: |
     These adapters require external engines (Spark, LakeSail server) but their
