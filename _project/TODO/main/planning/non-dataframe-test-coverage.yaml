@@ -381,7 +381,7 @@ work:
 
 - id: w21
   summary: "Test cloud platform SQL generation: BigQuery + Databricks"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     platforms/bigquery.py (514 miss, 38.7%). Target: +180 stmts.
