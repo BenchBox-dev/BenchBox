@@ -1,4 +1,4 @@
-generated_at: '2026-03-24T10:14:28.182502'
+generated_at: '2026-03-24T10:25:59.031572'
 total_items: 24
 items:
 - id: gate-monitoring-behind-optional-extra
@@ -382,8 +382,8 @@ items:
   - quality
   estimated_effort: Large (2-3 weeks)
   work_total: 13
-  work_done: 9
-  work_ready: 3
+  work_done: 10
+  work_ready: 2
   deferred_count: 4
   needs:
   - fix-coverage-theater

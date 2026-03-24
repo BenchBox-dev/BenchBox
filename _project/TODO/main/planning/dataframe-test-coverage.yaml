@@ -255,7 +255,7 @@ work:
 
 - id: w11
   summary: "Test SSB dataframe queries"
-  status: pending
+  status: done
   needs: [w2, w9]
   description: |
     core/ssb/dataframe_queries/queries.py: 419 stmts, 192 miss (54.2%).
