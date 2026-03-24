@@ -363,7 +363,7 @@ work:
 
 - id: w20
   summary: "Test cloud platform SQL generation: Redshift + Snowflake"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     Test SQL generation logic — assert on SQL strings, NOT mock.called.
