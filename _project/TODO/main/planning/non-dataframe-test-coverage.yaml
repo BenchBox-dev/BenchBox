@@ -414,7 +414,7 @@ work:
 
 - id: w23
   summary: "Test cloud credential resolution and validation"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/credentials/*.py: ~500 miss across credential helpers.
