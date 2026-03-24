@@ -1,8 +1,8 @@
-generated_at: '2026-03-23T17:24:47.627350'
-total_items: 25
+generated_at: '2026-03-23T21:02:02.957852'
+total_items: 24
 statuses:
   Not Started:
-    count: 25
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -44,11 +44,6 @@ statuses:
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       priority: Low
       category: Benchmark Expansion
-    - id: fix-coverage-theater
-      file: TODO/main/active/fix-coverage-theater.yaml
-      title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
-      priority: High
-      category: Testing & Quality
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics

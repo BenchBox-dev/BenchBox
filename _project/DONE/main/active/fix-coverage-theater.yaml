@@ -2,7 +2,8 @@ id: fix-coverage-theater
 title: "Fix coverage theater: replace fake assertions with real behavioral tests"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-03-23"
 description: |
   Audit found ~30-35% of "coverage wave" tests inflate metrics without validating behavior.
   16 `assert True` instances always pass. 315 `assert hasattr` checks verify attributes exist
@@ -24,7 +25,7 @@ deps:
 work:
 - id: w1
   summary: "Kill all `assert True` statements (16 instances)"
-  status: pending
+  status: done
   needs: []
   description: |
     Replace every `assert True` with a real assertion.
@@ -44,7 +45,7 @@ work:
 
 - id: w2
   summary: "Upgrade hasattr-only checks to behavioral assertions (priority 20 of 315)"
-  status: pending
+  status: done
   needs: []
   description: |
     There are 315 `assert hasattr(...)` calls across 89 test files. Most are
@@ -70,7 +71,7 @@ work:
 
 - id: w3
   summary: "Deepen mock dispatch tests in 4 coverage files (12 instances)"
-  status: pending
+  status: done
   needs: []
   description: |
     4 test files with "coverage" in the name use `assert_called_once()` as the
@@ -96,7 +97,7 @@ work:
 
 - id: w4
   summary: "Fix trivial `.columns` assertions in dataframe query tests (81 tests)"
-  status: pending
+  status: done
   needs: []
   description: |
     tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py has 81 tests
@@ -107,7 +108,7 @@ work:
 
 - id: w5
   summary: "Convert import-only tests to behavioral tests"
-  status: pending
+  status: done
   needs: []
   description: |
     tests/unit/platforms/test_platform_adapters_coverage_wave_remaining.py (lines 42-99)
@@ -121,7 +122,7 @@ work:
 
 - id: w6
   summary: "Triage `assert ... is not None` sole-assertion tests (cap at top 20)"
-  status: pending
+  status: done
   needs: []
   description: |
     There are 1,122 `assert ... is not None` calls across tests. Most are

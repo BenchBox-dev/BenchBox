@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T17:24:48.860659'
-total_items: 598
+generated_at: '2026-03-23T21:02:04.527737'
+total_items: 599
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 550
+    count: 551
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1468,6 +1468,11 @@ statuses:
       title: Fix broken runtime paths in Databend, LakeSail, StarRocks, and pg_duckdb adapters
       priority: High
       category: Platform Expansion
+    - id: fix-coverage-theater
+      file: DONE/main/active/fix-coverage-theater.yaml
+      title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
+      priority: High
+      category: Testing & Quality
     - id: fix-ci-critical-issues
       file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml
       title: Fix critical CI issues for green builds

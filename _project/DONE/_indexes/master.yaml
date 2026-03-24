@@ -1,5 +1,5 @@
-generated_at: '2026-03-23T17:24:48.860136'
-total_items: 598
+generated_at: '2026-03-23T21:02:04.527086'
+total_items: 599
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1615,6 +1615,24 @@ items:
   work_total: 7
   work_done: 7
   work_ready: 0
+- id: fix-coverage-theater
+  file: DONE/main/active/fix-coverage-theater.yaml
+  title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - quality
+  - coverage
+  - technical-debt
+  estimated_effort: Medium (3-5 days)
+  completed_date: '2026-03-23'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  deferred_count: 2
 - id: platform-adapter-cursor-resource-leaks
   file: DONE/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
   title: Fix cursor and connection resource leaks across new platform adapters

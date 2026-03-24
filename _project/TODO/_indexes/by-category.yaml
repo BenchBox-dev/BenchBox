@@ -1,4 +1,4 @@
-generated_at: '2026-03-23T17:24:47.627326'
+generated_at: '2026-03-23T21:02:02.957825'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -128,13 +128,8 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 3
+    count: 2
     items:
-    - id: fix-coverage-theater
-      file: TODO/main/active/fix-coverage-theater.yaml
-      title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
-      priority: High
-      status: Not Started
     - id: dataframe-test-coverage
       file: TODO/main/planning/dataframe-test-coverage.yaml
       title: Increase DataFrame subsystem test coverage with behavioral tests

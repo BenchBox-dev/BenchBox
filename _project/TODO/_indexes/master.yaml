@@ -1,23 +1,6 @@
-generated_at: '2026-03-23T17:24:47.627295'
-total_items: 25
+generated_at: '2026-03-23T21:02:02.957793'
+total_items: 24
 items:
-- id: fix-coverage-theater
-  file: TODO/main/active/fix-coverage-theater.yaml
-  title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
-  worktree: main
-  category: Testing & Quality
-  priority: High
-  status: Not Started
-  tags:
-  - testing
-  - quality
-  - coverage
-  - technical-debt
-  estimated_effort: Medium (3-5 days)
-  work_total: 6
-  work_done: 0
-  work_ready: 6
-  deferred_count: 2
 - id: gate-monitoring-behind-optional-extra
   file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
   title: Gate monitoring behind a benchbox[monitoring] optional extra
