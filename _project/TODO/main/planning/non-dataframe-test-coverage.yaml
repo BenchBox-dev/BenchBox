@@ -398,7 +398,7 @@ work:
 
 - id: w22
   summary: "Test cloud platform SQL generation: Athena + Azure Synapse"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     platforms/athena.py (360 miss, 44.7%). Target: +120 stmts.
