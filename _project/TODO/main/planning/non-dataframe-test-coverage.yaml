@@ -323,7 +323,7 @@ work:
 
 - id: w18
   summary: "Test CLI commands: onboarding + df_tuning"
-  status: pending
+  status: done
   needs: [w16]
   description: |
     cli/onboarding.py: 192 stmts, 168 miss (12.5%).
