@@ -1,4 +1,4 @@
-generated_at: '2026-03-24T10:53:42.849362'
+generated_at: '2026-03-24T18:46:38.919793'
 total_items: 24
 items:
 - id: gate-monitoring-behind-optional-extra
@@ -33,8 +33,8 @@ items:
   - platforms
   estimated_effort: Large (3-4 weeks across work units)
   work_total: 25
-  work_done: 15
-  work_ready: 9
+  work_done: 24
+  work_ready: 1
   deferred_count: 4
   needs:
   - fix-coverage-theater
@@ -382,8 +382,8 @@ items:
   - quality
   estimated_effort: Large (2-3 weeks)
   work_total: 13
-  work_done: 10
-  work_ready: 2
+  work_done: 13
+  work_ready: 0
   deferred_count: 4
   needs:
   - fix-coverage-theater
