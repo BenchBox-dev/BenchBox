@@ -158,7 +158,7 @@ work:
 
 - id: w7
   summary: "Test datafusion_df.py and polars_df.py adapter operations"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     These adapters wrap real in-process engines — fully testable locally.
