@@ -340,7 +340,7 @@ work:
 
 - id: w19
   summary: "Test CLI commands: platform + output + dryrun"
-  status: pending
+  status: done
   needs: [w16]
   description: |
     cli/platform.py: 492 stmts, 178 miss (63.8%).
