@@ -306,7 +306,7 @@ work:
 
 - id: w17
   summary: "Test CLI commands via CliRunner: benchmarks + config"
-  status: pending
+  status: done
   needs: []
   description: |
     cli/benchmarks.py: 758 stmts, 229 miss (69.8%).
