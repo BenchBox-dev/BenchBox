@@ -181,7 +181,7 @@ work:
 
 - id: w7
   summary: "Test core runner orchestration and config"
-  status: pending
+  status: done
   needs: []
   description: |
     core/runner/runner.py: 611 stmts, 133 miss (76.0%).
