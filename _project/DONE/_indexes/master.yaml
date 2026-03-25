@@ -1,5 +1,5 @@
-generated_at: '2026-03-25T11:13:55.181289'
-total_items: 600
+generated_at: '2026-03-25T00:07:27.289983'
+total_items: 599
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3816,15 +3816,15 @@ items:
   category: Data Quality and Compatibility Issues
   priority: Medium
   status: Completed
-- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
-  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
+- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
+  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
   title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
   worktree: unknown
   category: Project Lifecycle Management
   priority: Medium
   status: Completed
-- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
-  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
+- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
+  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
   title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
   worktree: unknown
   category: Project Lifecycle Management
@@ -4472,15 +4472,15 @@ items:
   category: Data Quality and Compatibility Issues
   priority: Medium
   status: Completed
-- id: compressed-data-generation-completed
-  file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+- id: compressed-data-generation-completed-2
+  file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
   title: Compressed Data Generation ✅ COMPLETED
   worktree: unknown
   category: Performance and Efficiency
   priority: Medium
   status: Completed
-- id: compressed-data-generation-completed-2
-  file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+- id: compressed-data-generation-completed
+  file: DONE/unknown/planning/compressed-data-generation-completed.yaml
   title: Compressed Data Generation ✅ COMPLETED
   worktree: unknown
   category: Performance and Efficiency
@@ -6035,15 +6035,15 @@ items:
   work_total: 3
   work_done: 3
   work_ready: 0
-- id: simple-cloud-storage-path-support-completed
-  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+- id: simple-cloud-storage-path-support-completed-2
+  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
   title: Simple Cloud Storage Path Support ✅ COMPLETED
   worktree: unknown
   category: Platform Support and Deployment
   priority: Medium
   status: Completed
-- id: simple-cloud-storage-path-support-completed-2
-  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+- id: simple-cloud-storage-path-support-completed
+  file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
   title: Simple Cloud Storage Path Support ✅ COMPLETED
   worktree: unknown
   category: Platform Support and Deployment
@@ -6419,15 +6419,15 @@ items:
   category: User Experience and CLI Enhancement
   priority: Medium
   status: Completed
-- id: implement-or-remove-incomplete-cli-commands
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+- id: implement-or-remove-incomplete-cli-commands-2
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)
   priority: Medium
   status: Completed
-- id: implement-or-remove-incomplete-cli-commands-2
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+- id: implement-or-remove-incomplete-cli-commands
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)
