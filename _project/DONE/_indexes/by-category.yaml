@@ -1,4 +1,4 @@
-generated_at: '2026-03-24T09:37:55.280282'
+generated_at: '2026-03-25T00:05:35.186338'
 total_categories: 72
 categories:
   '"Bug Fixes & Reliability"':
@@ -1898,13 +1898,13 @@ categories:
   Performance and Efficiency:
     count: 9
     items:
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       status: Completed
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       status: Completed
@@ -2384,13 +2384,13 @@ categories:
       title: DuckDB TPC-DS and TPC-H Example Updates for Enhanced Tuning ✅ COMPLETED
       priority: Medium
       status: Completed
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Completed
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Completed
@@ -2437,13 +2437,13 @@ categories:
       title: ✅ Harmonize CLI Parameters with unified_runner (Eliminate Brittle test_type Logic)
       priority: High
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       status: Completed
@@ -2609,13 +2609,13 @@ categories:
       title: '"✅ Add Global Quiet Mode (`--quiet`/`-q`) to Suppress All Output"'
       priority: Medium
       status: Completed
-    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
-      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
+    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
+      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
       title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
       priority: Medium
       status: Completed
-    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
-      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
+    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
+      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
       title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
       priority: Medium
       status: Completed

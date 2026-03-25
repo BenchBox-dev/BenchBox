@@ -1,5 +1,5 @@
-generated_at: '2026-03-24T10:34:16.160645'
-total_items: 24
+generated_at: '2026-03-25T00:05:31.822834'
+total_items: 25
 items:
 - id: gate-monitoring-behind-optional-extra
   file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
@@ -300,6 +300,25 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: ballista-distributed-adapter
+  file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
+  title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform
+  - sql
+  - distributed
+  - datafusion
+  - arrow
+  - olap
+  - ballista
+  estimated_effort: Medium-High
+  work_total: 9
+  work_done: 0
+  work_ready: 1
 - id: singlestore-adapter
   file: TODO/platform-expansion/planning/singlestore-adapter.yaml
   title: Add SingleStore Platform Adapter

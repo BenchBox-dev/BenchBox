@@ -1,0 +1,290 @@
+id: ballista-distributed-adapter
+title: "Add Apache DataFusion Ballista Distributed Query Platform Adapter"
+worktree: platform-expansion
+priority: Medium
+status: Not Started
+category: Platform Expansion
+description: |
+  Add support for Apache DataFusion Ballista, a distributed SQL query engine built on
+  Apache DataFusion and Apache Arrow. Ballista extends DataFusion's single-node execution
+  to a distributed cluster architecture with a scheduler and multiple executor nodes.
+
+  Ballista is notable for:
+  - Distributed SQL execution across a cluster (scheduler + executors)
+  - Built on DataFusion — same SQL dialect, same query planning, same Arrow-native execution
+  - Python bindings via the `ballista` PyPI package (BallistaBuilder API)
+  - Supports Parquet, CSV, and other Arrow-compatible formats on shared storage
+  - Kubernetes-native deployment with Helm charts
+  - Standalone mode for single-machine testing
+  - Columnar execution via Apache Arrow with query vectorization
+
+  Since Ballista uses DataFusion internally, the existing DataFusion adapter provides
+  a strong foundation. The key differences are: (1) connection via BallistaBuilder to a
+  remote scheduler instead of a local SessionContext, (2) data must reside on shared
+  storage accessible to all executors (S3, GCS, HDFS, or shared filesystem), and
+  (3) distributed execution semantics (partitioning, shuffles, task scheduling).
+
+  Reference: https://github.com/apache/datafusion-ballista
+  Python package: https://pypi.org/project/ballista/
+
+context_sections:
+  "Technical Background": |
+    Ballista uses the same DataFusion SQL dialect and query planner. The Python API
+    exposes a `BallistaBuilder` that connects to a scheduler endpoint and returns a
+    `SessionContext` compatible with DataFusion's API. This means:
+    - Query transformer (datafusion_query_transformer.py) can be reused as-is
+    - Write transformer (datafusion_write_transformer.py) needs adaptation for shared storage
+    - Query plan parser (datafusion.py plan parser) can be reused as-is
+    - SQL dialect target remains "datafusion"
+
+    The `ballista` Python package wraps Rust bindings and provides:
+    ```python
+    from ballista import BallistaBuilder
+    ctx = BallistaBuilder().standalone().build()      # Local standalone
+    ctx = BallistaBuilder().remote("host:50050").build()  # Remote scheduler
+    ctx.sql("SELECT * FROM table")                     # Same DataFusion SQL API
+    ```
+
+  "Connection & Deployment": |
+    Ballista supports multiple deployment modes relevant to benchmarking:
+
+    1. **Standalone** (single process, scheduler + executor combined):
+       - Best for CI testing and small-scale benchmarks
+       - `BallistaBuilder().standalone().build()`
+       - No external dependencies
+
+    2. **Distributed** (separate scheduler + N executors):
+       - `BallistaBuilder().remote("scheduler_host:50050").build()`
+       - Scheduler default port: 50050
+       - Requires shared storage for data files
+       - Kubernetes Helm chart available for orchestration
+
+    3. **Docker Compose** (multi-container local cluster):
+       - Good for integration testing with multiple executors
+       - Simulates distributed execution on a single machine
+
+  "Data Loading Considerations": |
+    Unlike single-node DataFusion where data files are local, Ballista executors need
+    access to shared storage. Data loading strategy must account for:
+    - Object storage paths (s3://, gs://, hdfs://) for distributed mode
+    - Local filesystem paths for standalone mode (same as DataFusion adapter)
+    - Table registration via `ctx.register_parquet()` or `ctx.register_csv()`
+    - No COPY/INSERT support — data must be pre-staged as files
+    - External table pattern from DataFusion adapter transfers directly
+
+  "Adapter Architecture Decision": |
+    Two viable approaches:
+
+    Option A: **Standalone adapter** (ballista.py) that composes DataFusion adapter logic
+    - Pro: Clean separation, independent evolution
+    - Pro: Can handle distributed-specific concerns (shared storage, cluster config)
+    - Con: Some code duplication with DataFusion adapter
+
+    Option B: **Deployment mode on DataFusion adapter** (datafusion:distributed)
+    - Pro: Maximum code reuse, minimal new code
+    - Con: Conflates single-node and distributed concerns
+    - Con: Connection setup is fundamentally different
+
+    **Recommended: Option A** — Create a new `BallistaAdapter` class that reuses
+    DataFusion's query/write transformers and plan parser, but has its own connection
+    management and data loading logic. This follows the pattern used by ClickHouse
+    (separate adapter, shared mixins).
+
+metadata:
+  tags:
+  - platform
+  - sql
+  - distributed
+  - datafusion
+  - arrow
+  - olap
+  - ballista
+  estimated_effort: Medium-High
+  created_date: "2026-03-24"
+
+deps:
+  needs: []
+
+technical_requirements:
+  dependencies:
+  - "ballista (PyPI package — Python bindings for Ballista)"
+  - "pyarrow>=10.0.0 (already a project dependency)"
+  compatibility: |
+    Ballista uses the same DataFusion SQL dialect. All TPC-H query transformations
+    from datafusion_query_transformer.py apply directly. TPC-DS compatibility
+    depends on DataFusion's SQL coverage (same limitations as DataFusion adapter).
+
+files_affected:
+  added:
+  - "benchbox/platforms/ballista.py"
+  - "tests/unit/platforms/test_ballista_adapter.py"
+  - "docs/platforms/ballista.md"
+  modified:
+  - "benchbox/platforms/__init__.py (add lazy import for BallistaAdapter)"
+  - "benchbox/core/platform_registry.py (add ballista platform metadata)"
+  - "pyproject.toml (add ballista optional dependency)"
+
+must_preserve:
+- "All existing DataFusion adapter tests pass: uv run -- python -m pytest tests/unit/platforms/test_datafusion_adapter.py -v"
+- "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+- "DataFusion query transformer behavior unchanged (reused, not forked)"
+- "Platform registry autodiscovery continues working for all existing platforms"
+- "DataFusion write transformer behavior unchanged (reused, not forked)"
+
+anti_patterns:
+- "DO NOT fork or modify DataFusionQueryTransformer — because Ballista uses the same DataFusion SQL dialect — import and reuse it directly"
+- "DO NOT modify the existing DataFusion adapter — because Ballista is a separate platform — create a new ballista.py file"
+- "DO NOT hardcode scheduler addresses — because deployment varies — make host:port configurable with sensible defaults"
+- "DO NOT assume local filesystem access for data in distributed mode — because executors read from shared storage — support object storage URIs (s3://, gs://)"
+- "DO NOT skip standalone mode support — because it enables CI testing without a cluster — support both standalone and remote deployment modes"
+
+verification:
+- description: "Ballista adapter imports correctly"
+  command: "uv run -- python -c \"from benchbox.platforms.ballista import BallistaAdapter; print('import OK')\""
+  expected_output: "import OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_ballista_adapter.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Existing platform tests unaffected"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Platform registry lists ballista"
+  command: "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry; r = PlatformRegistry(); print('ballista' in r.get_all_platforms())\""
+  expected_output: "True"
+- description: "Standalone mode smoke test (if ballista installed)"
+  command: "uv run -- python -c \"from ballista import BallistaBuilder; ctx = BallistaBuilder().standalone().build(); df = ctx.sql('SELECT 1 AS x'); print(df.collect())\""
+  expected_output: "Arrow batch with value 1"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/ballista.py"
+  - "tests/unit/platforms/test_ballista_adapter.py"
+  - "benchbox/platforms/__init__.py"
+  - "benchbox/core/platform_registry.py"
+  - "pyproject.toml"
+  - "docs/platforms/ballista.md"
+  do_not_modify:
+  - "benchbox/platforms/datafusion.py"
+  - "benchbox/platforms/datafusion_query_transformer.py"
+  - "benchbox/platforms/datafusion_write_transformer.py"
+  - "benchbox/core/query_plans/parsers/datafusion.py"
+  - "benchbox/core/runner/"
+
+success_metrics:
+- "BallistaAdapter passes TPC-H Q1, Q6, Q14 in standalone mode at SF 0.01"
+- "Standalone mode works without external cluster infrastructure"
+- "Remote mode connects to scheduler when host:port provided"
+- "Query transformer reuse confirmed (no forked copies)"
+- "Plan parser reuse confirmed (DataFusion EXPLAIN output is identical)"
+- "Documentation complete with standalone and distributed examples"
+- "Platform discoverable via benchbox run --platform ballista"
+
+open_questions:
+- "What is the minimum stable version of the `ballista` PyPI package to target?"
+- "Does Ballista's Python BallistaBuilder API support configuration options like memory limits and target partitions?"
+- "How mature are the Python bindings — are there known gaps vs the Rust API?"
+- "Should we support a Docker Compose deployment mode for integration testing?"
+- "Can Ballista register Delta Lake and Iceberg tables, or only Parquet/CSV?"
+- "What is the performance overhead of standalone mode vs direct DataFusion?"
+
+work:
+- id: w1
+  summary: "Research Ballista Python API surface and version compatibility"
+  description: |
+    Install the `ballista` package, test BallistaBuilder standalone mode, document
+    available configuration options, and verify API compatibility with DataFusion's
+    SessionContext. Confirm that ctx.sql() returns compatible DataFrame objects.
+  status: pending
+
+- id: w2
+  summary: "Create BallistaAdapter class with standalone and remote connection modes"
+  description: |
+    Create benchbox/platforms/ballista.py with BallistaAdapter extending PlatformAdapter.
+    Implement create_connection() using BallistaBuilder for both standalone (local) and
+    remote (scheduler) deployment modes. Reuse DataFusionConnectionCompat and
+    DataFusionCursorCompat wrappers since the SessionContext API is identical.
+    Add CLI arguments: --ballista-scheduler-host, --ballista-scheduler-port,
+    --ballista-mode (standalone/remote), --ballista-data-dir.
+  status: pending
+  needs: [w1]
+
+- id: w3
+  summary: "Implement data loading for standalone mode (local filesystem)"
+  description: |
+    Implement create_schema() and bulk_load_table() for standalone mode where data
+    files are on the local filesystem. Reuse DataFusion's register_parquet/register_csv
+    approach. Support the existing DataFusion write transformer for COPY-to-external-table
+    conversion. This should closely mirror DataFusionAdapter's data loading logic.
+  status: pending
+  needs: [w2]
+
+- id: w4
+  summary: "Implement data loading for distributed mode (shared storage)"
+  description: |
+    Extend data loading to support shared storage URIs (s3://, gs://, file://) for
+    distributed mode where executors need access to data files. Add configuration for
+    storage prefix (--ballista-storage-prefix). Handle table registration with remote
+    paths. This is the primary differentiator from the DataFusion adapter.
+  status: pending
+  needs: [w3]
+
+- id: w5
+  summary: "Wire up query transformer and plan parser reuse"
+  description: |
+    Import and reuse DataFusionQueryTransformer for TPC-H query compatibility.
+    Configure get_target_dialect() to return "datafusion". Verify that Ballista's
+    EXPLAIN output matches DataFusion's format so the existing plan parser works.
+    Override preprocess_query() to apply the transformer, matching DataFusion adapter.
+  status: pending
+  needs: [w2]
+
+- id: w6
+  summary: "Register Ballista in platform registry and lazy loading"
+  description: |
+    Add "ballista" entry to PlatformRegistry with metadata (display_name, description,
+    capabilities, requirements, deployment_modes for standalone and distributed).
+    Add BallistaAdapter to _LAZY_ADAPTERS in platforms/__init__.py.
+    Add `ballista = ["ballista>=0.12.0"]` to pyproject.toml optional dependencies.
+  status: pending
+  needs: [w2]
+
+- id: w7
+  summary: "Add comprehensive unit tests"
+  description: |
+    Create tests/unit/platforms/test_ballista_adapter.py with tests for:
+    - Adapter initialization (standalone and remote configs)
+    - from_config() factory method
+    - CLI argument parsing
+    - Platform info reporting
+    - Connection creation (mocked BallistaBuilder)
+    - Query transformer integration
+    - Data loading path construction
+    - Graceful handling when ballista package not installed
+    Use pytest.mark.unit and pytest.mark.fast markers.
+  status: pending
+  needs: [w5, w6]
+
+- id: w8
+  summary: "Run TPC-H validation in standalone mode at SF 0.01"
+  description: |
+    Execute TPC-H benchmark against Ballista in standalone mode:
+    benchbox run --platform ballista --benchmark tpch --scale 0.01
+    Verify all 22 queries execute successfully. Document any query failures
+    and their root causes. Compare results against DataFusion adapter output
+    for consistency.
+  status: pending
+  needs: [w3, w5]
+
+- id: w9
+  summary: "Create platform documentation"
+  description: |
+    Create docs/platforms/ballista.md with:
+    - Quick start (standalone mode)
+    - CLI usage examples (standalone and distributed)
+    - Configuration reference (all CLI arguments)
+    - Deployment guide (standalone, Docker Compose, Kubernetes)
+    - Performance tuning notes
+    - Comparison with single-node DataFusion
+    - Known limitations
+  status: pending
+  needs: [w7, w8]
