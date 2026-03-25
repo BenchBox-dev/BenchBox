@@ -204,7 +204,7 @@ work:
 
 - id: w8
   summary: "Test Redshift SQL generation and config validation"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/redshift.py: 1,075 stmts, 639 miss (37.1%).
@@ -222,7 +222,7 @@ work:
 
 - id: w9
   summary: "Test Databricks SQL generation and config validation"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/databricks/adapter.py: 1,036 stmts, 618 miss (35.3%).
@@ -240,7 +240,7 @@ work:
 
 - id: w10
   summary: "Test BigQuery SQL generation and config validation"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/bigquery.py: 838 stmts, 514 miss (34.6%).
@@ -258,7 +258,7 @@ work:
 
 - id: w11
   summary: "Test Snowflake SQL generation and config validation"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/snowflake.py: 730 stmts, 405 miss (40.8%).
@@ -425,15 +425,15 @@ metadata:
       w5  CLI compare/bench:  250
       w6  DF benchmark_suite: 130
       w7  runner/config/mixin:125
-      w8a Redshift:           280
-      w8b Databricks:         280
-      w8c BigQuery:           240
-      w8d Snowflake:          200
-      w9  cloud tier-2:       500
-      w10 base.py:             90
-      w11 utils:              230
-      w12 read_primitives DF: 280
-      w13 metadata+DF+runner: 300
+      w8  Redshift:           280
+      w9  Databricks:         280
+      w10 BigQuery:           240
+      w11 Snowflake:          200
+      w12 cloud tier-2:       500
+      w13 base.py:             90
+      w14 utils:              230
+      w15 read_primitives DF: 280
+      w16 metadata+DF+runner: 300
       TOTAL:                4,135
     Gap after omit: 3,928 lines → 207 line buffer (5%)
 
