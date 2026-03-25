@@ -11,11 +11,18 @@ description: |
   1. SCOPE REFINEMENT: Omit 3,526 stmts of untestable bulk (TPC-DI ETL complex
      transformations that require full CDC infrastructure, experimental concurrency
      code, ClickBench DF queries). This immediately adjusts the denominator and
-     boosts measured coverage to ~76.3%.
-  2. TARGETED TESTS: Cover ~3,928 additional lines from high-value locally-testable
-     files. Focus on base adapter, unified_frame, CLI commands, and DF benchmark
-     suite — all testable with real DuckDB/Polars/DataFusion connections or Click
-     CliRunner.
+     boosts measured coverage to ~76.3%. Gap after omit: 3,928 lines.
+  2. TARGETED TESTS: Cover ~4,130 additional lines (5% buffer over gap) from
+     high-value locally-testable files across 5 categories:
+     - Core/CLI/DF framework: ~1,600 lines (base adapter, unified_frame, CLI
+       commands, DF benchmark_suite, runner, base.py, utils)
+     - Cloud SQL generation (top 4): ~1,000 lines (Redshift, Databricks, BigQuery,
+       Snowflake — config validation + SQL string assertions)
+     - Cloud SQL generation (tier 2): ~500 lines (Athena, Synapse, Firebolt,
+       ClickHouse, PostgreSQL, Trino)
+     - DF query implementations: ~280 lines (read_primitives DF queries)
+     - Remaining high-miss modules: ~350 lines (metadata_primitives, DataFusion
+       adapter, TPC-DS runner gaps)
 
   Anti-coverage-theater principles:
   - Every test must call a function and assert on specific output values
@@ -66,12 +73,12 @@ work:
     Coverage jumps from 71.4% → ~76.3%.
 
 - id: w2
-  summary: "Test base adapter concrete methods to 80%"
+  summary: "Test base adapter concrete methods to 85%"
   status: pending
   needs: [w1]
   description: |
     platforms/base/adapter.py: 2,171 stmts, 640 miss (67.9%).
-    Target: push to 80% (~270 stmts gained).
+    Target: push to 85% (~350 stmts gained).
 
     Use DuckDB adapter as concrete implementation:
     - _execute_with_retry: transient error retry with backoff
@@ -92,7 +99,7 @@ work:
   needs: []
   description: |
     platforms/dataframe/unified_frame.py: 1,633 stmts, 603 miss (58.7%).
-    Target: push to 75% (~270 stmts gained).
+    Target: push to 80% (~350 stmts gained).
 
     Prior work units (w2-w4 of dataframe-test-coverage TODO) covered column,
     filter, sort, aggregation, join, window, and expression operations.
@@ -114,7 +121,7 @@ work:
   needs: []
   description: |
     cli/commands/run.py: 1,127 stmts, 424 miss (58.0%).
-    Target: push to 75% (~190 stmts gained).
+    Target: push to 78% (~260 stmts gained).
 
     Test via Click CliRunner (no real benchmark execution):
     - Option parsing: --platform, --benchmark, --scale, --queries, --phases
@@ -136,24 +143,24 @@ work:
   needs: [w4]
   description: |
     cli/commands/compare.py: 875 stmts, 232 miss (71.2%).
-    Target: push to 80% (~80 stmts gained).
+    Target: push to 82% (~95 stmts gained).
     - 2-way and 3-way comparison with fixture result JSON files
     - Table formatting: column alignment, sorting
     - Metric calculation: speedup, regression detection
 
     cli/benchmarks.py: 758 stmts, 198 miss (72.5%).
-    Target: push to 80% (~55 stmts gained).
+    Target: push to 82% (~70 stmts gained).
     - Benchmark listing output format
     - Benchmark info display for each benchmark type
     - Query listing per benchmark
 
     cli/platform.py: 492 stmts, 163 miss (63.5%).
-    Target: push to 75% (~60 stmts gained).
+    Target: push to 80% (~85 stmts gained).
     - Platform listing: all, by category, with details
     - Platform info display
     - Platform validation checks
 
-    Combined target: ~195 stmts gained.
+    Combined target: ~250 stmts gained.
 
 - id: w6
   summary: "Test DataFrame benchmark_suite orchestration"
@@ -161,7 +168,7 @@ work:
   needs: []
   description: |
     core/dataframe/benchmark_suite.py: 555 stmts, 194 miss (61.2%).
-    Target: push to 78% (~95 stmts gained).
+    Target: push to 80% (~130 stmts gained).
 
     - Suite initialization with config (scale_factor, engine, benchmark_type)
     - Data generation phase: creates correct tables with expected schemas
@@ -178,64 +185,112 @@ work:
   needs: []
   description: |
     core/runner/runner.py: 611 stmts, 133 miss (76.0%).
-    Target: push to 85% (~55 stmts gained).
+    Target: push to 87% (~70 stmts gained).
     - Run configuration validation
     - Phase orchestration (generate, load, warmup, power, throughput)
     - Result collection and formatting
     - Error recovery paths
 
     core/config_utils.py: 251 stmts, 65 miss (69.0%).
-    Target: push to 82% (~35 stmts gained).
+    Target: push to 85% (~40 stmts gained).
     - Config loading and merging
     - Default values
     - Environment variable override
 
     core/benchmark_mixins.py: 125 stmts, 22 miss (76.0%).
-    Target: push to 85% (~10 stmts gained).
+    Target: push to 90% (~15 stmts gained).
 
-    Combined target: ~100 stmts gained.
+    Combined target: ~125 stmts gained.
 
-- id: w8
-  summary: "Test cloud platform SQL generation: remaining platforms"
+- id: w8a
+  summary: "Test Redshift SQL generation and config validation"
   status: pending
   needs: []
   description: |
-    Assert on generated SQL strings, NOT mock.called.
+    platforms/redshift.py: 1,075 stmts, 639 miss (37.1%).
+    Target: push to 63% (~280 stmts gained).
 
-    Top targets by miss count (test config/validation and SQL generation only):
-    - platforms/redshift.py: 639 miss → target +200 stmts
-      COPY FROM S3, UNLOAD, CREATE TABLE with dist/sort keys, type mapping
-    - platforms/databricks/adapter.py: 618 miss → target +200 stmts
-      Unity Catalog naming, COPY INTO, Delta operations, config validation
-    - platforms/bigquery.py: 514 miss → target +180 stmts
-      BQ-specific SQL, dataset/table naming, partitioning/clustering DDL
-    - platforms/snowflake.py: 405 miss → target +150 stmts
-      COPY INTO, stage management, warehouse config
+    Assert on generated SQL strings, NOT mock.called:
+    - COPY FROM S3 command generation: table name, s3 path, IAM role, format options
+    - UNLOAD command generation: query text, s3 path, format, compression
+    - CREATE TABLE with DISTKEY/SORTKEY: column selection, key validation
+    - Type mapping: Redshift-specific types (SUPER, GEOMETRY, TIMESTAMPTZ)
+    - Connection config validation: host, port, SSL, IAM role resolution
+    - Error handling: invalid dist/sort key configs, missing required fields
 
-    These are the same platforms from non-dataframe-test-coverage w20-w22
-    that were marked done but clearly still have significant gaps. The prior
-    tests covered some SQL paths; this work unit targets the remaining
-    uncovered connection config, type mapping, and DDL generation paths.
+    Existing tests: tests/unit/platforms/test_redshift_adapter.py — extend.
 
-    Combined target: ~730 stmts gained.
+- id: w8b
+  summary: "Test Databricks SQL generation and config validation"
+  status: pending
+  needs: []
+  description: |
+    platforms/databricks/adapter.py: 1,036 stmts, 618 miss (35.3%).
+    Target: push to 62% (~280 stmts gained).
+
+    Assert on generated SQL strings:
+    - Unity Catalog three-level naming: catalog.schema.table construction
+    - COPY INTO generation: from cloud storage with format options
+    - Delta table operations: OPTIMIZE, VACUUM, Z-ORDER SQL
+    - Config validation: cluster vs SQL warehouse settings, auth methods
+    - Type mapping: Databricks-specific types
+    - Error handling: invalid catalog/schema names, missing warehouse
+
+    Existing tests: tests/unit/platforms/test_databricks_adapter.py — extend.
+
+- id: w8c
+  summary: "Test BigQuery SQL generation and config validation"
+  status: pending
+  needs: []
+  description: |
+    platforms/bigquery.py: 838 stmts, 514 miss (34.6%).
+    Target: push to 63% (~240 stmts gained).
+
+    Assert on generated SQL strings:
+    - Query transformation: BQ-specific SQL syntax differences
+    - Dataset/table naming: project.dataset.table construction
+    - Partitioning DDL: time/range partitioning, clustering columns
+    - LOAD job config construction: format, compression, write disposition
+    - Config validation: project ID, dataset, service account path
+    - Type mapping: BQ-specific types (STRUCT, ARRAY, GEOGRAPHY)
+
+    Existing tests: tests/unit/platforms/test_bigquery_adapter.py — extend.
+
+- id: w8d
+  summary: "Test Snowflake SQL generation and config validation"
+  status: pending
+  needs: []
+  description: |
+    platforms/snowflake.py: 730 stmts, 405 miss (40.8%).
+    Target: push to 68% (~200 stmts gained).
+
+    Assert on generated SQL strings:
+    - COPY INTO generation: from stage, file format options
+    - Stage management: CREATE STAGE DDL, stage path construction
+    - Warehouse config: size, auto-suspend, scaling policy SQL
+    - Config validation: account, user, warehouse, role, auth method
+    - Type mapping: Snowflake-specific types (VARIANT, OBJECT, ARRAY)
+
+    Existing tests: tests/unit/platforms/test_snowflake_adapter.py — extend.
 
 - id: w9
   summary: "Test remaining cloud platforms and adapters"
   status: pending
-  needs: [w8]
+  needs: [w8a]
   description: |
     Second tier of cloud platforms (smaller files, less miss):
-    - platforms/athena.py: 360 miss → target +120 stmts
-    - platforms/azure_synapse.py: 254 miss → target +100 stmts
-    - platforms/firebolt.py: 255 miss → target +80 stmts
-    - platforms/clickhouse_cloud.py: 159 miss → target +60 stmts
-    - platforms/postgresql.py: 158 miss → target +50 stmts
-    - platforms/trino.py: 139 miss → target +40 stmts
+    - platforms/athena.py: 360 miss → target +130 stmts
+    - platforms/azure_synapse.py: 254 miss → target +110 stmts
+    - platforms/firebolt.py: 255 miss → target +90 stmts
+    - platforms/clickhouse_cloud.py: 159 miss → target +70 stmts
+    - platforms/postgresql.py: 158 miss → target +55 stmts
+    - platforms/trino.py: 139 miss → target +45 stmts
 
     Same pattern: test SQL generation and config validation with string
-    assertions, no real credentials needed.
+    assertions, no real credentials needed. Follow the per-platform test
+    patterns established in w8a-w8d.
 
-    Combined target: ~450 stmts gained.
+    Combined target: ~500 stmts gained.
 
 - id: w10
   summary: "Test base.py BaseBenchmark abstract methods"
@@ -243,7 +298,7 @@ work:
   needs: []
   description: |
     base.py: 277 stmts, 148 miss (42.4%).
-    Target: push to 70% (~75 stmts gained).
+    Target: push to 75% (~90 stmts gained).
 
     - Config validation: scale factor, output dir, benchmark name
     - Default method implementations in abstract base
@@ -255,24 +310,76 @@ work:
   status: pending
   needs: []
   description: |
-    utils/tpc_compilation.py: 126 miss (60.4%) → target +70 stmts
+    utils/tpc_compilation.py: 126 miss (60.4%) → target +80 stmts
     - Binary detection, version parsing, platform detection
 
-    utils/resource_limits.py: 50 miss (73.0%) → target +30 stmts
+    utils/resource_limits.py: 50 miss (73.0%) → target +35 stmts
     - Memory checks, disk space validation
 
-    utils/cloud_storage.py: 81 miss (71.1%) → target +40 stmts
+    utils/cloud_storage.py: 81 miss (71.1%) → target +50 stmts
     - Path creation, cloud detection, local fallback
 
-    core/tpch/streams.py: 92 miss (51.0%) → target +50 stmts
+    core/tpch/streams.py: 92 miss (51.0%) → target +65 stmts
     - Stream permutation, query ordering, seed handling
 
-    Combined target: ~190 stmts gained.
+    Combined target: ~230 stmts gained.
 
 - id: w12
+  summary: "Test read_primitives remaining DF query implementations"
+  status: pending
+  needs: []
+  description: |
+    core/read_primitives/dataframe_queries.py: 1,872 stmts, 666 miss (64.4%).
+    Target: push to 80% (~280 stmts gained).
+
+    Prior work (dataframe-test-coverage w12) covered the most common
+    operations. This work unit targets the remaining uncovered query
+    functions — primarily the more complex operations that weren't hit
+    by the parametrized sweep:
+    - Multi-table join operations with aggregation
+    - Window functions with complex partition/order specs
+    - Nested subquery patterns (correlated and uncorrelated)
+    - Type-specific operations (decimal arithmetic, date ranges)
+    - Edge cases: empty input handling, null propagation
+
+    Use real Polars and Pandas with small test DataFrames.
+    Follow patterns in tests/unit/core/read_primitives/test_read_primitives_dataframe.py.
+
+- id: w13
+  summary: "Test metadata_primitives, DataFusion adapter, and TPC-DS runner gaps"
+  status: pending
+  needs: []
+  description: |
+    Three mid-coverage files with significant remaining gaps:
+
+    core/metadata_primitives/dataframe_operations.py: 609 stmts, 303 miss (50.6%).
+    Target: push to 72% (~130 stmts gained).
+    - Metadata query operations (table list, column info, statistics)
+    - Schema introspection operations
+    - Use DuckDB as test engine
+
+    platforms/datafusion.py: 701 stmts, 208 miss (67.3%).
+    Target: push to 80% (~90 stmts gained).
+    - Session creation, table registration, catalog ops
+    - Plan capture: EXPLAIN output parsing
+    - External table support: Parquet file registration
+    - Write operations: CREATE TABLE AS SELECT
+    Follow patterns in tests/unit/platforms/test_datafusion_real_connection.py.
+
+    core/tpcds/benchmark/runner.py: 673 stmts, 224 miss (62.7%).
+    Target: push to 75% (~80 stmts gained).
+    - Data loading: CSV parsing with delimiter detection
+    - Table loading order with FK dependency resolution
+    - Maintenance test delegation and result mapping
+    - Validation engine integration
+    Follow patterns in tests/unit/core/tpcds/benchmark/test_tpcds_runner_streams.py.
+
+    Combined target: ~300 stmts gained.
+
+- id: w14
   summary: "Ratchet fail_under to 80 and align CI config"
   status: pending
-  needs: [w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11]
+  needs: [w1, w2, w3, w4, w5, w6, w7, w8a, w8b, w8c, w8d, w9, w10, w11, w12, w13]
   description: |
     Final gate after all coverage work lands:
     1. Run full coverage report and confirm >= 80%
@@ -312,9 +419,25 @@ metadata:
     gap_lines: 6044
   coverage_math: |
     Step 1 (w1 scope refinement): omit 3,526 untestable stmts → 76.3%
-    Step 2 (w2-w11 targeted tests): cover ~3,928 lines → 80%+
-    Budget: 2,465 stmts from core/cli/df + 730 cloud SQL + 450 cloud tier-2
-            + 75 base + 190 utils = ~3,910 stmts
+    Step 2 (w2-w13 targeted tests): cover ~4,135 lines → 80%+
+    Budget by work unit:
+      w2  base adapter:       350
+      w3  unified_frame:      350
+      w4  CLI run:            260
+      w5  CLI compare/bench:  250
+      w6  DF benchmark_suite: 130
+      w7  runner/config/mixin:125
+      w8a Redshift:           280
+      w8b Databricks:         280
+      w8c BigQuery:           240
+      w8d Snowflake:          200
+      w9  cloud tier-2:       500
+      w10 base.py:             90
+      w11 utils:              230
+      w12 read_primitives DF: 280
+      w13 metadata+DF+runner: 300
+      TOTAL:                4,135
+    Gap after omit: 3,928 lines → 207 line buffer (5%)
 
 verification:
   command: |

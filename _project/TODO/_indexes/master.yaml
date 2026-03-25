@@ -1,4 +1,4 @@
-generated_at: '2026-03-25T07:55:50.115438'
+generated_at: '2026-03-25T09:31:55.557929'
 total_items: 25
 items:
 - id: gate-monitoring-behind-optional-extra
@@ -69,9 +69,9 @@ items:
   - coverage
   - quality
   estimated_effort: Large (2-3 weeks)
-  work_total: 12
+  work_total: 17
   work_done: 0
-  work_ready: 8
+  work_ready: 13
   deferred_count: 4
   needs:
   - dataframe-test-coverage
