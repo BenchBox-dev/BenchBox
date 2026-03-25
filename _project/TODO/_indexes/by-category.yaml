@@ -1,4 +1,4 @@
-generated_at: '2026-03-25T09:31:55.557962'
+generated_at: '2026-03-25T10:24:51.824856'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -128,23 +128,18 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 3
+    count: 2
     items:
-    - id: dataframe-test-coverage
-      file: TODO/main/planning/dataframe-test-coverage.yaml
-      title: Increase DataFrame subsystem test coverage with behavioral tests
-      priority: Medium-High
-      status: In Progress
     - id: non-dataframe-test-coverage
       file: TODO/main/planning/non-dataframe-test-coverage.yaml
       title: Increase core, CLI, platform, and utils test coverage to 80%
       priority: High
       status: In Progress
     - id: coverage-to-80-percent
-      file: TODO/main/planning/coverage-to-80-percent.yaml
+      file: TODO/main/active/coverage-to-80-percent.yaml
       title: Reach 80% test coverage through scope refinement and targeted behavioral tests
       priority: High
-      status: Not Started
+      status: In Progress
   User Experience:
     count: 1
     items:

@@ -1,4 +1,4 @@
-generated_at: '2026-03-25T09:31:57.005040'
+generated_at: '2026-03-25T10:24:53.220395'
 total_categories: 72
 categories:
   '"Bug Fixes & Reliability"':
@@ -2836,12 +2836,17 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 7
+    count: 8
     items:
     - id: fix-coverage-theater
       file: DONE/main/active/fix-coverage-theater.yaml
       title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
       priority: High
+      status: Completed
+    - id: dataframe-test-coverage
+      file: DONE/main/planning/dataframe-test-coverage.yaml
+      title: Increase DataFrame subsystem test coverage with behavioral tests
+      priority: Medium-High
       status: Completed
     - id: migrate-ascii-chart-tests-to-textcharts
       file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml

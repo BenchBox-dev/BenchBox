@@ -1,5 +1,5 @@
-generated_at: '2026-03-25T09:31:57.004752'
-total_items: 599
+generated_at: '2026-03-25T10:24:53.220085'
+total_items: 600
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7315,6 +7315,26 @@ items:
   work_total: 7
   work_done: 7
   work_ready: 0
+- id: dataframe-test-coverage
+  file: DONE/main/planning/dataframe-test-coverage.yaml
+  title: Increase DataFrame subsystem test coverage with behavioral tests
+  worktree: main
+  category: Testing & Quality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - testing
+  - coverage
+  - dataframe
+  - quality
+  estimated_effort: Large (2-3 weeks)
+  completed_date: '2026-03-25'
+  work_total: 13
+  work_done: 13
+  work_ready: 0
+  deferred_count: 4
+  needs:
+  - fix-coverage-theater
 - id: integrate-write-primitives-dataframe-mode
   file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml
   title: Integrate Write Primitives DataFrame Mode with Runner and Registry

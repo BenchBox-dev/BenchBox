@@ -2,7 +2,8 @@ id: dataframe-test-coverage
 title: "Increase DataFrame subsystem test coverage with behavioral tests"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-03-25"
 description: |
   The DataFrame subsystem spans three layers totaling 21,643 statements at 50.7%
   coverage — the single largest coverage gap in the project.

@@ -2,7 +2,7 @@ id: coverage-to-80-percent
 title: "Reach 80% test coverage through scope refinement and targeted behavioral tests"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 description: |
   Coverage is at 71.4% (81,722 / 109,707 stmts). Target is 80% (87,766 covered).
   Gap: 6,044 more lines to cover.
@@ -43,7 +43,7 @@ deps:
 work:
 - id: w1
   summary: "Omit untestable bulk from coverage scope"
-  status: pending
+  status: done
   needs: []
   description: |
     Add to pyproject.toml [tool.coverage.run] omit:
@@ -202,7 +202,7 @@ work:
 
     Combined target: ~125 stmts gained.
 
-- id: w8a
+- id: w8
   summary: "Test Redshift SQL generation and config validation"
   status: pending
   needs: []
@@ -220,7 +220,7 @@ work:
 
     Existing tests: tests/unit/platforms/test_redshift_adapter.py — extend.
 
-- id: w8b
+- id: w9
   summary: "Test Databricks SQL generation and config validation"
   status: pending
   needs: []
@@ -238,7 +238,7 @@ work:
 
     Existing tests: tests/unit/platforms/test_databricks_adapter.py — extend.
 
-- id: w8c
+- id: w10
   summary: "Test BigQuery SQL generation and config validation"
   status: pending
   needs: []
@@ -256,7 +256,7 @@ work:
 
     Existing tests: tests/unit/platforms/test_bigquery_adapter.py — extend.
 
-- id: w8d
+- id: w11
   summary: "Test Snowflake SQL generation and config validation"
   status: pending
   needs: []
@@ -273,10 +273,10 @@ work:
 
     Existing tests: tests/unit/platforms/test_snowflake_adapter.py — extend.
 
-- id: w9
+- id: w12
   summary: "Test remaining cloud platforms and adapters"
   status: pending
-  needs: [w8a]
+  needs: [w8]
   description: |
     Second tier of cloud platforms (smaller files, less miss):
     - platforms/athena.py: 360 miss → target +130 stmts
@@ -288,11 +288,11 @@ work:
 
     Same pattern: test SQL generation and config validation with string
     assertions, no real credentials needed. Follow the per-platform test
-    patterns established in w8a-w8d.
+    patterns established in w8-w11.
 
     Combined target: ~500 stmts gained.
 
-- id: w10
+- id: w13
   summary: "Test base.py BaseBenchmark abstract methods"
   status: pending
   needs: []
@@ -305,7 +305,7 @@ work:
     - Property accessors
     - Error path handling
 
-- id: w11
+- id: w14
   summary: "Test remaining utils and supporting modules"
   status: pending
   needs: []
@@ -324,7 +324,7 @@ work:
 
     Combined target: ~230 stmts gained.
 
-- id: w12
+- id: w15
   summary: "Test read_primitives remaining DF query implementations"
   status: pending
   needs: []
@@ -345,7 +345,7 @@ work:
     Use real Polars and Pandas with small test DataFrames.
     Follow patterns in tests/unit/core/read_primitives/test_read_primitives_dataframe.py.
 
-- id: w13
+- id: w16
   summary: "Test metadata_primitives, DataFusion adapter, and TPC-DS runner gaps"
   status: pending
   needs: []
@@ -376,10 +376,10 @@ work:
 
     Combined target: ~300 stmts gained.
 
-- id: w14
+- id: w17
   summary: "Ratchet fail_under to 80 and align CI config"
   status: pending
-  needs: [w1, w2, w3, w4, w5, w6, w7, w8a, w8b, w8c, w8d, w9, w10, w11, w12, w13]
+  needs: [w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15, w16]
   description: |
     Final gate after all coverage work lands:
     1. Run full coverage report and confirm >= 80%
@@ -390,18 +390,16 @@ work:
 
 deferred:
 - summary: "TPC-DI ETL deep coverage (transformations.py, batch.py, scd_processor.py)"
-  reason: "Requires full CDC/SCD pipeline infrastructure with staged incremental loads.
-    2,226 missing statements but extremely high effort. Omitted from scope and deferred
-    until TPC-DI ETL testing infrastructure is built."
+  reason: "Requires full CDC/SCD pipeline infrastructure with staged incremental loads. 2,226 missing statements but extremely
+    high effort. Omitted from scope and deferred until TPC-DI ETL testing infrastructure is built."
 - summary: "Cloud Spark adapters (EMR Serverless, Dataproc Serverless, Synapse Spark)"
-  reason: "Require real cloud Spark sessions or complex mocking. Better covered by
-    platform-live-integration-tests TODO."
+  reason: "Require real cloud Spark sessions or complex mocking. Better covered by platform-live-integration-tests TODO."
 - summary: "PySpark and LakeSail DataFrame adapters"
-  reason: "Require external engines (Spark, LakeSail server). Config/validation logic
-    was covered in dataframe-test-coverage w13; remaining gaps are engine-specific."
+  reason: "Require external engines (Spark, LakeSail server). Config/validation logic was covered in dataframe-test-coverage
+    w13; remaining gaps are engine-specific."
 - summary: "Experimental modules (GPU benchmark, NL2SQL evaluator)"
-  reason: "Experimental code changes frequently. Testing to 80% is wasted effort if
-    modules are restructured. Cover after modules graduate from experimental."
+  reason: "Experimental code changes frequently. Testing to 80% is wasted effort if modules are restructured. Cover after
+    modules graduate from experimental."
 
 metadata:
   tags:
@@ -452,19 +450,18 @@ must_preserve:
 - "Coverage config in pyproject.toml remains source of truth for local dev"
 
 anti_patterns:
-- "DO NOT write import-only tests — because importing a module is not testing it —
-  every test must call a function and assert on its output"
-- "DO NOT add tests just to hit line coverage — because a test that can never fail
-  is worse than no test — every test should fail if the code under test is broken"
-- "DO NOT mock internal methods to test dispatchers — because you're testing mock
-  wiring not behavior — use real DuckDB/Polars/DataFusion wherever possible"
-- "DO NOT test cloud SQL generation by asserting mock.called — because that doesn't
-  verify SQL correctness — assert the generated SQL string contains expected clauses"
-- "DO NOT put 'coverage' in test filenames — because test names should describe what
-  they verify — name after the behavior being tested"
-- "DO NOT omit files from coverage just because they are hard to test — because that
-  hides real gaps — only omit genuinely untestable code (external infrastructure,
-  experimental, bulk mechanical translations)"
+- "DO NOT write import-only tests — because importing a module is not testing it — every test must call a function and assert
+  on its output"
+- "DO NOT add tests just to hit line coverage — because a test that can never fail is worse than no test — every test should
+  fail if the code under test is broken"
+- "DO NOT mock internal methods to test dispatchers — because you're testing mock wiring not behavior — use real DuckDB/Polars/DataFusion
+  wherever possible"
+- "DO NOT test cloud SQL generation by asserting mock.called — because that doesn't verify SQL correctness — assert the generated
+  SQL string contains expected clauses"
+- "DO NOT put 'coverage' in test filenames — because test names should describe what they verify — name after the behavior
+  being tested"
+- "DO NOT omit files from coverage just because they are hard to test — because that hides real gaps — only omit genuinely
+  untestable code (external infrastructure, experimental, bulk mechanical translations)"
 
 scope_limit:
   include:
