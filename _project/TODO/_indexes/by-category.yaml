@@ -1,4 +1,4 @@
-generated_at: '2026-03-25T11:58:34.269199'
+generated_at: '2026-03-25T18:42:17.360837'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -72,12 +72,17 @@ categories:
       priority: High
       status: Not Started
   Platform Expansion:
-    count: 9
+    count: 10
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
       title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
       priority: Low
+      status: Not Started
+    - id: ballista-distributed-adapter
+      file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
+      title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
+      priority: Medium
       status: Not Started
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml

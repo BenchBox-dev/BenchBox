@@ -77,21 +77,43 @@ work:
   status: pending
   needs: [w1]
   description: |
-    platforms/base/adapter.py: 2,171 stmts, 640 miss (67.9%).
-    Target: push to 85% (~350 stmts gained).
+    platforms/base/adapter.py: 2,171 stmts, ~560 miss (74%).
+    Target: push to 85% (~240 stmts still to gain).
 
-    Use DuckDB adapter as concrete implementation:
-    - _execute_with_retry: transient error retry with backoff
-    - _format_results: result dict structure validation
-    - _build_connection_string: string construction for different platforms
-    - get_platform_info: engine name, version, features
-    - Table management: create_schema, drop_schema with error paths
-    - Plan capture: _capture_query_plan EXPLAIN output parsing
-    - Error wrapping: PlatformError creation from various exception types
-    - Query timeout: verify timeout parameter propagation
-    - Result formatting: ensure timing fields are populated
+    Already covered (2026-03-25 review session, tests/unit/platforms/test_base_adapter_database_management.py):
+    - Database management helpers: handle_existing_database, _remove_database, check_database_exists
+    - Plan capture failure branches: timeout, sampling, first-N limit, no-output, no-parser,
+      parse exception, parse-none, serialization error, large-plan warning
+    - Tuning validation: _validate_database_tunings exception path, save_tuning_metadata
+    - Row count validation: success, failure, exception paths
+    - Schema creation: _execute_schema_statements partial failure, transform, empty
+    - Connection: PlatformAdapterConnection maintenance/validation modes, cursor extraction
+    - Performance summarization: _summarize_performance_characteristics edge cases
+      (empty results L589, _extract default fallback L596, duration field fallback L609,
+      non-numeric/null rows_returned L702-705)
 
-    Existing tests: tests/unit/platforms/test_base_adapter.py — extend, not replace.
+    Remaining gap (3 buckets from coverage analysis, ~560 miss / 26%):
+
+    BUCKET 1 — Throughput/maintenance phases (HIGH effort, ~120 stmts):
+      Lines 2285-2359: _build_execution_phases throughput path
+      Lines 4268-4331: throughput stream assembly
+      Lines 4335-4490: maintenance phase DDL helpers
+      Requires: mock ThroughputTestResult with stream_results, mock MaintenanceTestResult
+      Approach: use SimpleNamespace mocks with realistic stream/query result structures
+
+    BUCKET 2 — DDL helpers, large platform-specific blocks (MEDIUM effort, ~200 stmts):
+      Lines 4503-4620, 4633-4714, 4727-4802, 4815-4888: per-phase query execution helpers
+      Requires: mock benchmark + connection with realistic query definition structures
+      Approach: parametrized tests across power/warmup/throughput execution paths
+
+    BUCKET 3 — Error branches in power/warmup loops (LOW effort, ~40 stmts):
+      Scattered single lines: L621, L626, L635, L847, L877, L896-900, L909-910
+      These are mostly except/else branches in _coerce_time_seconds and execute helpers
+      Approach: inject TypeError/ValueError via side_effect on individual result fields
+
+    Use DuckDB adapter as concrete implementation where engine calls are needed.
+    Existing tests: tests/unit/platforms/test_base_adapter.py and
+    tests/unit/platforms/test_base_adapter_database_management.py — extend, not replace.
 
 - id: w3
   summary: "Test unified_frame.py string, date, and subquery operations"
@@ -417,9 +439,10 @@ metadata:
     gap_lines: 6044
   coverage_math: |
     Step 1 (w1 scope refinement): omit 3,526 untestable stmts → 76.3%
-    Step 2 (w2-w13 targeted tests): cover ~4,135 lines → 80%+
-    Budget by work unit:
-      w2  base adapter:       350
+    Step 2 (w2-w16 targeted tests): cover ~4,135 lines → 80%+
+
+    Budget by work unit (remaining after 2026-03-25 session):
+      w2  base adapter:       240  (was 350, ~110 lines covered in review session)
       w3  unified_frame:      350
       w4  CLI run:            260
       w5  CLI compare/bench:  250
@@ -434,8 +457,11 @@ metadata:
       w14 utils:              230
       w15 read_primitives DF: 280
       w16 metadata+DF+runner: 300
-      TOTAL:                4,135
-    Gap after omit: 3,928 lines → 207 line buffer (5%)
+      TOTAL:                4,025
+    Gap after omit: 3,928 lines → 97 line buffer (~2.5%)
+
+    NOTE: w2 buffer tightened — if throughput/maintenance phase tests prove
+    harder than estimated, pull 100 lines from w12 cloud tier-2 slack.
 
 verification:
   command: |
