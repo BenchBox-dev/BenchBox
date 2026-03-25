@@ -12,11 +12,12 @@ description: |
   Ballista is notable for:
   - Distributed SQL execution across a cluster (scheduler + executors)
   - Built on DataFusion — same SQL dialect, same query planning, same Arrow-native execution
-  - Python bindings via the `ballista` PyPI package (BallistaBuilder API)
+  - Python bindings built from source (BallistaBuilder and BallistaSessionContext APIs)
   - Supports Parquet, CSV, and other Arrow-compatible formats on shared storage
   - Kubernetes-native deployment with Helm charts
   - Standalone mode for single-machine testing
   - Columnar execution via Apache Arrow with query vectorization
+  - Claims 2.9x speedup over Spark on TPC-H at 100GB scale factor
 
   Since Ballista uses DataFusion internally, the existing DataFusion adapter provides
   a strong foundation. The key differences are: (1) connection via BallistaBuilder to a
@@ -24,8 +25,14 @@ description: |
   storage accessible to all executors (S3, GCS, HDFS, or shared filesystem), and
   (3) distributed execution semantics (partitioning, shuffles, task scheduling).
 
+  IMPORTANT: The `ballista` name on PyPI is occupied by an UNRELATED package (a PyTorch
+  helper). The Apache Ballista Python bindings are NOT published to PyPI as prebuilt
+  wheels. Users must build from source using maturin from the main Ballista repo
+  (apache/datafusion-ballista/python/). This significantly affects installation UX
+  and CI integration.
+
   Reference: https://github.com/apache/datafusion-ballista
-  Python package: https://pypi.org/project/ballista/
+  Python bindings: https://github.com/apache/datafusion-ballista/tree/main/python
 
 context_sections:
   "Technical Background": |
@@ -37,13 +44,27 @@ context_sections:
     - Query plan parser (datafusion.py plan parser) can be reused as-is
     - SQL dialect target remains "datafusion"
 
-    The `ballista` Python package wraps Rust bindings and provides:
+    The Python bindings (built from source via maturin) provide two APIs:
+
     ```python
+    # Older BallistaBuilder API:
     from ballista import BallistaBuilder
-    ctx = BallistaBuilder().standalone().build()      # Local standalone
-    ctx = BallistaBuilder().remote("host:50050").build()  # Remote scheduler
-    ctx.sql("SELECT * FROM table")                     # Same DataFusion SQL API
+    ctx = BallistaBuilder().standalone()                    # Local standalone
+    ctx = BallistaBuilder().remote("df://host:50050")       # Remote scheduler
+
+    # Newer BallistaSessionContext API:
+    from ballista import BallistaSessionContext
+    ctx = BallistaSessionContext("df://localhost:50050")     # Remote scheduler
+
+    ctx.sql("SELECT * FROM table")                          # Same DataFusion SQL API
     ```
+
+    Known Python binding limitations (GitHub issue #1142):
+    1. SessionConfig not propagated to cluster
+    2. No custom Ballista configuration from Python
+    3. No UDF serialization support
+    4. New connection created per request (inefficient)
+    5. Must build from source — no prebuilt PyPI wheels
 
   "Connection & Deployment": |
     Ballista supports multiple deployment modes relevant to benchmarking:
@@ -107,12 +128,16 @@ deps:
 
 technical_requirements:
   dependencies:
-  - "ballista (PyPI package — Python bindings for Ballista)"
+  - "ballista (built from source via maturin — NOT available on PyPI)"
   - "pyarrow>=10.0.0 (already a project dependency)"
+  - "maturin (build tool, dev dependency only)"
+  - "Rust toolchain (required to build ballista from source)"
   compatibility: |
     Ballista uses the same DataFusion SQL dialect. All TPC-H query transformations
     from datafusion_query_transformer.py apply directly. TPC-DS compatibility
     depends on DataFusion's SQL coverage (same limitations as DataFusion adapter).
+    Version numbers are aligned with DataFusion (e.g., Ballista 50.x matches
+    DataFusion 50.x). The DataFusion Python version must match the Ballista version.
 
 files_affected:
   added:
@@ -180,20 +205,24 @@ success_metrics:
 - "Platform discoverable via benchbox run --platform ballista"
 
 open_questions:
-- "What is the minimum stable version of the `ballista` PyPI package to target?"
-- "Does Ballista's Python BallistaBuilder API support configuration options like memory limits and target partitions?"
-- "How mature are the Python bindings — are there known gaps vs the Rust API?"
+- "How should we handle the build-from-source requirement? Options: (a) document Rust/maturin setup, (b) pre-build wheels in CI, (c) vendor a wheel, (d) wait for official PyPI release"
+- "Should we target the BallistaBuilder API (older, more documented) or BallistaSessionContext (newer)?"
+- "Does the new-connection-per-request limitation (issue #1142) impact benchmark timing accuracy?"
 - "Should we support a Docker Compose deployment mode for integration testing?"
-- "Can Ballista register Delta Lake and Iceberg tables, or only Parquet/CSV?"
+- "Can Ballista register Delta Lake and Iceberg tables, or only Parquet/CSV/JSON?"
 - "What is the performance overhead of standalone mode vs direct DataFusion?"
+- "How do we handle DataFusion/Ballista version alignment in pyproject.toml when ballista isn't on PyPI?"
 
 work:
 - id: w1
-  summary: "Research Ballista Python API surface and version compatibility"
+  summary: "Build Ballista Python bindings from source and document setup"
   description: |
-    Install the `ballista` package, test BallistaBuilder standalone mode, document
+    Clone apache/datafusion-ballista, build Python bindings using maturin
+    (requires Rust toolchain). Test BallistaBuilder standalone mode, document
     available configuration options, and verify API compatibility with DataFusion's
     SessionContext. Confirm that ctx.sql() returns compatible DataFrame objects.
+    Document the build process for contributors and CI. Evaluate both
+    BallistaBuilder and BallistaSessionContext APIs for suitability.
   status: pending
 
 - id: w2
@@ -244,7 +273,8 @@ work:
     Add "ballista" entry to PlatformRegistry with metadata (display_name, description,
     capabilities, requirements, deployment_modes for standalone and distributed).
     Add BallistaAdapter to _LAZY_ADAPTERS in platforms/__init__.py.
-    Add `ballista = ["ballista>=0.12.0"]` to pyproject.toml optional dependencies.
+    Note: Cannot add standard pyproject.toml extra since ballista is not on PyPI.
+    Document build-from-source requirement in installation_command metadata.
   status: pending
   needs: [w2]
 
