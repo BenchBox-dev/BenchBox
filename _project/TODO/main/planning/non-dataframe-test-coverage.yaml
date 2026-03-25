@@ -62,7 +62,7 @@ work:
 
 - id: w2
   summary: "Test base data_loading.py format detection and dispatch"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     platforms/base/data_loading.py: 849 stmts, 300 miss (64.7%).
@@ -80,7 +80,7 @@ work:
 
 - id: w3
   summary: "Test TPC-H generator"
-  status: pending
+  status: done
   needs: []
   description: |
     core/tpch/generator.py: 578 stmts, 198 miss (65.7%).
@@ -94,7 +94,7 @@ work:
 
 - id: w4
   summary: "Test TPC-DS benchmark runner"
-  status: pending
+  status: done
   needs: []
   description: |
     core/tpcds/benchmark/runner.py: 673 stmts, 235 miss (65.1%).
@@ -126,7 +126,7 @@ work:
 
 - id: w6
   summary: "Test write_primitives benchmark operations"
-  status: pending
+  status: done
   needs: []
   description: |
     core/write_primitives/benchmark.py: 483 stmts, 254 miss (47.4%).
@@ -140,7 +140,7 @@ work:
 
 - id: w7
   summary: "Test primitives generator_base"
-  status: pending
+  status: done
   needs: []
   description: |
     core/primitives/generator_base.py: 493 stmts, 155 miss (68.6%).
@@ -168,7 +168,7 @@ work:
 
 - id: w9
   summary: "Test joinorder generator"
-  status: pending
+  status: done
   needs: []
   description: |
     core/joinorder/generator.py: 213 stmts, 169 miss (20.7%).
@@ -181,7 +181,7 @@ work:
 
 - id: w10
   summary: "Test coffeeshop generator"
-  status: pending
+  status: done
   needs: []
   description: |
     core/coffeeshop/generator.py: 227 stmts, 139 miss (38.8%).
@@ -214,7 +214,7 @@ work:
 
 - id: w12
   summary: "Test local platform adapters: DuckDB + Polars SQL"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     platforms/duckdb.py: 694 stmts, 186 miss (73.2%).
@@ -381,7 +381,7 @@ work:
 
 - id: w21
   summary: "Test cloud platform SQL generation: BigQuery + Databricks"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     platforms/bigquery.py (514 miss, 38.7%). Target: +180 stmts.
@@ -398,7 +398,7 @@ work:
 
 - id: w22
   summary: "Test cloud platform SQL generation: Athena + Azure Synapse"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     platforms/athena.py (360 miss, 44.7%). Target: +120 stmts.
@@ -434,7 +434,7 @@ work:
 
 - id: w24
   summary: "Ratchet fail_under to 70 (intermediate gate)"
-  status: pending
+  status: done
   needs: [w1, w13, w14, w15, w16]
   description: |
     After the first batch of work lands (base adapter, utils, initial CLI),

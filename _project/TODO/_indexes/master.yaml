@@ -33,8 +33,8 @@ items:
   - platforms
   estimated_effort: Large (3-4 weeks across work units)
   work_total: 25
-  work_done: 13
-  work_ready: 11
+  work_done: 24
+  work_ready: 1
   deferred_count: 4
   needs:
   - fix-coverage-theater
@@ -57,6 +57,25 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 3
+- id: coverage-to-80-percent
+  file: TODO/main/active/coverage-to-80-percent.yaml
+  title: Reach 80% test coverage through scope refinement and targeted behavioral tests
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: In Progress
+  tags:
+  - testing
+  - coverage
+  - quality
+  estimated_effort: Large (2-3 weeks)
+  work_total: 17
+  work_done: 6
+  work_ready: 9
+  deferred_count: 4
+  needs:
+  - dataframe-test-coverage
+  - non-dataframe-test-coverage
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -387,25 +406,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: dataframe-test-coverage
-  file: TODO/main/planning/dataframe-test-coverage.yaml
-  title: Increase DataFrame subsystem test coverage with behavioral tests
-  worktree: main
-  category: Testing & Quality
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - testing
-  - coverage
-  - dataframe
-  - quality
-  estimated_effort: Large (2-3 weeks)
-  work_total: 13
-  work_done: 10
-  work_ready: 2
-  deferred_count: 4
-  needs:
-  - fix-coverage-theater
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

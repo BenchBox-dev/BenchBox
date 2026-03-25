@@ -1246,7 +1246,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 70
+    count: 71
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1488,6 +1488,11 @@ priorities:
       file: DONE/main/active/coverage-core-tpcdi.yaml
       title: Improve test coverage for core/tpcdi module to ≥50%
       category: Testing and Quality Assurance
+      status: Completed
+    - id: dataframe-test-coverage
+      file: DONE/main/planning/dataframe-test-coverage.yaml
+      title: Increase DataFrame subsystem test coverage with behavioral tests
+      category: Testing & Quality
       status: Completed
     - id: integrate-write-primitives-dataframe-mode
       file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml

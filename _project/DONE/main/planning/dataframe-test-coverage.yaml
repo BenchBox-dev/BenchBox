@@ -2,7 +2,8 @@ id: dataframe-test-coverage
 title: "Increase DataFrame subsystem test coverage with behavioral tests"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-03-25"
 description: |
   The DataFrame subsystem spans three layers totaling 21,643 statements at 50.7%
   coverage — the single largest coverage gap in the project.
@@ -181,7 +182,7 @@ work:
 
 - id: w8
   summary: "Test dataframe_runner.py lifecycle with real engines"
-  status: pending
+  status: done
   needs: [w5]
   description: |
     dataframe_runner.py: 331 stmts, 165 miss (50.2%). The DataFrame-specific
@@ -231,7 +232,7 @@ work:
 
 - id: w10
   summary: "Test TPC-H dataframe queries against known results at SF=0.01"
-  status: pending
+  status: done
   needs: [w2, w8]
   description: |
     core/tpch/dataframe_queries.py: 737 stmts, 269 miss (63.5%).
@@ -268,7 +269,7 @@ work:
 
 - id: w12
   summary: "Test read_primitives and transaction_primitives dataframe operations"
-  status: pending
+  status: done
   needs: [w2, w9]
   description: |
     read_primitives dataframe queries: 1,872 stmts, 785 miss (58.1%).
