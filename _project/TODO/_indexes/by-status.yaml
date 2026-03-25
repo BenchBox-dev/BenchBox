@@ -1,5 +1,5 @@
-generated_at: '2026-03-24T18:46:38.919831'
-total_items: 24
+generated_at: '2026-03-25T07:55:50.115485'
+total_items: 25
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Testing & Quality
   Not Started:
-    count: 22
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -102,6 +102,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Medium
       category: Platform Expansion
+    - id: coverage-to-80-percent
+      file: TODO/main/planning/coverage-to-80-percent.yaml
+      title: Reach 80% test coverage through scope refinement and targeted behavioral tests
+      priority: High
+      category: Testing & Quality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

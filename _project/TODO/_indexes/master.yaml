@@ -1,5 +1,5 @@
-generated_at: '2026-03-24T18:46:38.919793'
-total_items: 24
+generated_at: '2026-03-25T07:55:50.115438'
+total_items: 25
 items:
 - id: gate-monitoring-behind-optional-extra
   file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
@@ -57,6 +57,25 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 3
+- id: coverage-to-80-percent
+  file: TODO/main/planning/coverage-to-80-percent.yaml
+  title: Reach 80% test coverage through scope refinement and targeted behavioral tests
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Not Started
+  tags:
+  - testing
+  - coverage
+  - quality
+  estimated_effort: Large (2-3 weeks)
+  work_total: 12
+  work_done: 0
+  work_ready: 8
+  deferred_count: 4
+  needs:
+  - dataframe-test-coverage
+  - non-dataframe-test-coverage
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
