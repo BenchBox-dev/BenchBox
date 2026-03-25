@@ -294,7 +294,7 @@ work:
 
 - id: w13
   summary: "Test base.py BaseBenchmark abstract methods"
-  status: pending
+  status: done
   needs: []
   description: |
     base.py: 277 stmts, 148 miss (42.4%).
