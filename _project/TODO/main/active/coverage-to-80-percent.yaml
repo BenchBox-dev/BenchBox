@@ -307,7 +307,7 @@ work:
 
 - id: w14
   summary: "Test remaining utils and supporting modules"
-  status: pending
+  status: done
   needs: []
   description: |
     utils/tpc_compilation.py: 126 miss (60.4%) → target +80 stmts
