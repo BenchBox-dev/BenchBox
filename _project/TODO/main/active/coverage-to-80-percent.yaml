@@ -74,7 +74,7 @@ work:
 
 - id: w2
   summary: "Test base adapter concrete methods to 85%"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     platforms/base/adapter.py: 2,171 stmts, ~560 miss (74%).
@@ -120,12 +120,12 @@ work:
   status: pending
   needs: []
   description: |
-    platforms/dataframe/unified_frame.py: 1,633 stmts, 603 miss (58.7%).
-    Target: push to 80% (~350 stmts gained).
+    platforms/dataframe/unified_frame.py: 1,647 stmts, 519 miss (64%).
+    Target: push to 80% (~260 stmts gained).
 
-    Prior work units (w2-w4 of dataframe-test-coverage TODO) covered column,
-    filter, sort, aggregation, join, window, and expression operations.
-    Remaining gaps:
+    Tests created in 2026-03-26 session (test_unified_frame_datafusion_real.py)
+    covered basic expression, column, filter, and aggregation paths. Current
+    64% leaves 519 miss. Extend the existing test file with:
     - String operations: contains, starts_with, ends_with, replace, concat
     - Date operations: year/month/day extraction, date_add, date_diff
     - Subquery operations: EXISTS, IN subquery, scalar subquery
@@ -135,6 +135,7 @@ work:
     - Nested aggregations: HAVING clause filtering
     - Type coercion edge cases: decimal → float, date → string
 
+    Extend: tests/unit/platforms/dataframe/test_unified_frame_datafusion_real.py
     Parametrize across Polars and Pandas engines.
 
 - id: w4
@@ -142,26 +143,27 @@ work:
   status: pending
   needs: []
   description: |
-    cli/commands/run.py: 1,127 stmts, 424 miss (58.0%).
-    Target: push to 78% (~260 stmts gained).
+    cli/commands/run.py: 1,127 stmts, 317 miss (67%).
+    Target: push to 78% (~120 more stmts to gain; ~140 gained so far).
 
-    Test via Click CliRunner (no real benchmark execution):
-    - Option parsing: --platform, --benchmark, --scale, --queries, --phases
-    - Validation errors: invalid platform name, unsupported benchmark,
-      bad query IDs, invalid phase names
+    Tests created in 2026-03-26 session (test_run_command_interactive_paths.py)
+    covered validation error paths: bad flags, invalid queries, phase errors,
+    missing required args, platform-option without platform. Current 67% leaves
+    317 miss. Extend the existing test file with:
     - --dry-run mode: produces preview output without execution
     - --help and --help-topic: verify help text rendering
-    - --queries constraints: max 100, alphanumeric only, phase compatibility
     - --compression: valid formats (zstd, zstd:9, gzip:6, none)
     - --platform-option: key=value parsing, repeated options
-    - Error messages: user-friendly errors for common mistakes
-    - Exit codes: 0 for success, non-zero for validation errors
+    - --tuning and --validation flags: accepted values and defaults
+    - --official flag with compliant scale factors (success path)
+    - Non-interactive mode with all required flags (full success path)
 
+    Extend: tests/unit/cli/test_run_command_interactive_paths.py
     Use cli_benchmark_mocks fixture from tests/unit/conftest.py.
 
 - id: w5
   summary: "Test CLI compare and benchmarks commands"
-  status: pending
+  status: done
   needs: [w4]
   description: |
     cli/commands/compare.py: 875 stmts, 232 miss (71.2%).
@@ -186,7 +188,7 @@ work:
 
 - id: w6
   summary: "Test DataFrame benchmark_suite orchestration"
-  status: pending
+  status: done
   needs: []
   description: |
     core/dataframe/benchmark_suite.py: 555 stmts, 194 miss (61.2%).
@@ -348,7 +350,7 @@ work:
 
 - id: w15
   summary: "Test read_primitives remaining DF query implementations"
-  status: pending
+  status: done
   needs: []
   description: |
     core/read_primitives/dataframe_queries.py: 1,872 stmts, 666 miss (64.4%).
@@ -368,47 +370,52 @@ work:
     Follow patterns in tests/unit/core/read_primitives/test_read_primitives_dataframe.py.
 
 - id: w16
-  summary: "Test metadata_primitives, DataFusion adapter, and TPC-DS runner gaps"
+  summary: "Test DataFusion adapter expression and write paths"
   status: pending
   needs: []
   description: |
-    Three mid-coverage files with significant remaining gaps:
+    Two sub-tasks completed in 2026-03-26 session; one remains:
 
-    core/metadata_primitives/dataframe_operations.py: 609 stmts, 303 miss (50.6%).
-    Target: push to 72% (~130 stmts gained).
-    - Metadata query operations (table list, column info, statistics)
-    - Schema introspection operations
-    - Use DuckDB as test engine
+    ✅ core/metadata_primitives/dataframe_operations.py: now at 77% (target 72%).
+       Tests in tests/unit/dataframe/test_dataframe_operations.py.
 
-    platforms/datafusion.py: 701 stmts, 208 miss (67.3%).
+    ✅ core/tpcds/benchmark/runner.py: now at 74% (~target 75%).
+       Tests in tests/unit/core/tpcds/benchmark/test_tpcds_runner_coverage.py.
+       Also fixed table name case normalization bug in runner.py.
+
+    REMAINING: platforms/datafusion.py: 701 stmts, 208 miss (67%).
     Target: push to 80% (~90 stmts gained).
     - Session creation, table registration, catalog ops
     - Plan capture: EXPLAIN output parsing
     - External table support: Parquet file registration
     - Write operations: CREATE TABLE AS SELECT
+    Extend: tests/unit/platforms/dataframe/test_unified_frame_datafusion_real.py
     Follow patterns in tests/unit/platforms/test_datafusion_real_connection.py.
 
-    core/tpcds/benchmark/runner.py: 673 stmts, 224 miss (62.7%).
-    Target: push to 75% (~80 stmts gained).
-    - Data loading: CSV parsing with delimiter detection
-    - Table loading order with FK dependency resolution
-    - Maintenance test delegation and result mapping
-    - Validation engine integration
-    Follow patterns in tests/unit/core/tpcds/benchmark/test_tpcds_runner_streams.py.
-
-    Combined target: ~300 stmts gained.
-
 - id: w17
-  summary: "Ratchet fail_under to 80 and align CI config"
+  summary: "Align CI coverage config and ratchet fail_under to 80"
   status: pending
   needs: [w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15, w16]
   description: |
-    Final gate after all coverage work lands:
-    1. Run full coverage report and confirm >= 80%
-    2. Ratchet pyproject.toml [tool.coverage.report] fail_under from 70 to 80
-    3. Align .coveragerc_core with pyproject.toml omit list
-    4. Verify CI pipeline uses correct coverage config
-    5. Commit threshold change
+    CRITICAL DISCOVERY (2026-03-26): .coveragerc_core (used by pytest-ci.ini /
+    make coverage-fast) does NOT include the pyproject.toml omit rules. The
+    omitted files (TPC-DI ETL, ClickBench DF queries, experimental concurrency,
+    bulk DF query sets) add ~8,500 stmts and ~8,000 miss lines to the
+    denominator, depressing measured coverage from ~80% to 73%.
+
+    Fixing this alone is likely sufficient to reach 80%. Do this FIRST.
+
+    Steps in order:
+    1. Align .coveragerc_core: copy the full omit block from
+       pyproject.toml [tool.coverage.run] omit into .coveragerc_core [run] omit.
+       Also update source from "benchbox/core" to "benchbox" to match scope.
+    2. Run: BENCHBOX_SKIP_TEST_LOCK=1 make coverage-fast
+       Check TOTAL line. If >= 80%, proceed to step 4.
+    3. If still < 80%: complete remaining targeted work in priority order —
+       w12 cloud tier-2 (~500 stmts), w3 unified_frame (~260), w4 CLI run
+       (~120), w16 DataFusion (~90) — until 80% is reached.
+    4. Ratchet pyproject.toml [tool.coverage.report] fail_under from 70 to 80.
+    5. Commit .coveragerc_core alignment + threshold change together.
 
 deferred:
 - summary: "TPC-DI ETL deep coverage (transformations.py, batch.py, scd_processor.py)"
@@ -438,30 +445,31 @@ metadata:
     target_pct: 80.0
     gap_lines: 6044
   coverage_math: |
-    Step 1 (w1 scope refinement): omit 3,526 untestable stmts → 76.3%
-    Step 2 (w2-w16 targeted tests): cover ~4,135 lines → 80%+
+    ACTUALS as of 2026-03-26 (measured via make coverage-fast / pytest-ci.ini):
+    Current measured: 73% (115,891 stmts, 29,069 miss)
 
-    Budget by work unit (remaining after 2026-03-25 session):
-      w2  base adapter:       240  (was 350, ~110 lines covered in review session)
-      w3  unified_frame:      350
-      w4  CLI run:            260
-      w5  CLI compare/bench:  250
-      w6  DF benchmark_suite: 130
-      w7  runner/config/mixin:125
-      w8  Redshift:           280
-      w9  Databricks:         280
-      w10 BigQuery:           240
-      w11 Snowflake:          200
-      w12 cloud tier-2:       500
-      w13 base.py:             90
-      w14 utils:              230
-      w15 read_primitives DF: 280
-      w16 metadata+DF+runner: 300
-      TOTAL:                4,025
-    Gap after omit: 3,928 lines → 97 line buffer (~2.5%)
+    ROOT CAUSE of 73% vs expected 80%:
+    .coveragerc_core does not apply pyproject.toml omit rules. The omitted
+    files (TPC-DI ETL ~3,226 miss, bulk DF queries ~4,924 miss, experimental
+    ~284 miss) add ~8,500 stmts and ~8,000 miss to the denominator. Removing
+    them pushes measured coverage to ~80.4% without any new tests.
 
-    NOTE: w2 buffer tightened — if throughput/maintenance phase tests prove
-    harder than estimated, pull 100 lines from w12 cloud tier-2 slack.
+    Work unit actuals:
+      w2  base adapter:        86% ✅ (target 85%)
+      w3  unified_frame:       64% ❌ (target 80%, ~260 stmts remain)
+      w4  CLI run:             67% ❌ (target 78%, ~120 stmts remain)
+      w5  CLI compare/bench:  79-89% ✅
+      w6  DF benchmark_suite:  79% ✅ (close enough)
+      w12 cloud tier-2:      59-72% ❌ (not started)
+      w15 read_primitives DF:  97% ✅ (target 80%, exceeded)
+      w16 metadata:            77% ✅ | runner: 74% ✅ | DataFusion: 67% ❌
+
+    Remaining targeted work (if needed after .coveragerc_core alignment):
+      w12 cloud tier-2:       ~500 stmts (Athena, Synapse, Firebolt, etc.)
+      w3  unified_frame:      ~260 stmts
+      w4  CLI run:            ~120 stmts
+      w16 DataFusion only:     ~90 stmts
+      TOTAL remaining:        ~970 stmts
 
 verification:
   command: |
