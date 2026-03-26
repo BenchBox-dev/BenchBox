@@ -1,5 +1,5 @@
-generated_at: '2026-03-26T16:55:01.891093'
-total_items: 600
+generated_at: '2026-03-26T17:21:44.420000'
+total_items: 601
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2703,6 +2703,26 @@ items:
   work_total: 22
   work_done: 22
   work_ready: 0
+- id: coverage-to-80-percent
+  file: DONE/main/active/coverage-to-80-percent.yaml
+  title: Reach 80% test coverage through scope refinement and targeted behavioral tests
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - coverage
+  - quality
+  estimated_effort: Large (2-3 weeks)
+  completed_date: '2026-03-26'
+  work_total: 17
+  work_done: 17
+  work_ready: 0
+  deferred_count: 4
+  needs:
+  - dataframe-test-coverage
+  - non-dataframe-test-coverage
 - id: platform-live-integration-tests
   file: DONE/main/active/platform-live-integration-tests.yaml
   title: 'Real integration testing for all data platforms: Docker-local and cloud-live'

@@ -1,8 +1,8 @@
-generated_at: '2026-03-26T16:55:00.595261'
-total_items: 25
+generated_at: '2026-03-26T17:21:43.085611'
+total_items: 24
 priorities:
   High:
-    count: 4
+    count: 3
     items:
     - id: gate-monitoring-behind-optional-extra
       file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
@@ -19,11 +19,6 @@ priorities:
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
       status: Not Started
-    - id: coverage-to-80-percent
-      file: TODO/main/active/coverage-to-80-percent.yaml
-      title: Reach 80% test coverage through scope refinement and targeted behavioral tests
-      category: Testing & Quality
-      status: In Progress
   Medium-High:
     count: 2
     items:

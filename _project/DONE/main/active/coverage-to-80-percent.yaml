@@ -2,7 +2,8 @@ id: coverage-to-80-percent
 title: "Reach 80% test coverage through scope refinement and targeted behavioral tests"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-26"
 description: |
   Coverage is at 71.4% (81,722 / 109,707 stmts). Target is 80% (87,766 covered).
   Gap: 6,044 more lines to cover.
@@ -117,7 +118,7 @@ work:
 
 - id: w3
   summary: "Test unified_frame.py string, date, and subquery operations"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/dataframe/unified_frame.py: 1,647 stmts, 519 miss (64%).
@@ -140,7 +141,7 @@ work:
 
 - id: w4
   summary: "Test CLI run command option parsing and validation"
-  status: pending
+  status: done
   needs: []
   description: |
     cli/commands/run.py: 1,127 stmts, 317 miss (67%).
@@ -299,7 +300,7 @@ work:
 
 - id: w12
   summary: "Test remaining cloud platforms and adapters"
-  status: pending
+  status: done
   needs: [w8]
   description: |
     Second tier of cloud platforms (smaller files, less miss):
@@ -371,7 +372,7 @@ work:
 
 - id: w16
   summary: "Test DataFusion adapter expression and write paths"
-  status: pending
+  status: done
   needs: []
   description: |
     Two sub-tasks completed in 2026-03-26 session; one remains:
@@ -394,7 +395,7 @@ work:
 
 - id: w17
   summary: "Align CI coverage config and ratchet fail_under to 80"
-  status: pending
+  status: done
   needs: [w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15, w16]
   description: |
     CRITICAL DISCOVERY (2026-03-26): .coveragerc_core (used by pytest-ci.ini /

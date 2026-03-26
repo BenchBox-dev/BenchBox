@@ -1,5 +1,5 @@
-generated_at: '2026-03-26T16:55:01.891611'
-total_items: 600
+generated_at: '2026-03-26T17:21:44.420540'
+total_items: 601
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 552
+    count: 553
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2189,6 +2189,11 @@ statuses:
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: High
       category: Testing and Quality Assurance
+    - id: coverage-to-80-percent
+      file: DONE/main/active/coverage-to-80-percent.yaml
+      title: Reach 80% test coverage through scope refinement and targeted behavioral tests
+      priority: High
+      category: Testing & Quality
     - id: platform-live-integration-tests
       file: DONE/main/active/platform-live-integration-tests.yaml
       title: 'Real integration testing for all data platforms: Docker-local and cloud-live'

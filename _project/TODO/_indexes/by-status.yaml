@@ -1,17 +1,12 @@
-generated_at: '2026-03-26T16:55:00.595269'
-total_items: 25
+generated_at: '2026-03-26T17:21:43.085620'
+total_items: 24
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
     - id: non-dataframe-test-coverage
       file: TODO/main/planning/non-dataframe-test-coverage.yaml
       title: Increase core, CLI, platform, and utils test coverage to 80%
-      priority: High
-      category: Testing & Quality
-    - id: coverage-to-80-percent
-      file: TODO/main/active/coverage-to-80-percent.yaml
-      title: Reach 80% test coverage through scope refinement and targeted behavioral tests
       priority: High
       category: Testing & Quality
   Not Started:
