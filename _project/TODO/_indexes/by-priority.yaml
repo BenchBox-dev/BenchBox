@@ -1,8 +1,8 @@
-generated_at: '2026-03-26T17:21:43.085611'
-total_items: 24
+generated_at: '2026-03-26T19:05:29.009839'
+total_items: 25
 priorities:
   High:
-    count: 3
+    count: 4
     items:
     - id: gate-monitoring-behind-optional-extra
       file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
@@ -18,6 +18,11 @@ priorities:
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
+      status: Not Started
+    - id: bottom-25-module-coverage
+      file: TODO/main/planning/bottom-25-module-coverage.yaml
+      title: Raise bottom 25 modules (all <42% coverage) to 80%
+      category: Testing & Quality
       status: Not Started
   Medium-High:
     count: 2

@@ -1,5 +1,5 @@
-generated_at: '2026-03-26T17:21:43.085576'
-total_items: 24
+generated_at: '2026-03-26T19:05:29.009805'
+total_items: 25
 items:
 - id: gate-monitoring-behind-optional-extra
   file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
@@ -57,6 +57,27 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 3
+- id: bottom-25-module-coverage
+  file: TODO/main/planning/bottom-25-module-coverage.yaml
+  title: Raise bottom 25 modules (all <42% coverage) to 80%
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Not Started
+  tags:
+  - testing
+  - coverage
+  - quality
+  - cli
+  - platforms
+  - tuning
+  estimated_effort: Large (2-3 weeks across work units)
+  work_total: 16
+  work_done: 0
+  work_ready: 16
+  deferred_count: 3
+  needs:
+  - non-dataframe-test-coverage
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
