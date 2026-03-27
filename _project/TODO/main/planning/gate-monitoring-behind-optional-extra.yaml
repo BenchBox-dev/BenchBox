@@ -13,11 +13,21 @@ description: |
   The coupling is light, but monitoring ships to all users even though it is
   not required for core benchmarking. The proportionate fix is to:
 
-  1. Add `prune benchbox/monitoring` to MANIFEST.in (exclude from default
-     wheel).
-  2. Add a `monitoring` optional extra in pyproject.toml that re-includes it.
-  3. Make the runner's monitoring import conditional (graceful degradation
-     when monitoring is not installed).
+  1. Exclude `benchbox.monitoring` from the default wheel by adding it to the
+     `exclude` list in `[tool.setuptools.packages.find]` in pyproject.toml.
+     NOTE: MANIFEST.in controls sdist content only, not wheel content.
+  2. Add a `monitoring = []` optional extra in pyproject.toml as an intent
+     marker. This signals the feature exists and reserves the extra name for
+     a future separate distribution. It cannot re-include excluded wheel
+     content — users who want monitoring from a wheel install would need a
+     separate package or a source checkout.
+  3. Make the runner's monitoring imports conditional (graceful degradation
+     when monitoring is not importable).
+
+  Simpler alternative: skip step 1 (keep monitoring in the wheel) and only
+  do step 3. This achieves graceful degradation without any packaging
+  complexity. Choose this path if the packaging investigation (w1a) reveals
+  the wheel-exclusion UX is not worth the tradeoff.
 
   A full standalone `runwatch` package is not justified for ~2,000 lines with
   one consumer.
@@ -38,14 +48,18 @@ future_state:
 impact:
   user_impact: |
     Default installs become slightly smaller. Users who want monitoring
-    install `benchbox[monitoring]`. Benchmark execution works identically
-    without monitoring — reports simply omit resource/timing detail.
+    install `benchbox[monitoring]` (future: requires separate distribution)
+    or install from source. Benchmark execution works identically without
+    monitoring — reports simply omit resource/timing detail.
   maintainer_impact: |
     Monitoring code stays in the repo and is testable from source. The only
-    change is that the wheel excludes it by default.
+    wheel change is excluding `benchbox.monitoring` from the packages.find
+    include set.
   packaging_impact: |
-    One MANIFEST.in line, one pyproject.toml extra, conditional imports in
-    3 runner files. No new packages.
+    One `[tool.setuptools.packages.find]` exclude entry, one pyproject.toml
+    optional-extra marker, conditional imports in 3 runner files. No new
+    packages. Note: MANIFEST.in is NOT the right mechanism for wheel
+    exclusion — it controls sdist only.
   regression_risk: |
     Low. The runner already has a no-monitoring fallback path (monitoring
     can be disabled via config). Making the import conditional is a small
@@ -59,10 +73,12 @@ justification: |
 cost_benefit_analysis:
   expected_benefits: |
     Moderate. Default wheel shrinks, install surface narrows, monitoring
-    ownership boundary becomes explicit via the optional extra.
+    ownership boundary becomes explicit via the optional extra marker.
   expected_costs: |
-    Small. MANIFEST.in edit, pyproject.toml extra, conditional imports in
-    3 files, test updates for the gated import path.
+    Small. pyproject.toml packages.find exclude entry, optional-extra marker,
+    conditional imports in 3 files, test updates for the gated import path.
+    w1a research may reveal that the wheel-exclusion path is not worth the
+    UX tradeoff, in which case only conditional imports (w2, w3) are needed.
   recommendation: |
     Proceed when convenient. A standalone extraction should only happen if
     a second consumer materializes or the internal boundary has been stable
@@ -70,7 +86,6 @@ cost_benefit_analysis:
 
 files_affected:
   modified:
-  - "MANIFEST.in"
   - "pyproject.toml"
   - "benchbox/core/runner/runner.py"
   - "benchbox/core/runner/dataframe_runner.py"
@@ -79,29 +94,49 @@ files_affected:
 
 work:
 - id: w1
-  summary: "Exclude monitoring from wheel and add optional extra"
+  summary: "Research correct wheel-exclusion mechanism and decide on scope"
   status: pending
   notes: |
-    In MANIFEST.in: add `prune benchbox/monitoring` to exclude from wheel.
-    In pyproject.toml: add `monitoring = []` optional extra (no external
-    deps needed, this just controls wheel inclusion).
-    Note: MANIFEST.in prune may need a setuptools override or a different
-    mechanism to conditionally include based on extras. Investigate the
-    right packaging approach.
+    Confirm that adding `"benchbox.monitoring", "benchbox.monitoring.*"` to
+    `[tool.setuptools.packages.find] exclude` in pyproject.toml is the right
+    wheel-exclusion mechanism (MANIFEST.in controls sdist only, not wheel).
+    Verify with: `uv build --wheel && unzip -l dist/*.whl | grep monitoring`.
+    Decide whether to proceed with wheel exclusion or limit scope to
+    conditional imports only (w3, w4). Document the decision in w2 notes
+    before starting w2.
 
 - id: w2
-  summary: "Make monitoring imports conditional in runner and progress"
+  summary: "Apply packaging changes: exclude monitoring from wheel, add optional extra marker"
   needs: [w1]
+  status: pending
+  notes: |
+    In pyproject.toml [tool.setuptools.packages.find]:
+      Add `"benchbox.monitoring"` and `"benchbox.monitoring.*"` to the
+      `exclude` list (alongside existing `benchbox.release` entries).
+    In pyproject.toml [project.optional-dependencies]:
+      Add `monitoring = []` as an intent marker. This is a placeholder — it
+      cannot re-include excluded wheel content without a separate distribution.
+      It reserves the extra name and signals the feature exists.
+    Do NOT edit MANIFEST.in — it has no effect on wheel content.
+    Verify exclusion: `uv build --wheel && unzip -l dist/*.whl | grep -c monitoring`
+    should return 0.
+    Skip this unit entirely if w1 decides wheel exclusion is not worth it.
+
+- id: w3
+  summary: "Make monitoring imports conditional in runner and progress"
+  needs: [w2]
   status: pending
   notes: |
     In runner.py, dataframe_runner.py, and progress.py: wrap monitoring
     imports in try/except ImportError. Fall back to a no-op stub when
-    monitoring is not installed. This extends the existing monitoring-disabled
+    monitoring is not importable. This extends the existing monitoring-disabled
     config path.
+    If w1 decided to skip wheel exclusion, change this unit's needs to []
+    (no dependency on w2) and start here directly.
 
-- id: w3
+- id: w4
   summary: "Update tests to cover both with-monitoring and without-monitoring paths"
-  needs: [w2]
+  needs: [w3]
   status: pending
   notes: |
     Ensure monitoring tests still pass from source checkout. Add a test
@@ -115,11 +150,15 @@ must_preserve:
 - "No added daemon, service, or network requirement for local runs"
 
 approach: |
-  MANIFEST.in exclusion + optional extra + conditional imports. No new
-  packages, no extraction, no compatibility shims.
+  Wheel exclusion via [tool.setuptools.packages.find] exclude (NOT MANIFEST.in)
+  + optional-extra marker + conditional imports. No new packages, no
+  extraction, no compatibility shims. If wheel exclusion UX is unsatisfactory
+  (confirmed in w1a), fall back to conditional imports only (w2, w3).
 
 anti_patterns:
 - "DO NOT create a standalone runwatch package — ~2,000 lines with one consumer does not justify a separate distribution"
+- "DO NOT use MANIFEST.in for wheel exclusion — MANIFEST.in controls sdist content only; wheel exclusion requires [tool.setuptools.packages.find] exclude in pyproject.toml"
+- "DO NOT add monitoring = [] optional extra expecting it to re-include excluded wheel content — pip extras add dependencies, not source files; this extra is a marker only"
 - "DO NOT change report schemas or timing keys as part of this work"
 - "DO NOT remove monitoring source code from the repo — it stays for development, just excluded from the default wheel"
 
@@ -133,16 +172,19 @@ verification:
 - description: "Core benchmark execution tests pass (monitoring not required)"
   command: "uv run -- python -m pytest tests/unit/core/runner/ -q"
   expected_output: "All tests pass"
+- description: "Wheel does not contain benchbox/monitoring (if wheel exclusion chosen)"
+  command: "uv build --wheel && unzip -l dist/*.whl | grep monitoring | wc -l"
+  expected_output: "0"
 
 scope_limit:
   only_modify:
-  - "MANIFEST.in"
   - "pyproject.toml"
   - "benchbox/core/runner/runner.py"
   - "benchbox/core/runner/dataframe_runner.py"
   - "benchbox/cli/progress.py"
   - "tests/unit/monitoring/"
   do_not_touch:
+  - "MANIFEST.in (not relevant to wheel content)"
   - "benchbox/monitoring/ source code (stays in repo, just excluded from default wheel)"
   - "Benchmark query definitions"
   - "Platform adapters"

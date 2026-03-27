@@ -1,4 +1,4 @@
-generated_at: '2026-03-26T20:19:13.356285'
+generated_at: '2026-03-27T08:35:05.853775'
 total_categories: 9
 categories:
   AI/ML Capabilities:
@@ -133,18 +133,13 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 2
+    count: 1
     items:
     - id: non-dataframe-test-coverage
       file: TODO/main/planning/non-dataframe-test-coverage.yaml
       title: Increase core, CLI, platform, and utils test coverage to 80%
       priority: High
       status: In Progress
-    - id: bottom-25-module-coverage
-      file: TODO/main/planning/bottom-25-module-coverage.yaml
-      title: Raise bottom 25 modules (all <42% coverage) to 80%
-      priority: High
-      status: Not Started
   User Experience:
     count: 1
     items:

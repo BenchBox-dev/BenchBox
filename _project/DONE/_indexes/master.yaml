@@ -1,5 +1,5 @@
-generated_at: '2026-03-26T20:19:14.662048'
-total_items: 601
+generated_at: '2026-03-27T08:35:07.848544'
+total_items: 602
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2646,6 +2646,28 @@ items:
   work_total: 101
   work_done: 101
   work_ready: 0
+- id: bottom-25-module-coverage
+  file: DONE/main/bottom-25-module-coverage.yaml
+  title: Raise bottom 25 modules (all <42% coverage) to 80%
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - coverage
+  - quality
+  - cli
+  - platforms
+  - tuning
+  estimated_effort: Large (2-3 weeks across work units)
+  completed_date: '2026-03-26'
+  work_total: 19
+  work_done: 19
+  work_ready: 0
+  deferred_count: 3
+  needs:
+  - non-dataframe-test-coverage
 - id: coverage-below-50-modules-wave-plan
   file: DONE/main/active/coverage-below-50-modules-wave-plan.yaml
   title: Raise remaining benchbox modules below 50% to >=50% coverage

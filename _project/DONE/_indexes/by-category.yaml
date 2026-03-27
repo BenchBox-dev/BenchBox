@@ -1,4 +1,4 @@
-generated_at: '2026-03-26T20:19:14.662321'
+generated_at: '2026-03-27T08:35:07.848926'
 total_categories: 72
 categories:
   '"Bug Fixes & Reliability"':
@@ -2836,7 +2836,7 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 9
+    count: 10
     items:
     - id: fix-coverage-theater
       file: DONE/main/active/fix-coverage-theater.yaml
@@ -2856,6 +2856,11 @@ categories:
     - id: phase-5-testing-infrastructure
       file: DONE/query-plan-remediation/phase-5-testing-infrastructure.yaml
       title: 'Query Plan Remediation - Phase 5: Testing Infrastructure'
+      priority: High
+      status: Completed
+    - id: bottom-25-module-coverage
+      file: DONE/main/bottom-25-module-coverage.yaml
+      title: Raise bottom 25 modules (all <42% coverage) to 80%
       priority: High
       status: Completed
     - id: coverage-to-80-percent
