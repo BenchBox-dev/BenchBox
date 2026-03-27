@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T09:04:14.222806'
-total_items: 603
+generated_at: '2026-03-27T09:48:55.737725'
+total_items: 604
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 215
+    count: 216
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -688,6 +688,11 @@ priorities:
       file: DONE/main/active/include-tpc-metrics-in-result-outputs.yaml
       title: Include TPC Metrics (Power@Size, Throughput@Size, QphH/QphDS@Size) in All Result Outputs
       category: Core Functionality
+      status: Completed
+    - id: non-dataframe-test-coverage
+      file: DONE/main/planning/non-dataframe-test-coverage.yaml
+      title: Increase core, CLI, platform, and utils test coverage to 80%
+      category: Testing & Quality
       status: Completed
     - id: integrate-dataframe-mode-into-cli
       file: DONE/dataframe-cli/completed/integrate-dataframe-mode-into-cli.yaml

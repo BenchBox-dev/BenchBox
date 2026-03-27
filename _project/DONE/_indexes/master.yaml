@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T09:04:14.220658'
-total_items: 603
+generated_at: '2026-03-27T09:48:55.737295'
+total_items: 604
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2063,6 +2063,27 @@ items:
   - tpc-ds
   estimated_effort: 2-3 days
   completed_date: '2026-01-25'
+- id: non-dataframe-test-coverage
+  file: DONE/main/planning/non-dataframe-test-coverage.yaml
+  title: Increase core, CLI, platform, and utils test coverage to 80%
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - coverage
+  - quality
+  - core
+  - cli
+  - platforms
+  estimated_effort: Large (3-4 weeks across work units)
+  work_total: 25
+  work_done: 25
+  work_ready: 0
+  deferred_count: 4
+  needs:
+  - fix-coverage-theater
 - id: integrate-dataframe-mode-into-cli
   file: DONE/dataframe-cli/completed/integrate-dataframe-mode-into-cli.yaml
   title: Integrate DataFrame Mode into CLI

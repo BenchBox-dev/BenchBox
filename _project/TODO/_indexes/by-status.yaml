@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T09:03:55.441417'
-total_items: 24
+generated_at: '2026-03-27T09:48:54.331889'
+total_items: 23
 statuses:
   Not Started:
     count: 23
@@ -119,11 +119,3 @@ statuses:
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
-  Completed:
-    count: 1
-    items:
-    - id: non-dataframe-test-coverage
-      file: TODO/main/planning/non-dataframe-test-coverage.yaml
-      title: Increase core, CLI, platform, and utils test coverage to 80%
-      priority: High
-      category: Testing & Quality

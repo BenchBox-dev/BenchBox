@@ -1,27 +1,6 @@
-generated_at: '2026-03-27T09:03:55.441325'
-total_items: 24
+generated_at: '2026-03-27T09:48:54.331826'
+total_items: 23
 items:
-- id: non-dataframe-test-coverage
-  file: TODO/main/planning/non-dataframe-test-coverage.yaml
-  title: Increase core, CLI, platform, and utils test coverage to 80%
-  worktree: main
-  category: Testing & Quality
-  priority: High
-  status: Completed
-  tags:
-  - testing
-  - coverage
-  - quality
-  - core
-  - cli
-  - platforms
-  estimated_effort: Large (3-4 weeks across work units)
-  work_total: 25
-  work_done: 25
-  work_ready: 0
-  deferred_count: 4
-  needs:
-  - fix-coverage-theater
 - id: productize-result-publishing-and-artifact-sharing
   file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
   title: Productize result publishing and artifact sharing workflow

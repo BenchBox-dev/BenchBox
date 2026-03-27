@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T09:04:14.222596'
+generated_at: '2026-03-27T09:48:55.737577'
 total_categories: 72
 categories:
   '"Bug Fixes & Reliability"':
@@ -2841,7 +2841,7 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 10
+    count: 11
     items:
     - id: fix-coverage-theater
       file: DONE/main/active/fix-coverage-theater.yaml
@@ -2852,6 +2852,11 @@ categories:
       file: DONE/main/planning/dataframe-test-coverage.yaml
       title: Increase DataFrame subsystem test coverage with behavioral tests
       priority: Medium-High
+      status: Completed
+    - id: non-dataframe-test-coverage
+      file: DONE/main/planning/non-dataframe-test-coverage.yaml
+      title: Increase core, CLI, platform, and utils test coverage to 80%
+      priority: High
       status: Completed
     - id: migrate-ascii-chart-tests-to-textcharts
       file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml
