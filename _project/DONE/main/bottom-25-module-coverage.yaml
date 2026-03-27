@@ -2,7 +2,7 @@ id: bottom-25-module-coverage
 title: "Raise bottom 25 modules (all <42% coverage) to 80%"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 description: |
   After completing non-dataframe-test-coverage, 25 modules remain below 42%
   coverage and were either not targeted by the previous TODO or only partially
@@ -47,7 +47,7 @@ deps:
 work:
 - id: w1
   summary: "Test pg_extension_comparison pure functions (0% → 100%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/core/pg_extension_comparison.py: 68 stmts, 0% coverage.
@@ -87,7 +87,7 @@ work:
 
 - id: w2
   summary: "Test config builder pure functions: azure/config_utils + databend/__init__ (0%, 29% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/azure/config_utils.py: 22 stmts, 0% coverage.
@@ -120,7 +120,7 @@ work:
 
 - id: w3
   summary: "Test schema constant modules: coffeeshop/schema + tpcdi/schema_extensions (20%, 33% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/core/coffeeshop/schema.py: 40 stmts, 20% coverage.
@@ -178,7 +178,7 @@ work:
 
 - id: w4
   summary: "Test dependency_validation unit functions with synthetic data (16% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/utils/dependency_validation.py: 83 stmts missing, 16% coverage.
@@ -231,7 +231,7 @@ work:
 
 - id: w5
   summary: "Test CoffeeShop benchmark end-to-end with DuckDB (19% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/core/coffeeshop/benchmark.py: 88 stmts missing, 19% coverage.
@@ -283,7 +283,7 @@ work:
 
 - id: w6
   summary: "Test Doris DDL generator SQL output (19% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/core/tuning/generators/doris.py: 93 stmts missing, 19% coverage.
@@ -339,7 +339,7 @@ work:
 
 - id: w7
   summary: "Test QuestDB DDL generator SQL output (19% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/core/tuning/generators/questdb.py: 61 stmts missing, 19% coverage.
@@ -386,7 +386,7 @@ work:
 
 - id: w8
   summary: "Test CLI wrapper commands via CliRunner: datagen + run_official (22%, 33% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/cli/commands/datagen.py: 32 stmts missing, 22% coverage.
@@ -421,7 +421,7 @@ work:
 
 - id: w9
   summary: "Test TPCHSkew facade validation and property delegation (39% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/tpch_skew.py: 27 stmts missing, 39% coverage.
@@ -460,7 +460,7 @@ work:
 
 - id: w10
   summary: "Test cli/system SystemProfiler + mcp/__init__ lazy exports (35%, 35% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/cli/system.py: 17 stmts missing, 36% coverage (30 total stmts).
@@ -498,7 +498,7 @@ work:
 
 - id: w11
   summary: "Test MotherDuck adapter init, config, and mocked connection (31% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/motherduck.py: 99 stmts missing, 31% coverage (154 total).
@@ -540,7 +540,7 @@ work:
 
 - id: w12
   summary: "Test credentials/shared interactive prompt with mocked Rich (0% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/credentials/shared.py: 42 stmts, 0% coverage.
@@ -587,7 +587,7 @@ work:
 
 - id: w13
   summary: "Test tuning_group CLI commands via CliRunner (40% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/cli/commands/tuning_group.py: 133 stmts missing, 40% coverage (242 total).
@@ -642,7 +642,7 @@ work:
 
 - id: w14
   summary: "Test Redshift SQL generation — uncover remaining branches (37% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/redshift.py: 639 miss, 37% (1075 total stmts).
@@ -671,7 +671,7 @@ work:
 
 - id: w15
   summary: "Test Snowflake SQL generation — uncover remaining branches (40% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/snowflake.py: 405 miss, 40% (730 total stmts).
@@ -698,7 +698,7 @@ work:
 
 - id: w16
   summary: "Test BigQuery SQL generation — uncover remaining branches (34% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/bigquery.py: 514 miss, 34% (838 total stmts).
@@ -725,7 +725,7 @@ work:
 
 - id: w17
   summary: "Test Databricks adapter SQL generation — uncover remaining branches (35% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/databricks/adapter.py: 618 miss, 35% (1036 total stmts).
@@ -751,7 +751,7 @@ work:
 
 - id: w18
   summary: "Test Athena SQL generation — uncover remaining branches (41% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/athena.py: 360 miss, 41% (651 total stmts).
@@ -777,7 +777,7 @@ work:
 
 - id: w19
   summary: "Test Azure Synapse SQL generation — uncover remaining branches (54% → 80%)"
-  status: pending
+  status: done
   needs: []
   description: |
     platforms/azure_synapse.py: targeted by w22 previously. This unit covers
@@ -802,19 +802,15 @@ work:
 
 deferred:
 - summary: "platforms/databricks/dataframe_adapter (18%, 120 miss) and platforms/dataframe/pyspark_df (23%, 200 miss)"
-  reason: "Both require Spark session setup (SparkContext or SparkSession). PySpark
-    tests already have a 1046-line test file at 23% because most tests skip when
-    PySpark is not installed. Meaningful coverage requires a PySpark fixture or
-    the separate dataframe platform CI environment. Cover in the dataframe-platform
-    testing initiative, not here."
+  reason: "Both require Spark session setup (SparkContext or SparkSession). PySpark tests already have a 1046-line test file
+    at 23% because most tests skip when PySpark is not installed. Meaningful coverage requires a PySpark fixture or the separate
+    dataframe platform CI environment. Cover in the dataframe-platform testing initiative, not here."
 - summary: "platforms/azure/spark_execution_utils (27%, 30 miss)"
-  reason: "Azure Spark utilities require mocking Synapse/Fabric Spark session internals.
-    Low ROI (only 30 missing lines) and fragile mock setup. Cover alongside
-    other Azure Spark work when a real Spark session fixture is available."
+  reason: "Azure Spark utilities require mocking Synapse/Fabric Spark session internals. Low ROI (only 30 missing lines) and
+    fragile mock setup. Cover alongside other Azure Spark work when a real Spark session fixture is available."
 - summary: "TPC-DI ETL modules (core/tpcdi/etl/batch.py 882 miss, transformations.py 1053 miss)"
-  reason: "These are in the omit list of .coveragerc_core and were explicitly deferred
-    in non-dataframe-test-coverage. Still deferred: high effort, niche benchmark,
-    requires complex CDC/SCD fixtures. Cover after 80% overall target is sustained."
+  reason: "These are in the omit list of .coveragerc_core and were explicitly deferred in non-dataframe-test-coverage. Still
+    deferred: high effort, niche benchmark, requires complex CDC/SCD fixtures. Cover after 80% overall target is sustained."
 
 metadata:
   tags:
@@ -846,10 +842,14 @@ must_preserve:
 - "Test file names must describe the behavior being tested, not contain 'coverage'"
 
 anti_patterns:
-- "DO NOT test that a config field 'is not None' — because that can never fail once the field is populated — assert the actual value"
-- "DO NOT mock internal helper functions to test a dispatcher — because you then test the mock, not the code — use real inputs and assert on real output"
-- "DO NOT assert mock.called for SQL generation tests — because called=True doesn't verify the SQL is correct — always assert on the SQL string"
-- "DO NOT write a test that only calls get_available_presets() and asserts len > 0 — because that can't catch a bug where a preset is removed — assert the specific preset names"
+- "DO NOT test that a config field 'is not None' — because that can never fail once the field is populated — assert the actual
+  value"
+- "DO NOT mock internal helper functions to test a dispatcher — because you then test the mock, not the code — use real inputs
+  and assert on real output"
+- "DO NOT assert mock.called for SQL generation tests — because called=True doesn't verify the SQL is correct — always assert
+  on the SQL string"
+- "DO NOT write a test that only calls get_available_presets() and asserts len > 0 — because that can't catch a bug where
+  a preset is removed — assert the specific preset names"
 - "DO NOT test only the happy path for CLI wrappers — because error validation is where bugs live — test every exit(1) branch"
 
 scope_limit:
@@ -858,3 +858,4 @@ scope_limit:
   exclude:
   - "benchbox/ source code (no production changes)"
   - "pytest.ini or pyproject.toml (no config changes)"
+completed_date: "2026-03-26"
