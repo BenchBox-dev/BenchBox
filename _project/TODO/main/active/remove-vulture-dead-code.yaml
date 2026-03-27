@@ -2,7 +2,7 @@ id: remove-vulture-dead-code
 title: "Remove dead code identified by vulture static analysis"
 worktree: main
 priority: Medium
-status: Not Started
+status: In Progress
 description: |
   A vulture analysis (80% confidence) identified 25 dead-code findings across
   3 categories. One of the unreachable-code findings is an active bug:
@@ -51,7 +51,7 @@ justification: |
 work:
 - id: w1
   summary: "Fix unreachable code — 3 instances including latent bug in transformations.py"
-  status: pending
+  status: done
   needs: []
   description: |
     Three locations with unreachable code to fix:
