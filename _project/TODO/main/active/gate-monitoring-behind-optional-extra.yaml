@@ -2,7 +2,7 @@ id: gate-monitoring-behind-optional-extra
 title: "Gate monitoring behind a benchbox[monitoring] optional extra"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Packaging
 description: |
   The `benchbox.monitoring` package (~2,000 lines) ships in the installable
@@ -95,20 +95,19 @@ files_affected:
 work:
 - id: w1
   summary: "Research correct wheel-exclusion mechanism and decide on scope"
-  status: pending
+  status: done
   notes: |
-    Confirm that adding `"benchbox.monitoring", "benchbox.monitoring.*"` to
-    `[tool.setuptools.packages.find] exclude` in pyproject.toml is the right
-    wheel-exclusion mechanism (MANIFEST.in controls sdist only, not wheel).
-    Verify with: `uv build --wheel && unzip -l dist/*.whl | grep monitoring`.
-    Decide whether to proceed with wheel exclusion or limit scope to
-    conditional imports only (w3, w4). Document the decision in w2 notes
-    before starting w2.
+    Decision: skip wheel exclusion (w2). benchbox.monitoring has no external
+    dependencies, so wheel exclusion provides no install-size or dependency
+    benefit worth the confusing `monitoring = []` extra that installs nothing
+    (pip extras add dependencies, not source files). Proceeding with
+    conditional imports only (w3, w4) — this achieves graceful degradation
+    without packaging complexity.
 
 - id: w2
   summary: "Apply packaging changes: exclude monitoring from wheel, add optional extra marker"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     In pyproject.toml [tool.setuptools.packages.find]:
       Add `"benchbox.monitoring"` and `"benchbox.monitoring.*"` to the
@@ -125,7 +124,7 @@ work:
 - id: w3
   summary: "Make monitoring imports conditional in runner and progress"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     In runner.py, dataframe_runner.py, and progress.py: wrap monitoring
     imports in try/except ImportError. Fall back to a no-op stub when
