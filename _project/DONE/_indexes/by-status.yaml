@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:34:38.723203'
-total_items: 605
+generated_at: '2026-03-27T16:37:00.667665'
+total_items: 606
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 557
+    count: 558
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2354,6 +2354,11 @@ statuses:
       title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)
       priority: Medium
       category: Code Quality
+    - id: resolve-dataframe-tpcds-xfails
+      file: DONE/main/active/resolve-dataframe-tpcds-xfails.yaml
+      title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
+      priority: High
+      category: Testing & Quality
     - id: resource-management
       file: DONE/runtime-ops/completed/resource-management.yaml
       title: Resource Management

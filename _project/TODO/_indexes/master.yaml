@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:34:37.437693'
-total_items: 24
+generated_at: '2026-03-27T16:36:59.336337'
+total_items: 23
 items:
 - id: productize-result-publishing-and-artifact-sharing
   file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
@@ -20,24 +20,6 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 3
-- id: resolve-dataframe-tpcds-xfails
-  file: TODO/main/active/resolve-dataframe-tpcds-xfails.yaml
-  title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
-  worktree: main
-  category: Testing & Quality
-  priority: High
-  status: In Progress
-  tags:
-  - dataframe
-  - testing
-  - xfail
-  - dask-df
-  - pyspark-df
-  - tpcds
-  estimated_effort: Medium — dask isin fix may require query translator change; pyspark is likely a guard improvement
-  work_total: 5
-  work_done: 3
-  work_ready: 2
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter

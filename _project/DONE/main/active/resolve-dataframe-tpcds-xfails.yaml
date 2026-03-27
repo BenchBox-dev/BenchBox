@@ -2,7 +2,7 @@ id: resolve-dataframe-tpcds-xfails
 title: "Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Testing & Quality
 description: |
   Two platform/benchmark combinations were marked xfail in the matrix integration
@@ -41,7 +41,7 @@ metadata:
 work:
   - id: w1
     summary: "Diagnose dask-df isin failure — identify which TPC-DS queries trigger it and what expression form Dask rejects"
-    status: pending
+    status: done
     notes: |
       Run: uv run -- python -m pytest tests/e2e/test_dataframe_platforms.py::TestDaskDataFrameE2E -k "tpch" -n 0 -v --runxfail
       and the matrix test for dask-df/tpcds with --runxfail to collect actual error messages.
@@ -51,7 +51,7 @@ work:
   - id: w2
     summary: "Fix or work around dask-df isin expression failure in TPC-H and TPC-DS query translation"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Options in priority order:
       1. Emit .isin(list(…)) instead of .isin(…) if Dask requires materialized list
@@ -62,7 +62,7 @@ work:
   - id: w3
     summary: "Remove dask-df xfail markers from matrix test and e2e test once fix is verified"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Files to update:
       - tests/integration/test_local_platform_benchmark_matrix.py (_DATAFRAME_XFAIL_COMBINATIONS dict)
@@ -70,7 +70,7 @@ work:
 
   - id: w4
     summary: "Diagnose pyspark-df/tpcds CI failure — determine if it's an is_dataframe_available gap or missing JVM guard"
-    status: pending
+    status: done
     notes: |
       Check whether is_dataframe_available("pyspark-df") already returns False in the
       CI environment (which would mean the xfail is unreachable dead code) or whether
@@ -80,7 +80,7 @@ work:
   - id: w5
     summary: "Fix pyspark-df availability guard or document as environment-only, then remove xfail marker"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       If is_dataframe_available already handles this: the xfail in matrix test is
       unreachable — remove it and add a comment to the guard instead.

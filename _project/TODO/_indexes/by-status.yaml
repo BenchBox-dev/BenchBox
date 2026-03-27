@@ -1,14 +1,6 @@
-generated_at: '2026-03-27T16:34:37.437747'
-total_items: 24
+generated_at: '2026-03-27T16:36:59.336382'
+total_items: 23
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: resolve-dataframe-tpcds-xfails
-      file: TODO/main/active/resolve-dataframe-tpcds-xfails.yaml
-      title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
-      priority: High
-      category: Testing & Quality
   Not Started:
     count: 23
     items:

@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:34:38.723054'
-total_items: 605
+generated_at: '2026-03-27T16:37:00.667540'
+total_items: 606
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 217
+    count: 218
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -998,6 +998,11 @@ priorities:
       file: DONE/main/active/bulk-shard-loading-duckdb.yaml
       title: Replace per-shard INSERT loops with single bulk INSERT for DuckDB handlers
       category: Core Functionality
+      status: Completed
+    - id: resolve-dataframe-tpcds-xfails
+      file: DONE/main/active/resolve-dataframe-tpcds-xfails.yaml
+      title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
+      category: Testing & Quality
       status: Completed
     - id: fix-datafusion-read-write-primitives-parity
       file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml

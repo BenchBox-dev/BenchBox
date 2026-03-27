@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T16:34:38.722885'
+generated_at: '2026-03-27T16:37:00.667401'
 total_categories: 72
 categories:
   '"Bug Fixes & Reliability"':
@@ -2841,7 +2841,7 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 12
+    count: 13
     items:
     - id: fix-coverage-theater
       file: DONE/main/active/fix-coverage-theater.yaml
@@ -2891,6 +2891,11 @@ categories:
     - id: remediate-coverage-theater
       file: DONE/main/active/remediate-coverage-theater.yaml
       title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
+      priority: High
+      status: Completed
+    - id: resolve-dataframe-tpcds-xfails
+      file: DONE/main/active/resolve-dataframe-tpcds-xfails.yaml
+      title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
       priority: High
       status: Completed
     - id: restore-lightweight-fast-test-lane-with-comprehensive-reclassification

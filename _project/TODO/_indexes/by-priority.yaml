@@ -1,19 +1,14 @@
-generated_at: '2026-03-27T16:34:37.437737'
-total_items: 24
+generated_at: '2026-03-27T16:36:59.336374'
+total_items: 23
 priorities:
   High:
-    count: 2
+    count: 1
     items:
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
       status: Not Started
-    - id: resolve-dataframe-tpcds-xfails
-      file: TODO/main/active/resolve-dataframe-tpcds-xfails.yaml
-      title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
-      category: Testing & Quality
-      status: In Progress
   Medium-High:
     count: 5
     items:

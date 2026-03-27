@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T16:34:37.437722'
+generated_at: '2026-03-27T16:36:59.336360'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -125,18 +125,13 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 2
+    count: 1
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       priority: Low
       status: Not Started
-    - id: resolve-dataframe-tpcds-xfails
-      file: TODO/main/active/resolve-dataframe-tpcds-xfails.yaml
-      title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
-      priority: High
-      status: In Progress
   User Experience:
     count: 1
     items:
