@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T08:50:16.639272'
+generated_at: '2026-03-27T09:03:55.441380'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -136,7 +136,7 @@ categories:
       file: TODO/main/planning/non-dataframe-test-coverage.yaml
       title: Increase core, CLI, platform, and utils test coverage to 80%
       priority: High
-      status: In Progress
+      status: Completed
   User Experience:
     count: 1
     items:

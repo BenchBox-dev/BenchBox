@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T08:50:16.639286'
+generated_at: '2026-03-27T09:03:55.441407'
 total_items: 24
 priorities:
   High:
@@ -8,7 +8,7 @@ priorities:
       file: TODO/main/planning/non-dataframe-test-coverage.yaml
       title: Increase core, CLI, platform, and utils test coverage to 80%
       category: Testing & Quality
-      status: In Progress
+      status: Completed
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow

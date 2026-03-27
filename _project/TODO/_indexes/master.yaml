@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T08:50:16.639243'
+generated_at: '2026-03-27T09:03:55.441325'
 total_items: 24
 items:
 - id: non-dataframe-test-coverage
@@ -7,7 +7,7 @@ items:
   worktree: main
   category: Testing & Quality
   priority: High
-  status: In Progress
+  status: Completed
   tags:
   - testing
   - coverage
@@ -17,8 +17,8 @@ items:
   - platforms
   estimated_effort: Large (3-4 weeks across work units)
   work_total: 25
-  work_done: 24
-  work_ready: 1
+  work_done: 25
+  work_ready: 0
   deferred_count: 4
   needs:
   - fix-coverage-theater
