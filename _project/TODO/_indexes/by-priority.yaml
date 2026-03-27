@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T17:16:20.294005'
-total_items: 21
+generated_at: '2026-03-27T17:24:03.250070'
+total_items: 22
 priorities:
   High:
     count: 3
@@ -28,7 +28,7 @@ priorities:
       category: Benchmark Development
       status: Not Started
   Medium:
-    count: 5
+    count: 6
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -49,6 +49,11 @@ priorities:
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
+      status: Not Started
+    - id: remove-vulture-dead-code
+      file: TODO/main/planning/remove-vulture-dead-code.yaml
+      title: Remove dead code identified by vulture static analysis
+      category: Testing & Quality
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T17:16:20.293973'
-total_items: 21
+generated_at: '2026-03-27T17:24:03.250032'
+total_items: 22
 items:
 - id: on-demand-tpc-answer-download
   file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
@@ -328,6 +328,21 @@ items:
   priority: Medium
   status: Not Started
   work_total: 4
+  work_done: 0
+  work_ready: 1
+- id: remove-vulture-dead-code
+  file: TODO/main/planning/remove-vulture-dead-code.yaml
+  title: Remove dead code identified by vulture static analysis
+  worktree: main
+  category: Testing & Quality
+  priority: Medium
+  status: Not Started
+  tags:
+  - quality
+  - dead-code
+  - vulture
+  estimated_effort: Small
+  work_total: 3
   work_done: 0
   work_ready: 1
 - id: stackoverflow-benchmark
