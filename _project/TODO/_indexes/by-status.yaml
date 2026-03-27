@@ -1,8 +1,8 @@
-generated_at: '2026-03-27T16:42:00.158951'
-total_items: 23
+generated_at: '2026-03-27T16:55:52.721592'
+total_items: 22
 statuses:
   Not Started:
-    count: 23
+    count: 22
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -49,11 +49,6 @@ statuses:
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
       priority: Low
       category: Platform Expansion
-    - id: deferred-dataframe-benchmark-implementations
-      file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
-      title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
-      priority: Medium-High
-      category: Benchmark Expansion
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics

@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:37:00.667540'
-total_items: 606
+generated_at: '2026-03-27T16:55:53.985049'
+total_items: 607
 priorities:
   Critical:
     count: 35
@@ -1276,7 +1276,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 71
+    count: 72
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1443,6 +1443,11 @@ priorities:
       file: DONE/platform-expansion/active/databend-cloud-olap-platform.yaml
       title: Databend Cloud-Native OLAP Platform Integration
       category: Platform Expansion
+      status: Completed
+    - id: deferred-dataframe-benchmark-implementations
+      file: DONE/main/planning/deferred-dataframe-benchmark-implementations.yaml
+      title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
+      category: Benchmark Expansion
       status: Completed
     - id: dataframe-write-primitives-model
       file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml

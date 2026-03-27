@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:42:00.158899'
-total_items: 23
+generated_at: '2026-03-27T16:55:52.721539'
+total_items: 22
 items:
 - id: on-demand-tpc-answer-download
   file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
@@ -365,23 +365,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: deferred-dataframe-benchmark-implementations
-  file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
-  title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
-  worktree: main
-  category: Benchmark Expansion
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - dataframe
-  - benchmarks
-  - deferred-followup
-  - architecture
-  estimated_effort: Large — each benchmark needs dedicated design
-  work_total: 4
-  work_done: 0
-  work_ready: 4
-  deferred_count: 1
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

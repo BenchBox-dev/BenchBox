@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:37:00.667155'
-total_items: 606
+generated_at: '2026-03-27T16:55:53.984635'
+total_items: 607
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7187,6 +7187,24 @@ items:
   work_total: 22
   work_done: 22
   work_ready: 0
+- id: deferred-dataframe-benchmark-implementations
+  file: DONE/main/planning/deferred-dataframe-benchmark-implementations.yaml
+  title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
+  worktree: main
+  category: Benchmark Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - dataframe
+  - benchmarks
+  - deferred-followup
+  - architecture
+  estimated_effort: Large — each benchmark needs dedicated design
+  completed_date: '2026-02-18'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  deferred_count: 1
 - id: dataframe-write-primitives-model
   file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
   title: Define DataFrame Execution Model for Write Primitives

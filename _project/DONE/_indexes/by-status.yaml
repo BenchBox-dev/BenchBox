@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:37:00.667665'
-total_items: 606
+generated_at: '2026-03-27T16:55:53.985177'
+total_items: 607
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 558
+    count: 559
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1067,6 +1067,11 @@ statuses:
       title: Decompose monolithic ASCII visualization render() functions (complexity batch 3)
       priority: Medium
       category: Core Functionality
+    - id: deferred-dataframe-benchmark-implementations
+      file: DONE/main/planning/deferred-dataframe-benchmark-implementations.yaml
+      title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
+      priority: Medium-High
+      category: Benchmark Expansion
     - id: deferred-dataframe-performance-analysis
       file: DONE/main/active/deferred-dataframe-performance-analysis.yaml
       title: Deferred DataFrame Performance Cross-Platform Analysis

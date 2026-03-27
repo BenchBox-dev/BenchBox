@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:37:00.667401'
-total_categories: 72
+generated_at: '2026-03-27T16:55:53.984895'
+total_categories: 73
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -147,6 +147,14 @@ categories:
       title: Metadata Primitives Complexity Enhancements
       priority: High
       status: Not Started
+  Benchmark Expansion:
+    count: 1
+    items:
+    - id: deferred-dataframe-benchmark-implementations
+      file: DONE/main/planning/deferred-dataframe-benchmark-implementations.yaml
+      title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
+      priority: Medium-High
+      status: Completed
   Benchmark Implementation - Critical Fixes:
     count: 1
     items:

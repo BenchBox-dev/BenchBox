@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:42:00.158926'
-total_categories: 8
+generated_at: '2026-03-27T16:55:52.721570'
+total_categories: 7
 categories:
   AI/ML Capabilities:
     count: 1
@@ -41,14 +41,6 @@ categories:
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
-      status: Not Started
-  Benchmark Expansion:
-    count: 1
-    items:
-    - id: deferred-dataframe-benchmark-implementations
-      file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
-      title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
-      priority: Medium-High
       status: Not Started
   Core Functionality:
     count: 2

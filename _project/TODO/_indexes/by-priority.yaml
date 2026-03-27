@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:42:00.158941'
-total_items: 23
+generated_at: '2026-03-27T16:55:52.721583'
+total_items: 22
 priorities:
   High:
     count: 3
@@ -20,13 +20,8 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium-High:
-    count: 2
+    count: 1
     items:
-    - id: deferred-dataframe-benchmark-implementations
-      file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
-      title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
-      category: Benchmark Expansion
-      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
