@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T16:36:59.336382'
+generated_at: '2026-03-27T16:42:00.158951'
 total_items: 23
 statuses:
   Not Started:
@@ -77,7 +77,7 @@ statuses:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
-      priority: Medium-High
+      priority: High
       category: Core Functionality
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
@@ -97,7 +97,7 @@ statuses:
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
-      priority: Medium-High
+      priority: Low
       category: User Experience
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
@@ -112,7 +112,7 @@ statuses:
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
-      priority: Medium-High
+      priority: High
       category: AI/ML Capabilities
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml

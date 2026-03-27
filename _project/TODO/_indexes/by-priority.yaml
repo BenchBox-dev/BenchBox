@@ -1,41 +1,36 @@
-generated_at: '2026-03-27T16:36:59.336374'
+generated_at: '2026-03-27T16:42:00.158941'
 total_items: 23
 priorities:
   High:
-    count: 1
+    count: 3
     items:
+    - id: on-demand-tpc-answer-download
+      file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
+      title: Implement on-demand download of TPC answer files for validation
+      category: Core Functionality
+      status: Not Started
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
       status: Not Started
+    - id: vector-search-benchmark-support
+      file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
+      title: Vector Search Benchmark Support
+      category: AI/ML Capabilities
+      status: Not Started
   Medium-High:
-    count: 5
+    count: 2
     items:
     - id: deferred-dataframe-benchmark-implementations
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
       category: Benchmark Expansion
       status: Not Started
-    - id: on-demand-tpc-answer-download
-      file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
-      title: Implement on-demand download of TPC answer files for validation
-      category: Core Functionality
-      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
-      status: Not Started
-    - id: deferred-visualization-and-output-enhancements
-      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
-      title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
-      category: User Experience
-      status: Not Started
-    - id: vector-search-benchmark-support
-      file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
-      title: Vector Search Benchmark Support
-      category: AI/ML Capabilities
       status: Not Started
   Medium:
     count: 5
@@ -66,7 +61,7 @@ priorities:
       category: Benchmark Development
       status: Not Started
   Low:
-    count: 12
+    count: 13
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -117,6 +112,11 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
+      status: Not Started
+    - id: deferred-visualization-and-output-enhancements
+      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
+      title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
+      category: User Experience
       status: Not Started
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml

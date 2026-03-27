@@ -1,7 +1,7 @@
 id: deferred-visualization-and-output-enhancements
 title: "Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering"
 worktree: main
-priority: Medium-High
+priority: Low
 status: Not Started
 category: User Experience
 description: |
