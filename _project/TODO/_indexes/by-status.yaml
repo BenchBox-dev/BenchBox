@@ -1,8 +1,8 @@
-generated_at: '2026-03-27T09:48:54.331889'
-total_items: 23
+generated_at: '2026-03-27T09:49:17.248456'
+total_items: 24
 statuses:
   Not Started:
-    count: 23
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -94,6 +94,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Medium
       category: Platform Expansion
+    - id: resolve-dataframe-tpcds-xfails
+      file: TODO/main/planning/resolve-dataframe-tpcds-xfails.yaml
+      title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
+      priority: Low
+      category: Testing & Quality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

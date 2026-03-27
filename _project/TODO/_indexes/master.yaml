@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T09:48:54.331826'
-total_items: 23
+generated_at: '2026-03-27T09:49:17.248415'
+total_items: 24
 items:
 - id: productize-result-publishing-and-artifact-sharing
   file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
@@ -226,6 +226,24 @@ items:
   work_total: 14
   work_done: 0
   work_ready: 12
+- id: resolve-dataframe-tpcds-xfails
+  file: TODO/main/planning/resolve-dataframe-tpcds-xfails.yaml
+  title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
+  worktree: main
+  category: Testing & Quality
+  priority: Low
+  status: Not Started
+  tags:
+  - dataframe
+  - testing
+  - xfail
+  - dask-df
+  - pyspark-df
+  - tpcds
+  estimated_effort: Medium — dask isin fix may require query translator change; pyspark is likely a guard improvement
+  work_total: 5
+  work_done: 0
+  work_ready: 2
 - id: deferred-visualization-and-output-enhancements
   file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
   title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
