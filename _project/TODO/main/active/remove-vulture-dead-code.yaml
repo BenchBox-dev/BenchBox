@@ -81,7 +81,7 @@ work:
 
 - id: w2
   summary: "Fix unused function parameters — prefix with _ or implement (12 instances)"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     12 function parameters declared but never read in their method bodies.
