@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:55:52.721583'
-total_items: 22
+generated_at: '2026-03-27T17:16:20.294005'
+total_items: 21
 priorities:
   High:
     count: 3
@@ -56,7 +56,7 @@ priorities:
       category: Benchmark Development
       status: Not Started
   Low:
-    count: 13
+    count: 12
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -107,11 +107,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: deferred-visualization-and-output-enhancements
-      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
-      title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
-      category: User Experience
       status: Not Started
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml

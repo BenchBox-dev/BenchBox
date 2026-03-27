@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:55:52.721539'
-total_items: 22
+generated_at: '2026-03-27T17:16:20.293973'
+total_items: 21
 items:
 - id: on-demand-tpc-answer-download
   file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
@@ -225,22 +225,6 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
-- id: deferred-visualization-and-output-enhancements
-  file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
-  title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
-  worktree: main
-  category: User Experience
-  priority: Low
-  status: Not Started
-  tags:
-  - visualization
-  - charts
-  - deferred-followup
-  - research-needed
-  estimated_effort: Medium
-  work_total: 3
-  work_done: 0
-  work_ready: 3
 - id: tigerdata-cloud-enhancements
   file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
   title: TigerData Cloud Enhancements

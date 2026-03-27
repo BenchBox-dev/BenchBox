@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:55:52.721570'
-total_categories: 7
+generated_at: '2026-03-27T17:16:20.293995'
+total_categories: 6
 categories:
   AI/ML Capabilities:
     count: 1
@@ -122,13 +122,5 @@ categories:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
-      priority: Low
-      status: Not Started
-  User Experience:
-    count: 1
-    items:
-    - id: deferred-visualization-and-output-enhancements
-      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
-      title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
       priority: Low
       status: Not Started

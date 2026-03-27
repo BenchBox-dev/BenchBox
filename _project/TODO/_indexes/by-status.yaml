@@ -1,8 +1,8 @@
-generated_at: '2026-03-27T16:55:52.721592'
-total_items: 22
+generated_at: '2026-03-27T17:16:20.294012'
+total_items: 21
 statuses:
   Not Started:
-    count: 22
+    count: 21
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -89,11 +89,6 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Medium
       category: Platform Expansion
-    - id: deferred-visualization-and-output-enhancements
-      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
-      title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
-      priority: Low
-      category: User Experience
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
