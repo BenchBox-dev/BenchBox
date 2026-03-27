@@ -1,8 +1,16 @@
-generated_at: '2026-03-27T17:27:39.575542'
+generated_at: '2026-03-27T17:31:21.884304'
 total_items: 22
 statuses:
+  In Progress:
+    count: 1
+    items:
+    - id: remove-vulture-dead-code
+      file: TODO/main/active/remove-vulture-dead-code.yaml
+      title: Remove dead code identified by vulture static analysis
+      priority: High
+      category: Testing & Quality
   Not Started:
-    count: 22
+    count: 21
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -22,12 +30,12 @@ statuses:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
-      priority: Low
+      priority: Medium-High
       category: Testing & Quality
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
-      priority: Medium
+      priority: Medium-High
       category: Platform Expansion
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
@@ -37,17 +45,17 @@ statuses:
     - id: http-tls-certificate-validation
       file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
       title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
-      priority: Low
+      priority: Medium-High
       category: Platform Expansion
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
-      priority: Low
+      priority: Medium-High
       category: Platform Expansion
     - id: cloud-integration-test-infrastructure
       file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
-      priority: Low
+      priority: Medium-High
       category: Platform Expansion
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
@@ -87,13 +95,8 @@ statuses:
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
-      priority: Medium
+      priority: Low
       category: Platform Expansion
-    - id: remove-vulture-dead-code
-      file: TODO/main/planning/remove-vulture-dead-code.yaml
-      title: Remove dead code identified by vulture static analysis
-      priority: Medium
-      category: Testing & Quality
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

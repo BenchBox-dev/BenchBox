@@ -1,7 +1,7 @@
 id: cloud-integration-test-infrastructure
 title: "Cloud Platform Integration Test Infrastructure — Deferred Live Tests"
 worktree: platform-expansion
-priority: Low
+priority: Medium-High
 status: Not Started
 category: Platform Expansion
 description: |

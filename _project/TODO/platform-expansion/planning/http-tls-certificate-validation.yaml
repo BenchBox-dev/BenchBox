@@ -1,7 +1,7 @@
 id: http-tls-certificate-validation
 title: "Add TLS Certificate Validation Options to HTTP-Based Data Loading"
 worktree: platform-expansion
-priority: Low
+priority: Medium-High
 status: Not Started
 category: Platform Expansion
 description: |

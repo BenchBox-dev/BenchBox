@@ -1,8 +1,8 @@
-generated_at: '2026-03-27T17:27:39.575531'
+generated_at: '2026-03-27T17:31:21.884294'
 total_items: 22
 priorities:
   High:
-    count: 3
+    count: 4
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
@@ -14,73 +14,27 @@ priorities:
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
       status: Not Started
+    - id: remove-vulture-dead-code
+      file: TODO/main/active/remove-vulture-dead-code.yaml
+      title: Remove dead code identified by vulture static analysis
+      category: Testing & Quality
+      status: In Progress
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
       category: AI/ML Capabilities
       status: Not Started
   Medium-High:
-    count: 1
-    items:
-    - id: nyc-taxi-benchmark-expansion
-      file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
-      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
-      category: Benchmark Development
-      status: Not Started
-  Medium:
     count: 6
     items:
-    - id: ballista-distributed-adapter
-      file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
-      title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
-      category: Platform Expansion
-      status: Not Started
-    - id: singlestore-adapter
-      file: TODO/platform-expansion/planning/singlestore-adapter.yaml
-      title: Add SingleStore Platform Adapter
-      category: Platform Expansion
-      status: Not Started
-    - id: flight-data-benchmark
-      file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
-      title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
-      category: Benchmark Development
-      status: Not Started
-    - id: reenable-fireducks-after-upstream-fixes
-      file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
-      title: Re-enable FireDucks after upstream stability fixes
-      category: Platform Expansion
-      status: Not Started
-    - id: remove-vulture-dead-code
-      file: TODO/main/planning/remove-vulture-dead-code.yaml
-      title: Remove dead code identified by vulture static analysis
-      category: Testing & Quality
-      status: Not Started
-    - id: stackoverflow-benchmark
-      file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
-      title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
-      category: Benchmark Development
-      status: Not Started
-  Low:
-    count: 12
-    items:
-    - id: bodo-jit-and-mpi-support
-      file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
-      title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
-      category: Platform Expansion
-      status: Not Started
-    - id: cedardb-adapter
-      file: TODO/platform-expansion/planning/cedardb-adapter.yaml
-      title: Add CedarDB Platform Adapter
-      category: Platform Expansion
-      status: Not Started
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       category: Testing & Quality
       status: Not Started
-    - id: siriusdb-adapter
-      file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
-      title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
+    - id: singlestore-adapter
+      file: TODO/platform-expansion/planning/singlestore-adapter.yaml
+      title: Add SingleStore Platform Adapter
       category: Platform Expansion
       status: Not Started
     - id: http-tls-certificate-validation
@@ -98,6 +52,47 @@ priorities:
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
       category: Platform Expansion
       status: Not Started
+    - id: nyc-taxi-benchmark-expansion
+      file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
+      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+      category: Benchmark Development
+      status: Not Started
+  Medium:
+    count: 3
+    items:
+    - id: ballista-distributed-adapter
+      file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
+      title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: flight-data-benchmark
+      file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
+      title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
+      category: Benchmark Development
+      status: Not Started
+    - id: stackoverflow-benchmark
+      file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
+      title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
+      category: Benchmark Development
+      status: Not Started
+  Low:
+    count: 9
+    items:
+    - id: bodo-jit-and-mpi-support
+      file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
+      title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: cedardb-adapter
+      file: TODO/platform-expansion/planning/cedardb-adapter.yaml
+      title: Add CedarDB Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: siriusdb-adapter
+      file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
+      title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
+      category: Platform Expansion
+      status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -112,6 +107,11 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
+      status: Not Started
+    - id: reenable-fireducks-after-upstream-fixes
+      file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
+      title: Re-enable FireDucks after upstream stability fixes
+      category: Platform Expansion
       status: Not Started
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml

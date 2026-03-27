@@ -1,7 +1,7 @@
 id: singlestore-adapter
 title: "Add SingleStore Platform Adapter"
 worktree: platform-expansion
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Platform Expansion
 description: |

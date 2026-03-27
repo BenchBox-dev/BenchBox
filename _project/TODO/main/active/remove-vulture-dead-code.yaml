@@ -1,7 +1,7 @@
 id: remove-vulture-dead-code
 title: "Remove dead code identified by vulture static analysis"
 worktree: main
-priority: Medium
+priority: High
 status: In Progress
 description: |
   A vulture analysis (80% confidence) identified 25 dead-code findings across

@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T17:27:39.575512'
+generated_at: '2026-03-27T17:31:21.884276'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -76,7 +76,7 @@ categories:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
@@ -86,22 +86,22 @@ categories:
     - id: http-tls-certificate-validation
       file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
       title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
-      priority: Low
+      priority: Medium-High
       status: Not Started
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
-      priority: Low
+      priority: Medium-High
       status: Not Started
     - id: cloud-integration-test-infrastructure
       file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
-      priority: Low
+      priority: Medium-High
       status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
-      priority: Medium
+      priority: Low
       status: Not Started
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
@@ -122,10 +122,10 @@ categories:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
-      priority: Low
+      priority: Medium-High
       status: Not Started
     - id: remove-vulture-dead-code
-      file: TODO/main/planning/remove-vulture-dead-code.yaml
+      file: TODO/main/active/remove-vulture-dead-code.yaml
       title: Remove dead code identified by vulture static analysis
-      priority: Medium
-      status: Not Started
+      priority: High
+      status: In Progress

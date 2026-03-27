@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T17:27:39.575483'
+generated_at: '2026-03-27T17:31:21.884245'
 total_items: 22
 items:
 - id: on-demand-tpc-answer-download
@@ -36,6 +36,21 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 3
+- id: remove-vulture-dead-code
+  file: TODO/main/active/remove-vulture-dead-code.yaml
+  title: Remove dead code identified by vulture static analysis
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: In Progress
+  tags:
+  - quality
+  - dead-code
+  - vulture
+  estimated_effort: Small
+  work_total: 11
+  work_done: 1
+  work_ready: 1
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support
@@ -87,22 +102,6 @@ items:
   work_total: 11
   work_done: 0
   work_ready: 11
-- id: add-hypothesis-property-tests
-  file: TODO/main/planning/add-hypothesis-property-tests.yaml
-  title: Add Hypothesis property-based tests for pure-function invariants
-  worktree: main
-  category: Testing & Quality
-  priority: Low
-  status: Not Started
-  tags:
-  - testing
-  - quality
-  - property-based
-  - hypothesis
-  estimated_effort: Medium
-  work_total: 5
-  work_done: 0
-  work_ready: 1
 - id: siriusdb-adapter
   file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
   title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
@@ -121,54 +120,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: http-tls-certificate-validation
-  file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
-  title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Low
-  status: Not Started
-  tags:
-  - tls
-  - security
-  - http
-  - deferred-followup
-  estimated_effort: Small — 1 day
-  work_total: 3
-  work_done: 0
-  work_ready: 1
-- id: pg-extension-advanced-benchmarking
-  file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
-  title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Low
-  status: Not Started
-  tags:
-  - pg-extensions
-  - pg-mooncake
-  - pg-duckdb
-  - benchmarking
-  - deferred-followup
-  estimated_effort: Small — 1-2 days
-  work_total: 3
-  work_done: 0
-  work_ready: 3
-- id: cloud-integration-test-infrastructure
-  file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
-  title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Low
-  status: Not Started
-  tags:
-  - integration-tests
-  - cloud
-  - deferred-followup
-  estimated_effort: Large — requires cloud account provisioning
-  work_total: 11
-  work_done: 0
-  work_ready: 1
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -225,6 +176,16 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
+- id: reenable-fireducks-after-upstream-fixes
+  file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
+  title: Re-enable FireDucks after upstream stability fixes
+  worktree: main
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  work_total: 4
+  work_done: 0
+  work_ready: 1
 - id: tigerdata-cloud-enhancements
   file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
   title: TigerData Cloud Enhancements
@@ -281,25 +242,6 @@ items:
   work_total: 9
   work_done: 0
   work_ready: 1
-- id: singlestore-adapter
-  file: TODO/platform-expansion/planning/singlestore-adapter.yaml
-  title: Add SingleStore Platform Adapter
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  tags:
-  - platform
-  - sql
-  - mysql-compatible
-  - distributed
-  - olap
-  - cloud
-  - singlestore
-  estimated_effort: Medium
-  work_total: 15
-  work_done: 0
-  work_ready: 15
 - id: flight-data-benchmark
   file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
   title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -320,31 +262,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: reenable-fireducks-after-upstream-fixes
-  file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
-  title: Re-enable FireDucks after upstream stability fixes
-  worktree: main
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-- id: remove-vulture-dead-code
-  file: TODO/main/planning/remove-vulture-dead-code.yaml
-  title: Remove dead code identified by vulture static analysis
-  worktree: main
-  category: Testing & Quality
-  priority: Medium
-  status: Not Started
-  tags:
-  - quality
-  - dead-code
-  - vulture
-  estimated_effort: Small
-  work_total: 11
-  work_done: 0
-  work_ready: 1
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
@@ -364,6 +281,89 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: add-hypothesis-property-tests
+  file: TODO/main/planning/add-hypothesis-property-tests.yaml
+  title: Add Hypothesis property-based tests for pure-function invariants
+  worktree: main
+  category: Testing & Quality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - testing
+  - quality
+  - property-based
+  - hypothesis
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+- id: singlestore-adapter
+  file: TODO/platform-expansion/planning/singlestore-adapter.yaml
+  title: Add SingleStore Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - platform
+  - sql
+  - mysql-compatible
+  - distributed
+  - olap
+  - cloud
+  - singlestore
+  estimated_effort: Medium
+  work_total: 15
+  work_done: 0
+  work_ready: 15
+- id: http-tls-certificate-validation
+  file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
+  title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - tls
+  - security
+  - http
+  - deferred-followup
+  estimated_effort: Small — 1 day
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+- id: pg-extension-advanced-benchmarking
+  file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
+  title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - pg-extensions
+  - pg-mooncake
+  - pg-duckdb
+  - benchmarking
+  - deferred-followup
+  estimated_effort: Small — 1-2 days
+  work_total: 3
+  work_done: 0
+  work_ready: 3
+- id: cloud-integration-test-infrastructure
+  file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
+  title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - integration-tests
+  - cloud
+  - deferred-followup
+  estimated_effort: Large — requires cloud account provisioning
+  work_total: 11
+  work_done: 0
+  work_ready: 1
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
