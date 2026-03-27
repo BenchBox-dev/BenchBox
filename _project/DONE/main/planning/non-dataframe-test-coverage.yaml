@@ -495,7 +495,7 @@ metadata:
 
 verification:
   command: |
-    uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" -n auto --strict-markers --tb=short -o "addopts=" -p pytest_cov --cov=benchbox --cov-report=term -q --no-header 2>&1 | grep -E "^(TOTAL|Required|WARNING)" | head -5
+    uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" -n auto --strict-markers --tb=short -p pytest_cov --cov=benchbox --cov-report=term -q --no-header 2>&1 | grep -E "^(TOTAL|Required|WARNING)" | head -5
   expected: "TOTAL line shows >= 80% coverage; no WARNING about below threshold"
 
 must_preserve:
