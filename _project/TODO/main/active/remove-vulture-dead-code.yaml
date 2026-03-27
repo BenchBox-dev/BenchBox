@@ -120,7 +120,7 @@ work:
 
 - id: w3
   summary: "Audit unused import: athena.py:47 AthenaCursor"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Read ~20 lines around athena.py:47. Decide: delete if unused, move into
@@ -131,7 +131,7 @@ work:
 
 - id: w4
   summary: "Audit unused import: cudf.py:39 dask_cudf"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Read ~20 lines around cudf.py:39. dask_cudf is an optional GPU dep —
@@ -142,7 +142,7 @@ work:
 
 - id: w5
   summary: "Audit unused import: databricks/adapter.py:42 DatabricksConnection"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Read ~20 lines around adapter.py:42. DatabricksConnection may be used in
@@ -153,7 +153,7 @@ work:
 
 - id: w6
   summary: "Audit unused import: delta_lake_maintenance.py:30 deltalake"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Read ~20 lines around delta_lake_maintenance.py:30. deltalake is an
@@ -164,7 +164,7 @@ work:
 
 - id: w7
   summary: "Audit unused import: iceberg_maintenance.py:35 pyiceberg"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Read ~20 lines around iceberg_maintenance.py:35. pyiceberg is an optional
@@ -175,7 +175,7 @@ work:
 
 - id: w8
   summary: "Audit unused imports: lakesail.py:47 DateType, DecimalType"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Read ~20 lines around lakesail.py:47. DateType and DecimalType may be
@@ -187,7 +187,7 @@ work:
 
 - id: w9
   summary: "Audit unused import: snowflake.py:37 SnowflakeError"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Read ~20 lines around snowflake.py:37. SnowflakeError is likely used in
@@ -198,7 +198,7 @@ work:
 
 - id: w10
   summary: "Audit unused imports: spark.py:39 DateType, DecimalType"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Read ~20 lines around spark.py:39. DateType and DecimalType are PySpark
@@ -210,7 +210,7 @@ work:
 
 - id: w11
   summary: "Audit unused import: cloud_storage.py:23 CloudPathNotExistsError"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Read ~20 lines around cloud_storage.py:23. CloudPathNotExistsError may
@@ -243,11 +243,11 @@ verification:
   command: "uv run -- python -m pytest tests/unit/core/tpcdi/ tests/unit/core/ssb/ tests/unit/platforms/databricks/ -q"
   expected_output: "All tests pass, 0 errors"
 - description: "Full fast test suite passes after each work unit"
-  command: "uv run -- python -m pytest -m fast -q"
+  command: "make test-fast"
   expected_output: "All tests pass"
 - description: "vulture confirms dead code removed"
-  command: "uv run --with vulture vulture benchbox --min-confidence 80"
-  expected_output: "Zero findings (or only whitelisted false positives)"
+  command: "uv run --with vulture vulture benchbox --min-confidence 80 --ignore-names issue_rate"
+  expected_output: "Zero findings (issue_rate whitelisted: public kwarg used by tests)"
 - description: "Lint clean after all changes"
   command: "uv run ruff check benchbox"
   expected_output: "All checks passed"
