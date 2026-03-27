@@ -2,7 +2,8 @@ id: remove-vulture-dead-code
 title: "Remove dead code identified by vulture static analysis"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-27"
 description: |
   A vulture analysis (80% confidence) identified 25 dead-code findings across
   3 categories. One of the unreachable-code findings is an active bug:

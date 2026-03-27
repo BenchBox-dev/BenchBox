@@ -1,8 +1,8 @@
-generated_at: '2026-03-27T17:31:21.884294'
-total_items: 22
+generated_at: '2026-03-27T17:50:48.030881'
+total_items: 21
 priorities:
   High:
-    count: 4
+    count: 3
     items:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
@@ -14,11 +14,6 @@ priorities:
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
       status: Not Started
-    - id: remove-vulture-dead-code
-      file: TODO/main/active/remove-vulture-dead-code.yaml
-      title: Remove dead code identified by vulture static analysis
-      category: Testing & Quality
-      status: In Progress
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support

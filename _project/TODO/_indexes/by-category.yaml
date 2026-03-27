@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T17:31:21.884276'
+generated_at: '2026-03-27T17:50:48.030871'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -117,15 +117,10 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 2
+    count: 1
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       priority: Medium-High
       status: Not Started
-    - id: remove-vulture-dead-code
-      file: TODO/main/active/remove-vulture-dead-code.yaml
-      title: Remove dead code identified by vulture static analysis
-      priority: High
-      status: In Progress

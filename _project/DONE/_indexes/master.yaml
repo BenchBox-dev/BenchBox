@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T17:31:23.222399'
-total_items: 607
+generated_at: '2026-03-27T17:50:49.351254'
+total_items: 608
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2943,6 +2943,22 @@ items:
   owners:
   - joe
   estimated_effort: 3-5 days
+- id: remove-vulture-dead-code
+  file: DONE/main/active/remove-vulture-dead-code.yaml
+  title: Remove dead code identified by vulture static analysis
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - quality
+  - dead-code
+  - vulture
+  estimated_effort: Small
+  completed_date: '2026-03-27'
+  work_total: 11
+  work_done: 11
+  work_ready: 0
 - id: remove-release-tooling-from-wheel
   file: DONE/main/active/remove-release-tooling-from-wheel.yaml
   title: Remove maintainer-only release tooling from the default install surface

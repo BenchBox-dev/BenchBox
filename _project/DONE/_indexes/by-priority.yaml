@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T17:31:23.222918'
-total_items: 607
+generated_at: '2026-03-27T17:50:49.351651'
+total_items: 608
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 218
+    count: 219
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -983,6 +983,11 @@ priorities:
       file: DONE/dataframe-benchmarks/active/remove-sql-coupling-from-tpcdi-dataframe-mode.yaml
       title: Remove SQL coupling from TPC-DI DataFrame mode and unify ETL orchestration via backend protocol
       category: Core Functionality
+      status: Completed
+    - id: remove-vulture-dead-code
+      file: DONE/main/active/remove-vulture-dead-code.yaml
+      title: Remove dead code identified by vulture static analysis
+      category: Testing & Quality
       status: Completed
     - id: remove-release-tooling-from-wheel
       file: DONE/main/active/remove-release-tooling-from-wheel.yaml

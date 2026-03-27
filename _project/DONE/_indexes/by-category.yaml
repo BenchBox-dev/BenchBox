@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T17:31:23.222760'
+generated_at: '2026-03-27T17:50:49.351513'
 total_categories: 73
 categories:
   '"Bug Fixes & Reliability"':
@@ -2849,7 +2849,7 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 13
+    count: 14
     items:
     - id: fix-coverage-theater
       file: DONE/main/active/fix-coverage-theater.yaml
@@ -2899,6 +2899,11 @@ categories:
     - id: remediate-coverage-theater
       file: DONE/main/active/remediate-coverage-theater.yaml
       title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'
+      priority: High
+      status: Completed
+    - id: remove-vulture-dead-code
+      file: DONE/main/active/remove-vulture-dead-code.yaml
+      title: Remove dead code identified by vulture static analysis
       priority: High
       status: Completed
     - id: resolve-dataframe-tpcds-xfails
