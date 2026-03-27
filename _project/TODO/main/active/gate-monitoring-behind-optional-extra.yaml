@@ -136,7 +136,7 @@ work:
 - id: w4
   summary: "Update tests to cover both with-monitoring and without-monitoring paths"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Ensure monitoring tests still pass from source checkout. Add a test
     that verifies core benchmark execution works when monitoring is not
