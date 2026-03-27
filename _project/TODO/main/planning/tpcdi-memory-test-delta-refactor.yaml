@@ -89,9 +89,12 @@ anti_patterns:
   - "DO NOT merge the calibration print into production code -- because debug prints in test output are noise -- remove the temporary print before committing w2"
 
 verification:
-  - description: "Memory assertion uses memory_growth_mb not peak_memory_mb"
-    command: "grep -n 'memory_growth_mb\\|peak_memory_mb' tests/performance/test_tpcdi_scalability.py"
-    expected_output: "Assertion line references memory_growth_mb; peak_memory_mb only appears in data collection and print"
+  - description: "No assert still references peak_memory_mb"
+    command: "grep -c 'assert.*peak_memory_mb' tests/performance/test_tpcdi_scalability.py"
+    expected_output: "0"
+  - description: "Exactly one assert now references memory_growth_mb"
+    command: "grep -c 'assert.*memory_growth_mb' tests/performance/test_tpcdi_scalability.py"
+    expected_output: "1"
   - description: "Test passes at all scale factors without flakiness"
     command: "uv run -- python -m pytest tests/performance/test_tpcdi_scalability.py::TestTPCDIScalabilityPerformance::test_multi_scale_factor_performance_analysis -n 0 -v"
     expected_output: "1 passed"
