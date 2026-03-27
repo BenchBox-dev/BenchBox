@@ -1,18 +1,13 @@
-generated_at: '2026-03-27T16:24:54.158519'
-total_items: 25
+generated_at: '2026-03-27T16:34:13.257053'
+total_items: 24
 priorities:
   High:
-    count: 3
+    count: 2
     items:
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
-      status: Not Started
-    - id: tpcdi-memory-test-delta-refactor
-      file: TODO/main/planning/tpcdi-memory-test-delta-refactor.yaml
-      title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
-      category: Testing & Quality
       status: Not Started
     - id: resolve-dataframe-tpcds-xfails
       file: TODO/main/active/resolve-dataframe-tpcds-xfails.yaml

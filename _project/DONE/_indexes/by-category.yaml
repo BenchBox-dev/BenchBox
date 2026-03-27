@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T16:24:55.495726'
+generated_at: '2026-03-27T16:34:14.616111'
 total_categories: 72
 categories:
   '"Bug Fixes & Reliability"':
@@ -2841,7 +2841,7 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 11
+    count: 12
     items:
     - id: fix-coverage-theater
       file: DONE/main/active/fix-coverage-theater.yaml
@@ -2881,6 +2881,11 @@ categories:
     - id: platform-live-integration-tests
       file: DONE/main/active/platform-live-integration-tests.yaml
       title: 'Real integration testing for all data platforms: Docker-local and cloud-live'
+      priority: High
+      status: Completed
+    - id: tpcdi-memory-test-delta-refactor
+      file: DONE/main/active/tpcdi-memory-test-delta-refactor.yaml
+      title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
       priority: High
       status: Completed
     - id: remediate-coverage-theater

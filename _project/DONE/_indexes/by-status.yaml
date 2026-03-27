@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:24:55.495989'
-total_items: 604
+generated_at: '2026-03-27T16:34:14.616385'
+total_items: 605
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 556
+    count: 557
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2264,6 +2264,11 @@ statuses:
       title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
       priority: High
       category: Core Functionality
+    - id: tpcdi-memory-test-delta-refactor
+      file: DONE/main/active/tpcdi-memory-test-delta-refactor.yaml
+      title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
+      priority: High
+      category: Testing & Quality
     - id: refactor-validation-logic-from-cli-to-core-module-completed
       file: DONE/unknown/planning/refactor-validation-logic-from-cli-to-core-module-completed.yaml
       title: Refactor Validation Logic from CLI to Core Module - COMPLETED ✅

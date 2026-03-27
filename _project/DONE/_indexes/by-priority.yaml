@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:24:55.495864'
-total_items: 604
+generated_at: '2026-03-27T16:34:14.616255'
+total_items: 605
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 216
+    count: 217
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -953,6 +953,11 @@ priorities:
       file: DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml
       title: Refactor MCP to use public BaseBenchmark API instead of CLI internals
       category: Core Functionality
+      status: Completed
+    - id: tpcdi-memory-test-delta-refactor
+      file: DONE/main/active/tpcdi-memory-test-delta-refactor.yaml
+      title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
+      category: Testing & Quality
       status: Completed
     - id: refactor-core-dependencies-to-optional
       file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:24:54.158529'
-total_items: 25
+generated_at: '2026-03-27T16:34:13.257062'
+total_items: 24
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Testing & Quality
   Not Started:
-    count: 24
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -102,11 +102,6 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Medium
       category: Platform Expansion
-    - id: tpcdi-memory-test-delta-refactor
-      file: TODO/main/planning/tpcdi-memory-test-delta-refactor.yaml
-      title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
-      priority: High
-      category: Testing & Quality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering

@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T16:24:55.495478'
-total_items: 604
+generated_at: '2026-03-27T16:34:14.615858'
+total_items: 605
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2844,6 +2844,24 @@ items:
   - technical-debt
   estimated_effort: Medium
   completed_date: '2026-01-18'
+- id: tpcdi-memory-test-delta-refactor
+  file: DONE/main/active/tpcdi-memory-test-delta-refactor.yaml
+  title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - performance
+  - tpcdi
+  - memory
+  - regression-detection
+  estimated_effort: Small — validation method change + one calibration run to pick threshold
+  completed_date: '2026-03-27'
+  work_total: 2
+  work_done: 2
+  work_ready: 0
 - id: refactor-core-dependencies-to-optional
   file: DONE/infrastructure-publishing/planning/refactor-core-dependencies-to-optional.yaml
   title: Refactor platform-specific packages from core to optional dependencies

@@ -2,7 +2,8 @@ id: tpcdi-memory-test-delta-refactor
 title: "Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-03-27"
 category: Testing & Quality
 description: |
   The TPC-DI scalability test's memory assertion checks absolute process RSS:
@@ -43,7 +44,7 @@ metadata:
 work:
   - id: w1
     summary: "Run a calibration pass to observe actual memory_growth_mb values across scale factors"
-    status: pending
+    status: done
     notes: |
       Add a temporary print to _validate_performance_thresholds to emit memory_growth_mb
       for each scale factor, then run the test:
@@ -55,7 +56,7 @@ work:
   - id: w2
     summary: "Replace peak_memory_mb assertion with memory_growth_mb and calibrated threshold"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       In _validate_performance_thresholds (line ~301), change:
         max_memory_mb = 1000 * scale_factor + 2000
