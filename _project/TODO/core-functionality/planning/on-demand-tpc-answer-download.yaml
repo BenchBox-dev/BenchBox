@@ -6,7 +6,7 @@ id: on-demand-tpc-answer-download
 title: "Implement on-demand download of TPC answer files for validation"
 worktree: core-functionality
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   Currently, TPC-H and TPC-DS answer files (~4.2 MB total) are only available in
@@ -112,47 +112,47 @@ success_metrics:
 work:
 - id: w1
   summary: "Design cache directory structure (~/.cache/benchbox/answers/)"
-  status: pending
+  status: done
 - id: w2
   summary: "Implement download manager with retry logic and checksums"
-  status: pending
+  status: done
 - id: w3
   summary: "Add configuration for answer file source URL (GitHub releases or CDN)"
-  status: pending
+  status: done
 - id: w4
   summary: "Update loader.py to check cache before raising FileNotFoundError"
-  status: pending
+  status: done
 - id: w5
   summary: "Check ~/.cache/benchbox/answers/tpch/ for TPC-H answers"
   needs:
   - w4
-  status: pending
+  status: done
 - id: w6
   summary: "Check ~/.cache/benchbox/answers/tpcds/ for TPC-DS answers"
   needs:
   - w4
-  status: pending
+  status: done
 - id: w7
   summary: "Trigger download when cache miss and validation enabled"
-  status: pending
+  status: done
 - id: w8
   summary: "Add CLI option to pre-download answers (benchbox download-answers)"
-  status: pending
+  status: done
 - id: w9
   summary: "Package answer files as GitHub release asset"
   status: pending
 - id: w10
   summary: "Add checksum verification for downloaded files"
-  status: pending
+  status: done
 - id: w11
   summary: "Document download behavior in user guide"
   status: pending
 - id: w12
   summary: "Unit tests for download manager"
-  status: pending
+  status: done
 - id: w13
   summary: "Integration test: fresh install → validation triggers download"
-  status: pending
+  status: done
 - id: w14
   summary: "Test offline mode (cache hit, no network)"
-  status: pending
+  status: done
