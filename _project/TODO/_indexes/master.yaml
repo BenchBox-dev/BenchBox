@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T17:24:03.250032'
+generated_at: '2026-03-27T17:27:39.575483'
 total_items: 22
 items:
 - id: on-demand-tpc-answer-download
@@ -342,7 +342,7 @@ items:
   - dead-code
   - vulture
   estimated_effort: Small
-  work_total: 3
+  work_total: 11
   work_done: 0
   work_ready: 1
 - id: stackoverflow-benchmark
