@@ -119,7 +119,7 @@ verification:
     command: "uv run -- python -m pytest tests/integration/test_local_platform_benchmark_matrix.py -k 'pyspark-df and tpcds' -n 0 -v"
     expected_output: "1 passed or 1 skipped (not xfailed)"
   - description: "Full DataFrame matrix test suite passes without regressions"
-    command: "uv run -- python -m pytest tests/integration/test_local_platform_benchmark_matrix.py -m fast -q"
+    command: "uv run -- python -m pytest tests/integration/test_local_platform_benchmark_matrix.py::test_local_dataframe_platform_benchmark_matrix -n auto -q"
     expected_output: "No failures in non-xfail tests"
 
 scope_limit:
