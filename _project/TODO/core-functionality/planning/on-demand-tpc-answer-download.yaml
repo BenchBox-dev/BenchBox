@@ -5,7 +5,7 @@
 id: on-demand-tpc-answer-download
 title: "Implement on-demand download of TPC answer files for validation"
 worktree: core-functionality
-priority: Low
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 description: |

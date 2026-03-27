@@ -1,8 +1,8 @@
 id: resolve-dataframe-tpcds-xfails
 title: "Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight"
 worktree: main
-priority: Low
-status: Not Started
+priority: High
+status: In Progress
 category: Testing & Quality
 description: |
   Two platform/benchmark combinations were marked xfail in the matrix integration

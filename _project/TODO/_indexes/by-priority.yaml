@@ -1,21 +1,46 @@
-generated_at: '2026-03-27T09:53:06.130538'
+generated_at: '2026-03-27T16:24:54.158519'
 total_items: 25
 priorities:
   High:
-    count: 1
+    count: 3
     items:
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
       status: Not Started
+    - id: tpcdi-memory-test-delta-refactor
+      file: TODO/main/planning/tpcdi-memory-test-delta-refactor.yaml
+      title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
+      category: Testing & Quality
+      status: Not Started
+    - id: resolve-dataframe-tpcds-xfails
+      file: TODO/main/active/resolve-dataframe-tpcds-xfails.yaml
+      title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
+      category: Testing & Quality
+      status: In Progress
   Medium-High:
-    count: 2
+    count: 5
     items:
+    - id: deferred-dataframe-benchmark-implementations
+      file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
+      title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
+      category: Benchmark Expansion
+      status: Not Started
+    - id: on-demand-tpc-answer-download
+      file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
+      title: Implement on-demand download of TPC answer files for validation
+      category: Core Functionality
+      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
+      status: Not Started
+    - id: deferred-visualization-and-output-enhancements
+      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
+      title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
+      category: User Experience
       status: Not Started
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
@@ -51,7 +76,7 @@ priorities:
       category: Benchmark Development
       status: Not Started
   Low:
-    count: 17
+    count: 12
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -88,11 +113,6 @@ priorities:
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
       category: Platform Expansion
       status: Not Started
-    - id: deferred-dataframe-benchmark-implementations
-      file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
-      title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
-      category: Benchmark Expansion
-      status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -107,26 +127,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: on-demand-tpc-answer-download
-      file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
-      title: Implement on-demand download of TPC answer files for validation
-      category: Core Functionality
-      status: Not Started
-    - id: tpcdi-memory-test-delta-refactor
-      file: TODO/main/planning/tpcdi-memory-test-delta-refactor.yaml
-      title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
-      category: Testing & Quality
-      status: Not Started
-    - id: resolve-dataframe-tpcds-xfails
-      file: TODO/main/planning/resolve-dataframe-tpcds-xfails.yaml
-      title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
-      category: Testing & Quality
-      status: Not Started
-    - id: deferred-visualization-and-output-enhancements
-      file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
-      title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
-      category: User Experience
       status: Not Started
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml

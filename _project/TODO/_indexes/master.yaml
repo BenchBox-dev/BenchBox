@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T09:53:06.130476'
+generated_at: '2026-03-27T16:24:54.158473'
 total_items: 25
 items:
 - id: productize-result-publishing-and-artifact-sharing
@@ -20,6 +20,41 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 3
+- id: tpcdi-memory-test-delta-refactor
+  file: TODO/main/planning/tpcdi-memory-test-delta-refactor.yaml
+  title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Not Started
+  tags:
+  - testing
+  - performance
+  - tpcdi
+  - memory
+  - regression-detection
+  estimated_effort: Small — validation method change + one calibration run to pick threshold
+  work_total: 2
+  work_done: 0
+  work_ready: 1
+- id: resolve-dataframe-tpcds-xfails
+  file: TODO/main/active/resolve-dataframe-tpcds-xfails.yaml
+  title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: In Progress
+  tags:
+  - dataframe
+  - testing
+  - xfail
+  - dask-df
+  - pyspark-df
+  - tpcds
+  estimated_effort: Medium — dask isin fix may require query translator change; pyspark is likely a guard improvement
+  work_total: 5
+  work_done: 0
+  work_ready: 2
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -137,23 +172,6 @@ items:
   work_total: 11
   work_done: 0
   work_ready: 1
-- id: deferred-dataframe-benchmark-implementations
-  file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
-  title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
-  worktree: main
-  category: Benchmark Expansion
-  priority: Low
-  status: Not Started
-  tags:
-  - dataframe
-  - benchmarks
-  - deferred-followup
-  - architecture
-  estimated_effort: Large — each benchmark needs dedicated design
-  work_total: 4
-  work_done: 0
-  work_ready: 4
-  deferred_count: 1
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -210,73 +228,6 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
-- id: on-demand-tpc-answer-download
-  file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
-  title: Implement on-demand download of TPC answer files for validation
-  worktree: core-functionality
-  category: Core Functionality
-  priority: Low
-  status: Not Started
-  tags:
-  - validation
-  - packaging
-  - wheel
-  - user-experience
-  estimated_effort: Medium
-  work_total: 14
-  work_done: 0
-  work_ready: 12
-- id: tpcdi-memory-test-delta-refactor
-  file: TODO/main/planning/tpcdi-memory-test-delta-refactor.yaml
-  title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
-  worktree: main
-  category: Testing & Quality
-  priority: Low
-  status: Not Started
-  tags:
-  - testing
-  - performance
-  - tpcdi
-  - memory
-  - regression-detection
-  estimated_effort: Small — validation method change + one calibration run to pick threshold
-  work_total: 2
-  work_done: 0
-  work_ready: 1
-- id: resolve-dataframe-tpcds-xfails
-  file: TODO/main/planning/resolve-dataframe-tpcds-xfails.yaml
-  title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
-  worktree: main
-  category: Testing & Quality
-  priority: Low
-  status: Not Started
-  tags:
-  - dataframe
-  - testing
-  - xfail
-  - dask-df
-  - pyspark-df
-  - tpcds
-  estimated_effort: Medium — dask isin fix may require query translator change; pyspark is likely a guard improvement
-  work_total: 5
-  work_done: 0
-  work_ready: 2
-- id: deferred-visualization-and-output-enhancements
-  file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
-  title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
-  worktree: main
-  category: User Experience
-  priority: Low
-  status: Not Started
-  tags:
-  - visualization
-  - charts
-  - deferred-followup
-  - research-needed
-  estimated_effort: Medium
-  work_total: 3
-  work_done: 0
-  work_ready: 3
 - id: tigerdata-cloud-enhancements
   file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
   title: TigerData Cloud Enhancements
@@ -401,6 +352,39 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: deferred-dataframe-benchmark-implementations
+  file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
+  title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
+  worktree: main
+  category: Benchmark Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - dataframe
+  - benchmarks
+  - deferred-followup
+  - architecture
+  estimated_effort: Large — each benchmark needs dedicated design
+  work_total: 4
+  work_done: 0
+  work_ready: 4
+  deferred_count: 1
+- id: on-demand-tpc-answer-download
+  file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
+  title: Implement on-demand download of TPC answer files for validation
+  worktree: core-functionality
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - validation
+  - packaging
+  - wheel
+  - user-experience
+  estimated_effort: Medium
+  work_total: 14
+  work_done: 0
+  work_ready: 12
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -420,6 +404,22 @@ items:
   work_total: 12
   work_done: 0
   work_ready: 12
+- id: deferred-visualization-and-output-enhancements
+  file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
+  title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
+  worktree: main
+  category: User Experience
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - visualization
+  - charts
+  - deferred-followup
+  - research-needed
+  estimated_effort: Medium
+  work_total: 3
+  work_done: 0
+  work_ready: 3
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support

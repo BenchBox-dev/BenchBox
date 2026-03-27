@@ -1,7 +1,7 @@
 id: deferred-dataframe-benchmark-implementations
 title: "Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks"
 worktree: main
-priority: Low
+priority: Medium-High
 status: Not Started
 category: Benchmark Expansion
 description: |

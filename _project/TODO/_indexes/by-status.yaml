@@ -1,8 +1,16 @@
-generated_at: '2026-03-27T09:53:06.130550'
+generated_at: '2026-03-27T16:24:54.158529'
 total_items: 25
 statuses:
+  In Progress:
+    count: 1
+    items:
+    - id: resolve-dataframe-tpcds-xfails
+      file: TODO/main/active/resolve-dataframe-tpcds-xfails.yaml
+      title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
+      priority: High
+      category: Testing & Quality
   Not Started:
-    count: 25
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -52,7 +60,7 @@ statuses:
     - id: deferred-dataframe-benchmark-implementations
       file: TODO/main/planning/deferred-dataframe-benchmark-implementations.yaml
       title: Deferred DataFrame Benchmark Implementations — Architecturally Complex Benchmarks
-      priority: Low
+      priority: Medium-High
       category: Benchmark Expansion
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
@@ -77,7 +85,7 @@ statuses:
     - id: on-demand-tpc-answer-download
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
-      priority: Low
+      priority: Medium-High
       category: Core Functionality
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
@@ -97,17 +105,12 @@ statuses:
     - id: tpcdi-memory-test-delta-refactor
       file: TODO/main/planning/tpcdi-memory-test-delta-refactor.yaml
       title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
-      priority: Low
-      category: Testing & Quality
-    - id: resolve-dataframe-tpcds-xfails
-      file: TODO/main/planning/resolve-dataframe-tpcds-xfails.yaml
-      title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
-      priority: Low
+      priority: High
       category: Testing & Quality
     - id: deferred-visualization-and-output-enhancements
       file: TODO/main/planning/deferred-visualization-and-output-enhancements.yaml
       title: Rich Output Formats — PNG, HTML/SVG, and Greyscale Chart Rendering
-      priority: Low
+      priority: Medium-High
       category: User Experience
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml

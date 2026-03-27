@@ -1,7 +1,7 @@
 id: tpcdi-memory-test-delta-refactor
 title: "Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS"
 worktree: main
-priority: Low
+priority: High
 status: Not Started
 category: Testing & Quality
 description: |
