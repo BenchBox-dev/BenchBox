@@ -1,22 +1,6 @@
-generated_at: '2026-03-27T08:35:05.853716'
-total_items: 24
+generated_at: '2026-03-27T08:42:10.929228'
+total_items: 23
 items:
-- id: gate-monitoring-behind-optional-extra
-  file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
-  title: Gate monitoring behind a benchbox[monitoring] optional extra
-  worktree: main
-  category: Packaging
-  priority: High
-  status: Not Started
-  tags:
-  - architecture
-  - packaging
-  - monitoring
-  - scope-review
-  estimated_effort: Small
-  work_total: 4
-  work_done: 0
-  work_ready: 1
 - id: non-dataframe-test-coverage
   file: TODO/main/planning/non-dataframe-test-coverage.yaml
   title: Increase core, CLI, platform, and utils test coverage to 80%

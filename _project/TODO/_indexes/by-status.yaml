@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T08:35:05.853823'
-total_items: 24
+generated_at: '2026-03-27T08:42:10.929317'
+total_items: 23
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Testing & Quality
   Not Started:
-    count: 23
+    count: 22
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -67,11 +67,6 @@ statuses:
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
       category: Supporting Infrastructure
-    - id: gate-monitoring-behind-optional-extra
-      file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
-      title: Gate monitoring behind a benchbox[monitoring] optional extra
-      priority: High
-      category: Packaging
     - id: geospatial-primitives-benchmark
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
       title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations

@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T08:35:07.848544'
-total_items: 602
+generated_at: '2026-03-27T08:42:12.652706'
+total_items: 603
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1764,6 +1764,23 @@ items:
   - cluster
   estimated_effort: 2 weeks
   completed_date: '2025-12-24'
+- id: gate-monitoring-behind-optional-extra
+  file: DONE/main/active/gate-monitoring-behind-optional-extra.yaml
+  title: Gate monitoring behind a benchbox[monitoring] optional extra
+  worktree: main
+  category: Packaging
+  priority: High
+  status: Completed
+  tags:
+  - architecture
+  - packaging
+  - monitoring
+  - scope-review
+  estimated_effort: Small
+  completed_date: '2026-03-27'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: guard-tpc-ds-fractional-scale-defaults
   file: DONE/benchmark-expansion/planning/guard-tpc-ds-fractional-scale-defaults.yaml
   title: Guard TPC-DS Fractional Scale Defaults

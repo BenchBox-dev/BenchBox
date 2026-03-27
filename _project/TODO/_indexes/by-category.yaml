@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T08:35:05.853775'
-total_categories: 9
+generated_at: '2026-03-27T08:42:10.929260'
+total_categories: 8
 categories:
   AI/ML Capabilities:
     count: 1
@@ -61,14 +61,6 @@ categories:
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
-      priority: High
-      status: Not Started
-  Packaging:
-    count: 1
-    items:
-    - id: gate-monitoring-behind-optional-extra
-      file: TODO/main/planning/gate-monitoring-behind-optional-extra.yaml
-      title: Gate monitoring behind a benchbox[monitoring] optional extra
       priority: High
       status: Not Started
   Platform Expansion:

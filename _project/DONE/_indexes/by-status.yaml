@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T08:35:07.849279'
-total_items: 602
+generated_at: '2026-03-27T08:42:12.653960'
+total_items: 603
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 554
+    count: 555
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1543,6 +1543,11 @@ statuses:
       title: GCP Dataproc Serverless Platform
       priority: Medium
       category: Platform Expansion
+    - id: gate-monitoring-behind-optional-extra
+      file: DONE/main/active/gate-monitoring-behind-optional-extra.yaml
+      title: Gate monitoring behind a benchbox[monitoring] optional extra
+      priority: High
+      category: Packaging
     - id: guard-tpc-ds-fractional-scale-defaults
       file: DONE/benchmark-expansion/planning/guard-tpc-ds-fractional-scale-defaults.yaml
       title: Guard TPC-DS Fractional Scale Defaults

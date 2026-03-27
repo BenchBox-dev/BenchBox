@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T08:35:07.849094'
-total_items: 602
+generated_at: '2026-03-27T08:42:12.653509'
+total_items: 603
 priorities:
   Critical:
     count: 35
@@ -180,7 +180,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 214
+    count: 215
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -593,6 +593,11 @@ priorities:
       file: DONE/platform-expansion/planning/gcp-dataproc-platform.yaml
       title: GCP Dataproc Managed Spark Platform
       category: Platform Expansion
+      status: Completed
+    - id: gate-monitoring-behind-optional-extra
+      file: DONE/main/active/gate-monitoring-behind-optional-extra.yaml
+      title: Gate monitoring behind a benchbox[monitoring] optional extra
+      category: Packaging
       status: Completed
     - id: guard-tpc-ds-fractional-scale-defaults
       file: DONE/benchmark-expansion/planning/guard-tpc-ds-fractional-scale-defaults.yaml

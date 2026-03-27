@@ -2,7 +2,8 @@ id: gate-monitoring-behind-optional-extra
 title: "Gate monitoring behind a benchbox[monitoring] optional extra"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-27"
 category: Packaging
 description: |
   The `benchbox.monitoring` package (~2,000 lines) ships in the installable

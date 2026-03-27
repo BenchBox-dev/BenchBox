@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T08:35:07.848926'
+generated_at: '2026-03-27T08:42:12.653057'
 total_categories: 72
 categories:
   '"Bug Fixes & Reliability"':
@@ -1872,8 +1872,13 @@ categories:
       priority: High
       status: Completed
   Packaging:
-    count: 1
+    count: 2
     items:
+    - id: gate-monitoring-behind-optional-extra
+      file: DONE/main/active/gate-monitoring-behind-optional-extra.yaml
+      title: Gate monitoring behind a benchbox[monitoring] optional extra
+      priority: High
+      status: Completed
     - id: formalize-mcp-internal-apis
       file: DONE/main/active/formalize-mcp-internal-apis.yaml
       title: Promote 3 internal MCP API references to public exports
