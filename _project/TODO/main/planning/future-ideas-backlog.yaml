@@ -13,6 +13,10 @@ description: |
   When any item below is ready for implementation, create a dedicated TODO
   file with full tasks, phases, guardrails, and files_affected.
 
+  Note: Geospatial benchmark support was removed from this backlog —
+  it is tracked by the dedicated TODO:
+  TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
+
 metadata:
   tags:
   - backlog
@@ -20,84 +24,66 @@ metadata:
   - research-needed
   estimated_effort: "Research phase: 1-2 weeks per item"
   created_date: "2026-02-07"
-  last_updated: "2026-02-07T10:00:00"
+  last_updated: "2026-03-27T00:00:00"
 
   migration_review_required: true
 impact:
   business_value: |
     These represent potential long-term expansion of BenchBox into specialized
-    domains (geospatial, graph, streaming) and improved user experience (web UI).
+    domains (graph, streaming) and improved user experience (web UI).
     Each needs research to validate demand and feasibility before investment.
 work:
 - id: w1
-  summary: "Geospatial Benchmark Support — PostGIS Integration"
+  summary: "Graph Query Benchmark Support — Neo4j, Neptune"
   status: pending
 - id: w2
-  summary: "Research PostGIS benchmark standards and spatial query workloads"
+  summary: "Research LDBC Social Network Benchmark (industry standard)"
   needs:
   - w1
   status: pending
 - id: w3
-  summary: "Evaluate overlap with geospatial-primitives-benchmark TODO"
+  summary: "Evaluate Cypher vs Gremlin vs GQL query language strategy"
   needs:
   - w1
   status: pending
 - id: w4
-  summary: "Define ST_* function coverage and test datasets"
+  summary: "Define graph traversal workload and dataset"
   needs:
   - w1
   status: pending
 - id: w5
-  summary: "Graph Query Benchmark Support — Neo4j, Neptune"
+  summary: "Interactive Benchmark Explorer — Web UI"
   status: pending
 - id: w6
-  summary: "Research LDBC Social Network Benchmark (industry standard)"
+  summary: "Define target users and use cases (why CLI + charts aren't sufficient)"
   needs:
   - w5
   status: pending
 - id: w7
-  summary: "Evaluate Cypher vs Gremlin vs GQL query language strategy"
+  summary: "Choose technology stack (React vs Vue, Flask vs FastAPI)"
   needs:
   - w5
   status: pending
 - id: w8
-  summary: "Define graph traversal workload and dataset"
+  summary: "Design API for serving benchmark results"
   needs:
   - w5
   status: pending
 - id: w9
-  summary: "Interactive Benchmark Explorer — Web UI"
+  summary: "Streaming Benchmark Support — Kafka, Flink, Spark Streaming"
   status: pending
 - id: w10
-  summary: "Define target users and use cases (why CLI + charts aren't sufficient)"
+  summary: "Research Nexmark benchmark (streaming standard)"
   needs:
   - w9
   status: pending
 - id: w11
-  summary: "Choose technology stack (React vs Vue, Flask vs FastAPI)"
+  summary: "Evaluate overlap with existing TSBS DevOps benchmark"
   needs:
   - w9
   status: pending
 - id: w12
-  summary: "Design API for serving benchmark results"
-  needs:
-  - w9
-  status: pending
-- id: w13
-  summary: "Streaming Benchmark Support — Kafka, Flink, Spark Streaming"
-  status: pending
-- id: w14
-  summary: "Research Nexmark benchmark (streaming standard)"
-  needs:
-  - w13
-  status: pending
-- id: w15
-  summary: "Evaluate overlap with existing TSBS DevOps benchmark"
-  needs:
-  - w13
-  status: pending
-- id: w16
   summary: "Separate concerns: Kafka (message broker) vs Flink/Spark (processing)"
   needs:
-  - w13
+  - w9
   status: pending

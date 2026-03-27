@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T16:34:13.257010'
+generated_at: '2026-03-27T16:34:37.437693'
 total_items: 24
 items:
 - id: productize-result-publishing-and-artifact-sharing
@@ -167,9 +167,9 @@ items:
   - future
   - research-needed
   estimated_effort: 'Research phase: 1-2 weeks per item'
-  work_total: 16
+  work_total: 12
   work_done: 0
-  work_ready: 4
+  work_ready: 3
 - id: geospatial-primitives-benchmark
   file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
   title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
