@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T09:49:17.248448'
-total_items: 24
+generated_at: '2026-03-27T09:53:06.130538'
+total_items: 25
 priorities:
   High:
     count: 1
@@ -51,7 +51,7 @@ priorities:
       category: Benchmark Development
       status: Not Started
   Low:
-    count: 16
+    count: 17
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -112,6 +112,11 @@ priorities:
       file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
       category: Core Functionality
+      status: Not Started
+    - id: tpcdi-memory-test-delta-refactor
+      file: TODO/main/planning/tpcdi-memory-test-delta-refactor.yaml
+      title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
+      category: Testing & Quality
       status: Not Started
     - id: resolve-dataframe-tpcds-xfails
       file: TODO/main/planning/resolve-dataframe-tpcds-xfails.yaml

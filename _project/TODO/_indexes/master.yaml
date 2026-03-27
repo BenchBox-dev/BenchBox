@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T09:49:17.248415'
-total_items: 24
+generated_at: '2026-03-27T09:53:06.130476'
+total_items: 25
 items:
 - id: productize-result-publishing-and-artifact-sharing
   file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
@@ -226,6 +226,23 @@ items:
   work_total: 14
   work_done: 0
   work_ready: 12
+- id: tpcdi-memory-test-delta-refactor
+  file: TODO/main/planning/tpcdi-memory-test-delta-refactor.yaml
+  title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
+  worktree: main
+  category: Testing & Quality
+  priority: Low
+  status: Not Started
+  tags:
+  - testing
+  - performance
+  - tpcdi
+  - memory
+  - regression-detection
+  estimated_effort: Small — validation method change + one calibration run to pick threshold
+  work_total: 2
+  work_done: 0
+  work_ready: 1
 - id: resolve-dataframe-tpcds-xfails
   file: TODO/main/planning/resolve-dataframe-tpcds-xfails.yaml
   title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight

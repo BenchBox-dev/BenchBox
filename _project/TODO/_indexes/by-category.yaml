@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T09:49:17.248437'
+generated_at: '2026-03-27T09:53:06.130521'
 total_categories: 8
 categories:
   AI/ML Capabilities:
@@ -125,11 +125,16 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 2
+    count: 3
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
+      priority: Low
+      status: Not Started
+    - id: tpcdi-memory-test-delta-refactor
+      file: TODO/main/planning/tpcdi-memory-test-delta-refactor.yaml
+      title: Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS
       priority: Low
       status: Not Started
     - id: resolve-dataframe-tpcds-xfails
