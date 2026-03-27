@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T08:42:10.929276'
-total_items: 23
+generated_at: '2026-03-27T08:50:16.639286'
+total_items: 24
 priorities:
   High:
     count: 2
@@ -56,7 +56,7 @@ priorities:
       category: Benchmark Development
       status: Not Started
   Low:
-    count: 14
+    count: 15
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -67,6 +67,11 @@ priorities:
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: add-hypothesis-property-tests
+      file: TODO/main/planning/add-hypothesis-property-tests.yaml
+      title: Add Hypothesis property-based tests for pure-function invariants
+      category: Testing & Quality
       status: Not Started
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml

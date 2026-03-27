@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T08:42:10.929228'
-total_items: 23
+generated_at: '2026-03-27T08:50:16.639243'
+total_items: 24
 items:
 - id: non-dataframe-test-coverage
   file: TODO/main/planning/non-dataframe-test-coverage.yaml
@@ -76,6 +76,22 @@ items:
   work_total: 11
   work_done: 0
   work_ready: 11
+- id: add-hypothesis-property-tests
+  file: TODO/main/planning/add-hypothesis-property-tests.yaml
+  title: Add Hypothesis property-based tests for pure-function invariants
+  worktree: main
+  category: Testing & Quality
+  priority: Low
+  status: Not Started
+  tags:
+  - testing
+  - quality
+  - property-based
+  - hypothesis
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
 - id: siriusdb-adapter
   file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
   title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter

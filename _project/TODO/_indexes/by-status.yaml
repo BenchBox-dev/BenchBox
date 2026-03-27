@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T08:42:10.929317'
-total_items: 23
+generated_at: '2026-03-27T08:50:16.639296'
+total_items: 24
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Testing & Quality
   Not Started:
-    count: 22
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -27,6 +27,11 @@ statuses:
       title: Add CedarDB Platform Adapter
       priority: Low
       category: Platform Expansion
+    - id: add-hypothesis-property-tests
+      file: TODO/main/planning/add-hypothesis-property-tests.yaml
+      title: Add Hypothesis property-based tests for pure-function invariants
+      priority: Low
+      category: Testing & Quality
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
