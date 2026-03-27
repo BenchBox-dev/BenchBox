@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T17:50:49.351513'
+generated_at: '2026-03-27T19:07:43.378089'
 total_categories: 73
 categories:
   '"Bug Fixes & Reliability"':
@@ -491,7 +491,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 193
+    count: 194
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1084,6 +1084,11 @@ categories:
       file: DONE/physical-tuning/active/ctas-sort-local-sql-platforms.yaml
       title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
       priority: Medium-High
+      status: Completed
+    - id: on-demand-tpc-answer-download
+      file: DONE/core-functionality/planning/on-demand-tpc-answer-download.yaml
+      title: Implement on-demand download of TPC answer files for validation
+      priority: High
       status: Completed
     - id: platform-driver-runtime-isolation
       file: DONE/core-functionality/active/platform-driver-runtime-isolation.yaml

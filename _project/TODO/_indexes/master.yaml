@@ -1,22 +1,6 @@
-generated_at: '2026-03-27T17:50:48.030852'
-total_items: 21
+generated_at: '2026-03-27T19:07:42.034377'
+total_items: 20
 items:
-- id: on-demand-tpc-answer-download
-  file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
-  title: Implement on-demand download of TPC answer files for validation
-  worktree: core-functionality
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - validation
-  - packaging
-  - wheel
-  - user-experience
-  estimated_effort: Medium
-  work_total: 14
-  work_done: 0
-  work_ready: 12
 - id: productize-result-publishing-and-artifact-sharing
   file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
   title: Productize result publishing and artifact sharing workflow

@@ -1,8 +1,8 @@
-generated_at: '2026-03-27T17:50:48.030889'
-total_items: 21
+generated_at: '2026-03-27T19:07:42.034424'
+total_items: 20
 statuses:
   Not Started:
-    count: 21
+    count: 20
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -69,11 +69,6 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: on-demand-tpc-answer-download
-      file: TODO/core-functionality/planning/on-demand-tpc-answer-download.yaml
-      title: Implement on-demand download of TPC answer files for validation
-      priority: High
-      category: Core Functionality
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T17:50:49.351776'
-total_items: 608
+generated_at: '2026-03-27T19:07:43.378384'
+total_items: 609
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 560
+    count: 561
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1663,6 +1663,11 @@ statuses:
       file: DONE/physical-tuning/active/ctas-sort-local-sql-platforms.yaml
       title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
       priority: Medium-High
+      category: Core Functionality
+    - id: on-demand-tpc-answer-download
+      file: DONE/core-functionality/planning/on-demand-tpc-answer-download.yaml
+      title: Implement on-demand download of TPC answer files for validation
+      priority: High
       category: Core Functionality
     - id: platform-driver-runtime-isolation
       file: DONE/core-functionality/active/platform-driver-runtime-isolation.yaml

@@ -6,7 +6,8 @@ id: on-demand-tpc-answer-download
 title: "Implement on-demand download of TPC answer files for validation"
 worktree: core-functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-03-27"
 category: Core Functionality
 description: |
   Currently, TPC-H and TPC-DS answer files (~4.2 MB total) are only available in

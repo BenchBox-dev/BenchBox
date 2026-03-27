@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T17:50:49.351254'
-total_items: 608
+generated_at: '2026-03-27T19:07:43.377810'
+total_items: 609
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1965,6 +1965,23 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 4 weeks
+- id: on-demand-tpc-answer-download
+  file: DONE/core-functionality/planning/on-demand-tpc-answer-download.yaml
+  title: Implement on-demand download of TPC answer files for validation
+  worktree: core-functionality
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - validation
+  - packaging
+  - wheel
+  - user-experience
+  estimated_effort: Medium
+  completed_date: '2026-03-27'
+  work_total: 14
+  work_done: 12
+  work_ready: 2
 - id: platform-driver-runtime-isolation
   file: DONE/core-functionality/active/platform-driver-runtime-isolation.yaml
   title: Implement per-run platform driver runtime isolation (DuckDB first)
