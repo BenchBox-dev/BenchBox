@@ -2,7 +2,7 @@ id: non-dataframe-test-coverage
 title: "Increase core, CLI, platform, and utils test coverage to 80%"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 description: |
   Non-DataFrame coverage gaps across 4 categories totaling ~11,500 missing
   statements. These are higher ROI than DataFrame queries because they protect
@@ -449,7 +449,7 @@ work:
 
 - id: w25
   summary: "Ratchet fail_under to 80 and align CI coverage config"
-  status: pending
+  status: done
   needs: [w24, w11, w12, w20, w21, w22]
   description: |
     After all coverage work lands:
