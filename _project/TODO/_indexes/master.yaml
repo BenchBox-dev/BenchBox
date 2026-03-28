@@ -1,5 +1,5 @@
-generated_at: '2026-03-28T14:30:18.336309'
-total_items: 21
+generated_at: '2026-03-28T14:42:54.830836'
+total_items: 20
 items:
 - id: productize-result-publishing-and-artifact-sharing
   file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
@@ -318,21 +318,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 3
-- id: cloud-integration-test-infrastructure
-  file: TODO/platform-expansion/active/cloud-integration-test-infrastructure.yaml
-  title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - integration-tests
-  - cloud
-  - deferred-followup
-  estimated_effort: Large — requires cloud account provisioning
-  work_total: 13
-  work_done: 1
-  work_ready: 1
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control

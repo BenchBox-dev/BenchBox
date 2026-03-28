@@ -1,5 +1,5 @@
-generated_at: '2026-03-28T14:26:49.676371'
-total_items: 609
+generated_at: '2026-03-28T14:42:56.139137'
+total_items: 610
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 561
+    count: 562
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -809,6 +809,11 @@ statuses:
       title: Cloud Platform Error Message Context
       priority: Medium
       category: Platform Polish
+    - id: cloud-integration-test-infrastructure
+      file: DONE/platform-expansion/active/cloud-integration-test-infrastructure.yaml
+      title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
+      priority: Medium-High
+      category: Platform Expansion
     - id: cloud-spark-adapter-consolidation
       file: DONE/platform-expansion/active/cloud-spark-adapter-consolidation.yaml
       title: Cloud Spark Adapter Consolidation - Extract Common Patterns

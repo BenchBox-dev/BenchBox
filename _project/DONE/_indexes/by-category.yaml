@@ -1,4 +1,4 @@
-generated_at: '2026-03-28T14:26:49.676107'
+generated_at: '2026-03-28T14:42:56.138827'
 total_categories: 73
 categories:
   '"Bug Fixes & Reliability"':
@@ -2019,7 +2019,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 69
+    count: 70
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2174,6 +2174,11 @@ categories:
     - id: cloud-spark-job-adapters-open-table-format-loading
       file: DONE/main/active/cloud-spark-job-adapters-open-table-format-loading.yaml
       title: Close open-table-format loading gaps for job-based managed Spark adapters
+      priority: Medium-High
+      status: Completed
+    - id: cloud-integration-test-infrastructure
+      file: DONE/platform-expansion/active/cloud-integration-test-infrastructure.yaml
+      title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
       priority: Medium-High
       status: Completed
     - id: modin-cudf-dask-production-ready

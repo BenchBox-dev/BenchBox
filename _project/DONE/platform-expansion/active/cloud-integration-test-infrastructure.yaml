@@ -2,7 +2,8 @@ id: cloud-integration-test-infrastructure
 title: "Cloud Platform Integration Test Infrastructure — Deferred Live Tests"
 worktree: platform-expansion
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-03-28"
 category: Platform Expansion
 description: |
   Consolidates deferred live integration test work from completed platform
@@ -114,7 +115,7 @@ work:
 - id: w1
   summary: "Add per-platform live test markers to pyproject.toml and create shared cloud test fixtures"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Register new markers (live_firebolt, live_starburst, live_motherduck,
     live_pg_duckdb, live_pg_mooncake) in pyproject.toml.
@@ -124,7 +125,7 @@ work:
 - id: w2
   summary: "Firebolt Cloud live smoke tests — connect, create table, run TPC-H Q1, validate result"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     External blocker: requires Firebolt Cloud trial/paid account with
     provisioned engine and S3 credentials for data loading.
@@ -133,7 +134,7 @@ work:
 - id: w3
   summary: "StarRocks live smoke tests — connect, create table, run TPC-H Q1, validate result"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     No external blocker — Docker Compose setup already exists at
     docker/starrocks/docker-compose.yml. Use skip_unless_docker_service()
@@ -142,7 +143,7 @@ work:
 - id: w4
   summary: "Starburst Galaxy live smoke tests — connect, create table, run TPC-H Q1, validate result"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     External blocker: requires Starburst Galaxy trial/paid account and
     running cluster.
@@ -151,7 +152,7 @@ work:
 - id: w5
   summary: "MotherDuck live smoke tests — connect, create table, run TPC-H Q1, validate result"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Free tier available (10 GB). Env var: MOTHERDUCK_TOKEN.
     Use get_env_or_skip("MOTHERDUCK_TOKEN", "MotherDuck").
@@ -159,7 +160,7 @@ work:
 - id: w6
   summary: "pg_duckdb MotherDuck mode integration tests — connect via MotherDuck, run TPC-H Q1"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Requires Docker (pg_duckdb extension) + MOTHERDUCK_TOKEN for MotherDuck mode.
     Two-phase skip: skip_unless_docker_service for pg, get_env_or_skip for token.
@@ -167,7 +168,7 @@ work:
 - id: w7
   summary: "pg_duckdb S3 Parquet/Iceberg data lake query tests"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     External blocker: requires S3 bucket with Parquet/Iceberg test data.
     Env vars: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, BENCHBOX_S3_TEST_BUCKET.
@@ -175,7 +176,7 @@ work:
 - id: w8
   summary: "pg_mooncake S3/GCS object storage integration tests"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     External blocker: requires S3 or GCS bucket with credentials and a
     Docker PostgreSQL instance with pg_mooncake extension.
@@ -183,7 +184,7 @@ work:
 - id: w9
   summary: "pg_mooncake pg_moonlink WAL replication benchmarking tests"
   needs: [w8]
-  status: pending
+  status: done
   notes: |
     Requires pg_mooncake Docker setup from w8 plus WAL configuration.
     Tests replication lag measurement and benchmark consistency under WAL load.
@@ -191,7 +192,7 @@ work:
 - id: w10
   summary: "Docker-based PostgreSQL extension CI harness — Docker Compose for pg_duckdb, pg_mooncake, pg_analytics"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Create unified Docker Compose config under docker/pg-extensions/ that
     brings up PostgreSQL with all three extensions. Wire into Makefile as
@@ -200,7 +201,7 @@ work:
 - id: w11
   summary: "Multi-extension comparison orchestration — run benchmarks across pg extensions sequentially"
   needs: [w6, w8, w10]
-  status: pending
+  status: done
   notes: |
     Script or pytest fixture that runs the same benchmark suite against
     pg_duckdb, pg_mooncake, and pg_analytics, collecting results per extension.
@@ -208,7 +209,7 @@ work:
 - id: w12
   summary: "Multi-extension comparison report generation — produce comparison tables from orchestrated results"
   needs: [w11]
-  status: pending
+  status: done
   notes: |
     Takes collected results from w11 and generates comparison report
     (ASCII table + optional HTML chart). Integrate with existing
