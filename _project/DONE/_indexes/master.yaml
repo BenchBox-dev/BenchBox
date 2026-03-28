@@ -1,4 +1,4 @@
-generated_at: '2026-03-27T19:07:43.377810'
+generated_at: '2026-03-27T20:19:58.854595'
 total_items: 609
 items:
 - id: interactive-wizard-dry-run-support
@@ -1980,8 +1980,8 @@ items:
   estimated_effort: Medium
   completed_date: '2026-03-27'
   work_total: 14
-  work_done: 12
-  work_ready: 2
+  work_done: 14
+  work_ready: 0
 - id: platform-driver-runtime-isolation
   file: DONE/core-functionality/active/platform-driver-runtime-isolation.yaml
   title: Implement per-run platform driver runtime isolation (DuckDB first)

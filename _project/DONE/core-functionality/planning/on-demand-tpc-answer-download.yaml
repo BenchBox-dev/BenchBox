@@ -141,13 +141,13 @@ work:
   status: done
 - id: w9
   summary: "Package answer files as GitHub release asset"
-  status: pending
+  status: done
 - id: w10
   summary: "Add checksum verification for downloaded files"
   status: done
 - id: w11
   summary: "Document download behavior in user guide"
-  status: pending
+  status: done
 - id: w12
   summary: "Unit tests for download manager"
   status: done
