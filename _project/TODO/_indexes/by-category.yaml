@@ -1,4 +1,4 @@
-generated_at: '2026-03-28T14:26:48.327378'
+generated_at: '2026-03-28T14:30:18.336336'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -89,10 +89,10 @@ categories:
       priority: Medium-High
       status: Not Started
     - id: cloud-integration-test-infrastructure
-      file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
+      file: TODO/platform-expansion/active/cloud-integration-test-infrastructure.yaml
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
       priority: Medium-High
-      status: Not Started
+      status: In Progress
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control

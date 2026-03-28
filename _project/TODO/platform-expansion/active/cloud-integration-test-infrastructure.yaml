@@ -2,7 +2,7 @@ id: cloud-integration-test-infrastructure
 title: "Cloud Platform Integration Test Infrastructure — Deferred Live Tests"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Platform Expansion
 description: |
   Consolidates deferred live integration test work from completed platform
@@ -93,7 +93,7 @@ guardrails:
 work:
 - id: w0
   summary: "Research — inventory cloud accounts, document provisioning steps, estimate costs"
-  status: pending
+  status: done
   notes: |
     Produce a provisioning checklist covering:
     1. Which accounts already exist (check for env vars / config files)
