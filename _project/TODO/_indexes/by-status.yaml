@@ -1,8 +1,8 @@
-generated_at: '2026-03-27T20:19:57.590477'
-total_items: 20
+generated_at: '2026-03-28T14:26:48.327399'
+total_items: 21
 statuses:
   Not Started:
-    count: 20
+    count: 21
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -69,6 +69,11 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
+    - id: motherduck-cloud-features
+      file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
+      title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
+      priority: Medium-High
+      category: Platform Expansion
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

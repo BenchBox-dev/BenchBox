@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T20:19:57.590469'
-total_items: 20
+generated_at: '2026-03-28T14:26:48.327391'
+total_items: 21
 priorities:
   High:
     count: 2
@@ -15,7 +15,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium-High:
-    count: 6
+    count: 7
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -40,6 +40,11 @@ priorities:
     - id: cloud-integration-test-infrastructure
       file: TODO/platform-expansion/planning/cloud-integration-test-infrastructure.yaml
       title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests
+      category: Platform Expansion
+      status: Not Started
+    - id: motherduck-cloud-features
+      file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
+      title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
       status: Not Started
     - id: nyc-taxi-benchmark-expansion

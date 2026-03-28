@@ -1,5 +1,5 @@
-generated_at: '2026-03-27T20:19:57.590435'
-total_items: 20
+generated_at: '2026-03-28T14:26:48.327351'
+total_items: 21
 items:
 - id: productize-result-publishing-and-artifact-sharing
   file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
@@ -330,7 +330,22 @@ items:
   - cloud
   - deferred-followup
   estimated_effort: Large — requires cloud account provisioning
-  work_total: 11
+  work_total: 13
+  work_done: 0
+  work_ready: 1
+- id: motherduck-cloud-features
+  file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
+  title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - motherduck
+  - cloud-features
+  - deferred-followup
+  estimated_effort: Medium — requires MotherDuck free-tier account
+  work_total: 3
   work_done: 0
   work_ready: 1
 - id: nyc-taxi-benchmark-expansion
