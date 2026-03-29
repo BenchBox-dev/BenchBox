@@ -25,8 +25,9 @@ description: |
   - Styling: Tailwind CSS or minimal custom CSS
   - Routing: File-based real paths (not hash routing) for stable share URLs
 
-  The app outputs to `results/` in the assembled site directory and deploys
-  alongside the existing landing page, docs, and blog on GitHub Pages.
+  The app builds into `results-explorer/dist/`; the GitHub Pages workflow then
+  copies that output into `site/results/` so it deploys alongside the existing
+  landing page, docs, and blog.
 
 work:
 - id: w1
@@ -107,7 +108,7 @@ work:
     2. Verify `base: '/results/'` produces correct asset paths
     3. Verify DuckDB-WASM files are included in the output
     4. Verify static data files (manifest.json, details/, results.duckdb) are
-       copied to the output
+       copied to `dist/data/`
     5. Test locally with `npx serve dist` that all routes work
     6. Document build prerequisites in a README
 

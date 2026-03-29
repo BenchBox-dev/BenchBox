@@ -15,7 +15,7 @@ description: |
   announcement.
 
   Launch criteria (from strategy memo):
-  1. Seed corpus has ≥30 results across ≥3 benchmarks and ≥4 platforms
+  1. Seed corpus has ≥30 results across TPC-H, TPC-DS, and SSB, spanning ≥4 platforms
   2. All explorer pages render correctly with real data
   3. Compare view produces meaningful query-level comparisons
   4. DuckDB-WASM search/filter works in Chrome, Firefox, Safari
@@ -119,10 +119,10 @@ approach: |
 
 verification:
 - description: "Seed corpus meets coverage requirements"
-  command: "uv run -- python -c \"import json; m = json.load(open('results-explorer/public/data/manifest.json')); print(f'{len(m[\"results\"])} results, {len(m[\"benchmarks\"])} benchmarks, {len(m[\"platforms\"])} platforms'); assert len(m['results']) >= 30; assert len(m['benchmarks']) >= 3; assert len(m['platforms']) >= 4\""
-  expected_output: "≥30 results, ≥3 benchmarks, ≥4 platforms"
+  command: "uv run -- python -c \"import json; m = json.load(open('results-explorer/public/data/manifest.json')); benchmarks = set(m['benchmarks']); print(f'{len(m[\"results\"])} results, {sorted(benchmarks)}, {len(m[\"platforms\"])} platforms'); assert len(m['results']) >= 30; assert {'tpch', 'tpcds', 'ssb'}.issubset(benchmarks); assert len(m['platforms']) >= 4\""
+  expected_output: "≥30 results including tpch, tpcds, ssb, and ≥4 platforms"
 - description: "Full site build succeeds (landing + docs + blog + explorer)"
-  command: "cd results-explorer && npm run build && test -f dist/results/index.html && test -f dist/results/tpch/index.html && ls dist/results/r/*/index.html | wc -l | xargs test 30 -le"
+  command: "cd results-explorer && npm run build && test -f dist/index.html && test -f dist/tpch/index.html && ls dist/r/*/index.html | wc -l | xargs test 30 -le"
   expected_output: "All pages present in build output"
 - description: "Explorer component test suite passes"
   command: "cd results-explorer && npm test -- --run"
@@ -135,6 +135,7 @@ scope_limit:
   only_modify:
   - "_project/TODO/"
   - "_project/DONE/"
+  - "_project/analysis/"
   - "CHANGELOG.md"
   - "README.md"
   do_not_modify:

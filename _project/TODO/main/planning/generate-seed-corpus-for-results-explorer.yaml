@@ -14,13 +14,15 @@ description: |
   that generates the results, and committing the canonical schema-v2 bundles
   to a data directory that the static build pipeline can consume.
 
-  Target: ≥30 result bundles covering TPC-H (SF 0.01, 0.1, 1) and TPC-DS (SF 1)
-  across DuckDB, DataFusion, ClickHouse, Polars, and at least one cloud platform.
-  Each bundle must include companion files (plans, tuning) where available.
+  Target: ≥30 result bundles covering TPC-H (SF 0.01, 0.1, 1), TPC-DS (SF 1),
+  and SSB (SF 0.01, 0.1) across DuckDB, DataFusion, ClickHouse, and Polars,
+  with extra compatible runs added until the launch floor is met. Each bundle
+  must include companion files (plans, tuning) where available.
 
   The corpus should be regenerable from CI so it stays fresh as BenchBox and
-  platforms evolve. Results are committed to a `results-data/` directory at the
-  repo root (or a dedicated data repo — decide in w1).
+  platforms evolve. Results are committed under `results-data/` at the repo
+  root. A dedicated data repo is explicitly deferred until repo size or corpus
+  churn makes extraction worthwhile.
 
 work:
 - id: w1
@@ -29,18 +31,18 @@ work:
   notes: |
     Decide:
     - Which benchmark×platform×scale combinations to include (target ≥30 bundles)
-    - Whether bundles live in-repo (e.g., `results-data/bundles/`) or a separate
-      `benchbox-results` data repo
+    - Exact directory layout under `results-data/bundles/`
     - Naming convention for bundles (e.g., `tpch-duckdb-sf0.01-{date}.json`)
     - Whether to capture query plans for all runs (recommended: yes for DuckDB/DataFusion)
     Minimum coverage matrix:
     | Benchmark | Platforms | Scale Factors |
     |-----------|-----------|---------------|
     | TPC-H | DuckDB, DataFusion, Polars, ClickHouse | 0.01, 0.1, 1.0 |
-    | TPC-DS | DuckDB, DataFusion | 1.0 |
-    | SSB | DuckDB | 0.01, 0.1 |
-    This yields ~30 combinations. Cloud platforms (Snowflake, Databricks) can be
-    added as stretch goals if credentials are available in CI.
+    | TPC-DS | DuckDB, DataFusion, Polars, ClickHouse | 1.0 |
+    | SSB | DuckDB, DataFusion, Polars, ClickHouse | 0.01, 0.1 |
+    This establishes a 24-run floor. Add at least 6 extra compatible runs
+    (for example cloud platforms or extra curated cohorts) to reach the ≥30
+    launch threshold.
 
 - id: w2
   summary: "Build a GitHub Actions workflow that generates seed corpus bundles"

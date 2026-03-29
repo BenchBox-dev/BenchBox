@@ -90,13 +90,15 @@ work:
   needs: [w2, w3]
   status: pending
   notes: |
-    Add a CLI entry point: `python scripts/build_read_model.py --input results-data/bundles/ --output site/results/data/`
+    Add a CLI entry point: `uv run -- python scripts/build_read_model.py --input results-data/bundles/ --output results-explorer/public/data/`
     The script should:
     - Accept input corpus directory and output directory as arguments
     - Log progress (N bundles processed, N queries indexed)
     - Exit non-zero on validation errors
     - Be idempotent (clean output dir on each run)
-    This entry point will be called by the GitHub Pages workflow.
+    This entry point will be called by the GitHub Pages workflow before the
+    Vite build. The Vite output in `results-explorer/dist/` is then copied to
+    `site/results/` during site assembly.
 
 - id: w5
   summary: "Add tests for the static build pipeline"

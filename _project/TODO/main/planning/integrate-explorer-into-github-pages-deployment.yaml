@@ -28,14 +28,15 @@ work:
   summary: "Add explorer build steps to the GitHub Pages workflow"
   status: pending
   notes: |
-    Modify `.github/workflows/docs.yml` to add steps after the existing Sphinx
-    build:
+    Modify `.github/workflows/docs.yml` so the workflow also triggers on
+    `results-explorer/**` and `results-data/**`, then add build steps after the
+    existing Sphinx build:
 
     1. Set up Node.js (v20+)
     2. Install explorer dependencies: `cd results-explorer && npm ci`
     3. Run static build pipeline: `uv run -- python scripts/build_read_model.py --input results-data/bundles/ --output results-explorer/public/data/`
     4. Build explorer: `cd results-explorer && npm run build`
-    5. Copy explorer output to site assembly: `cp -r results-explorer/dist/ site/results/`
+    5. Copy explorer output to site assembly: `mkdir -p site/results && cp -R results-explorer/dist/. site/results/`
 
     The step order matters: pipeline must run before Vite build (Vite needs data
     files in `public/data/`), and explorer copy must happen before the Pages

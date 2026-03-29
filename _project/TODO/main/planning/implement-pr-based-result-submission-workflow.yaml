@@ -11,7 +11,8 @@ description: |
   Phase 2 of the results platform: enable community contributions via a
   PR-based submission model. Instead of building a hosted API, contributors
   use `benchbox submit --output ./submission/` to package a result bundle
-  with a submission manifest, then open a PR to the results data repository.
+  with a submission manifest, then open a PR against this repository touching
+  `results-data/`.
 
   GitHub Actions CI validates the submission (schema, hash, cohort, sanity).
   Maintainers review and merge. Merge triggers a rebuild of derived read
@@ -51,7 +52,7 @@ work:
     1. Takes a result bundle path (or --last to use most recent)
     2. Prompts for optional contributor info and context
     3. Writes submission package to the specified output directory
-    4. Prints instructions for opening a PR to the data repository
+    4. Prints instructions for opening a PR against the current results corpus location
 
     This command does NOT upload anything. It only packages locally.
 
@@ -60,7 +61,8 @@ work:
   needs: [w1]
   status: pending
   notes: |
-    Create a GitHub Actions workflow for the data repo that runs on PRs:
+    Create a GitHub Actions workflow in this repo that runs on PRs touching
+    `results-data/`:
     - Schema validation: bundle conforms to schema-v2
     - Hash verification: bundle content matches declared hash
     - Cohort compatibility: benchmark/scale/query-set are valid
@@ -133,7 +135,7 @@ verification:
   command: "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py -q"
   expected_output: "All tests pass"
 - description: "Trust labels render correctly in the explorer"
-  command: "cd results-explorer && npm run build && grep -l 'Community Submitted' dist/results/r/*/index.html | head -1"
+  command: "cd results-explorer && npm run build && grep -l 'Community Submitted' dist/r/*/index.html | head -1"
   expected_output: "At least one detail page with community label"
 
 scope_limit:

@@ -123,10 +123,10 @@ anti_patterns:
 
 verification:
 - description: "Vite build succeeds and detail pages are pre-rendered"
-  command: "cd results-explorer && npm run build && ls dist/results/r/*/index.html | wc -l"
+  command: "cd results-explorer && npm run build && ls dist/r/*/index.html | wc -l"
   expected_output: "≥30 (matching seed corpus size)"
 - description: "Pre-rendered detail pages contain query table without JavaScript"
-  command: "cd results-explorer && grep -c '<td>' dist/results/r/$(ls dist/results/r/ | head -1)/index.html"
+  command: "cd results-explorer && grep -c '<td>' dist/r/$(ls dist/r/ | head -1)/index.html"
   expected_output: "≥22 (one row per query minimum)"
 - description: "Detail page component tests pass"
   command: "cd results-explorer && npm test -- --run"

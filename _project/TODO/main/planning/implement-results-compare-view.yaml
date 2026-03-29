@@ -133,7 +133,7 @@ verification:
   command: "cd results-explorer && npm run build"
   expected_output: "Build completes with exit code 0"
 - description: "Compare route fallback page exists in build output"
-  command: "cd results-explorer && test -f dist/results/compare/index.html || test -f dist/results/404.html"
+  command: "cd results-explorer && test -f dist/compare/index.html || test -f dist/404.html"
   expected_output: "At least one fallback for client-side compare routing exists"
 - description: "Compare view component tests pass (cohort validation, data merge, rendering)"
   command: "cd results-explorer && npm test -- --run"

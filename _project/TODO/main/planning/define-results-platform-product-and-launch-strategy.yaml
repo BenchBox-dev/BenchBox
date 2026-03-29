@@ -22,8 +22,9 @@ description: |
   **Phase assignment:** This is a prerequisite planning item. Must complete before
   any Phase 1 implementation begins. The refined strategy memo at
   `_project/analysis/benchbox-results-platform-strategy.md` contains the current
-  recommended phasing: Phase 1 (static explorer MVP), Phase 2 (PR-based community
-  contributions), Phase 3 (hosted API, only if demand warrants).
+  recommended phasing: Phase 1 (static explorer MVP with repo-local
+  `results-data/`), Phase 2 (PR-based community contributions against that
+  corpus), Phase 3 (hosted API, only if demand warrants).
 
 work:
 - id: w1
@@ -53,8 +54,10 @@ work:
   needs: [w3]
   status: pending
   notes: |
-    Decide whether the explorer launches at `/results/` or a separate subdomain,
-    and explicitly separate local/cloud publication from hosted submission.
+    Confirm the launch topology: explorer at `/results/`, seed corpus stored
+    under repo-local `results-data/`, and a single GitHub Pages workflow for
+    deployment. Explicitly separate local/cloud publication from hosted
+    submission. A dedicated data repo is a later optimization, not the default.
 
 - id: w5
   summary: "Publish the strategy artifact and update companion TODO dependencies"
