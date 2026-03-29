@@ -1,4 +1,4 @@
-generated_at: '2026-03-28T14:42:54.830861'
+generated_at: '2026-03-29T08:03:57.206830'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -51,7 +51,7 @@ categories:
       priority: High
       status: Not Started
   Platform Expansion:
-    count: 10
+    count: 11
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -86,6 +86,11 @@ categories:
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
+      priority: Medium-High
+      status: Not Started
+    - id: cloud-integration-test-gaps
+      file: TODO/platform-expansion/planning/cloud-integration-test-gaps.yaml
+      title: Cloud Integration Test Infrastructure — Address Review Gaps
       priority: Medium-High
       status: Not Started
     - id: motherduck-cloud-features
