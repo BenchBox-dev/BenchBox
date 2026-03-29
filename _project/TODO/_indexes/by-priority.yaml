@@ -1,12 +1,62 @@
-generated_at: '2026-03-29T08:16:53.021326'
-total_items: 20
+generated_at: '2026-03-29T10:15:01.429836'
+total_items: 35
 priorities:
   High:
-    count: 2
+    count: 12
     items:
+    - id: build-results-explorer-subsite-on-benchbox-dev
+      file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
+      title: Build a results explorer subsite on benchbox.dev
+      category: Core Functionality
+      status: Not Started
+    - id: build-static-pipeline-bundles-to-read-model
+      file: TODO/main/planning/build-static-pipeline-bundles-to-read-model.yaml
+      title: Build static pipeline that transforms result bundles into explorer read models
+      category: Core Functionality
+      status: Not Started
+    - id: define-results-platform-product-and-launch-strategy
+      file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
+      title: Define BenchBox results platform product boundary and launch strategy
+      category: Core Functionality
+      status: Not Started
+    - id: generate-seed-corpus-for-results-explorer
+      file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
+      title: Generate seed corpus of benchmark results for the results explorer
+      category: Core Functionality
+      status: Not Started
+    - id: implement-explorer-home-and-browse-pages
+      file: TODO/main/planning/implement-explorer-home-and-browse-pages.yaml
+      title: Implement explorer home page and benchmark/platform browse pages
+      category: Core Functionality
+      status: Not Started
+    - id: implement-result-detail-page
+      file: TODO/main/planning/implement-result-detail-page.yaml
+      title: Implement result detail page with query timings, metadata, and bundle download
+      category: Core Functionality
+      status: Not Started
+    - id: implement-results-compare-view
+      file: TODO/main/planning/implement-results-compare-view.yaml
+      title: Implement results compare view for side-by-side benchmark analysis
+      category: Core Functionality
+      status: Not Started
+    - id: integrate-explorer-into-github-pages-deployment
+      file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
+      title: Integrate results explorer into GitHub Pages deployment workflow
+      category: Core Functionality
+      status: Not Started
+    - id: launch-results-explorer-acceptance-and-seed
+      file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
+      title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
+      category: Core Functionality
+      status: Not Started
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
+      category: Core Functionality
+      status: Not Started
+    - id: scaffold-results-explorer-frontend
+      file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
+      title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
       category: Core Functionality
       status: Not Started
     - id: vector-search-benchmark-support
@@ -48,17 +98,37 @@ priorities:
       category: Benchmark Development
       status: Not Started
   Medium:
-    count: 3
+    count: 7
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       category: Platform Expansion
       status: Not Started
+    - id: define-hosted-results-contract-and-governance-model
+      file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
+      title: Define hosted results contract, trust labels, and governance model
+      category: Core Functionality
+      status: Not Started
+    - id: design-results-ingest-storage-and-derived-read-model
+      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+      title: Design results ingest, storage, and derived read-model architecture
+      category: Core Functionality
+      status: Not Started
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
       category: Benchmark Development
+      status: Not Started
+    - id: implement-pr-based-result-submission-workflow
+      file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
+      title: Implement PR-based community result submission workflow
+      category: Core Functionality
+      status: Not Started
+    - id: integrate-benchbox-cli-submit-and-service-auth
+      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+      title: Integrate BenchBox CLI submission flow and service authentication
+      category: Core Functionality
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
@@ -66,7 +136,7 @@ priorities:
       category: Benchmark Development
       status: Not Started
   Low:
-    count: 9
+    count: 10
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -97,6 +167,11 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
+      status: Not Started
+    - id: operate-results-platform-security-observability-and-abuse-controls
+      file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+      title: Operate results platform security, observability, and abuse controls
+      category: Core Functionality
       status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml

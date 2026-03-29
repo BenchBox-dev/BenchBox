@@ -1,0 +1,124 @@
+id: generate-seed-corpus-for-results-explorer
+title: "Generate seed corpus of benchmark results for the results explorer"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+deps:
+  needs:
+  - define-results-platform-product-and-launch-strategy
+description: |
+  The Phase 1 results explorer needs a curated seed corpus of real benchmark
+  results to be useful at launch. This TODO covers defining which benchmarks,
+  platforms, and scale factors to include, building a reproducible CI workflow
+  that generates the results, and committing the canonical schema-v2 bundles
+  to a data directory that the static build pipeline can consume.
+
+  Target: ≥30 result bundles covering TPC-H (SF 0.01, 0.1, 1) and TPC-DS (SF 1)
+  across DuckDB, DataFusion, ClickHouse, Polars, and at least one cloud platform.
+  Each bundle must include companion files (plans, tuning) where available.
+
+  The corpus should be regenerable from CI so it stays fresh as BenchBox and
+  platforms evolve. Results are committed to a `results-data/` directory at the
+  repo root (or a dedicated data repo — decide in w1).
+
+work:
+- id: w1
+  summary: "Define seed corpus spec: benchmarks, platforms, scale factors, and storage location"
+  status: pending
+  notes: |
+    Decide:
+    - Which benchmark×platform×scale combinations to include (target ≥30 bundles)
+    - Whether bundles live in-repo (e.g., `results-data/bundles/`) or a separate
+      `benchbox-results` data repo
+    - Naming convention for bundles (e.g., `tpch-duckdb-sf0.01-{date}.json`)
+    - Whether to capture query plans for all runs (recommended: yes for DuckDB/DataFusion)
+    Minimum coverage matrix:
+    | Benchmark | Platforms | Scale Factors |
+    |-----------|-----------|---------------|
+    | TPC-H | DuckDB, DataFusion, Polars, ClickHouse | 0.01, 0.1, 1.0 |
+    | TPC-DS | DuckDB, DataFusion | 1.0 |
+    | SSB | DuckDB | 0.01, 0.1 |
+    This yields ~30 combinations. Cloud platforms (Snowflake, Databricks) can be
+    added as stretch goals if credentials are available in CI.
+
+- id: w2
+  summary: "Build a GitHub Actions workflow that generates seed corpus bundles"
+  needs: [w1]
+  status: pending
+  notes: |
+    Create `.github/workflows/seed-corpus.yml` (or extend an existing workflow)
+    that runs the specified benchmark matrix using `benchbox run`. Each run should:
+    - Export canonical schema-v2 bundles with companion files
+    - Use `--capture-plans` where supported
+    - Use `--validation full` for correctness verification
+    - Output bundles to a consistent directory structure
+    The workflow should be manually triggerable (`workflow_dispatch`) and
+    optionally scheduled (weekly/monthly) for corpus freshness.
+
+- id: w3
+  summary: "Run initial seed corpus generation and commit bundles"
+  needs: [w2]
+  status: pending
+  notes: |
+    Execute the workflow, verify all bundles pass schema validation, and commit
+    the initial corpus. Verify that each bundle has valid metadata, query timings,
+    and companion files. Document any platforms that failed or were skipped and why.
+
+- id: w4
+  summary: "Add a corpus inventory manifest and validation script"
+  needs: [w3]
+  status: pending
+  notes: |
+    Create a simple `corpus-inventory.json` that lists all bundles with their
+    benchmark, platform, scale factor, date, and file paths. Add a validation
+    script that checks all listed bundles exist, pass schema validation, and
+    have consistent metadata. This manifest is consumed by the static build
+    pipeline (separate TODO).
+
+metadata:
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - seed-corpus
+  - ci
+  estimated_effort: "Medium"
+  created_date: "2026-03-29"
+
+impact:
+  business_value: |
+    Without real data, the explorer is an empty shell. The seed corpus is the
+    minimum viable content that makes the Phase 1 explorer worth launching.
+  user_impact: |
+    Users see real benchmark results from day one instead of placeholder data.
+  technical_debt: |
+    Establishes a reproducible corpus generation workflow that prevents the
+    explorer from depending on manually curated or stale data.
+
+must_preserve:
+- "Existing benchbox run and export workflows must not be modified — seed generation uses them as-is"
+- "Schema-v2 bundle format is the canonical artifact — no custom export shapes"
+
+approach: |
+  Use `benchbox run` directly to generate all seed results. The seed workflow is
+  a consumer of the existing CLI, not a new code path. Focus on coverage breadth
+  (many platform×benchmark combinations) over depth (extreme scale factors).
+
+anti_patterns:
+- "DO NOT include only synthetic or trivially small results — because the explorer must show realistic platform behavior — run actual benchmarks at SF 0.01+ with full query sets"
+- "DO NOT commit large bundles (>10MB each) directly to the main repo — because git history bloats permanently — use a data repo, LFS, or CI-generated artifacts if bundles are large"
+- "DO NOT generate the corpus manually and commit ad hoc — because the corpus must be reproducible and refreshable — build a CI workflow from the start"
+
+verification:
+- description: "All seed bundles pass schema validation"
+  command: "uv run -- python -c \"import json, pathlib; bundles = list(pathlib.Path('results-data/bundles').glob('*.json')); print(f'{len(bundles)} bundles found'); assert len(bundles) >= 30\""
+  expected_output: "≥30 bundles found"
+
+scope_limit:
+  only_modify:
+  - "results-data/"
+  - ".github/workflows/"
+  do_not_modify:
+  - "benchbox/"
+  - "tests/"

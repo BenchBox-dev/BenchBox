@@ -1,6 +1,185 @@
-generated_at: '2026-03-29T08:16:53.021290'
-total_items: 20
+generated_at: '2026-03-29T10:15:01.429789'
+total_items: 35
 items:
+- id: build-results-explorer-subsite-on-benchbox-dev
+  file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
+  title: Build a results explorer subsite on benchbox.dev
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - website
+  - frontend
+  - explorer
+  - benchbox-dev
+  estimated_effort: Large
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+- id: build-static-pipeline-bundles-to-read-model
+  file: TODO/main/planning/build-static-pipeline-bundles-to-read-model.yaml
+  title: Build static pipeline that transforms result bundles into explorer read models
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - build-pipeline
+  - read-model
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - generate-seed-corpus-for-results-explorer
+- id: define-results-platform-product-and-launch-strategy
+  file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
+  title: Define BenchBox results platform product boundary and launch strategy
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - website
+  - submission
+  - product-strategy
+  - architecture
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+- id: generate-seed-corpus-for-results-explorer
+  file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
+  title: Generate seed corpus of benchmark results for the results explorer
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - seed-corpus
+  - ci
+  estimated_effort: Medium
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+- id: implement-explorer-home-and-browse-pages
+  file: TODO/main/planning/implement-explorer-home-and-browse-pages.yaml
+  title: Implement explorer home page and benchmark/platform browse pages
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - frontend
+  - browse
+  - home
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - scaffold-results-explorer-frontend
+- id: implement-result-detail-page
+  file: TODO/main/planning/implement-result-detail-page.yaml
+  title: Implement result detail page with query timings, metadata, and bundle download
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - frontend
+  - detail-page
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - scaffold-results-explorer-frontend
+- id: implement-results-compare-view
+  file: TODO/main/planning/implement-results-compare-view.yaml
+  title: Implement results compare view for side-by-side benchmark analysis
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - frontend
+  - compare
+  - analysis
+  estimated_effort: Large
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - scaffold-results-explorer-frontend
+  - implement-result-detail-page
+- id: integrate-explorer-into-github-pages-deployment
+  file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
+  title: Integrate results explorer into GitHub Pages deployment workflow
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - deployment
+  - github-pages
+  - ci
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - build-static-pipeline-bundles-to-read-model
+  - scaffold-results-explorer-frontend
+  - implement-explorer-home-and-browse-pages
+  - implement-result-detail-page
+  - implement-results-compare-view
+- id: launch-results-explorer-acceptance-and-seed
+  file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
+  title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - launch
+  - acceptance
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - generate-seed-corpus-for-results-explorer
+  - integrate-explorer-into-github-pages-deployment
 - id: productize-result-publishing-and-artifact-sharing
   file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
   title: Productize result publishing and artifact sharing workflow
@@ -20,6 +199,29 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 3
+  needs:
+  - define-results-platform-product-and-launch-strategy
+- id: scaffold-results-explorer-frontend
+  file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
+  title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - frontend
+  - vite
+  - duckdb-wasm
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - build-static-pipeline-bundles-to-read-model
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support
@@ -145,6 +347,26 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
+- id: operate-results-platform-security-observability-and-abuse-controls
+  file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+  title: Operate results platform security, observability, and abuse controls
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - results
+  - security
+  - observability
+  - moderation
+  - operations
+  estimated_effort: Large
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-hosted-results-contract-and-governance-model
+  - design-results-ingest-storage-and-derived-read-model
 - id: reenable-fireducks-after-upstream-fixes
   file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
   title: Re-enable FireDucks after upstream stability fixes
@@ -211,6 +433,45 @@ items:
   work_total: 9
   work_done: 0
   work_ready: 1
+- id: define-hosted-results-contract-and-governance-model
+  file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
+  title: Define hosted results contract, trust labels, and governance model
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - governance
+  - ranking
+  - trust
+  - privacy
+  estimated_effort: Large
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+- id: design-results-ingest-storage-and-derived-read-model
+  file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+  title: Design results ingest, storage, and derived read-model architecture
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - api
+  - storage
+  - read-model
+  - architecture
+  estimated_effort: Large
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - define-hosted-results-contract-and-governance-model
 - id: flight-data-benchmark
   file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
   title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -231,6 +492,47 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: implement-pr-based-result-submission-workflow
+  file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
+  title: Implement PR-based community result submission workflow
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - phase-2
+  - community
+  - submission
+  - pr-workflow
+  estimated_effort: Large
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - launch-results-explorer-acceptance-and-seed
+- id: integrate-benchbox-cli-submit-and-service-auth
+  file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+  title: Integrate BenchBox CLI submission flow and service authentication
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - cli
+  - auth
+  - submission
+  - api
+  estimated_effort: Large
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - define-hosted-results-contract-and-governance-model
+  - design-results-ingest-storage-and-derived-read-model
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

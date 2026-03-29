@@ -1,0 +1,92 @@
+id: operate-results-platform-security-observability-and-abuse-controls
+title: "Operate results platform security, observability, and abuse controls"
+worktree: main
+priority: Low
+status: Not Started
+category: Core Functionality
+deps:
+  needs:
+  - define-hosted-results-contract-and-governance-model
+  - design-results-ingest-storage-and-derived-read-model
+description: |
+  A hosted benchmark-results platform is not credible if anyone can spam it,
+  exfiltrate private metadata, or silently corrupt public read models. Before
+  BenchBox opens self-service submissions broadly, it needs threat modeling,
+  quotas, moderation controls, observability, backups, and explicit incident
+  procedures.
+
+  This item covers the operational and governance controls that make the hosted
+  platform safe to run in public.
+
+  **Phase assignment:** Phase 3 only. Phase 1 (static, maintainer-curated) and
+  Phase 2 (PR-based, GitHub-mediated) have no hosted services to secure or
+  operate. This work is only relevant if/when a hosted API is built.
+
+work:
+- id: w1
+  summary: "Write the threat model and identify protected assets and abuse cases"
+  status: pending
+
+- id: w2
+  summary: "Define authentication, authorization, rate limiting, and quota controls"
+  needs: [w1]
+  status: pending
+
+- id: w3
+  summary: "Define moderation, trust-promotion, takedown, and audit-log workflows"
+  needs: [w1, w2]
+  status: pending
+
+- id: w4
+  summary: "Define platform SLOs, metrics, alerting, backups, and restore procedures"
+  needs: [w2]
+  status: pending
+
+- id: w5
+  summary: "Define incident response and public communication procedures for result integrity issues"
+  needs: [w3, w4]
+  status: pending
+
+metadata:
+  tags:
+  - results
+  - security
+  - observability
+  - moderation
+  - operations
+  estimated_effort: "Large"
+  created_date: "2026-03-29"
+
+impact:
+  business_value: |
+    Protects the credibility of BenchBox-hosted results before public exposure
+    creates reputational or operational risk.
+  user_impact: |
+    Users get clearer trust labels, better uptime, and safer handling of
+    private or unlisted submissions.
+  technical_debt: |
+    Prevents security and moderation from becoming an afterthought bolted onto
+    a live service.
+
+must_preserve:
+- "Public and unlisted result visibility rules stay enforceable at the storage and API layers, not only in UI hints"
+- "Explorer rebuilds and moderation actions remain auditable after the fact"
+
+approach: |
+  Treat trust, moderation, and observability as first-class platform features.
+  The hosted explorer can be static-first, but the write path still needs the
+  same operational rigor as any public ingestion service.
+
+anti_patterns:
+- "DO NOT launch self-service public submissions without quotas and rate limits -- because abuse cost will be immediate -- define throttling and eligibility rules first"
+- "DO NOT rely on UI badges alone for trust and visibility enforcement -- because storage and API mistakes can leak data -- enforce policy at the service boundary"
+
+files_affected:
+  modified:
+  - "_project/analysis/benchbox-results-platform-strategy.md"
+  - "_project/TODO/main/planning/"
+
+scope_limit:
+  only_modify:
+  - "_project/analysis/"
+  - "_project/TODO/"

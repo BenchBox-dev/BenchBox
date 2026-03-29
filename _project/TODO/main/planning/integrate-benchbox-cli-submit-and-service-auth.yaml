@@ -1,0 +1,103 @@
+id: integrate-benchbox-cli-submit-and-service-auth
+title: "Integrate BenchBox CLI submission flow and service authentication"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+deps:
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - define-hosted-results-contract-and-governance-model
+  - design-results-ingest-storage-and-derived-read-model
+description: |
+  BenchBox already has strong local run/export/history workflows, but it does
+  not have a supported hosted submission flow. This item adds the hosted CLI
+  contract, authentication model, and status/reporting flow for sending
+  canonical result bundles to BenchBox services.
+
+  The critical product rule is that hosted submission should not overload the
+  semantics of local artifact publication. `benchbox publish` and
+  `benchbox submit` must stay distinct so users know whether they are copying
+  files to storage or uploading results into the hosted platform.
+
+  **Phase assignment:** Phase 2-3. Phase 2 uses a simpler PR-based submission
+  model (`benchbox submit --output` packages a bundle for PR contribution).
+  The full hosted API + auth flow described here is Phase 3, contingent on
+  submission volume exceeding what PR-based review can handle.
+
+work:
+- id: w1
+  summary: "Define CLI surface and config contract for hosted submission"
+  status: pending
+  notes: |
+    Reconcile existing `service_url` placeholder material with the chosen
+    `submit` workflow and related help/docs.
+
+- id: w2
+  summary: "Implement authentication and local session/token handling"
+  needs: [w1]
+  status: pending
+
+- id: w3
+  summary: "Implement submission, status polling, retries, and idempotent re-submit behavior"
+  needs: [w2]
+  status: pending
+
+- id: w4
+  summary: "Connect hosted result URLs and submission history back into local CLI surfaces"
+  needs: [w3]
+  status: pending
+
+- id: w5
+  summary: "Document and test the hosted submission workflow end to end"
+  needs: [w4]
+  status: pending
+
+metadata:
+  tags:
+  - results
+  - cli
+  - auth
+  - submission
+  - api
+  estimated_effort: "Large"
+  created_date: "2026-03-29"
+
+impact:
+  business_value: |
+    Creates the user-facing bridge from BenchBox CLI runs to the hosted results
+    platform.
+  user_impact: |
+    Users can submit canonical result bundles directly from BenchBox and track
+    what happened to the submission.
+  technical_debt: |
+    Prevents the current placeholder service settings from staying as dead or
+    misleading configuration surface.
+
+must_preserve:
+- "`benchbox run`, `benchbox export`, and `benchbox results` remain valid for users who never interact with the hosted platform"
+- "Hosted submission uploads the canonical schema-v2 bundle instead of a second bespoke payload shape"
+
+approach: |
+  Build hosted submission on top of existing export/history surfaces, not as a
+  parallel runner. Submission should work for already-exported results first,
+  then compose naturally with the run lifecycle.
+
+anti_patterns:
+- "DO NOT hide hosted submission inside generic export or results flags -- because users need to understand when they are invoking a networked service -- expose a first-class submit surface"
+- "DO NOT bypass the existing exporter when sending hosted submissions -- because that creates incompatible local vs hosted artifacts -- submit the canonical bundle"
+
+files_affected:
+  modified:
+  - "benchbox/cli/commands/"
+  - "benchbox/core/results/"
+  - "docs/reference/cli/"
+  - "docs/CLI_REFERENCE.md"
+  - "tests/"
+
+scope_limit:
+  only_modify:
+  - "benchbox/cli/"
+  - "benchbox/core/results/"
+  - "docs/"
+  - "tests/"

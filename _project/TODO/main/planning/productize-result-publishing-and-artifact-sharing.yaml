@@ -11,6 +11,12 @@ description: |
   prototype under `benchbox/core/publishing/` plus a strong self-contained test suite, but it stopped
   short of becoming a BenchBox feature.
 
+  This TODO is now explicitly scoped as the BenchBox-local artifact publication track. It should own
+  `benchbox publish` style workflows for copying canonical result bundles to local/cloud storage and
+  tracking durable publication metadata. Hosted result submission (`benchbox submit`) and the public
+  explorer at `benchbox.dev/results/` are tracked by the companion results-platform TODO cluster
+  created from `_project/analysis/benchbox-results-platform-strategy.md`.
+
   Current state after review:
   - The publishing module has zero runtime or CLI consumers outside its own tests.
   - BenchBox already has a canonical result path in `benchbox.core.results.exporter` that powers
@@ -27,6 +33,10 @@ description: |
   a supported user workflow or remain prunable dead code. The implementation plan below assumes the
   feature is worth keeping and focuses on making it genuinely useful by integrating it with the
   canonical results/export/history path rather than preserving a parallel subsystem.
+
+deps:
+  needs:
+  - define-results-platform-product-and-launch-strategy
 
 work:
 - id: w1
@@ -49,8 +59,8 @@ work:
     3) listing published artifacts/history,
     4) retention/cleanup operations,
     5) stable share links for local and/or cloud backends.
-    Choose the CLI surface explicitly (`benchbox publish`, `benchbox results publish`, or equivalent)
-    and document why.
+    Hosted service submission is intentionally out of scope here; this item should recommend a local
+    or storage-backed `benchbox publish` surface and document why.
 
 - id: w3
   summary: "Design and implement a persistent publication metadata model that survives process restart"
@@ -150,7 +160,7 @@ metadata:
   - scope-review
   estimated_effort: "Large"
   created_date: "2026-03-12"
-  last_updated: "2026-03-12T00:00:00"
+  last_updated: "2026-03-29T00:00:00"
 
 impact:
   business_value: |
@@ -295,7 +305,7 @@ success_metrics:
 - "The feature has at least one supported user-facing CLI path and is documented in CLI/help/docs"
 
 open_questions:
-- "Should the supported CLI surface be a top-level `benchbox publish` command or a `benchbox results` subcommand family?"
+- "Should local/cloud artifact publication standardize on a top-level `benchbox publish` command or an `artifacts`/`results` subcommand family?"
 - "Should durable publication metadata live beside result bundles, under `benchmark_runs/published/`, or in a separate indexed store?"
 - "Should cloud publishing support launch only for directly addressable/public roots first, with private resolver workflows deferred?"
 - "Which prototype-only surfaces should be deleted outright once the supported publishing flow lands?"

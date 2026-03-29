@@ -1,0 +1,99 @@
+id: design-results-ingest-storage-and-derived-read-model
+title: "Design results ingest, storage, and derived read-model architecture"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+deps:
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - define-hosted-results-contract-and-governance-model
+description: |
+  Once BenchBox decides what a hosted result means, it still needs an
+  architecture that separates the mutable write path from the public read path.
+  The write path must ingest immutable raw bundles reliably; the read path must
+  serve fast public exploration without forcing the browser to query arbitrary
+  uploads directly.
+
+  This item defines the service boundary, storage tiers, async ingest model,
+  rebuild strategy, and the derived public read models consumed by the results
+  explorer.
+
+  **Phase assignment:** This TODO covers the full hosted ingest architecture
+  (Phase 3). The Phase 1 static build pipeline (bundles → manifests → DuckDB
+  snapshot) is simpler and is tracked by dedicated Phase 1 implementation TODOs.
+  This item remains relevant for Phase 3 API design but is NOT a blocker for
+  Phase 1 or Phase 2.
+
+work:
+- id: w1
+  summary: "Design the submission API, idempotency rules, and raw bundle storage model"
+  status: pending
+
+- id: w2
+  summary: "Define durable metadata schema for runs, submissions, actors, trust, and cohorts"
+  needs: [w1]
+  status: pending
+
+- id: w3
+  summary: "Define derived public read models for browsing, compare, and analysis"
+  needs: [w2]
+  status: pending
+  notes: |
+    Include static manifests, leaderboard projections, and whether a Parquet or
+    DuckDB snapshot is worth shipping for browser-side analysis.
+
+- id: w4
+  summary: "Choose deployment boundaries for API, workers, storage, and static explorer assets"
+  needs: [w1, w3]
+  status: pending
+
+- id: w5
+  summary: "Define backfill, rebuild, retention, and failure-recovery procedures"
+  needs: [w2, w3, w4]
+  status: pending
+
+metadata:
+  tags:
+  - results
+  - api
+  - storage
+  - read-model
+  - architecture
+  estimated_effort: "Large"
+  created_date: "2026-03-29"
+
+impact:
+  business_value: |
+    Gives BenchBox a buildable platform architecture instead of a vague notion
+    of "upload results and analyze them on the site".
+  user_impact: |
+    Users get stable result pages and responsive public browsing without waiting
+    on a browser to parse every raw submission directly.
+  technical_debt: |
+    Establishes the boundary between immutable source artifacts and rebuildable
+    derived projections before implementation creates a tangled hybrid.
+
+must_preserve:
+- "Raw schema-v2 bundles and companion files remain immutable source artifacts"
+- "The public explorer can be rebuilt from stored source artifacts plus durable metadata"
+
+approach: |
+  Use a split write/read architecture. Store raw bundles once, normalize into
+  durable metadata, and publish rebuildable read models for the explorer.
+  Prefer static-friendly public reads and keep authenticated mutations behind
+  the hosted service boundary.
+
+anti_patterns:
+- "DO NOT make the explorer query arbitrary raw uploads as its primary data source -- because that couples UX latency and safety to uncurated artifacts -- serve derived read models"
+- "DO NOT collapse object storage keys, submission IDs, and public result URLs into one identifier -- because retries, rebuilds, and public permalinks have different lifecycles -- separate them explicitly"
+
+files_affected:
+  modified:
+  - "_project/analysis/benchbox-results-platform-strategy.md"
+  - "_project/TODO/main/planning/"
+
+scope_limit:
+  only_modify:
+  - "_project/analysis/"
+  - "_project/TODO/"

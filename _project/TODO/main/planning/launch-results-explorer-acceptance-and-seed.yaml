@@ -1,0 +1,141 @@
+id: launch-results-explorer-acceptance-and-seed
+title: "Launch results explorer: acceptance testing, seed corpus verification, and go-live"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+deps:
+  needs:
+  - generate-seed-corpus-for-results-explorer
+  - integrate-explorer-into-github-pages-deployment
+description: |
+  Final launch gate for the Phase 1 results explorer. This TODO verifies that
+  all launch criteria are met, the seed corpus is complete and correct, the
+  explorer works end-to-end in production, and the feature is ready for public
+  announcement.
+
+  Launch criteria (from strategy memo):
+  1. Seed corpus has ≥30 results across ≥3 benchmarks and ≥4 platforms
+  2. All explorer pages render correctly with real data
+  3. Compare view produces meaningful query-level comparisons
+  4. DuckDB-WASM search/filter works in Chrome, Firefox, Safari
+  5. GitHub Pages deployment succeeds end-to-end from CI
+  6. Explorer is navigable from the existing benchbox.dev site header/nav
+
+work:
+- id: w1
+  summary: "Verify seed corpus completeness and quality"
+  status: pending
+  notes: |
+    Run the corpus inventory validation:
+    - ≥30 bundles present and schema-valid
+    - ≥3 benchmarks represented (TPC-H, TPC-DS, SSB minimum)
+    - ≥4 platforms represented (DuckDB, DataFusion, Polars, ClickHouse minimum)
+    - All bundles have valid query timings (no zero-duration or error-only runs)
+    - Companion files present where expected (plans for DuckDB/DataFusion)
+
+    If gaps exist, generate additional runs to fill them before launch.
+
+- id: w2
+  summary: "Run cross-browser acceptance testing"
+  needs: [w1]
+  status: pending
+  notes: |
+    Test the deployed explorer (or local preview) on:
+    - Chrome (latest): all pages, DuckDB-WASM, compare view
+    - Firefox (latest): all pages, DuckDB-WASM, compare view
+    - Safari (latest): all pages, DuckDB-WASM, compare view
+    - Mobile Chrome/Safari: basic navigation and detail pages
+
+    Verify:
+    - Pages load within 3 seconds on broadband
+    - DuckDB-WASM initializes and filtering works
+    - Compare view renders charts and tables correctly
+    - Share URLs work when opened in a new tab/browser
+    - Raw bundle download links work
+    - No console errors or broken asset references
+
+- id: w3
+  summary: "Verify production deployment end-to-end"
+  needs: [w1]
+  status: pending
+  notes: |
+    Push to main and verify the full GitHub Pages deployment:
+    - Landing page still works at benchbox.dev
+    - Docs still work at benchbox.dev/docs/
+    - Blog still works at benchbox.dev/blog/
+    - Explorer works at benchbox.dev/results/
+    - All explorer routes resolve (home, browse, detail, compare)
+    - "Results" nav link is visible on all site pages
+    - No mixed content warnings or CORS errors
+
+- id: w4
+  summary: "Write changelog entry and update project documentation"
+  needs: [w2, w3]
+  status: pending
+  notes: |
+    - Add changelog entry for the results explorer launch
+    - Update README if it references the project's web presence
+    - Update CLAUDE.md if any new commands or conventions were added
+    - Verify docs/CLI_REFERENCE.md doesn't need updates
+
+- id: w5
+  summary: "Mark Phase 1 complete and update TODO cluster status"
+  needs: [w3, w4]
+  status: pending
+  notes: |
+    - Mark `build-results-explorer-subsite-on-benchbox-dev` as complete
+    - Move all completed Phase 1 implementation TODOs to DONE
+    - Update the strategy memo with actual launch date and any deviations
+    - Update `define-results-platform-product-and-launch-strategy` status
+    - Regenerate TODO indexes
+
+metadata:
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - launch
+  - acceptance
+  estimated_effort: "Medium"
+  created_date: "2026-03-29"
+
+impact:
+  business_value: |
+    This is the gate between "built" and "shipped". Without acceptance testing
+    and verification, the explorer could launch with broken pages or missing data.
+  user_impact: |
+    Users get a polished, tested experience on launch day instead of a half-working
+    prototype.
+
+must_preserve:
+- "Existing benchbox.dev pages (landing, docs, blog) must be verified as unaffected"
+- "All seed corpus results must be accessible and renderable in the explorer"
+
+approach: |
+  Systematic verification of all launch criteria. No shortcuts — test every
+  page, every browser, every deployment path. Fix issues found during acceptance
+  before marking launch complete.
+
+verification:
+- description: "Seed corpus meets coverage requirements"
+  command: "uv run -- python -c \"import json; m = json.load(open('results-explorer/public/data/manifest.json')); print(f'{len(m[\"results\"])} results, {len(m[\"benchmarks\"])} benchmarks, {len(m[\"platforms\"])} platforms'); assert len(m['results']) >= 30; assert len(m['benchmarks']) >= 3; assert len(m['platforms']) >= 4\""
+  expected_output: "≥30 results, ≥3 benchmarks, ≥4 platforms"
+- description: "Full site build succeeds (landing + docs + blog + explorer)"
+  command: "cd results-explorer && npm run build && test -f dist/results/index.html && test -f dist/results/tpch/index.html && ls dist/results/r/*/index.html | wc -l | xargs test 30 -le"
+  expected_output: "All pages present in build output"
+- description: "Explorer component test suite passes"
+  command: "cd results-explorer && npm test -- --run"
+  expected_output: "All tests pass"
+- description: "Cross-browser acceptance — manual"
+  command: "echo 'Manual: verify Chrome, Firefox, Safari per w2 checklist'"
+  expected_output: "Manual verification — all browsers pass"
+
+scope_limit:
+  only_modify:
+  - "_project/TODO/"
+  - "_project/DONE/"
+  - "CHANGELOG.md"
+  - "README.md"
+  do_not_modify:
+  - "benchbox/"

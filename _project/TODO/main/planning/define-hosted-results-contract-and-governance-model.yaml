@@ -1,0 +1,103 @@
+id: define-hosted-results-contract-and-governance-model
+title: "Define hosted results contract, trust labels, and governance model"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+deps:
+  needs:
+  - define-results-platform-product-and-launch-strategy
+description: |
+  A hosted results platform is not just an upload endpoint. BenchBox needs a
+  durable contract for what a hosted result is, how it relates to the canonical
+  schema-v2 bundle, who can see it, how trustworthy it is, and which runs are
+  valid to compare or rank together.
+
+  This item defines the canonical hosted object model and the governance rules
+  around visibility, trust promotion, compatibility cohorts, privacy, and
+  public claims. Without this layer, the API, UI, and ranking surfaces will
+  drift into misleading or contradictory behavior.
+
+  **Phase assignment:** Phase 2-3 preparation. NOT required for Phase 1 (all
+  results are maintainer-curated, so trust labels and governance are trivial).
+  The cohort compatibility rules (w3) are partially relevant to Phase 1 compare
+  views but can be handled with simple same-benchmark/same-scale validation
+  without a full governance model.
+
+work:
+- id: w1
+  summary: "Define hosted result identity, immutable bundle contract, and ingest status model"
+  status: pending
+  notes: |
+    Separate bundle hash, submission identity, and public result identity.
+
+- id: w2
+  summary: "Define visibility states and trust labels for hosted results"
+  needs: [w1]
+  status: pending
+  notes: |
+    Cover private, unlisted, public self-reported, public curated, and public
+    verified states or an explicitly revised equivalent.
+
+- id: w3
+  summary: "Define cohort and ranking eligibility rules for comparison and leaderboards"
+  needs: [w2]
+  status: pending
+  notes: |
+    Prevent incompatible runs from being mixed into misleading comparisons.
+
+- id: w4
+  summary: "Define privacy, redaction, retention, and data-removal policy"
+  needs: [w2]
+  status: pending
+  notes: |
+    Decide what system metadata may be public, redactable, or removable after submission.
+
+- id: w5
+  summary: "Document the contract for CLI, API, and frontend consumers"
+  needs: [w3, w4]
+  status: pending
+
+metadata:
+  tags:
+  - results
+  - governance
+  - ranking
+  - trust
+  - privacy
+  estimated_effort: "Large"
+  created_date: "2026-03-29"
+
+impact:
+  business_value: |
+    Creates the policy layer that makes hosted results credible instead of just
+    easy to upload.
+  user_impact: |
+    Users will know whether a result is private, unlisted, public, curated, or
+    verified, and will not be misled by silent ranking mismatches.
+  technical_debt: |
+    Prevents API fields, explorer badges, and moderation workflows from being
+    reinvented independently by different implementation tracks.
+
+must_preserve:
+- "Canonical BenchBox result bundles remain downloadable and distinguishable from any derived hosted metadata"
+- "BenchBox does not imply TPC certification or equivalent official standing for ordinary hosted submissions"
+
+approach: |
+  Treat the canonical schema-v2 bundle as input, not as the full hosted public
+  contract. Add hosted result identity, visibility, and trust semantics above
+  it without mutating the raw bundle format into a service-shaped payload.
+
+anti_patterns:
+- "DO NOT treat every public upload as equally trustworthy -- because self-reported and curated results carry different weight -- make trust labels explicit in the contract"
+- "DO NOT allow ranking before compatibility cohorts are defined -- because mixed cohorts create false leaderboards -- define comparison eligibility first"
+
+files_affected:
+  modified:
+  - "_project/analysis/benchbox-results-platform-strategy.md"
+  - "_project/TODO/main/planning/"
+
+scope_limit:
+  only_modify:
+  - "_project/analysis/"
+  - "_project/TODO/"
