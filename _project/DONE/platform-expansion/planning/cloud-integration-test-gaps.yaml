@@ -2,7 +2,8 @@ id: cloud-integration-test-gaps
 title: "Cloud Integration Test Infrastructure — Address Review Gaps"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-03-29"
 category: Platform Expansion
 description: |
   Code review of the cloud-integration-test-infrastructure implementation
@@ -85,7 +86,7 @@ guardrails:
 work:
 - id: w0
   summary: "S3 test fixture — replace pre-existing file assumption with self-contained setup/teardown"
-  status: pending
+  status: done
   notes: |
     In test_pg_duckdb_live.py, replace s3_test_bucket fixture with
     s3_test_parquet fixture that:
@@ -99,7 +100,7 @@ work:
 
 - id: w1
   summary: "Firebolt test depth — add SchemaManagement, DataLoading, TPC-H QueryExecution, SpecificFeatures"
-  status: pending
+  status: done
   notes: |
     Add to test_firebolt_live.py:
     - TestLiveFireboltSchemaManagement: test_create_and_drop_database
@@ -113,7 +114,7 @@ work:
 
 - id: w2
   summary: "MotherDuck test depth — add SchemaManagement, DataLoading, TPC-H QueryExecution, SpecificFeatures"
-  status: pending
+  status: done
   notes: |
     Add to test_motherduck_live.py:
     - TestLiveMotherDuckSchemaManagement: test_schema_creation
@@ -127,7 +128,7 @@ work:
 
 - id: w3
   summary: "Starburst test depth — add SchemaManagement, DataLoading, TPC-H QueryExecution, SpecificFeatures"
-  status: pending
+  status: done
   notes: |
     Add to test_starburst_live.py:
     - Module-level starburst_writable_catalog() fixture
@@ -145,7 +146,7 @@ work:
 - id: w4
   summary: "Comparison test refactor — replace subprocess CLI with Python adapter API"
   needs: [w1, w2, w3]
-  status: pending
+  status: done
   notes: |
     In test_pg_extension_comparison.py:
     1. Remove subprocess/json imports, remove _run_benchmark_for_platform()
@@ -164,7 +165,7 @@ work:
 - id: w5
   summary: "Scope creep acknowledgment — note in commit message"
   needs: [w0, w1, w2, w3, w4]
-  status: pending
+  status: done
   notes: |
     Include in the final commit message a note about the PREFER_PLATFORM_FORMAT_ORDER
     production code refactor (commit ccbd69f56) that was bundled in the original

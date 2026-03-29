@@ -1,5 +1,5 @@
-generated_at: '2026-03-29T08:06:51.003872'
-total_items: 21
+generated_at: '2026-03-29T08:16:53.021326'
+total_items: 20
 priorities:
   High:
     count: 2
@@ -15,7 +15,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium-High:
-    count: 7
+    count: 6
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -35,11 +35,6 @@ priorities:
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
-      category: Platform Expansion
-      status: Not Started
-    - id: cloud-integration-test-gaps
-      file: TODO/platform-expansion/planning/cloud-integration-test-gaps.yaml
-      title: Cloud Integration Test Infrastructure — Address Review Gaps
       category: Platform Expansion
       status: Not Started
     - id: motherduck-cloud-features

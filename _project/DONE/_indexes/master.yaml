@@ -1,5 +1,5 @@
-generated_at: '2026-03-29T08:03:58.608025'
-total_items: 610
+generated_at: '2026-03-29T08:16:54.340769'
+total_items: 611
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7126,6 +7126,22 @@ items:
   work_ready: 0
   needs:
   - spark-mixin-open-table-format-loading
+- id: cloud-integration-test-gaps
+  file: DONE/platform-expansion/planning/cloud-integration-test-gaps.yaml
+  title: Cloud Integration Test Infrastructure — Address Review Gaps
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - integration-tests
+  - cloud
+  - review-followup
+  estimated_effort: Medium — 5 files, mostly additive test code
+  completed_date: '2026-03-29'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: cloud-integration-test-infrastructure
   file: DONE/platform-expansion/active/cloud-integration-test-infrastructure.yaml
   title: Cloud Platform Integration Test Infrastructure — Deferred Live Tests

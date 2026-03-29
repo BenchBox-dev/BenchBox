@@ -1,8 +1,8 @@
-generated_at: '2026-03-29T08:06:51.003880'
-total_items: 21
+generated_at: '2026-03-29T08:16:53.021334'
+total_items: 20
 statuses:
   Not Started:
-    count: 21
+    count: 20
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -42,11 +42,6 @@ statuses:
     - id: pg-extension-advanced-benchmarking
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
-      priority: Medium-High
-      category: Platform Expansion
-    - id: cloud-integration-test-gaps
-      file: TODO/platform-expansion/planning/cloud-integration-test-gaps.yaml
-      title: Cloud Integration Test Infrastructure — Address Review Gaps
       priority: Medium-High
       category: Platform Expansion
     - id: flight-data-benchmark

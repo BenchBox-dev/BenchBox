@@ -1,5 +1,5 @@
-generated_at: '2026-03-29T08:06:51.003835'
-total_items: 21
+generated_at: '2026-03-29T08:16:53.021290'
+total_items: 20
 items:
 - id: productize-result-publishing-and-artifact-sharing
   file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
@@ -318,21 +318,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 3
-- id: cloud-integration-test-gaps
-  file: TODO/platform-expansion/planning/cloud-integration-test-gaps.yaml
-  title: Cloud Integration Test Infrastructure — Address Review Gaps
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - integration-tests
-  - cloud
-  - review-followup
-  estimated_effort: Medium — 5 files, mostly additive test code
-  work_total: 6
-  work_done: 0
-  work_ready: 4
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
