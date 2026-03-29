@@ -55,8 +55,12 @@ metadata:
 
 guardrails:
   verification:
-    command: "uv run -- python -m pytest -m 'fast and not (slow or stress or resource_heavy or live_integration)' --tb=short -q"
-    expected: "All fast tests pass; new test code is credential-gated and does not run without env vars"
+    command: "uv run ruff check tests/integration/platforms/test_firebolt_live.py tests/integration/platforms/test_motherduck_live.py tests/integration/platforms/test_starburst_live.py tests/integration/platforms/test_pg_extension_comparison.py tests/integration/platforms/test_pg_duckdb_live.py && make test-fast"
+    expected: "Ruff clean on all 5 files; all fast tests pass; new test code is credential-gated and does not run without env vars"
+    spot_checks:
+    - "uv run -- python -m pytest tests/integration/platforms/test_firebolt_live.py --collect-only 2>&1 | grep 'test session starts' — verifies no import errors, expect 9 tests"
+    - "uv run -- python -m pytest tests/integration/platforms/test_motherduck_live.py --collect-only 2>&1 | grep 'test session starts' — expect 9 tests"
+    - "uv run -- python -m pytest tests/integration/platforms/test_starburst_live.py --collect-only 2>&1 | grep 'test session starts' — expect 9 tests"
   must_preserve:
   - "Existing test behavior in test_firebolt_live.py, test_starburst_live.py, test_motherduck_live.py — new classes are additive"
   - "Existing comparison test assertions in TestPgExtensionComparisonOrchestration and TestPgExtensionComparisonReport"
