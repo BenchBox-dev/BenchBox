@@ -7,6 +7,7 @@ category: Core Functionality
 deps:
   needs:
   - define-results-platform-product-and-launch-strategy
+  - resolve-results-explorer-brand-ownership
 description: |
   BenchBox needs a public-facing results explorer that feels like a product, not
   a directory listing of JSON files. The explorer should live at

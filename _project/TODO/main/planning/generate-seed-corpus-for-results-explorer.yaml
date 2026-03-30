@@ -14,10 +14,17 @@ description: |
   that generates the results, and committing the canonical schema-v2 bundles
   to a data directory that the static build pipeline can consume.
 
-  Target: ≥30 result bundles covering TPC-H (SF 0.01, 0.1, 1), TPC-DS (SF 1),
-  and SSB (SF 0.01, 0.1) across DuckDB, DataFusion, ClickHouse, and Polars,
-  with extra compatible runs added until the launch floor is met. Each bundle
-  must include companion files (plans, tuning) where available.
+  **Corpus strategy: depth over breadth.** The primary deliverable is a dynamic
+  comparison tool, so the corpus must have sufficient depth per benchmark — many
+  platforms at the same scale factor — rather than just hitting a raw bundle
+  count. The target is: each included benchmark has ≥3 comparable platforms at
+  the same scale factor, across most supported benchmarks and platforms at
+  limited scale factors.
+
+  Coverage matrix: TPC-H (SF 0.01, 0.1, 1), TPC-DS (SF 1), and SSB (SF 0.01,
+  0.1) across DuckDB, DataFusion, ClickHouse, and Polars, plus additional
+  platforms as available. Each bundle must include companion files (plans,
+  tuning) where supported.
 
   The corpus should be regenerable from CI so it stays fresh as BenchBox and
   platforms evolve. Results are committed under `results-data/` at the repo
@@ -30,7 +37,8 @@ work:
   status: pending
   notes: |
     Decide:
-    - Which benchmark×platform×scale combinations to include (target ≥30 bundles)
+    - Which benchmark×platform×scale combinations to include (prioritize depth:
+      ≥3 platforms per benchmark×scale, across most supported benchmarks)
     - Exact directory layout under `results-data/bundles/`
     - Naming convention for bundles (e.g., `tpch-duckdb-sf0.01-{date}.json`)
     - Whether to capture query plans for all runs (recommended: yes for DuckDB/DataFusion)

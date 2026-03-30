@@ -15,12 +15,15 @@ description: |
   announcement.
 
   Launch criteria (from strategy memo):
-  1. Seed corpus has ≥30 results across TPC-H, TPC-DS, and SSB, spanning ≥4 platforms
-  2. All explorer pages render correctly with real data
-  3. Compare view produces meaningful query-level comparisons
-  4. DuckDB-WASM search/filter works in Chrome, Firefox, Safari
+  1. Seed corpus has sufficient depth for the dynamic comparison tool: each
+     included benchmark has ≥3 comparable platforms at the same scale factor
+  2. Compare view is the primary entry point and works end-to-end: select
+     benchmark/scale/platforms → query-level timing breakdown → shareable URL
+  3. All explorer pages render correctly with real data
+  4. DuckDB-WASM filtering works in Chrome, Firefox, Safari
   5. GitHub Pages deployment succeeds end-to-end from CI
-  6. Explorer is navigable from the existing benchbox.dev site header/nav
+  6. Explorer is navigable from the existing site header/nav
+  7. Brand ownership decision is resolved and reflected in domain/hosting/identity
 
 work:
 - id: w1
@@ -28,13 +31,14 @@ work:
   status: pending
   notes: |
     Run the corpus inventory validation:
-    - ≥30 bundles present and schema-valid
-    - ≥3 benchmarks represented (TPC-H, TPC-DS, SSB minimum)
-    - ≥4 platforms represented (DuckDB, DataFusion, Polars, ClickHouse minimum)
-    - All bundles have valid query timings (no zero-duration or error-only runs)
+    - Each included benchmark has ≥3 comparable platforms at the same scale factor
+    - All bundles are schema-valid with valid query timings (no zero-duration or error-only runs)
     - Companion files present where expected (plans for DuckDB/DataFusion)
+    - The dynamic comparison tool produces meaningful comparisons for every
+      benchmark×scale combination in the corpus
 
-    If gaps exist, generate additional runs to fill them before launch.
+    If gaps exist (e.g., a benchmark has only 2 platforms), generate additional
+    runs to fill them before launch.
 
 - id: w2
   summary: "Run cross-browser acceptance testing"

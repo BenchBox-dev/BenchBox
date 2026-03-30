@@ -1,7 +1,7 @@
 # BenchBox Results Platform Product + Architecture Strategy
 
 **Created:** 2026-03-29
-**Revised:** 2026-03-29
+**Revised:** 2026-03-30
 **Originating TODO:** `productize-result-publishing-and-artifact-sharing`
 
 ## Executive Summary
@@ -42,20 +42,101 @@ many successful open-source benchmark databases (e.g., js-framework-benchmark,
 ClickBench contribution model) proves that community contributions scale well
 without a custom API until volume demands one.
 
+## Product Intent and Positioning
+
+### Core Hypothesis
+
+"People want to browse and compare public benchmark results across platforms."
+This is the primary value proposition that Phase 1 must validate.
+
+### Target Audience
+
+The broader data/analytics community — not just existing BenchBox users. The
+explorer is a credibility and marketing play: transparent, reproducible,
+multi-benchmark results that visitors can explore and compare themselves.
+
+### Differentiator vs ClickBench
+
+ClickBench covers a single workload in a single format. BenchBox's explorer
+differentiates on three axes:
+
+1. **Multi-benchmark coverage** — TPC-H, TPC-DS, SSB, and future benchmarks in
+   one place, not siloed sites
+2. **Rich per-query detail** — execution plans, tuning configurations, validation
+   status, companion files
+3. **Reproducibility** — any published result can be re-run with `benchbox run`
+   using the same parameters
+
+ClickBench was considered and rejected because its format cannot capture what
+BenchBox measures (items 2 and 3 above).
+
+### Explorer as Dynamic Tool
+
+The explorer is a **dynamic comparison tool**, not a static shootout page.
+Visitors pick benchmark, scale factor, and platforms to build their own
+comparisons. This is the core UX — not a curated leaderboard.
+
+### Corpus Size and DuckDB-WASM Justification
+
+The benchmark × platform × scale matrix is large even at launch. Phase 1 should
+cover most supported benchmarks and platforms at limited scale factors. DuckDB-WASM
+is justified because:
+
+- The corpus needs to be large enough for a dynamic tool to be useful
+- It will grow quickly as new platforms and benchmarks are added
+- It demonstrates BenchBox's DuckDB expertise (audience alignment)
+
+The ≥30 result seed corpus target is a rough estimate, open to revision based on
+what's needed for the dynamic comparison tool to feel useful.
+
+### Visual Identity and Build Pipeline
+
+The explorer is a standalone Vite app with its own build pipeline, but shares the
+benchbox.dev visual identity (header, nav, styling). It is not embedded in the
+docs or blog — it is a distinct feature of the site.
+
+### SEO
+
+Search engine discoverability is nice-to-have but not a launch blocker. Users
+will primarily arrive through benchbox.dev directly. Pre-rendering can be added
+post-launch if organic traffic becomes a goal.
+
+### Timeline
+
+No hard deadline or external event. Quality over speed.
+
+### Open Question: Brand Ownership
+
+It is not yet decided whether the results explorer should live under the BenchBox
+brand (benchbox.dev/results/) or under the Oxbow Research brand. This decision
+affects hosting, curation authority, submission model, and long-term business
+positioning. **It must be resolved before implementation begins** and is tracked
+as a blocking TODO (`resolve-results-explorer-brand-ownership`).
+
 ## Phase 1 MVP Definition
+
+### Primary Deliverable: Dynamic Comparison Tool
+
+The core UX of Phase 1 is a **dynamic comparison tool** where visitors pick a
+benchmark, scale factor, and platforms, then see a side-by-side query-level
+timing breakdown. This is the feature that differentiates the explorer from a
+file listing, makes users come back and share links, and validates the core
+hypothesis ("people want to browse and compare public benchmark results").
+
+All other Phase 1 deliverables (home page, browse pages, detail pages) exist to
+support navigation into and out of comparisons. They are necessary but secondary.
 
 ### What Ships
 
-| Component | Description | Done When |
-| --- | --- | --- |
-| **Seed corpus** | ≥30 result bundles covering TPC-H (SF 0.01, 0.1, 1), TPC-DS (SF 1), and SSB (SF 0.01, 0.1) across DuckDB, DataFusion, ClickHouse, Polars, plus extra compatible runs to reach launch coverage | Bundles exported, validated, and committed under `results-data/bundles/` |
-| **Static build pipeline** | Script that transforms canonical schema-v2 bundles into: (1) navigation manifest JSON, (2) per-result detail JSON, (3) DuckDB database snapshot for browser-side analysis | Pipeline runs in CI, output deployed to GitHub Pages |
-| **Explorer home** | Landing page at `/results/` with benchmark/platform summary cards and recent results | Page renders with real data |
-| **Browse pages** | Benchmark index (`/results/tpch/`), platform index (`/results/duckdb/`), filterable result lists | Users can navigate to any result from browse pages |
-| **Result detail page** | Stable URL per result showing metadata, query timings, validation status, and raw bundle download link | Detail page works for all seed corpus results |
-| **Compare view** | Side-by-side or overlay comparison of 2+ compatible results with query-level timing breakdown | Compare works for same-benchmark, same-scale results |
-| **Search/filter** | DuckDB-WASM powered filtering by benchmark, platform, scale factor, date range | Filters work client-side over the full corpus |
-| **GitHub Pages integration** | Explorer builds and deploys alongside existing landing + docs + blog in the same Pages workflow | Single `git push` to `main` deploys everything |
+| Component | Role | Description | Done When |
+| --- | --- | --- | --- |
+| **Compare view** | **Primary** | Dynamic comparison tool: pick benchmark/scale/platforms, see side-by-side query-level timing breakdown with cohort validation | Compare works for any compatible results in the corpus; shareable URLs |
+| **Seed corpus** | Data | Result bundles with depth per benchmark (many platforms at key scale factors) rather than just breadth | Bundles exported, validated, committed under `results-data/bundles/` |
+| **Static build pipeline** | Data | Transforms canonical schema-v2 bundles into navigation manifest JSON, per-result detail JSON, and DuckDB database snapshot | Pipeline runs in CI, output deployed to GitHub Pages |
+| **Explorer home + browse** | Navigation | Landing page with summary cards; benchmark and platform index pages with filterable result lists and "compare" checkboxes | Users can navigate to any result and select results for comparison |
+| **Result detail page** | Supporting | Stable URL per result showing metadata, query timings, validation status, and raw bundle download | Detail page works for all seed corpus results |
+| **DuckDB-WASM filtering** | Interaction | Client-side filtering by benchmark, platform, scale factor, date range | Filters work over the full corpus |
+| **GitHub Pages integration** | Deployment | Explorer builds and deploys alongside existing landing + docs + blog | Single `git push` to `main` deploys everything |
 
 ### What Does NOT Ship in Phase 1
 
@@ -68,12 +149,16 @@ without a custom API until volume demands one.
 
 ### Launch Criteria
 
-1. Seed corpus has ≥30 results across TPC-H, TPC-DS, and SSB, spanning ≥4 platforms
-2. All explorer pages render correctly with real data
-3. Compare view produces meaningful query-level comparisons
-4. DuckDB-WASM search/filter works in Chrome, Firefox, Safari
+1. Seed corpus has sufficient depth for the dynamic comparison tool to show
+   meaningful cross-platform comparisons: each included benchmark has ≥3
+   comparable platforms at the same scale factor
+2. Compare view is the primary entry point and works end-to-end: select
+   benchmark/scale/platforms → see query-level timing breakdown → share URL
+3. All explorer pages render correctly with real data
+4. DuckDB-WASM filtering works in Chrome, Firefox, Safari
 5. GitHub Pages deployment succeeds end-to-end from CI
 6. Explorer is navigable from the existing benchbox.dev site header/nav
+7. Brand ownership decision is resolved and reflected in domain/hosting/identity
 
 ## Phase 2: Community Contributions (Deferred)
 
@@ -371,7 +456,9 @@ platform or explorer.
 | TODO | Phase | Priority | Rationale |
 | --- | --- | --- | --- |
 | `define-results-platform-product-and-launch-strategy` | Planning | High | Must complete before any implementation |
-| `build-results-explorer-subsite-on-benchbox-dev` | Phase 1 | High | Core deliverable |
+| `resolve-results-explorer-brand-ownership` | Planning | High | Blocks all implementation — domain, hosting, identity depend on this |
+| `build-results-explorer-subsite-on-benchbox-dev` | Phase 1 | High | Core deliverable (umbrella) |
+| `implement-results-compare-view` | Phase 1 | High | **Primary deliverable** — the dynamic comparison tool is the core UX |
 | `define-hosted-results-contract-and-governance-model` | Phase 2-3 prep | Medium | Not needed for Phase 1 (all curated) |
 | `design-results-ingest-storage-and-derived-read-model` | Phase 3 | Medium | Phase 1 static pipeline is covered by dedicated implementation TODOs |
 | `integrate-benchbox-cli-submit-and-service-auth` | Phase 2-3 | Medium | Deferred until explorer is proven |

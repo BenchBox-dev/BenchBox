@@ -7,19 +7,22 @@ category: Core Functionality
 deps:
   needs:
   - scaffold-results-explorer-frontend
-  - implement-result-detail-page
 description: |
-  Build the compare view at `/results/compare?ids=id1,id2[,id3]`. This is the
-  core analytical feature of the explorer — users select 2-4 compatible results
-  and see a side-by-side comparison of query timings, with visual indicators
-  for performance differences.
+  Build the dynamic comparison tool at `/results/compare?ids=id1,id2[,id3]`.
+  **This is the primary Phase 1 deliverable** — the feature that validates the
+  core hypothesis ("people want to browse and compare public benchmark results")
+  and differentiates the explorer from a file listing.
+
+  The compare view is a dynamic tool: visitors pick a benchmark, scale factor,
+  and platforms, then see a side-by-side query-level timing breakdown. It is the
+  feature that makes users come back and share links.
 
   Comparison requires cohort validation: results must share the same benchmark
   and scale factor to be meaningfully compared. The compare view should warn
   (but not block) when comparing across different configurations.
 
-  This is the Geekbench "compare" equivalent — the feature that makes the
-  explorer analytically useful beyond just browsing.
+  Note: this TODO does NOT depend on the result detail page. Compare and detail
+  are independent siblings, both depending only on the scaffold.
 
 work:
 - id: w1
