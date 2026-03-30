@@ -7,7 +7,6 @@ category: Core Functionality
 deps:
   needs:
   - define-results-platform-product-and-launch-strategy
-  - resolve-results-explorer-brand-ownership
 description: |
   BenchBox needs a public-facing results explorer that feels like a product, not
   a directory listing of JSON files. The explorer should live at
@@ -21,9 +20,13 @@ description: |
   deployed to GitHub Pages. The governance and ingest TODOs were removed as
   blockers because Phase 1 is entirely maintainer-curated with no hosted services.
 
-  This TODO is now an umbrella for the Phase 1 implementation. Detailed
-  implementation tasks are tracked as separate TODOs in the results-explorer
-  cluster.
+  This TODO is a **tracking umbrella** for the Phase 1 implementation. It does
+  not contain implementation work itself — it mirrors the milestone state of the
+  results-explorer cluster. Mark each work unit done when the corresponding
+  cluster item(s) are completed. Mark this item Completed when w3 is done.
+
+  Note: resolve-results-explorer-brand-ownership must be resolved before launch
+  but does not block implementation. BenchBox placement is the working default.
 
 work:
 - id: w1
@@ -84,6 +87,14 @@ approach: |
 anti_patterns:
 - "DO NOT hide the canonical raw bundle behind a UI-only representation -- because reproducibility matters -- make the underlying bundle downloadable from result pages"
 - "DO NOT use hash-only routing for canonical public result URLs -- because stable shareable pages matter for a benchmark site -- use real result paths or pre-rendered files"
+
+verification:
+- description: "Explorer root exists and has a built index"
+  command: "test -d results/ && test -f results/index.html && echo PRESENT"
+  expected_output: "PRESENT"
+- description: "Existing docs and landing pages build cleanly after explorer is integrated"
+  command: "cd landing && npm run build 2>&1 | grep -c '[Ee]rror' || echo 0"
+  expected_output: "0"
 
 files_affected:
   modified:

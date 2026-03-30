@@ -1,8 +1,8 @@
-generated_at: '2026-03-29T11:00:49.755836'
-total_items: 35
+generated_at: '2026-03-30T18:32:32.500738'
+total_items: 36
 priorities:
   High:
-    count: 12
+    count: 13
     items:
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
@@ -52,6 +52,11 @@ priorities:
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
+      category: Core Functionality
+      status: Not Started
+    - id: resolve-results-explorer-brand-ownership
+      file: TODO/main/planning/resolve-results-explorer-brand-ownership.yaml
+      title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
       category: Core Functionality
       status: Not Started
     - id: scaffold-results-explorer-frontend

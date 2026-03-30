@@ -1,5 +1,5 @@
-generated_at: '2026-03-29T11:00:49.755795'
-total_items: 35
+generated_at: '2026-03-30T18:32:32.500682'
+total_items: 36
 items:
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
@@ -135,7 +135,6 @@ items:
   work_ready: 1
   needs:
   - scaffold-results-explorer-frontend
-  - implement-result-detail-page
 - id: integrate-explorer-into-github-pages-deployment
   file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
   title: Integrate results explorer into GitHub Pages deployment workflow
@@ -199,6 +198,25 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 3
+  needs:
+  - define-results-platform-product-and-launch-strategy
+- id: resolve-results-explorer-brand-ownership
+  file: TODO/main/planning/resolve-results-explorer-brand-ownership.yaml
+  title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - brand
+  - decision
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
   needs:
   - define-results-platform-product-and-launch-strategy
 - id: scaffold-results-explorer-frontend
@@ -361,7 +379,7 @@ items:
   - moderation
   - operations
   estimated_effort: Large
-  work_total: 5
+  work_total: 8
   work_done: 0
   work_ready: 1
   needs:
@@ -466,7 +484,7 @@ items:
   - read-model
   - architecture
   estimated_effort: Large
-  work_total: 5
+  work_total: 8
   work_done: 0
   work_ready: 1
   needs:
@@ -526,7 +544,7 @@ items:
   - submission
   - api
   estimated_effort: Large
-  work_total: 5
+  work_total: 8
   work_done: 0
   work_ready: 1
   needs:

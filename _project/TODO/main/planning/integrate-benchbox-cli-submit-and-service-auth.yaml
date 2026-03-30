@@ -27,31 +27,82 @@ description: |
 
 work:
 - id: w1
-  summary: "Define CLI surface and config contract for hosted submission"
+  summary: "Sketch the CLI surface: draft `benchbox submit --help` output and config key names"
   status: pending
   notes: |
-    Reconcile existing `service_url` placeholder material with the chosen
-    `submit` workflow and related help/docs.
+    Write the full --help text before any code is written. Define all flags
+    (--last, --bundle, --dry-run), config keys (service.url, service.token),
+    and the explicit distinction from `benchbox publish`. Reconcile with
+    existing service_url placeholder. Output: submit-cli-surface.md under
+    _project/analysis/.
 
 - id: w2
-  summary: "Implement authentication and local session/token handling"
+  summary: "Map submit to existing result export surfaces — identify reuse points in exporter and results CLI"
   needs: [w1]
   status: pending
+  notes: |
+    Read benchbox/cli/commands/results.py and benchbox/core/results/exporter.py.
+    Identify which existing code is reused (export path resolution, bundle
+    validation) vs. net-new (network layer, auth). Document the composition
+    seam before writing any implementation.
 
 - id: w3
-  summary: "Implement submission, status polling, retries, and idempotent re-submit behavior"
-  needs: [w2]
+  summary: "Implement `benchbox submit` command skeleton with --dry-run and local validation"
+  needs: [w1, w2]
   status: pending
+  notes: |
+    Create benchbox/cli/commands/submit.py. Wire into CLI entrypoint.
+    --dry-run must work without credentials — just validates the bundle and
+    prints what would be uploaded. Passes `benchbox submit --help` and
+    `benchbox submit --dry-run <path>` smoke tests before w4 begins.
 
 - id: w4
-  summary: "Connect hosted result URLs and submission history back into local CLI surfaces"
+  summary: "Implement authentication: token fetch, local keychain storage, and refresh flow"
   needs: [w3]
   status: pending
+  notes: |
+    On first submit, prompt for token. Store securely (keyring or encrypted
+    file). On subsequent runs, load token from storage. Handle 401 by prompting
+    for re-auth rather than hard-failing. Do not store plaintext tokens in
+    config files.
 
 - id: w5
-  summary: "Document and test the hosted submission workflow end to end"
+  summary: "Implement upload, status polling, retries, and idempotent re-submit"
   needs: [w4]
   status: pending
+  notes: |
+    POST the canonical schema-v2 bundle. Poll for async processing status
+    (accepted → validated → published). Retry on transient errors (5xx,
+    network). Re-submit with same bundle must be idempotent — service returns
+    the existing hosted URL rather than creating a duplicate.
+
+- id: w6
+  summary: "Connect hosted result URL and submission history into `benchbox results --submitted`"
+  needs: [w5]
+  status: pending
+  notes: |
+    After a successful submission, persist the hosted URL in local history.
+    `benchbox results --submitted` lists past submissions with their hosted
+    URLs. Builds on the existing results history surfaces without modifying
+    the exporter.
+
+- id: w7
+  summary: "Write unit and integration tests for the full hosted submission flow"
+  needs: [w5, w6]
+  status: pending
+  notes: |
+    Unit tests: CLI flag parsing, dry-run output, auth token storage/retrieval.
+    Integration tests: full submit flow with a mock service (httpretty or
+    respx). Cover retry, idempotency, and 401 re-auth paths.
+
+- id: w8
+  summary: "Update CLI reference docs and add hosted-submission walkthrough"
+  needs: [w6, w7]
+  status: pending
+  notes: |
+    Update docs/CLI_REFERENCE.md and docs/reference/cli/ with submit command
+    docs. Add a how-to page covering the end-to-end workflow:
+    run → export → submit → track hosted URL.
 
 metadata:
   tags:
@@ -86,6 +137,17 @@ approach: |
 anti_patterns:
 - "DO NOT hide hosted submission inside generic export or results flags -- because users need to understand when they are invoking a networked service -- expose a first-class submit surface"
 - "DO NOT bypass the existing exporter when sending hosted submissions -- because that creates incompatible local vs hosted artifacts -- submit the canonical bundle"
+
+verification:
+- description: "Submit command skeleton is importable and --help works"
+  command: "uv run -- python -m benchbox submit --help 2>&1 | grep -c 'submit'"
+  expected_output: "1"
+- description: "Submit unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q"
+  expected_output: "All tests pass"
+- description: "Submit integration tests pass against mock service"
+  command: "uv run -- python -m pytest tests/integration/test_hosted_submission.py -q"
+  expected_output: "All tests pass"
 
 files_affected:
   modified:

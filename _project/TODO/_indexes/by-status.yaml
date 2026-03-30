@@ -1,8 +1,8 @@
-generated_at: '2026-03-29T11:00:49.755846'
-total_items: 35
+generated_at: '2026-03-30T18:32:32.500749'
+total_items: 36
 statuses:
   Not Started:
-    count: 35
+    count: 36
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -154,6 +154,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Low
       category: Platform Expansion
+    - id: resolve-results-explorer-brand-ownership
+      file: TODO/main/planning/resolve-results-explorer-brand-ownership.yaml
+      title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
+      priority: High
+      category: Core Functionality
     - id: scaffold-results-explorer-frontend
       file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
       title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM

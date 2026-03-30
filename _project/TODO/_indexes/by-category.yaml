@@ -1,4 +1,4 @@
-generated_at: '2026-03-29T11:00:49.755823'
+generated_at: '2026-03-30T18:32:32.500719'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -43,7 +43,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 16
+    count: 17
     items:
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
@@ -118,6 +118,11 @@ categories:
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
+      priority: High
+      status: Not Started
+    - id: resolve-results-explorer-brand-ownership
+      file: TODO/main/planning/resolve-results-explorer-brand-ownership.yaml
+      title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
       priority: High
       status: Not Started
     - id: scaffold-results-explorer-frontend
