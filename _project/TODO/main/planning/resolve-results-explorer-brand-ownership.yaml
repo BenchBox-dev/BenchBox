@@ -18,8 +18,10 @@ description: |
   - **Business positioning**: is the explorer a BenchBox feature or a standalone
     Oxbow Research product that happens to use BenchBox data
 
-  This must be resolved before frontend scaffolding begins because it determines
-  the domain, base URL, design tokens, and navigation structure.
+  **Working default:** BenchBox placement (benchbox.dev/results/). All
+  implementation proceeds under this assumption. This TODO validates that default
+  or overrides it with a different brand placement. It must be resolved before
+  launch, but does not block scaffolding or implementation that uses the default.
 
 work:
 - id: w1
@@ -27,8 +29,13 @@ work:
   status: pending
   notes: |
     Clarify: is Oxbow Research a parent brand, a sibling product, a company
-    entity, or something else? What is its existing web presence (if any)?
-    What does it publish beyond BenchBox?
+    entity, or something else? Research steps:
+    - Check for any existing oxbow.dev / oxbow-research.com / oxbowresearch.io
+      web presence and what it publishes
+    - Search git log for "Oxbow Research" mentions and note existing uses
+    - Check GitHub org / domain registrations for any oxbow-* properties
+    - Check README, CLAUDE.md, and _project/analysis/ for any prior positioning
+    Output: 1-paragraph summary of Oxbow Research's current identity and scope.
 
 - id: w2
   summary: "Evaluate the tradeoffs of each brand placement"
@@ -77,6 +84,13 @@ must_preserve:
 approach: |
   This is a product/business decision, not a technical one. Gather the relevant
   context about Oxbow Research, evaluate tradeoffs, and make a clear call.
+  The working default (BenchBox placement) is valid until overridden — so this
+  decision affects domain/identity configuration, not which code to write.
+
+anti_patterns:
+- "DO NOT defer the brand decision past the frontend scaffold -- because URL structure and domain assumptions get baked into routing, CI, and nav -- resolve before scaffold-results-explorer-frontend lands"
+- "DO NOT split the explorer across two brands without explicit intent -- because a benchbox.dev/results/ entry point that redirects to another domain confuses users and breaks search indexing -- pick one home"
+- "DO NOT treat this as a technical spike -- because it is a product/business decision -- gather context and make a call rather than prototyping both options"
 
 scope_limit:
   only_modify:

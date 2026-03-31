@@ -97,16 +97,7 @@ verification:
   expected_output: "0"
 
 files_affected:
-  modified:
-  - ".github/workflows/docs.yml"
-  - "landing/"
-  - "docs/"
-  added:
-  - "results/"
+  note: "Tracking umbrella — no files are modified by this item directly. See constituent TODOs for per-item file scope."
 
 scope_limit:
-  only_modify:
-  - ".github/workflows/docs.yml"
-  - "landing/"
-  - "docs/"
-  - "results/"
+  note: "Tracking umbrella — scope is enforced by constituent implementation TODOs, not here."

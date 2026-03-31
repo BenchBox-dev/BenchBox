@@ -29,7 +29,11 @@ work:
   summary: "Define hosted result identity, immutable bundle contract, and ingest status model"
   status: pending
   notes: |
-    Separate bundle hash, submission identity, and public result identity.
+    Separate three distinct identifiers: (1) bundle hash — content-addressable,
+    immutable; (2) submission ID — generated on ingest, survives re-upload;
+    (3) public result ID — stable permalink, may be minted after curation.
+    Define allowed ingest status transitions: pending → validated → published,
+    plus rejected and withdrawn. Output: identity-model.md draft.
 
 - id: w2
   summary: "Define visibility states and trust labels for hosted results"
@@ -57,6 +61,14 @@ work:
   summary: "Document the contract for CLI, API, and frontend consumers"
   needs: [w3, w4]
   status: pending
+  notes: |
+    Produce a single hosted-results-contract.md that specifies:
+    - What fields the submission endpoint accepts and returns
+    - Which visibility states and trust labels the explorer must render
+    - Which cohort fields must match for a compare view to be valid
+    - What privacy/redaction/removal operations are supported
+    This doc is the authoritative input for design-results-ingest (Phase 3
+    API design) and the explorer frontend trust-label implementation.
 
 metadata:
   tags:

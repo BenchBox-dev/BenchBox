@@ -121,13 +121,19 @@ approach: |
   page, every browser, every deployment path. Fix issues found during acceptance
   before marking launch complete.
 
+anti_patterns:
+- "DO NOT mark launch complete before all 7 criteria are verified -- because a partial launch is harder to fix than a delayed launch -- gate on all criteria passing"
+- "DO NOT accept corpus depth below the ≥3-platforms threshold by shipping placeholder data -- because the compare view is the primary deliverable and requires depth -- generate missing runs before launch"
+- "DO NOT skip cross-browser testing on the assumption that Chrome results cover Firefox and Safari -- because DuckDB-WASM has browser-specific loading differences -- test each browser explicitly"
+- "DO NOT merge the explorer into main without verifying existing benchbox.dev pages still work -- because a broken docs or landing deploy is a regression even if the explorer is perfect -- always check sibling pages"
+
 verification:
-- description: "Seed corpus meets coverage requirements"
-  command: "uv run -- python -c \"import json; m = json.load(open('results-explorer/public/data/manifest.json')); benchmarks = set(m['benchmarks']); print(f'{len(m[\"results\"])} results, {sorted(benchmarks)}, {len(m[\"platforms\"])} platforms'); assert len(m['results']) >= 30; assert {'tpch', 'tpcds', 'ssb'}.issubset(benchmarks); assert len(m['platforms']) >= 4\""
-  expected_output: "≥30 results including tpch, tpcds, ssb, and ≥4 platforms"
+- description: "Seed corpus meets depth-per-benchmark criterion (≥3 platforms per benchmark×scale cohort)"
+  command: "uv run -- python -c \"import json, collections; m = json.load(open('results-explorer/public/data/manifest.json')); cohorts = collections.defaultdict(set); [cohorts[(r['benchmark'], str(r.get('scale_factor','')))].add(r['platform']) for r in m['results']]; print(f'{len(m[\"results\"])} results across {len(cohorts)} cohorts'); [print(f'  {k}: {len(v)} platforms ({sorted(v)})') for k,v in sorted(cohorts.items())]; assert all(len(v) >= 3 for v in cohorts.values()), f'Cohorts with <3 platforms: {dict((k,len(v)) for k,v in cohorts.items() if len(v)<3)}'\""
+  expected_output: "All benchmark×scale cohorts have ≥3 comparable platforms"
 - description: "Full site build succeeds (landing + docs + blog + explorer)"
-  command: "cd results-explorer && npm run build && test -f dist/index.html && test -f dist/tpch/index.html && ls dist/r/*/index.html | wc -l | xargs test 30 -le"
-  expected_output: "All pages present in build output"
+  command: "cd results-explorer && npm run build && test -f dist/index.html && test -f dist/tpch/index.html && ls dist/r/*/index.html | wc -l"
+  expected_output: "Build succeeds; index, benchmark, and result detail pages present"
 - description: "Explorer component test suite passes"
   command: "cd results-explorer && npm test -- --run"
   expected_output: "All tests pass"

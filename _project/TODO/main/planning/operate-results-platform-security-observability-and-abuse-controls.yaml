@@ -131,10 +131,12 @@ anti_patterns:
 - "DO NOT rely on UI badges alone for trust and visibility enforcement -- because storage and API mistakes can leak data -- enforce policy at the service boundary"
 
 verification:
-- description: "Threat model document committed with STRIDE coverage"
+  # These are done-state checks — run them after work completes, not before.
+  # The output files are created by this TODO's work units.
+- description: "Threat model document committed with STRIDE coverage (run after w2)"
   command: "grep -c 'Spoofing\\|Tampering\\|Repudiation\\|Information\\|Denial\\|Elevation' _project/analysis/threat-model.md"
   expected_output: "6"
-- description: "Incident runbook committed and covers all required classes"
+- description: "Incident runbook committed and covers all three required incident classes (run after w8)"
   command: "grep -c 'integrity\\|breach\\|abuse' _project/analysis/incident-runbook.md"
   expected_output: "3"
 
