@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T13:41:10.846530'
+generated_at: '2026-04-01T13:49:59.025526'
 total_categories: 74
 categories:
   '"Bug Fixes & Reliability"':
@@ -1580,7 +1580,7 @@ categories:
       priority: Medium-High
       status: Completed
   Documentation:
-    count: 15
+    count: 16
     items:
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
@@ -1635,6 +1635,11 @@ categories:
     - id: mcp-landing-page-elevation
       file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
       title: Elevate MCP Feature on Landing Page and Documentation
+      priority: High
+      status: Completed
+    - id: docs-fix-critical-accuracy-errors
+      file: DONE/main/planning/docs-fix-critical-accuracy-errors.yaml
+      title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
       priority: High
       status: Completed
     - id: query-plan-documentation-testing

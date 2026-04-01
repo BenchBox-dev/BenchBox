@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T13:43:17.465610'
+generated_at: '2026-04-01T13:49:57.688763'
 total_categories: 7
 categories:
   AI/ML Capabilities:
@@ -131,7 +131,7 @@ categories:
       priority: High
       status: Not Started
   Documentation:
-    count: 5
+    count: 4
     items:
     - id: docs-fix-deprecated-references
       file: TODO/main/planning/docs-fix-deprecated-references.yaml
@@ -141,11 +141,6 @@ categories:
     - id: docs-document-undocumented-cli-commands
       file: TODO/main/planning/docs-document-undocumented-cli-commands.yaml
       title: Document 10 undocumented CLI commands and 13 undocumented run flags
-      priority: High
-      status: Not Started
-    - id: docs-fix-critical-accuracy-errors
-      file: TODO/main/planning/docs-fix-critical-accuracy-errors.yaml
-      title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
       priority: High
       status: Not Started
     - id: docs-rewrite-architecture-and-structure

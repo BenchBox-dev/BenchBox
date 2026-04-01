@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:43:17.465629'
-total_items: 41
+generated_at: '2026-04-01T13:49:57.688783'
+total_items: 40
 priorities:
   Critical:
     count: 1
@@ -10,16 +10,11 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 8
+    count: 7
     items:
     - id: docs-document-undocumented-cli-commands
       file: TODO/main/planning/docs-document-undocumented-cli-commands.yaml
       title: Document 10 undocumented CLI commands and 13 undocumented run flags
-      category: Documentation
-      status: Not Started
-    - id: docs-fix-critical-accuracy-errors
-      file: TODO/main/planning/docs-fix-critical-accuracy-errors.yaml
-      title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
       category: Documentation
       status: Not Started
     - id: motherduck-cloud-features

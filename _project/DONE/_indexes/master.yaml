@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:41:10.846226'
-total_items: 613
+generated_at: '2026-04-01T13:49:59.025242'
+total_items: 614
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1670,6 +1670,23 @@ items:
   work_done: 6
   work_ready: 0
   deferred_count: 2
+- id: docs-fix-critical-accuracy-errors
+  file: DONE/main/planning/docs-fix-critical-accuracy-errors.yaml
+  title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
+  worktree: main
+  category: Documentation
+  priority: High
+  status: Completed
+  tags:
+  - documentation
+  - accuracy
+  - critical-fix
+  - user-facing
+  estimated_effort: Small
+  completed_date: '2026-04-01'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: platform-adapter-cursor-resource-leaks
   file: DONE/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
   title: Fix cursor and connection resource leaks across new platform adapters

@@ -51,66 +51,109 @@ impact:
 
 work:
 - id: w1
-  summary: "Add documentation for 13 undocumented benchbox run flags"
+  summary: "Document Databricks-specific run flags (5 flags)"
   status: pending
   needs: []
   description: |
-    Add each flag to docs/reference/cli/run.md with description, type,
-    default value, and valid choices. At least one example per flag or
-    flag group. Group Databricks-specific flags (--databricks-clustering-strategy,
-    --liquid-clustering-columns, --sorted-ingestion-*) in a Databricks section.
-    Give --mode clear guidance on sql vs dataframe usage.
+    Add to docs/reference/cli/run.md a Databricks section covering:
+    --databricks-clustering-strategy, --liquid-clustering-columns,
+    --sorted-ingestion-mode, --sorted-ingestion-method, --presort.
+    Include type, default, valid choices, and 1-2 examples.
   files:
   - docs/reference/cli/run.md
 
 - id: w2
-  summary: "Create docs for visualize, report, and metrics commands"
+  summary: "Document general undocumented run flags (8 flags)"
   status: pending
   needs: []
   description: |
-    Add entries to docs/reference/cli/ for each command. Document all
-    subcommands and flags from Click decorators. Include at least 2 usage
-    examples per command. Cross-reference from CLI_REFERENCE.md or index.md.
+    Add to docs/reference/cli/run.md documentation for:
+    --table-mode, --table-format, --mode (sql vs dataframe guidance),
+    --no-monitoring, --no-progress, --ignore-memory-warnings,
+    --global-cache, --plan-config. Include type, default, valid choices.
   files:
-  - docs/reference/cli/index.md
+  - docs/reference/cli/run.md
 
 - id: w3
+  summary: "Create docs for visualize command"
+  status: pending
+  needs: []
+  description: |
+    Create docs/reference/cli/visualize.md. Document all subcommands and
+    flags from Click decorators in benchbox/cli/commands/visualize.py.
+    Include at least 2 usage examples.
+  files:
+  - docs/reference/cli/visualize.md
+  - benchbox/cli/commands/visualize.py  # source of truth
+
+- id: w4
+  summary: "Create docs for report and metrics commands"
+  status: pending
+  needs: []
+  description: |
+    Create docs/reference/cli/report.md and docs/reference/cli/metrics.md.
+    Document flags from benchbox/cli/commands/report.py and metrics.py.
+    Include at least 2 usage examples per command.
+  files:
+  - docs/reference/cli/report.md
+  - docs/reference/cli/metrics.md
+  - benchbox/cli/commands/report.py     # source of truth
+  - benchbox/cli/commands/metrics.py    # source of truth
+
+- id: w5
   summary: "Create docs for datagen, aggregate, and setup commands"
   status: pending
   needs: []
   description: |
-    Add entries to docs/reference/cli/ for each command. Document standalone
-    data generation workflow (datagen), result aggregation options (aggregate),
-    and credential setup flow per platform (setup).
+    Create docs/reference/cli/datagen.md, aggregate.md, and setup.md.
+    Document standalone data generation workflow, result aggregation
+    options, and credential setup flow per platform.
   files:
-  - docs/reference/cli/index.md
+  - docs/reference/cli/datagen.md
+  - docs/reference/cli/aggregate.md
+  - docs/reference/cli/setup.md
+  - benchbox/cli/commands/datagen.py            # source of truth
+  - benchbox/cli/commands/aggregate.py          # source of truth
+  - benchbox/cli/commands/setup.py              # source of truth
 
-- id: w4
+- id: w6
   summary: "Create docs for plan-history, show-plan, and download-answers"
   status: pending
   needs: []
   description: |
-    Add entries to docs/reference/cli/ or a utilities page. Document the
-    query plan capture workflow (plan-history, show-plan) and answer-set
-    download for validation (download-answers).
+    Create docs/reference/cli/query-plans.md covering plan-history and
+    show-plan as a workflow. Create docs/reference/cli/download-answers.md.
+    Document flags from Click decorators.
   files:
-  - docs/reference/cli/utilities.md
+  - docs/reference/cli/query-plans.md
+  - docs/reference/cli/download-answers.md
+  - benchbox/cli/commands/plan_history.py       # source of truth
+  - benchbox/cli/commands/show_plan.py          # source of truth
+  - benchbox/cli/commands/download_answers.py   # source of truth
 
-- id: w5
-  summary: "Update CLI_REFERENCE.md to index all commands"
+- id: w7
+  summary: "Update CLI_REFERENCE.md and index to list all commands"
   status: pending
-  needs: [w1, w2, w3, w4]
+  needs: [w1, w2, w3, w4, w5, w6]
   description: |
     Update CLI_REFERENCE.md to list every non-hidden command with links to
-    detailed docs in docs/reference/cli/. Exclude hidden commands (run-official)
-    from public index. Ensure consistent formatting with existing entries.
+    detailed docs in docs/reference/cli/. Update docs/reference/cli/index.md
+    to include new pages. Exclude hidden commands (run-official) from
+    public index. Ensure consistent formatting with existing entries.
   files:
   - docs/CLI_REFERENCE.md
+  - docs/reference/cli/index.md
 
 verification:
-- description: "All non-hidden commands appear in CLI_REFERENCE.md"
-  command: "uv run benchbox --help 2>/dev/null | head -40"
-  expected_output: "All listed commands should have corresponding doc entries"
+- description: "All non-hidden commands have doc pages"
+  command: "for cmd in visualize report metrics aggregate datagen setup; do [ -f docs/reference/cli/$cmd.md ] && echo \"PASS: $cmd\" || echo \"FAIL: $cmd missing\"; done"
+  expected_output: "PASS for all commands"
+- description: "New run flags documented"
+  command: "grep -c 'table-mode\\|table-format\\|presort\\|plan-config\\|no-monitoring\\|no-progress\\|ignore-memory-warnings\\|global-cache\\|mode' docs/reference/cli/run.md | xargs -I{} test {} -ge 8 && echo 'PASS: flags documented' || echo 'FAIL: flags missing'"
+  expected_output: "PASS: flags documented"
+- description: "CLI_REFERENCE.md indexes new commands"
+  command: "for cmd in visualize report metrics aggregate datagen setup; do grep -qi $cmd docs/CLI_REFERENCE.md && echo \"PASS: $cmd\" || echo \"FAIL: $cmd missing\"; done"
+  expected_output: "PASS for all commands"
 
 scope_limit:
   only_modify:

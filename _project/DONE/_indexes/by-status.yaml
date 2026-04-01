@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:41:10.846840'
-total_items: 613
+generated_at: '2026-04-01T13:49:59.025814'
+total_items: 614
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 565
+    count: 566
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1503,6 +1503,11 @@ statuses:
       title: Fix critical CI issues for green builds
       priority: Critical
       category: Testing and Quality Assurance
+    - id: docs-fix-critical-accuracy-errors
+      file: DONE/main/planning/docs-fix-critical-accuracy-errors.yaml
+      title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
+      priority: High
+      category: Documentation
     - id: platform-adapter-cursor-resource-leaks
       file: DONE/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
       title: Fix cursor and connection resource leaks across new platform adapters

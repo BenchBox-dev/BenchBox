@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:43:17.465570'
-total_items: 41
+generated_at: '2026-04-01T13:49:57.688727'
+total_items: 40
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -31,25 +31,9 @@ items:
   - completeness
   - user-facing
   estimated_effort: Large
-  work_total: 5
+  work_total: 7
   work_done: 0
-  work_ready: 4
-- id: docs-fix-critical-accuracy-errors
-  file: TODO/main/planning/docs-fix-critical-accuracy-errors.yaml
-  title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
-  worktree: main
-  category: Documentation
-  priority: High
-  status: Not Started
-  tags:
-  - documentation
-  - accuracy
-  - critical-fix
-  - user-facing
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 3
+  work_ready: 6
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
@@ -751,6 +735,6 @@ items:
   - consistency
   - user-experience
   estimated_effort: Small
-  work_total: 3
+  work_total: 6
   work_done: 0
-  work_ready: 3
+  work_ready: 5

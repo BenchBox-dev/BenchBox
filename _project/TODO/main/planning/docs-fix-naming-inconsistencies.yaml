@@ -46,14 +46,16 @@ impact:
 
 work:
 - id: w1
-  summary: "Add CLI name callout to each benchmark doc"
+  summary: "Add CLI name callout to TPC-family benchmark docs (7 files)"
   status: pending
   needs: []
   description: |
-    Add a prominent callout near the top of each benchmark doc showing the
-    CLI-usable name, e.g. "CLI name: `tpch`". Ensure example CLI commands
-    in each doc use the correct CLI name. Update index page
-    (docs/benchmarks/index.md) to show both display name and CLI name.
+    Add a prominent callout near the top of each TPC-family benchmark doc
+    showing the CLI-usable name, e.g. "**CLI name:** `tpch`". Ensure
+    example CLI commands use the correct CLI name.
+    Mapping: tpc-h.md→tpch, tpc-ds.md→tpcds, tpc-di.md→tpcdi,
+    tpc-havoc.md→tpchavoc, tpch-skew.md→tpch_skew, tpc-ds-obt.md→tpcds_obt,
+    join-order.md→joinorder.
   files:
   - docs/benchmarks/tpc-h.md
   - docs/benchmarks/tpc-ds.md
@@ -62,6 +64,16 @@ work:
   - docs/benchmarks/tpch-skew.md
   - docs/benchmarks/tpc-ds-obt.md
   - docs/benchmarks/join-order.md
+
+- id: w2
+  summary: "Add CLI name callout to non-TPC benchmark docs (8 files)"
+  status: pending
+  needs: []
+  description: |
+    Add CLI name callout to remaining benchmark docs. Most filenames match
+    the CLI name (ssb, clickbench, nyctaxi, h2odb, datavault, coffeeshop,
+    amplab). For hyphenated names: tsbs-devops.md→tsbs_devops.
+  files:
   - docs/benchmarks/ssb.md
   - docs/benchmarks/clickbench.md
   - docs/benchmarks/nyctaxi.md
@@ -70,39 +82,65 @@ work:
   - docs/benchmarks/datavault.md
   - docs/benchmarks/coffeeshop.md
   - docs/benchmarks/amplab.md
+
+- id: w3
+  summary: "Add CLI name callout to primitives benchmark docs (4 files)"
+  status: pending
+  needs: []
+  description: |
+    Add CLI name callout to primitives docs. Mapping:
+    metadata-primitives.md→metadata_primitives,
+    read-primitives.md→read_primitives,
+    write-primitives.md→write_primitives,
+    transaction-primitives.md→transaction_primitives.
+  files:
   - docs/benchmarks/metadata-primitives.md
   - docs/benchmarks/read-primitives.md
   - docs/benchmarks/write-primitives.md
   - docs/benchmarks/transaction-primitives.md
+
+- id: w4
+  summary: "Update benchmark index page with CLI names"
+  status: pending
+  needs: [w1, w2, w3]
+  description: |
+    Update docs/benchmarks/index.md to show both display name and CLI
+    name for every benchmark. Use a table format: | Benchmark | CLI Name | Description |.
+  files:
   - docs/benchmarks/index.md
 
-- id: w2
-  summary: "Add CLI name callout to each platform doc"
+- id: w5
+  summary: "Add CLI name callout to platform docs with naming mismatches"
   status: pending
   needs: []
   description: |
     Add a prominent callout near the top of each platform doc showing the
-    CLI registration name. Ensure example CLI commands use the correct
-    registration name. Document any naming aliases.
+    CLI registration name. Mapping: pg_duckdb.md→pg-duckdb,
+    pg_mooncake.md→pg-mooncake. Ensure example CLI commands use the
+    correct hyphenated registration name.
   files:
   - docs/platforms/pg_duckdb.md
   - docs/platforms/pg_mooncake.md
 
-- id: w3
-  summary: "Verify and correct TPC-DS table count (24 vs 25)"
+- id: w6
+  summary: "Clarify TPC-DS table count (24 vs 25 — DBGEN_VERSION)"
   status: pending
   needs: []
   description: |
-    Check whether DBGEN_VERSION is a data table or metadata table. Update
-    TPC-DS doc to state the correct count, explicitly mentioning or
-    excluding DBGEN_VERSION with rationale.
+    This is a naming/accuracy issue in the TPC-DS doc: the table count is
+    ambiguous. Check whether DBGEN_VERSION is a data table or metadata
+    table. Update TPC-DS doc to state the correct count, explicitly
+    mentioning or excluding DBGEN_VERSION with rationale.
   files:
   - docs/benchmarks/tpc-ds.md
 
 verification:
-- description: "Benchmark docs contain CLI name callouts"
-  command: "grep -l 'CLI name' docs/benchmarks/*.md | wc -l"
-  expected_output: "Count should match number of benchmark docs (19+)"
+- description: "All benchmark docs (excl. index) contain CLI name callouts"
+  command: "total=$(ls docs/benchmarks/*.md | grep -v index.md | wc -l); found=$(grep -l 'CLI name' docs/benchmarks/*.md | grep -v index.md | wc -l); echo \"$found/$total benchmarks have CLI name callout\"; [ \"$found\" -eq \"$total\" ] && echo 'PASS' || echo 'FAIL'"
+  expected_output: "20/20 benchmarks have CLI name callout — PASS"
+- description: "Index page has CLI name column"
+  command: "grep -q 'CLI Name\\|CLI name\\|cli.name' docs/benchmarks/index.md && echo 'PASS: index has CLI names' || echo 'FAIL: index missing CLI names'"
+  expected_output: "PASS: index has CLI names"
 
 scope_limit:
   only_modify:

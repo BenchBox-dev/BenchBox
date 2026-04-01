@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:41:10.846683'
-total_items: 613
+generated_at: '2026-04-01T13:49:59.025675'
+total_items: 614
 priorities:
   Critical:
     count: 36
@@ -185,7 +185,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 221
+    count: 222
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -563,6 +563,11 @@ priorities:
       file: DONE/main/active/fix-coverage-theater.yaml
       title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
       category: Testing & Quality
+      status: Completed
+    - id: docs-fix-critical-accuracy-errors
+      file: DONE/main/planning/docs-fix-critical-accuracy-errors.yaml
+      title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
+      category: Documentation
       status: Completed
     - id: platform-adapter-cursor-resource-leaks
       file: DONE/platform-expansion/planning/platform-adapter-cursor-resource-leaks.yaml
