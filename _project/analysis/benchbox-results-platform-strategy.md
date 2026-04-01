@@ -91,7 +91,9 @@ is justified because:
 The primary corpus criterion is **depth per benchmark**: each included benchmark
 must have ≥3 comparable platforms at the same scale factor. The ≥30 total bundle
 count is a secondary estimate that falls out of the coverage matrix, not an
-independent target.
+independent target. Depth is the right primary target because the core deliverable
+is a comparison tool — a cohort needs multiple platforms at the same scale to be
+meaningful, regardless of total bundle count.
 
 ### Visual Identity and Build Pipeline
 
@@ -342,6 +344,7 @@ The static build pipeline transforms canonical schema-v2 bundles into:
 Compare views use query parameters for flexibility:
 - `/results/compare?ids=tpch-duckdb-sf1-20260315,tpch-datafusion-sf1-20260315`
 - Cohort validation happens client-side: same benchmark + same scale factor required
+- **Cohort mismatch is a hard-block, not a warning.** The compare view refuses to render incompatible comparisons (different benchmark or different scale factor). Non-blocking differences (query subset, tuning mode) produce warnings but do not prevent rendering.
 
 ### Site Integration
 

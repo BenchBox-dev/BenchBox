@@ -88,7 +88,7 @@ approach: |
   decision affects domain/identity configuration, not which code to write.
 
 anti_patterns:
-- "DO NOT defer the brand decision past the frontend scaffold -- because URL structure and domain assumptions get baked into routing, CI, and nav -- resolve before scaffold-results-explorer-frontend lands"
+- "DO NOT defer the brand decision past the Phase 1 launch -- because URL structure and domain assumptions baked into routing and CI during scaffold will need rework if the brand overrides the working default -- scaffold may proceed under the BenchBox default, but the decision must be finalized before launch-results-explorer-acceptance-and-seed executes"
 - "DO NOT split the explorer across two brands without explicit intent -- because a benchbox.dev/results/ entry point that redirects to another domain confuses users and breaks search indexing -- pick one home"
 - "DO NOT treat this as a technical spike -- because it is a product/business decision -- gather context and make a call rather than prototyping both options"
 
