@@ -1,7 +1,7 @@
 id: enforce-no-conflicting-test-markers
 title: "Enforce no conflicting test markers: detection hook + remediation of 43 existing violations"
 worktree: main
-priority: Medium-High
+priority: High
 status: In Progress
 category: Testing & Quality
 
@@ -250,7 +250,7 @@ work:
 
   - id: w14
     summary: "Promote validation hook from warning to error mode"
-    status: pending
+    status: done
     needs: [w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13]
     description: |
       Once all violations are remediated, update the conflict-detection block in
@@ -277,7 +277,7 @@ work:
 
   - id: w15
     summary: "Add make lint-markers target for pre-commit and CI"
-    status: pending
+    status: done
     needs: [w14]
     description: |
       Add a Makefile target that runs marker validation without executing tests:
