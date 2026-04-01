@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T09:23:56.972095'
+generated_at: '2026-04-01T09:49:07.115974'
 total_categories: 7
 categories:
   AI/ML Capabilities:
@@ -200,10 +200,15 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 1
+    count: 2
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
+      priority: Medium-High
+      status: Not Started
+    - id: enforce-no-conflicting-test-markers
+      file: TODO/main/planning/enforce-no-conflicting-test-markers.yaml
+      title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
       priority: Medium-High
       status: Not Started

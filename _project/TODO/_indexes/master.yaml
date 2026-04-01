@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T09:23:56.972068'
-total_items: 37
+generated_at: '2026-04-01T09:49:07.115943'
+total_items: 38
 items:
 - id: close-pre-beta-release-blockers
   file: TODO/main/planning/close-pre-beta-release-blockers.yaml
@@ -659,6 +659,22 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 3
+- id: enforce-no-conflicting-test-markers
+  file: TODO/main/planning/enforce-no-conflicting-test-markers.yaml
+  title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
+  worktree: main
+  category: Testing & Quality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - testing
+  - quality
+  - markers
+  - conftest
+  estimated_effort: Medium
+  work_total: 6
+  work_done: 0
+  work_ready: 1
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control

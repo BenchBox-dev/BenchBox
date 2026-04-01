@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T09:23:56.972110'
-total_items: 37
+generated_at: '2026-04-01T09:49:07.115994'
+total_items: 38
 priorities:
   Critical:
     count: 1
@@ -78,7 +78,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium-High:
-    count: 6
+    count: 7
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -99,6 +99,11 @@ priorities:
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       category: Platform Expansion
+      status: Not Started
+    - id: enforce-no-conflicting-test-markers
+      file: TODO/main/planning/enforce-no-conflicting-test-markers.yaml
+      title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
+      category: Testing & Quality
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml

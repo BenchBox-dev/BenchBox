@@ -1,0 +1,313 @@
+id: enforce-no-conflicting-test-markers
+title: "Enforce no conflicting test markers: detection hook + remediation of 43 existing violations"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Testing & Quality
+
+description: |
+  43 tests across 12 files currently carry mutually exclusive marker combinations
+  that undermine the fast/medium/slow speed-lane semantics and cause selection
+  ambiguity for both humans and automation.
+
+  Discovered violations (as of 2026-04-01):
+    fast + slow        : 13 tests in 5 files
+    medium + slow      : 26 tests in 6 files
+    fast + resource_heavy: 4 tests in 1 file
+
+  Conflict rules to enforce:
+    Speed-lane mutual exclusion: a test may carry at most one of {fast, medium, slow}
+    Exclusion-set incompatibility: fast is incompatible with {slow, stress, resource_heavy, live_integration}
+
+  The fix has two parts:
+  1. A pytest_collection_finish hook in tests/conftest.py that fails the run when
+     any collected test violates the rules. Starts in warning mode, promoted to
+     error mode once all violations are remediated.
+  2. Remediation of all 43 existing violations — each test gets a single correct
+     speed marker based on what it actually does.
+
+  This makes the pytest_collection_modifyitems exclusion hook (added in
+  d84c897a8) a belt-and-suspenders safety net rather than the primary guard.
+
+metadata:
+  tags:
+    - testing
+    - quality
+    - markers
+    - conftest
+  estimated_effort: Medium
+  created_date: "2026-04-01"
+  source_review: "conversation: systematically prevent conflicting test markers"
+
+impact:
+  user_impact: |
+    None — test infrastructure only. No production behavior or API changes.
+  maintainer_impact: |
+    Future tests with conflicting markers fail collection immediately with a
+    clear error message listing the offending tests and the violated rule.
+    Agents and CI can trust -m fast to be unambiguous.
+  regression_risk: |
+    Low. Only test marker annotations change; no test logic is modified.
+    The validation hook has a BENCHBOX_SKIP_MARKER_CHECK escape hatch for
+    migration periods.
+
+justification: |
+  The collection-modifyitems hook added to work around -m fast behavior is a
+  symptom fix. The root cause is that tests carry contradictory markers. Fixing
+  the markers and enforcing the constraint at collection time eliminates the
+  ambiguity entirely and makes the hook a genuine safety net rather than
+  load-bearing scaffolding.
+
+work:
+  - id: w1
+    summary: "Add pytest_collection_finish validation hook in warning mode"
+    status: pending
+    needs: []
+    description: |
+      Add a pytest_collection_finish hook to tests/conftest.py that scans
+      every collected item for marker conflicts and emits pytest.PytestWarning
+      (not an error yet) for each violation, listing the test node ID and the
+      offending marker pair.
+
+      Conflict rules:
+        SPEED_LANE_EXCLUSIVE = frozenset of all 3-element subsets of
+          {fast, medium, slow} — a test may not have 2+ from this set.
+        FAST_INCOMPATIBLE = {slow, stress, resource_heavy, live_integration}
+          — a test marked fast may not also have any of these.
+
+      Hook signature:
+        def pytest_collection_finish(session) -> None:
+            violations = []
+            for item in session.items:
+                markers = {m.name for m in item.iter_markers()}
+                # speed-lane check
+                lane_hits = markers & {"fast", "medium", "slow"}
+                if len(lane_hits) > 1:
+                    violations.append((item.nodeid, sorted(lane_hits), "speed-lane conflict"))
+                # fast-incompatible check
+                if "fast" in markers:
+                    bad = markers & FAST_INCOMPATIBLE
+                    if bad:
+                        violations.append((item.nodeid, sorted(bad | {"fast"}), "fast incompatible with exclusion markers"))
+            if violations:
+                if os.environ.get("BENCHBOX_SKIP_MARKER_CHECK"):
+                    for nodeid, markers, rule in violations:
+                        warnings.warn(f"Marker conflict ({rule}): {nodeid} has {markers}", pytest.PytestWarning)
+                else:
+                    # Error mode: fail collection
+                    lines = [f"  {nodeid}  markers={markers}  rule={rule}" for nodeid, markers, rule in violations]
+                    pytest.fail(f"Marker conflicts detected ({len(violations)} tests):\n" + "\n".join(lines))
+
+      At this point set to WARNING mode (use BENCHBOX_SKIP_MARKER_CHECK=1
+      always) so CI doesn't break while violations are fixed in w2-w4.
+    files:
+      - tests/conftest.py
+
+  - id: w2
+    summary: "Fix fast+slow conflicts (13 tests, 5 files)"
+    status: pending
+    needs: [w1]
+    description: |
+      Remove the incorrect marker from each test. For each file, read the
+      actual test body and decide which single speed lane is correct:
+
+      tests/integration/test_nyctaxi_duckdb.py (3 tests: TestNYCTaxiDataGeneration)
+        - test_data_generation_creates_files, test_taxi_zones_data_complete,
+          test_trips_data_structure
+        - These are integration tests generating real data → remove @fast, keep @slow
+
+      tests/integration/test_tsbs_devops_duckdb.py (5 tests: TestTSBSDevOpsDataGeneration)
+        - test_data_generation_creates_files, test_tags_data_structure,
+          test_cpu_data_structure, test_data_load_to_duckdb, test_queries_execute_on_data
+        - Integration tests with real DuckDB I/O → remove @fast, keep @slow
+
+      tests/test_tpcds_direct.py (1 test: test_tpcds_queries)
+        - Reads from an annotation: inspect the test body to decide. If it
+          runs TPC-DS queries end-to-end → remove @fast, keep @slow.
+
+      tests/unit/monitoring/test_profiler.py (3 tests: TestEnhancedResourceProfiler)
+        - test_start_stop_cycle, test_collects_cpu_memory, test_updates_monitor
+        - Profiler unit tests: if they're lightweight mocks, remove @slow, keep @fast.
+          If they do real CPU/memory sampling, remove @fast, keep @slow.
+          Read the test body to decide.
+
+      tests/unit/platforms/test_databricks_liquid_clustering.py (1 test)
+        - test_platform_metadata_includes_clustering_strategy_and_operations
+        - Platform metadata test likely a pure unit test → remove @slow, keep @fast.
+
+      Rule: resolve by reading the test. If it does I/O or takes >1s → slow.
+      If it's a pure unit test with mocks/stubs → fast.
+    files:
+      - tests/integration/test_nyctaxi_duckdb.py
+      - tests/integration/test_tsbs_devops_duckdb.py
+      - tests/test_tpcds_direct.py
+      - tests/unit/monitoring/test_profiler.py
+      - tests/unit/platforms/test_databricks_liquid_clustering.py
+
+  - id: w3
+    summary: "Fix medium+slow conflicts (26 tests, 6 files)"
+    status: pending
+    needs: [w1]
+    description: |
+      Remove the incorrect speed-lane marker from each test. By volume:
+
+      tests/unit/benchmarks/test_write_primitives_generator.py (18 tests)
+        - TestFileLocking (6): file-locking logic with mocks? → likely medium
+        - TestScaleFactorValidation (4): scale factor checks → likely medium
+        - TestSmallDatasetHandling (4): small dataset creation → medium or slow
+        - TestConcurrentGeneration (2): concurrency tests → possibly slow
+        Read each class's test body. Classes that mock filesystem → medium.
+        Classes that do real file I/O or generation → slow.
+
+      tests/integration/test_tpch_skew_duckdb.py (4 tests)
+        - TestTPCHSkewDataGeneration (2): generates real data → slow
+        - TestTPCHSkewQueryExecution (2): runs real queries → slow
+        Remove @medium, keep @slow.
+
+      tests/integration/test_phase4_validation_integration.py (2 tests)
+        - test_validation_scalability, test_concurrent_validation_safety
+        - Integration tests → remove @medium, keep @slow.
+
+      tests/test_tpcdi.py (2 tests: TestTPCDIBenchmarkCoverage)
+        - test_load_data_to_database_coverage, test_run_benchmark_coverage
+        - Benchmark coverage tests → read body to decide (mock-based → medium,
+          real execution → slow).
+
+      tests/unit/test_release_infrastructure.py (1 test)
+        - test_package_build_succeeds: runs uv build → slow (real subprocess)
+        Remove @medium, keep @slow.
+
+      tests/unit/test_tpcdi_phase1.py (1 test)
+        - TestDataGenerator::test_complete_data_generation
+        - Generates real data → slow. Remove @medium, keep @slow.
+
+      Rule: same as w2 — read the test body, resolve to single speed lane.
+    files:
+      - tests/unit/benchmarks/test_write_primitives_generator.py
+      - tests/integration/test_tpch_skew_duckdb.py
+      - tests/integration/test_phase4_validation_integration.py
+      - tests/test_tpcdi.py
+      - tests/unit/test_release_infrastructure.py
+      - tests/unit/test_tpcdi_phase1.py
+
+  - id: w4
+    summary: "Fix fast+resource_heavy conflicts (4 tests, 1 file)"
+    status: pending
+    needs: [w1]
+    description: |
+      tests/integration/core/data_organization/test_presorted_generation.py (4 tests)
+        - test_row_count_equivalence
+        - test_sort_key_monotonic
+        - test_delta_sorted_output_writes_readable_delta_table
+        - test_iceberg_sorted_output_writes_iceberg_layout
+
+      These tests write Delta/Iceberg table layouts — clearly resource-heavy I/O.
+      Remove @fast. If they run in seconds they're @medium, if minutes → @slow.
+      Keep @resource_heavy. Read the test body to confirm.
+    files:
+      - tests/integration/core/data_organization/test_presorted_generation.py
+
+  - id: w5
+    summary: "Promote validation hook from warning to error mode"
+    status: pending
+    needs: [w2, w3, w4]
+    description: |
+      Once all violations are remediated, update the pytest_collection_finish
+      hook in tests/conftest.py to run in error mode by default:
+      - Remove the BENCHBOX_SKIP_MARKER_CHECK conditional
+      - Always call pytest.fail() on violations
+      - Keep BENCHBOX_SKIP_MARKER_CHECK as an escape hatch (warning mode) for
+        developer convenience during authoring, but not used in CI
+
+      Verify the hook fires correctly with a synthetic test:
+        # Temporarily add a test with @pytest.mark.fast @pytest.mark.slow and
+        # confirm collection fails with a clear error. Delete it after.
+
+      Also verify that -m slow, -m stress, -m resource_heavy still collect
+      correctly (hook must not block explicit opt-in runs).
+    files:
+      - tests/conftest.py
+
+  - id: w6
+    summary: "Add make lint-markers target for pre-commit and CI"
+    status: pending
+    needs: [w5]
+    description: |
+      Add a Makefile target that runs marker validation without executing tests:
+
+        lint-markers:
+            uv run -- python -m pytest --collect-only -q -p no:warnings 2>&1 | tail -1
+
+      Because the pytest_collection_finish hook fires during collection,
+      --collect-only is sufficient to trigger it. A non-zero exit code means
+      conflicts were found.
+
+      Wire into CI: add lint-markers to the existing lint job (or a new
+      test-quality job) in .github/workflows/ so marker conflicts block PRs.
+
+      Update Makefile help text to document the target.
+    files:
+      - Makefile
+      - .github/workflows/ci.yml  # or whichever workflow runs lint
+
+must_preserve:
+  - "make test-fast and uv run -- python -m pytest -m fast -q collect identical sets (enforced by existing collection hook in d84c897a8)"
+  - "make test-slow, make test-stress, make test-all still collect their expected sets — hook must not block explicit marker opt-in"
+  - "BENCHBOX_SKIP_MARKER_CHECK=1 suppresses validation errors (escape hatch preserved)"
+  - "No test logic changes — only marker annotations modified"
+
+approach: |
+  Work units are sequenced: add the hook in warning mode first (w1) so CI
+  remains green while violations are fixed (w2-w4 can run in any order or in
+  parallel). Promote to error mode (w5) only after all 43 violations are gone,
+  confirmed by pytest --collect-only returning zero marker-conflict warnings.
+  Finally add the make target (w6) to give pre-commit a fast entry point.
+
+anti_patterns:
+  - "DO NOT add new markers to tests without first checking for speed-lane conflicts — the hook will catch it, but better to prevent it"
+  - "DO NOT resolve conflicts by removing resource_heavy or live_integration from tests that genuinely need those markers — those exist to route tests to the right runner; remove the speed-lane marker instead"
+  - "DO NOT use BENCHBOX_SKIP_MARKER_CHECK=1 in CI — it defeats the entire purpose"
+  - "DO NOT change test logic while fixing markers — this is a metadata-only cleanup"
+
+verification:
+  - description: "No fast+slow conflicts after w2"
+    command: "uv run -- python -m pytest --collect-only -q --override-ini=\"addopts=-p _benchbox_pytest_xdist_safety --strict-markers --strict-config -p no:cov\" -m \"fast and slow\" -p no:warnings 2>&1 | tail -3"
+    expected_output: "no tests collected"
+  - description: "No medium+slow conflicts after w3"
+    command: "uv run -- python -m pytest --collect-only -q --override-ini=\"addopts=-p _benchbox_pytest_xdist_safety --strict-markers --strict-config -p no:cov\" -m \"medium and slow\" -p no:warnings 2>&1 | tail -3"
+    expected_output: "no tests collected"
+  - description: "No fast+resource_heavy conflicts after w4"
+    command: "uv run -- python -m pytest --collect-only -q --override-ini=\"addopts=-p _benchbox_pytest_xdist_safety --strict-markers --strict-config -p no:cov\" -m \"fast and resource_heavy\" -p no:warnings 2>&1 | tail -3"
+    expected_output: "no tests collected"
+  - description: "Validation hook fires and fails on a synthetic conflicting test"
+    command: "uv run -- python -m pytest --collect-only -q -p no:warnings 2>&1 | grep -c 'Marker conflict'"
+    expected_output: "0 (after all violations fixed)"
+  - description: "make test-fast still collects 16538 tests after marker remediation"
+    command: "uv run -- python -m pytest -m fast -q --collect-only -p no:warnings 2>&1 | tail -3"
+    expected_output: "16538 tests collected (or similar — verify exact count hasn't regressed significantly)"
+  - description: "make lint-markers exits 0"
+    command: "make lint-markers"
+    expected_output: "exit code 0"
+
+scope_limit:
+  only_modify:
+    - "tests/conftest.py (validation hook)"
+    - "tests/integration/test_nyctaxi_duckdb.py"
+    - "tests/integration/test_tsbs_devops_duckdb.py"
+    - "tests/test_tpcds_direct.py"
+    - "tests/unit/monitoring/test_profiler.py"
+    - "tests/unit/platforms/test_databricks_liquid_clustering.py"
+    - "tests/unit/benchmarks/test_write_primitives_generator.py"
+    - "tests/integration/test_tpch_skew_duckdb.py"
+    - "tests/integration/test_phase4_validation_integration.py"
+    - "tests/test_tpcdi.py"
+    - "tests/unit/test_release_infrastructure.py"
+    - "tests/unit/test_tpcdi_phase1.py"
+    - "tests/integration/core/data_organization/test_presorted_generation.py"
+    - "Makefile"
+    - ".github/workflows/ci.yml"
+  do_not_touch:
+    - "Production source code (benchbox/ package)"
+    - "pytest.ini addopts (do not change the default -m expression)"
+    - "The pytest_collection_modifyitems exclusion hook added in d84c897a8 — it remains a valid safety net"
+    - "Any test files not listed above"

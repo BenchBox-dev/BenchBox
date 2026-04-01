@@ -1,8 +1,8 @@
-generated_at: '2026-04-01T09:23:56.972120'
-total_items: 37
+generated_at: '2026-04-01T09:49:07.116004'
+total_items: 38
 statuses:
   Not Started:
-    count: 37
+    count: 38
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -74,6 +74,11 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
+    - id: enforce-no-conflicting-test-markers
+      file: TODO/main/planning/enforce-no-conflicting-test-markers.yaml
+      title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
+      priority: Medium-High
+      category: Testing & Quality
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
