@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T10:04:06.494170'
-total_categories: 6
+generated_at: '2026-04-01T10:05:20.469859'
+total_categories: 7
 categories:
   AI/ML Capabilities:
     count: 1
@@ -182,6 +182,14 @@ categories:
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
       priority: Low
+      status: Not Started
+  Release Readiness:
+    count: 1
+    items:
+    - id: close-pre-beta-release-blockers
+      file: TODO/main/planning/close-pre-beta-release-blockers.yaml
+      title: Close pre-Beta release blockers in status messaging, install docs, packaging policy, and typecheck gating
+      priority: Critical
       status: Not Started
   Supporting Infrastructure:
     count: 1

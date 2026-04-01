@@ -1,8 +1,8 @@
-generated_at: '2026-04-01T10:04:06.494198'
-total_items: 37
+generated_at: '2026-04-01T10:05:20.469885'
+total_items: 38
 statuses:
   Not Started:
-    count: 37
+    count: 38
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -54,6 +54,11 @@ statuses:
       title: Build static pipeline that transforms result bundles into explorer read models
       priority: High
       category: Core Functionality
+    - id: close-pre-beta-release-blockers
+      file: TODO/main/planning/close-pre-beta-release-blockers.yaml
+      title: Close pre-Beta release blockers in status messaging, install docs, packaging policy, and typecheck gating
+      priority: Critical
+      category: Release Readiness
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy

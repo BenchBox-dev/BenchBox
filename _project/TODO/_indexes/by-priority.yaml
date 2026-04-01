@@ -1,6 +1,14 @@
-generated_at: '2026-04-01T10:04:06.494188'
-total_items: 37
+generated_at: '2026-04-01T10:05:20.469873'
+total_items: 38
 priorities:
+  Critical:
+    count: 1
+    items:
+    - id: close-pre-beta-release-blockers
+      file: TODO/main/planning/close-pre-beta-release-blockers.yaml
+      title: Close pre-Beta release blockers in status messaging, install docs, packaging policy, and typecheck gating
+      category: Release Readiness
+      status: Not Started
   High:
     count: 13
     items:
