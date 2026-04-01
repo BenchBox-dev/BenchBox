@@ -66,14 +66,21 @@ approach: |
     benchbox/platforms/pg_mooncake_type_compat.yaml, version-tagged. Read the
     pg_mooncake changelog/release notes for the version in use to enumerate
     supported column types. Do not modify the adapter itself.
-  - For w2: add a `migration` phase to the pg_mooncake adapter (alongside load/power)
-    that runs ALTER TABLE ... SET ACCESS METHOD columnar on a loaded heap table and
-    records wall time + storage delta. Follow the pattern in
-    benchbox/platforms/clickhouse/adapter.py for optional phases.
-  - For w3: add a --compare-native flag to benchbox run (or a standalone
-    benchbox compare command) that runs the same query set on pg_duckdb and then
-    on duckdb, and writes a per-query timing delta JSON to the results bundle.
-    Follow the existing result bundle schema in benchbox/core/results/schema.py.
+  - For w2: add an optional MigrationPhase dataclass to benchbox/core/results/models.py
+    (alongside existing SetupPhase fields). In pg_mooncake.py, add a run_migration_phase()
+    method that executes ALTER TABLE ... SET ACCESS METHOD columnar, records wall time
+    and storage delta, and returns a MigrationPhase instance or None. The runner skips
+    this phase when not configured — use the NOT_RUN stub pattern (status="not_run",
+    duration_ms=0) already present in benchbox/core/runner/runner.py (LifecyclePhases).
+    Update _build_phases_block() in schema.py to conditionally include the migration
+    phase using the "Omit Empty" principle.
+  - For w3: add a NativeComparison dataclass to benchbox/core/results/models.py with
+    a list of per-query delta entries {query_id, pg_duckdb_ms, duckdb_ms, delta_ms}.
+    In pg_duckdb.py, add an optional run_native_comparison() method triggered by a
+    --platform-option compare_native=true flag. Serialize via a new top-level
+    "comparisons" key in schema.py using the "Omit Empty" pattern (omit if None).
+    Do NOT add --compare-native as a top-level CLI flag — use the existing
+    --platform-option K=V mechanism already in benchbox run.
 
 anti_patterns:
 - "DO NOT modify pg_mooncake or pg_duckdb connection/auth code — these are read-only
@@ -87,6 +94,7 @@ scope_limit:
   - "benchbox/platforms/pg_mooncake.py"
   - "benchbox/platforms/pg_mooncake_type_compat.yaml"
   - "benchbox/platforms/pg_duckdb.py"
+  - "benchbox/core/results/models.py"
   - "benchbox/core/results/schema.py"
   - "tests/unit/platforms/test_pg_mooncake_adapter.py"
   - "tests/unit/platforms/test_pg_duckdb_adapter.py"
@@ -105,5 +113,4 @@ work:
 - id: w3
   summary: "Add pg_duckdb vs native DuckDB comparison output — run identical TPC-H queries
     on both platforms, write per-query timing delta JSON into the result bundle"
-  needs: []
   status: pending

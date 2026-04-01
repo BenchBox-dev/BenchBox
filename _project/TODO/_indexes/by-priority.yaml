@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:38:04.150298'
-total_items: 36
+generated_at: '2026-04-01T13:41:09.335720'
+total_items: 41
 priorities:
   Critical:
     count: 1
@@ -10,8 +10,18 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 5
+    count: 8
     items:
+    - id: docs-document-undocumented-cli-commands
+      file: TODO/main/planning/docs-document-undocumented-cli-commands.yaml
+      title: Document 10 undocumented CLI commands and 13 undocumented run flags
+      category: Documentation
+      status: Not Started
+    - id: docs-fix-critical-accuracy-errors
+      file: TODO/main/planning/docs-fix-critical-accuracy-errors.yaml
+      title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
+      category: Documentation
+      status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
@@ -27,6 +37,11 @@ priorities:
       title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
       category: Core Functionality
       status: Not Started
+    - id: docs-rewrite-architecture-and-structure
+      file: TODO/main/planning/docs-rewrite-architecture-and-structure.yaml
+      title: Rewrite architecture.md and structure.md to match current codebase
+      category: Documentation
+      status: Not Started
     - id: scaffold-results-explorer-frontend
       file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
       title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
@@ -38,7 +53,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium-High:
-    count: 10
+    count: 11
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -70,6 +85,11 @@ priorities:
       title: Build static pipeline that transforms result bundles into explorer read models
       category: Core Functionality
       status: Not Started
+    - id: docs-fix-deprecated-references
+      file: TODO/main/planning/docs-fix-deprecated-references.yaml
+      title: Clean up deprecated command references and stale content across docs
+      category: Documentation
+      status: Not Started
     - id: generate-seed-corpus-for-results-explorer
       file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
       title: Generate seed corpus of benchmark results for the results explorer
@@ -91,7 +111,7 @@ priorities:
       category: Benchmark Development
       status: Not Started
   Medium:
-    count: 10
+    count: 11
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -142,6 +162,11 @@ priorities:
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       category: Benchmark Development
+      status: Not Started
+    - id: docs-fix-naming-inconsistencies
+      file: TODO/main/planning/docs-fix-naming-inconsistencies.yaml
+      title: Standardize benchmark and platform naming across documentation
+      category: Documentation
       status: Not Started
   Low:
     count: 10

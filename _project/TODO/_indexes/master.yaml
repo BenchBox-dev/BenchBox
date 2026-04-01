@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:38:04.150232'
-total_items: 36
+generated_at: '2026-04-01T13:41:09.335666'
+total_items: 41
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -18,6 +18,38 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 1
+- id: docs-document-undocumented-cli-commands
+  file: TODO/main/planning/docs-document-undocumented-cli-commands.yaml
+  title: Document 10 undocumented CLI commands and 13 undocumented run flags
+  worktree: main
+  category: Documentation
+  priority: High
+  status: Not Started
+  tags:
+  - documentation
+  - cli
+  - completeness
+  - user-facing
+  estimated_effort: Large
+  work_total: 5
+  work_done: 0
+  work_ready: 0
+- id: docs-fix-critical-accuracy-errors
+  file: TODO/main/planning/docs-fix-critical-accuracy-errors.yaml
+  title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
+  worktree: main
+  category: Documentation
+  priority: High
+  status: Not Started
+  tags:
+  - documentation
+  - accuracy
+  - critical-fix
+  - user-facing
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 0
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
@@ -73,6 +105,22 @@ items:
   work_ready: 1
   needs:
   - define-results-platform-product-and-launch-strategy
+- id: docs-rewrite-architecture-and-structure
+  file: TODO/main/planning/docs-rewrite-architecture-and-structure.yaml
+  title: Rewrite architecture.md and structure.md to match current codebase
+  worktree: main
+  category: Documentation
+  priority: High
+  status: Not Started
+  tags:
+  - documentation
+  - architecture
+  - design
+  - developer-experience
+  estimated_effort: Medium
+  work_total: 3
+  work_done: 0
+  work_ready: 0
 - id: scaffold-results-explorer-frontend
   file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
   title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
@@ -489,6 +537,22 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: docs-fix-naming-inconsistencies
+  file: TODO/main/planning/docs-fix-naming-inconsistencies.yaml
+  title: Standardize benchmark and platform naming across documentation
+  worktree: main
+  category: Documentation
+  priority: Medium
+  status: Not Started
+  tags:
+  - documentation
+  - naming
+  - consistency
+  - user-experience
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 0
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml
   title: Add Hypothesis property-based tests for pure-function invariants
@@ -596,6 +660,22 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - generate-seed-corpus-for-results-explorer
+- id: docs-fix-deprecated-references
+  file: TODO/main/planning/docs-fix-deprecated-references.yaml
+  title: Clean up deprecated command references and stale content across docs
+  worktree: main
+  category: Documentation
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - documentation
+  - cleanup
+  - deprecated
+  - staleness
+  estimated_effort: Medium
+  work_total: 6
+  work_done: 0
+  work_ready: 0
 - id: generate-seed-corpus-for-results-explorer
   file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
   title: Generate seed corpus of benchmark results for the results explorer

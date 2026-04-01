@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:38:04.150278'
-total_categories: 6
+generated_at: '2026-04-01T13:41:09.335701'
+total_categories: 7
 categories:
   AI/ML Capabilities:
     count: 1
@@ -129,6 +129,34 @@ categories:
       file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
       title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
       priority: High
+      status: Not Started
+  Documentation:
+    count: 5
+    items:
+    - id: docs-fix-deprecated-references
+      file: TODO/main/planning/docs-fix-deprecated-references.yaml
+      title: Clean up deprecated command references and stale content across docs
+      priority: Medium-High
+      status: Not Started
+    - id: docs-document-undocumented-cli-commands
+      file: TODO/main/planning/docs-document-undocumented-cli-commands.yaml
+      title: Document 10 undocumented CLI commands and 13 undocumented run flags
+      priority: High
+      status: Not Started
+    - id: docs-fix-critical-accuracy-errors
+      file: TODO/main/planning/docs-fix-critical-accuracy-errors.yaml
+      title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
+      priority: High
+      status: Not Started
+    - id: docs-rewrite-architecture-and-structure
+      file: TODO/main/planning/docs-rewrite-architecture-and-structure.yaml
+      title: Rewrite architecture.md and structure.md to match current codebase
+      priority: High
+      status: Not Started
+    - id: docs-fix-naming-inconsistencies
+      file: TODO/main/planning/docs-fix-naming-inconsistencies.yaml
+      title: Standardize benchmark and platform naming across documentation
+      priority: Medium
       status: Not Started
   Platform Expansion:
     count: 10

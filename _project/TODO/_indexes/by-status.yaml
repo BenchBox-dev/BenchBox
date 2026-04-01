@@ -1,8 +1,8 @@
-generated_at: '2026-04-01T13:38:04.150309'
-total_items: 36
+generated_at: '2026-04-01T13:41:09.335730'
+total_items: 41
 statuses:
   Not Started:
-    count: 36
+    count: 41
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -54,6 +54,11 @@ statuses:
       title: Build static pipeline that transforms result bundles into explorer read models
       priority: Medium-High
       category: Core Functionality
+    - id: docs-fix-deprecated-references
+      file: TODO/main/planning/docs-fix-deprecated-references.yaml
+      title: Clean up deprecated command references and stale content across docs
+      priority: Medium-High
+      category: Documentation
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
@@ -69,6 +74,16 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
+    - id: docs-document-undocumented-cli-commands
+      file: TODO/main/planning/docs-document-undocumented-cli-commands.yaml
+      title: Document 10 undocumented CLI commands and 13 undocumented run flags
+      priority: High
+      category: Documentation
+    - id: docs-fix-critical-accuracy-errors
+      file: TODO/main/planning/docs-fix-critical-accuracy-errors.yaml
+      title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
+      priority: High
+      category: Documentation
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -159,6 +174,11 @@ statuses:
       title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
       priority: High
       category: Core Functionality
+    - id: docs-rewrite-architecture-and-structure
+      file: TODO/main/planning/docs-rewrite-architecture-and-structure.yaml
+      title: Rewrite architecture.md and structure.md to match current codebase
+      priority: High
+      category: Documentation
     - id: scaffold-results-explorer-frontend
       file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
       title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
@@ -169,6 +189,11 @@ statuses:
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       priority: Medium
       category: Benchmark Development
+    - id: docs-fix-naming-inconsistencies
+      file: TODO/main/planning/docs-fix-naming-inconsistencies.yaml
+      title: Standardize benchmark and platform naming across documentation
+      priority: Medium
+      category: Documentation
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
