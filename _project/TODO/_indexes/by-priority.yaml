@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:49:57.688783'
-total_items: 40
+generated_at: '2026-04-01T14:27:54.504558'
+total_items: 37
 priorities:
   Critical:
     count: 1
@@ -10,13 +10,8 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 7
+    count: 6
     items:
-    - id: docs-document-undocumented-cli-commands
-      file: TODO/main/planning/docs-document-undocumented-cli-commands.yaml
-      title: Document 10 undocumented CLI commands and 13 undocumented run flags
-      category: Documentation
-      status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
@@ -48,7 +43,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium-High:
-    count: 12
+    count: 10
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -80,11 +75,6 @@ priorities:
       title: Build static pipeline that transforms result bundles into explorer read models
       category: Core Functionality
       status: Not Started
-    - id: docs-fix-deprecated-references
-      file: TODO/main/planning/docs-fix-deprecated-references.yaml
-      title: Clean up deprecated command references and stale content across docs
-      category: Documentation
-      status: Not Started
     - id: generate-seed-corpus-for-results-explorer
       file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
       title: Generate seed corpus of benchmark results for the results explorer
@@ -104,11 +94,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
-      status: Not Started
-    - id: docs-fix-naming-inconsistencies
-      file: TODO/main/planning/docs-fix-naming-inconsistencies.yaml
-      title: Standardize benchmark and platform naming across documentation
-      category: Documentation
       status: Not Started
   Medium:
     count: 10

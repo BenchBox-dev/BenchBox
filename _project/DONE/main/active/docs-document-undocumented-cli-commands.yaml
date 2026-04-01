@@ -2,7 +2,8 @@ id: docs-document-undocumented-cli-commands
 title: "Document 10 undocumented CLI commands and 13 undocumented run flags"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-01"
 description: |
   Documentation audit (2026-04-01) found 10 CLI commands with NO documentation
   and 13 flags on `benchbox run` that are undocumented.
@@ -52,7 +53,7 @@ impact:
 work:
 - id: w1
   summary: "Document Databricks-specific run flags (5 flags)"
-  status: pending
+  status: done
   needs: []
   description: |
     Add to docs/reference/cli/run.md a Databricks section covering:
@@ -64,7 +65,7 @@ work:
 
 - id: w2
   summary: "Document general undocumented run flags (8 flags)"
-  status: pending
+  status: done
   needs: []
   description: |
     Add to docs/reference/cli/run.md documentation for:
@@ -76,7 +77,7 @@ work:
 
 - id: w3
   summary: "Create docs for visualize command"
-  status: pending
+  status: done
   needs: []
   description: |
     Create docs/reference/cli/visualize.md. Document all subcommands and
@@ -88,7 +89,7 @@ work:
 
 - id: w4
   summary: "Create docs for report and metrics commands"
-  status: pending
+  status: done
   needs: []
   description: |
     Create docs/reference/cli/report.md and docs/reference/cli/metrics.md.
@@ -102,7 +103,7 @@ work:
 
 - id: w5
   summary: "Create docs for datagen, aggregate, and setup commands"
-  status: pending
+  status: done
   needs: []
   description: |
     Create docs/reference/cli/datagen.md, aggregate.md, and setup.md.
@@ -118,7 +119,7 @@ work:
 
 - id: w6
   summary: "Create docs for plan-history, show-plan, and download-answers"
-  status: pending
+  status: done
   needs: []
   description: |
     Create docs/reference/cli/query-plans.md covering plan-history and
@@ -133,7 +134,7 @@ work:
 
 - id: w7
   summary: "Update CLI_REFERENCE.md and index to list all commands"
-  status: pending
+  status: done
   needs: [w1, w2, w3, w4, w5, w6]
   description: |
     Update CLI_REFERENCE.md to list every non-hidden command with links to

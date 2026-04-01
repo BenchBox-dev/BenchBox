@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:49:59.025242'
-total_items: 614
+generated_at: '2026-04-01T14:27:55.881626'
+total_items: 617
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1192,6 +1192,23 @@ items:
   - joe
   estimated_effort: Medium
   completed_date: '2026-02-07'
+- id: docs-document-undocumented-cli-commands
+  file: DONE/main/active/docs-document-undocumented-cli-commands.yaml
+  title: Document 10 undocumented CLI commands and 13 undocumented run flags
+  worktree: main
+  category: Documentation
+  priority: High
+  status: Completed
+  tags:
+  - documentation
+  - cli
+  - completeness
+  - user-facing
+  estimated_effort: Large
+  completed_date: '2026-04-01'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
 - id: document-stdout-patches
   file: DONE/tpcds-docs/document-stdout-patches.yaml
   title: Document TPC-DS stdout patches and credit tpcds-kit origin
@@ -7142,6 +7159,23 @@ items:
   - utilities
   estimated_effort: 2-3 days
   completed_date: '2026-01-25'
+- id: docs-fix-deprecated-references
+  file: DONE/main/planning/docs-fix-deprecated-references.yaml
+  title: Clean up deprecated command references and stale content across docs
+  worktree: main
+  category: Documentation
+  priority: Medium-High
+  status: Completed
+  tags:
+  - documentation
+  - cleanup
+  - deprecated
+  - staleness
+  estimated_effort: Medium
+  completed_date: '2026-04-01'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: open-table-format-gap-analysis
   file: DONE/main/active/open-table-format-gap-analysis.yaml
   title: Close open table format support gaps across all BenchBox platforms
@@ -7908,6 +7942,23 @@ items:
   - snowpark
   - pyspark-compatible
   estimated_effort: 1.5 weeks
+- id: docs-fix-naming-inconsistencies
+  file: DONE/main/planning/docs-fix-naming-inconsistencies.yaml
+  title: Standardize benchmark and platform naming across documentation
+  worktree: main
+  category: Documentation
+  priority: Medium-High
+  status: Completed
+  tags:
+  - documentation
+  - naming
+  - consistency
+  - user-experience
+  estimated_effort: Small
+  completed_date: '2026-04-01'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: surface-driver-version-in-cli-progress-output
   file: DONE/main/active/surface-driver-version-in-cli-progress-output.yaml
   title: Surface active driver version in CLI progress output

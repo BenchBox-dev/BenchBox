@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:49:59.025814'
-total_items: 614
+generated_at: '2026-04-01T14:27:55.882222'
+total_items: 617
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 566
+    count: 569
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -779,6 +779,11 @@ statuses:
       title: Circular Import Issues ✅ COMPLETED
       priority: Medium
       category: Code Quality and Technical Debt
+    - id: docs-fix-deprecated-references
+      file: DONE/main/planning/docs-fix-deprecated-references.yaml
+      title: Clean up deprecated command references and stale content across docs
+      priority: Medium-High
+      category: Documentation
     - id: clickhouse-cloud-deployment
       file: DONE/platform-expansion/active/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
@@ -1122,6 +1127,11 @@ statuses:
       title: Distinct Database Naming Based on Configuration Characteristics
       priority: Medium
       category: Project Lifecycle Management
+    - id: docs-document-undocumented-cli-commands
+      file: DONE/main/active/docs-document-undocumented-cli-commands.yaml
+      title: Document 10 undocumented CLI commands and 13 undocumented run flags
+      priority: High
+      category: Documentation
     - id: document-stdout-patches
       file: DONE/tpcds-docs/document-stdout-patches.yaml
       title: Document TPC-DS stdout patches and credit tpcds-kit origin
@@ -2524,6 +2534,11 @@ statuses:
       title: Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED
       priority: Medium
       category: Core Functionality
+    - id: docs-fix-naming-inconsistencies
+      file: DONE/main/planning/docs-fix-naming-inconsistencies.yaml
+      title: Standardize benchmark and platform naming across documentation
+      priority: Medium-High
+      category: Documentation
     - id: starburst-platform-adapter
       file: DONE/platform-expansion/planning/starburst-platform-adapter.yaml
       title: Starburst Platform Adapter

@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T13:49:59.025526'
+generated_at: '2026-04-01T14:27:55.881922'
 total_categories: 74
 categories:
   '"Bug Fixes & Reliability"':
@@ -1580,7 +1580,7 @@ categories:
       priority: Medium-High
       status: Completed
   Documentation:
-    count: 16
+    count: 19
     items:
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
@@ -1602,6 +1602,11 @@ categories:
       title: Add sphinx-tags to BenchBox Documentation
       priority: Medium
       status: Completed
+    - id: docs-fix-deprecated-references
+      file: DONE/main/planning/docs-fix-deprecated-references.yaml
+      title: Clean up deprecated command references and stale content across docs
+      priority: Medium-High
+      status: Completed
     - id: comprehensive-docs-quality-audit
       file: DONE/docs-experience/active/comprehensive-docs-quality-audit.yaml
       title: Comprehensive Documentation Quality Audit
@@ -1612,6 +1617,11 @@ categories:
       title: Create Comprehensive DataFrame Documentation
       priority: High
       status: Not Started
+    - id: docs-document-undocumented-cli-commands
+      file: DONE/main/active/docs-document-undocumented-cli-commands.yaml
+      title: Document 10 undocumented CLI commands and 13 undocumented run flags
+      priority: High
+      status: Completed
     - id: pyspark-sql-documentation
       file: DONE/dataframe-expansion/planning/pyspark-sql-documentation.yaml
       title: Document PySpark SQL mode usage
@@ -1656,6 +1666,11 @@ categories:
       file: DONE/docs-experience/active/comparison-matrix-restructure.yaml
       title: Restructure Platform Comparison Matrix with Grouped Categories
       priority: High
+      status: Completed
+    - id: docs-fix-naming-inconsistencies
+      file: DONE/main/planning/docs-fix-naming-inconsistencies.yaml
+      title: Standardize benchmark and platform naming across documentation
+      priority: Medium-High
       status: Completed
     - id: surface-driver-version-options-in-cli-help
       file: DONE/main/active/surface-driver-version-options-in-cli-help.yaml

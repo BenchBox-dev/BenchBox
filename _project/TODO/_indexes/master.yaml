@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:49:57.688727'
-total_items: 40
+generated_at: '2026-04-01T14:27:54.504503'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -18,22 +18,6 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 1
-- id: docs-document-undocumented-cli-commands
-  file: TODO/main/planning/docs-document-undocumented-cli-commands.yaml
-  title: Document 10 undocumented CLI commands and 13 undocumented run flags
-  worktree: main
-  category: Documentation
-  priority: High
-  status: Not Started
-  tags:
-  - documentation
-  - cli
-  - completeness
-  - user-facing
-  estimated_effort: Large
-  work_total: 7
-  work_done: 0
-  work_ready: 6
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
@@ -628,22 +612,6 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - generate-seed-corpus-for-results-explorer
-- id: docs-fix-deprecated-references
-  file: TODO/main/planning/docs-fix-deprecated-references.yaml
-  title: Clean up deprecated command references and stale content across docs
-  worktree: main
-  category: Documentation
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - documentation
-  - cleanup
-  - deprecated
-  - staleness
-  estimated_effort: Medium
-  work_total: 6
-  work_done: 0
-  work_ready: 6
 - id: generate-seed-corpus-for-results-explorer
   file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
   title: Generate seed corpus of benchmark results for the results explorer
@@ -722,19 +690,3 @@ items:
   work_total: 12
   work_done: 0
   work_ready: 12
-- id: docs-fix-naming-inconsistencies
-  file: TODO/main/planning/docs-fix-naming-inconsistencies.yaml
-  title: Standardize benchmark and platform naming across documentation
-  worktree: main
-  category: Documentation
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - documentation
-  - naming
-  - consistency
-  - user-experience
-  estimated_effort: Small
-  work_total: 6
-  work_done: 0
-  work_ready: 5

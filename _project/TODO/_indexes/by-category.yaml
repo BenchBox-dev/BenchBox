@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T13:49:57.688763'
+generated_at: '2026-04-01T14:27:54.504541'
 total_categories: 7
 categories:
   AI/ML Capabilities:
@@ -131,27 +131,12 @@ categories:
       priority: High
       status: Not Started
   Documentation:
-    count: 4
+    count: 1
     items:
-    - id: docs-fix-deprecated-references
-      file: TODO/main/planning/docs-fix-deprecated-references.yaml
-      title: Clean up deprecated command references and stale content across docs
-      priority: Medium-High
-      status: Not Started
-    - id: docs-document-undocumented-cli-commands
-      file: TODO/main/planning/docs-document-undocumented-cli-commands.yaml
-      title: Document 10 undocumented CLI commands and 13 undocumented run flags
-      priority: High
-      status: Not Started
     - id: docs-rewrite-architecture-and-structure
       file: TODO/main/planning/docs-rewrite-architecture-and-structure.yaml
       title: Rewrite architecture.md and structure.md to match current codebase
       priority: High
-      status: Not Started
-    - id: docs-fix-naming-inconsistencies
-      file: TODO/main/planning/docs-fix-naming-inconsistencies.yaml
-      title: Standardize benchmark and platform naming across documentation
-      priority: Medium-High
       status: Not Started
   Platform Expansion:
     count: 10

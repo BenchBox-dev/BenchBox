@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T13:49:59.025675'
-total_items: 614
+generated_at: '2026-04-01T14:27:55.882085'
+total_items: 617
 priorities:
   Critical:
     count: 36
@@ -185,7 +185,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 222
+    count: 223
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -412,6 +412,11 @@ priorities:
       file: DONE/dataframe-benchmarks/active/dataframe-tpcdi-architecture.yaml
       title: Design DataFrame Architecture for TPC-DI ETL Workload
       category: Core Functionality
+      status: Completed
+    - id: docs-document-undocumented-cli-commands
+      file: DONE/main/active/docs-document-undocumented-cli-commands.yaml
+      title: Document 10 undocumented CLI commands and 13 undocumented run flags
+      category: Documentation
       status: Completed
     - id: document-stdout-patches
       file: DONE/tpcds-docs/document-stdout-patches.yaml
@@ -1301,7 +1306,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 74
+    count: 76
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1423,6 +1428,11 @@ priorities:
       file: DONE/core-functionality/centralize-file-format-detection.yaml
       title: Centralize File Format and Compression Extension Detection
       category: Core Functionality
+      status: Completed
+    - id: docs-fix-deprecated-references
+      file: DONE/main/planning/docs-fix-deprecated-references.yaml
+      title: Clean up deprecated command references and stale content across docs
+      category: Documentation
       status: Completed
     - id: open-table-format-gap-analysis
       file: DONE/main/active/open-table-format-gap-analysis.yaml
@@ -1663,6 +1673,11 @@ priorities:
       file: DONE/platform-expansion/planning/snowpark-connect-platform.yaml
       title: Snowpark Connect for Spark Platform
       category: Platform Expansion
+      status: Completed
+    - id: docs-fix-naming-inconsistencies
+      file: DONE/main/planning/docs-fix-naming-inconsistencies.yaml
+      title: Standardize benchmark and platform naming across documentation
+      category: Documentation
       status: Completed
     - id: surface-driver-version-in-cli-progress-output
       file: DONE/main/active/surface-driver-version-in-cli-progress-output.yaml
