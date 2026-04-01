@@ -104,7 +104,7 @@ work:
 
   - id: w2
     summary: "Fix fast+slow: test_nyctaxi_duckdb.py (3 tests)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/integration/test_nyctaxi_duckdb.py (3 tests: TestNYCTaxiDataGeneration)
@@ -116,7 +116,7 @@ work:
 
   - id: w3
     summary: "Fix fast+slow: test_tsbs_devops_duckdb.py (5 tests)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/integration/test_tsbs_devops_duckdb.py (5 tests: TestTSBSDevOpsDataGeneration)
@@ -128,7 +128,7 @@ work:
 
   - id: w4
     summary: "Fix fast+slow: test_tpcds_direct.py (1 test)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/test_tpcds_direct.py (1 test: test_tpcds_queries)
@@ -139,7 +139,7 @@ work:
 
   - id: w5
     summary: "Fix fast+slow: test_profiler.py (3 tests)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/unit/monitoring/test_profiler.py (3 tests: TestEnhancedResourceProfiler)
@@ -151,7 +151,7 @@ work:
 
   - id: w6
     summary: "Fix fast+slow: test_databricks_liquid_clustering.py (1 test)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/unit/platforms/test_databricks_liquid_clustering.py (1 test)
@@ -162,7 +162,7 @@ work:
 
   - id: w7
     summary: "Fix medium+slow: test_write_primitives_generator.py (18 tests)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/unit/benchmarks/test_write_primitives_generator.py (18 tests)
@@ -177,7 +177,7 @@ work:
 
   - id: w8
     summary: "Fix medium+slow: test_tpch_skew_duckdb.py (4 tests)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/integration/test_tpch_skew_duckdb.py (4 tests)
@@ -189,7 +189,7 @@ work:
 
   - id: w9
     summary: "Fix medium+slow: test_phase4_validation_integration.py (2 tests)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/integration/test_phase4_validation_integration.py (2 tests)
@@ -200,7 +200,7 @@ work:
 
   - id: w10
     summary: "Fix medium+slow: test_tpcdi.py (2 tests)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/test_tpcdi.py (2 tests: TestTPCDIBenchmarkCoverage)
@@ -211,7 +211,7 @@ work:
 
   - id: w11
     summary: "Fix medium+slow: test_release_infrastructure.py (1 test)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/unit/test_release_infrastructure.py (1 test)
@@ -222,7 +222,7 @@ work:
 
   - id: w12
     summary: "Fix medium+slow: test_tpcdi_phase1.py (1 test)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/unit/test_tpcdi_phase1.py (1 test)
@@ -233,7 +233,7 @@ work:
 
   - id: w13
     summary: "Fix fast+resource_heavy: test_presorted_generation.py (4 tests)"
-    status: pending
+    status: done
     needs: [w1]
     description: |
       tests/integration/core/data_organization/test_presorted_generation.py (4 tests)
