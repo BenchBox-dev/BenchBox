@@ -1,7 +1,7 @@
 id: define-results-platform-product-and-launch-strategy
 title: "Define BenchBox results platform product boundary and launch strategy"
 worktree: main
-priority: High
+priority: Critical
 status: Not Started
 category: Core Functionality
 description: |

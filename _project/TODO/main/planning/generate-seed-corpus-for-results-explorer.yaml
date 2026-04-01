@@ -1,7 +1,7 @@
 id: generate-seed-corpus-for-results-explorer
 title: "Generate seed corpus of benchmark results for the results explorer"
 worktree: main
-priority: High
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 deps:

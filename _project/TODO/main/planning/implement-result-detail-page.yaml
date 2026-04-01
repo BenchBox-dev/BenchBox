@@ -1,7 +1,7 @@
 id: implement-result-detail-page
 title: "Implement result detail page with query timings, metadata, and bundle download"
 worktree: main
-priority: High
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 deps:

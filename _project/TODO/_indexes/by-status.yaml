@@ -1,8 +1,16 @@
-generated_at: '2026-04-01T10:38:21.910129'
+generated_at: '2026-04-01T10:47:39.474191'
 total_items: 37
 statuses:
+  In Progress:
+    count: 1
+    items:
+    - id: enforce-no-conflicting-test-markers
+      file: TODO/main/active/enforce-no-conflicting-test-markers.yaml
+      title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
+      priority: Medium-High
+      category: Testing & Quality
   Not Started:
-    count: 37
+    count: 36
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -47,17 +55,17 @@ statuses:
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
       title: Build a results explorer subsite on benchbox.dev
-      priority: High
+      priority: Medium-High
       category: Core Functionality
     - id: build-static-pipeline-bundles-to-read-model
       file: TODO/main/planning/build-static-pipeline-bundles-to-read-model.yaml
       title: Build static pipeline that transforms result bundles into explorer read models
-      priority: High
+      priority: Medium-High
       category: Core Functionality
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
-      priority: High
+      priority: Critical
       category: Core Functionality
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
@@ -69,11 +77,6 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
-    - id: enforce-no-conflicting-test-markers
-      file: TODO/main/planning/enforce-no-conflicting-test-markers.yaml
-      title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
-      priority: Medium-High
-      category: Testing & Quality
     - id: flight-data-benchmark
       file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
       title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
@@ -87,7 +90,7 @@ statuses:
     - id: generate-seed-corpus-for-results-explorer
       file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
       title: Generate seed corpus of benchmark results for the results explorer
-      priority: High
+      priority: Medium-High
       category: Core Functionality
     - id: geospatial-primitives-benchmark
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
@@ -107,17 +110,17 @@ statuses:
     - id: implement-explorer-home-and-browse-pages
       file: TODO/main/planning/implement-explorer-home-and-browse-pages.yaml
       title: Implement explorer home page and benchmark/platform browse pages
-      priority: High
+      priority: Medium-High
       category: Core Functionality
     - id: implement-result-detail-page
       file: TODO/main/planning/implement-result-detail-page.yaml
       title: Implement result detail page with query timings, metadata, and bundle download
-      priority: High
+      priority: Medium-High
       category: Core Functionality
     - id: implement-results-compare-view
       file: TODO/main/planning/implement-results-compare-view.yaml
       title: Implement results compare view for side-by-side benchmark analysis
-      priority: High
+      priority: Medium
       category: Core Functionality
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -127,12 +130,12 @@ statuses:
     - id: integrate-explorer-into-github-pages-deployment
       file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
       title: Integrate results explorer into GitHub Pages deployment workflow
-      priority: High
+      priority: Medium
       category: Core Functionality
     - id: launch-results-explorer-acceptance-and-seed
       file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
       title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
-      priority: High
+      priority: Medium
       category: Core Functionality
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml

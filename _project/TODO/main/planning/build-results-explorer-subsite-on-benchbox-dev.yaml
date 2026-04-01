@@ -1,7 +1,7 @@
 id: build-results-explorer-subsite-on-benchbox-dev
 title: "Build a results explorer subsite on benchbox.dev"
 worktree: main
-priority: High
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 deps:

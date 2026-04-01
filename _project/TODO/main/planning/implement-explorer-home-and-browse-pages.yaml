@@ -1,7 +1,7 @@
 id: implement-explorer-home-and-browse-pages
 title: "Implement explorer home page and benchmark/platform browse pages"
 worktree: main
-priority: High
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 deps:

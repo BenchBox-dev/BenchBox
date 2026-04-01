@@ -1,7 +1,7 @@
 id: build-static-pipeline-bundles-to-read-model
 title: "Build static pipeline that transforms result bundles into explorer read models"
 worktree: main
-priority: High
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 deps:
