@@ -13,11 +13,13 @@ different product contracts, trust models, and operational requirements.
 Recommended split:
 
 1. `benchbox publish`
-   Local/cloud artifact publication of canonical result bundles plus truthful
-   storage references.
+   Local/cloud artifact publication. Publishes canonical result bundles to
+   local or cloud storage (S3, R2, etc.). Does not interact with the hosted
+   results platform or public corpus.
 2. `benchbox submit`
-   Upload of canonical result bundles to the BenchBox results corpus — initially
-   via PR-based contribution, later via hosted API if demand warrants.
+   Public corpus contribution. Packages a canonical bundle with a submission
+   manifest and either prepares a PR against `results-data/` (Phase 2) or
+   uploads directly to the hosted API (Phase 3).
 3. `benchbox.dev/results/`
    A static-first public explorer for browsing, comparing, and analyzing
    curated public results.
@@ -86,8 +88,10 @@ is justified because:
 - It will grow quickly as new platforms and benchmarks are added
 - It demonstrates BenchBox's DuckDB expertise (audience alignment)
 
-The ≥30 result seed corpus target is a rough estimate, open to revision based on
-what's needed for the dynamic comparison tool to feel useful.
+The primary corpus criterion is **depth per benchmark**: each included benchmark
+must have ≥3 comparable platforms at the same scale factor. The ≥30 total bundle
+count is a secondary estimate that falls out of the coverage matrix, not an
+independent target.
 
 ### Visual Identity and Build Pipeline
 
@@ -110,8 +114,13 @@ No hard deadline or external event. Quality over speed.
 It is not yet decided whether the results explorer should live under the BenchBox
 brand (benchbox.dev/results/) or under the Oxbow Research brand. This decision
 affects hosting, curation authority, submission model, and long-term business
-positioning. **It must be resolved before implementation begins** and is tracked
-as a blocking TODO (`resolve-results-explorer-brand-ownership`).
+positioning.
+
+**Working default:** BenchBox placement (benchbox.dev/results/). All implementation
+proceeds under this assumption. The brand ownership TODO
+(`resolve-results-explorer-brand-ownership`) validates or overrides this default.
+**It must be resolved before launch**, but it does not block scaffolding or
+implementation work that uses the default.
 
 ## Phase 1 MVP Definition
 
@@ -143,7 +152,9 @@ support navigation into and out of comparisons. They are necessary but secondary
 - No user accounts, authentication, or authorization
 - No hosted submission API or `benchbox submit` command
 - No anonymous or community uploads
-- No public ranking or leaderboards (only browse + compare)
+- No branded "leaderboard" page, but cohort views may be sorted by total duration
+  or geometric mean — this is a sorted table within a validated cohort, not a
+  cross-context ranking claim
 - No organization accounts or private workspaces
 - No moderation, trust labels, or abuse controls (not needed — corpus is maintainer-curated)
 
@@ -166,9 +177,9 @@ support navigation into and out of comparisons. They are necessary but secondary
 
 Instead of building a hosted API, Phase 2 uses a PR-based contribution model:
 
-1. Contributor runs `benchbox submit --output ./submission/` which packages the
-   canonical schema-v2 bundle with a submission manifest (contributor metadata,
-   benchmark context, optional notes)
+1. Contributor runs `benchbox submit --output ./submission/` which packages
+   the canonical schema-v2 bundle with a submission manifest (contributor
+   metadata, benchmark context, optional notes)
 2. Contributor opens a PR against this repository touching `results-data/`
 3. GitHub Actions CI validates: schema conformance, bundle integrity (hash check),
    cohort compatibility, and basic sanity checks (no absurd timings, valid platform)
@@ -195,7 +206,7 @@ can handle. That threshold is unlikely in the first year of a results platform.
 
 ### What Ships in Phase 2
 
-- `benchbox submit --output` CLI command to package submission bundles
+- `benchbox submit` command to package and submit results to the public corpus
 - Submission manifest schema (contributor, context, notes)
 - CI validation workflow for the data repository
 - Trust labels in explorer: "maintainer" vs "community-submitted"
@@ -242,7 +253,7 @@ if the results platform becomes a core product with sustained community usage.
 | --- | --- | --- |
 | Canonical results already exist as schema-v2 bundles with companion files | `benchbox/core/results/exporter.py` | All downstream paths ingest the real exported bundle, not a second payload |
 | Public site is currently static GitHub Pages assembled from landing + docs + blog | `.github/workflows/docs.yml`, `docs/conf.py` | The public explorer must be a static subsite — no server dependency |
-| BenchBox already hints at a hosted service contract | `_project/specs/cli/config.md` documents `submit_to_service` and `service_url` | CLI submission is a legitimate future direction, but Phase 1-2 do not require it |
+| BenchBox already hints at a hosted service contract | `_project/specs/cli/config.md` documents `submit_to_service` and `service_url` | CLI public submission (`benchbox submit`) is a legitimate future direction, but Phase 1 does not require it |
 | Existing publishing prototype is process-local | `benchbox/core/publishing/artifacts.py`, `benchbox/core/publishing/permalink.py` | The prototype is not the hosted service architecture; it is only a source of reusable concepts |
 
 ## Reference Matrix
@@ -260,10 +271,10 @@ BenchBox needs three explicit user contracts, but they do NOT all ship at once.
 
 | Contract | Primary actor | Phase | Runtime boundary |
 | --- | --- | --- | --- |
-| Publish | BenchBox user sharing files or mirroring artifacts | Independent (existing TODO) | CLI + local/cloud storage backend |
+| Publish (local/cloud) | BenchBox user sharing files or mirroring artifacts | Independent (existing TODO) | CLI + local/cloud storage backend |
 | Explore | Reader/analyst comparing public results | **Phase 1** | Static subsite on GitHub Pages |
-| Submit (PR) | Community contributor adding results | **Phase 2** | GitHub PR + CI validation |
-| Submit (API) | Self-service submitter | **Phase 3** | Hosted API + async ingest |
+| Submit (PR) | Community contributor adding results | **Phase 2** | `benchbox submit --output` → GitHub PR + CI validation |
+| Submit (API) | Self-service submitter | **Phase 3** | `benchbox submit` → Hosted API + async ingest |
 
 ## Technology Recommendations for Phase 1
 
@@ -441,8 +452,10 @@ If a cohort is too heterogeneous for a clean ranking, the explorer should fall
 back to filters and pairwise comparison rather than pretend the leaderboard is
 authoritative.
 
-**Leaderboards are explicitly deferred until Phase 2 at earliest.** Phase 1 has
-browse + compare only.
+**No branded "leaderboard" page.** Phase 1 browse views may sort results within
+a validated cohort (e.g., by total duration or geometric mean), but this is
+presented as a sorted table, not a ranked competition. Cross-context ranking
+claims are never shown.
 
 ## Impact on Existing Publishing TODO
 
@@ -456,12 +469,12 @@ platform or explorer.
 | TODO | Phase | Priority | Rationale |
 | --- | --- | --- | --- |
 | `define-results-platform-product-and-launch-strategy` | Planning | High | Must complete before any implementation |
-| `resolve-results-explorer-brand-ownership` | Planning | High | Blocks all implementation — domain, hosting, identity depend on this |
+| `resolve-results-explorer-brand-ownership` | Planning | High | Must resolve before launch — implementation proceeds with BenchBox as working default |
 | `build-results-explorer-subsite-on-benchbox-dev` | Phase 1 | High | Core deliverable (umbrella) |
 | `implement-results-compare-view` | Phase 1 | High | **Primary deliverable** — the dynamic comparison tool is the core UX |
 | `define-hosted-results-contract-and-governance-model` | Phase 2-3 prep | Medium | Not needed for Phase 1 (all curated) |
 | `design-results-ingest-storage-and-derived-read-model` | Phase 3 | Medium | Phase 1 static pipeline is covered by dedicated implementation TODOs |
-| `integrate-benchbox-cli-submit-and-service-auth` | Phase 2-3 | Medium | Deferred until explorer is proven |
+| `integrate-benchbox-cli-submit-and-service-auth` | Phase 2-3 | Medium | Deferred until explorer is proven; `benchbox submit` command for PR-based and hosted corpus contribution |
 | `operate-results-platform-security-observability-and-abuse-controls` | Phase 3 | Low | No hosted services to operate until Phase 3 |
 
 ## External Sources

@@ -7,6 +7,7 @@ category: Core Functionality
 deps:
   needs:
   - scaffold-results-explorer-frontend
+  - build-static-pipeline-bundles-to-read-model
 description: |
   Build the primary navigation pages for the results explorer: the home/landing
   page and the browse-by-benchmark and browse-by-platform index pages. These
@@ -57,7 +58,11 @@ work:
     - Results table: all results for this platform, sorted by date desc
       Columns: benchmark, scale_factor, total_duration_ms, queries_passed, date
     - Filters: benchmark dropdown, scale factor dropdown
-    - "Compare" checkboxes for cross-benchmark or cross-scale comparison
+    - "Compare" checkboxes: only enabled when selected results share the same
+      benchmark AND scale factor. Cross-benchmark and cross-scale compare
+      entry points must NOT be offered because the compare view hard-blocks
+      those combinations. Disable or hide checkboxes for results that would
+      create an incompatible cohort with the current selection.
 
     Data source: same as benchmark index, filtered by platform.
 

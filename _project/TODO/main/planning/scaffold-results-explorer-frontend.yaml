@@ -7,8 +7,6 @@ category: Core Functionality
 deps:
   needs:
   - define-results-platform-product-and-launch-strategy
-  - resolve-results-explorer-brand-ownership
-  - build-static-pipeline-bundles-to-read-model
 description: |
   Set up the frontend project for the results explorer at `benchbox.dev/results/`.
   The explorer is a standalone static app built with Vite and TypeScript that
@@ -29,6 +27,19 @@ description: |
   The app builds into `results-explorer/dist/`; the GitHub Pages workflow then
   copies that output into `site/results/` so it deploys alongside the existing
   landing page, docs, and blog.
+
+  **Dependency note:** `resolve-results-explorer-brand-ownership` is NOT a
+  blocker for scaffolding — implementation proceeds with BenchBox placement as
+  the working default. Brand must be resolved before launch (tracked in
+  `launch-results-explorer-acceptance-and-seed`).
+
+  `build-static-pipeline-bundles-to-read-model` is NOT a blocker for the
+  scaffold shell (layout, routing, DuckDB-WASM init). The data access layer
+  (w2) uses fixture data during development; production read models are
+  injected by the pipeline at CI time. Page-level TODOs
+  (`implement-explorer-home-and-browse-pages`, `implement-results-compare-view`)
+  carry the explicit pipeline dependency so the scaffold can start as soon as
+  the strategy is complete.
 
 work:
 - id: w1

@@ -1,4 +1,4 @@
-generated_at: '2026-03-31T08:18:19.709899'
+generated_at: '2026-04-01T07:47:19.763158'
 total_items: 36
 items:
 - id: build-results-explorer-subsite-on-benchbox-dev
@@ -96,6 +96,7 @@ items:
   work_ready: 1
   needs:
   - scaffold-results-explorer-frontend
+  - build-static-pipeline-bundles-to-read-model
 - id: implement-result-detail-page
   file: TODO/main/planning/implement-result-detail-page.yaml
   title: Implement result detail page with query timings, metadata, and bundle download
@@ -135,6 +136,7 @@ items:
   work_ready: 1
   needs:
   - scaffold-results-explorer-frontend
+  - build-static-pipeline-bundles-to-read-model
 - id: integrate-explorer-into-github-pages-deployment
   file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
   title: Integrate results explorer into GitHub Pages deployment workflow
@@ -179,6 +181,7 @@ items:
   needs:
   - generate-seed-corpus-for-results-explorer
   - integrate-explorer-into-github-pages-deployment
+  - resolve-results-explorer-brand-ownership
 - id: productize-result-publishing-and-artifact-sharing
   file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
   title: Productize result publishing and artifact sharing workflow
@@ -239,7 +242,6 @@ items:
   work_ready: 1
   needs:
   - define-results-platform-product-and-launch-strategy
-  - build-static-pipeline-bundles-to-read-model
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support

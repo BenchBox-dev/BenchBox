@@ -89,8 +89,8 @@ anti_patterns:
 - "DO NOT use hash-only routing for canonical public result URLs -- because stable shareable pages matter for a benchmark site -- use real result paths or pre-rendered files"
 
 verification:
-- description: "Explorer root exists and has a built index"
-  command: "test -d results/ && test -f results/index.html && echo PRESENT"
+- description: "Explorer Vite build output exists with an index"
+  command: "test -d results-explorer/dist/ && test -f results-explorer/dist/index.html && echo PRESENT"
   expected_output: "PRESENT"
 - description: "Existing docs and landing pages build cleanly after explorer is integrated"
   command: "cd landing && npm run build 2>&1 | grep -c '[Ee]rror' || echo 0"

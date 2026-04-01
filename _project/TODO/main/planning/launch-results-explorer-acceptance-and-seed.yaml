@@ -8,6 +8,7 @@ deps:
   needs:
   - generate-seed-corpus-for-results-explorer
   - integrate-explorer-into-github-pages-deployment
+  - resolve-results-explorer-brand-ownership
 description: |
   Final launch gate for the Phase 1 results explorer. This TODO verifies that
   all launch criteria are met, the seed corpus is complete and correct, the

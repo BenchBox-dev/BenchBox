@@ -7,6 +7,7 @@ category: Core Functionality
 deps:
   needs:
   - scaffold-results-explorer-frontend
+  - build-static-pipeline-bundles-to-read-model
 description: |
   Build the dynamic comparison tool at `/results/compare?ids=id1,id2[,id3]`.
   **This is the primary Phase 1 deliverable** — the feature that validates the
@@ -17,9 +18,11 @@ description: |
   and platforms, then see a side-by-side query-level timing breakdown. It is the
   feature that makes users come back and share links.
 
-  Comparison requires cohort validation: results must share the same benchmark
-  and scale factor to be meaningfully compared. The compare view should warn
-  (but not block) when comparing across different configurations.
+  Comparison requires strict cohort validation: results must share the same
+  benchmark and scale factor to be compared. Incompatible comparisons (different
+  benchmark or different scale factor) must be hard-blocked with a clear error,
+  not merely warned. This prevents misleading cross-context comparisons from
+  ever reaching the user.
 
   Note: this TODO does NOT depend on the result detail page. Compare and detail
   are independent siblings, both depending only on the scaffold.
@@ -31,10 +34,10 @@ work:
   notes: |
     When the compare view loads with `?ids=id1,id2`:
     1. Fetch detail JSON for each result ID
-    2. Validate cohort compatibility:
-       - Same benchmark: required (error if mismatched)
-       - Same scale factor: required (error if mismatched)
-       - Same query set: warn if different (e.g., subset vs full)
+    2. Validate cohort compatibility (strict — block incompatible, don't warn):
+       - Same benchmark: required (hard-block if mismatched — show error, refuse to render)
+       - Same scale factor: required (hard-block if mismatched — show error, refuse to render)
+       - Same query set: warn if different (e.g., subset vs full) but allow comparison
        - Different platform/config: expected and fine
     3. Build a merged query-level dataset: for each query ID, collect timings
        from all compared results
@@ -51,7 +54,7 @@ work:
     - Speedup indicator: "Result A is X.Xx faster/slower than Result B" (based
       on total duration or geometric mean of query times)
     - Cohort info: benchmark, scale factor, query count
-    - Warnings if configurations differ materially
+    - Warnings if non-blocking configurations differ (query subset, tuning mode)
 
 - id: w3
   summary: "Implement the query-level comparison table"
@@ -119,16 +122,17 @@ impact:
 
 must_preserve:
 - "Compare URLs must be stable and shareable — query params, not session state"
-- "Cohort validation must prevent misleading cross-benchmark comparisons"
+- "Cohort validation must hard-block incompatible comparisons (different benchmark or scale factor) — never render them with a warning"
 
 approach: |
   Load detail JSONs for each compared result, merge on query ID, and render
   a table + chart. Use DuckDB-WASM for the merge query if convenient, or
   do it in TypeScript for simpler results. Keep the comparison honest —
-  warn about configuration differences, don't hide them.
+  hard-block incompatible cohorts (different benchmark or scale factor), and
+  warn about non-blocking configuration differences without hiding them.
 
 anti_patterns:
-- "DO NOT allow comparing results from different benchmarks without a clear error — because TPC-H vs TPC-DS comparison is meaningless — validate cohort compatibility"
+- "DO NOT allow comparing results from different benchmarks or different scale factors — because cross-context comparison is meaningless and misleading — hard-block with an error, do not render the comparison"
 - "DO NOT compute a single 'score' that hides per-query variation — because aggregate scores obscure important per-query behavior — show query-level detail prominently"
 
 verification:

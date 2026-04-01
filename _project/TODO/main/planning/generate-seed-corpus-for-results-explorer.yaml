@@ -48,9 +48,9 @@ work:
     | TPC-H | DuckDB, DataFusion, Polars, ClickHouse | 0.01, 0.1, 1.0 |
     | TPC-DS | DuckDB, DataFusion, Polars, ClickHouse | 1.0 |
     | SSB | DuckDB, DataFusion, Polars, ClickHouse | 0.01, 0.1 |
-    This establishes a 24-run floor. Add at least 6 extra compatible runs
-    (for example cloud platforms or extra curated cohorts) to reach the ≥30
-    launch threshold.
+    This establishes a 24-run floor with ≥4 platforms per benchmark×scale
+    cohort, satisfying the depth criterion. Additional runs (cloud platforms,
+    extra curated cohorts) are welcome but not required to meet launch criteria.
 
 - id: w2
   summary: "Build a GitHub Actions workflow that generates seed corpus bundles"
@@ -112,8 +112,9 @@ must_preserve:
 
 approach: |
   Use `benchbox run` directly to generate all seed results. The seed workflow is
-  a consumer of the existing CLI, not a new code path. Focus on coverage breadth
-  (many platform×benchmark combinations) over depth (extreme scale factors).
+  a consumer of the existing CLI, not a new code path. Focus on depth per
+  benchmark (≥3 platforms at the same scale factor per benchmark) to ensure the
+  dynamic comparison tool has meaningful content at launch.
 
 anti_patterns:
 - "DO NOT include only synthetic or trivially small results — because the explorer must show realistic platform behavior — run actual benchmarks at SF 0.01+ with full query sets"
@@ -121,9 +122,9 @@ anti_patterns:
 - "DO NOT generate the corpus manually and commit ad hoc — because the corpus must be reproducible and refreshable — build a CI workflow from the start"
 
 verification:
-- description: "All seed bundles pass schema validation"
-  command: "uv run -- python -c \"import json, pathlib; bundles = list(pathlib.Path('results-data/bundles').glob('*.json')); print(f'{len(bundles)} bundles found'); assert len(bundles) >= 30\""
-  expected_output: "≥30 bundles found"
+- description: "All seed bundles pass schema validation and depth-per-benchmark criterion"
+  command: "uv run -- python -c \"import json, pathlib, collections; bundles = list(pathlib.Path('results-data/bundles').glob('*.json')); print(f'{len(bundles)} bundles found'); cohorts = collections.defaultdict(set); [cohorts[(json.load(open(b))['metadata']['benchmark'], str(json.load(open(b))['metadata'].get('scale_factor','')))].add(json.load(open(b))['metadata']['platform']) for b in bundles]; [print(f'  {k}: {len(v)} platforms') for k,v in sorted(cohorts.items())]; assert all(len(v) >= 3 for v in cohorts.values()), f'Some cohorts have <3 platforms: {dict((k,len(v)) for k,v in cohorts.items() if len(v)<3)}'\""
+  expected_output: "All bundles found; every benchmark×scale cohort has ≥3 platforms"
 
 scope_limit:
   only_modify:
