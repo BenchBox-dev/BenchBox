@@ -90,16 +90,18 @@ work:
                     if bad:
                         violations.append((item.nodeid, sorted(bad | {"fast"}), "fast incompatible with exclusion markers"))
             if violations:
-                if os.environ.get("BENCHBOX_SKIP_MARKER_CHECK"):
-                    for nodeid, markers, rule in violations:
-                        warnings.warn(f"Marker conflict ({rule}): {nodeid} has {markers}", pytest.PytestWarning)
-                else:
-                    # Error mode: fail collection
+                if os.environ.get("BENCHBOX_ENFORCE_MARKER_CHECK"):
+                    # Error mode (promoted in w5): fail collection
                     lines = [f"  {nodeid}  markers={markers}  rule={rule}" for nodeid, markers, rule in violations]
                     pytest.fail(f"Marker conflicts detected ({len(violations)} tests):\n" + "\n".join(lines))
+                else:
+                    # Warning mode (default during migration)
+                    for nodeid, markers, rule in violations:
+                        warnings.warn(f"Marker conflict ({rule}): {nodeid} has {markers}", pytest.PytestWarning)
 
-      At this point set to WARNING mode (use BENCHBOX_SKIP_MARKER_CHECK=1
-      always) so CI doesn't break while violations are fixed in w2-w4.
+      Warning mode is the default so CI stays green while violations are
+      fixed in w2-w4. Setting BENCHBOX_ENFORCE_MARKER_CHECK=1 opts into
+      error mode early (useful for local validation).
     files:
       - tests/conftest.py
 
@@ -214,8 +216,8 @@ work:
     description: |
       Once all violations are remediated, update the pytest_collection_finish
       hook in tests/conftest.py to run in error mode by default:
-      - Remove the BENCHBOX_SKIP_MARKER_CHECK conditional
-      - Always call pytest.fail() on violations
+      - Flip the default: error mode unless BENCHBOX_SKIP_MARKER_CHECK=1
+      - Remove the BENCHBOX_ENFORCE_MARKER_CHECK env var (no longer needed)
       - Keep BENCHBOX_SKIP_MARKER_CHECK as an escape hatch (warning mode) for
         developer convenience during authoring, but not used in CI
 
@@ -248,12 +250,12 @@ work:
       Update Makefile help text to document the target.
     files:
       - Makefile
-      - .github/workflows/ci.yml  # or whichever workflow runs lint
+      - .github/workflows/lint.yml  # or whichever workflow runs lint
 
 must_preserve:
   - "make test-fast and uv run -- python -m pytest -m fast -q collect identical sets (enforced by existing collection hook in d84c897a8)"
   - "make test-slow, make test-stress, make test-all still collect their expected sets — hook must not block explicit marker opt-in"
-  - "BENCHBOX_SKIP_MARKER_CHECK=1 suppresses validation errors (escape hatch preserved)"
+  - "BENCHBOX_SKIP_MARKER_CHECK=1 suppresses validation errors after w5 promotion (escape hatch preserved); during w1-w4 migration, BENCHBOX_ENFORCE_MARKER_CHECK=1 opts into early error mode"
   - "No test logic changes — only marker annotations modified"
 
 approach: |
@@ -264,10 +266,10 @@ approach: |
   Finally add the make target (w6) to give pre-commit a fast entry point.
 
 anti_patterns:
-  - "DO NOT add new markers to tests without first checking for speed-lane conflicts — the hook will catch it, but better to prevent it"
+  - "DO NOT add new markers to tests without first checking for speed-lane conflicts — because the hook catches it at collection time but a failing CI run wastes 10+ minutes before you see the error; check locally with --collect-only first"
   - "DO NOT resolve conflicts by removing resource_heavy or live_integration from tests that genuinely need those markers — those exist to route tests to the right runner; remove the speed-lane marker instead"
   - "DO NOT use BENCHBOX_SKIP_MARKER_CHECK=1 in CI — it defeats the entire purpose"
-  - "DO NOT change test logic while fixing markers — this is a metadata-only cleanup"
+  - "DO NOT change test logic while fixing markers — because this is a metadata-only cleanup and any logic change risks introducing regressions that get blamed on the marker fix, making it harder to revert cleanly"
 
 verification:
   - description: "No fast+slow conflicts after w2"
@@ -305,7 +307,7 @@ scope_limit:
     - "tests/unit/test_tpcdi_phase1.py"
     - "tests/integration/core/data_organization/test_presorted_generation.py"
     - "Makefile"
-    - ".github/workflows/ci.yml"
+    - ".github/workflows/lint.yml"
   do_not_touch:
     - "Production source code (benchbox/ package)"
     - "pytest.ini addopts (do not change the default -m expression)"
