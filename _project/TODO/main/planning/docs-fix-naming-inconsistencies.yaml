@@ -2,7 +2,8 @@ id: docs-fix-naming-inconsistencies
 title: "Standardize benchmark and platform naming across documentation"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-01"
 description: |
   Documentation audit (2026-04-01) found systemic naming inconsistencies:
 
@@ -47,7 +48,7 @@ impact:
 work:
 - id: w1
   summary: "Add CLI name callout to TPC-family benchmark docs (7 files)"
-  status: pending
+  status: done
   needs: []
   description: |
     Add a prominent callout near the top of each TPC-family benchmark doc
@@ -67,7 +68,7 @@ work:
 
 - id: w2
   summary: "Add CLI name callout to non-TPC benchmark docs (8 files)"
-  status: pending
+  status: done
   needs: []
   description: |
     Add CLI name callout to remaining benchmark docs. Most filenames match
@@ -85,7 +86,7 @@ work:
 
 - id: w3
   summary: "Add CLI name callout to primitives benchmark docs (4 files)"
-  status: pending
+  status: done
   needs: []
   description: |
     Add CLI name callout to primitives docs. Mapping:
@@ -101,7 +102,7 @@ work:
 
 - id: w4
   summary: "Update benchmark index page with CLI names"
-  status: pending
+  status: done
   needs: [w1, w2, w3]
   description: |
     Update docs/benchmarks/index.md to show both display name and CLI
@@ -111,7 +112,7 @@ work:
 
 - id: w5
   summary: "Add CLI name callout to platform docs with naming mismatches"
-  status: pending
+  status: done
   needs: []
   description: |
     Add a prominent callout near the top of each platform doc showing the
@@ -124,7 +125,7 @@ work:
 
 - id: w6
   summary: "Clarify TPC-DS table count (24 vs 25 — DBGEN_VERSION)"
-  status: pending
+  status: done
   needs: []
   description: |
     This is a naming/accuracy issue in the TPC-DS doc: the table count is
