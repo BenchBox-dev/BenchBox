@@ -49,15 +49,61 @@ files_affected:
   - "benchbox/platforms/pg_mooncake.py"
   - "benchbox/platforms/pg_duckdb.py"
 
+verification:
+- description: "Existing pg_mooncake tests still pass after any changes"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_pg_mooncake_adapter.py -x -q"
+  expected_output: "all tests pass, 0 failures"
+- description: "Existing pg_duckdb tests still pass after any changes"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_pg_duckdb_adapter.py -x -q"
+  expected_output: "all tests pass, 0 failures"
+
+must_preserve:
+- "pg_mooncake adapter: existing query execution, connection management, and TPC-H/TPC-DS run paths"
+- "pg_duckdb adapter: existing query execution and schema load paths"
+
+approach: |
+  - For w1: emit the compatibility matrix as a YAML file at
+    benchbox/platforms/pg_mooncake_type_compat.yaml, version-tagged. Read the
+    pg_mooncake changelog/release notes for the version in use to enumerate
+    supported column types. Do not modify the adapter itself.
+  - For w2: add a `migration` phase to the pg_mooncake adapter (alongside load/power)
+    that runs ALTER TABLE ... SET ACCESS METHOD columnar on a loaded heap table and
+    records wall time + storage delta. Follow the pattern in
+    benchbox/platforms/clickhouse/adapter.py for optional phases.
+  - For w3: add a --compare-native flag to benchbox run (or a standalone
+    benchbox compare command) that runs the same query set on pg_duckdb and then
+    on duckdb, and writes a per-query timing delta JSON to the results bundle.
+    Follow the existing result bundle schema in benchbox/core/results/schema.py.
+
+anti_patterns:
+- "DO NOT modify pg_mooncake or pg_duckdb connection/auth code — these are read-only
+   enhancements; touching connection paths risks breaking live adapters with no
+   benefit"
+- "DO NOT hardcode type lists for w1 — pull from pg_mooncake release notes or a
+   live information_schema query, so the matrix stays accurate across versions"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/pg_mooncake.py"
+  - "benchbox/platforms/pg_mooncake_type_compat.yaml"
+  - "benchbox/platforms/pg_duckdb.py"
+  - "benchbox/core/results/schema.py"
+  - "tests/unit/platforms/test_pg_mooncake_adapter.py"
+  - "tests/unit/platforms/test_pg_duckdb_adapter.py"
+
 work:
 - id: w1
-  summary: "Document pg_mooncake data type compatibility matrix — enumerate supported types per pg_mooncake version"
+  summary: "Write pg_mooncake type compatibility matrix to pg_mooncake_type_compat.yaml
+    — enumerate supported column types for the pinned version from release notes"
   status: pending
 
 - id: w2
-  summary: "Add heap-to-columnstore migration benchmark — measure conversion time and storage overhead for pg_mooncake"
+  summary: "Add optional migration phase to pg_mooncake adapter — ALTER TABLE heap→columnar,
+    record wall time and storage delta, emit as a phase result in the result bundle"
   status: pending
 
 - id: w3
-  summary: "Build pg_duckdb vs native DuckDB comparison report — run identical queries on both, generate timing delta table"
+  summary: "Add pg_duckdb vs native DuckDB comparison output — run identical TPC-H queries
+    on both platforms, write per-query timing delta JSON into the result bundle"
+  needs: []
   status: pending
