@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T13:43:03.882526'
+generated_at: '2026-04-01T13:43:17.465641'
 total_items: 41
 statuses:
   Not Started:
@@ -192,7 +192,7 @@ statuses:
     - id: docs-fix-naming-inconsistencies
       file: TODO/main/planning/docs-fix-naming-inconsistencies.yaml
       title: Standardize benchmark and platform naming across documentation
-      priority: Medium
+      priority: Medium-High
       category: Documentation
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml

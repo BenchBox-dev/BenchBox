@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T13:43:03.882455'
+generated_at: '2026-04-01T13:43:17.465570'
 total_items: 41
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -537,22 +537,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: docs-fix-naming-inconsistencies
-  file: TODO/main/planning/docs-fix-naming-inconsistencies.yaml
-  title: Standardize benchmark and platform naming across documentation
-  worktree: main
-  category: Documentation
-  priority: Medium
-  status: Not Started
-  tags:
-  - documentation
-  - naming
-  - consistency
-  - user-experience
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 3
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml
   title: Add Hypothesis property-based tests for pure-function invariants
@@ -754,3 +738,19 @@ items:
   work_total: 12
   work_done: 0
   work_ready: 12
+- id: docs-fix-naming-inconsistencies
+  file: TODO/main/planning/docs-fix-naming-inconsistencies.yaml
+  title: Standardize benchmark and platform naming across documentation
+  worktree: main
+  category: Documentation
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - documentation
+  - naming
+  - consistency
+  - user-experience
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 3
