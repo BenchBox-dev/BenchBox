@@ -2,7 +2,8 @@ id: docs-fix-deprecated-references
 title: "Clean up deprecated command references and stale content across docs"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-01"
 description: |
   Documentation audit (2026-04-01) found several docs referencing deprecated
   commands, stale module paths, or outdated information:
@@ -58,7 +59,7 @@ impact:
 work:
 - id: w1
   summary: "Rewrite or remove dataframe-comparison.md — compare-dataframes deprecated"
-  status: pending
+  status: done
   needs: []
   description: |
     Either rewrite file to use `benchbox compare` workflow, or replace
@@ -69,7 +70,7 @@ work:
 
 - id: w2
   summary: "Remove create-sample-tuning references from tuning.md"
-  status: pending
+  status: done
   needs: []
   description: |
     Update tuning.md to document only `tuning init` as the primary command.
@@ -80,7 +81,7 @@ work:
 
 - id: w3
   summary: "Verify and update power-run docs against current executor API"
-  status: pending
+  status: done
   needs: []
   description: |
     PowerRunExecutor EXISTS at benchbox.utils.execution_manager (line 148).
@@ -99,7 +100,7 @@ work:
 
 - id: w4
   summary: "Verify and update dataframe-benchmarks.md module paths"
-  status: pending
+  status: done
   needs: []
   description: |
     Note: benchbox.core.dataframe.profiling.DataFrameProfiler EXISTS
@@ -117,7 +118,7 @@ work:
 
 - id: w5
   summary: "Update roadmap.md with current platform count and phase status"
-  status: pending
+  status: done
   needs: []
   description: |
     Update platform count. Actual count is 27 concrete adapters (not 40+).
@@ -136,7 +137,7 @@ work:
 
 - id: w6
   summary: "Update adding-dataframe-platform.md with current adapter base classes"
-  status: pending
+  status: done
   needs: []
   description: |
     Document ExpressionFamilyAdapter and PandasFamilyAdapter base classes.
