@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T14:27:55.881922'
+generated_at: '2026-04-01T14:35:06.138456'
 total_categories: 74
 categories:
   '"Bug Fixes & Reliability"':
@@ -1580,7 +1580,7 @@ categories:
       priority: Medium-High
       status: Completed
   Documentation:
-    count: 19
+    count: 20
     items:
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
@@ -1665,6 +1665,11 @@ categories:
     - id: comparison-matrix-restructure
       file: DONE/docs-experience/active/comparison-matrix-restructure.yaml
       title: Restructure Platform Comparison Matrix with Grouped Categories
+      priority: High
+      status: Completed
+    - id: docs-rewrite-architecture-and-structure
+      file: DONE/main/planning/docs-rewrite-architecture-and-structure.yaml
+      title: Rewrite architecture.md and structure.md to match current codebase
       priority: High
       status: Completed
     - id: docs-fix-naming-inconsistencies

@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T14:27:55.882085'
-total_items: 617
+generated_at: '2026-04-01T14:35:06.138602'
+total_items: 618
 priorities:
   Critical:
     count: 36
@@ -185,7 +185,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 223
+    count: 224
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -1058,6 +1058,11 @@ priorities:
       file: DONE/result-object-migration/active/result-schema-v2-redesign.yaml
       title: Result Output Schema v2.0 Complete Redesign
       category: Core Functionality
+      status: Completed
+    - id: docs-rewrite-architecture-and-structure
+      file: DONE/main/planning/docs-rewrite-architecture-and-structure.yaml
+      title: Rewrite architecture.md and structure.md to match current codebase
+      category: Documentation
       status: Completed
     - id: secure-credential-handling
       file: DONE/security-hardening/secure-credential-handling.yaml

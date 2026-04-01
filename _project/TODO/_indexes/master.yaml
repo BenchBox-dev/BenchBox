@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T14:27:54.504503'
-total_items: 37
+generated_at: '2026-04-01T14:35:04.807499'
+total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -73,22 +73,6 @@ items:
   work_ready: 1
   needs:
   - define-results-platform-product-and-launch-strategy
-- id: docs-rewrite-architecture-and-structure
-  file: TODO/main/planning/docs-rewrite-architecture-and-structure.yaml
-  title: Rewrite architecture.md and structure.md to match current codebase
-  worktree: main
-  category: Documentation
-  priority: High
-  status: Not Started
-  tags:
-  - documentation
-  - architecture
-  - design
-  - developer-experience
-  estimated_effort: Medium
-  work_total: 3
-  work_done: 0
-  work_ready: 1
 - id: scaffold-results-explorer-frontend
   file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
   title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM

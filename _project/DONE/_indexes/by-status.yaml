@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T14:27:55.882222'
-total_items: 617
+generated_at: '2026-04-01T14:35:06.138748'
+total_items: 618
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 569
+    count: 570
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2449,6 +2449,11 @@ statuses:
       title: Result Output Schema v2.0 Complete Redesign
       priority: High
       category: Core Functionality
+    - id: docs-rewrite-architecture-and-structure
+      file: DONE/main/planning/docs-rewrite-architecture-and-structure.yaml
+      title: Rewrite architecture.md and structure.md to match current codebase
+      priority: High
+      category: Documentation
     - id: runtime-module-refactor-batch-two
       file: DONE/runtime-ops/planning/runtime-module-refactor-batch-two.yaml
       title: Runtime Module Refactor – Batch Two

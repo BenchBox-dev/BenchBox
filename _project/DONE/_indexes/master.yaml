@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T14:27:55.881626'
-total_items: 617
+generated_at: '2026-04-01T14:35:06.138181'
+total_items: 618
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3197,6 +3197,23 @@ items:
   owners:
   - joe
   estimated_effort: Large
+- id: docs-rewrite-architecture-and-structure
+  file: DONE/main/planning/docs-rewrite-architecture-and-structure.yaml
+  title: Rewrite architecture.md and structure.md to match current codebase
+  worktree: main
+  category: Documentation
+  priority: High
+  status: Completed
+  tags:
+  - documentation
+  - architecture
+  - design
+  - developer-experience
+  estimated_effort: Medium
+  completed_date: '2026-04-01'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: secure-credential-handling
   file: DONE/security-hardening/secure-credential-handling.yaml
   title: Secure Credential Handling

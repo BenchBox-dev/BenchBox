@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T14:27:54.504541'
-total_categories: 7
+generated_at: '2026-04-01T14:35:04.807529'
+total_categories: 6
 categories:
   AI/ML Capabilities:
     count: 1
@@ -128,14 +128,6 @@ categories:
     - id: scaffold-results-explorer-frontend
       file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
       title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
-      priority: High
-      status: Not Started
-  Documentation:
-    count: 1
-    items:
-    - id: docs-rewrite-architecture-and-structure
-      file: TODO/main/planning/docs-rewrite-architecture-and-structure.yaml
-      title: Rewrite architecture.md and structure.md to match current codebase
       priority: High
       status: Not Started
   Platform Expansion:

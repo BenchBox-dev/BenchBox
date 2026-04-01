@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T14:27:54.504558'
-total_items: 37
+generated_at: '2026-04-01T14:35:04.807547'
+total_items: 36
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 6
+    count: 5
     items:
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
@@ -26,11 +26,6 @@ priorities:
       file: TODO/main/planning/resolve-results-explorer-brand-ownership.yaml
       title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
       category: Core Functionality
-      status: Not Started
-    - id: docs-rewrite-architecture-and-structure
-      file: TODO/main/planning/docs-rewrite-architecture-and-structure.yaml
-      title: Rewrite architecture.md and structure.md to match current codebase
-      category: Documentation
       status: Not Started
     - id: scaffold-results-explorer-frontend
       file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
