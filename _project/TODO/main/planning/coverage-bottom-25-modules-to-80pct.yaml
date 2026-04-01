@@ -1,0 +1,647 @@
+id: coverage-bottom-25-modules-to-80pct
+title: "Bring the 25 lowest-coverage modules to 80% fast-test coverage"
+worktree: main
+priority: Medium-High
+status: Not Started
+description: |
+  Current fast-test coverage sits at 80.04% (85,262 / 106,518 lines) — just 47
+  covered lines above the 80% threshold. The buffer is dangerously thin: a single
+  bad merge could drop us below the gate.
+
+  This item systematically brings the 25 lowest-coverage modules up to ≥80% each,
+  adding robustness to the overall coverage floor and reducing the risk of accidental
+  regression below the gate.
+
+  Coverage gaps (lines needed to reach 80% per module):
+    databricks/dataframe_adapter.py      23.57% →  +89 lines
+    dataframe/pyspark_df.py              28.06% → +145 lines
+    azure/spark_execution_utils.py       34.78% →  +21 lines
+    databricks/adapter.py                41.68% → +396 lines
+    bigquery.py                          42.15% → +321 lines
+    redshift.py                          42.98% → +435 lines
+    spark.py                             46.04% → +133 lines
+    snowflake.py                         46.43% → +245 lines
+    dataframe/lakesail_df.py             48.94% →  +88 lines
+    credentials/redshift.py              50.96% → +121 lines
+    tpcds/generator/streaming.py         52.20% →  +57 lines
+    motherduck.py                        52.60% →  +42 lines
+    base/cloud_spark/staging.py          53.24% →  +99 lines
+    tpchavoc/benchmark.py                53.51% →  +30 lines
+    credentials/snowflake.py             54.26% →  +48 lines
+    fabric_warehouse.py                  55.68% → +109 lines
+    clickhouse/diagnostics.py            56.18% →  +21 lines
+    transaction_primitives/dataframe_operations.py  56.18% →  +89 lines
+    tpcdi/financial_data.py              56.33% →  +38 lines
+    starburst.py                         56.73% →  +24 lines
+    comparison/suite.py                  56.97% →  +56 lines
+    results/anonymization.py             57.20% →  +59 lines
+    write_primitives/benchmark.py        57.35% → +109 lines
+    gcp/dataproc_adapter.py              58.14% →  +56 lines
+    aws/athena_spark_adapter.py          58.66% →  +60 lines
+
+  Total: ~2,891 new covered lines across 12 work units.
+
+  All tests MUST carry the @pytest.mark.fast marker so they run in the fast lane.
+  All external SDKs (databricks, pyspark, snowflake-connector, boto3, google-cloud,
+  pyodbc, duckdb, requests) are mocked — no live connections.
+
+category: Testing & Quality
+
+metadata:
+  tags:
+  - testing
+  - coverage
+  - fast-lane
+  estimated_effort: "Large"
+  created_date: "2026-04-01"
+  source_review: "Coverage gate buffer analysis — April 2026"
+
+impact:
+  user_impact: |
+    None — test-only changes. No production code modified.
+  maintainer_impact: |
+    Raises the coverage floor substantially on the 25 weakest modules, reducing
+    the risk that routine feature additions drop the project below the 80% gate.
+    Future contributors get faster feedback loops on regressions in these adapters.
+  regression_risk: |
+    Very low. Only new test files are added (or existing test files extended).
+    Production source code is never modified. All new tests must pass in the
+    existing CI fast lane.
+
+justification: |
+  With only 47 covered lines separating the project from a broken coverage gate,
+  the next non-trivial feature addition to any of these 25 modules could breach
+  the threshold. Bringing each module to its own 80% floor provides ~2,891 lines
+  of extra covered headroom and independently validates the adapter logic that is
+  currently only exercised by slow integration tests (which don't count toward
+  the gate).
+
+work:
+- id: w1
+  summary: "Pure-logic core utilities: financial_data, dataframe_operations, anonymization, spark_execution_utils"
+  status: pending
+  needs: []
+  description: |
+    Four modules with high pure-logic content and straightforward mocking.
+    No Spark sessions or cloud clients needed.
+
+    benchbox/core/tpcdi/financial_data.py (+38 lines → 80%)
+      - FinancialConstants: validate distribution properties (sum to 1.0, valid ranges)
+      - FinancialDataPatterns: test seeded reproducibility, industry/credit/trade-type
+        generation, boundary cases for every method
+      - File: tests/unit/core/tpcdi/test_financial_data_coverage.py (new)
+
+    benchbox/core/transaction_primitives/dataframe_operations.py (+89 lines → 80%)
+      - TransactionOperationType enum: iterate all values, verify no crashes
+      - DataFrameTransactionCapabilities.supports_operation(): test each op type
+        against mock MaintenanceCapabilities that returns True/False combinations
+      - get_unsupported_operations(): verify it returns the full complement set
+      - Transaction isolation level mapping: test every enum value
+      - File: tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py
+        (extend existing file)
+
+    benchbox/core/results/anonymization.py (+59 lines → 80%)
+      - OS-specific machine ID retrieval: patch subprocess.check_output for Linux
+        (returns fake machine-id content), patch winreg.OpenKey for Windows path,
+        patch subprocess for macOS IOPlatformUUID
+      - Path anonymization cache: verify same input returns same output across calls
+      - Hostname hashing: verify deterministic output given same salt
+      - PII regex detection: test hostnames, IP addresses, UNC paths, email-like
+        strings against each compiled pattern
+      - File: tests/unit/core/results/test_anonymization.py (extend existing)
+
+    benchbox/platforms/azure/spark_execution_utils.py (+21 lines → 80%)
+      - wait_for_livy_statement(): mock requests.get to return state transitions
+        WAITING → RUNNING → AVAILABLE, verify polling terminates and returns output
+      - Timeout path: mock clock to advance past timeout, verify ConfigurationError raised
+      - Error state: DEAD/CANCELLING states raise appropriate exception
+      - execute_livy_statement(): mock requests.post then wait_for_livy_statement
+      - File: tests/unit/platforms/azure/test_spark_execution_utils.py (new)
+  files:
+  - tests/unit/core/tpcdi/test_financial_data_coverage.py
+  - tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py
+  - tests/unit/core/results/test_anonymization.py
+  - tests/unit/platforms/azure/test_spark_execution_utils.py
+
+- id: w2
+  summary: "TPC generators and comparison suite: streaming, tpchavoc, comparison/suite"
+  status: pending
+  needs: []
+  description: |
+    benchbox/core/tpcds/generator/streaming.py (+57 lines → 80%)
+      - _generate_single_table_streaming(): mock subprocess.run (dsdgen), mock file
+        open/read/write, mock compression call; verify manifest entry created with
+        correct row count and file path
+      - _generate_parent_table_with_children(): verify catalog_sales triggers
+        catalog_returns, store_sales triggers store_returns, etc. Test routing table
+        completeness for all parent-child pairs
+      - Row count tracking during compression: mock iterator over chunks, verify
+        accumulation is correct
+      - Temp file cleanup: verify temp files are unlinked after successful generation
+        and also after error (use side_effect to trigger cleanup branch)
+      - File: tests/unit/core/tpcds/generator/test_streaming_coverage.py (extend)
+
+    benchbox/core/tpchavoc/benchmark.py (+30 lines → 80%)
+      - get_query("Q1_V2"): verify ID parsing splits on "_V", retrieves correct variant
+      - get_query_variant(query_id, variant_id): mock TPCHavocQueryManager, assert
+        correct query SQL returned
+      - validate_variant_equivalence(): mock ResultValidator returning equivalent/
+        non-equivalent reports; verify ValidationReport is populated correctly
+      - export_variant_queries(output_dir): mock file writes, verify all variants
+        written with expected naming convention
+      - File: tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py (extend)
+
+    benchbox/core/comparison/suite.py (+56 lines → 80%)
+      - get_available_platforms(type="sql"): mock registry to return mixed platform
+        list; verify only SQL platforms returned
+      - _run_sql_comparison(): mock two SQL adapters with canned timings; verify
+        results dict keyed by platform name with timing arrays
+      - _run_dataframe_comparison(): same pattern for DF adapters
+      - _get_summary(): verify fastest/slowest selection, geometric mean computation,
+        regression detection when platform B is > 10% slower than platform A
+      - get_report(): verify output contains all expected sections
+      - File: tests/unit/core/test_comparison.py (extend existing)
+  files:
+  - tests/unit/core/tpcds/generator/test_streaming_coverage.py
+  - tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py
+  - tests/unit/core/test_comparison.py
+
+- id: w3
+  summary: "DataFrame expression builders: pyspark_df, lakesail_df, databricks DF adapter"
+  status: pending
+  needs: []
+  description: |
+    Three adapters that share the ExpressionFamilyAdapter interface. Mock SparkSession
+    and DataFrame/Column objects once, reuse across all three modules.
+
+    benchbox/platforms/dataframe/pyspark_df.py (+145 lines → 80%)
+      - _build_window_spec(): test all orderBy / partitionBy combinations
+      - _build_aggregate_window_spec(): ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+      - window_rank(), window_row_number(), window_dense_rank(): verify WindowSpec passed
+        to correct pyspark.sql.functions call (mock pyspark.sql.functions)
+      - window_sum/avg/count/min/max(): verify column expression wraps agg function
+      - date_sub(), date_add(), cast_date(), cast_string(): verify correct Column ops
+      - read_csv(), read_parquet(): mock spark.read.csv / .parquet; assert options set
+      - scalar(), scalar_to_df(): mock collect() returning [[value]]; verify unwrapping
+      - union_all(): verify df.union() called with correct args
+      - rename_columns(): verify df.withColumnRenamed chain
+      - get_query_plan(): mock df.explain() capture
+      - register_table(): mock createOrReplaceTempView
+      - _get_or_create_session(): mock SparkSessionManager.get_or_create(); test
+        DataFrameTuningConfiguration applied to SparkConf
+      - File: tests/unit/platforms/dataframe/test_pyspark_df.py (extend)
+
+    benchbox/platforms/dataframe/lakesail_df.py (+88 lines → 80%)
+      - Same expression method coverage as pyspark_df (reuse mock pattern)
+      - Spark Connect endpoint parsing: valid "sc://host:15002" succeeds,
+        missing scheme raises ValueError
+      - Session initialization to remote endpoint: mock SparkSession.builder.remote()
+      - File: tests/unit/platforms/dataframe/test_lakesail_df.py (extend)
+
+    benchbox/platforms/databricks/dataframe_adapter.py (+89 lines → 80%)
+      - Expression helpers col/lit/sum_col/avg_col/count_col/min_col/max_col:
+        verify each returns expected Column expression (mock pyspark.sql.functions)
+      - execute_dataframe_query() with callable: pass lambda that returns mock DF;
+        verify row count captured and timing recorded
+      - execute_dataframe_query() with SQL string: mock spark.sql(); verify same flow
+      - execute_query() dispatcher: assert callable routed to execute_dataframe_query,
+        string routed to parent execute_query
+      - _get_or_create_spark_session() fallback: raise ImportError on DatabricksSession
+        import, verify falls back to SQL-only mode
+      - File: tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py (extend)
+  files:
+  - tests/unit/platforms/dataframe/test_pyspark_df.py
+  - tests/unit/platforms/dataframe/test_lakesail_df.py
+  - tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py
+
+- id: w4
+  summary: "Small cloud adapters: motherduck, starburst, clickhouse diagnostics"
+  status: pending
+  needs: []
+  description: |
+    Three small adapters (<160 stmts each), each needing ~20-42 new covered lines.
+
+    benchbox/platforms/motherduck.py (+42 lines → 80%)
+      - Token validation: missing token raises ConfigurationError (assert exact message)
+      - Database name config: default "my_db" used when not set; explicit name preserved
+      - Memory limit parsing: "4GB", "4096MB", integer forms all accepted; invalid
+        string raises ConfigurationError
+      - Dialect resolution: verify MotherDuck inherits DuckDB dialect
+      - _connect(): mock duckdb.connect with token-bearing connection string; verify
+        "md:" scheme prepended
+      - File: tests/unit/platforms/test_motherduck.py (extend)
+
+    benchbox/platforms/starburst.py (+24 lines → 80%)
+      - _configure_starburst_defaults(): verify default port=443, https=True set on
+        parent config when not explicitly provided
+      - Host validation: missing host raises ConfigurationError
+      - Username format: "user@domain.com/role" split correctly into connector params
+      - HTTPS enforcement: any explicit http:// in host raises ConfigurationError
+      - File: tests/unit/platforms/test_starburst.py (extend)
+
+    benchbox/platforms/clickhouse/diagnostics.py (+21 lines → 80%)
+      - get_platform_info() server mode: mock clickhouse_driver client; mock system
+        queries for version, settings, database stats; verify dict keys present
+      - get_platform_info() local (chdb) mode: mock chdb.query(); verify local
+        metadata path taken
+      - check_server_database_exists(): mock SELECT 1 FROM system.databases;
+        test true/false branches
+      - _get_platform_metadata(): verify compression and merge-tree settings captured
+      - File: tests/unit/platforms/test_clickhouse_cloud_coverage.py (extend)
+  files:
+  - tests/unit/platforms/test_motherduck.py
+  - tests/unit/platforms/test_starburst.py
+  - tests/unit/platforms/test_clickhouse_cloud_coverage.py
+
+- id: w5
+  summary: "Credential modules: credentials/snowflake and credentials/redshift"
+  status: pending
+  needs: []
+  description: |
+    Both credential modules use Rich Console/Prompt for interactive setup. Mock all
+    I/O; never trigger actual network connections.
+
+    benchbox/platforms/credentials/snowflake.py (+48 lines → 80%)
+      - _auto_detect_snowflake(): set SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER,
+        SNOWFLAKE_PASSWORD env vars; verify returns pre-filled credential dict
+      - Account identifier normalization: "acct.snowflakecomputing.com" stripped to
+        "acct"; plain "acct" unchanged; "acct.region.snowflakecomputing.com" stripped
+        to "acct.region"
+      - setup_snowflake_credentials() happy path: mock Prompt.ask() to return
+        canned values; mock CredentialManager.save(); verify called with correct dict
+      - validate_snowflake_credentials(): mock snowflake.connector.connect() to
+        succeed; verify returns True; mock to raise OperationalError, verify False
+      - File: tests/unit/platforms/credentials/test_snowflake_defaults.py (extend)
+
+    benchbox/platforms/credentials/redshift.py (+121 lines → 80%)
+      - _auto_detect_redshift(): set REDSHIFT_HOST, REDSHIFT_USER, REDSHIFT_PASSWORD
+        env vars; verify returns pre-filled dict
+      - IAM role selection: when REDSHIFT_IAM_ROLE env var set, verify auth_method
+        set to "iam" in returned dict
+      - S3 staging parsing: "s3://bucket/prefix" → {bucket: "bucket", prefix: "prefix"}
+      - setup_redshift_credentials() happy path: mock Confirm.ask/Prompt.ask; verify
+        CredentialManager.save called
+      - Host/port parsing: "host:5439" split correctly; bare host gets default port 5439
+      - Validation branch: mock redshift_connector.connect() success/failure
+      - File: tests/unit/platforms/credentials/test_redshift_defaults.py (extend)
+  files:
+  - tests/unit/platforms/credentials/test_snowflake_defaults.py
+  - tests/unit/platforms/credentials/test_redshift_defaults.py
+
+- id: w6
+  summary: "Cloud staging URI parsing and write-primitives validation logic"
+  status: pending
+  needs: []
+  description: |
+    benchbox/platforms/base/cloud_spark/staging.py (+99 lines → 80%)
+      - CloudProvider detection from URI:
+        "s3://bucket/key" → AWS_S3
+        "gs://bucket/key" → GCS
+        "abfss://container@account.dfs.core.windows.net/path" → AZURE_ADLS
+        "wasbs://..." → AZURE_BLOB
+        "dbfs:/..." → DBFS
+        "/local/path" → LOCAL
+        Unknown scheme raises ValueError
+      - UploadProgress.percent_complete: verify (uploaded / total) * 100 with boundary
+        cases (0 bytes, exactly total, 0 total → 0% not ZeroDivisionError)
+      - StagingConfig fields: uri, provider, credentials; dataclass construction
+      - CloudSparkStaging.from_uri() factory: verify dispatches to correct subclass
+        for each provider scheme; unknown scheme raises ValueError
+      - Bucket/prefix extraction: "s3://my-bucket/path/to/prefix" → bucket="my-bucket",
+        prefix="path/to/prefix"
+      - File: tests/unit/platforms/base/cloud_spark/test_staging.py (extend)
+
+    benchbox/core/write_primitives/benchmark.py (+109 lines → 80%)
+      - _check_validation_query() exact mode: mock cursor returning row_count=500;
+        expected=500 → pass; expected=499 → fail with message
+      - _check_validation_query() min/max mode: within range → pass; outside → fail
+      - OperationResult aggregation: verify total_time, rows_affected, success flag
+      - WritePrimitivesBenchmark initialization: mock WritePrimitivesDataGenerator
+        and WriteOperationsManager; verify both constructed with correct config
+      - Staging table creation: mock adapter.execute(); verify CREATE TABLE ... AS
+        SELECT sql submitted for each operation type
+      - Error handling: when execute() raises, verify OperationResult.success=False
+        and exception captured in .error field
+      - File: tests/unit/core/write_primitives/test_benchmark_execution.py (extend)
+  files:
+  - tests/unit/platforms/base/cloud_spark/test_staging.py
+  - tests/unit/core/write_primitives/test_benchmark_execution.py
+
+- id: w7
+  summary: "spark.py: deployment modes, config validation, resource allocation"
+  status: pending
+  needs: []
+  description: |
+    benchbox/platforms/spark.py (+133 lines → 80%)
+
+    Mock SparkSession.builder at module level (patch "benchbox.platforms.spark.SparkSession").
+
+    Areas to cover:
+    - Deployment mode handling: master="local[*]", "local[4]", "spark://host:7077",
+      "yarn", "k8s://https://k8s-host:6443" — each sets master correctly in config
+    - Resource allocation: executor_memory + driver_memory with "g"/"m" suffix;
+      invalid format raises ConfigurationError
+    - Shuffle partition calculation: default=200 for local mode; auto-detection
+      for cluster mode based on executor_cores * num_executors
+    - SparkConf building: verify all config keys forwarded to SparkConf; extra
+      platform_option K=V pairs forwarded as spark.K=V
+    - _build_create_external_table_sql(): verify USING PARQUET / USING DELTA options,
+      LOCATION clause, OPTIONS(...) for CSV with delimiter
+    - Warehouse selection for Hive metastore: verify spark.sql.warehouse.dir set
+    - Close/cleanup: mock SparkContext.stop(); verify called on adapter.close()
+    - File: tests/unit/platforms/test_spark_adapter_coverage.py (new)
+  files:
+  - tests/unit/platforms/test_spark_adapter_coverage.py
+
+- id: w8
+  summary: "databricks/adapter.py: warehouse selection, clustering, SQL generation (large)"
+  status: pending
+  needs: []
+  description: |
+    benchbox/platforms/databricks/adapter.py (+396 lines → 80%)
+
+    This is the largest single work unit. Mock databricks.sql and all credential
+    helpers. Focus on the business logic that does NOT require a live Databricks
+    workspace.
+
+    Warehouse selection (_select_databricks_warehouse):
+    - Multiple warehouses: select by name match (case-insensitive partial match)
+    - No name given: select first RUNNING warehouse, else first warehouse
+    - No warehouses returned: raises ConfigurationError
+    - Warehouse ID explicitly configured: verify used directly without listing
+
+    Clustering strategy (_resolve_databricks_clustering_strategy):
+    - Explicit "liquid" in tuning config → LIQUID_CLUSTERING
+    - Explicit "zorder" in tuning config → ZORDER
+    - Neither → NONE (no clustering)
+    - Invalid strategy name → ConfigurationError
+
+    SQL generation (_build_ctas_sort_sql):
+    - ZORDER: verify "OPTIMIZE table ZORDER BY (col1, col2)" template
+    - LIQUID_CLUSTERING: verify "ALTER TABLE table CLUSTER BY (col1, col2)" template
+    - No sort columns → returns None (no post-CTAS statement)
+
+    Data loading flow:
+    - _build_copy_into_sql(): verify COPY INTO sql for Parquet vs CSV, with and
+      without credential options
+    - _upload_to_dbfs(): mock dbfs_client.upload(); verify chunked upload with
+      correct block size
+    - External table creation: verify CREATE TABLE ... USING DELTA LOCATION
+    - UC Volumes path resolution: "dbfs:/mnt/..." vs "abfss://..." vs "s3://..."
+
+    Error handling:
+    - Connection retry: mock first connect raising OperationalError, second succeeding
+    - Query timeout: mock execute_query raising TimeoutError; verify surfaced cleanly
+
+    File: tests/unit/platforms/test_databricks_adapter_coverage.py (new, to avoid
+    bloating existing files)
+  files:
+  - tests/unit/platforms/test_databricks_adapter_coverage.py
+
+- id: w9
+  summary: "AWS Athena Spark + GCP Dataproc: state polling and job lifecycle"
+  status: pending
+  needs: []
+  description: |
+    Both adapters follow the same "submit job → poll state → retrieve result" pattern.
+    Mock boto3/google-cloud clients.
+
+    benchbox/platforms/aws/athena_spark_adapter.py (+60 lines → 80%)
+      - AthenaSparkSessionState / AthenaSparkCalculationState: iterate all values
+      - Session creation polling: mock boto3 client to return CREATING → CREATED → IDLE
+        state transitions; verify function returns session ID
+      - Calculation submission: mock start_calculation_execution(); verify WorkGroup
+        and code passed correctly
+      - Calculation polling: QUEUED → RUNNING → COMPLETED; verify result S3 URI returned
+      - Timeout path: advance mock time past max_wait; verify TimeoutError raised
+      - FAILED state: mock final state = FAILED; verify exception with DPU error message
+      - Session termination: mock terminate_session(); verify called on adapter.close()
+      - File: tests/unit/platforms/aws/test_athena_spark_coverage.py (extend)
+
+    benchbox/platforms/gcp/dataproc_adapter.py (+56 lines → 80%)
+      - DataprocJobState constants: iterate all values
+      - Cluster config building: verify cluster name, region, master/worker machine
+        types set from config; Spark properties forwarded
+      - Job submission: mock JobControllerClient.submit_job(); verify PySparkJob
+        constructed with correct main_jar and args
+      - Job polling: PENDING → SETUP_DONE → RUNNING → DONE; verify job reference returned
+      - FAILED state: mock job.status.state = ERROR; verify DataprocError raised
+        with driver output from GCS
+      - GCS result retrieval: mock storage.Client.bucket().blob().download_as_text()
+      - File: tests/unit/platforms/gcp/test_dataproc_coverage.py (extend)
+  files:
+  - tests/unit/platforms/aws/test_athena_spark_coverage.py
+  - tests/unit/platforms/gcp/test_dataproc_coverage.py
+
+- id: w10
+  summary: "fabric_warehouse.py and snowflake.py: auth logic and connection config"
+  status: pending
+  needs: []
+  description: |
+    benchbox/platforms/fabric_warehouse.py (+109 lines → 80%)
+      Mock pyodbc.connect and all azure-identity libraries.
+      - ODBC connection string building: verify Driver, Server, Database, UID/PWD
+        in string for username/password auth
+      - Service principal auth: mock ClientSecretCredential; verify access token
+        inserted as UID="" PWD={token} with correct ODBC options
+      - DefaultAzureCredential path: mock token refresh; verify token inserted
+      - Item type validation: only Warehouse accepted; Lakehouse raises ConfigurationError
+        with helpful message referencing OneLake endpoint
+      - COPY INTO parameter building: verify FROM 'adls://...' with CREDENTIAL=
+        (IDENTITY='...') clause
+      - Auth token refresh: mock token expiry; verify new token fetched on execute
+      - File: tests/unit/platforms/test_microsoft_fabric_adapter.py (extend)
+
+    benchbox/platforms/snowflake.py (+245 lines → 80%)
+      Mock snowflake.connector.connect and DictCursor.
+      - Account identifier normalization: strip ".snowflakecomputing.com" suffix
+        in all variants (region, multi-cluster, VPS)
+      - Warehouse auto-suspend: when tuning.notuning=False verify ALTER WAREHOUSE
+        SET AUTO_SUSPEND issued after connection
+      - Query cache control: verify USE WAREHOUSE / ALTER SESSION SET
+        USE_CACHED_RESULT=FALSE when cache disabled in config
+      - Result cache validation: mock SELECT 1 returning cached vs fresh result;
+        verify is_cached flag set correctly
+      - Nondeterminism suppression: verify ALTER SESSION SET
+        TIMESTAMP_TYPE_MAPPING='TIMESTAMP_NTZ' issued when determinism=strict
+      - _build_ctas_sort_sql(): CLUSTER BY (col1, col2) appended to CREATE TABLE
+      - Connection retry: first connect raises ProgrammingError "authentication",
+        second succeeds; verify up to 2 retries attempted
+      - File: tests/unit/platforms/test_snowflake_adapter_coverage.py (new)
+  files:
+  - tests/unit/platforms/test_microsoft_fabric_adapter.py
+  - tests/unit/platforms/test_snowflake_adapter_coverage.py
+
+- id: w11
+  summary: "bigquery.py: GCS integration, auth, and query execution branches"
+  status: pending
+  needs: []
+  description: |
+    benchbox/platforms/bigquery.py (+321 lines → 80%)
+      Mock google.cloud.bigquery.Client, google.cloud.storage.Client,
+      and google.auth modules.
+
+      Configuration parsing:
+      - Project ID auto-detection: mock google.auth.default() returning project "proj-123";
+        verify used when not in config
+      - Dataset name generation: benchmark slug + scale factor → dataset name
+      - GCS staging root parsing: "gs://bucket/prefix" → {bucket, prefix}; missing
+        staging_root raises ConfigurationError
+
+      Authentication branches:
+      - Service account JSON key file: mock service_account.Credentials.from_service_account_file();
+        verify credentials used in client constructor
+      - Service account JSON string (inline): mock from_service_account_info(); same
+      - Application Default Credentials: mock google.auth.default()
+
+      Query execution:
+      - execute_query() with job_config: verify QueryJobConfig constructed with
+        correct use_query_cache, destination table when result_table configured
+      - Job result iteration: mock query_job.result() returning iterable of Row objects;
+        verify rows correctly mapped to dicts
+      - DML (INSERT/UPDATE/DELETE): verify num_dml_affected_rows captured
+
+      Data loading:
+      - _upload_to_gcs(): mock storage.Client.bucket().blob().upload_from_filename();
+        verify chunked upload for files >10MB
+      - _load_from_gcs(): mock bigquery.LoadJobConfig(); verify source_format set
+        correctly for PARQUET vs CSV
+      - _create_external_table(): verify BigQueryExternalConfig with PARQUET format,
+        GCS URI pattern
+
+      Error handling:
+      - google.api_core.exceptions.NotFound on dataset → CREATE DATASET attempted
+      - google.api_core.exceptions.BadRequest on query → surfaced as BenchmarkError
+
+      File: tests/unit/platforms/test_bigquery_adapter_coverage.py (new)
+  files:
+  - tests/unit/platforms/test_bigquery_adapter_coverage.py
+
+- id: w12
+  summary: "redshift.py: COPY command, IAM/S3 integration, connector selection (largest)"
+  status: pending
+  needs: []
+  description: |
+    benchbox/platforms/redshift.py (+435 lines → 80%)
+      Mock redshift_connector, psycopg2, and boto3 S3 client.
+
+      Connector selection:
+      - redshift_connector available → used; verify import attempted first
+      - redshift_connector unavailable (ImportError) → psycopg2 used as fallback
+      - Neither available → raises ImportError with install instructions
+
+      Connection setup:
+      - Standard auth (user/password): verify connection kwargs include host, port,
+        database, user, password
+      - IAM auth: verify iam=True, cluster_identifier, db_user set; no password kwarg
+      - SSL config: sslmode="verify-full" when ssl_verify=True
+      - Connection retry on OperationalError: up to max_retries; then raises
+
+      S3 integration:
+      - _parse_s3_staging_root(): "s3://bucket/prefix/" → (bucket, prefix);
+        missing "s3://" raises ConfigurationError
+      - _build_copy_command(): verify COPY schema.table FROM 's3://...' with
+        IAM_ROLE / ACCESS_KEY_ID+SECRET_ACCESS_KEY credential block depending on auth_method
+      - CSV options: DELIMITER ',' IGNOREHEADER 1 REMOVEQUOTES EMPTYASNULL appended
+      - Parquet options: FORMAT AS PARQUET appended; no DELIMITER
+      - GZIP option: GZIP appended when compression=gzip
+
+      Data loading flow:
+      - upload_to_s3(): mock boto3.client.upload_file(); verify key = prefix + filename
+      - load_from_s3(): mock execute(COPY ...); verify S3 path constructed from
+        staging_root + table_name + "*.parquet"
+      - Manifest-based load: mock manifest JSON on S3; verify COPY ... MANIFEST used
+
+      SQL generation:
+      - _build_create_external_table_sql(): EXTERNAL TABLE in Spectrum schema
+        with ROW FORMAT ... STORED AS PARQUET LOCATION 's3://...'
+      - SORT KEY / DIST KEY: verify DISTKEY(col) SORTKEY(col1, col2) in CREATE TABLE
+        when specified in tuning config
+
+      WLM / query group:
+      - set_query_group(): mock execute("SET query_group TO ..."); verify called
+        before each benchmark query when wlm_queue configured
+
+      File: tests/unit/platforms/test_redshift_adapter_coverage.py (new)
+  files:
+  - tests/unit/platforms/test_redshift_adapter_coverage.py
+
+must_preserve:
+- "All existing passing tests continue to pass — zero regressions"
+- "Overall fast-lane coverage stays ≥80.04% after every individual work unit commit"
+- "No production source files modified — tests only"
+- "@pytest.mark.fast marker present on every new test function"
+- "No live network calls — all external SDK clients mocked with unittest.mock.patch"
+
+approach: |
+  Work units w1–w4 and w6–w9 are fully independent and can be executed in any order.
+  w5 (credentials) has no dependencies but shares mock patterns with w10; do w5 first
+  to establish the Rich Console mock helpers.
+  w10–w12 (large cloud adapters) should be done after w5 to leverage the established
+  mocking patterns.
+
+  For each work unit:
+  1. Run coverage on the target module first to identify the exact uncovered lines:
+     uv run -- python -m pytest --cov=benchbox/<module> --cov-report=term-missing -m fast -q
+  2. Add tests targeting the uncovered lines
+  3. Verify module coverage ≥80% before committing
+  4. Run the full fast smoke suite to confirm no regressions
+
+  Recommended mock setup for cloud SDKs:
+  - boto3: patch at "benchbox.platforms.redshift.boto3" etc. (not at boto3 root)
+  - google.cloud: use MagicMock() for both bigquery.Client and storage.Client
+  - snowflake.connector: patch "benchbox.platforms.snowflake.snowflake.connector.connect"
+  - databricks.sql: patch "benchbox.platforms.databricks.adapter.databricks"
+  - pyspark: patch "benchbox.platforms.dataframe.pyspark_df.SparkSession"
+  - pyodbc: patch "benchbox.platforms.fabric_warehouse.pyodbc.connect"
+
+anti_patterns:
+- "DO NOT add @pytest.mark.slow, @pytest.mark.live_integration, or @pytest.mark.resource_heavy markers — only @pytest.mark.fast"
+- "DO NOT import or instantiate real cloud SDK clients in tests — all external calls must be mocked"
+- "DO NOT use -o 'addopts=' to override pytest.ini — this strips -n auto and makes tests 10x slower"
+- "DO NOT call list() on color_cycle() return values — color_cycle() returns an infinite itertools.cycle; use list(theme.palette or DEFAULT_PALETTE) instead"
+- "DO NOT modify production source files to make them more testable — only add/extend test files"
+- "DO NOT batch all 25 modules into a single test file — keep per-module or per-group test files aligned with existing test directory structure"
+
+verification:
+- description: "All 25 target modules individually reach ≥80% coverage in the fast lane"
+  command: "uv run -- python -m pytest -m fast -q --cov=benchbox/platforms/databricks --cov=benchbox/platforms/dataframe --cov=benchbox/platforms/azure --cov=benchbox/platforms/bigquery --cov=benchbox/platforms/redshift --cov=benchbox/platforms/spark --cov=benchbox/platforms/snowflake --cov=benchbox/platforms/credentials --cov=benchbox/platforms/motherduck --cov=benchbox/platforms/base/cloud_spark --cov=benchbox/platforms/fabric_warehouse --cov=benchbox/platforms/clickhouse --cov=benchbox/platforms/starburst --cov=benchbox/platforms/gcp --cov=benchbox/platforms/aws --cov=benchbox/core/tpcds/generator --cov=benchbox/core/tpchavoc --cov=benchbox/core/comparison --cov=benchbox/core/results/anonymization --cov=benchbox/core/write_primitives --cov=benchbox/core/transaction_primitives --cov=benchbox/core/tpcdi --cov-report=term-missing 2>&1 | grep -E '(FAILED|ERROR|PASSED|[0-9]+%)'"
+  expected_output: "All target modules show ≥80% coverage; no FAILED or ERROR lines"
+- description: "Overall fast-lane coverage stays at or above 80.04%"
+  command: "uv run -- python -m pytest -m fast -q --cov=benchbox --cov-report=term 2>&1 | tail -5"
+  expected_output: "Total coverage ≥ 80%"
+- description: "No regressions — full fast test suite passes"
+  command: "uv run -- python -m pytest -m fast -q 2>&1 | tail -5"
+  expected_output: "passed, 0 failed"
+
+scope_limit:
+  only_modify:
+  - "tests/unit/core/tpcdi/test_financial_data_coverage.py"
+  - "tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py"
+  - "tests/unit/core/results/test_anonymization.py"
+  - "tests/unit/platforms/azure/test_spark_execution_utils.py"
+  - "tests/unit/core/tpcds/generator/test_streaming_coverage.py"
+  - "tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py"
+  - "tests/unit/core/test_comparison.py"
+  - "tests/unit/platforms/dataframe/test_pyspark_df.py"
+  - "tests/unit/platforms/dataframe/test_lakesail_df.py"
+  - "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py"
+  - "tests/unit/platforms/test_motherduck.py"
+  - "tests/unit/platforms/test_starburst.py"
+  - "tests/unit/platforms/test_clickhouse_cloud_coverage.py"
+  - "tests/unit/platforms/credentials/test_snowflake_defaults.py"
+  - "tests/unit/platforms/credentials/test_redshift_defaults.py"
+  - "tests/unit/platforms/base/cloud_spark/test_staging.py"
+  - "tests/unit/core/write_primitives/test_benchmark_execution.py"
+  - "tests/unit/platforms/test_spark_adapter_coverage.py"
+  - "tests/unit/platforms/test_databricks_adapter_coverage.py"
+  - "tests/unit/platforms/aws/test_athena_spark_coverage.py"
+  - "tests/unit/platforms/gcp/test_dataproc_coverage.py"
+  - "tests/unit/platforms/test_microsoft_fabric_adapter.py"
+  - "tests/unit/platforms/test_snowflake_adapter_coverage.py"
+  - "tests/unit/platforms/test_bigquery_adapter_coverage.py"
+  - "tests/unit/platforms/test_redshift_adapter_coverage.py"
+  do_not_touch:
+  - "Any benchbox/ production source file"
+  - "pytest.ini, pyproject.toml, conftest.py (no new fixtures or config changes)"
+  - "tests/integration/, tests/e2e/, tests/live/ (slow test directories)"

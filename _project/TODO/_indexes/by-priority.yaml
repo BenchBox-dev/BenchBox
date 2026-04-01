@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T14:35:04.807547'
-total_items: 36
+generated_at: '2026-04-01T17:00:14.275420'
+total_items: 37
 priorities:
   Critical:
     count: 1
@@ -38,7 +38,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium-High:
-    count: 10
+    count: 11
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -59,6 +59,11 @@ priorities:
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       category: Platform Expansion
+      status: Not Started
+    - id: coverage-bottom-25-modules-to-80pct
+      file: TODO/main/planning/coverage-bottom-25-modules-to-80pct.yaml
+      title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
+      category: Testing & Quality
       status: Not Started
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml

@@ -1,8 +1,8 @@
-generated_at: '2026-04-01T14:35:04.807557'
-total_items: 36
+generated_at: '2026-04-01T17:00:14.275430'
+total_items: 37
 statuses:
   Not Started:
-    count: 36
+    count: 37
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -44,6 +44,11 @@ statuses:
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Medium-High
       category: Platform Expansion
+    - id: coverage-bottom-25-modules-to-80pct
+      file: TODO/main/planning/coverage-bottom-25-modules-to-80pct.yaml
+      title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
+      priority: Medium-High
+      category: Testing & Quality
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
       title: Build a results explorer subsite on benchbox.dev

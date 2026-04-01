@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T14:35:04.807499'
-total_items: 36
+generated_at: '2026-04-01T17:00:14.275369'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -557,6 +557,21 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 3
+- id: coverage-bottom-25-modules-to-80pct
+  file: TODO/main/planning/coverage-bottom-25-modules-to-80pct.yaml
+  title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
+  worktree: main
+  category: Testing & Quality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - testing
+  - coverage
+  - fast-lane
+  estimated_effort: Large
+  work_total: 12
+  work_done: 0
+  work_ready: 12
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
   title: Build a results explorer subsite on benchbox.dev
