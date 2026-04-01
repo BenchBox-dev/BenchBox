@@ -1,8 +1,8 @@
-generated_at: '2026-04-01T10:05:21.872462'
-total_items: 611
+generated_at: '2026-04-01T10:27:29.471677'
+total_items: 612
 priorities:
   Critical:
-    count: 35
+    count: 36
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -13,6 +13,11 @@ priorities:
       file: DONE/release-readiness/bundle-tpc-query-templates-in-wheel.yaml
       title: Bundle TPC-H/TPC-DS query templates inside package for wheel distribution
       category: Core Functionality
+      status: Completed
+    - id: close-pre-beta-release-blockers
+      file: DONE/main/active/close-pre-beta-release-blockers.yaml
+      title: Close pre-Beta release blockers in status messaging, install docs, packaging policy, and typecheck gating
+      category: Release Readiness
       status: Completed
     - id: cloud-spark-shared-infrastructure
       file: DONE/platform-expansion/planning/cloud-spark-shared-infrastructure.yaml

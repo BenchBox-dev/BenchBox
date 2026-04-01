@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T10:05:21.872309'
-total_categories: 73
+generated_at: '2026-04-01T10:27:29.471509'
+total_categories: 74
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -2774,6 +2774,14 @@ categories:
       file: DONE/query-plan-remediation/phase-3-robustness-validation.yaml
       title: 'Query Plan Remediation - Phase 3: Robustness & Validation'
       priority: High
+      status: Completed
+  Release Readiness:
+    count: 1
+    items:
+    - id: close-pre-beta-release-blockers
+      file: DONE/main/active/close-pre-beta-release-blockers.yaml
+      title: Close pre-Beta release blockers in status messaging, install docs, packaging policy, and typecheck gating
+      priority: Critical
       status: Completed
   Reliability:
     count: 1

@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T10:05:21.872038'
-total_items: 611
+generated_at: '2026-04-01T10:27:29.471171'
+total_items: 612
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -32,6 +32,26 @@ items:
   owners:
   - joeharris76
   estimated_effort: 2-3 hours
+- id: close-pre-beta-release-blockers
+  file: DONE/main/active/close-pre-beta-release-blockers.yaml
+  title: Close pre-Beta release blockers in status messaging, install docs, packaging policy, and typecheck gating
+  worktree: main
+  category: Release Readiness
+  priority: Critical
+  status: Completed
+  tags:
+  - beta
+  - release-readiness
+  - packaging
+  - docs
+  - typecheck
+  - install-surface
+  estimated_effort: Large
+  completed_date: '2026-04-01'
+  work_total: 10
+  work_done: 10
+  work_ready: 0
+  deferred_count: 3
 - id: cloud-spark-shared-infrastructure
   file: DONE/platform-expansion/planning/cloud-spark-shared-infrastructure.yaml
   title: Cloud Spark Shared Infrastructure

@@ -1,25 +1,6 @@
-generated_at: '2026-04-01T10:05:20.469831'
-total_items: 38
+generated_at: '2026-04-01T10:27:27.918143'
+total_items: 37
 items:
-- id: close-pre-beta-release-blockers
-  file: TODO/main/planning/close-pre-beta-release-blockers.yaml
-  title: Close pre-Beta release blockers in status messaging, install docs, packaging policy, and typecheck gating
-  worktree: main
-  category: Release Readiness
-  priority: Critical
-  status: Not Started
-  tags:
-  - beta
-  - release-readiness
-  - packaging
-  - docs
-  - typecheck
-  - install-surface
-  estimated_effort: Large
-  work_total: 10
-  work_done: 0
-  work_ready: 1
-  deferred_count: 3
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
   title: Build a results explorer subsite on benchbox.dev
