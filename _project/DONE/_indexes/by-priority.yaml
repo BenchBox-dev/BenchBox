@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T10:47:40.859428'
-total_items: 612
+generated_at: '2026-04-01T13:32:55.339857'
+total_items: 613
 priorities:
   Critical:
     count: 36
@@ -185,7 +185,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 220
+    count: 221
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -447,6 +447,11 @@ priorities:
       file: DONE/core-functionality/active/enforce-explicit-query-run-type-across-executions.yaml
       title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths
       category: Core Functionality
+      status: Completed
+    - id: enforce-no-conflicting-test-markers
+      file: DONE/main/active/enforce-no-conflicting-test-markers.yaml
+      title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
+      category: Testing & Quality
       status: Completed
     - id: dataframe-parameter-substitution-parity
       file: DONE/core-functionality/active/dataframe-parameter-substitution-parity.yaml

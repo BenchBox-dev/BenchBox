@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T10:47:39.474179'
-total_items: 37
+generated_at: '2026-04-01T13:32:53.908328'
+total_items: 36
 priorities:
   Critical:
     count: 1
@@ -10,8 +10,13 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 4
+    count: 5
     items:
+    - id: motherduck-cloud-features
+      file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
+      title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
+      category: Platform Expansion
+      status: Not Started
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
@@ -33,7 +38,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium-High:
-    count: 12
+    count: 10
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -65,11 +70,6 @@ priorities:
       title: Build static pipeline that transforms result bundles into explorer read models
       category: Core Functionality
       status: Not Started
-    - id: enforce-no-conflicting-test-markers
-      file: TODO/main/active/enforce-no-conflicting-test-markers.yaml
-      title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
-      category: Testing & Quality
-      status: In Progress
     - id: generate-seed-corpus-for-results-explorer
       file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
       title: Generate seed corpus of benchmark results for the results explorer
@@ -84,11 +84,6 @@ priorities:
       file: TODO/main/planning/implement-result-detail-page.yaml
       title: Implement result detail page with query timings, metadata, and bundle download
       category: Core Functionality
-      status: Not Started
-    - id: motherduck-cloud-features
-      file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
-      title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
-      category: Platform Expansion
       status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml

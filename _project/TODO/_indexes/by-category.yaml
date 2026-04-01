@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T10:47:39.474159'
+generated_at: '2026-04-01T13:32:53.908311'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -171,7 +171,7 @@ categories:
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
-      priority: Medium-High
+      priority: High
       status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
@@ -192,15 +192,10 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 2
+    count: 1
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       priority: Medium-High
       status: Not Started
-    - id: enforce-no-conflicting-test-markers
-      file: TODO/main/active/enforce-no-conflicting-test-markers.yaml
-      title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
-      priority: Medium-High
-      status: In Progress

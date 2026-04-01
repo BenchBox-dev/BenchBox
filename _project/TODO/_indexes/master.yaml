@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T10:47:39.474119'
-total_items: 37
+generated_at: '2026-04-01T13:32:53.908277'
+total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -16,6 +16,21 @@ items:
   - architecture
   estimated_effort: Medium
   work_total: 5
+  work_done: 0
+  work_ready: 1
+- id: motherduck-cloud-features
+  file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
+  title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - motherduck
+  - cloud-features
+  - deferred-followup
+  estimated_effort: Medium — requires MotherDuck free-tier account
+  work_total: 3
   work_done: 0
   work_ready: 1
 - id: productize-result-publishing-and-artifact-sharing
@@ -581,22 +596,6 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - generate-seed-corpus-for-results-explorer
-- id: enforce-no-conflicting-test-markers
-  file: TODO/main/active/enforce-no-conflicting-test-markers.yaml
-  title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
-  worktree: main
-  category: Testing & Quality
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - testing
-  - quality
-  - markers
-  - conftest
-  estimated_effort: Medium
-  work_total: 15
-  work_done: 1
-  work_ready: 12
 - id: generate-seed-corpus-for-results-explorer
   file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
   title: Generate seed corpus of benchmark results for the results explorer
@@ -656,21 +655,6 @@ items:
   work_ready: 1
   needs:
   - scaffold-results-explorer-frontend
-- id: motherduck-cloud-features
-  file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
-  title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - motherduck
-  - cloud-features
-  - deferred-followup
-  estimated_effort: Medium — requires MotherDuck free-tier account
-  work_total: 3
-  work_done: 0
-  work_ready: 1
 - id: nyc-taxi-benchmark-expansion
   file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
   title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support

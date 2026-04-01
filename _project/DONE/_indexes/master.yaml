@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T10:47:40.858996'
-total_items: 612
+generated_at: '2026-04-01T13:32:55.339453'
+total_items: 613
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1301,6 +1301,23 @@ items:
   estimated_effort: Medium
   work_total: 9
   work_done: 9
+  work_ready: 0
+- id: enforce-no-conflicting-test-markers
+  file: DONE/main/active/enforce-no-conflicting-test-markers.yaml
+  title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - quality
+  - markers
+  - conftest
+  estimated_effort: Medium
+  completed_date: '2026-04-01'
+  work_total: 15
+  work_done: 15
   work_ready: 0
 - id: dataframe-parameter-substitution-parity
   file: DONE/core-functionality/active/dataframe-parameter-substitution-parity.yaml

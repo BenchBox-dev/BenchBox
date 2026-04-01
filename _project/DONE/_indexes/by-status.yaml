@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T10:47:40.859558'
-total_items: 612
+generated_at: '2026-04-01T13:32:55.339992'
+total_items: 613
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 564
+    count: 565
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1202,6 +1202,11 @@ statuses:
       title: Enforce explicit query run_type tagging across SQL and DataFrame execution paths
       priority: High
       category: Core Functionality
+    - id: enforce-no-conflicting-test-markers
+      file: DONE/main/active/enforce-no-conflicting-test-markers.yaml
+      title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
+      priority: High
+      category: Testing & Quality
     - id: coverage-ci-enforcement
       file: DONE/main/active/coverage-ci-enforcement.yaml
       title: Enforce per-module 50% coverage floor in CI

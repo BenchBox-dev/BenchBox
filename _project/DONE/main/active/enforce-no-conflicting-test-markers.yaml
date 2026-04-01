@@ -2,7 +2,8 @@ id: enforce-no-conflicting-test-markers
 title: "Enforce no conflicting test markers: detection hook + remediation of 43 existing violations"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-01"
 category: Testing & Quality
 
 description: |

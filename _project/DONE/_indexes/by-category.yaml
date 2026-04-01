@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T10:47:40.859281'
+generated_at: '2026-04-01T13:32:55.339710'
 total_categories: 74
 categories:
   '"Bug Fixes & Reliability"':
@@ -2872,8 +2872,13 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 14
+    count: 15
     items:
+    - id: enforce-no-conflicting-test-markers
+      file: DONE/main/active/enforce-no-conflicting-test-markers.yaml
+      title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
+      priority: High
+      status: Completed
     - id: fix-coverage-theater
       file: DONE/main/active/fix-coverage-theater.yaml
       title: 'Fix coverage theater: replace fake assertions with real behavioral tests'

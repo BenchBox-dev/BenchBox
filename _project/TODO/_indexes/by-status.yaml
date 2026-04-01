@@ -1,14 +1,6 @@
-generated_at: '2026-04-01T10:47:39.474191'
-total_items: 37
+generated_at: '2026-04-01T13:32:53.908339'
+total_items: 36
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: enforce-no-conflicting-test-markers
-      file: TODO/main/active/enforce-no-conflicting-test-markers.yaml
-      title: 'Enforce no conflicting test markers: detection hook + remediation of 43 existing violations'
-      priority: Medium-High
-      category: Testing & Quality
   Not Started:
     count: 36
     items:
@@ -140,7 +132,7 @@ statuses:
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
-      priority: Medium-High
+      priority: High
       category: Platform Expansion
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
