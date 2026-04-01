@@ -2,7 +2,7 @@ id: enforce-no-conflicting-test-markers
 title: "Enforce no conflicting test markers: detection hook + remediation of 43 existing violations"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Testing & Quality
 
 description: |
@@ -62,7 +62,7 @@ justification: |
 work:
   - id: w1
     summary: "Merge conflict validation into pytest_collection_modifyitems (warning mode)"
-    status: pending
+    status: done
     needs: []
     description: |
       Extend the existing pytest_collection_modifyitems hook in tests/conftest.py by
