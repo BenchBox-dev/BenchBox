@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T13:41:09.335666'
+generated_at: '2026-04-01T13:43:03.882455'
 total_items: 41
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -33,7 +33,7 @@ items:
   estimated_effort: Large
   work_total: 5
   work_done: 0
-  work_ready: 0
+  work_ready: 4
 - id: docs-fix-critical-accuracy-errors
   file: TODO/main/planning/docs-fix-critical-accuracy-errors.yaml
   title: Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags
@@ -49,7 +49,7 @@ items:
   estimated_effort: Small
   work_total: 3
   work_done: 0
-  work_ready: 0
+  work_ready: 3
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
@@ -120,7 +120,7 @@ items:
   estimated_effort: Medium
   work_total: 3
   work_done: 0
-  work_ready: 0
+  work_ready: 1
 - id: scaffold-results-explorer-frontend
   file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
   title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
@@ -552,7 +552,7 @@ items:
   estimated_effort: Small
   work_total: 3
   work_done: 0
-  work_ready: 0
+  work_ready: 3
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml
   title: Add Hypothesis property-based tests for pure-function invariants
@@ -675,7 +675,7 @@ items:
   estimated_effort: Medium
   work_total: 6
   work_done: 0
-  work_ready: 0
+  work_ready: 6
 - id: generate-seed-corpus-for-results-explorer
   file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
   title: Generate seed corpus of benchmark results for the results explorer

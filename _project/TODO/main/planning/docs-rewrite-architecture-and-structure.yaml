@@ -1,0 +1,95 @@
+id: docs-rewrite-architecture-and-structure
+title: "Rewrite architecture.md and structure.md to match current codebase"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  Documentation audit (2026-04-01) found that the two foundational design docs
+  are severely outdated:
+
+  1. `docs/design/architecture.md` describes a non-existent `.run()` method
+     and Template Method pattern. The actual execution model is lifecycle-based
+     via `ExecutionPhases` and `BenchmarkResults` models. Missing entirely:
+     `DataFrameContext`, `ExpressionFamilyAdapter`, `PandasFamilyAdapter`
+     classes and the whole DataFrame execution path.
+
+  2. `docs/design/structure.md` completely omits `benchbox/core/` (30+
+     subsystems) and `benchbox/platforms/` (40+ database adapters). A user
+     reading this doc cannot understand the actual project organization.
+
+  These are the docs developers read FIRST when trying to understand the
+  codebase. Getting them wrong cascades into confusion everywhere.
+
+category: Documentation
+
+metadata:
+  tags:
+  - documentation
+  - architecture
+  - design
+  - developer-experience
+  estimated_effort: "Medium"
+  created_date: "2026-04-01"
+  source_review: "Comprehensive documentation audit conversation"
+
+impact:
+  user_impact: |
+    Developers and contributors reading architecture docs will form incorrect
+    mental models of the system, leading to confusion and wasted time.
+  maintainer_impact: |
+    Architecture docs are the primary onboarding reference. Inaccuracy here
+    increases support burden and slows contributor ramp-up.
+  regression_risk: |
+    Zero — documentation-only changes.
+
+work:
+- id: w1
+  summary: "Map current execution model, key classes, and data flow"
+  status: pending
+  needs: []
+  description: |
+    Research the actual codebase to document:
+    - Execution lifecycle (phases, runners, results)
+    - SQL vs DataFrame execution paths and their key classes
+    - All subsystems in benchbox/core/
+    - Platform adapter organization in benchbox/platforms/
+    - Key data models (ExecutionPhases, BenchmarkResults, etc.)
+  files: []
+
+- id: w2
+  summary: "Rewrite architecture.md with current execution model"
+  status: pending
+  needs: [w1]
+  description: |
+    Rewrite architecture.md to describe lifecycle-based execution (not
+    Template Method). Document ExecutionPhases, BenchmarkResults models.
+    Cover both SQL and DataFrame execution paths. Mention DataFrameContext
+    and adapter families. Include diagrams or clear prose showing data flow.
+    Ensure no references to non-existent APIs.
+  files:
+  - docs/design/architecture.md
+
+- id: w3
+  summary: "Rewrite structure.md with complete directory map"
+  status: pending
+  needs: [w1]
+  description: |
+    Rewrite structure.md to document benchbox/core/ and all major subsystems,
+    benchbox/platforms/ and adapter organization, benchbox/benchmarks/
+    organization, and benchbox/cli/ command structure. Include accurate file
+    counts and a tree diagram matching actual directory output.
+  files:
+  - docs/design/structure.md
+
+verification:
+- description: "Documented directories match actual directories"
+  command: "ls -d benchbox/*/ 2>/dev/null | head -20"
+  expected_output: "All listed directories should appear in structure.md"
+
+scope_limit:
+  only_modify:
+  - "docs/design/architecture.md"
+  - "docs/design/structure.md"
+  do_not_touch:
+  - "Any source code files"
+  - "Other documentation files"

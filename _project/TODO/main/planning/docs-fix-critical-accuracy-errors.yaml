@@ -1,0 +1,101 @@
+id: docs-fix-critical-accuracy-errors
+title: "Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  Documentation audit (2026-04-01) found 3 critical accuracy errors that will
+  cause user failures if followed:
+
+  1. `docs/advanced/custom-benchmarks.md` has a Python syntax error (missing
+     colon in loop statement) and calls a non-existent method
+     `get_create_tables_sql("duckdb")` with a dialect parameter that doesn't
+     exist in the API.
+
+  2. `docs/benchmarks/ai-primitives.md` documents a complete benchmark (16
+     queries, schema, examples) that has NO implementation in the codebase.
+     Users cannot run this benchmark.
+
+  3. `docs/tutorials/dataframe-quickstart.md` uses `-o` as shorthand for
+     `--output`, but no such short flag exists in the CLI. Also references
+     deprecated `--df-tuning` and `benchbox df-tuning` commands that should
+     be `benchbox tuning`.
+
+  These are the highest-impact doc bugs because they cause immediate user
+  errors when following the documentation.
+
+category: Documentation
+
+metadata:
+  tags:
+  - documentation
+  - accuracy
+  - critical-fix
+  - user-facing
+  estimated_effort: "Small"
+  created_date: "2026-04-01"
+  source_review: "Comprehensive documentation audit conversation"
+
+impact:
+  user_impact: |
+    Users following custom-benchmarks.md will hit syntax errors. Users trying
+    ai-primitives will find it doesn't exist. Users following dataframe
+    quickstart will get CLI errors from wrong flags.
+  maintainer_impact: |
+    None — documentation-only changes.
+  regression_risk: |
+    Zero — no code changes.
+
+work:
+- id: w1
+  summary: "Fix syntax error and non-existent API call in custom-benchmarks.md"
+  status: pending
+  needs: []
+  description: |
+    Fix the missing colon in the loop statement and replace the call to
+    non-existent `get_create_tables_sql("duckdb")` with the actual API.
+    Verify all code examples in the file are syntactically valid Python.
+  files:
+  - docs/advanced/custom-benchmarks.md
+
+- id: w2
+  summary: "Remove or stub ai-primitives.md — no implementation exists"
+  status: pending
+  needs: []
+  description: |
+    Either remove ai-primitives.md and clean up toctree references,
+    or clearly mark it as "Planned — Not Yet Implemented" with all
+    runnable examples removed so users don't try to execute it.
+  files:
+  - docs/benchmarks/ai-primitives.md
+  - docs/benchmarks/index.md
+
+- id: w3
+  summary: "Fix incorrect -o flag and deprecated df-tuning in dataframe-quickstart.md"
+  status: pending
+  needs: []
+  description: |
+    Replace all `-o` references with `--output`. Replace all `--df-tuning`
+    references with `--tuning`. Replace all `benchbox df-tuning` references
+    with `benchbox tuning`. Verify CLI examples match actual Click command
+    signatures.
+  files:
+  - docs/tutorials/dataframe-quickstart.md
+
+verification:
+- description: "No bare -o flags remain in dataframe quickstart"
+  command: "grep -n '\\b-o\\b' docs/tutorials/dataframe-quickstart.md | grep -v '\\-\\-o' || echo 'PASS: no bare -o flags'"
+  expected_output: "PASS: no bare -o flags"
+- description: "No df-tuning references remain"
+  command: "grep -rn 'df-tuning\\|df_tuning' docs/tutorials/ || echo 'PASS: no deprecated refs'"
+  expected_output: "PASS: no deprecated refs"
+
+scope_limit:
+  only_modify:
+  - "docs/advanced/custom-benchmarks.md"
+  - "docs/benchmarks/ai-primitives.md"
+  - "docs/benchmarks/index.md"
+  - "docs/tutorials/dataframe-quickstart.md"
+  do_not_touch:
+  - "Any source code files"
+  - "Other documentation files beyond the 4 listed"

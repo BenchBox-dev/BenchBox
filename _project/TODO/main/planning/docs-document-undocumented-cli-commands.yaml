@@ -1,0 +1,121 @@
+id: docs-document-undocumented-cli-commands
+title: "Document 10 undocumented CLI commands and 13 undocumented run flags"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  Documentation audit (2026-04-01) found 10 CLI commands with NO documentation
+  and 13 flags on `benchbox run` that are undocumented.
+
+  Undocumented commands:
+  - benchbox visualize (benchbox/cli/commands/visualize.py)
+  - benchbox report (benchbox/cli/commands/report.py)
+  - benchbox metrics (benchbox/cli/commands/metrics.py)
+  - benchbox aggregate (benchbox/cli/commands/aggregate.py)
+  - benchbox datagen (benchbox/cli/commands/datagen.py)
+  - benchbox download-answers (benchbox/cli/commands/download_answers.py)
+  - benchbox plan-history (benchbox/cli/commands/plan_history.py)
+  - benchbox show-plan (benchbox/cli/commands/show_plan.py)
+  - benchbox setup (benchbox/cli/commands/setup.py)
+  - benchbox run-official (benchbox/cli/commands/run_official.py — hidden)
+
+  Undocumented `benchbox run` flags:
+  --table-mode, --table-format, --presort, --sorted-ingestion-mode,
+  --sorted-ingestion-method, --databricks-clustering-strategy,
+  --liquid-clustering-columns, --mode, --no-monitoring, --no-progress,
+  --ignore-memory-warnings, --global-cache, --plan-config
+
+  Some commands may be intentionally hidden (run-official). For those, a brief
+  internal note is sufficient rather than full public docs.
+
+category: Documentation
+
+metadata:
+  tags:
+  - documentation
+  - cli
+  - completeness
+  - user-facing
+  estimated_effort: "Large"
+  created_date: "2026-04-01"
+  source_review: "Comprehensive documentation audit conversation"
+
+impact:
+  user_impact: |
+    Users discovering these commands via --help have no documentation to
+    reference for usage patterns, examples, or caveats.
+  maintainer_impact: |
+    Undocumented features generate support questions and inconsistent usage.
+  regression_risk: |
+    Zero — documentation-only changes.
+
+work:
+- id: w1
+  summary: "Add documentation for 13 undocumented benchbox run flags"
+  status: pending
+  needs: []
+  description: |
+    Add each flag to docs/reference/cli/run.md with description, type,
+    default value, and valid choices. At least one example per flag or
+    flag group. Group Databricks-specific flags (--databricks-clustering-strategy,
+    --liquid-clustering-columns, --sorted-ingestion-*) in a Databricks section.
+    Give --mode clear guidance on sql vs dataframe usage.
+  files:
+  - docs/reference/cli/run.md
+
+- id: w2
+  summary: "Create docs for visualize, report, and metrics commands"
+  status: pending
+  needs: []
+  description: |
+    Add entries to docs/reference/cli/ for each command. Document all
+    subcommands and flags from Click decorators. Include at least 2 usage
+    examples per command. Cross-reference from CLI_REFERENCE.md or index.md.
+  files:
+  - docs/reference/cli/index.md
+
+- id: w3
+  summary: "Create docs for datagen, aggregate, and setup commands"
+  status: pending
+  needs: []
+  description: |
+    Add entries to docs/reference/cli/ for each command. Document standalone
+    data generation workflow (datagen), result aggregation options (aggregate),
+    and credential setup flow per platform (setup).
+  files:
+  - docs/reference/cli/index.md
+
+- id: w4
+  summary: "Create docs for plan-history, show-plan, and download-answers"
+  status: pending
+  needs: []
+  description: |
+    Add entries to docs/reference/cli/ or a utilities page. Document the
+    query plan capture workflow (plan-history, show-plan) and answer-set
+    download for validation (download-answers).
+  files:
+  - docs/reference/cli/utilities.md
+
+- id: w5
+  summary: "Update CLI_REFERENCE.md to index all commands"
+  status: pending
+  needs: [w1, w2, w3, w4]
+  description: |
+    Update CLI_REFERENCE.md to list every non-hidden command with links to
+    detailed docs in docs/reference/cli/. Exclude hidden commands (run-official)
+    from public index. Ensure consistent formatting with existing entries.
+  files:
+  - docs/CLI_REFERENCE.md
+
+verification:
+- description: "All non-hidden commands appear in CLI_REFERENCE.md"
+  command: "uv run benchbox --help 2>/dev/null | head -40"
+  expected_output: "All listed commands should have corresponding doc entries"
+
+scope_limit:
+  only_modify:
+  - "docs/reference/cli/"
+  - "docs/CLI_REFERENCE.md"
+  do_not_touch:
+  - "Any source code files"
+  - "Existing CLI command implementations"

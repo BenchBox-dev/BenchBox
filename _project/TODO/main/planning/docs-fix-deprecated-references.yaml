@@ -1,0 +1,130 @@
+id: docs-fix-deprecated-references
+title: "Clean up deprecated command references and stale content across docs"
+worktree: main
+priority: Medium-High
+status: Not Started
+description: |
+  Documentation audit (2026-04-01) found several docs referencing deprecated
+  commands, stale module paths, or outdated information:
+
+  1. docs/guides/dataframe-comparison.md — documents deprecated
+     compare-dataframes command. Has deprecation notice but entire file
+     still walks through old workflow.
+
+  2. docs/reference/cli/tuning.md — still references create-sample-tuning
+     (hidden/deprecated in code). Should only document tuning init.
+
+  3. docs/advanced/power-run-concurrent-queries.md — references outdated
+     PowerRunExecutor class. Actual execution is via benchbox.core.runner.
+
+  4. docs/performance/dataframe-benchmarks.md — stale module paths like
+     benchbox.core.dataframe.profiling.DataFrameProfiler.
+
+  5. docs/development/roadmap.md — platform count (28) is stale; codebase
+     has 40+ adapters. Phase 1 completion status not updated.
+
+  6. docs/development/adding-dataframe-platform.md — doesn't mention
+     ExpressionFamilyAdapter / PandasFamilyAdapter base classes. Code
+     examples use outdated query patterns.
+
+category: Documentation
+
+metadata:
+  tags:
+  - documentation
+  - cleanup
+  - deprecated
+  - staleness
+  estimated_effort: "Medium"
+  created_date: "2026-04-01"
+  source_review: "Comprehensive documentation audit conversation"
+
+impact:
+  user_impact: |
+    Users following deprecated command examples get errors or warnings.
+    Developers reading outdated module paths waste time searching for
+    non-existent code.
+  maintainer_impact: |
+    Stale docs erode trust in documentation accuracy over time.
+  regression_risk: |
+    Zero — documentation-only changes.
+
+work:
+- id: w1
+  summary: "Rewrite or remove dataframe-comparison.md — compare-dataframes deprecated"
+  status: pending
+  needs: []
+  description: |
+    Either rewrite file to use `benchbox compare` workflow, or replace
+    with a redirect/pointer to compare command docs. Ensure no references
+    to `compare-dataframes` command remain.
+  files:
+  - docs/guides/dataframe-comparison.md
+
+- id: w2
+  summary: "Remove create-sample-tuning references from tuning.md"
+  status: pending
+  needs: []
+  description: |
+    Update tuning.md to document only `tuning init` as the primary command.
+    Remove all examples using `create-sample-tuning`. A brief migration
+    note is acceptable but not a full deprecated section.
+  files:
+  - docs/reference/cli/tuning.md
+
+- id: w3
+  summary: "Update power-run docs with current executor API"
+  status: pending
+  needs: []
+  description: |
+    Replace references to PowerRunExecutor with actual class/module paths.
+    Update execution model description to match lifecycle-based approach.
+  files:
+  - docs/advanced/power-run-concurrent-queries.md
+
+- id: w4
+  summary: "Update dataframe-benchmarks.md module paths"
+  status: pending
+  needs: []
+  description: |
+    Verify all module paths against actual codebase imports. Remove or
+    correct non-existent paths like benchbox.core.dataframe.profiling.DataFrameProfiler.
+  files:
+  - docs/performance/dataframe-benchmarks.md
+
+- id: w5
+  summary: "Update roadmap.md with current platform count and phase status"
+  status: pending
+  needs: []
+  description: |
+    Update platform count to actual (40+). Mark completed items as complete.
+    Ensure future items reflect current plans.
+  files:
+  - docs/development/roadmap.md
+
+- id: w6
+  summary: "Update adding-dataframe-platform.md with current adapter base classes"
+  status: pending
+  needs: []
+  description: |
+    Document ExpressionFamilyAdapter and PandasFamilyAdapter base classes.
+    Update code examples to use current API patterns. Verify import paths
+    match actual codebase.
+  files:
+  - docs/development/adding-dataframe-platform.md
+
+verification:
+- description: "No deprecated command references remain in updated files"
+  command: "grep -rn 'compare-dataframes\\|create-sample-tuning\\|PowerRunExecutor\\|df-tuning' docs/ || echo 'PASS: no deprecated refs'"
+  expected_output: "PASS: no deprecated refs"
+
+scope_limit:
+  only_modify:
+  - "docs/guides/dataframe-comparison.md"
+  - "docs/reference/cli/tuning.md"
+  - "docs/advanced/power-run-concurrent-queries.md"
+  - "docs/performance/dataframe-benchmarks.md"
+  - "docs/development/roadmap.md"
+  - "docs/development/adding-dataframe-platform.md"
+  do_not_touch:
+  - "Any source code files"

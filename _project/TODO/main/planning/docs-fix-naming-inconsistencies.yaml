@@ -1,0 +1,115 @@
+id: docs-fix-naming-inconsistencies
+title: "Standardize benchmark and platform naming across documentation"
+worktree: main
+priority: Medium-High
+status: Not Started
+description: |
+  Documentation audit (2026-04-01) found systemic naming inconsistencies:
+
+  Benchmark naming: Docs use hyphenated filenames (tpc-h.md, tpc-ds.md,
+  join-order.md) while the code registry uses compact/underscored names
+  (tpch, tpcds, joinorder). Users reading docs can't directly use the
+  documented names in CLI commands.
+
+  Affected benchmarks: tpc-h->tpch, tpc-ds->tpcds, tpc-di->tpcdi,
+  tpc-havoc->tpchavoc, tpch-skew->tpch_skew, tpc-ds-obt->tpcds_obt,
+  join-order->joinorder, metadata-primitives->metadata_primitives,
+  read-primitives->read_primitives, write-primitives->write_primitives,
+  transaction-primitives->transaction_primitives, tsbs-devops->tsbs_devops.
+
+  Platform naming: Docs use different conventions than registration names
+  (pg_duckdb.md vs registered pg-duckdb, etc.)
+
+  Resolution approach: Don't rename files (URLs would break). Instead,
+  ensure each doc prominently shows the CLI-usable name near the top.
+
+category: Documentation
+
+metadata:
+  tags:
+  - documentation
+  - naming
+  - consistency
+  - user-experience
+  estimated_effort: "Small"
+  created_date: "2026-04-01"
+  source_review: "Comprehensive documentation audit conversation"
+
+impact:
+  user_impact: |
+    Users reading benchmark/platform docs use the wrong name in CLI commands,
+    causing immediate errors on first use.
+  maintainer_impact: |
+    Low — one-time fix with clear pattern.
+  regression_risk: |
+    Zero — documentation-only changes.
+
+work:
+- id: w1
+  summary: "Add CLI name callout to each benchmark doc"
+  status: pending
+  needs: []
+  description: |
+    Add a prominent callout near the top of each benchmark doc showing the
+    CLI-usable name, e.g. "CLI name: `tpch`". Ensure example CLI commands
+    in each doc use the correct CLI name. Update index page
+    (docs/benchmarks/index.md) to show both display name and CLI name.
+  files:
+  - docs/benchmarks/tpc-h.md
+  - docs/benchmarks/tpc-ds.md
+  - docs/benchmarks/tpc-di.md
+  - docs/benchmarks/tpc-havoc.md
+  - docs/benchmarks/tpch-skew.md
+  - docs/benchmarks/tpc-ds-obt.md
+  - docs/benchmarks/join-order.md
+  - docs/benchmarks/ssb.md
+  - docs/benchmarks/clickbench.md
+  - docs/benchmarks/nyctaxi.md
+  - docs/benchmarks/tsbs-devops.md
+  - docs/benchmarks/h2odb.md
+  - docs/benchmarks/datavault.md
+  - docs/benchmarks/coffeeshop.md
+  - docs/benchmarks/amplab.md
+  - docs/benchmarks/metadata-primitives.md
+  - docs/benchmarks/read-primitives.md
+  - docs/benchmarks/write-primitives.md
+  - docs/benchmarks/transaction-primitives.md
+  - docs/benchmarks/index.md
+
+- id: w2
+  summary: "Add CLI name callout to each platform doc"
+  status: pending
+  needs: []
+  description: |
+    Add a prominent callout near the top of each platform doc showing the
+    CLI registration name. Ensure example CLI commands use the correct
+    registration name. Document any naming aliases.
+  files:
+  - docs/platforms/pg_duckdb.md
+  - docs/platforms/pg_mooncake.md
+
+- id: w3
+  summary: "Verify and correct TPC-DS table count (24 vs 25)"
+  status: pending
+  needs: []
+  description: |
+    Check whether DBGEN_VERSION is a data table or metadata table. Update
+    TPC-DS doc to state the correct count, explicitly mentioning or
+    excluding DBGEN_VERSION with rationale.
+  files:
+  - docs/benchmarks/tpc-ds.md
+
+verification:
+- description: "Benchmark docs contain CLI name callouts"
+  command: "grep -l 'CLI name' docs/benchmarks/*.md | wc -l"
+  expected_output: "Count should match number of benchmark docs (19+)"
+
+scope_limit:
+  only_modify:
+  - "docs/benchmarks/"
+  - "docs/platforms/pg_duckdb.md"
+  - "docs/platforms/pg_mooncake.md"
+  do_not_touch:
+  - "Any source code files"
+  - "Documentation filenames (do not rename)"
+  - "Benchmark or platform registration names in code"
