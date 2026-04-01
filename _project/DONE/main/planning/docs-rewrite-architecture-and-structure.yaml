@@ -2,7 +2,8 @@ id: docs-rewrite-architecture-and-structure
 title: "Rewrite architecture.md and structure.md to match current codebase"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-01"
 description: |
   Documentation audit (2026-04-01) found that the two foundational design docs
   are severely outdated:
@@ -45,7 +46,7 @@ impact:
 work:
 - id: w1
   summary: "Map current execution model, key classes, and data flow"
-  status: pending
+  status: done
   needs: []
   description: |
     Research the actual codebase to document:
@@ -64,7 +65,7 @@ work:
 
 - id: w2
   summary: "Rewrite architecture.md with current execution model"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     Rewrite architecture.md to describe lifecycle-based execution (not
@@ -84,7 +85,7 @@ work:
 
 - id: w3
   summary: "Rewrite structure.md with complete directory map"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     Rewrite structure.md to document benchbox/core/ and all major subsystems,
