@@ -1,5 +1,5 @@
-generated_at: '2026-04-02T09:18:26.055969'
-total_items: 38
+generated_at: '2026-04-02T09:25:42.894873'
+total_items: 37
 priorities:
   Critical:
     count: 1
@@ -10,13 +10,8 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 6
+    count: 5
     items:
-    - id: windows-ci-hardening
-      file: TODO/main/planning/windows-ci-hardening.yaml
-      title: Harden CI and static analysis to catch Windows-specific failures before merge
-      category: Testing & Quality
-      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

@@ -1,4 +1,4 @@
-generated_at: '2026-04-02T09:18:30.625219'
+generated_at: '2026-04-02T09:25:44.342300'
 total_categories: 74
 categories:
   '"Bug Fixes & Reliability"':
@@ -2897,7 +2897,7 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 15
+    count: 16
     items:
     - id: enforce-no-conflicting-test-markers
       file: DONE/main/active/enforce-no-conflicting-test-markers.yaml
@@ -2907,6 +2907,11 @@ categories:
     - id: fix-coverage-theater
       file: DONE/main/active/fix-coverage-theater.yaml
       title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
+      priority: High
+      status: Completed
+    - id: windows-ci-hardening
+      file: DONE/main/planning/windows-ci-hardening.yaml
+      title: Harden CI and static analysis to catch Windows-specific failures before merge
       priority: High
       status: Completed
     - id: dataframe-test-coverage

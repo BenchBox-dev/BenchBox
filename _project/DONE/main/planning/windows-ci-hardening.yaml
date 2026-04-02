@@ -2,7 +2,8 @@ id: windows-ci-hardening
 title: "Harden CI and static analysis to catch Windows-specific failures before merge"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-02"
 description: |
   Codebase audit identified several categories of Windows issues that can
   slip past the current CI matrix (Windows + Python 3.12 running fast tests
@@ -67,7 +68,7 @@ deps:
 work:
 - id: w1
   summary: "Enable ruff PLW1514 rule for open() without explicit encoding"
-  status: pending
+  status: done
   needs: []
   description: |
     Add PLW1514 (unspecified-encoding) to the ruff select list in
@@ -81,7 +82,7 @@ work:
 
 - id: w2
   summary: "Add Windows + Python 3.10 to CI test matrix"
-  status: pending
+  status: done
   needs: []
   description: |
     Add one include entry to the test.yml strategy matrix:
@@ -95,7 +96,7 @@ work:
 
 - id: w3
   summary: "Make test-package job cross-platform"
-  status: pending
+  status: done
   needs: []
   description: |
     The test-package job uses `source test-venv/bin/activate` and bare
@@ -107,7 +108,7 @@ work:
 
 - id: w4
   summary: "Run integration-smoke tests on Windows"
-  status: pending
+  status: done
   needs: [w3]
   description: |
     Add windows-latest to the integration-smoke job matrix. These ~46
@@ -119,7 +120,7 @@ work:
 
 - id: w5
   summary: "Add static analysis script for Windows anti-patterns"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     Create a lightweight script (scripts/check_windows_antipatterns.py or
@@ -136,7 +137,7 @@ work:
 
 - id: w6
   summary: "Fix existing Windows anti-pattern violations"
-  status: pending
+  status: done
   needs: [w5]
   description: |
     Fix issues surfaced by the new static checks:
@@ -152,7 +153,7 @@ work:
 
 - id: w7
   summary: "Add targeted unit tests for platform-dependent code paths"
-  status: pending
+  status: done
   needs: [w6]
   description: |
     Add unit tests that exercise Windows-sensitive code by mocking
@@ -192,7 +193,8 @@ approach: |
   batch. Follow the existing CI structure in .github/workflows/test.yml.
 
 anti_patterns:
-- "DO NOT add Windows-only workarounds with sys.platform checks scattered through business logic — centralize platform abstractions in utils/"
+- "DO NOT add Windows-only workarounds with sys.platform checks scattered through business logic — centralize platform abstractions
+  in utils/"
 - "DO NOT make integration tests conditional on platform — fix the tests to be cross-platform instead"
 - "DO NOT use continue-on-error: true for Windows jobs — that hides failures instead of catching them"
 

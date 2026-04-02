@@ -1,5 +1,5 @@
-generated_at: '2026-04-02T09:18:30.624139'
-total_items: 618
+generated_at: '2026-04-02T09:25:44.342030'
+total_items: 619
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1860,6 +1860,24 @@ items:
   priority: High
   status: Completed
   completed_date: '2025-11-27'
+- id: windows-ci-hardening
+  file: DONE/main/planning/windows-ci-hardening.yaml
+  title: Harden CI and static analysis to catch Windows-specific failures before merge
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - ci
+  - windows
+  - cross-platform
+  - release-quality
+  estimated_effort: Medium
+  completed_date: '2026-04-02'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  deferred_count: 2
 - id: harden-operator-type-handling
   file: DONE/query-plan-remediation/planning/harden-operator-type-handling.yaml
   title: Harden plan comparison and visualization for unknown operator types

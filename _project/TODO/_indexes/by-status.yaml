@@ -1,5 +1,5 @@
-generated_at: '2026-04-02T09:18:26.055983'
-total_items: 38
+generated_at: '2026-04-02T09:25:42.894883'
+total_items: 37
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 37
+    count: 36
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -102,11 +102,6 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: windows-ci-hardening
-      file: TODO/main/planning/windows-ci-hardening.yaml
-      title: Harden CI and static analysis to catch Windows-specific failures before merge
-      priority: High
-      category: Testing & Quality
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow

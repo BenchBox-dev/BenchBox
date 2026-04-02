@@ -1,5 +1,5 @@
-generated_at: '2026-04-02T09:18:30.626126'
-total_items: 618
+generated_at: '2026-04-02T09:25:44.342441'
+total_items: 619
 priorities:
   Critical:
     count: 36
@@ -185,7 +185,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 224
+    count: 225
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -623,6 +623,11 @@ priorities:
       file: DONE/benchmark-expansion/planning/guard-tpc-ds-fractional-scale-defaults.yaml
       title: Guard TPC-DS Fractional Scale Defaults
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+      status: Completed
+    - id: windows-ci-hardening
+      file: DONE/main/planning/windows-ci-hardening.yaml
+      title: Harden CI and static analysis to catch Windows-specific failures before merge
+      category: Testing & Quality
       status: Completed
     - id: harden-operator-type-handling
       file: DONE/query-plan-remediation/planning/harden-operator-type-handling.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-02T09:18:26.055791'
-total_items: 38
+generated_at: '2026-04-02T09:25:42.894831'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -18,23 +18,6 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 1
-- id: windows-ci-hardening
-  file: TODO/main/planning/windows-ci-hardening.yaml
-  title: Harden CI and static analysis to catch Windows-specific failures before merge
-  worktree: main
-  category: Testing & Quality
-  priority: High
-  status: Not Started
-  tags:
-  - ci
-  - windows
-  - cross-platform
-  - release-quality
-  estimated_effort: Medium
-  work_total: 7
-  work_done: 4
-  work_ready: 1
-  deferred_count: 2
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
