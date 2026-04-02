@@ -36,7 +36,14 @@ distributable via `benchbox setup`.
 
 ### Session Lifetime
 
-API keys do not expire by default. Admins can revoke any token at any time via
+API keys do not expire by default. However, a maximum key lifetime of 12 months
+is recommended. After 12 months, the API returns `401 Unauthorized` with
+`{"error": "token_expired", "message": "API key expired; run benchbox setup --service to provision a new token"}`.
+A renewal prompt is shown in the CLI 30 days before expiry. This directly
+mitigates the Med-High spoofing/impersonation risk identified in the threat
+model by limiting the window of exposure for compromised keys.
+
+Admins can revoke any token at any time via
 the admin CLI (`benchbox admin revoke-token --actor-id X`). Revocation takes
 effect immediately — the token is removed from the validation store.
 
@@ -79,12 +86,17 @@ and warns if the file is world-readable on subsequent runs.
 
 Actors in their first 7 days after token issuance receive:
 - 3× burst budget (30 submissions per 60-second window)
-- No storage quota enforcement (facilitates initial corpus seeding)
+- Elevated storage quota of 2 GB (instead of the standard 500 MB; facilitates
+  initial corpus seeding while preventing unbounded abuse)
 - Same daily cap (50/day) — the grace period is about burst flexibility, not
   unlimited daily volume
 
 After 7 days the standard limits apply automatically with no action required
 from the actor.
+
+**Grace-period abuse prevention:** Auto-revoke any API key provisioned from
+an IP address that has spawned ≥5 new accounts in 24 hours or ≥20 new accounts
+in 7 days. This check is enforced at token provisioning time, not retroactively.
 
 ### Limit Breach Responses
 
@@ -298,7 +310,16 @@ leaked; misconfigured bucket ACL made private bundles world-readable.
 
 **Response steps:**
 
-1. **Revoke all API keys and rotate service credentials** (target: < 1 hour
+1. **Triage: confirm breach with a second independent signal before mass
+   revocation.** Correlate the initial detection signal with at least one
+   independent source (e.g., cross-reference anomalous access patterns with
+   audit logs, verify the report with a second team member, or confirm via a
+   different monitoring channel). This step must complete within 30 minutes of
+   detection. If the second signal confirms the breach, proceed to step 2. If
+   the breach cannot be confirmed but also cannot be ruled out, proceed anyway
+   and treat the incident as real until proven otherwise.
+
+2. **Revoke all API keys and rotate service credentials** (target: < 1 hour
    from detection). This is a broad action — err on the side of revoking too
    many rather than too few.
    ```
@@ -308,21 +329,28 @@ leaked; misconfigured bucket ACL made private bundles world-readable.
    account keys. Re-deploy services with new credentials before re-enabling
    access.
 
-2. **Audit access logs to determine exposure scope.** For each access log entry
+   **Rollback for false positives:** If post-triage investigation determines the
+   incident was a false positive, restore actor access promptly: re-enable
+   revoked API keys (or direct affected actors to re-provision via
+   `benchbox setup --service`), post a brief explanation to affected actors, and
+   file an internal report documenting the false positive to improve detection
+   accuracy.
+
+3. **Audit access logs to determine exposure scope.** For each access log entry
    in the affected time window, identify: which resources were accessed, by
    which IP or credential, and whether the access was authorized. Document the
    scope in the incident report.
 
-3. **Notify affected actors within 72 hours.** Legal requirement in most
+4. **Notify affected actors within 72 hours.** Legal requirement in most
    jurisdictions. Notification must include: what data was exposed, approximate
    time window, what BenchBox has done, and what actors should do (e.g.,
    consider rotating passwords if email was exposed). Coordinate with legal
    counsel if actor volume is large or if regulated data (PII) was involved.
 
-4. **File incident report with full timeline and remediation steps.** Report
+5. **File incident report with full timeline and remediation steps.** Report
    must be retained for a minimum of 2 years.
 
-5. **Re-enable actor access only after root cause is fixed and a security
+6. **Re-enable actor access only after root cause is fixed and a security
    review confirms the breach vector is closed.** Do not rush this step.
    Actors whose keys were revoked are notified and directed to re-provision
    via `benchbox setup --service`.
@@ -383,4 +411,4 @@ not in this document.
 | On-call maintainer | First responder for all incident classes |
 | Secondary maintainer | Backup if primary is unavailable |
 | Legal counsel | Required for Class B if PII is exposed |
-| security@benchbox.dev | Public intake for external reports |
+| security@benchbox.dev | Public intake for external reports; acknowledge within 72 hours, triage within 7 days |
