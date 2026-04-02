@@ -1,5 +1,5 @@
-generated_at: '2026-04-02T17:17:26.657657'
-total_items: 619
+generated_at: '2026-04-02T17:24:33.783132'
+total_items: 620
 priorities:
   Critical:
     count: 36
@@ -1316,7 +1316,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 76
+    count: 77
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1433,6 +1433,11 @@ priorities:
       file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
       title: Bidirectional Sync and True-Up Releases for Public/Private Repos
       category: Core Functionality
+      status: Completed
+    - id: coverage-bottom-25-modules-to-80pct
+      file: DONE/main/active/coverage-bottom-25-modules-to-80pct.yaml
+      title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
+      category: Testing & Quality
       status: Completed
     - id: centralize-file-format-detection
       file: DONE/core-functionality/centralize-file-format-detection.yaml

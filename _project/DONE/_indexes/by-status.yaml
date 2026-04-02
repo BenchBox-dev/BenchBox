@@ -1,5 +1,5 @@
-generated_at: '2026-04-02T17:17:26.657824'
-total_items: 619
+generated_at: '2026-04-02T17:24:33.783284'
+total_items: 620
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 571
+    count: 572
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -714,6 +714,11 @@ statuses:
       title: Bodo DataFrame Platform Adapter
       priority: Medium
       category: Platform Expansion
+    - id: coverage-bottom-25-modules-to-80pct
+      file: DONE/main/active/coverage-bottom-25-modules-to-80pct.yaml
+      title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
+      priority: Medium-High
+      category: Testing & Quality
     - id: postgres-extension-benchmarking-infrastructure
       file: DONE/platform-expansion/planning/postgres-extension-benchmarking-infrastructure.yaml
       title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions

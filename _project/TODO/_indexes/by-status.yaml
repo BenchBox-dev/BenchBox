@@ -1,14 +1,6 @@
-generated_at: '2026-04-02T17:17:21.848181'
-total_items: 37
+generated_at: '2026-04-02T17:24:32.275382'
+total_items: 36
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: coverage-bottom-25-modules-to-80pct
-      file: TODO/main/active/coverage-bottom-25-modules-to-80pct.yaml
-      title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
-      priority: Medium-High
-      category: Testing & Quality
   Not Started:
     count: 34
     items:

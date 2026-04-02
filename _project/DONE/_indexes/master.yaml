@@ -1,5 +1,5 @@
-generated_at: '2026-04-02T17:17:26.656639'
-total_items: 619
+generated_at: '2026-04-02T17:24:33.782678'
+total_items: 620
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7180,6 +7180,22 @@ items:
   - github
   estimated_effort: Large
   completed_date: '2026-01-18'
+- id: coverage-bottom-25-modules-to-80pct
+  file: DONE/main/active/coverage-bottom-25-modules-to-80pct.yaml
+  title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
+  worktree: main
+  category: Testing & Quality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - testing
+  - coverage
+  - fast-lane
+  estimated_effort: Extra Large
+  completed_date: '2026-04-02'
+  work_total: 24
+  work_done: 24
+  work_ready: 0
 - id: centralize-file-format-detection
   file: DONE/core-functionality/centralize-file-format-detection.yaml
   title: Centralize File Format and Compression Extension Detection
