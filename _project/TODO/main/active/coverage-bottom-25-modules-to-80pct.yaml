@@ -209,7 +209,7 @@ work:
 
 - id: w3
   summary: "DataFrame expression builders: pyspark_df, lakesail_df, databricks DF adapter"
-  status: pending
+  status: done
   needs: []
   description: |
     Three adapters that share the ExpressionFamilyAdapter interface. Mock SparkSession
@@ -1225,16 +1225,27 @@ approach: |
   - pyodbc: patch "benchbox.platforms.fabric_warehouse.pyodbc.connect"
 
 anti_patterns:
-- "DO NOT add @pytest.mark.slow, @pytest.mark.live_integration, or @pytest.mark.resource_heavy markers — because those markers cause tests to be excluded from the fast lane and won't count toward the 80% coverage gate — use only @pytest.mark.fast"
-- "DO NOT import or instantiate real cloud SDK clients in tests — because CI has no cloud credentials and live calls cause flakiness and violate the fast-lane contract — mock all external SDK calls with unittest.mock.patch"
+- "DO NOT add @pytest.mark.slow, @pytest.mark.live_integration, or @pytest.mark.resource_heavy markers — because those markers
+  cause tests to be excluded from the fast lane and won't count toward the 80% coverage gate — use only @pytest.mark.fast"
+- "DO NOT import or instantiate real cloud SDK clients in tests — because CI has no cloud credentials and live calls cause
+  flakiness and violate the fast-lane contract — mock all external SDK calls with unittest.mock.patch"
 - "DO NOT use -o 'addopts=' to override pytest.ini — this strips -n auto and makes tests 10x slower"
-- "DO NOT call list() on color_cycle() return values — color_cycle() returns an infinite itertools.cycle; use list(theme.palette or DEFAULT_PALETTE) instead"
-- "DO NOT modify production source files to make them more testable — because changes to production code require their own review cycle and could introduce regressions that dwarf the coverage gain — only add/extend test files"
-- "DO NOT batch all 25 modules into a single test file — because monolithic test files make coverage diffs unreadable and slow down targeted reruns — keep per-module or per-group test files aligned with existing test directory structure"
+- "DO NOT call list() on color_cycle() return values — color_cycle() returns an infinite itertools.cycle; use list(theme.palette
+  or DEFAULT_PALETTE) instead"
+- "DO NOT modify production source files to make them more testable — because changes to production code require their own
+  review cycle and could introduce regressions that dwarf the coverage gain — only add/extend test files"
+- "DO NOT batch all 25 modules into a single test file — because monolithic test files make coverage diffs unreadable and
+  slow down targeted reruns — keep per-module or per-group test files aligned with existing test directory structure"
 
 verification:
 - description: "All 25 target modules individually reach ≥80% coverage in the fast lane"
-  command: "uv run -- python -m pytest -m fast -q --cov=benchbox/platforms/databricks --cov=benchbox/platforms/dataframe --cov=benchbox/platforms/azure --cov=benchbox/platforms/bigquery --cov=benchbox/platforms/redshift --cov=benchbox/platforms/spark --cov=benchbox/platforms/snowflake --cov=benchbox/platforms/credentials --cov=benchbox/platforms/motherduck --cov=benchbox/platforms/base/cloud_spark --cov=benchbox/platforms/fabric_warehouse --cov=benchbox/platforms/clickhouse --cov=benchbox/platforms/starburst --cov=benchbox/platforms/gcp --cov=benchbox/platforms/aws --cov=benchbox/core/tpcds/generator --cov=benchbox/core/tpchavoc --cov=benchbox/core/comparison --cov=benchbox/core/results/anonymization --cov=benchbox/core/write_primitives --cov=benchbox/core/transaction_primitives --cov=benchbox/core/tpcdi --cov-report=term-missing 2>&1 | grep -E '(FAILED|ERROR|PASSED|[0-9]+%)'"
+  command: "uv run -- python -m pytest -m fast -q --cov=benchbox/platforms/databricks --cov=benchbox/platforms/dataframe --cov=benchbox/platforms/azure
+    --cov=benchbox/platforms/bigquery --cov=benchbox/platforms/redshift --cov=benchbox/platforms/spark --cov=benchbox/platforms/snowflake
+    --cov=benchbox/platforms/credentials --cov=benchbox/platforms/motherduck --cov=benchbox/platforms/base/cloud_spark --cov=benchbox/platforms/fabric_warehouse
+    --cov=benchbox/platforms/clickhouse --cov=benchbox/platforms/starburst --cov=benchbox/platforms/gcp --cov=benchbox/platforms/aws
+    --cov=benchbox/core/tpcds/generator --cov=benchbox/core/tpchavoc --cov=benchbox/core/comparison --cov=benchbox/core/results/anonymization
+    --cov=benchbox/core/write_primitives --cov=benchbox/core/transaction_primitives --cov=benchbox/core/tpcdi --cov-report=term-missing
+    2>&1 | grep -E '(FAILED|ERROR|PASSED|[0-9]+%)'"
   expected_output: "All target modules show ≥80% coverage; no FAILED or ERROR lines"
 - description: "Overall fast-lane coverage stays at or above 80.04%"
   command: "uv run -- python -m pytest -m fast -q --cov=benchbox --cov-report=term 2>&1 | tail -5"
