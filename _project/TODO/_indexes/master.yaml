@@ -1,4 +1,4 @@
-generated_at: '2026-04-02T08:48:55.671463'
+generated_at: '2026-04-02T09:18:26.055791'
 total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -32,8 +32,8 @@ items:
   - release-quality
   estimated_effort: Medium
   work_total: 7
-  work_done: 0
-  work_ready: 3
+  work_done: 4
+  work_ready: 1
   deferred_count: 2
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -505,10 +505,10 @@ items:
   - testing
   - coverage
   - fast-lane
-  estimated_effort: Large
-  work_total: 14
+  estimated_effort: Extra Large
+  work_total: 24
   work_done: 13
-  work_ready: 1
+  work_ready: 10
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
   title: Build a results explorer subsite on benchbox.dev
