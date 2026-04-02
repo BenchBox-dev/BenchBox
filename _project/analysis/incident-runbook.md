@@ -94,6 +94,10 @@ Actors in their first 7 days after token issuance receive:
 After 7 days the standard limits apply automatically with no action required
 from the actor.
 
+**Grace-period abuse prevention:** Auto-revoke any API key provisioned from
+an IP address that has spawned ≥5 new accounts in 24 hours or ≥20 new accounts
+in 7 days. This check is enforced at token provisioning time, not retroactively.
+
 ### Limit Breach Responses
 
 | Limit Hit | HTTP Status | Response Body |

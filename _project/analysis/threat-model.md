@@ -33,6 +33,22 @@ services. This threat model applies exclusively to Phase 3.
 
 ---
 
+### Trust and Visibility Model
+
+This threat model references visibility states and trust labels defined in
+the governance contract (`hosted-results-contract.md`, Section 2). In brief:
+
+- Visibility states control access and indexing: `private`, `unlisted`,
+  `public-self-reported`, `public-curated`, `public-verified`.
+- Trust labels communicate provenance: `maintainer-run`, `community-submission`,
+  `verified` (reserved for future third-party attestation).
+
+Trust labels are server-controlled. No actor API endpoint permits self-promotion.
+Promotion from `community-submission` to `maintainer-run` requires explicit
+admin action recorded in the audit log.
+
+---
+
 ## w2 — STRIDE Threat Analysis
 
 ### Submission Layer (Phase 3 API)
@@ -47,6 +63,7 @@ services. This threat model applies exclusively to Phase 3.
 | **Elevation of Privilege** | Low-trust actor promoting their own result to `public-curated` status without maintainer approval | Low | High | Med | Trust labels are server-controlled; actors have no API endpoint to self-promote; promotion is an admin-only action requiring explicit maintainer token scope |
 | **Denial of Service** | Abusing the 7-day grace period for new actors (3x burst, no storage quota) by creating throwaway accounts for unlimited storage consumption | Med | High | Med-High | Cap grace-period storage at 2 GB per actor (not unlimited); require email verification before token issuance to raise throwaway account cost; monitor for multiple accounts from the same IP range; auto-revoke grace-period actors exceeding the bounded exemption |
 | **Tampering** | Compromised CI dependency (poisoned GitHub Action, malicious Python package) injecting tampered bundles or exfiltrating credentials, bypassing all server-side validations | Low | High | Med | Pin all CI dependencies by hash (actions and pip packages); enable Dependabot / supply-chain alerts; run ingest pipeline in a minimal, audited container image; require two-maintainer review for CI workflow changes; verify bundle signatures end-to-end independent of pipeline |
+| **Elevation of Privilege** | Compromised maintainer account (GitHub or admin CLI token) used to promote malicious results, revoke legitimate tokens, or withdraw valid results | Low | Critical | Med-High | Require hardware security keys for maintainer GitHub access; rotate admin tokens quarterly or after any personnel change; require two-admin approval for trust promotion; log all admin actions to immutable audit trail |
 
 ### Storage Layer
 
@@ -54,7 +71,7 @@ services. This threat model applies exclusively to Phase 3.
 |---|---|---|---|---|---|
 | **Spoofing** | Replacing a stored bundle with a different one under the same content-addressable key | Low | High | Med | Object store versioning enabled; keys are SHA-256 content hashes; any write to an existing key triggers an alert; re-verify hash on every read before serving |
 | **Tampering** | Direct write to the storage bucket bypassing the ingest API | Low | High | Med | Bucket policy: only the ingest service IAM role may write; all other principals are read-only or denied; bucket-level CloudTrail / audit logging enabled |
-| **Repudiation** | No audit log means no way to prove who changed a result's visibility state | Med | Med | Med | Every visibility or trust-label state change is recorded in the audit log with actor_id and reason_code; logs are append-only and stored outside the metadata DB |
+| **Repudiation** | No audit log means no way to prove who changed a result's visibility state | Med | Med | Med | Every visibility or trust-label state change is recorded in the audit log with actor_id and reason_code; logs are append-only and stored outside the metadata DB. Audit logs are stored in a write-once, append-only object store (e.g., S3 with Object Lock or equivalent) separate from the metadata DB. No service account, including the API server, has delete or modify permissions on the audit log bucket. |
 | **Information Disclosure** | Misconfigured bucket ACLs make private bundles world-readable | Med | High | High | Private and unlisted bundles stored under an ACL-restricted prefix; public bundles served via CDN from a separate public prefix; ACL misconfiguration alerts on policy drift |
 | **Denial of Service** | Storage exhaustion from uncapped uploads across many actors | Med | Med | Med | Per-actor storage quota (500 MB); service-level quota enforced before writing to the object store; lifecycle policy auto-expires rejected bundles after 30 days |
 | **Elevation of Privilege** | CI pipeline credentials with overly broad object store permissions allowing arbitrary writes | Low | High | Med | CI role is read-only for raw bundles; write access restricted to ingest service role; role separation enforced by IAM; credentials rotated on each deploy |
