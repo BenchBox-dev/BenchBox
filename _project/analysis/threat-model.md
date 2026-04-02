@@ -33,6 +33,22 @@ services. This threat model applies exclusively to Phase 3.
 
 ---
 
+### Trust and Visibility Model
+
+This threat model references visibility states and trust labels defined in
+the governance contract (`hosted-results-contract.md`, Section 2). In brief:
+
+- Visibility states control access and indexing: `private`, `unlisted`,
+  `public-self-reported`, `public-curated`, `public-verified`.
+- Trust labels communicate provenance: `maintainer-run`, `community-submission`,
+  `verified` (reserved for future third-party attestation).
+
+Trust labels are server-controlled. No actor API endpoint permits self-promotion.
+Promotion from `community-submission` to `maintainer-run` requires explicit
+admin action recorded in the audit log.
+
+---
+
 ## w2 — STRIDE Threat Analysis
 
 ### Submission Layer (Phase 3 API)
@@ -45,6 +61,9 @@ services. This threat model applies exclusively to Phase 3.
 | **Information Disclosure** | API leaking private or unlisted bundle metadata to unauthenticated callers | Med | High | Med-High | Default-deny: all metadata queries require authentication unless the result's visibility is `public`; enforce at API layer, not UI layer |
 | **Denial of Service** | Flooding the submission endpoint with large bundles to exhaust storage and compute | High | Med | High | Per-actor rate limiting (burst + daily cap); hard bundle size cap (50 MB); async ingest with queue depth limit; reject before writing to storage |
 | **Elevation of Privilege** | Low-trust actor promoting their own result to `public-curated` status without maintainer approval | Low | High | Med | Trust labels are server-controlled; actors have no API endpoint to self-promote; promotion is an admin-only action requiring explicit maintainer token scope |
+| **Denial of Service** | Abusing the 7-day grace period for new actors (3x burst, no storage quota) by creating throwaway accounts for unlimited storage consumption | Med | High | Med-High | Cap grace-period storage at 2 GB per actor (not unlimited); require email verification before token issuance to raise throwaway account cost; monitor for multiple accounts from the same IP range; auto-revoke grace-period actors exceeding the bounded exemption |
+| **Tampering** | Compromised CI dependency (poisoned GitHub Action, malicious Python package) injecting tampered bundles or exfiltrating credentials, bypassing all server-side validations | Low | High | Med | Pin all CI dependencies by hash (actions and pip packages); enable Dependabot / supply-chain alerts; run ingest pipeline in a minimal, audited container image; require two-maintainer review for CI workflow changes; verify bundle signatures end-to-end independent of pipeline |
+| **Elevation of Privilege** | Compromised maintainer account (GitHub or admin CLI token) used to promote malicious results, revoke legitimate tokens, or withdraw valid results | Low | Critical | Med-High | Require hardware security keys for maintainer GitHub access; rotate admin tokens quarterly or after any personnel change; require two-admin approval for trust promotion; log all admin actions to immutable audit trail |
 
 ### Storage Layer
 
@@ -52,7 +71,7 @@ services. This threat model applies exclusively to Phase 3.
 |---|---|---|---|---|---|
 | **Spoofing** | Replacing a stored bundle with a different one under the same content-addressable key | Low | High | Med | Object store versioning enabled; keys are SHA-256 content hashes; any write to an existing key triggers an alert; re-verify hash on every read before serving |
 | **Tampering** | Direct write to the storage bucket bypassing the ingest API | Low | High | Med | Bucket policy: only the ingest service IAM role may write; all other principals are read-only or denied; bucket-level CloudTrail / audit logging enabled |
-| **Repudiation** | No audit log means no way to prove who changed a result's visibility state | Med | Med | Med | Every visibility or trust-label state change is recorded in the audit log with actor_id and reason_code; logs are append-only and stored outside the metadata DB |
+| **Repudiation** | No audit log means no way to prove who changed a result's visibility state | Med | Med | Med | Every visibility or trust-label state change is recorded in the audit log with actor_id and reason_code; logs are append-only and stored outside the metadata DB. Audit logs are stored in a write-once, append-only object store (e.g., S3 with Object Lock or equivalent) separate from the metadata DB. No service account, including the API server, has delete or modify permissions on the audit log bucket. |
 | **Information Disclosure** | Misconfigured bucket ACLs make private bundles world-readable | Med | High | High | Private and unlisted bundles stored under an ACL-restricted prefix; public bundles served via CDN from a separate public prefix; ACL misconfiguration alerts on policy drift |
 | **Denial of Service** | Storage exhaustion from uncapped uploads across many actors | Med | Med | Med | Per-actor storage quota (500 MB); service-level quota enforced before writing to the object store; lifecycle policy auto-expires rejected bundles after 30 days |
 | **Elevation of Privilege** | CI pipeline credentials with overly broad object store permissions allowing arbitrary writes | Low | High | Med | CI role is read-only for raw bundles; write access restricted to ingest service role; role separation enforced by IAM; credentials rotated on each deploy |
@@ -72,15 +91,15 @@ services. This threat model applies exclusively to Phase 3.
 
 ## w3 — Top-10 Mitigations (Ranked by Risk Score)
 
-| Rank | Threat | Layer | Risk Score | Mitigation | Assigns To |
-|---|---|---|---|---|---|
-| 1 | Private bundles world-readable due to ACL misconfiguration | Storage | High | Separate public/private prefixes; ACL drift alerts | Phase 3 launch gate — storage design |
-| 2 | DuckDB snapshot contains fields that should be redacted | Explorer | High | Build pipeline projection; CI schema assertion | Phase 3 launch gate — ingest/read model design |
-| 3 | Flooding submission API with large bundles (DoS) | Submission | High | Rate limiting, bundle size cap, async queue depth limit | `integrate-benchbox-cli-submit-and-service-auth` |
-| 4 | API leaking private metadata to unauthenticated callers | Submission | Med-High | Default-deny auth enforcement at API layer | Phase 3 launch gate — auth design (w4) |
-| 5 | Impersonating a trusted submitter | Submission | Med-High | Token bound to actor_id; server re-validates; no client-supplied identity | Phase 3 launch gate — auth design (w4) |
-| 6 | Bundle tampered after hash computed client-side | Submission | Med-High | Server-side hash re-verification on receipt | Phase 3 launch gate — ingest design |
-| 7 | Direct write to storage bucket bypassing ingest API | Storage | Med | Bucket policy: ingest service role only; CloudTrail logging | Phase 3 launch gate — storage design |
-| 8 | No audit log for visibility state changes | Storage | Med | Append-only audit log (actor_id, action, timestamp); stored outside metadata DB | w6 (moderation + audit log) |
-| 9 | CI pipeline credentials with overly broad storage permissions | Storage | Med | Read-only CI role; write access restricted to ingest service; IAM role separation | Phase 3 launch gate — storage design |
-| 10 | Malformed manifest.json injected via PR | Explorer | Med | CI schema validation before merge; branch protection | Phase 1 CI hardening |
+| Rank | Threat | Layer | Risk Score | Mitigation | OWASP API Security Top 10 | Assigns To |
+|---|---|---|---|---|---|---|
+| 1 | Private bundles world-readable due to ACL misconfiguration | Storage | High | Separate public/private prefixes; ACL drift alerts | API1:2023 Broken Object Level Authorization | Phase 3 launch gate — storage design |
+| 2 | DuckDB snapshot contains fields that should be redacted | Explorer | High | Build pipeline projection; CI schema assertion | API3:2023 Broken Object Property Level Authorization | Phase 3 launch gate — ingest/read model design |
+| 3 | Flooding submission API with large bundles (DoS) | Submission | High | Rate limiting, bundle size cap, async queue depth limit | API4:2023 Unrestricted Resource Consumption | `integrate-benchbox-cli-submit-and-service-auth` |
+| 4 | API leaking private metadata to unauthenticated callers | Submission | Med-High | Default-deny auth enforcement at API layer | API5:2023 Broken Function Level Authorization | Phase 3 launch gate — auth design (w4) |
+| 5 | Impersonating a trusted submitter | Submission | Med-High | Token bound to actor_id; server re-validates; no client-supplied identity | API2:2023 Broken Authentication | Phase 3 launch gate — auth design (w4) |
+| 6 | Bundle tampered after hash computed client-side | Submission | Med-High | Server-side hash re-verification on receipt | API8:2023 Security Misconfiguration | Phase 3 launch gate — ingest design |
+| 7 | Direct write to storage bucket bypassing ingest API | Storage | Med | Bucket policy: ingest service role only; CloudTrail logging | API8:2023 Security Misconfiguration | Phase 3 launch gate — storage design |
+| 8 | No audit log for visibility state changes | Storage | Med | Append-only audit log (actor_id, action, timestamp); stored outside metadata DB | API9:2023 Improper Inventory Management | w6 (moderation + audit log) |
+| 9 | CI pipeline credentials with overly broad storage permissions | Storage | Med | Read-only CI role; write access restricted to ingest service; IAM role separation | API8:2023 Security Misconfiguration | Phase 3 launch gate — storage design |
+| 10 | Malformed manifest.json injected via PR | Explorer | Med | CI schema validation before merge; branch protection | API10:2023 Unsafe Consumption of APIs | Phase 1 CI hardening |
