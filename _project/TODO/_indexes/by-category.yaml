@@ -1,4 +1,4 @@
-generated_at: '2026-04-02T17:24:32.275351'
+generated_at: '2026-04-02T19:12:20.714929'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -192,10 +192,15 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 1
+    count: 2
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       priority: Medium
+      status: Not Started
+    - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
+      file: TODO/main/planning/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
+      title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
+      priority: Medium-High
       status: Not Started

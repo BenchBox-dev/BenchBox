@@ -1,5 +1,5 @@
-generated_at: '2026-04-02T17:24:32.275370'
-total_items: 36
+generated_at: '2026-04-02T19:12:20.714944'
+total_items: 37
 priorities:
   Critical:
     count: 1
@@ -38,7 +38,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   Medium-High:
-    count: 12
+    count: 13
     items:
     - id: http-tls-certificate-validation
       file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
@@ -49,6 +49,11 @@ priorities:
       file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       category: Platform Expansion
+      status: Not Started
+    - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
+      file: TODO/main/planning/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
+      title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
+      category: Testing & Quality
       status: Not Started
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
