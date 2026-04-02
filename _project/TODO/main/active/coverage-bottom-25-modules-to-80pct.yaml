@@ -536,7 +536,7 @@ work:
 
 - id: w12
   summary: "redshift.py part 1: connector selection, connection setup, S3 URI parsing"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/redshift.py (first half — ~218 lines toward 80%)
