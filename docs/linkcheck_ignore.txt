@@ -27,3 +27,6 @@ https://sigmod\.org/.*
 
 # SelectDB portal intermittently drops connections
 https://selectdb\.com
+
+# Okabe-Ito color palette page intermittently returns 500
+https://jfly\.uni-koeln\.de/.*

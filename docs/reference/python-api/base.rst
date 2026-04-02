@@ -75,6 +75,7 @@ Data Generation
 ~~~~~~~~~~~~~~~
 
 .. automethod:: benchbox.base.BaseBenchmark.generate_data
+   :noindex:
 
    **Required override** - Each benchmark implements data generation logic.
 
@@ -84,6 +85,7 @@ Query Access
 ~~~~~~~~~~~~
 
 .. automethod:: benchbox.base.BaseBenchmark.get_queries
+   :noindex:
 
    **Required override** - Returns all queries for the benchmark.
 
@@ -98,6 +100,7 @@ Query Access
        }
 
 .. automethod:: benchbox.base.BaseBenchmark.get_query
+   :noindex:
 
    **Required override** - Get single query by ID with optional parameters.
 
@@ -111,6 +114,7 @@ Database Setup
 ~~~~~~~~~~~~~~
 
 .. automethod:: benchbox.base.BaseBenchmark.setup_database
+   :noindex:
 
    Sets up database schema and loads data. Automatically calls :meth:`generate_data` if needed.
 
@@ -118,10 +122,12 @@ Execution
 ~~~~~~~~~
 
 .. automethod:: benchbox.base.BaseBenchmark.run_query
+   :noindex:
 
    Execute single query and return detailed results including timing and row counts.
 
 .. automethod:: benchbox.base.BaseBenchmark.run_benchmark
+   :noindex:
 
    Execute complete benchmark suite with optional filtering by query IDs.
 
@@ -139,6 +145,7 @@ Execution
        )
 
 .. automethod:: benchbox.base.BaseBenchmark.run_with_platform
+   :noindex:
 
    **Recommended entry point** - Run benchmark using platform adapter for optimized execution.
 
@@ -173,6 +180,7 @@ SQL Translation
 ~~~~~~~~~~~~~~~
 
 .. automethod:: benchbox.base.BaseBenchmark.translate_query
+   :noindex:
 
    Translate query to different SQL dialect using sqlglot.
 
@@ -201,6 +209,7 @@ Results Creation
 ~~~~~~~~~~~~~~~~
 
 .. automethod:: benchbox.base.BaseBenchmark.create_enhanced_benchmark_result
+   :noindex:
 
    Create standardized :class:`~benchbox.core.results.models.BenchmarkResults` object with structured metadata.
 
@@ -210,6 +219,7 @@ Properties
 ----------
 
 .. autoattribute:: benchbox.base.BaseBenchmark.benchmark_name
+   :noindex:
    :annotation: str
 
    Human-readable benchmark name (e.g., "TPC-H", "ClickBench").
@@ -228,10 +238,12 @@ Utility Methods
 ---------------
 
 .. automethod:: benchbox.base.BaseBenchmark.format_results
+   :noindex:
 
    Format benchmark results dictionary into human-readable string.
 
 .. automethod:: benchbox.base.BaseBenchmark.get_data_source_benchmark
+   :noindex:
 
    Returns name of source benchmark if this benchmark reuses data from another.
 
