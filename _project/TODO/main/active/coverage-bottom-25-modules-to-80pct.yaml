@@ -391,7 +391,7 @@ work:
 
 - id: w13
   summary: "databricks/adapter.py part 2: data loading, DBFS upload, error handling"
-  status: pending
+  status: done
   needs: [w8]
   description: |
     benchbox/platforms/databricks/adapter.py (second half — remaining ~198 lines to 80%)
@@ -569,7 +569,7 @@ work:
 
 - id: w14
   summary: "redshift.py part 2: data loading flow, SQL generation, WLM query group"
-  status: pending
+  status: done
   needs: [w12]
   description: |
     benchbox/platforms/redshift.py (second half — remaining ~217 lines to 80%)
