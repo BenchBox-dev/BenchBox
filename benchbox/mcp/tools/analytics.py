@@ -760,26 +760,29 @@ def _extract_plan_summary(plan: dict) -> dict[str, Any]:
 
     def count_operators(node: dict | list) -> None:
         if isinstance(node, dict):
-            summary["operator_count"] += 1
-            op_type = node.get("type", node.get("operator", "")).lower()
-            if "join" in op_type:
-                summary["join_count"] += 1
-            if "scan" in op_type or "read" in op_type:
-                summary["scan_count"] += 1
-            if "rows" in node:
-                if summary["estimated_rows"] is None:
-                    summary["estimated_rows"] = node["rows"]
-            if "cost" in node:
-                if summary["estimated_cost"] is None:
-                    summary["estimated_cost"] = node["cost"]
-            for v in node.values():
-                count_operators(v)
-        elif isinstance(node, list):
+            _update_plan_summary(summary, node)
+            for value in node.values():
+                count_operators(value)
+            return
+        if isinstance(node, list):
             for item in node:
                 count_operators(item)
 
     count_operators(plan)
     return summary
+
+
+def _update_plan_summary(summary: dict[str, Any], node: dict[str, Any]) -> None:
+    summary["operator_count"] += 1
+    op_type = node.get("type", node.get("operator", "")).lower()
+    if "join" in op_type:
+        summary["join_count"] += 1
+    if "scan" in op_type or "read" in op_type:
+        summary["scan_count"] += 1
+    if summary["estimated_rows"] is None and "rows" in node:
+        summary["estimated_rows"] = node["rows"]
+    if summary["estimated_cost"] is None and "cost" in node:
+        summary["estimated_cost"] = node["cost"]
 
 
 def _format_plan_tree(plan: dict, indent: int = 0) -> str:

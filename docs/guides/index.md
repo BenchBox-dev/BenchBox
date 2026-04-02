@@ -46,8 +46,8 @@ Working with different data formats and storage systems:
 Guides for comparing benchmark performance across platforms:
 
 - [Platform Comparison Guide](platform-comparison.md) - Unified comparison for SQL and DataFrame platforms
-- [DataFrame Comparison Guide](dataframe-comparison.md) - Legacy DataFrame comparison (deprecated)
-- [DataFrame Migration Guide](dataframe-migration.md) - Migrate from SQL to DataFrame benchmarking
+- [DataFrame Comparison Guide](dataframe-comparison.md) - DataFrame cross-platform comparison
+- [DataFrame Benchmarking Guide](dataframe-migration.md) - Adopting DataFrame benchmarking
 
 ## Visualization
 

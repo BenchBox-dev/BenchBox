@@ -19,6 +19,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [TPC-H](tpc-h.md)
 **TPC-H Decision Support Benchmark**
+- **CLI name**: `tpch`
 - **Purpose**: Standard decision support and analytical query performance
 - **Queries**: 22 business-oriented analytical queries
 - **Schema**: 8 tables modeling a wholesale supplier database
@@ -27,6 +28,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [TPC-DS](tpc-ds.md)
 **TPC-DS Decision Support Benchmark**
+- **CLI name**: `tpcds`
 - **Purpose**: Complex analytical workloads with advanced SQL features
 - **Queries**: 99 complex analytical queries with CTEs, window functions
 - **Schema**: 24 tables modeling a retail data warehouse
@@ -35,6 +37,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [TPC-DI](tpc-di.md)
 **TPC-DI Data Integration Benchmark**
+- **CLI name**: `tpcdi`
 - **Purpose**: Data integration and ETL performance testing
 - **Queries**: Data transformation and loading operations
 - **Schema**: Dimensional data warehouse with fact and dimension tables
@@ -46,6 +49,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [TPC-H Data Vault](datavault.md)
 **TPC-H Data Vault Benchmark**
+- **CLI name**: `datavault`
 - **Purpose**: TPC-H adapted for Data Vault 2.0 modeling pattern performance testing
 - **Queries**: 22 TPC-H queries adapted for Hub-Link-Satellite joins
 - **Schema**: 21 tables (7 Hubs, 6 Links, 8 Satellites) from TPC-H source
@@ -57,6 +61,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [Star Schema Benchmark (SSB)](ssb.md)
 **Star Schema Benchmark**
+- **CLI name**: `ssb`
 - **Purpose**: Star schema analytical query performance
 - **Queries**: 13 queries across 4 query flights
 - **Schema**: Classic star schema with fact and dimension tables
@@ -65,6 +70,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [AMPLab](amplab.md)
 **AMPLab Big Data Benchmark**
+- **CLI name**: `amplab`
 - **Purpose**: Big data processing and analytics performance
 - **Queries**: Web analytics and user behavior queries
 - **Schema**: Web analytics data model
@@ -73,6 +79,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [Join Order Benchmark](join-order.md)
 **Join Order Optimization Benchmark**
+- **CLI name**: `joinorder`
 - **Purpose**: Query optimizer join order evaluation
 - **Queries**: 13 complex multi-table join queries
 - **Schema**: 21 tables modeling IMDB movie database
@@ -84,6 +91,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [ClickBench](clickbench.md)
 **ClickHouse Analytical Benchmark**
+- **CLI name**: `clickbench`
 - **Purpose**: High-performance analytical query testing
 - **Queries**: 43 analytical queries from real web analytics
 - **Schema**: Web analytics event data
@@ -92,6 +100,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [H2ODB](h2odb.md)
 **H2O Database Benchmark**
+- **CLI name**: `h2odb`
 - **Purpose**: Data science and machine learning workloads
 - **Queries**: Aggregation and groupby operations
 - **Schema**: Data science oriented tables
@@ -100,6 +109,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [NYC Taxi](nyctaxi.md)
 **NYC Taxi OLAP Benchmark**
+- **CLI name**: `nyctaxi`
 - **Purpose**: Real-world transportation data analytics
 - **Queries**: 25 OLAP queries across 9 categories
 - **Schema**: NYC TLC trip records with taxi zones dimension
@@ -108,6 +118,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [TSBS DevOps](tsbs-devops.md)
 **Time Series Benchmark Suite for DevOps**
+- **CLI name**: `tsbs_devops`
 - **Purpose**: Infrastructure monitoring and observability workloads
 - **Queries**: 18 DevOps monitoring queries across 10 categories
 - **Schema**: CPU, memory, disk, network metrics with host tags
@@ -116,6 +127,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [CoffeeShop](coffeeshop.md)
 **CoffeeShop Point-of-Sale Benchmark**
+- **CLI name**: `coffeeshop`
 - **Purpose**: Real-world transactional and analytical workloads
 - **Queries**: Point-of-sale operations and reporting
 - **Schema**: Retail transaction data model
@@ -127,6 +139,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [Read Primitives](read-primitives.md)
 **Database Read Primitives Benchmark**
+- **CLI name**: `read_primitives`
 - **Purpose**: Individual database operation testing
 - **Queries**: 109 primitive operation queries across 26 categories
 - **Schema**: TPC-H schema for familiar data patterns
@@ -135,6 +148,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [Write Primitives](write-primitives.md)
 **Database Write Operations Benchmark (v2)**
+- **CLI name**: `write_primitives`
 - **Purpose**: Comprehensive non-transactional write operation testing
 - **Queries**: 109 write operations across 6 categories (INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL)
 - **Schema**: TPC-H schema with 16 category-based staging tables
@@ -144,6 +158,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [Transaction Primitives](transaction-primitives.md)
 **Database Transaction Testing Benchmark**
+- **CLI name**: `transaction_primitives`
 - **Purpose**: ACID transaction guarantees and isolation level testing
 - **Queries**: 8 transaction operations (COMMIT, ROLLBACK, SAVEPOINT, isolation levels)
 - **Schema**: TPC-H schema with transaction staging tables
@@ -156,6 +171,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [TPC-DS-OBT](tpc-ds-obt.md)
 **TPC-DS One Big Table Benchmark**
+- **CLI name**: `tpcds_obt`
 - **Purpose**: Denormalized wide-table analytical workloads
 - **Queries**: TPC-DS queries adapted for single-table schema
 - **Schema**: Single denormalized "One Big Table" with all TPC-DS attributes
@@ -164,6 +180,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [TPC-Havoc](tpc-havoc.md)
 **TPC-H Syntax Variants Benchmark**
+- **CLI name**: `tpchavoc`
 - **Purpose**: Query optimizer stress testing through syntax variations
 - **Queries**: 220 variants (22 TPC-H queries × 10 syntax variants each)
 - **Schema**: TPC-H schema with identical data
@@ -172,6 +189,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 
 #### [TPC-H Skew](tpch-skew.md)
 **TPC-H Data Skew Benchmark**
+- **CLI name**: `tpch_skew`
 - **Purpose**: Test optimizer behavior on non-uniform data distributions
 - **Queries**: 22 TPC-H queries with configurable skew parameters
 - **Schema**: TPC-H schema with Zipfian, normal, or exponential data distributions

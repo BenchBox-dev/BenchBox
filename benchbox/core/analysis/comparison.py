@@ -629,27 +629,11 @@ class PlatformComparison:
 
         for i, platform_a in enumerate(platforms):
             for platform_b in platforms[i + 1 :]:
-                wins_a = 0
-                wins_b = 0
-                ties = 0
-                total_ratio = []
-
-                for qc in query_comparisons.values():
-                    if platform_a in qc.metrics and platform_b in qc.metrics:
-                        ratio_a = qc.performance_ratios.get(platform_a, 1.0)
-                        ratio_b = qc.performance_ratios.get(platform_b, 1.0)
-
-                        # Calculate relative ratio (A/B, >1 means A is slower)
-                        if qc.metrics[platform_b].mean > 0:
-                            rel_ratio = qc.metrics[platform_a].mean / qc.metrics[platform_b].mean
-                            total_ratio.append(rel_ratio)
-
-                        if ratio_a < ratio_b / self.config.performance_ratio_threshold:
-                            wins_a += 1
-                        elif ratio_b < ratio_a / self.config.performance_ratio_threshold:
-                            wins_b += 1
-                        else:
-                            ties += 1
+                wins_a, wins_b, ties, total_ratio = self._score_platform_pair(
+                    query_comparisons,
+                    platform_a,
+                    platform_b,
+                )
 
                 # Calculate overall performance ratio
                 geo_ratio = calculate_geometric_mean(total_ratio) if total_ratio else 1.0
@@ -662,20 +646,6 @@ class PlatformComparison:
                 else:
                     winner = None  # Too close to call
 
-                # Generate insights
-                insights = []
-                if winner:
-                    loser = platform_b if winner == platform_a else platform_a
-                    wins = wins_a if winner == platform_a else wins_b
-                    total = wins_a + wins_b + ties
-                    insights.append(f"{winner} wins {wins}/{total} queries against {loser}")
-
-                    if geo_ratio != 1.0:
-                        if geo_ratio > 1.0:
-                            insights.append(f"{platform_b} is {geo_ratio:.2f}x faster overall than {platform_a}")
-                        else:
-                            insights.append(f"{platform_a} is {1 / geo_ratio:.2f}x faster overall than {platform_b}")
-
                 comparisons.append(
                     HeadToHeadComparison(
                         platform_a=platform_a,
@@ -685,7 +655,15 @@ class PlatformComparison:
                         wins_a=wins_a,
                         wins_b=wins_b,
                         ties=ties,
-                        insights=insights,
+                        insights=self._build_head_to_head_insights(
+                            platform_a,
+                            platform_b,
+                            winner,
+                            geo_ratio,
+                            wins_a,
+                            wins_b,
+                            ties,
+                        ),
                     )
                 )
 
@@ -794,46 +772,117 @@ class PlatformComparison:
         Returns:
             List of insight strings
         """
-        insights = []
+        del query_comparisons, head_to_head
+        insights: list[str] = []
+        insights.extend(self._insight_overall_winner(rankings))
+        insights.extend(self._insight_win_rates(rankings))
+        insights.extend(self._insight_consistency())
+        insights.extend(self._insight_cost(cost_analysis))
+        return insights
 
-        # Overall winner insight
-        if rankings:
-            winner = rankings[0]
-            if len(rankings) > 1:
-                runner_up = rankings[1]
-                speedup = runner_up.geometric_mean_time / winner.geometric_mean_time
-                if speedup > 1.1:
-                    insights.append(
-                        f"{winner.platform} is the overall winner, {speedup:.2f}x faster than {runner_up.platform}"
-                    )
-                else:
-                    insights.append(f"{winner.platform} edges out {runner_up.platform} with similar performance")
+    def _score_platform_pair(
+        self,
+        query_comparisons: dict[str, QueryComparison],
+        platform_a: str,
+        platform_b: str,
+    ) -> tuple[int, int, int, list[float]]:
+        """Compute wins, ties, and relative ratios for a platform pair."""
+        wins_a = 0
+        wins_b = 0
+        ties = 0
+        total_ratio: list[float] = []
+        threshold = self.config.performance_ratio_threshold
 
-        # Win rate insights
-        for ranking in rankings[:3]:  # Top 3
-            if ranking.win_rate >= 70:
-                insights.append(f"{ranking.platform} wins {ranking.win_rate:.0f}% of queries")
+        for qc in query_comparisons.values():
+            if platform_a not in qc.metrics or platform_b not in qc.metrics:
+                continue
+            ratio_a = qc.performance_ratios.get(platform_a, 1.0)
+            ratio_b = qc.performance_ratios.get(platform_b, 1.0)
+            if qc.metrics[platform_b].mean > 0:
+                total_ratio.append(qc.metrics[platform_a].mean / qc.metrics[platform_b].mean)
+            if ratio_a < ratio_b / threshold:
+                wins_a += 1
+            elif ratio_b < ratio_a / threshold:
+                wins_b += 1
+            else:
+                ties += 1
 
-        # Consistency insights
+        return wins_a, wins_b, ties, total_ratio
+
+    @staticmethod
+    def _build_head_to_head_insights(
+        platform_a: str,
+        platform_b: str,
+        winner: str | None,
+        geo_ratio: float,
+        wins_a: int,
+        wins_b: int,
+        ties: int,
+    ) -> list[str]:
+        """Build human-readable insights for a head-to-head comparison."""
+        if not winner:
+            return []
+
+        loser = platform_b if winner == platform_a else platform_a
+        wins = wins_a if winner == platform_a else wins_b
+        total = wins_a + wins_b + ties
+        insights = [f"{winner} wins {wins}/{total} queries against {loser}"]
+        if geo_ratio == 1.0:
+            return insights
+        if geo_ratio > 1.0:
+            insights.append(f"{platform_b} is {geo_ratio:.2f}x faster overall than {platform_a}")
+        else:
+            insights.append(f"{platform_a} is {1 / geo_ratio:.2f}x faster overall than {platform_b}")
+        return insights
+
+    @staticmethod
+    def _insight_overall_winner(rankings: list[PlatformRanking]) -> list[str]:
+        """Summarize the overall winner when rankings are available."""
+        if not rankings or len(rankings) == 1:
+            return []
+        winner = rankings[0]
+        runner_up = rankings[1]
+        speedup = runner_up.geometric_mean_time / winner.geometric_mean_time
+        if speedup > 1.1:
+            return [f"{winner.platform} is the overall winner, {speedup:.2f}x faster than {runner_up.platform}"]
+        return [f"{winner.platform} edges out {runner_up.platform} with similar performance"]
+
+    @staticmethod
+    def _insight_win_rates(rankings: list[PlatformRanking]) -> list[str]:
+        """Summarize dominant win-rate results for the top-ranked platforms."""
+        return [
+            f"{ranking.platform} wins {ranking.win_rate:.0f}% of queries"
+            for ranking in rankings[:3]
+            if ranking.win_rate >= 70
+        ]
+
+    def _insight_consistency(self) -> list[str]:
+        """Summarize consistency and variance across benchmark results."""
+        insights: list[str] = []
         for result in self.results:
             times = _extract_query_times(result)
-            if times:
-                cv = _calculate_cv(list(times.values()))
-                if cv < 0.2:
-                    insights.append(f"{result.platform} shows very consistent performance (CV={cv:.2f})")
-                elif cv > 0.5:
-                    insights.append(f"{result.platform} shows high variance in query times (CV={cv:.2f})")
+            if not times:
+                continue
+            cv = _calculate_cv(list(times.values()))
+            if cv < 0.2:
+                insights.append(f"{result.platform} shows very consistent performance (CV={cv:.2f})")
+            elif cv > 0.5:
+                insights.append(f"{result.platform} shows high variance in query times (CV={cv:.2f})")
+        return insights
 
-        # Cost insights
-        if cost_analysis:
-            insights.append(f"{cost_analysis.best_value} offers the best price/performance")
-            if len(cost_analysis.cost_rankings) > 1:
-                cheapest = cost_analysis.cost_rankings[0]
-                most_expensive = cost_analysis.cost_rankings[-1]
-                savings = cost_analysis.potential_savings.get(cheapest, 0)
-                if savings > 0:
-                    insights.append(f"Switching from {most_expensive} to {cheapest} could save ${savings:.2f}")
-
+    @staticmethod
+    def _insight_cost(cost_analysis: Optional[CostPerformanceAnalysis]) -> list[str]:
+        """Summarize price/performance insights when cost data is available."""
+        if not cost_analysis:
+            return []
+        insights = [f"{cost_analysis.best_value} offers the best price/performance"]
+        if len(cost_analysis.cost_rankings) <= 1:
+            return insights
+        cheapest = cost_analysis.cost_rankings[0]
+        most_expensive = cost_analysis.cost_rankings[-1]
+        savings = cost_analysis.potential_savings.get(cheapest, 0)
+        if savings > 0:
+            insights.append(f"Switching from {most_expensive} to {cheapest} could save ${savings:.2f}")
         return insights
 
 

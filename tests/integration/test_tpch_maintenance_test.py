@@ -656,8 +656,8 @@ class TestMaintenanceTestPerformance:
             assert final_lineitem_count < lineitem_count, "Should have deleted lineitems"
         else:
             # RF2 didn't find any orders to delete (all orders are too recent)
-            # This is acceptable - just verify the execution path worked
-            assert True, "RF2 executed successfully but found no orders to delete"
+            # Verify the result reports zero rows affected
+            assert rf2_result.rows_affected == 0, f"Expected 0 rows affected, got {rf2_result.rows_affected}"
 
         # Now actually close the real connection
         conn.close()

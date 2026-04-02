@@ -11,7 +11,10 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from benchbox.base import BaseBenchmark
 
 import yaml
 
@@ -134,7 +137,9 @@ class DryRunExecutor:
                 platform_adapter = None
                 result.platform_config = {"data_only": True}
             else:
-                platform_config = self._get_platform_config(database_config, system_profile, benchmark_config)
+                platform_config = self._get_platform_config(
+                    database_config, system_profile, benchmark_config, benchmark=benchmark
+                )
                 platform_config["dry_run"] = True  # Suppress DB validation during dry run
                 result.platform_config = platform_config
 
@@ -372,6 +377,7 @@ class DryRunExecutor:
         database_config: Optional[DatabaseConfig],
         system_profile: SystemProfile,
         benchmark_config: Optional[BenchmarkConfig] = None,
+        benchmark: Optional["BaseBenchmark"] = None,
     ) -> dict[str, Any]:
         from benchbox.core.platform_config import get_platform_config
 
@@ -380,6 +386,13 @@ class DryRunExecutor:
 
         benchmark_name = getattr(benchmark_config, "name", None) if benchmark_config else None
         scale_factor = getattr(benchmark_config, "scale_factor", None) if benchmark_config else None
+
+        # For benchmarks that share another benchmark's data (e.g., read_primitives → tpch),
+        # use the data source name for database naming so the existing database is reused.
+        if benchmark is not None:
+            data_source = getattr(benchmark, "get_data_source_benchmark", lambda: None)()
+            if data_source:
+                benchmark_name = data_source
 
         return get_platform_config(database_config, system_profile, benchmark_name, scale_factor)
 

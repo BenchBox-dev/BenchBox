@@ -19,9 +19,15 @@ def test_dataframe_package_exports_and_flags():
 
 
 def test_dataframe_package_optional_exports_are_defined():
-    # Optional adapters may be None when dependencies are unavailable.
-    assert hasattr(dataframe_pkg, "ModinDataFrameAdapter")
-    assert hasattr(dataframe_pkg, "CuDFDataFrameAdapter")
-    assert hasattr(dataframe_pkg, "DaskDataFrameAdapter")
-    assert hasattr(dataframe_pkg, "DataFusionDataFrameAdapter")
-    assert hasattr(dataframe_pkg, "PySparkDataFrameAdapter")
+    # Optional adapters may be None when dependencies are unavailable,
+    # but the attribute must exist (either a class or None).
+    for name in (
+        "ModinDataFrameAdapter",
+        "CuDFDataFrameAdapter",
+        "DaskDataFrameAdapter",
+        "DataFusionDataFrameAdapter",
+        "PySparkDataFrameAdapter",
+    ):
+        attr = getattr(dataframe_pkg, name, _SENTINEL := object())
+        assert attr is not _SENTINEL, f"{name} not exported from dataframe package"
+        assert attr is None or callable(attr), f"{name} should be None or a class, got {type(attr)}"

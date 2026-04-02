@@ -1199,15 +1199,9 @@ class AzureSynapseAdapter(PlatformAdapter):
 
     def get_query_plan(self, connection: Any, query: str) -> str:
         """Get query execution plan for analysis."""
-        cursor = connection.cursor()
-        try:
-            cursor.execute(f"EXPLAIN {query}")
-            plan_rows = cursor.fetchall()
-            return "\n".join([str(row[0]) for row in plan_rows])
-        except Exception as e:
-            return f"Could not get query plan: {e}"
-        finally:
-            cursor.close()
+        from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+
+        return get_query_plan_from_cursor(connection, query)
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Update statistics for query optimization."""
@@ -1345,46 +1339,29 @@ def _build_synapse_config(
     info: Any,
 ) -> Any:
     """Build Azure Synapse database configuration with credential loading."""
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
+    from benchbox.platforms.azure.config_utils import build_platform_config
 
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("synapse") or {}
-
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "Azure Synapse"
-    driver_package = info.driver_package if info else "pyodbc"
-
-    config_dict = {
-        "type": "synapse",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        "server": merged_options.get("server"),
-        "port": merged_options.get("port"),
-        "username": merged_options.get("username"),
-        "password": merged_options.get("password"),
-        "schema": merged_options.get("schema"),
-        "auth_method": merged_options.get("auth_method"),
-        "storage_account": merged_options.get("storage_account"),
-        "container": merged_options.get("container"),
-        "staging_root": merged_options.get("staging_root"),
-        "storage_sas_token": merged_options.get("storage_sas_token"),
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    if "database" in overrides and overrides["database"]:
-        config_dict["database"] = overrides["database"]
-
-    return DatabaseConfig(**config_dict)
+    return build_platform_config(
+        platform_type="synapse",
+        credential_key="synapse",
+        default_display_name="Azure Synapse",
+        default_driver_package="pyodbc",
+        platform_fields=[
+            "server",
+            "port",
+            "username",
+            "password",
+            "schema",
+            "auth_method",
+            "storage_account",
+            "container",
+            "staging_root",
+            "storage_sas_token",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
 
 # Register the config builder with the platform hook registry

@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, metadata-primitives, custom-benchmark
 ```
 
+> **CLI name:** `metadata_primitives` — use `benchbox run --benchmark metadata_primitives`
+
 The Metadata Primitives benchmark tests database catalog introspection performance using INFORMATION_SCHEMA views and platform-specific commands (SHOW, DESCRIBE, PRAGMA). Unlike data operation benchmarks, this focuses on metadata operations critical for data catalog integration, schema discovery, and data governance workflows.
 
 ## Overview

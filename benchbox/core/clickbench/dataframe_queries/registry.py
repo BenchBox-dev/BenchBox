@@ -28,15 +28,7 @@ def list_clickbench_queries(
     family: str | None = None,
     category: QueryCategory | None = None,
 ) -> list[DataFrameQuery]:
-    """List ClickBench DataFrame queries with optional filtering.
-
-    Args:
-        family: Filter by family ("expression" or "pandas")
-        category: Filter by query category
-
-    Returns:
-        List of matching DataFrameQuery objects
-    """
+    """List ClickBench DataFrame queries with optional filtering."""
     return CLICKBENCH_DATAFRAME_QUERIES.list_queries(family=family, category=category)
 
 

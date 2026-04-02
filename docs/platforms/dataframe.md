@@ -399,16 +399,16 @@ benchbox run --platform polars-df --benchmark tpch --tuning ./my_tuning.yaml
 
 ```bash
 # View recommended settings for your system
-benchbox df-tuning show-defaults --platform polars
+benchbox tuning show-defaults --platform polars
 
 # Create a sample tuning configuration
-benchbox df-tuning create-sample --platform polars --output polars_tuning.yaml
+benchbox tuning create-sample --platform polars --output polars_tuning.yaml
 
 # Validate a configuration file
-benchbox df-tuning validate polars_tuning.yaml --platform polars
+benchbox tuning validate polars_tuning.yaml --platform polars
 
 # List supported platforms
-benchbox df-tuning list-platforms
+benchbox tuning list-platforms
 ```
 
 ### Tuning Configuration Options
@@ -618,7 +618,7 @@ Validate your configuration before running:
 
 ```bash
 # Validate a configuration file
-benchbox df-tuning validate my_config.yaml --platform polars
+benchbox tuning validate my_config.yaml --platform polars
 
 # Output includes issues and suggestions
 ✓ Configuration valid

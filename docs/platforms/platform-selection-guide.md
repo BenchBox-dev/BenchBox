@@ -58,7 +58,8 @@ BenchBox uses optional dependency extras to keep the core installation lightweig
 
 | Extra              | What it Enables                                           | Install Command                                   |
 | ------------------ | --------------------------------------------------------- | ------------------------------------------------- |
-| `(none)`           | DuckDB + SQLite (local development)                       | `uv add benchbox`                         |
+| `(none)`           | SQLite only (core package, no DuckDB)                     | `uv add benchbox`                         |
+| `[duckdb]`         | DuckDB for local analytics                                | `uv add benchbox --extra duckdb`          |
 | `[cloudstorage]`   | Cloudpathlib helpers for S3, GCS, Azure paths             | `uv add benchbox --extra cloudstorage`        |
 | `[cloud]`          | BigQuery, Databricks SQL, Redshift, Snowflake connectors  | `uv add benchbox --extra cloud`               |
 | `[databricks]`     | Databricks SQL Warehouses + Unity Catalog tooling         | `uv add benchbox --extra databricks`          |
@@ -918,7 +919,7 @@ Platform selection depends on your specific requirements. Common platform choice
 - **Arrow-native workflows**: DataFusion-df (Rust-based, Arrow integration)
 - **GPU acceleration**: cuDF-df (NVIDIA RAPIDS, coming soon)
 
-DuckDB is included with BenchBox by default for SQL benchmarking. Polars is included for DataFrame benchmarking. Cloud platforms and additional DataFrame libraries can be added as requirements grow.
+Install BenchBox with the `[duckdb]` extra for SQL benchmarking. Polars is included for DataFrame benchmarking. Cloud platforms and additional DataFrame libraries can be added as requirements grow.
 
 ## See Also
 

@@ -83,7 +83,7 @@ class SimpleBenchmark(BaseBenchmark):
             raise ValueError(f"Query '{query_id}' not found")
         return self._queries[query_id]
 
-    def get_create_tables_sql(self) -> str:
+    def get_create_tables_sql(self, dialect: str = "standard", tuning_config=None) -> str:
         """Get DDL statements for benchmark tables."""
         return """
         CREATE TABLE test_table (
@@ -118,8 +118,7 @@ def test_simple_benchmark():
     conn.execute(ddl)
 
     # Load data
-    for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+    for table_name, file_path in data_files.items():
         conn.execute(f"""
             INSERT INTO {table_name}
             SELECT * FROM read_csv('{file_path}', header=false, delimiter='|')

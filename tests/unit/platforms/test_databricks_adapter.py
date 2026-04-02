@@ -12,10 +12,11 @@ from unittest.mock import Mock, call, patch
 import pytest
 
 from benchbox.platforms.databricks import DatabricksAdapter
+from benchbox.platforms.databricks.adapter import _select_databricks_warehouse
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.slow,
+    pytest.mark.fast,
     pytest.mark.cloud_import,
 ]
 
@@ -965,3 +966,1281 @@ class TestDatabricksAdapter:
             assert adapter.schema == "my_schema"
             assert adapter.enable_delta_optimization is True
             assert adapter.delta_auto_optimize is True
+
+
+class TestDatabricksSqlGenerationHelpers:
+    """Exercise helper-heavy SQL generation and staging behavior."""
+
+    def test_select_databricks_warehouse_prefers_running_then_available(self):
+        logger = Mock()
+        running = Mock()
+        running.name = "running-wh"
+        running.state = "RUNNING"
+        pending = Mock()
+        pending.name = "pending-wh"
+        pending.state = "STARTING"
+        deleted = Mock()
+        deleted.name = "deleted-wh"
+        deleted.state = "DELETED"
+
+        selected_running = _select_databricks_warehouse([pending, running], very_verbose=True, logger=logger)
+        selected_available = _select_databricks_warehouse([deleted, pending], very_verbose=True, logger=logger)
+
+        assert selected_running is running
+        assert selected_available is pending
+        assert _select_databricks_warehouse([], very_verbose=False, logger=logger) is None
+
+    def test_resolve_stage_root_prefers_explicit_staging_root_and_uc_volume(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            explicit_adapter = DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+                staging_root="dbfs:/Volumes/workspace/tmp/",
+            )
+            uc_volume_adapter = DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+                uc_catalog="main",
+                uc_schema="benchbox",
+                uc_volume="data",
+            )
+            invalid_adapter = DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+            )
+
+        assert explicit_adapter._resolve_stage_root(Path("/tmp/data")) == "dbfs:/Volumes/workspace/tmp"
+        assert uc_volume_adapter._resolve_stage_root(Path("/tmp/data")) == "dbfs:/Volumes/main/benchbox/data"
+        with pytest.raises(ValueError, match="requires a cloud/UC Volume staging location"):
+            invalid_adapter._resolve_stage_root(Path("/tmp/data"))
+
+    def test_resolve_file_uri_and_delimiter_handles_uc_volume_and_local_paths(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+            )
+
+        volume_uri, volume_filename, volume_delimiter = adapter._resolve_file_uri_and_delimiter(
+            "dbfs:/Volumes/main/benchbox/data/lineitem.tbl.1",
+            "dbfs:/Volumes/main/benchbox/data",
+        )
+        local_uri, local_filename, local_delimiter = adapter._resolve_file_uri_and_delimiter(
+            Path("/tmp/orders.csv"),
+            "dbfs:/Volumes/main/benchbox/data",
+        )
+
+        assert volume_uri == "dbfs:/Volumes/main/benchbox/data/lineitem.tbl.1"
+        assert volume_filename == "lineitem.tbl.1"
+        assert volume_delimiter == "|"
+        assert local_uri == "dbfs:/Volumes/main/benchbox/data/orders.csv"
+        assert local_filename == "orders.csv"
+        assert local_delimiter == ","
+
+    def test_get_column_list_for_table_uses_schema_metadata(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+            )
+
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {
+            "orders": {
+                "columns": [
+                    {"name": "o_orderkey"},
+                    {"name": "o_orderdate"},
+                ]
+            }
+        }
+
+        assert adapter._get_column_list_for_table(benchmark, "orders") == " (o_orderkey, o_orderdate)"
+        assert adapter._get_column_list_for_table(Mock(spec=[]), "orders") == ""
+
+    def test_external_location_from_file_uri_normalizes_wildcard_and_rejects_non_parquet(self):
+        assert (
+            DatabricksAdapter._external_location_from_file_uri("dbfs:/Volumes/main/benchbox/orders/part-*.parquet")
+            == "dbfs:/Volumes/main/benchbox/orders"
+        )
+        assert (
+            DatabricksAdapter._external_location_from_file_uri("dbfs:/Volumes/main/benchbox/orders/part-000.parquet")
+            == "dbfs:/Volumes/main/benchbox/orders"
+        )
+        with pytest.raises(ValueError, match="requires Parquet sources"):
+            DatabricksAdapter._external_location_from_file_uri("dbfs:/Volumes/main/benchbox/orders/orders.csv")
+
+    def test_load_single_table_builds_copy_into_with_column_mapping_and_optimize(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+                catalog="main",
+                schema="benchbox",
+            )
+
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {
+            "orders": {
+                "columns": [
+                    {"name": "o_orderkey"},
+                    {"name": "o_orderdate"},
+                ]
+            }
+        }
+        cursor = Mock()
+        cursor.fetchone.return_value = (7,)
+        connection = Mock()
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            row_count, copy_time, optimize_time = adapter._load_single_table(
+                cursor,
+                connection,
+                benchmark,
+                "orders",
+                Path("orders.tbl.1"),
+                "dbfs:/Volumes/main/benchbox/data",
+                {"orders"},
+            )
+
+        assert row_count == 7
+        assert copy_time >= 0.0
+        assert optimize_time >= 0.0
+        assert cursor.execute.call_args_list[0].args[0] == (
+            "COPY INTO ORDERS (o_orderkey, o_orderdate) FROM "
+            "'dbfs:/Volumes/main/benchbox/data/orders.tbl.1' "
+            "FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='|', 'header'='false')"
+        )
+        assert cursor.execute.call_args_list[1].args[0] == "SELECT COUNT(*) FROM ORDERS"
+        assert cursor.execute.call_args_list[2].args[0] == "OPTIMIZE ORDERS"
+
+    def test_vacuum_table_executes_delta_maintenance(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+                enable_delta_optimization=True,
+            )
+
+        connection = Mock()
+        cursor = Mock()
+        connection.cursor.return_value = cursor
+
+        adapter.vacuum_table(connection, "orders", hours=24)
+
+        cursor.execute.assert_called_once_with("VACUUM ORDERS RETAIN 24 HOURS")
+        cursor.close.assert_called_once()
+
+    def test_validate_external_table_requirements_accepts_uc_volume(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+                uc_catalog="main",
+                uc_schema="benchbox",
+                uc_volume="data",
+            )
+
+        adapter.validate_external_table_requirements()
+
+
+class TestConvertToDeltaTable:
+    """Test _convert_to_delta_table SQL transformation."""
+
+    def _make_adapter(self, **kwargs):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            defaults = {
+                "server_hostname": "test.cloud.databricks.com",
+                "http_path": "/sql/1.0/warehouses/test",
+                "access_token": "tok",
+            }
+            defaults.update(kwargs)
+            return DatabricksAdapter(**defaults)
+
+    def test_adds_or_replace_to_create_table(self):
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE foo (id BIGINT)")
+        assert result.startswith("CREATE OR REPLACE TABLE foo")
+
+    def test_preserves_existing_or_replace(self):
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE OR REPLACE TABLE foo (id BIGINT)")
+        assert result.count("OR REPLACE") == 1
+
+    def test_adds_using_delta_after_column_defs(self):
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t (a INT, b STRING)")
+        assert "USING DELTA" in result
+        # USING DELTA should appear after the closing paren
+        paren_idx = result.index(")")
+        delta_idx = result.index("USING DELTA")
+        assert delta_idx > paren_idx
+
+    def test_does_not_add_using_delta_when_already_present(self):
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t (a INT) USING DELTA")
+        assert result.count("USING DELTA") == 1
+
+    def test_adds_tblproperties_for_auto_optimize(self):
+        adapter = self._make_adapter(delta_auto_optimize=True)
+        result = adapter._convert_to_delta_table("CREATE TABLE t (a INT)")
+        assert "TBLPROPERTIES" in result
+        assert "'delta.autoOptimize.optimizeWrite' = 'true'" in result
+        assert "'delta.autoOptimize.autoCompact' = 'true'" in result
+
+    def test_no_tblproperties_when_auto_optimize_disabled(self):
+        adapter = self._make_adapter(delta_auto_optimize=False)
+        result = adapter._convert_to_delta_table("CREATE TABLE t (a INT)")
+        assert "TBLPROPERTIES ()" in result
+
+    def test_preserves_existing_tblproperties(self):
+        adapter = self._make_adapter()
+        sql = "CREATE TABLE t (a INT) TBLPROPERTIES ('x'='y')"
+        result = adapter._convert_to_delta_table(sql)
+        # Should NOT add a second TBLPROPERTIES block
+        assert result.count("TBLPROPERTIES") == 1
+
+    def test_non_create_table_passthrough(self):
+        adapter = self._make_adapter()
+        sql = "INSERT INTO foo VALUES (1)"
+        assert adapter._convert_to_delta_table(sql) == sql
+
+    def test_nested_parens_in_column_defs(self):
+        adapter = self._make_adapter()
+        sql = "CREATE TABLE t (a DECIMAL(10,2), b VARCHAR(100))"
+        result = adapter._convert_to_delta_table(sql)
+        # Should still find the right closing paren
+        assert "USING DELTA" in result
+        assert "DECIMAL(10,2)" in result
+        assert "VARCHAR(100)" in result
+
+
+class TestFixDatabricksSqlSyntax:
+    """Test _fix_databricks_sql_syntax NULLS FIRST/LAST removal."""
+
+    def _make_adapter(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            return DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+            )
+
+    def test_removes_nulls_last_from_pk(self):
+        adapter = self._make_adapter()
+        sql = "CREATE TABLE t (id INT, PRIMARY KEY (id NULLS LAST))"
+        result = adapter._fix_databricks_sql_syntax(sql)
+        assert "NULLS LAST" not in result
+        assert "PRIMARY KEY" in result
+
+    def test_removes_nulls_first_from_pk(self):
+        adapter = self._make_adapter()
+        sql = "CREATE TABLE t (id INT, PRIMARY KEY (id NULLS FIRST))"
+        result = adapter._fix_databricks_sql_syntax(sql)
+        assert "NULLS FIRST" not in result
+        assert "PRIMARY KEY" in result
+
+    def test_removes_multiple_nulls_clauses(self):
+        adapter = self._make_adapter()
+        sql = "CREATE TABLE t (a INT, b INT, PRIMARY KEY (a NULLS LAST, b NULLS FIRST))"
+        result = adapter._fix_databricks_sql_syntax(sql)
+        assert "NULLS LAST" not in result
+        assert "NULLS FIRST" not in result
+        assert "PRIMARY KEY" in result
+
+    def test_no_change_without_nulls(self):
+        adapter = self._make_adapter()
+        sql = "CREATE TABLE t (id INT, PRIMARY KEY (id))"
+        result = adapter._fix_databricks_sql_syntax(sql)
+        assert result == sql
+
+    def test_no_change_without_pk(self):
+        adapter = self._make_adapter()
+        sql = "CREATE TABLE t (id INT) ORDER BY id NULLS LAST"
+        result = adapter._fix_databricks_sql_syntax(sql)
+        # NULLS LAST outside a PRIMARY KEY should be preserved
+        assert result == sql
+
+
+class TestBuildCtasSortSql:
+    """Test _build_ctas_sort_sql for various sorted ingestion methods."""
+
+    def _make_adapter(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            return DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+            )
+
+    def _mock_column(self, name):
+        col = Mock()
+        col.name = name
+        return col
+
+    def test_ctas_method_generates_create_or_replace(self):
+        adapter = self._make_adapter()
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "ctas")):
+            result = adapter._build_ctas_sort_sql("LINEITEM", [self._mock_column("l_orderkey")])
+        assert result == "CREATE OR REPLACE TABLE LINEITEM AS SELECT * FROM LINEITEM ORDER BY l_orderkey"
+
+    def test_z_order_method_generates_optimize_zorder(self):
+        adapter = self._make_adapter()
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "z_order")):
+            result = adapter._build_ctas_sort_sql("ORDERS", [self._mock_column("o_orderkey")])
+        assert result == "OPTIMIZE ORDERS ZORDER BY (o_orderkey)"
+
+    def test_liquid_clustering_method_generates_alter_table(self):
+        adapter = self._make_adapter()
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "liquid_clustering")):
+            result = adapter._build_ctas_sort_sql("PART", [self._mock_column("p_partkey")])
+        assert result == "ALTER TABLE PART CLUSTER BY (p_partkey)"
+
+    def test_off_mode_returns_none(self):
+        adapter = self._make_adapter()
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("off", "ctas")):
+            result = adapter._build_ctas_sort_sql("T", [self._mock_column("x")])
+        assert result is None
+
+    def test_multiple_columns_joined(self):
+        adapter = self._make_adapter()
+        cols = [self._mock_column("a"), self._mock_column("b")]
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "z_order")):
+            result = adapter._build_ctas_sort_sql("T", cols)
+        assert result == "OPTIMIZE T ZORDER BY (a, b)"
+
+    def test_unsupported_method_raises(self):
+        adapter = self._make_adapter()
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "exotic_method")):
+            with pytest.raises(ValueError, match="not supported"):
+                adapter._build_ctas_sort_sql("T", [self._mock_column("x")])
+
+
+class TestResolveClusteringStrategy:
+    """Test _resolve_databricks_clustering_strategy precedence logic."""
+
+    def _make_adapter(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            return DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+            )
+
+    def test_default_is_z_order(self):
+        adapter = self._make_adapter()
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            assert adapter._resolve_databricks_clustering_strategy() == "z_order"
+
+    def test_no_platform_opts_returns_z_order(self):
+        adapter = self._make_adapter()
+        mock_config = Mock()
+        mock_config.platform_optimizations = None
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
+            assert adapter._resolve_databricks_clustering_strategy() == "z_order"
+
+    def test_liquid_enabled_overrides_z_order(self):
+        adapter = self._make_adapter()
+        mock_config = Mock()
+        mock_opts = Mock()
+        mock_opts.databricks_clustering_strategy = "z_order"
+        mock_opts.liquid_clustering_enabled = True
+        mock_opts.liquid_clustering_columns = []
+        mock_opts.z_ordering_enabled = True
+        mock_config.platform_optimizations = mock_opts
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
+            assert adapter._resolve_databricks_clustering_strategy() == "liquid_clustering"
+
+    def test_liquid_columns_set_selects_liquid(self):
+        adapter = self._make_adapter()
+        mock_config = Mock()
+        mock_opts = Mock()
+        mock_opts.databricks_clustering_strategy = "z_order"
+        mock_opts.liquid_clustering_enabled = False
+        mock_opts.liquid_clustering_columns = ["col1", "col2"]
+        mock_opts.z_ordering_enabled = False
+        mock_config.platform_optimizations = mock_opts
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
+            assert adapter._resolve_databricks_clustering_strategy() == "liquid_clustering"
+
+    def test_explicit_strategy_none_returns_none(self):
+        adapter = self._make_adapter()
+        mock_config = Mock()
+        mock_opts = Mock()
+        mock_opts.databricks_clustering_strategy = "none"
+        mock_opts.liquid_clustering_enabled = False
+        mock_opts.liquid_clustering_columns = []
+        mock_opts.z_ordering_enabled = False
+        mock_config.platform_optimizations = mock_opts
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
+            assert adapter._resolve_databricks_clustering_strategy() == "none"
+
+    def test_z_ordering_enabled_returns_z_order(self):
+        adapter = self._make_adapter()
+        mock_config = Mock()
+        mock_opts = Mock()
+        mock_opts.databricks_clustering_strategy = "auto"
+        mock_opts.liquid_clustering_enabled = False
+        mock_opts.liquid_clustering_columns = []
+        mock_opts.z_ordering_enabled = True
+        mock_config.platform_optimizations = mock_opts
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
+            assert adapter._resolve_databricks_clustering_strategy() == "z_order"
+
+
+class TestDeltaOperationsSql:
+    """Test Delta table operations SQL generation (OPTIMIZE, VACUUM, ANALYZE)."""
+
+    def _make_adapter(self, **kwargs):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            defaults = {
+                "server_hostname": "test.cloud.databricks.com",
+                "http_path": "/sql/1.0/warehouses/test",
+                "access_token": "tok",
+            }
+            defaults.update(kwargs)
+            return DatabricksAdapter(**defaults)
+
+    def test_optimize_table_generates_correct_sql(self):
+        adapter = self._make_adapter(enable_delta_optimization=True)
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        adapter.optimize_table(conn, "lineitem")
+        cursor.execute.assert_called_once_with("OPTIMIZE LINEITEM")
+
+    def test_optimize_table_skips_when_disabled(self):
+        adapter = self._make_adapter(enable_delta_optimization=False)
+        conn = Mock()
+        adapter.optimize_table(conn, "orders")
+        conn.cursor.assert_not_called()
+
+    def test_vacuum_table_default_retention(self):
+        adapter = self._make_adapter(enable_delta_optimization=True)
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        adapter.vacuum_table(conn, "part")
+        cursor.execute.assert_called_once_with("VACUUM PART RETAIN 168 HOURS")
+
+    def test_vacuum_table_custom_retention(self):
+        adapter = self._make_adapter(enable_delta_optimization=True)
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        adapter.vacuum_table(conn, "supplier", hours=48)
+        cursor.execute.assert_called_once_with("VACUUM SUPPLIER RETAIN 48 HOURS")
+
+    def test_vacuum_table_skips_when_disabled(self):
+        adapter = self._make_adapter(enable_delta_optimization=False)
+        conn = Mock()
+        adapter.vacuum_table(conn, "orders")
+        conn.cursor.assert_not_called()
+
+    def test_analyze_table_generates_compute_statistics(self):
+        adapter = self._make_adapter()
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        adapter.analyze_table(conn, "nation")
+        cursor.execute.assert_called_once_with("ANALYZE TABLE NATION COMPUTE STATISTICS")
+
+    def test_analyze_table_handles_error_gracefully(self):
+        adapter = self._make_adapter()
+        conn = Mock()
+        cursor = Mock()
+        cursor.execute.side_effect = Exception("access denied")
+        conn.cursor.return_value = cursor
+        # Should not raise - just log warning
+        adapter.analyze_table(conn, "region")
+        cursor.execute.assert_called_once_with("ANALYZE TABLE REGION COMPUTE STATISTICS")
+
+
+class TestConfigValidation:
+    """Test configuration validation and initialization edge cases."""
+
+    def test_missing_only_server_hostname(self):
+        from benchbox.core.exceptions import ConfigurationError
+
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            with pytest.raises(ConfigurationError, match="server_hostname") as exc_info:
+                DatabricksAdapter(
+                    http_path="/sql/1.0/warehouses/test",
+                    access_token="test_token",
+                )
+            assert "server_hostname" in str(exc_info.value)
+
+    def test_missing_only_http_path(self):
+        from benchbox.core.exceptions import ConfigurationError
+
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            with pytest.raises(ConfigurationError, match="http_path") as exc_info:
+                DatabricksAdapter(
+                    server_hostname="host.databricks.com",
+                    access_token="test_token",
+                )
+            assert "http_path" in str(exc_info.value)
+
+    def test_missing_only_access_token(self):
+        from benchbox.core.exceptions import ConfigurationError
+
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            with pytest.raises(ConfigurationError, match="access_token") as exc_info:
+                DatabricksAdapter(
+                    server_hostname="host.databricks.com",
+                    http_path="/sql/1.0/warehouses/test",
+                )
+            assert "access_token" in str(exc_info.value)
+
+    def test_missing_all_required_fields(self):
+        from benchbox.core.exceptions import ConfigurationError
+
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            with pytest.raises(ConfigurationError, match="Databricks configuration is incomplete"):
+                DatabricksAdapter()
+
+    def test_alternative_config_keys_host_and_token(self):
+        """Test 'host' and 'token' alternative keys for server_hostname and access_token."""
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                host="alt.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                token="alt_token",
+            )
+            assert adapter.server_hostname == "alt.cloud.databricks.com"
+            assert adapter.access_token == "alt_token"
+
+    def test_delta_settings_explicit_false(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="host.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+                enable_delta_optimization=False,
+                delta_auto_optimize=False,
+                delta_auto_compact=False,
+            )
+            assert adapter.enable_delta_optimization is False
+            assert adapter.delta_auto_optimize is False
+            assert adapter.delta_auto_compact is False
+
+    def test_cluster_settings(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="host.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+                cluster_size="Large",
+                auto_terminate_minutes=60,
+            )
+            assert adapter.cluster_size == "Large"
+            assert adapter.auto_terminate_minutes == 60
+
+    def test_disable_result_cache_default(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="host.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+            )
+            assert adapter.disable_result_cache is True
+
+    def test_create_catalog_default_false(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="host.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+            )
+            assert adapter.create_catalog is False
+
+    def test_uc_volume_configuration(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="host.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+                uc_catalog="my_catalog",
+                uc_schema="my_schema",
+                uc_volume="my_volume",
+            )
+            assert adapter.uc_catalog == "my_catalog"
+            assert adapter.uc_schema == "my_schema"
+            assert adapter.uc_volume == "my_volume"
+
+
+class TestIsCloudUri:
+    """Test _is_cloud_uri static method."""
+
+    def test_s3_uri(self):
+        assert DatabricksAdapter._is_cloud_uri("s3://bucket/path") is True
+
+    def test_gs_uri(self):
+        assert DatabricksAdapter._is_cloud_uri("gs://bucket/path") is True
+
+    def test_abfss_uri(self):
+        assert DatabricksAdapter._is_cloud_uri("abfss://container@account.dfs.core.windows.net/path") is True
+
+    def test_dbfs_uri(self):
+        assert DatabricksAdapter._is_cloud_uri("dbfs:/Volumes/cat/schema/vol") is True
+
+    def test_local_path_not_cloud(self):
+        assert DatabricksAdapter._is_cloud_uri("/tmp/data") is False
+
+    def test_relative_path_not_cloud(self):
+        assert DatabricksAdapter._is_cloud_uri("data/files") is False
+
+
+class TestDetectShardedFiles:
+    """Test _detect_sharded_files logic for multi-part file detection."""
+
+    def _make_adapter(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            return DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+            )
+
+    def test_detects_compressed_sharded_file(self, tmp_path):
+        # Create sharded files: lineitem.tbl.1.zst, lineitem.tbl.2.zst
+        (tmp_path / "lineitem.tbl.1.zst").write_bytes(b"data1")
+        (tmp_path / "lineitem.tbl.2.zst").write_bytes(b"data2")
+
+        adapter = self._make_adapter()
+        is_sharded, pattern, chunk_files = adapter._detect_sharded_files(tmp_path / "lineitem.tbl.1.zst", "lineitem")
+        assert is_sharded is True
+        assert pattern == "lineitem.tbl.*.zst"
+        assert len(chunk_files) == 2
+
+    def test_detects_uncompressed_sharded_file(self, tmp_path):
+        (tmp_path / "orders.tbl.1").write_bytes(b"data1")
+        (tmp_path / "orders.tbl.2").write_bytes(b"data2")
+        (tmp_path / "orders.tbl.3").write_bytes(b"data3")
+
+        adapter = self._make_adapter()
+        is_sharded, pattern, chunk_files = adapter._detect_sharded_files(tmp_path / "orders.tbl.1", "orders")
+        assert is_sharded is True
+        assert pattern == "orders.tbl.*"
+        assert len(chunk_files) == 3
+
+    def test_single_file_not_sharded(self, tmp_path):
+        (tmp_path / "nation.csv").write_bytes(b"data")
+
+        adapter = self._make_adapter()
+        is_sharded, pattern, chunk_files = adapter._detect_sharded_files(tmp_path / "nation.csv", "nation")
+        assert is_sharded is False
+
+
+class TestManifestPatternForName:
+    """Test _manifest_pattern_for_name static method."""
+
+    def test_compressed_sharded_name(self):
+        base, ext = DatabricksAdapter._manifest_pattern_for_name("lineitem.tbl.1.zst")
+        assert base == "lineitem.tbl"
+        assert ext == ".zst"
+
+    def test_uncompressed_sharded_name(self):
+        base, ext = DatabricksAdapter._manifest_pattern_for_name("orders.tbl.3")
+        assert base == "orders.tbl"
+        assert ext == ""
+
+    def test_simple_filename(self):
+        base, ext = DatabricksAdapter._manifest_pattern_for_name("nation.csv")
+        assert base == "nation"
+        assert ext == ".csv"
+
+
+class TestDetectManifestWildcard:
+    """Test _detect_manifest_wildcard for wildcard pattern generation."""
+
+    def _make_adapter(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            return DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+            )
+
+    def test_consistent_sharded_names_produce_wildcard(self):
+        adapter = self._make_adapter()
+        names = ["lineitem.tbl.1.zst", "lineitem.tbl.2.zst", "lineitem.tbl.3.zst"]
+        result = adapter._detect_manifest_wildcard(names)
+        assert result == "lineitem.tbl.*.zst"
+
+    def test_inconsistent_names_return_none(self):
+        adapter = self._make_adapter()
+        names = ["lineitem.tbl.1.zst", "orders.tbl.2.zst"]
+        result = adapter._detect_manifest_wildcard(names)
+        assert result is None
+
+    def test_uncompressed_sharded_wildcard(self):
+        adapter = self._make_adapter()
+        names = ["orders.tbl.1", "orders.tbl.2"]
+        result = adapter._detect_manifest_wildcard(names)
+        assert result == "orders.tbl.*"
+
+
+class TestEnsureUcVolumeExists:
+    """Test _ensure_uc_volume_exists SQL generation and error handling."""
+
+    def _make_adapter(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            return DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+            )
+
+    def test_creates_schema_and_volume(self):
+        adapter = self._make_adapter()
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+
+        adapter._ensure_uc_volume_exists("dbfs:/Volumes/my_cat/my_schema/my_vol", conn)
+
+        calls = [c.args[0] for c in cursor.execute.call_args_list]
+        assert calls[0] == "CREATE SCHEMA IF NOT EXISTS my_cat.my_schema"
+        assert calls[1] == "CREATE VOLUME IF NOT EXISTS my_cat.my_schema.my_vol"
+
+    def test_creates_volume_with_subpath(self):
+        adapter = self._make_adapter()
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+
+        adapter._ensure_uc_volume_exists("dbfs:/Volumes/cat/sch/vol/subdir/data", conn)
+
+        calls = [c.args[0] for c in cursor.execute.call_args_list]
+        assert calls[0] == "CREATE SCHEMA IF NOT EXISTS cat.sch"
+        assert calls[1] == "CREATE VOLUME IF NOT EXISTS cat.sch.vol"
+
+    def test_invalid_path_not_starting_with_volumes(self):
+        adapter = self._make_adapter()
+        conn = Mock()
+        with pytest.raises(ValueError, match="Must start with dbfs:/Volumes/"):
+            adapter._ensure_uc_volume_exists("dbfs:/some/other/path", conn)
+
+    def test_incomplete_path_too_few_parts(self):
+        adapter = self._make_adapter()
+        conn = Mock()
+        with pytest.raises(ValueError, match="Expected dbfs:/Volumes/catalog/schema/volume"):
+            adapter._ensure_uc_volume_exists("dbfs:/Volumes/cat/sch", conn)
+
+    def test_permission_denied_on_schema_creation(self):
+        adapter = self._make_adapter()
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        cursor.execute.side_effect = Exception("permission denied")
+
+        with pytest.raises(ValueError, match="Permission denied creating schema"):
+            adapter._ensure_uc_volume_exists("dbfs:/Volumes/cat/sch/vol", conn)
+
+    def test_permission_denied_on_volume_creation(self):
+        adapter = self._make_adapter()
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+
+        call_count = 0
+
+        def side_effect(sql):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:  # Volume creation
+                raise Exception("access denied to create volume")
+
+        cursor.execute.side_effect = side_effect
+
+        with pytest.raises(ValueError, match="Permission denied creating UC Volume"):
+            adapter._ensure_uc_volume_exists("dbfs:/Volumes/cat/sch/vol", conn)
+
+
+class TestGetExistingTables:
+    """Test _get_existing_tables SQL generation."""
+
+    def _make_adapter(self, catalog="test_catalog", schema="test_schema"):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            return DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+                catalog=catalog,
+                schema=schema,
+            )
+
+    def test_returns_non_temporary_tables(self):
+        adapter = self._make_adapter()
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        cursor.fetchall.return_value = [
+            ("test_schema", "orders", False),
+            ("test_schema", "lineitem", False),
+            ("test_schema", "tmp_view", True),
+        ]
+
+        tables = adapter._get_existing_tables(conn)
+
+        cursor.execute.assert_called_once_with("SHOW TABLES IN test_catalog.test_schema")
+        assert tables == ["orders", "lineitem"]
+        assert "tmp_view" not in tables
+
+    def test_handles_error_returns_empty(self):
+        adapter = self._make_adapter()
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        cursor.execute.side_effect = Exception("connection lost")
+
+        tables = adapter._get_existing_tables(conn)
+
+        assert tables == []
+
+
+class TestUnityCatalogNaming:
+    """Test three-level naming: catalog.schema.table in generated SQL."""
+
+    def _make_adapter(self, catalog="analytics", schema="benchmarks"):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            return DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+                catalog=catalog,
+                schema=schema,
+            )
+
+    def test_drop_database_uses_catalog_dot_schema(self):
+        adapter = self._make_adapter(catalog="prod", schema="tpch_sf10")
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql") as mock_sql:
+            mock_sql.connect.return_value = conn
+            adapter.drop_database()
+        cursor.execute.assert_called_with("DROP SCHEMA IF EXISTS prod.tpch_sf10 CASCADE")
+
+    def test_check_server_database_queries_catalog_then_schema(self):
+        adapter = self._make_adapter(catalog="dev", schema="test_schema")
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        cursor.fetchall.side_effect = [
+            [["dev"], ["other"]],
+            [["test_schema"], ["default"]],
+        ]
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql") as mock_sql:
+            mock_sql.connect.return_value = conn
+            result = adapter.check_server_database_exists()
+
+        assert result is True
+        calls = [c.args[0] for c in cursor.execute.call_args_list]
+        assert calls[0] == "SHOW CATALOGS"
+        assert calls[1] == "SHOW SCHEMAS IN dev"
+
+    def test_create_schema_without_catalog_creation(self):
+        """Schema creation SQL should use catalog.schema pattern."""
+        adapter = self._make_adapter(catalog="workspace", schema="tpch_sf1")
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+
+        mock_benchmark = Mock()
+
+        with patch.object(adapter, "_create_schema_with_tuning", return_value="CREATE TABLE t (id INT)"):
+            with patch.object(adapter, "_fix_databricks_sql_syntax", side_effect=lambda x: x):
+                with patch.object(adapter, "_execute_schema_statements", return_value=(1, [])):
+                    adapter.create_schema(mock_benchmark, conn)
+
+        calls = [c.args[0] for c in cursor.execute.call_args_list]
+        assert "CREATE SCHEMA IF NOT EXISTS workspace.tpch_sf1" in calls
+        assert "USE CATALOG workspace" in calls
+        assert "USE SCHEMA tpch_sf1" in calls
+
+    def test_create_schema_with_catalog_creation(self):
+        """When create_catalog=True, both catalog and schema creation SQL."""
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+                catalog="new_catalog",
+                schema="new_schema",
+                create_catalog=True,
+            )
+
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        mock_benchmark = Mock()
+
+        with patch.object(adapter, "_create_schema_with_tuning", return_value="CREATE TABLE t (id INT)"):
+            with patch.object(adapter, "_fix_databricks_sql_syntax", side_effect=lambda x: x):
+                with patch.object(adapter, "_execute_schema_statements", return_value=(1, [])):
+                    adapter.create_schema(mock_benchmark, conn)
+
+        calls = [c.args[0] for c in cursor.execute.call_args_list]
+        assert "CREATE CATALOG IF NOT EXISTS new_catalog" in calls
+        assert "CREATE SCHEMA IF NOT EXISTS new_catalog.new_schema" in calls
+
+
+class TestCopyIntoSqlGeneration:
+    """Test COPY INTO SQL generation for various data formats."""
+
+    def _make_adapter(self, **kwargs):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            defaults = {
+                "server_hostname": "test.cloud.databricks.com",
+                "http_path": "/sql/1.0/warehouses/test",
+                "access_token": "tok",
+                "catalog": "main",
+                "schema": "bench",
+            }
+            defaults.update(kwargs)
+            return DatabricksAdapter(**defaults)
+
+    def test_copy_into_tbl_format_uses_pipe_delimiter(self):
+        """TPC .tbl files should use pipe delimiter."""
+        adapter = self._make_adapter()
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {"lineitem": {"columns": [{"name": "l_orderkey"}, {"name": "l_partkey"}]}}
+        cursor = Mock()
+        cursor.fetchone.return_value = (1000,)
+        conn = Mock()
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            adapter._load_single_table(
+                cursor,
+                conn,
+                benchmark,
+                "lineitem",
+                Path("lineitem.tbl"),
+                "dbfs:/Volumes/main/bench/data",
+                {"lineitem"},
+            )
+
+        copy_sql = cursor.execute.call_args_list[0].args[0]
+        assert "COPY INTO LINEITEM" in copy_sql
+        assert "'delimiter'='|'" in copy_sql
+        assert "'header'='false'" in copy_sql
+
+    def test_copy_into_csv_format_uses_comma_delimiter(self):
+        """CSV files should use comma delimiter."""
+        adapter = self._make_adapter()
+        benchmark = Mock(spec=[])  # No get_schema
+        cursor = Mock()
+        cursor.fetchone.return_value = (500,)
+        conn = Mock()
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            adapter._load_single_table(
+                cursor,
+                conn,
+                benchmark,
+                "customers",
+                Path("customers.csv"),
+                "dbfs:/Volumes/main/bench/data",
+                {"customers"},
+            )
+
+        copy_sql = cursor.execute.call_args_list[0].args[0]
+        assert "COPY INTO CUSTOMERS" in copy_sql
+        assert "'delimiter'=','" in copy_sql
+
+    def test_copy_into_with_uc_volume_uri(self):
+        """COPY INTO should use the UC Volume URI directly."""
+        adapter = self._make_adapter()
+        benchmark = Mock(spec=[])
+        cursor = Mock()
+        cursor.fetchone.return_value = (42,)
+        conn = Mock()
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            adapter._load_single_table(
+                cursor,
+                conn,
+                benchmark,
+                "region",
+                "dbfs:/Volumes/main/bench/data/region.tbl",
+                "dbfs:/Volumes/main/bench/data",
+                {"region"},
+            )
+
+        copy_sql = cursor.execute.call_args_list[0].args[0]
+        assert "'dbfs:/Volumes/main/bench/data/region.tbl'" in copy_sql
+
+    def test_copy_into_with_wildcard_for_sharded(self):
+        """Wildcard patterns should be passed through to COPY INTO."""
+        adapter = self._make_adapter()
+        benchmark = Mock(spec=[])
+        cursor = Mock()
+        cursor.fetchone.return_value = (9999,)
+        conn = Mock()
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            adapter._load_single_table(
+                cursor,
+                conn,
+                benchmark,
+                "lineitem",
+                "dbfs:/Volumes/main/bench/data/lineitem.tbl.*",
+                "dbfs:/Volumes/main/bench/data",
+                {"lineitem"},
+            )
+
+        copy_sql = cursor.execute.call_args_list[0].args[0]
+        assert "lineitem.tbl.*" in copy_sql
+
+    def test_load_single_table_raises_when_table_missing(self):
+        adapter = self._make_adapter()
+        cursor = Mock()
+        conn = Mock()
+        benchmark = Mock(spec=[])
+
+        with pytest.raises(RuntimeError, match="does not exist"):
+            adapter._load_single_table(
+                cursor,
+                conn,
+                benchmark,
+                "nonexistent",
+                Path("nonexistent.tbl"),
+                "dbfs:/data",
+                {"orders", "lineitem"},
+            )
+
+    def test_load_single_table_runs_optimize_when_delta_enabled(self):
+        adapter = self._make_adapter(enable_delta_optimization=True)
+        benchmark = Mock(spec=[])
+        cursor = Mock()
+        cursor.fetchone.return_value = (10,)
+        conn = Mock()
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            row_count, copy_time, optimize_time = adapter._load_single_table(
+                cursor,
+                conn,
+                benchmark,
+                "nation",
+                Path("nation.tbl"),
+                "dbfs:/data",
+                {"nation"},
+            )
+
+        assert row_count == 10
+        calls = [c.args[0] for c in cursor.execute.call_args_list]
+        assert "OPTIMIZE NATION" in calls
+
+    def test_load_single_table_skips_optimize_when_delta_disabled(self):
+        adapter = self._make_adapter(enable_delta_optimization=False)
+        benchmark = Mock(spec=[])
+        cursor = Mock()
+        cursor.fetchone.return_value = (10,)
+        conn = Mock()
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            row_count, copy_time, optimize_time = adapter._load_single_table(
+                cursor,
+                conn,
+                benchmark,
+                "nation",
+                Path("nation.tbl"),
+                "dbfs:/data",
+                {"nation"},
+            )
+
+        assert row_count == 10
+        assert optimize_time == 0.0
+        calls = [c.args[0] for c in cursor.execute.call_args_list]
+        assert "OPTIMIZE NATION" not in calls
+
+
+class TestGetPlatformInfo:
+    """Test get_platform_info metadata collection."""
+
+    def _make_adapter(self, **kwargs):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            defaults = {
+                "server_hostname": "test.cloud.databricks.com",
+                "http_path": "/sql/1.0/warehouses/test",
+                "access_token": "tok",
+                "catalog": "main",
+                "schema": "benchbox",
+            }
+            defaults.update(kwargs)
+            return DatabricksAdapter(**defaults)
+
+    def test_platform_info_without_connection(self):
+        adapter = self._make_adapter()
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            with patch.dict("sys.modules", {"databricks.sdk": None}):
+                info = adapter.get_platform_info(connection=None)
+
+        assert info["platform_type"] == "databricks"
+        assert info["platform_name"] == "Databricks"
+        assert info["connection_mode"] == "remote"
+        assert info["host"] == "test.cloud.databricks.com"
+        assert info["configuration"]["catalog"] == "main"
+        assert info["configuration"]["schema"] == "benchbox"
+        assert info["configuration"]["result_cache_enabled"] is False
+        assert info["platform_version"] is None
+
+    def test_platform_info_includes_delta_settings(self):
+        adapter = self._make_adapter(
+            enable_delta_optimization=True,
+            delta_auto_optimize=True,
+            delta_auto_compact=True,
+        )
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            with patch.dict("sys.modules", {"databricks.sdk": None}):
+                info = adapter.get_platform_info(connection=None)
+
+        config = info["configuration"]
+        assert config["enable_delta_optimization"] is True
+        assert config["delta_auto_optimize"] is True
+        assert config["delta_auto_compact"] is True
+
+    def test_platform_info_with_connection_queries_version(self):
+        adapter = self._make_adapter()
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        cursor.fetchone.return_value = ["Runtime 14.3 LTS"]
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            # Patch out the SDK import to avoid ImportError in warehouse metadata section
+            with patch.dict("sys.modules", {"databricks.sdk": None}):
+                info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "Runtime 14.3 LTS"
+        assert info["engine_version"] == "Runtime 14.3 LTS"
+
+
+class TestResolveDataFiles:
+    """Test _resolve_databricks_data_files resolution logic."""
+
+    def _make_adapter(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            return DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+            )
+
+    def test_uses_benchmark_tables_attribute(self):
+        adapter = self._make_adapter()
+        benchmark = Mock()
+        benchmark.tables = {"orders": "/data/orders.tbl", "lineitem": "/data/lineitem.tbl"}
+        result = adapter._resolve_databricks_data_files(benchmark, Path("/data"))
+        assert result == {"orders": "/data/orders.tbl", "lineitem": "/data/lineitem.tbl"}
+
+    def test_uses_impl_tables_fallback(self):
+        adapter = self._make_adapter()
+        benchmark = Mock(spec=[])
+        benchmark._impl = Mock()
+        benchmark._impl.tables = {"region": "/data/region.tbl"}
+        # Need to make hasattr return True for _impl
+        benchmark.tables = None
+        result = adapter._resolve_databricks_data_files(benchmark, Path("/data"))
+        assert result == {"region": "/data/region.tbl"}
+
+    def test_uses_manifest_fallback(self, tmp_path):
+        import json
+
+        adapter = self._make_adapter()
+        benchmark = Mock(spec=[])
+
+        manifest = {
+            "tables": {
+                "nation": [{"path": "nation.tbl"}],
+                "region": [{"path": "region.tbl"}],
+            }
+        }
+        (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest))
+
+        result = adapter._resolve_databricks_data_files(benchmark, tmp_path)
+        assert "nation" in result
+        assert "region" in result
+
+    def test_raises_when_no_data_found(self, tmp_path):
+        adapter = self._make_adapter()
+        benchmark = Mock(spec=[])
+
+        with pytest.raises(ValueError, match="No data files found"):
+            adapter._resolve_databricks_data_files(benchmark, tmp_path)
+
+
+class TestSelectDatabricksWarehouseEdgeCases:
+    """Additional edge cases for _select_databricks_warehouse."""
+
+    def test_all_deleted_returns_none(self):
+        logger = Mock()
+        d1 = Mock(name="del1", state="DELETED")
+        d2 = Mock(name="del2", state="DELETING")
+        result = _select_databricks_warehouse([d1, d2], very_verbose=False, logger=logger)
+        assert result is None
+
+    def test_verbose_logging_on_running_selection(self):
+        logger = Mock()
+        wh = Mock()
+        wh.name = "prod-wh"
+        wh.state = "RUNNING"
+        result = _select_databricks_warehouse([wh], very_verbose=True, logger=logger)
+        assert result is wh
+        logger.info.assert_any_call("Selected running warehouse: prod-wh")
+
+
+class TestFromConfigEdgeCases:
+    """Test from_config placeholder detection and auto-detection paths."""
+
+    def test_placeholder_hostname_triggers_auto_detect(self):
+        """Config with placeholder hostname should trigger auto-detection."""
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            with patch.object(DatabricksAdapter, "_auto_detect_databricks_config", return_value=None):
+                # Should fail because auto-detect returns None and credentials are placeholders
+                from benchbox.core.exceptions import ConfigurationError
+
+                with pytest.raises(ConfigurationError):
+                    DatabricksAdapter.from_config(
+                        {
+                            "server_hostname": "your-workspace.cloud.databricks.com",
+                            "http_path": "/sql/1.0/warehouses/your-warehouse-id",
+                            "access_token": "test_token",
+                        }
+                    )
+
+    def test_from_config_with_explicit_schema_override(self):
+        """Explicit non-default schema should be preserved even with benchmark context."""
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter.from_config(
+                {
+                    "server_hostname": "test.cloud.databricks.com",
+                    "http_path": "/sql/1.0/warehouses/test",
+                    "access_token": "test_token",
+                    "schema": "my_custom_schema",
+                    "benchmark": "tpch",
+                    "scale_factor": 1,
+                }
+            )
+        assert adapter.schema == "my_custom_schema"
+
+    def test_from_config_without_benchmark_context_uses_default(self):
+        """Without benchmark context, schema falls back to provided or 'benchbox'."""
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter.from_config(
+                {
+                    "server_hostname": "test.cloud.databricks.com",
+                    "http_path": "/sql/1.0/warehouses/test",
+                    "access_token": "test_token",
+                }
+            )
+        assert adapter.schema == "benchbox"

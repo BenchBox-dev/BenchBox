@@ -475,18 +475,14 @@ print(df.groupby("status").count())
 
 ## Schema Evolution
 
-BenchBox maintains backward compatibility through schema versioning.
+BenchBox uses schema versioning to manage result format evolution.
 
 **Current Version**: v1 (result_schema_v1)
 
-**Compatibility Promise**:
+**Schema Rules**:
 - New fields may be added (with defaults)
 - Existing fields won't be removed or renamed
 - Type changes are breaking (trigger major version)
-
-**Migration**: If schema changes occur, migration guides will be provided.
-
-See: [Migration Guides](../migration/result_object_migration.md)
 
 ## Best Practices
 

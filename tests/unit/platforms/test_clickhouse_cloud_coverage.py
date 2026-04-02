@@ -301,10 +301,11 @@ def test_load_data_dispatches_to_s3_when_configured() -> None:
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://b/p/")
     mock_result = ({"t": 10}, 1.0, {"loading_method": "s3_staging"})
 
+    benchmark, connection = MagicMock(), MagicMock()
     with patch.object(adapter, "_load_data_via_s3", return_value=mock_result) as mock_s3:
-        result = adapter.load_data(MagicMock(), MagicMock(), Path("/tmp"))
+        result = adapter.load_data(benchmark, connection, Path("/tmp"))
 
-    mock_s3.assert_called_once()
+    mock_s3.assert_called_once_with(benchmark, connection, Path("/tmp"))
     assert result[2]["loading_method"] == "s3_staging"
 
 
@@ -313,10 +314,11 @@ def test_load_data_dispatches_to_gcs_when_configured() -> None:
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://b/p/")
     mock_result = ({"t": 10}, 1.0, {"loading_method": "gcs_staging"})
 
+    benchmark, connection = MagicMock(), MagicMock()
     with patch.object(adapter, "_load_data_via_gcs", return_value=mock_result) as mock_gcs:
-        result = adapter.load_data(MagicMock(), MagicMock(), Path("/tmp"))
+        result = adapter.load_data(benchmark, connection, Path("/tmp"))
 
-    mock_gcs.assert_called_once()
+    mock_gcs.assert_called_once_with(benchmark, connection, Path("/tmp"))
     assert result[2]["loading_method"] == "gcs_staging"
 
 
@@ -325,13 +327,14 @@ def test_load_data_falls_back_to_default_when_no_staging() -> None:
     adapter = ClickHouseCloudAdapter(host="h", password="p")
     mock_result = ({"t": 10}, 1.0, None)
 
+    benchmark, connection = MagicMock(), MagicMock()
     with patch(
         "benchbox.platforms.clickhouse.workload.ClickHouseWorkloadMixin.load_data",
         return_value=mock_result,
     ) as mock_parent:
-        result = adapter.load_data(MagicMock(), MagicMock(), Path("/tmp"))
+        result = adapter.load_data(benchmark, connection, Path("/tmp"))
 
-    mock_parent.assert_called_once()
+    mock_parent.assert_called_once_with(benchmark, connection, Path("/tmp"))
     assert result[2] is None
 
 
@@ -349,10 +352,11 @@ def test_create_external_tables_dispatches_to_s3() -> None:
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
     mock_result = ({"orders": 100}, 1.0, {"loading_method": "s3_external_views"})
 
+    benchmark, connection = MagicMock(), MagicMock()
     with patch.object(adapter, "_create_external_tables_via_s3", return_value=mock_result) as mock_s3:
-        result = adapter.create_external_tables(MagicMock(), MagicMock(), Path("/tmp"))
+        result = adapter.create_external_tables(benchmark, connection, Path("/tmp"))
 
-    mock_s3.assert_called_once()
+    mock_s3.assert_called_once_with(benchmark, connection, Path("/tmp"))
     assert result[2]["loading_method"] == "s3_external_views"
 
 
@@ -384,7 +388,9 @@ def test_create_external_tables_via_s3_builds_view_sql(tmp_path: Path) -> None:
 
     assert stats["orders"] == 17
     assert metadata["loading_method"] == "s3_external_views"
-    mock_s3_client.upload_file.assert_called_once()
+    upload_args = mock_s3_client.upload_file.call_args
+    assert upload_args is not None, "upload_file should have been called"
+    assert "bucket" in str(upload_args), "Upload should target the configured bucket"
 
     executed_sql = " ".join(call.args[0] for call in connection.execute.call_args_list)
     assert "CREATE OR REPLACE VIEW orders AS SELECT * FROM s3(" in executed_sql
@@ -461,8 +467,12 @@ def test_load_data_via_s3_uploads_and_ingests(tmp_path: Path) -> None:
     assert "test_table" in table_stats
     assert metadata["loading_method"] == "s3_staging"
     assert metadata["s3_staging_url"] == "s3://bucket/staging/"
-    # Verify S3 upload was called
-    mock_s3_client.upload_file.assert_called_once()
+    # Verify S3 upload was called with the data file
+    upload_args = mock_s3_client.upload_file.call_args
+    assert upload_args is not None, "upload_file should have been called"
+    # Check positional and keyword args directly to avoid repr escaping of backslashes on Windows
+    all_arg_values = list(upload_args.args) + list(upload_args.kwargs.values())
+    assert any(str(data_file) == str(a) for a in all_arg_values), f"Upload should include {data_file}"
     # Verify INSERT FROM s3() was executed
     execute_calls = [str(c) for c in connection.execute.call_args_list]
     assert any("s3(" in str(c) for c in execute_calls)

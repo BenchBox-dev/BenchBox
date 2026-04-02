@@ -660,46 +660,8 @@ benchbox run --platform duckdb --benchmark tpch --capture-plans -o current
 benchbox compare baseline/results.json current/results.json --include-plans
 ```
 
-## Migration from compare-dataframes
-
-The `compare-dataframes` command is deprecated. Migrate to `compare`:
-
-```bash
-# OLD
-benchbox compare-dataframes -p polars-df -p pandas-df
-
-# NEW
-benchbox compare -p polars-df -p pandas-df
-```
-
-```bash
-# OLD (SQL vs DataFrame)
-benchbox compare-dataframes -p polars-df --vs-sql duckdb
-
-# NEW
-benchbox compare -p polars-df -p duckdb
-```
-
-## Migration from compare-plans
-
-The `compare-plans` command is deprecated. Migrate to `compare --include-plans`:
-
-```bash
-# OLD
-benchbox compare-plans --run1 before.json --run2 after.json
-
-# NEW
-benchbox compare before.json after.json --include-plans
-
-# OLD with threshold
-benchbox compare-plans --run1 before.json --run2 after.json --threshold 0.9
-
-# NEW with threshold
-benchbox compare before.json after.json --include-plans --plan-threshold 0.9
-```
-
 ## Related Documentation
 
 - [CLI Reference](../reference/cli-reference.md) - Full command reference
-- [DataFrame Migration Guide](dataframe-migration.md) - Adopting DataFrame benchmarking
+- [DataFrame Benchmarking Guide](dataframe-migration.md) - Adopting DataFrame benchmarking
 - [Visualization Guide](../visualization/chart-generation-guide.md) - Chart customization

@@ -8,15 +8,22 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 import yaml
 
 from benchbox.core.config_utils import (
+    _get_default_output_dir,
     build_benchmark_config,
     build_platform_adapter_config,
     deep_merge_dicts,
+    extract_cli_config,
+    get_builtin_defaults,
     load_config_file,
+    load_platform_config,
+    load_tuning_config,
+    merge_all_configs,
     save_config_file,
     validate_config_sections,
     validate_numeric_config,
@@ -393,3 +400,237 @@ class TestValidateNumericConfig:
         assert len(errors) == 2
         assert "numeric" in errors[0]
         assert "numeric" in errors[1]
+
+
+class TestDefaultOutputDirHelper:
+    """Test private output-dir helper branches used by config builders."""
+
+    def test_missing_platform_or_benchmark_returns_none(self):
+        assert _get_default_output_dir(None, "tpch", 0.01) is None
+        assert _get_default_output_dir("duckdb", None, 0.01) is None
+
+    def test_duckdb_and_sqlite_use_benchmark_runs_path(self):
+        duckdb_dir = _get_default_output_dir("duckdb", "tpch", 0.01)
+        sqlite_dir = _get_default_output_dir("sqlite", "tpch", 0.01)
+
+        expected_suffix = str(Path("benchmark_runs") / "datagen" / "tpch_sf001")
+        assert duckdb_dir is not None and duckdb_dir.endswith(expected_suffix)
+        assert sqlite_dir is not None and sqlite_dir.endswith(expected_suffix)
+
+    def test_clickhouse_prefers_custom_data_path(self):
+        assert _get_default_output_dir("clickhouse", "tpch", 0.01, "/tmp/custom") == "/tmp/custom"
+        assert _get_default_output_dir("clickhouse", "tpch", 0.01) == "/tmp/benchbox_ch_local"
+
+    def test_unknown_platform_returns_none(self):
+        assert _get_default_output_dir("postgresql", "tpch", 0.01) is None
+
+
+class TestLoadPlatformConfig:
+    """Test platform-config loading and fallback behavior."""
+
+    def test_load_platform_config_uses_built_in_defaults_when_default_file_missing(self, tmp_path):
+        with patch("benchbox.core.config_utils.emit") as mock_emit:
+            original_cwd = Path.cwd()
+            try:
+                # Ensure examples/config/<platform>.yaml does not exist.
+                import os
+
+                os.chdir(tmp_path)
+                result = load_platform_config("missing-platform", verbose=True)
+            finally:
+                os.chdir(original_cwd)
+
+        assert result == {}
+        mock_emit.assert_called_once_with("Platform config using built-in defaults")
+
+    def test_load_platform_config_merges_connection_extra_params_and_settings(self, tmp_path):
+        config_path = tmp_path / "duckdb.yaml"
+        config_path.write_text(
+            yaml.safe_dump(
+                {
+                    "connection": {
+                        "database_path": "bench.duckdb",
+                        "extra_params": {"memory_limit": "8GB"},
+                    },
+                    "settings": {"threads": 4},
+                }
+            )
+        )
+
+        with patch("benchbox.core.config_utils.emit") as mock_emit:
+            result = load_platform_config("duckdb", str(config_path), verbose=True)
+
+        assert result == {
+            "database_path": "bench.duckdb",
+            "extra_params": {"memory_limit": "8GB"},
+            "memory_limit": "8GB",
+            "threads": 4,
+        }
+        mock_emit.assert_called_once_with(f"Platform config loaded from file: {config_path}")
+
+    def test_load_platform_config_warns_and_returns_empty_on_parse_failure(self, tmp_path):
+        config_path = tmp_path / "broken.yaml"
+        config_path.write_text("connection: [broken")
+
+        with patch("benchbox.core.config_utils.emit") as mock_emit:
+            result = load_platform_config("duckdb", str(config_path), verbose=True)
+
+        assert result == {}
+        assert mock_emit.call_count == 2
+        assert "Warning: Failed to load platform config" in mock_emit.call_args_list[0].args[0]
+        assert mock_emit.call_args_list[1].args[0] == "Using built-in defaults for duckdb"
+
+
+class TestLoadTuningConfig:
+    """Test tuning-config selection and parsing."""
+
+    def test_load_tuning_config_warns_when_auto_selected_file_is_missing(self, tmp_path):
+        with patch("benchbox.core.config_utils.emit") as mock_emit:
+            original_cwd = Path.cwd()
+            try:
+                import os
+
+                os.chdir(tmp_path)
+                result = load_tuning_config("duckdb", "tpch", "tuned", verbose=True)
+            finally:
+                os.chdir(original_cwd)
+
+        assert result is None
+        assert mock_emit.call_args_list == [
+            ((f"Warning: Tuning config not found: {Path('examples/tunings/duckdb/tpch_tuned.yaml')}",),),
+            (("Proceeding without tuning configuration",),),
+        ]
+
+    def test_load_tuning_config_loads_custom_file_and_reports_metadata(self, tmp_path):
+        tuning_path = tmp_path / "custom.yaml"
+        tuning_path.write_text(yaml.safe_dump({"threads": 8, "_metadata": {"configuration_type": "warehouse-profile"}}))
+
+        with patch("benchbox.core.config_utils.emit") as mock_emit:
+            result = load_tuning_config("duckdb", "tpch", str(tuning_path), verbose=True)
+
+        assert result == {"threads": 8, "_metadata": {"configuration_type": "warehouse-profile"}}
+        mock_emit.assert_called_once_with(
+            f"Tuning config loaded from custom file: {tuning_path} (type: warehouse-profile)"
+        )
+
+    def test_load_tuning_config_raises_for_missing_custom_file(self):
+        with pytest.raises(FileNotFoundError, match="Tuning config file not found"):
+            load_tuning_config("duckdb", "tpch", "/tmp/missing.yaml")
+
+    def test_load_tuning_config_warns_and_returns_none_on_parse_failure(self, tmp_path):
+        tuning_path = tmp_path / "broken.yaml"
+        tuning_path.write_text("[broken")
+
+        with patch("benchbox.core.config_utils.emit") as mock_emit:
+            result = load_tuning_config("duckdb", "tpch", str(tuning_path), verbose=True)
+
+        assert result is None
+        assert "Warning: Failed to load tuning config" in mock_emit.call_args.args[0]
+
+
+class TestMergeAllConfigs:
+    """Test precedence and normalization across merged configuration sources."""
+
+    def test_merge_all_configs_applies_precedence_and_quiet_overrides(self):
+        args = SimpleNamespace(scale=2, verbose=2, quiet=True, duckdb_database_path="/tmp/cli.duckdb")
+
+        with (
+            patch(
+                "benchbox.core.config_utils.get_builtin_defaults", return_value={"memory_limit": "4GB", "verbose": 0}
+            ),
+            patch(
+                "benchbox.core.config_utils.load_platform_config", return_value={"memory_limit": "8GB", "threads": 4}
+            ),
+            patch(
+                "benchbox.core.config_utils.load_tuning_config",
+                return_value={"memory_limit": "16GB", "tuning_only": True},
+            ),
+            patch(
+                "benchbox.core.config_utils.extract_cli_config",
+                return_value={"scale": 2, "verbose": 2, "quiet": True, "database_path": "/tmp/cli.duckdb"},
+            ),
+        ):
+            result = merge_all_configs("duckdb", "tpch", args, verbose=False)
+
+        assert result["memory_limit"] == "16GB"
+        assert result["threads"] == 4
+        assert result["tuning_only"] is True
+        assert result["tuning_config"] == {"memory_limit": "16GB", "tuning_only": True}
+        assert result["database_path"] == "/tmp/cli.duckdb"
+        assert result["scale_factor"] == 2
+        assert result["platform"] == "duckdb"
+        assert result["benchmark"] == "tpch"
+        assert result["verbose_enabled"] is False
+        assert result["very_verbose"] is False
+
+
+class TestBuiltinDefaults:
+    """Test platform-specific built-in defaults."""
+
+    @pytest.mark.parametrize(
+        ("platform", "expected"),
+        [
+            ("duckdb", {"memory_limit": "4GB", "database_path": None}),
+            ("databricks", {"catalog": "workspace", "schema": "benchbox"}),
+            ("clickhouse", {"mode": "local", "data_path": "/tmp/benchbox_ch_local"}),
+            ("sqlite", {"timeout": 30.0, "database_path": None}),
+            ("bigquery", {"location": "US", "dataset_id": "benchbox"}),
+            ("redshift", {"port": 5439, "database": "dev"}),
+            ("snowflake", {"warehouse": "COMPUTE_WH", "database": "BENCHBOX"}),
+        ],
+    )
+    def test_platform_specific_defaults(self, platform, expected):
+        defaults = get_builtin_defaults(platform, "tpch")
+        for key, value in expected.items():
+            assert defaults[key] == value
+        assert defaults["scale_factor"] == 0.01
+        assert defaults["phases"] == "power"
+
+
+class TestExtractCliConfig:
+    """Test CLI config extraction and alias normalization."""
+
+    def test_extract_cli_config_filters_none_and_maps_aliases(self):
+        args = SimpleNamespace(
+            duckdb_database_path="/tmp/duckdb.db",
+            sqlite_database_path=None,
+            data_path="/tmp/data",
+            redshift_host="redshift.example.com",
+            redshift_port=5439,
+            redshift_database="dev",
+            redshift_username="joe",
+            redshift_password="secret",
+            snowflake_database="BENCHBOX",
+            snowflake_schema="PUBLIC",
+            snowflake_username="user",
+            snowflake_password="pw",
+            server_hostname="dbc.example.com",
+            http_path="/sql/warehouse",
+            access_token="token",
+            project_id="project",
+            dataset_id="dataset",
+            credentials_path="/tmp/creds.json",
+            storage_bucket="bucket",
+            storage_prefix="prefix",
+            extra=None,
+        )
+
+        result = extract_cli_config(args)
+
+        assert result["database_path"] == "/tmp/duckdb.db"
+        assert result["data_path"] == "/tmp/data"
+        assert result["host"] == "redshift.example.com"
+        assert result["port"] == 5439
+        assert result["database"] == "BENCHBOX"
+        assert result["username"] == "user"
+        assert result["password"] == "pw"
+        assert result["schema"] == "PUBLIC"
+        assert result["server_hostname"] == "dbc.example.com"
+        assert result["http_path"] == "/sql/warehouse"
+        assert result["access_token"] == "token"
+        assert result["project_id"] == "project"
+        assert result["dataset_id"] == "dataset"
+        assert result["credentials_path"] == "/tmp/creds.json"
+        assert result["storage_bucket"] == "bucket"
+        assert result["storage_prefix"] == "prefix"
+        assert "extra" not in result

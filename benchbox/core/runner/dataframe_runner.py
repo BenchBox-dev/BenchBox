@@ -44,7 +44,11 @@ from benchbox.core.results.models import (
     TableLoadingStats,
 )
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
-from benchbox.monitoring import PerformanceMonitor
+
+try:
+    from benchbox.monitoring import PerformanceMonitor
+except ImportError:
+    PerformanceMonitor = None  # type: ignore[assignment,misc]
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.printing import quiet_console
 from benchbox.utils.verbosity import VerbositySettings

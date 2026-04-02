@@ -27,6 +27,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from benchbox.core.dataframe_manager_factory import get_dataframe_manager
+
 logger = logging.getLogger(__name__)
 
 
@@ -1786,19 +1788,14 @@ def get_dataframe_metadata_manager(
         DataFrameMetadataOperationsManager if platform supports DataFrame operations,
         None if platform is not a DataFrame platform.
     """
-    platform_lower = platform_name.lower()
-
-    # Check if this is a DataFrame platform
-    df_platforms = ("polars-df", "polars", "pandas-df", "pandas", "pyspark-df", "pyspark", "datafusion")
-    if not any(p in platform_lower for p in df_platforms):
-        logger.debug(f"Platform {platform_name} is not a DataFrame platform")
-        return None
-
-    try:
-        return DataFrameMetadataOperationsManager(platform_name, spark_session=spark_session)
-    except Exception as e:
-        logger.warning(f"Failed to create metadata manager for {platform_name}: {e}")
-        return None
+    return get_dataframe_manager(
+        platform_name,
+        manager_class=DataFrameMetadataOperationsManager,
+        supported_platforms=("polars-df", "polars", "pandas-df", "pandas", "pyspark-df", "pyspark", "datafusion"),
+        logger=logger,
+        manager_label="metadata",
+        spark_session=spark_session,
+    )
 
 
 __all__ = [

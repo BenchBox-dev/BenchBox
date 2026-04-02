@@ -10,7 +10,8 @@ Documentation for testing BenchBox functionality, including live integration tes
 ## Test Documentation
 
 - [Pytest xdist Safety](../development/pytest-xdist-safety.md) - Why BenchBox caps local xdist workers and how to validate changes
-- [Live Integration Tests](live-integration-tests.md) - Running integration tests against live database platforms
+- [Docker Integration Tests](docker-integration-tests.md) - Running real tests against database engines in Docker containers (free, no credentials)
+- [Live Integration Tests](live-integration-tests.md) - Running integration tests against live cloud database platforms
 
 ## Test Categories
 
@@ -58,7 +59,21 @@ E2E tests cover:
 
 See [E2E Testing Guide](e2e-testing.md) for detailed information.
 
-### Live Integration Tests
+### Docker Integration Tests
+Tests that execute real queries against database engines running in Docker containers.
+No cloud credentials needed: just Docker.
+
+```bash
+# Single platform
+make test-docker-clickhouse
+
+# All Docker platforms
+make test-docker-all
+```
+
+See [Docker Integration Tests](docker-integration-tests.md) for platform list and setup.
+
+### Live Integration Tests (Cloud)
 Tests that require live database credentials and cloud platforms.
 
 ```bash
@@ -82,5 +97,6 @@ See [Live Integration Tests](live-integration-tests.md) for detailed setup instr
 :hidden:
 
 e2e-testing
+docker-integration-tests
 live-integration-tests
 ```

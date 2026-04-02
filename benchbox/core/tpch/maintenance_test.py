@@ -104,7 +104,7 @@ class TPCHMaintenanceTest:
         self,
         maintenance_pairs: int = 1,
         concurrent_with_queries: bool = True,
-        query_stream_duration: Optional[float] = None,
+        _query_stream_duration: Optional[float] = None,
         rf1_interval: float = 30.0,
         rf2_interval: float = 30.0,
         validate_integrity: bool = True,

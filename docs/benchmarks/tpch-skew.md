@@ -5,6 +5,8 @@
 ```{tags} advanced, concept, tpch-skew, tpc-h, custom-benchmark
 ```
 
+> **CLI name:** `tpch_skew` — use `benchbox run --benchmark tpch_skew`
+
 ## Overview
 
 The TPC-H Skew benchmark extends the standard TPC-H benchmark with configurable data skew patterns to test database performance under realistic, non-uniform data distributions. Based on the research paper ["Introducing Skew into the TPC-H Benchmark"](https://www.tpc.org/tpctc/tpctc2011/slides_and_papers/introducing_skew_into_the_tpc_h_benchmark.pdf), this benchmark helps evaluate how query optimizers handle skewed data distributions that are common in real-world scenarios.

@@ -345,7 +345,8 @@ class TestTPCDSIntegration:
         # This would require dsqgen binary to be available
         # For now, just test the interface
         query_manager = TPCDSQueryManager()
-        assert query_manager is not None
+        assert isinstance(query_manager, TPCDSQueryManager)
+        assert hasattr(query_manager, "available")
 
     def test_integration_with_stream_manager(self):
         """Test integration with TPCDSStreamManager."""

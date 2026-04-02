@@ -152,6 +152,41 @@ _ISOLATION_REMEDIATION = {
 }
 
 
+def _extract_table_names(raw_table_names: Any) -> list[str]:
+    """Coerce various table name representations to a list of strings."""
+    if raw_table_names is None:
+        return []
+    if isinstance(raw_table_names, dict):
+        return [str(name) for name in raw_table_names.keys()]
+    if isinstance(raw_table_names, str):
+        return [raw_table_names]
+    if isinstance(raw_table_names, (list, tuple, set)):
+        return [str(name) for name in raw_table_names]
+    if hasattr(raw_table_names, "keys") and callable(raw_table_names.keys):
+        try:
+            return [str(name) for name in raw_table_names.keys()]
+        except Exception:
+            return []
+    return []
+
+
+def _resolve_benchmark_table_names(benchmark: Any) -> list[str]:
+    """Resolve table names from a benchmark object using fallback chain."""
+    if hasattr(benchmark, "get_table_names") and callable(benchmark.get_table_names):
+        try:
+            names = _extract_table_names(benchmark.get_table_names())
+            if names:
+                return names
+        except Exception:
+            pass
+    if hasattr(benchmark, "tables"):
+        names = _extract_table_names(benchmark.tables)
+        if names:
+            return names
+    impl = getattr(benchmark, "_impl", None)
+    return _extract_table_names(getattr(impl, "tables", None))
+
+
 def check_isolation_capability(
     adapter_class: type,
     platform_name: str,
@@ -1672,46 +1707,50 @@ class PlatformAdapter(VerbosityMixin, ABC):
         Returns:
             Benchmark type string (lowercase) or None if unknown
         """
-        # Try to get explicit _name attribute first
         if hasattr(benchmark, "_name"):
-            benchmark_id = normalize_benchmark_id(benchmark._name)
-            # normalize_benchmark_id returns the lowercase name for unknown benchmarks
-            # Check if it's a known benchmark or use as-is if simple
-            if benchmark_id in ("tpch", "tpcds", "ssb", "clickbench"):
+            benchmark_id = self._normalize_known_benchmark_id(benchmark._name)
+            if benchmark_id:
                 return benchmark_id
-            # If the original name had no spaces, use it directly
             if " " not in benchmark._name:
                 return benchmark._name.lower()
 
-        # Fall back to class name analysis
         class_name = type(benchmark).__name__.lower()
+        benchmark_id = self._normalize_known_benchmark_id(class_name) or self._class_name_benchmark_type(class_name)
+        if benchmark_id:
+            return benchmark_id
 
-        # Use normalize_benchmark_id for TPC benchmarks
-        normalized = normalize_benchmark_id(class_name)
-        if normalized in ("tpch", "tpcds", "ssb", "clickbench"):
-            return normalized
-
-        # Handle other benchmark types by class name pattern
-        if "amplab" in class_name:
-            return "amplab"
-        elif "h2odb" in class_name or "h2o" in class_name:
-            return "h2odb"
-        elif "coffeeshop" in class_name:
-            return "coffeeshop"
-        elif "joinorder" in class_name or "join_order" in class_name:
-            return "joinorder"
-        elif "tpcdi" in class_name or "tpc_di" in class_name:
-            return "tpcdi"
-        elif "star_schema" in class_name:
-            return "ssb"
-
-        # Check display_name if available
         if hasattr(benchmark, "display_name"):
-            benchmark_id = normalize_benchmark_id(str(benchmark.display_name))
-            if benchmark_id in ("tpch", "tpcds", "ssb", "clickbench"):
+            benchmark_id = self._normalize_known_benchmark_id(str(benchmark.display_name))
+            if benchmark_id:
                 return benchmark_id
 
-        # Unknown benchmark type - validation will be skipped
+        return None
+
+    @staticmethod
+    def _normalize_known_benchmark_id(name: str) -> str | None:
+        """Normalize a benchmark label when it matches a known benchmark family."""
+        benchmark_id = normalize_benchmark_id(name)
+        if benchmark_id in ("tpch", "tpcds", "ssb", "clickbench"):
+            return benchmark_id
+        return None
+
+    @staticmethod
+    def _class_name_benchmark_type(class_name: str) -> str | None:
+        """Resolve benchmark IDs from class-name patterns for non-TPC families."""
+        benchmark_patterns = [
+            ("amplab", "amplab"),
+            ("h2odb", "h2odb"),
+            ("h2o", "h2odb"),
+            ("coffeeshop", "coffeeshop"),
+            ("joinorder", "joinorder"),
+            ("join_order", "joinorder"),
+            ("tpcdi", "tpcdi"),
+            ("tpc_di", "tpcdi"),
+            ("star_schema", "ssb"),
+        ]
+        for pattern, benchmark_id in benchmark_patterns:
+            if pattern in class_name:
+                return benchmark_id
         return None
 
     def _build_query_result_with_validation(
@@ -2330,60 +2369,27 @@ class PlatformAdapter(VerbosityMixin, ABC):
         self, benchmark, connection: Any, schema_creation_time: float
     ) -> SchemaCreationPhase:
         """Create detailed schema creation phase tracking."""
-        # Convert existing schema creation time from seconds to milliseconds
         duration_ms = int(schema_creation_time * 1000)
-
-        def _extract_table_names(raw_table_names: Any) -> list[str]:
-            if raw_table_names is None:
-                return []
-            if isinstance(raw_table_names, dict):
-                return [str(name) for name in raw_table_names.keys()]
-            if isinstance(raw_table_names, str):
-                return [raw_table_names]
-            if isinstance(raw_table_names, (list, tuple, set)):
-                return [str(name) for name in raw_table_names]
-            if hasattr(raw_table_names, "keys") and callable(raw_table_names.keys):
-                try:
-                    return [str(name) for name in raw_table_names.keys()]
-                except Exception:
-                    return []
-            return []
-
-        table_names: list[str] = []
-
-        if hasattr(benchmark, "get_table_names") and callable(benchmark.get_table_names):
-            try:
-                table_names = _extract_table_names(benchmark.get_table_names())
-            except Exception:
-                table_names = []
-
-        if not table_names and hasattr(benchmark, "tables"):
-            table_names = _extract_table_names(benchmark.tables)
-
-        if not table_names:
-            impl = getattr(benchmark, "_impl", None)
-            table_names = _extract_table_names(getattr(impl, "tables", None))
-
-        # For now, create basic per-table stats since we don't have detailed timing
-        per_table_creation = {}
+        table_names = _resolve_benchmark_table_names(benchmark)
         table_count = len(table_names)
 
+        per_table_creation = {}
         if table_count > 0:
             estimated_time_per_table = max(1, duration_ms // table_count)
             for table_name in table_names:
                 per_table_creation[table_name] = TableCreationStats(
                     creation_time_ms=estimated_time_per_table,
                     status="SUCCESS",
-                    constraints_applied=1,  # Rough estimate
-                    indexes_created=1,  # Rough estimate
+                    constraints_applied=1,
+                    indexes_created=1,
                 )
 
         return SchemaCreationPhase(
             duration_ms=duration_ms,
             status="SUCCESS",
             tables_created=table_count,
-            constraints_applied=table_count,  # Rough estimate
-            indexes_created=table_count,  # Rough estimate
+            constraints_applied=table_count,
+            indexes_created=table_count,
             per_table_creation=per_table_creation,
         )
 
@@ -4106,6 +4112,7 @@ class PlatformAdapter(VerbosityMixin, ABC):
             timeout = run_config.get("timeout")
             iterations = run_config.get("iterations", TPCH_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
             warm_up_iterations = run_config.get("warm_up_iterations", TPCH_POWER_DEFAULT_WARMUP_ITERATIONS)
+            fail_fast = run_config.get("power_fail_fast", False)
 
             console.print(
                 f"[green]Running TPC-H Power Test (Scale Factor: {scale_factor}, Stream ID: {stream_id})[/green]"
@@ -4136,6 +4143,9 @@ class PlatformAdapter(VerbosityMixin, ABC):
                     validation_mode=validation_mode,
                     query_subset=query_subset,
                 )
+                # Mirror the power test's resolved validation policy instead of
+                # re-deriving it from stream IDs in the adapter.
+                connection_adapter._validate_row_count = power_test.config.validation
                 power_test_result = power_test.run()
                 for query_result in power_test_result.query_results:
                     platform_result = {
@@ -4169,6 +4179,9 @@ class PlatformAdapter(VerbosityMixin, ABC):
                     validation_mode=validation_mode,
                     query_subset=query_subset,
                 )
+                # Mirror the power test's resolved validation policy instead of
+                # re-deriving it from stream IDs in the adapter.
+                connection_adapter._validate_row_count = power_test.config.validation
 
                 # Execute the power test
                 power_test_result = power_test.run()
@@ -4211,6 +4224,18 @@ class PlatformAdapter(VerbosityMixin, ABC):
                     query_results.append(platform_result)
                 all_results.extend(query_results)
 
+                # Abort remaining iterations if all queries failed (connection/infra issue)
+                # or if fail_fast is enabled and any query failed
+                if not power_test_result.success:
+                    if power_test_result.queries_successful == 0:
+                        console.print("[yellow]⚠️  All queries failed — aborting remaining measurement runs[/yellow]")
+                        break
+                    if fail_fast:
+                        console.print(
+                            "[yellow]⚠️  Query failures detected (fail_fast enabled) — aborting remaining runs[/yellow]"
+                        )
+                        break
+
             return all_results
 
         except Exception as e:
@@ -4251,6 +4276,7 @@ class PlatformAdapter(VerbosityMixin, ABC):
         # Extract configuration (same defaults as TPC-H power test)
         iterations = run_config.get("iterations", GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
         warm_up_iterations = run_config.get("warm_up_iterations", GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS)
+        fail_fast = run_config.get("power_fail_fast", False)
         run_config.get("verbose", False)
 
         benchmark_name = getattr(benchmark, "_name", type(benchmark).__name__)
@@ -4283,6 +4309,18 @@ class PlatformAdapter(VerbosityMixin, ABC):
                 result["run_type"] = "measurement"
 
             all_measurement_results.extend(iteration_results)
+
+            # Abort remaining iterations if all queries failed (connection/infra issue)
+            # or if fail_fast is enabled and any query failed
+            successful = sum(1 for r in iteration_results if r.get("status") == "SUCCESS")
+            if iteration_results and successful == 0:
+                console.print("[yellow]⚠️  All queries failed — aborting remaining measurement runs[/yellow]")
+                break
+            if fail_fast and successful < len(iteration_results):
+                console.print(
+                    "[yellow]⚠️  Query failures detected (fail_fast enabled) — aborting remaining runs[/yellow]"
+                )
+                break
 
         # Display summary
         if all_measurement_results:
@@ -4317,6 +4355,7 @@ class PlatformAdapter(VerbosityMixin, ABC):
             timeout = run_config.get("timeout")
             iterations = run_config.get("iterations", TPCDS_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
             warm_up_iterations = run_config.get("warm_up_iterations", TPCDS_POWER_DEFAULT_WARMUP_ITERATIONS)
+            fail_fast = run_config.get("power_fail_fast", False)
 
             # Set TPC-DS validation mode from config (takes precedence over environment variable)
             set_config_validation_mode(validation_mode)
@@ -4437,6 +4476,18 @@ class PlatformAdapter(VerbosityMixin, ABC):
                         platform_result["error"] = query_result.get("error", "Unknown error")
                     query_results.append(platform_result)
                 all_results.extend(query_results)  # Accumulate results from all iterations
+
+                # Abort remaining iterations if all queries failed (connection/infra issue)
+                # or if fail_fast is enabled and any query failed
+                if not power_test_result.success:
+                    if power_test_result.queries_successful == 0:
+                        console.print("[yellow]⚠️  All queries failed — aborting remaining measurement runs[/yellow]")
+                        break
+                    if fail_fast:
+                        console.print(
+                            "[yellow]⚠️  Query failures detected (fail_fast enabled) — aborting remaining runs[/yellow]"
+                        )
+                        break
 
             return all_results
 
@@ -4893,6 +4944,7 @@ class PlatformAdapterConnection:
         self.connection_string = getattr(connection, "connection_string", "platform_adapter_connection")
         self.dialect = getattr(platform_adapter, "get_target_dialect", lambda: "standard")()
         self._maintenance_mode = maintenance_mode
+        self._validate_row_count = True
 
         # Benchmark context for query validation (set by TPC test runners)
         self.benchmark_type: str | None = None
@@ -4942,13 +4994,6 @@ class PlatformAdapterConnection:
             return self.connection.execute(query, parameters)
 
         # Non-parameterized queries use the platform adapter for validation support
-        # Debug: Write query to file to see what's being executed
-        try:
-            with open("/tmp/tpc_debug_queries.log", "a") as f:
-                f.write(f"TPC Query (ID: {self._current_query_id}): {query[:200]}...\n")
-        except Exception:
-            pass
-
         # Execute query with validation context
         result = self.platform_adapter.execute_query(
             self.connection,
@@ -4956,7 +5001,7 @@ class PlatformAdapterConnection:
             self._current_query_id,
             benchmark_type=self.benchmark_type,
             scale_factor=self.scale_factor,
-            validate_row_count=True,  # Enforce expected row-count checks for TPC workloads.
+            validate_row_count=self._validate_row_count,
             stream_id=self._current_stream_id,
         )
         return PlatformAdapterCursor(result)

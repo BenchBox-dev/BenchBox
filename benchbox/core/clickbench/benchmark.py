@@ -15,6 +15,7 @@ from benchbox.core.benchmark_mixins import DataGenerationMixin
 from benchbox.core.clickbench.generator import ClickBenchDataGenerator
 from benchbox.core.clickbench.queries import ClickBenchQueryManager
 from benchbox.core.clickbench.schema import TABLES, get_create_table_sql
+from benchbox.core.query_utils import get_queries_with_translation
 from benchbox.core.simple_benchmark_mixin import SimpleBenchmarkMixin
 from benchbox.core.utils.tuning import extract_constraint_flags
 
@@ -86,16 +87,7 @@ class ClickBenchBenchmark(SimpleBenchmarkMixin, DataGenerationMixin, BaseBenchma
         Returns:
             A dictionary mapping query identifiers to their SQL text
         """
-        queries = self.query_manager.get_all_queries()
-
-        # Apply dialect translation if requested
-        if dialect:
-            translated_queries = {}
-            for query_id, query in queries.items():
-                translated_queries[query_id] = self.translate_query_text(query, dialect)
-            return translated_queries
-
-        return queries
+        return get_queries_with_translation(self.query_manager, dialect, self.translate_query_text)
 
     def translate_query_text(self, query: str, dialect: str) -> str:
         """Translate a query string to a specific SQL dialect."""

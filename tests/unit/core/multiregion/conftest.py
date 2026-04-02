@@ -7,7 +7,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import pytest
 
-from benchbox.core.multiregion.config import (
+from benchbox.experimental.multiregion.config import (
     CloudProvider,
     MultiRegionConfig,
     Region,

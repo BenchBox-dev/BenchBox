@@ -5,6 +5,8 @@
 ```{tags} intermediate, guide, pg-duckdb, sql-platform, postgresql-extension
 ```
 
+> **CLI name:** `pg-duckdb` — use `benchbox run --platform pg-duckdb`
+
 pg_duckdb is a PostgreSQL extension that embeds DuckDB's columnar-vectorized analytics engine inside PostgreSQL, accelerating OLAP queries without requiring SQL changes or data migration. BenchBox provides first-class pg_duckdb support for benchmarking DuckDB-accelerated PostgreSQL workloads.
 
 ## Features

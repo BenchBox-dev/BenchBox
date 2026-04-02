@@ -11,7 +11,7 @@ from benchbox.platforms.databricks import dataframe_adapter as mod
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.slow,
+    pytest.mark.fast,
     pytest.mark.cloud_import,
 ]
 

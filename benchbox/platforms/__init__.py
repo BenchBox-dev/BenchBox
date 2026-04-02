@@ -672,6 +672,15 @@ try:
             name="staging_root",
             help="Cloud storage path for staging data (e.g., dbfs:/Volumes/..., s3://..., abfss://...)",
         ),
+        PlatformOptionSpec(
+            name="databricks_clustering_strategy",
+            choices=("z_order", "liquid_clustering", "none"),
+            help="Databricks SQL tuning strategy override (z_order, liquid_clustering, none)",
+        ),
+        PlatformOptionSpec(
+            name="liquid_clustering_columns",
+            help="Comma-separated Databricks liquid clustering columns",
+        ),
     )
 
     # BigQuery

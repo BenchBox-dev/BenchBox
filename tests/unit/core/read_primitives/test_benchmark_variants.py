@@ -432,6 +432,35 @@ class TestModernSQLFeatures:
         assert "list_min" in array_min_max_sql.lower()
         assert "list_max" in array_min_max_sql.lower()
 
+    def test_redshift_skips_only_semantically_inexact_window_queries(self):
+        """Test Redshift skips window queries whose exact semantics cannot be preserved."""
+        benchmark = ReadPrimitivesBenchmark()
+        queries_redshift = benchmark.get_queries(dialect="redshift")
+
+        assert "window_moving_frame" not in queries_redshift
+        assert "window_running_sum" not in queries_redshift
+
+    def test_redshift_skips_unsupported_statistical_functions(self):
+        """Test Redshift skips queries using CORR/COVAR/REGR_* — absent from Redshift catalog."""
+        benchmark = ReadPrimitivesBenchmark()
+        queries_redshift = benchmark.get_queries(dialect="redshift")
+
+        assert "statistical_correlation" not in queries_redshift
+        assert "timeseries_trend_analysis" not in queries_redshift
+
+    def test_redshift_uses_scalar_fallback_for_array_contains(self):
+        """Test Redshift keeps array_contains coverage via scalar membership logic."""
+        benchmark = ReadPrimitivesBenchmark()
+        queries_redshift = benchmark.get_queries(dialect="redshift")
+
+        array_contains_sql = queries_redshift.get("array_contains", "")
+
+        assert array_contains_sql
+        assert "CASE WHEN" in array_contains_sql.upper()
+        assert "MAX(" in array_contains_sql.upper()
+        assert "ARRAY_CONTAINS" not in array_contains_sql.upper()
+        assert "ARRAY_AGG" not in array_contains_sql.upper()
+
     def test_duckdb_uses_row_for_struct(self):
         """Test that DuckDB dialect uses ROW() for struct construction."""
         benchmark = ReadPrimitivesBenchmark()

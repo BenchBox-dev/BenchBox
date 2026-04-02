@@ -601,6 +601,433 @@ class TestAzureSynapseDataLoading:
         assert stats["orders"] == 1
         mock_blob_load.assert_called_once()
 
+    @pytest.mark.parametrize(
+        ("column_type", "expected"),
+        [
+            ("DECIMAL(15,2)", "DECIMAL(15,2)"),
+            ("varchar(128)", "VARCHAR(128)"),
+            ("bigint", "BIGINT"),
+            ("smallint", "SMALLINT"),
+            ("int", "INT"),
+            ("double", "FLOAT"),
+            ("real", "REAL"),
+            ("timestamp", "DATETIME2"),
+            ("bool", "BIT"),
+            ("geography", "VARCHAR(8000)"),
+            ("", "VARCHAR(8000)"),
+        ],
+    )
+    def test_map_external_column_type(self, column_type, expected, synapse_stubs):
+        """External-column type mapping should normalize supported Synapse types and safely fall back."""
+        assert AzureSynapseAdapter._map_external_column_type(column_type) == expected
+
+    def test_build_external_column_definitions_resolves_table_name_variants(self, synapse_stubs):
+        """Schema lookup should work across table-name casing variants."""
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {
+            "ORDERS": {
+                "columns": [
+                    {"name": "o_orderkey", "type": "BIGINT"},
+                    {"name": "o_orderdate", "type": "TIMESTAMP"},
+                ]
+            }
+        }
+
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+        )
+
+        column_defs = adapter._build_external_column_definitions(benchmark, "orders")
+
+        assert column_defs == "[o_orderkey] BIGINT, [o_orderdate] DATETIME2"
+
+    def test_build_external_column_definitions_rejects_missing_columns(self, synapse_stubs):
+        """Invalid schema metadata should raise a clear error for external mode."""
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {"orders": {"columns": []}}
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+        )
+
+        with pytest.raises(ValueError, match="No columns found"):
+            adapter._build_external_column_definitions(benchmark, "orders")
+
+    def test_resolve_external_credential_name_prefers_existing_name(self, synapse_stubs):
+        """Explicit storage credential name should be used as-is."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            storage_credential="BENCHBOX_PRECREATED_CRED",
+        )
+
+        assert adapter._resolve_external_credential_name(Mock()) == "BENCHBOX_PRECREATED_CRED"
+
+    def test_resolve_external_credential_name_creates_sas_credential(self, synapse_stubs):
+        """SAS tokens should produce a shared-access-signature scoped credential."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            storage_account="benchboxacct",
+            container="benchbox",
+            storage_sas_token="sv=2025-01-01&sig=abc'123",
+        )
+        mock_cursor = Mock()
+
+        credential_name = adapter._resolve_external_credential_name(mock_cursor)
+
+        assert credential_name == "BENCHBOX_EXTERNAL_SAS_CRED"
+        executed_sql = str(mock_cursor.execute.call_args.args[0])
+        assert "CREATE DATABASE SCOPED CREDENTIAL [BENCHBOX_EXTERNAL_SAS_CRED]" in executed_sql
+        assert "IDENTITY = 'SHARED ACCESS SIGNATURE'" in executed_sql
+        assert "sv=2025-01-01&sig=abc''123" in executed_sql
+
+    def test_resolve_external_credential_name_creates_key_credential(self, synapse_stubs):
+        """Storage account keys should produce a key-backed scoped credential."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            storage_account="benchboxacct",
+            container="benchbox",
+            storage_account_key="account-key-123",
+        )
+        mock_cursor = Mock()
+
+        credential_name = adapter._resolve_external_credential_name(mock_cursor)
+
+        assert credential_name == "BENCHBOX_EXTERNAL_KEY_CRED"
+        executed_sql = str(mock_cursor.execute.call_args.args[0])
+        assert "CREATE DATABASE SCOPED CREDENTIAL [BENCHBOX_EXTERNAL_KEY_CRED]" in executed_sql
+        assert "IDENTITY = 'benchboxacct'" in executed_sql
+        assert "SECRET = 'account-key-123'" in executed_sql
+
+    def test_setup_external_table_primitives_builds_data_source_with_credential(self, synapse_stubs):
+        """PolyBase primitives should create the external data source and parquet file format."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            storage_account="benchboxacct",
+            container="benchbox",
+        )
+        mock_cursor = Mock()
+
+        with (
+            patch.object(adapter, "_setup_external_data_source") as mock_setup_source,
+            patch.object(adapter, "_resolve_external_credential_name", return_value="BENCHBOX_EXTERNAL_SAS_CRED"),
+        ):
+            data_source_name, file_format_name = adapter._setup_external_table_primitives(mock_cursor)
+
+        assert (data_source_name, file_format_name) == ("BENCHBOX_EXTERNAL_SOURCE", "BENCHBOX_PARQUET_FORMAT")
+        mock_setup_source.assert_called_once_with(mock_cursor)
+        execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
+        assert any("CREATE EXTERNAL DATA SOURCE [BENCHBOX_EXTERNAL_SOURCE]" in sql for sql in execute_calls)
+        assert any("LOCATION = 'abfss://benchbox@benchboxacct.dfs.core.windows.net'" in sql for sql in execute_calls)
+        assert any("CREDENTIAL = [BENCHBOX_EXTERNAL_SAS_CRED]" in sql for sql in execute_calls)
+        assert any("CREATE EXTERNAL FILE FORMAT [BENCHBOX_PARQUET_FORMAT]" in sql for sql in execute_calls)
+
+    def test_load_data_via_blob_uses_sas_credential_clause(self, synapse_stubs, tmp_path):
+        """Blob-backed native loads should emit COPY INTO with inline SAS credentials."""
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = (2,)
+        csv_file = tmp_path / "orders.csv"
+        csv_file.write_text("1,a\n2,b\n")
+
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            schema="dbo",
+            username="admin",
+            password="secret",
+            storage_account="benchboxacct",
+            container="benchbox",
+            storage_sas_token="sv=2025-01-01&sig=fake",
+        )
+
+        with (
+            patch.object(adapter, "_setup_external_data_source"),
+            patch.object(adapter, "_upload_to_blob", return_value=["https://blob/orders.csv"]),
+        ):
+            stats = adapter._load_data_via_blob(mock_cursor, {"orders": [csv_file]}, tmp_path)
+
+        assert stats == {"orders": 2}
+        execute_sql = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
+        assert any("COPY INTO [dbo].[orders]" in sql for sql in execute_sql)
+        assert any("IDENTITY = 'Shared Access Signature'" in sql for sql in execute_sql)
+        assert any("SECRET = 'sv=2025-01-01&sig=fake'" in sql for sql in execute_sql)
+        assert any("FIELDTERMINATOR = ','" in sql for sql in execute_sql)
+        assert execute_sql[-1] == "SELECT COUNT(*) FROM [dbo].[orders]"
+
+    def test_load_data_via_blob_uses_named_storage_credential(self, synapse_stubs, tmp_path):
+        """Blob-backed native loads should support named database-scoped credentials."""
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = (1,)
+        csv_file = tmp_path / "orders.csv"
+        csv_file.write_text("1,a\n")
+
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            schema="dbo",
+            username="admin",
+            password="secret",
+            storage_account="benchboxacct",
+            container="benchbox",
+            storage_credential="BENCHBOX_SHARED_CRED",
+        )
+
+        with (
+            patch.object(adapter, "_setup_external_data_source"),
+            patch.object(adapter, "_upload_to_blob", return_value=["https://blob/orders.csv"]),
+        ):
+            stats = adapter._load_data_via_blob(mock_cursor, {"orders": [csv_file]}, tmp_path)
+
+        assert stats == {"orders": 1}
+        copy_sql = str(mock_cursor.execute.call_args_list[0].args[0])
+        assert "CREDENTIAL = 'BENCHBOX_SHARED_CRED'" in copy_sql
+
+    def test_generate_tuning_clause_with_distribution_and_partitioning(self, synapse_stubs):
+        """Synapse tuning SQL should combine HASH distribution, partitioning, and columnstore defaults."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            distribution_default="ROUND_ROBIN",
+        )
+
+        dist_col = Mock()
+        dist_col.name = "customer_id"
+        dist_col.order = 2
+        part_col = Mock()
+        part_col.name = "order_date"
+        part_col.order = 1
+
+        mock_tuning = Mock()
+        mock_tuning.has_any_tuning.return_value = True
+
+        with patch("benchbox.core.tuning.interface.TuningType") as mock_tuning_type:
+            mock_tuning_type.DISTRIBUTION = "distribution"
+            mock_tuning_type.PARTITIONING = "partitioning"
+
+            def get_columns_by_type(tuning_type):
+                if tuning_type == mock_tuning_type.DISTRIBUTION:
+                    return [dist_col]
+                if tuning_type == mock_tuning_type.PARTITIONING:
+                    return [part_col]
+                return []
+
+            mock_tuning.get_columns_by_type.side_effect = get_columns_by_type
+
+            clause = adapter.generate_tuning_clause(mock_tuning)
+
+        assert clause == (
+            "WITH (DISTRIBUTION = HASH([customer_id]), "
+            "PARTITION ([order_date] RANGE RIGHT FOR VALUES ()), "
+            "CLUSTERED COLUMNSTORE INDEX)"
+        )
+
+
+class TestSynapseUncoveredMethods:
+    """Tests for methods with low coverage in AzureSynapseAdapter."""
+
+    def test_extract_storage_account_from_abfss_url(self, synapse_stubs):
+        """Should extract account name from abfss:// URL."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+        )
+        url = "abfss://container@mystorageaccount.dfs.core.windows.net/path"
+        account = adapter._extract_storage_account(url)
+        assert account == "mystorageaccount"
+
+    def test_extract_storage_account_returns_none_for_invalid_url(self, synapse_stubs):
+        """Should return None when URL doesn't match expected pattern."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+        )
+        assert adapter._extract_storage_account("https://example.com/path") is None
+
+    def test_build_ctas_sort_sql_off_mode_returns_none(self, synapse_stubs):
+        """_build_ctas_sort_sql should return None when sorted ingestion is off."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+        )
+
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("off", None)):
+            result = adapter._build_ctas_sort_sql("orders", [])
+        assert result is None
+
+    def test_build_ctas_sort_sql_ctas_mode(self, synapse_stubs):
+        """_build_ctas_sort_sql should generate CTAS SQL when mode is on."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            schema="dbo",
+        )
+
+        col = Mock()
+        col.name = "l_shipdate"
+
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "ctas")):
+            result = adapter._build_ctas_sort_sql("lineitem", [col])
+
+        assert result is not None
+        assert "CREATE TABLE" in result
+        assert "lineitem__ctas_sort" in result
+        assert "ORDER BY l_shipdate" in result
+
+    def test_analyze_table_updates_statistics(self, synapse_stubs):
+        """analyze_table should execute UPDATE STATISTICS."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            schema="dbo",
+        )
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter.analyze_table(mock_conn, "orders")
+
+        executed = str(mock_cursor.execute.call_args)
+        assert "UPDATE STATISTICS" in executed
+        assert "orders" in executed
+
+    def test_analyze_table_handles_exception(self, synapse_stubs):
+        """analyze_table should not raise when UPDATE STATISTICS fails."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+        )
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.execute.side_effect = Exception("Statistics update failed")
+        mock_conn.cursor.return_value = mock_cursor
+
+        # Should not raise
+        adapter.analyze_table(mock_conn, "orders")
+
+    def test_close_connection_calls_close(self, synapse_stubs):
+        """close_connection should call close() on the connection."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+        )
+        mock_conn = Mock()
+
+        adapter.close_connection(mock_conn)
+        mock_conn.close.assert_called_once()
+
+    def test_close_connection_handles_none(self, synapse_stubs):
+        """close_connection should not fail when connection is None."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+        )
+        # Should not raise
+        adapter.close_connection(None)
+
+    def test_get_platform_info_with_connection(self, synapse_stubs):
+        """get_platform_info should include version when connection provided."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            database="testdb",
+        )
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.fetchone.side_effect = [
+            ("Microsoft Azure SQL Data Warehouse - 15.0.9999.1",),  # @@VERSION
+            None,  # db size query
+        ]
+        mock_conn.cursor.return_value = mock_cursor
+
+        info = adapter.get_platform_info(connection=mock_conn)
+
+        assert info["platform_name"] == "Azure Synapse"
+        assert "Microsoft Azure" in info["platform_version"]
+        assert info["configuration"]["database"] == "testdb"
+
+    def test_create_schema_executes_table_creation(self, synapse_stubs):
+        """create_schema should execute CREATE TABLE statements."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            schema="dbo",
+        )
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        class MockBenchmark:
+            pass
+
+        ddl = "CREATE TABLE orders (o_orderkey BIGINT, o_custkey BIGINT)"
+        with patch.object(adapter, "_create_schema_with_tuning", return_value=ddl):
+            duration = adapter.create_schema(MockBenchmark(), mock_conn)
+
+        assert isinstance(duration, float)
+        assert duration >= 0
+
+    def test_generate_tuning_clause_returns_empty_for_none(self, synapse_stubs):
+        """generate_tuning_clause should return empty string for None."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+        )
+        assert adapter.generate_tuning_clause(None) == ""
+
+    def test_generate_tuning_clause_uses_default_distribution_when_no_dist_col(self, synapse_stubs):
+        """generate_tuning_clause should use distribution_default when no dist column."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            distribution_default="ROUND_ROBIN",
+        )
+
+        from benchbox.core.tuning.interface import TuningType
+
+        table_tuning = Mock()
+        table_tuning.has_any_tuning.return_value = True
+        table_tuning.get_columns_by_type.return_value = []
+
+        result = adapter.generate_tuning_clause(table_tuning)
+        assert "DISTRIBUTION = ROUND_ROBIN" in result
+        assert "CLUSTERED COLUMNSTORE INDEX" in result
+
+    def test_apply_table_tunings_no_op_when_no_tuning(self, synapse_stubs):
+        """apply_table_tunings should be a no-op when no tuning is configured."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+        )
+        mock_conn = Mock()
+        table_tuning = Mock()
+        table_tuning.has_any_tuning.return_value = False
+
+        # Should not raise and should not call any connection methods
+        adapter.apply_table_tunings(table_tuning, mock_conn)
+        mock_conn.cursor.assert_not_called()
+
 
 class TestSynapseMasterKeyPassword:
     """Verify master key password is not hardcoded."""

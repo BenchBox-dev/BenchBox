@@ -35,6 +35,7 @@ from ..utils.dependencies import (
 )
 from ..utils.file_format import get_delimiter_for_file, is_tpc_format
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.sql_execution import execute_sql_query
 
 # PostgreSQL dialect for SQLGlot
 POSTGRES_DIALECT = "postgres"
@@ -44,6 +45,72 @@ try:
     import psycopg2.extras
 except ImportError:
     psycopg2 = None
+
+
+def _add_postgres_compatible_arguments(
+    parser: Any,
+    *,
+    prefix: str,
+    platform_label: str,
+    include_timescale_toggle: bool = False,
+) -> None:
+    """Register shared PostgreSQL-compatible CLI arguments."""
+    option_prefix = prefix.strip("-")
+
+    parser.add_argument(
+        f"--{option_prefix}-host",
+        dest="host",
+        default="localhost",
+        help=f"{platform_label} server hostname",
+    )
+    parser.add_argument(
+        f"--{option_prefix}-port",
+        dest="port",
+        type=int,
+        default=5432,
+        help=f"{platform_label} server port",
+    )
+    parser.add_argument(
+        f"--{option_prefix}-database",
+        dest="database",
+        help=f"{platform_label} database name (auto-generated if not specified)",
+    )
+    parser.add_argument(
+        f"--{option_prefix}-username",
+        dest="username",
+        default="postgres",
+        help=f"{platform_label} username",
+    )
+    parser.add_argument(
+        f"--{option_prefix}-password",
+        dest="password",
+        help=f"{platform_label} password",
+    )
+    parser.add_argument(
+        f"--{option_prefix}-schema",
+        dest="schema",
+        default="public",
+        help=f"{platform_label} schema name",
+    )
+    parser.add_argument(
+        f"--{option_prefix}-work-mem",
+        dest="work_mem",
+        default="256MB",
+        help=f"{platform_label} work_mem setting for queries",
+    )
+    parser.add_argument(
+        f"--{option_prefix}-maintenance-work-mem",
+        dest="maintenance_work_mem",
+        default="512MB",
+        help=f"{platform_label} maintenance_work_mem for VACUUM/CREATE INDEX",
+    )
+    if include_timescale_toggle:
+        parser.add_argument(
+            f"--{option_prefix}-enable-timescale",
+            dest="enable_timescale",
+            action="store_true",
+            help="Enable TimescaleDB extensions if available",
+        )
 
 
 class PostgreSQLAdapter(PlatformAdapter):
@@ -69,58 +136,11 @@ class PostgreSQLAdapter(PlatformAdapter):
         if not hasattr(parser, "add_argument"):
             return
         try:
-            parser.add_argument(
-                "--postgres-host",
-                dest="host",
-                default="localhost",
-                help="PostgreSQL server hostname",
-            )
-            parser.add_argument(
-                "--postgres-port",
-                dest="port",
-                type=int,
-                default=5432,
-                help="PostgreSQL server port",
-            )
-            parser.add_argument(
-                "--postgres-database",
-                dest="database",
-                help="PostgreSQL database name (auto-generated if not specified)",
-            )
-            parser.add_argument(
-                "--postgres-username",
-                dest="username",
-                default="postgres",
-                help="PostgreSQL username",
-            )
-            parser.add_argument(
-                "--postgres-password",
-                dest="password",
-                help="PostgreSQL password",
-            )
-            parser.add_argument(
-                "--postgres-schema",
-                dest="schema",
-                default="public",
-                help="PostgreSQL schema name",
-            )
-            parser.add_argument(
-                "--postgres-work-mem",
-                dest="work_mem",
-                default="256MB",
-                help="PostgreSQL work_mem setting for queries",
-            )
-            parser.add_argument(
-                "--postgres-maintenance-work-mem",
-                dest="maintenance_work_mem",
-                default="512MB",
-                help="PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX",
-            )
-            parser.add_argument(
-                "--postgres-enable-timescale",
-                dest="enable_timescale",
-                action="store_true",
-                help="Enable TimescaleDB extensions if available",
+            _add_postgres_compatible_arguments(
+                parser,
+                prefix="postgres",
+                platform_label="PostgreSQL",
+                include_timescale_toggle=True,
             )
         except Exception:
             pass
@@ -556,52 +576,17 @@ class PostgreSQLAdapter(PlatformAdapter):
         stream_id: int | None = None,
     ) -> dict[str, Any]:
         """Execute a single query and return detailed results."""
-        start_time = mono_time()
-        self.log_verbose(f"Executing query {query_id}")
-
-        try:
-            cursor = connection.cursor()
-            cursor.execute(query)
-            results = cursor.fetchall()
-            cursor.close()
-
-            execution_time = elapsed_seconds(start_time)
-            actual_row_count = len(results)
-
-            # Validate row count if enabled
-            validation_result = None
-            if validate_row_count and benchmark_type:
-                from benchbox.core.validation.query_validation import QueryValidator
-
-                validator = QueryValidator()
-                validation_result = validator.validate_query_result(
-                    benchmark_type=benchmark_type,
-                    query_id=query_id,
-                    actual_row_count=actual_row_count,
-                    scale_factor=scale_factor,
-                    stream_id=stream_id,
-                )
-
-            result = self._build_query_result_with_validation(
-                query_id=query_id,
-                execution_time=execution_time,
-                actual_row_count=actual_row_count,
-                first_row=results[0] if results else None,
-                validation_result=validation_result,
-            )
-
-            return result
-
-        except Exception as e:
-            execution_time = elapsed_seconds(start_time)
-            return {
-                "query_id": query_id,
-                "status": "FAILED",
-                "execution_time_seconds": execution_time,
-                "rows_returned": 0,
-                "error": str(e),
-                "error_type": type(e).__name__,
-            }
+        return execute_sql_query(
+            connection,
+            query,
+            query_id,
+            log_verbose=self.log_verbose,
+            build_query_result_with_validation=self._build_query_result_with_validation,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
 
     def get_query_plan(
         self,

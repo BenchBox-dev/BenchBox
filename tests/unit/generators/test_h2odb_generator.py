@@ -69,9 +69,8 @@ class TestH2ODataGenerator:
 
         if hasattr(generator, "get_supported_types"):
             supported_types = generator.get_supported_types()
-            for dtype in expected_types:
-                if dtype in supported_types:
-                    assert True
+            matched = [dtype for dtype in expected_types if dtype in supported_types]
+            assert len(matched) > 0, f"Expected at least one of {expected_types} in {supported_types}"
         elif hasattr(generator, "column_types"):
             assert isinstance(generator.column_types, (list, dict))
 

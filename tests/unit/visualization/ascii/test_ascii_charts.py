@@ -593,7 +593,7 @@ class TestExporterChartTypeDispatch:
         """PercentileLadder is importable from the ascii module."""
         from benchbox.core.visualization.ascii import PercentileLadder
 
-        assert PercentileLadder is not None
+        assert callable(PercentileLadder)
 
     # ── Normalized Speedup Chart Tests ────────────────────────────────
 
@@ -721,7 +721,8 @@ class TestShimImports:
     def test_bar_chart_importable(self):
         from benchbox.core.visualization.ascii.bar_chart import BarChart, BarData
 
-        assert BarChart is not None and BarData is not None
+        assert callable(BarChart)
+        assert callable(BarData)
 
     def test_all_chart_types_importable(self):
         from benchbox.core.visualization.ascii import (

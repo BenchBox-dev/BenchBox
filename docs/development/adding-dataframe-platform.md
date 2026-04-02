@@ -136,16 +136,17 @@ class MyPandasLikeContext(DataFrameContext):
 
 Create an adapter that handles data loading and query execution.
 
+For **expression family** platforms, inherit from `ExpressionFamilyAdapter`:
+
 ```python
-# benchbox/platforms/dataframe/myplatform.py
+# benchbox/platforms/dataframe/myplatform_df.py
 
-from benchbox.platforms.dataframe.base import DataFrameAdapter
+from benchbox.platforms.dataframe.expression_family import ExpressionFamilyAdapter
 
-class MyPlatformAdapter(DataFrameAdapter):
+class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
     """Adapter for MyPlatform DataFrame benchmarking."""
 
     platform_name = "myplatform-df"
-    family = "expression"  # or "pandas"
 
     def __init__(self, working_dir: str, **options):
         super().__init__(working_dir)

@@ -34,6 +34,24 @@ def test_clickhouse_platform_options_overrides():
     assert parsed["port"] == 9440
 
 
+def test_databricks_platform_options_support_tuning_overrides():
+    parsed = PlatformHookRegistry.parse_options(
+        "databricks",
+        [
+            ("databricks_clustering_strategy", "liquid_clustering"),
+            ("liquid_clustering_columns", "event_time,customer_id"),
+        ],
+    )
+    assert parsed["databricks_clustering_strategy"] == "liquid_clustering"
+    assert parsed["liquid_clustering_columns"] == "event_time,customer_id"
+
+
+def test_parse_options_omits_none_defaults():
+    parsed = PlatformHookRegistry.parse_options("databricks", [])
+    assert "databricks_clustering_strategy" not in parsed
+    assert "liquid_clustering_columns" not in parsed
+
+
 def test_parse_options_unknown_key_raises():
     with pytest.raises(PlatformOptionError):
         PlatformHookRegistry.parse_options("clickhouse", [("unknown", "value")])

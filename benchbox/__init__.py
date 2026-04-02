@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union
 # __version__ must be defined before `from . import platforms` because the
 # platforms import chain can circle back to benchbox.cli.app which reads
 # benchbox.__version__ at module level.
-__version__ = "0.1.5"
+__version__ = "0.2.0"
 
 from benchbox.base import BaseBenchmark
 from benchbox.nyctaxi import NYCTaxi
@@ -85,6 +85,14 @@ _BENCHMARK_REGISTRY: dict[str, _BenchmarkSpec] = {
 }
 
 
+# Public re-exports for MCP and external consumers — resolved lazily in
+# __getattr__ to avoid importing heavy registry modules at package load time.
+_PUBLIC_REEXPORTS: dict[str, tuple[str, str]] = {
+    "TPCH_DATAFRAME_QUERIES": ("benchbox.core.tpch.dataframe_queries", "TPCH_DATAFRAME_QUERIES"),
+    "TPCDS_DATAFRAME_QUERIES": ("benchbox.core.tpcds.dataframe_queries", "TPCDS_DATAFRAME_QUERIES"),
+    "DATAFRAME_PLATFORMS": ("benchbox.platforms.dataframe.platform_checker", "DATAFRAME_PLATFORMS"),
+}
+
 # Lazy import cache for benchmark classes (stores class or ImportError/None)
 _lazy_cache: dict[str, Union[type[BaseBenchmark], ImportError, None]] = {}
 
@@ -131,7 +139,7 @@ def _clear_lazy_cache() -> None:
 
 
 # Expose lazy-loaded classes as module attributes
-def __getattr__(name: str) -> type[BaseBenchmark] | ModuleType:
+def __getattr__(name: str) -> Any:
     """Module-level __getattr__ for lazy loading with enhanced error reporting."""
     # Import here to avoid circular imports
     try:
@@ -144,6 +152,10 @@ def __getattr__(name: str) -> type[BaseBenchmark] | ModuleType:
 
     if name == "platforms":
         return platforms
+
+    if name in _PUBLIC_REEXPORTS:
+        module_path, attr = _PUBLIC_REEXPORTS[name]
+        return getattr(import_module(module_path), attr)
 
     # Map benchmark names to their lazy importers and potential missing dependencies
     if name in _BENCHMARK_REGISTRY:
@@ -183,4 +195,8 @@ __all__ = [
     "CoffeeShop",
     "DataVault",
     "TPCDSOBT",
+    # Public re-exports (MCP / external consumers)
+    "TPCH_DATAFRAME_QUERIES",
+    "TPCDS_DATAFRAME_QUERIES",
+    "DATAFRAME_PLATFORMS",
 ]

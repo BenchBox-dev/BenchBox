@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from benchbox.core.gpu.capabilities import (
+from benchbox.experimental.gpu.capabilities import (
     GPUCapabilities,
     GPUDevice,
     GPUInfo,
@@ -254,9 +254,9 @@ class TestDetectRapids:
 class TestDetectGPU:
     """Tests for main GPU detection function."""
 
-    @patch("benchbox.core.gpu.capabilities._detect_nvidia_smi")
-    @patch("benchbox.core.gpu.capabilities._detect_cuda_toolkit")
-    @patch("benchbox.core.gpu.capabilities._detect_rapids")
+    @patch("benchbox.experimental.gpu.capabilities._detect_nvidia_smi")
+    @patch("benchbox.experimental.gpu.capabilities._detect_cuda_toolkit")
+    @patch("benchbox.experimental.gpu.capabilities._detect_rapids")
     def test_detect_with_nvidia(self, mock_rapids, mock_cuda, mock_nvidia):
         """Should detect NVIDIA GPU."""
         mock_nvidia.return_value = [
@@ -284,9 +284,9 @@ class TestDetectGPU:
         assert info.cuda_available is True
         assert info.cuda_version == "12.1"
 
-    @patch("benchbox.core.gpu.capabilities._detect_nvidia_smi")
-    @patch("benchbox.core.gpu.capabilities._detect_cuda_toolkit")
-    @patch("benchbox.core.gpu.capabilities._detect_rapids")
+    @patch("benchbox.experimental.gpu.capabilities._detect_nvidia_smi")
+    @patch("benchbox.experimental.gpu.capabilities._detect_cuda_toolkit")
+    @patch("benchbox.experimental.gpu.capabilities._detect_rapids")
     def test_detect_no_gpu(self, mock_rapids, mock_cuda, mock_nvidia):
         """Should handle no GPU available."""
         mock_nvidia.return_value = []
@@ -301,7 +301,7 @@ class TestDetectGPU:
 class TestGetGPUCapabilities:
     """Tests for get_gpu_capabilities function."""
 
-    @patch("benchbox.core.gpu.capabilities.detect_gpu")
+    @patch("benchbox.experimental.gpu.capabilities.detect_gpu")
     def test_capabilities_with_ampere(self, mock_detect):
         """Should detect Ampere capabilities."""
         mock_detect.return_value = GPUInfo(
@@ -324,7 +324,7 @@ class TestGetGPUCapabilities:
         assert caps.supports_fp64 is True
         assert caps.memory_bandwidth_gbps > 0
 
-    @patch("benchbox.core.gpu.capabilities.detect_gpu")
+    @patch("benchbox.experimental.gpu.capabilities.detect_gpu")
     def test_capabilities_no_gpu(self, mock_detect):
         """Should handle no GPU."""
         mock_detect.return_value = GPUInfo(available=False)

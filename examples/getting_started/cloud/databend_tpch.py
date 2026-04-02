@@ -15,7 +15,7 @@ Databend supports two deployment modes:
 - **Self-hosted**: User-managed cluster with object storage backend
   - Typically runs on port 8000 (HTTP, no SSL)
   - Requires MinIO or S3-compatible storage for data persistence
-  - DSN-based connection: databend://user:pass@host:port/database
+  - DSN-based connection: databend+http://user:pass@host:port/database?sslmode=disable
 
 Prerequisites:
     1. Databend Cloud account or self-hosted Databend instance
@@ -30,7 +30,7 @@ Required environment variables (choose one approach):
         DATABEND_PASSWORD        Database password
 
     Option B - DSN string:
-        DATABEND_DSN             Full DSN (e.g., databend://user:pass@host:port/db)
+        DATABEND_DSN             Full DSN (e.g., databend+http://user:pass@host:port/db?sslmode=disable)
 
 Optional environment variables:
     DATABEND_DATABASE        Target database name (default: benchbox)
@@ -49,7 +49,7 @@ Usage:
     python examples/getting_started/cloud/databend_tpch.py
 
     # Self-hosted via DSN
-    export DATABEND_DSN=databend://root:@localhost:8000/benchbox
+    export DATABEND_DSN=databend+http://benchbox:benchbox@localhost:8000/benchbox?sslmode=disable
 
     python examples/getting_started/cloud/databend_tpch.py
 
@@ -119,7 +119,7 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
         if not host:
             raise RuntimeError(
                 "Missing Databend connection configuration. Set either:\n"
-                "  DATABEND_DSN=databend://user:pass@host:port/db\n"
+                "  DATABEND_DSN=databend+http://user:pass@host:port/db?sslmode=disable\n"
                 "or:\n"
                 "  DATABEND_HOST=<hostname>\n"
                 "  DATABEND_USER=<username>\n"

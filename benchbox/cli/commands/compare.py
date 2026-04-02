@@ -1221,6 +1221,15 @@ def _check_regression_threshold(comparison: dict[str, Any], regression_threshold
         )
 
 
+def _build_execution_map(results: Any) -> dict[str, Any]:
+    """Collect the first execution per query ID across all phases."""
+    execution_map: dict[str, Any] = {}
+    for phase_results in results.phases.values():
+        for execution in phase_results.queries:
+            execution_map.setdefault(execution.query_id, execution)
+    return execution_map
+
+
 def _compare_plans(
     baseline: Any,
     current: Any,
@@ -1261,19 +1270,8 @@ def _compare_plans(
     comparator = QueryPlanComparator()
 
     # Get detailed per-query plan comparisons
-    baseline_map: dict[str, Any] = {}
-    current_map: dict[str, Any] = {}
-
-    # Extract all executions
-    for phase_results in baseline.phases.values():
-        for execution in phase_results.queries:
-            if execution.query_id not in baseline_map:
-                baseline_map[execution.query_id] = execution
-
-    for phase_results in current.phases.values():
-        for execution in phase_results.queries:
-            if execution.query_id not in current_map:
-                current_map[execution.query_id] = execution
+    baseline_map = _build_execution_map(baseline)
+    current_map = _build_execution_map(current)
 
     # Compare common queries
     common_queries = set(baseline_map.keys()) & set(current_map.keys())

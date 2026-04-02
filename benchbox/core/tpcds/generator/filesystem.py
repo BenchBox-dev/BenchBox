@@ -91,61 +91,53 @@ class FileArtifactMixin:
         use_compression = self.should_use_compression() if use_compression is None else use_compression
         table_paths: dict[str, list[Path]] = {}
         for table_name in self._known_table_names():
-            if use_compression:
-                expected_filename = f"{table_name}.dat"
-                compressed_filename = self.get_compressed_filename(expected_filename)
-                compressed_file = target_dir / compressed_filename
-                if compressed_file.exists() and self._is_valid_data_file(compressed_file):
-                    table_paths[table_name] = [compressed_file]
-                    continue
+            single_file = self._find_existing_single_table_file(target_dir, table_name, use_compression)
+            if single_file is not None:
+                table_paths[table_name] = [single_file]
+                continue
 
-                extension = self.get_compressor().get_file_extension()
-                candidate_files = list(target_dir.glob(f"{table_name}_*.dat{extension}"))
-                valid_parallel_files: list[Path] = []
-                for pf in candidate_files:
-                    name = pf.name
-                    # Strip compression suffix to get the core filename
-                    name_core = strip_compression_suffix(Path(name)).name
-                    stem = Path(name_core).stem
-                    if stem.startswith(f"{table_name}_"):
-                        suffix = stem[len(f"{table_name}_") :]
-                        parts = suffix.split("_")
-                        if (
-                            len(parts) == 2
-                            and parts[0].isdigit()
-                            and parts[1].isdigit()
-                            and self._is_valid_data_file(pf)
-                        ):
-                            valid_parallel_files.append(pf)
-                if valid_parallel_files:
-                    # Sort to ensure consistent ordering across runs
-                    table_paths[table_name] = sorted(valid_parallel_files)
-            else:
-                single_file = target_dir / f"{table_name}.dat"
-                if single_file.exists() and self._is_valid_data_file(single_file):
-                    table_paths[table_name] = [single_file]
-                    continue
-
-                candidate_files = list(target_dir.glob(f"{table_name}_*.dat"))
-                valid_parallel_files: list[Path] = []
-                for pf in candidate_files:
-                    name = pf.name
-                    stem = Path(name).stem
-                    if stem.startswith(f"{table_name}_"):
-                        suffix = stem[len(f"{table_name}_") :]
-                        parts = suffix.split("_")
-                        if (
-                            len(parts) == 2
-                            and parts[0].isdigit()
-                            and parts[1].isdigit()
-                            and self._is_valid_data_file(pf)
-                        ):
-                            valid_parallel_files.append(pf)
-                if valid_parallel_files:
-                    # Sort to ensure consistent ordering across runs
-                    table_paths[table_name] = sorted(valid_parallel_files)
+            parallel_files = self._find_existing_parallel_table_files(target_dir, table_name, use_compression)
+            if parallel_files:
+                table_paths[table_name] = parallel_files
 
         return table_paths
+
+    def _find_existing_single_table_file(
+        self,
+        target_dir: Path,
+        table_name: str,
+        use_compression: bool,
+    ) -> Path | None:
+        """Return the existing single-file artifact for a table, if present."""
+        filename = self.get_compressed_filename(f"{table_name}.dat") if use_compression else f"{table_name}.dat"
+        candidate = target_dir / filename
+        if candidate.exists() and self._is_valid_data_file(candidate):
+            return candidate
+        return None
+
+    def _find_existing_parallel_table_files(
+        self,
+        target_dir: Path,
+        table_name: str,
+        use_compression: bool,
+    ) -> list[Path]:
+        """Return sorted valid shard files for an existing table."""
+        extension = self.get_compressor().get_file_extension() if use_compression else ""
+        pattern = f"{table_name}_*.dat{extension}"
+        valid_parallel_files = [
+            path for path in target_dir.glob(pattern) if self._is_parallel_table_file(path, table_name, use_compression)
+        ]
+        return sorted(valid_parallel_files)
+
+    def _is_parallel_table_file(self, file_path: Path, table_name: str, use_compression: bool) -> bool:
+        """Check whether a file path matches the expected shard naming convention."""
+        name_core = strip_compression_suffix(file_path).name if use_compression else file_path.name
+        stem = Path(name_core).stem
+        if not stem.startswith(f"{table_name}_"):
+            return False
+        suffix = stem[len(f"{table_name}_") :]
+        parts = suffix.split("_")
+        return len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit() and self._is_valid_data_file(file_path)
 
     def _is_valid_data_file(self, file_path: Path) -> bool:
         """Check if a file contains valid data (not empty or just compressed headers).

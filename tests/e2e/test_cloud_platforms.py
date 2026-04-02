@@ -72,10 +72,34 @@ class TestRedshiftE2E:
     @pytest.mark.live_integration
     @pytest.mark.live_redshift
     def test_full_execution_with_credentials(self, tmp_path: Path) -> None:
-        """Test full execution with Redshift (requires credentials)."""
+        """Test full TPC-H power run against live Redshift cluster."""
         if not has_cloud_credentials("redshift"):
             pytest.skip("Redshift credentials not configured")
-        pytest.skip("Full Redshift execution test requires manual setup")
+
+        results_dir = tmp_path / "results"
+        results_dir.mkdir()
+
+        result = run_cli_command(
+            [
+                "run",
+                "--platform",
+                "redshift",
+                "--benchmark",
+                "tpch",
+                "--scale",
+                "0.01",
+                "--phases",
+                "power",
+                "--queries",
+                "Q1,Q6",
+            ],
+            env={"BENCHBOX_RESULTS_DIR": str(results_dir)},
+            timeout=600.0,
+        )
+
+        assert result.returncode == 0, f"Redshift benchmark failed:\n{result.stdout}"
+        result_files = list(results_dir.glob("*.json"))
+        assert result_files, "No result file produced"
 
 
 # ============================================================================

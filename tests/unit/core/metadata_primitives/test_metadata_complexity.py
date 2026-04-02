@@ -565,7 +565,8 @@ class TestMetadataGenerator:
     def test_generator_instantiation(self):
         """Test that generator can be instantiated."""
         generator = MetadataGenerator()
-        assert generator is not None
+        assert isinstance(generator, MetadataGenerator)
+        assert hasattr(generator, "setup")
 
 
 # =============================================================================

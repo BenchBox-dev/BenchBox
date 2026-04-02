@@ -31,6 +31,12 @@ def git_commit_with_timestamp(repo_path: Path, message: str, git_timestamp: str)
 
     print(f"\nCreating git commit with timestamp: {git_timestamp}")
 
+    # Pre-format and lint-fix before committing so pre-commit hooks don't
+    # auto-modify staged files and reject the commit.
+    subprocess.run(["uv", "run", "ruff", "format", "."], cwd=repo_path, check=True)
+    subprocess.run(["uv", "run", "ruff", "check", "--fix", "."], cwd=repo_path, check=True)
+    subprocess.run(["git", "add", "-u"], cwd=repo_path, check=True)
+
     result = subprocess.run(
         ["git", "commit", "-m", message],
         cwd=repo_path,

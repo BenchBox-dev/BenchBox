@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, read-primitives, custom-benchmark, performance
 ```
 
+> **CLI name:** `read_primitives` — use `benchbox run --benchmark read_primitives`
+
 ## Overview
 
 The Read Primitives benchmark provides focused testing of fundamental database operations without the complexity of business logic. It offers systematic testing of specific database capabilities through 109 comprehensive primitive SQL queries organized into 26 operation categories.

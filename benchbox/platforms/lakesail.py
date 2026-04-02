@@ -45,8 +45,6 @@ from .base.spark_execution_mixin import SparkDataLoadMixin, SparkQueryExecutionM
 try:
     from pyspark.sql import SparkSession
     from pyspark.sql.types import (
-        DateType,
-        DecimalType,
         DoubleType,
         IntegerType,
         LongType,
@@ -62,8 +60,6 @@ except ImportError:
     IntegerType = None
     LongType = None
     DoubleType = None
-    DecimalType = None
-    DateType = None
 
 
 class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter):
@@ -503,15 +499,9 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
 
     def _extract_table_name(self, statement: str) -> str | None:
         """Extract table name from CREATE TABLE statement."""
-        try:
-            import re
+        from benchbox.core.sql_utils import extract_table_name
 
-            match = re.search(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)", statement, re.IGNORECASE)
-            if match:
-                return match.group(1).strip()
-        except Exception:
-            pass
-        return None
+        return extract_table_name(statement)
 
     def _normalize_table_name_in_sql(self, sql: str) -> str:
         """Normalize table names in SQL to lowercase."""
@@ -603,23 +593,9 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         """Apply tuning configurations to a table on Sail server."""
-        if not table_tuning or not table_tuning.has_any_tuning():
-            return
+        from benchbox.platforms.base.tuning_utils import log_partition_tunings
 
-        table_name = table_tuning.table_name.lower()
-        self.logger.info(f"Applying LakeSail tunings for table: {table_name}")
-
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
-            if partition_columns:
-                sorted_cols = sorted(partition_columns, key=lambda col: col.order)
-                column_names = [col.name for col in sorted_cols]
-                self.logger.info(f"Partitioning for {table_name}: {', '.join(column_names)}")
-
-        except ImportError:
-            self.logger.warning("Tuning interface not available - skipping tuning application")
+        log_partition_tunings(table_tuning, self.logger, "LakeSail")
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration."""
@@ -690,48 +666,29 @@ def _build_lakesail_config(
     info: Any,
 ) -> Any:
     """Build LakeSail database configuration with credential loading."""
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
+    from benchbox.platforms.azure.config_utils import build_platform_config
 
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("lakesail") or {}
-
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "LakeSail Sail"
-    driver_package = info.driver_package if info else "pyspark"
-
-    config_dict = {
-        "type": "lakesail",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # LakeSail-specific fields
-        "endpoint": merged_options.get("endpoint"),
-        "app_name": merged_options.get("app_name"),
-        "driver_memory": merged_options.get("driver_memory"),
-        "sail_mode": merged_options.get("sail_mode"),
-        "sail_workers": merged_options.get("sail_workers"),
-        "shuffle_partitions": merged_options.get("shuffle_partitions"),
-        "adaptive_enabled": merged_options.get("adaptive_enabled"),
-        "table_format": merged_options.get("table_format"),
-        "spark_config": merged_options.get("spark_config"),
-        "disable_cache": merged_options.get("disable_cache"),
-        # Benchmark context for config-aware database naming
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    if "database" in overrides and overrides["database"]:
-        config_dict["database"] = overrides["database"]
-
-    return DatabaseConfig(**config_dict)
+    return build_platform_config(
+        platform_type="lakesail",
+        credential_key="lakesail",
+        default_display_name="LakeSail Sail",
+        default_driver_package="pyspark",
+        platform_fields=[
+            "endpoint",
+            "app_name",
+            "driver_memory",
+            "sail_mode",
+            "sail_workers",
+            "shuffle_partitions",
+            "adaptive_enabled",
+            "table_format",
+            "spark_config",
+            "disable_cache",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
 
 # Register the config builder with the platform hook registry

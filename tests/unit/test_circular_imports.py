@@ -80,7 +80,9 @@ class TestCircularImports:
                 continue  # Skip - pandas not installed
 
             module = importlib.import_module(module_name)
-            assert hasattr(module, class_name), f"{module_name} should have {class_name}"
+            cls = getattr(module, class_name, None)
+            assert cls is not None, f"{module_name} should export {class_name}"
+            assert callable(cls), f"{class_name} should be callable (a class)"
 
     def test_relative_imports_in_init_files(self):
         """Test that __init__.py files using relative imports work correctly."""
@@ -105,8 +107,10 @@ class TestCircularImports:
 
             # Should have the expected attributes from the relative imports
             if "tpchavoc" not in module_name:  # tpchavoc only exports benchmark class
-                assert hasattr(module, "TABLES") or hasattr(module, "get_create_table_sql"), (
-                    f"{module_name} should have schema-related exports"
+                tables = getattr(module, "TABLES", None)
+                create_fn = getattr(module, "get_create_table_sql", None)
+                assert tables is not None or create_fn is not None, (
+                    f"{module_name} should have TABLES or get_create_table_sql"
                 )
 
     def test_platform_adapters_importable(self):
@@ -185,7 +189,8 @@ class TestImportStructure:
         """Test that the main benchbox package imports correctly."""
         import benchbox
 
-        assert hasattr(benchbox, "__version__")
+        assert isinstance(benchbox.__version__, str)
+        assert len(benchbox.__version__) > 0
 
     def test_base_benchmark_importable(self):
         """Test that BaseBenchmark can be imported."""
@@ -221,4 +226,4 @@ class TestImportStructure:
 
         # Verify all instances have the expected base interface
         for benchmark in [tpch, tpcds, read_primitives, write_primitives, ssb]:
-            assert hasattr(benchmark, "scale_factor")
+            assert benchmark.scale_factor > 0, f"{type(benchmark).__name__} should have positive scale_factor"

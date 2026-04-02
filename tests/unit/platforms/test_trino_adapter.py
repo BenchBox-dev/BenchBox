@@ -1177,3 +1177,330 @@ class TestTrinoAdapter:
         # Verify platform name is 'Trino', not 'Presto'
         assert adapter.platform_name == "Trino"
         assert "Presto" not in adapter.platform_name
+
+
+class TestTrinoLocalHostDetection:
+    """Tests for _is_local_host helper."""
+
+    def _adapter(self):
+        try:
+            return TrinoAdapter()
+        except ImportError:
+            pytest.skip("Trino drivers not installed")
+
+    def test_localhost_string(self):
+        adapter = self._adapter()
+        assert adapter._is_local_host("localhost") is True
+
+    def test_ipv4_loopback(self):
+        adapter = self._adapter()
+        assert adapter._is_local_host("127.0.0.1") is True
+
+    def test_ipv6_loopback(self):
+        adapter = self._adapter()
+        assert adapter._is_local_host("::1") is True
+
+    def test_dot_local_hostname(self):
+        adapter = self._adapter()
+        assert adapter._is_local_host("my-machine.local") is True
+
+    def test_external_host_is_not_local(self):
+        adapter = self._adapter()
+        assert adapter._is_local_host("trino.example.com") is False
+
+    def test_none_is_not_local(self):
+        adapter = self._adapter()
+        assert adapter._is_local_host(None) is False
+
+    def test_empty_string_is_not_local(self):
+        adapter = self._adapter()
+        assert adapter._is_local_host("") is False
+
+
+class TestTrinoConnectionErrorDetection:
+    """Tests for _error_indicates_connection_refused and _build_friendly_connection_error."""
+
+    def _adapter(self, **kwargs):
+        try:
+            return TrinoAdapter(**kwargs)
+        except ImportError:
+            pytest.skip("Trino drivers not installed")
+
+    def test_connection_refused_message_detected(self):
+        adapter = self._adapter()
+        exc = Exception("connection refused: port 8080")
+        assert adapter._error_indicates_connection_refused(exc) is True
+
+    def test_max_retries_message_detected(self):
+        adapter = self._adapter()
+        exc = Exception("Max retries exceeded with url")
+        assert adapter._error_indicates_connection_refused(exc) is True
+
+    def test_other_error_not_detected(self):
+        adapter = self._adapter()
+        exc = Exception("Authentication failed: invalid credentials")
+        assert adapter._error_indicates_connection_refused(exc) is False
+
+    def test_friendly_error_for_local_refused(self):
+        adapter = self._adapter(host="localhost", port=8080)
+        exc = Exception("connection refused")
+        msg = adapter._build_friendly_connection_error(exc)
+        assert msg is not None
+        assert "localhost" in msg
+        assert "8080" in msg
+
+    def test_no_friendly_error_for_remote_host(self):
+        adapter = self._adapter(host="trino.example.com")
+        exc = Exception("connection refused")
+        msg = adapter._build_friendly_connection_error(exc)
+        assert msg is None
+
+    def test_no_friendly_error_for_non_refused_local(self):
+        adapter = self._adapter(host="localhost")
+        exc = Exception("Authentication failed")
+        msg = adapter._build_friendly_connection_error(exc)
+        assert msg is None
+
+
+class TestTrinoValueFormatting:
+    """Tests for _is_date_value and _escape_insert_value."""
+
+    def _adapter(self):
+        try:
+            return TrinoAdapter()
+        except ImportError:
+            pytest.skip("Trino drivers not installed")
+
+    def test_is_date_value_valid_date(self):
+        adapter = self._adapter()
+        assert adapter._is_date_value("1998-12-31") is True
+
+    def test_is_date_value_regex_only_checks_format(self):
+        adapter = self._adapter()
+        assert adapter._is_date_value("12/31/1998") is False
+        assert adapter._is_date_value("1998-13-99") is True  # YYYY-MM-DD pattern matches; no semantic validation
+        assert adapter._is_date_value("not-a-date") is False
+
+    def test_escape_empty_string_becomes_null(self):
+        adapter = self._adapter()
+        assert adapter._escape_insert_value("") == "NULL"
+
+    def test_escape_null_string_becomes_null(self):
+        adapter = self._adapter()
+        assert adapter._escape_insert_value("null") == "NULL"
+        assert adapter._escape_insert_value("NULL") == "NULL"
+
+    def test_escape_date_value(self):
+        adapter = self._adapter()
+        result = adapter._escape_insert_value("1998-01-15")
+        assert result == "DATE '1998-01-15'"
+
+    def test_escape_numeric_value_unquoted(self):
+        adapter = self._adapter()
+        assert adapter._escape_insert_value("42") == "42"
+        assert adapter._escape_insert_value("3.14") == "3.14"
+
+    def test_escape_string_value_quoted(self):
+        adapter = self._adapter()
+        result = adapter._escape_insert_value("hello world")
+        assert result == "'hello world'"
+
+    def test_escape_string_with_single_quote(self):
+        adapter = self._adapter()
+        result = adapter._escape_insert_value("O'Brien")
+        assert result == "'O''Brien'"
+
+
+class TestTrinoTableDefinitionOptimization:
+    """Tests for _optimize_table_definition."""
+
+    def _adapter(self, table_format="memory"):
+        try:
+            return TrinoAdapter(table_format=table_format)
+        except ImportError:
+            pytest.skip("Trino drivers not installed")
+
+    def test_non_create_table_statement_unchanged(self):
+        adapter = self._adapter()
+        sql = "INSERT INTO foo VALUES (1)"
+        assert adapter._optimize_table_definition(sql) == sql
+
+    def test_memory_format_removes_with_clause(self):
+        adapter = self._adapter(table_format="memory")
+        sql = "CREATE TABLE orders (id BIGINT) WITH (format = 'ORC')"
+        result = adapter._optimize_table_definition(sql)
+        assert "WITH" not in result
+        assert "CREATE TABLE orders" in result
+
+    def test_iceberg_format_adds_parquet_when_no_with(self):
+        adapter = self._adapter(table_format="iceberg")
+        sql = "CREATE TABLE orders (id BIGINT)"
+        result = adapter._optimize_table_definition(sql)
+        assert "WITH (format = 'PARQUET')" in result
+
+    def test_iceberg_format_preserves_existing_with(self):
+        adapter = self._adapter(table_format="iceberg")
+        sql = "CREATE TABLE orders (id BIGINT) WITH (format = 'ORC')"
+        result = adapter._optimize_table_definition(sql)
+        # Already has WITH, should not add another
+        assert result.count("WITH") == 1
+
+    def test_hive_format_adds_parquet_when_no_with(self):
+        adapter = self._adapter(table_format="hive")
+        sql = "CREATE TABLE orders (id BIGINT)"
+        result = adapter._optimize_table_definition(sql)
+        assert "WITH (format = 'PARQUET')" in result
+
+
+class TestTrinoConfigureForBenchmark:
+    """Tests for configure_for_benchmark."""
+
+    def _adapter(self):
+        try:
+            return TrinoAdapter()
+        except ImportError:
+            pytest.skip("Trino drivers not installed")
+
+    def test_olap_type_executes_session_settings(self):
+        adapter = self._adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter.configure_for_benchmark(mock_conn, "olap")
+
+        executed_sql = " ".join(str(c) for c in mock_cursor.execute.call_args_list)
+        assert "optimizer_hash_generation_enabled" in executed_sql
+        assert "join_reordering_strategy" in executed_sql
+        mock_cursor.close.assert_called_once()
+
+    def test_tpch_type_executes_session_settings(self):
+        adapter = self._adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter.configure_for_benchmark(mock_conn, "tpch")
+
+        assert mock_cursor.execute.call_count >= 1
+
+    def test_oltp_type_no_session_settings(self):
+        adapter = self._adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter.configure_for_benchmark(mock_conn, "oltp")
+
+        mock_cursor.execute.assert_not_called()
+        mock_cursor.close.assert_called_once()
+
+
+class TestTrinoAutoSelectCatalog:
+    """Tests for _auto_select_catalog catalog selection logic."""
+
+    def _adapter(self):
+        try:
+            return TrinoAdapter()
+        except ImportError:
+            pytest.skip("Trino drivers not installed")
+
+    def test_returns_none_when_no_catalogs(self):
+        adapter = self._adapter()
+        with patch.object(adapter, "_get_available_catalogs", return_value=[]):
+            assert adapter._auto_select_catalog() is None
+
+    def test_returns_none_when_only_system_catalogs(self):
+        adapter = self._adapter()
+        with patch.object(adapter, "_get_available_catalogs", return_value=["jmx", "system"]):
+            assert adapter._auto_select_catalog() is None
+
+    def test_prefers_hive_over_memory(self):
+        adapter = self._adapter()
+        with patch.object(adapter, "_get_available_catalogs", return_value=["memory", "hive", "system"]):
+            assert adapter._auto_select_catalog() == "hive"
+
+    def test_prefers_iceberg_over_memory(self):
+        adapter = self._adapter()
+        with patch.object(adapter, "_get_available_catalogs", return_value=["memory", "iceberg"]):
+            assert adapter._auto_select_catalog() == "iceberg"
+
+    def test_falls_back_to_memory_when_no_preferred(self):
+        adapter = self._adapter()
+        with patch.object(adapter, "_get_available_catalogs", return_value=["memory", "system"]):
+            assert adapter._auto_select_catalog() == "memory"
+
+    def test_falls_back_to_first_usable_catalog(self):
+        adapter = self._adapter()
+        with patch.object(adapter, "_get_available_catalogs", return_value=["custom_catalog", "another"]):
+            assert adapter._auto_select_catalog() == "custom_catalog"
+
+
+class TestTrinoTuningSupport:
+    """Tests for supports_tuning_type and generate_tuning_clause."""
+
+    def _adapter(self, **kwargs):
+        try:
+            return TrinoAdapter(**kwargs)
+        except ImportError:
+            pytest.skip("Trino drivers not installed")
+
+    def test_supports_partitioning_and_sorting(self):
+        from benchbox.core.tuning.interface import TuningType
+
+        adapter = self._adapter()
+        assert adapter.supports_tuning_type(TuningType.PARTITIONING) is True
+        assert adapter.supports_tuning_type(TuningType.SORTING) is True
+
+    def test_does_not_support_primary_keys(self):
+        from benchbox.core.tuning.interface import TuningType
+
+        adapter = self._adapter()
+        assert adapter.supports_tuning_type(TuningType.PRIMARY_KEYS) is False
+
+    def test_generate_tuning_clause_returns_empty_for_none(self):
+        adapter = self._adapter()
+        assert adapter.generate_tuning_clause(None) == ""
+
+    def test_generate_tuning_clause_returns_empty_for_no_tuning(self):
+        from unittest.mock import Mock
+
+        adapter = self._adapter()
+        table_tuning = Mock()
+        table_tuning.has_any_tuning.return_value = False
+        assert adapter.generate_tuning_clause(table_tuning) == ""
+
+    def test_generate_tuning_clause_hive_partitioning(self):
+        from unittest.mock import Mock
+
+        from benchbox.core.tuning.interface import TuningType
+
+        adapter = self._adapter(table_format="hive")
+        col1 = Mock()
+        col1.name = "l_shipdate"
+        col1.order = 1
+        table_tuning = Mock()
+        table_tuning.has_any_tuning.return_value = True
+        table_tuning.get_columns_by_type.side_effect = lambda t: ([col1] if t == TuningType.PARTITIONING else [])
+
+        result = adapter.generate_tuning_clause(table_tuning)
+        assert "PARTITIONED BY" in result
+        assert "l_shipdate" in result
+
+    def test_generate_tuning_clause_iceberg_partitioning(self):
+        from unittest.mock import Mock
+
+        from benchbox.core.tuning.interface import TuningType
+
+        adapter = self._adapter(table_format="iceberg")
+        col1 = Mock()
+        col1.name = "l_shipdate"
+        col1.order = 1
+        table_tuning = Mock()
+        table_tuning.has_any_tuning.return_value = True
+        table_tuning.get_columns_by_type.side_effect = lambda t: ([col1] if t == TuningType.PARTITIONING else [])
+
+        result = adapter.generate_tuning_clause(table_tuning)
+        assert "WITH" in result
+        assert "partitioning" in result
+        assert "l_shipdate" in result

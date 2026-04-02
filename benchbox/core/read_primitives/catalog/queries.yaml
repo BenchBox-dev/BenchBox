@@ -835,6 +835,7 @@ queries:
     WHERE o_orderdate >= DATE '1995-01-01'
       AND o_orderdate < DATE '1996-01-01'
     ORDER BY o_orderdate;
+  skip_on: [redshift]
 - id: window_unbounded_frame
   category: window
   sql: |2
@@ -869,7 +870,7 @@ queries:
     FROM orders
     WHERE JSON_EXTRACT(o_comment, '$.priority') IS NOT NULL
     LIMIT 1000;
-  skip_on: [duckdb, datafusion]
+  skip_on: [duckdb, datafusion, redshift]
   description: "TPC-H o_comment contains plain text, not valid JSON"
 - id: json_extract_nested
   category: json
@@ -884,7 +885,7 @@ queries:
     FROM customer
     WHERE JSON_VALID(c_comment)
     LIMIT 500;
-  skip_on: [datafusion]
+  skip_on: [datafusion, redshift]
 - id: json_aggregates
   category: json
   sql: |2
@@ -910,7 +911,7 @@ queries:
       WHERE p_type LIKE '%STEEL%'
       GROUP BY p_brand
       LIMIT 100;
-  skip_on: [datafusion]
+  skip_on: [datafusion, redshift]
 - id: fulltext_simple_search
   category: fulltext
   sql: |2
@@ -939,6 +940,18 @@ queries:
       LIMIT 100;
     datafusion: |2
 
+      SELECT
+          p_partkey,
+          p_name,
+          p_mfgr,
+          p_comment
+      FROM part
+      WHERE p_name LIKE '%STEEL%' OR p_name LIKE '%COPPER%'
+         OR p_comment LIKE '%STEEL%' OR p_comment LIKE '%COPPER%'
+      LIMIT 100;
+    redshift: |2
+
+      -- Redshift doesn't support MATCH...AGAINST, use LIKE instead
       SELECT
           p_partkey,
           p_name,
@@ -984,6 +997,17 @@ queries:
       WHERE c_comment LIKE '%BUILDING%'
         AND c_comment NOT LIKE '%FURNITURE%'
       LIMIT 50;
+    redshift: |2
+
+      -- Redshift doesn't support MATCH...AGAINST, use LIKE with AND/NOT logic
+      SELECT
+          c_custkey,
+          c_name,
+          c_comment
+      FROM customer
+      WHERE c_comment LIKE '%BUILDING%'
+        AND c_comment NOT LIKE '%FURNITURE%'
+      LIMIT 50;
 - id: fulltext_phrase_search
   category: fulltext
   sql: |2
@@ -1017,6 +1041,16 @@ queries:
       FROM supplier
       WHERE s_comment LIKE '%Customer Complaints%'
       ORDER BY s_suppkey;
+    redshift: |2
+
+      -- Redshift doesn't support MATCH...AGAINST, use LIKE with exact phrase
+      SELECT
+          s_suppkey,
+          s_name,
+          s_comment
+      FROM supplier
+      WHERE s_comment LIKE '%Customer Complaints%'
+      ORDER BY s_suppkey;
 - id: statistical_percentiles
   category: statistical
   sql: |2
@@ -1032,6 +1066,19 @@ queries:
         PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l_extendedprice) as price_p95
     FROM lineitem
     GROUP BY l_returnflag, l_linestatus;
+  variants:
+    redshift: |2
+
+      -- Redshift supports PERCENTILE_CONT only as a window function, not aggregate
+      SELECT DISTINCT
+          l_returnflag,
+          l_linestatus,
+          COUNT(*) OVER (PARTITION BY l_returnflag, l_linestatus) as record_count,
+          PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY l_quantity) OVER (PARTITION BY l_returnflag, l_linestatus) as quantity_q1,
+          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l_quantity) OVER (PARTITION BY l_returnflag, l_linestatus) as quantity_median,
+          PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY l_quantity) OVER (PARTITION BY l_returnflag, l_linestatus) as quantity_q3,
+          PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l_extendedprice) OVER (PARTITION BY l_returnflag, l_linestatus) as price_p95
+      FROM lineitem;
 - id: statistical_variance_stddev
   category: statistical
   sql: |2
@@ -1050,6 +1097,7 @@ queries:
     GROUP BY o_orderpriority;
 - id: statistical_correlation
   category: statistical
+  skip_on: [redshift]
   sql: |2
 
     -- Correlation analysis between numeric columns
@@ -1107,6 +1155,7 @@ queries:
     ORDER BY r.r_name NULLS LAST, n.n_name NULLS LAST, c.c_mktsegment NULLS LAST;
 - id: timeseries_trend_analysis
   category: timeseries
+  skip_on: [redshift]
   sql: |2
 
     -- Time series trend analysis with linear regression
@@ -1228,6 +1277,24 @@ queries:
       FROM ranked
       WHERE rn = 1
       ORDER BY max_balance DESC;
+    redshift: |2
+
+      WITH ranked AS (
+        SELECT
+          n.n_name,
+          c.c_name,
+          c.c_acctbal,
+          ROW_NUMBER() OVER (PARTITION BY n.n_name ORDER BY c.c_acctbal DESC, c.c_name) as rn
+        FROM customer c
+        JOIN nation n ON c.c_nationkey = n.n_nationkey
+      )
+      SELECT
+        n_name,
+        c_name as richest_customer,
+        c_acctbal as max_balance
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY max_balance DESC;
 - id: min_by_simple
   category: min
   sql: |2
@@ -1243,6 +1310,24 @@ queries:
     ORDER BY min_balance ASC;
   variants:
     datafusion: |2
+
+      WITH ranked AS (
+        SELECT
+          n.n_name,
+          c.c_name,
+          c.c_acctbal,
+          ROW_NUMBER() OVER (PARTITION BY n.n_name ORDER BY c.c_acctbal ASC, c.c_name) as rn
+        FROM customer c
+        JOIN nation n ON c.c_nationkey = n.n_nationkey
+      )
+      SELECT
+        n_name,
+        c_name as poorest_customer,
+        c_acctbal as min_balance
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY min_balance ASC;
+    redshift: |2
 
       WITH ranked AS (
         SELECT
@@ -1276,6 +1361,29 @@ queries:
     ORDER BY max_order_value DESC;
   variants:
     datafusion: |2
+
+      WITH ranked AS (
+        SELECT
+          c.c_mktsegment,
+          o.o_orderkey,
+          o.o_orderdate,
+          o.o_totalprice,
+          ROW_NUMBER() OVER (
+            PARTITION BY c.c_mktsegment
+            ORDER BY o.o_totalprice DESC, o.o_orderkey
+          ) as rn
+        FROM orders o
+        JOIN customer c ON o.o_custkey = c.c_custkey
+      )
+      SELECT
+        c_mktsegment,
+        o_orderkey as most_expensive_order_id,
+        o_orderdate as most_expensive_order_date,
+        o_totalprice as max_order_value
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY max_order_value DESC;
+    redshift: |2
 
       WITH ranked AS (
         SELECT
@@ -1334,6 +1442,28 @@ queries:
       FROM ranked
       WHERE rn = 1
       ORDER BY min_price ASC;
+    redshift: |2
+
+      WITH ranked AS (
+        SELECT
+          p_brand,
+          p_name,
+          p_type,
+          p_retailprice,
+          ROW_NUMBER() OVER (
+            PARTITION BY p_brand
+            ORDER BY p_retailprice ASC, p_name
+          ) as rn
+        FROM part
+      )
+      SELECT
+        p_brand,
+        p_name as cheapest_part_name,
+        p_type as cheapest_part_type,
+        p_retailprice as min_price
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY min_price ASC;
 - id: max_by_with_ties
   category: max
   sql: |2
@@ -1352,6 +1482,31 @@ queries:
     LIMIT 100;
   variants:
     datafusion: |2
+
+      WITH ranked AS (
+        SELECT
+          p.p_partkey,
+          p.p_name,
+          s.s_name,
+          ps.ps_supplycost,
+          ROW_NUMBER() OVER (
+            PARTITION BY p.p_partkey, p.p_name
+            ORDER BY ps.ps_supplycost DESC, s.s_name
+          ) as rn
+        FROM partsupp ps
+        JOIN part p ON ps.ps_partkey = p.p_partkey
+        JOIN supplier s ON ps.ps_suppkey = s.s_suppkey
+      )
+      SELECT
+        p_partkey,
+        p_name,
+        s_name as supplier_name,
+        ps_supplycost as max_supply_cost
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY max_supply_cost DESC
+      LIMIT 100;
+    redshift: |2
 
       WITH ranked AS (
         SELECT
@@ -1418,6 +1573,31 @@ queries:
       WHERE rn = 1
       ORDER BY min_supply_cost ASC
       LIMIT 100;
+    redshift: |2
+
+      WITH ranked AS (
+        SELECT
+          p.p_partkey,
+          p.p_name,
+          s.s_name,
+          ps.ps_supplycost,
+          ROW_NUMBER() OVER (
+            PARTITION BY p.p_partkey, p.p_name
+            ORDER BY ps.ps_supplycost ASC, s.s_name
+          ) as rn
+        FROM partsupp ps
+        JOIN part p ON ps.ps_partkey = p.p_partkey
+        JOIN supplier s ON ps.ps_suppkey = s.s_suppkey
+      )
+      SELECT
+        p_partkey,
+        p_name,
+        s_name as supplier_name,
+        ps_supplycost as min_supply_cost
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY min_supply_cost ASC
+      LIMIT 100;
 - id: qualify_row_number
   category: qualify
   sql: |2
@@ -1448,6 +1628,21 @@ queries:
     FROM part
     QUALIFY DENSE_RANK() OVER (PARTITION BY p_type ORDER BY p_retailprice DESC) <= 2
     ORDER BY p_type, price_rank;
+  variants:
+    redshift: |2
+
+      -- Redshift QUALIFY with DENSE_RANK requires subquery workaround
+      SELECT p_type, p_name, p_retailprice, price_rank
+      FROM (
+          SELECT
+              p_type,
+              p_name,
+              p_retailprice,
+              DENSE_RANK() OVER (PARTITION BY p_type ORDER BY p_retailprice DESC) as price_rank
+          FROM part
+      ) ranked
+      WHERE price_rank <= 2
+      ORDER BY p_type, price_rank;
 - id: qualify_percentile
   category: qualify
   sql: |2
@@ -1897,6 +2092,17 @@ queries:
       JOIN region r ON n.n_regionkey = r.r_regionkey
       GROUP BY r_name, n_name
       ORDER BY r_name, n_name, supplier_count;
+    redshift: |2
+
+      SELECT
+          r_name,
+          n_name,
+          COUNT(*) as supplier_count
+      FROM supplier s
+      JOIN nation n ON s.s_nationkey = n.n_nationkey
+      JOIN region r ON n.n_regionkey = r.r_regionkey
+      GROUP BY r_name, n_name
+      ORDER BY r_name, n_name, supplier_count;
 - id: orderby_all_desc
   category: orderby
   sql: |2
@@ -1912,6 +2118,16 @@ queries:
     LIMIT 100;
   variants:
     datafusion: |2
+
+      SELECT
+          p_brand,
+          p_type,
+          AVG(p_retailprice) as avg_price
+      FROM part
+      GROUP BY p_brand, p_type
+      ORDER BY p_brand DESC, p_type DESC, avg_price DESC
+      LIMIT 100;
+    redshift: |2
 
       SELECT
           p_brand,
@@ -1950,6 +2166,7 @@ queries:
       GROUP BY ps_suppkey
       HAVING COUNT(*) <= 10
       LIMIT 100;
+  skip_on: [redshift]
 - id: array_agg_distinct
   category: array
   sql: |2
@@ -1968,6 +2185,7 @@ queries:
           groupUniqArray(c_nationkey) as nation_keys
       FROM customer
       GROUP BY c_mktsegment;
+  skip_on: [redshift]
 - id: array_unnest
   category: array
   sql: |2
@@ -2014,6 +2232,7 @@ queries:
           ps_suppkey,
           arrayJoin(parts) as part_key
       FROM supplier_parts;
+  skip_on: [redshift]
 - id: array_contains
   category: array
   sql: |2
@@ -2082,6 +2301,15 @@ queries:
       FROM partsupp
       GROUP BY ps_suppkey
       LIMIT 100;
+    redshift: |2
+
+      -- Redshift has no native array type; use a scalar membership test
+      SELECT
+          ps_suppkey,
+          MAX(CASE WHEN ps_partkey = 100 THEN 1 ELSE 0 END) = 1 as has_part_100
+      FROM partsupp
+      GROUP BY ps_suppkey
+      LIMIT 100;
 - id: array_length
   category: array
   sql: |2
@@ -2140,6 +2368,16 @@ queries:
       GROUP BY ps_suppkey
       ORDER BY num_parts DESC
       LIMIT 100;
+    redshift: |2
+
+      -- Redshift has no native array type; count parts directly
+      SELECT
+          ps_suppkey,
+          COUNT(*) as num_parts
+      FROM partsupp
+      GROUP BY ps_suppkey
+      ORDER BY num_parts DESC
+      LIMIT 100;
 - id: array_slice
   category: array
   sql: |2
@@ -2189,6 +2427,7 @@ queries:
           arraySlice(prices, 1, 3) as top_3_orders
       FROM order_prices
       LIMIT 100;
+  skip_on: [redshift]
 - id: array_min_max
   category: array
   sql: |2
@@ -2247,6 +2486,16 @@ queries:
       FROM orders
       GROUP BY o_custkey
       LIMIT 100;
+    redshift: |2
+
+      -- Redshift has no native array type; compute min/max directly
+      SELECT
+          o_custkey,
+          MIN(o_totalprice) as min_order,
+          MAX(o_totalprice) as max_order
+      FROM orders
+      GROUP BY o_custkey
+      LIMIT 100;
   skip_on: [bigquery]
 - id: array_sort
   category: array
@@ -2294,7 +2543,7 @@ queries:
           arraySort(sizes) as sorted_sizes
       FROM part_sizes
       LIMIT 50;
-  skip_on: [bigquery]
+  skip_on: [bigquery, redshift]
 - id: array_distinct
   category: array
   sql: |2
@@ -2349,7 +2598,7 @@ queries:
       FROM lineitem
       GROUP BY l_orderkey
       LIMIT 100;
-  skip_on: [bigquery]
+  skip_on: [bigquery, redshift]
 
 # ============================================================================
 # STRUCT type operations - composite data types
@@ -2386,6 +2635,7 @@ queries:
       FROM customer
       WHERE c_nationkey = 1
       LIMIT 100;
+  skip_on: [redshift]
 - id: struct_access
   category: struct
   sql: |2
@@ -2422,6 +2672,7 @@ queries:
       FROM customer_info
       WHERE info.3 > 5000
       LIMIT 100;
+  skip_on: [redshift]
 - id: array_of_struct
   category: struct
   sql: |2
@@ -2449,6 +2700,7 @@ queries:
       WHERE o_orderdate = '1995-03-15'
       GROUP BY o_orderkey
       LIMIT 50;
+  skip_on: [redshift]
 
 # ============================================================================
 # MAP type operations - key-value collections
@@ -2500,7 +2752,7 @@ queries:
       FROM partsupp
       WHERE ps_suppkey <= 10
       GROUP BY ps_suppkey;
-  skip_on: [bigquery]
+  skip_on: [bigquery, redshift]
 - id: map_access
   category: map
   sql: |2
@@ -2542,7 +2794,7 @@ queries:
           MAP_EXTRACT(part_costs, '5')[1] as cost_for_part_5
       FROM supplier_costs
       LIMIT 10;
-  skip_on: [bigquery]
+  skip_on: [bigquery, redshift]
 - id: map_keys_values
   category: map
   sql: |2
@@ -2600,7 +2852,7 @@ queries:
           mapKeys(part_costs) as part_ids,
           mapValues(part_costs) as costs
       FROM supplier_costs;
-  skip_on: [bigquery]
+  skip_on: [bigquery, redshift]
 
 # ============================================================================
 # Higher-order functions - lambda operations on arrays
@@ -2673,7 +2925,7 @@ queries:
       FROM exploded
       GROUP BY p_brand
       LIMIT 50;
-  skip_on: [bigquery]
+  skip_on: [bigquery, redshift]
 - id: list_filter
   category: lambda
   sql: |2
@@ -2742,7 +2994,7 @@ queries:
       WHERE price > 100000
       GROUP BY o_custkey
       LIMIT 100;
-  skip_on: [bigquery]
+  skip_on: [bigquery, redshift]
 - id: list_reduce
   category: lambda
   sql: |2
@@ -2810,7 +3062,7 @@ queries:
       FROM exploded
       GROUP BY l_orderkey
       LIMIT 100;
-  skip_on: [bigquery]
+  skip_on: [bigquery, redshift]
 
 # ============================================================================
 # ASOF JOIN - time series fuzzy temporal lookups
@@ -2865,7 +3117,7 @@ queries:
       WHERE l.l_shipdate >= DATE '1995-01-01'
         AND l.l_shipdate < DATE '1995-02-01'
       LIMIT 100;
-  skip_on: [bigquery, databricks]
+  skip_on: [bigquery, databricks, redshift]
 
 # ============================================================================
 # PIVOT/UNPIVOT operations - row-to-column and column-to-row transformations
@@ -3083,6 +3335,16 @@ queries:
           FROM lineitem
       ) ranked
       WHERE qty_rank <= 5;
+    redshift: |2
+
+      -- Redshift QUALIFY with RANK requires subquery workaround
+      SELECT l_orderkey, l_returnflag, l_quantity, qty_rank
+      FROM (
+          SELECT l_orderkey, l_returnflag, l_quantity,
+                 RANK() OVER (PARTITION BY l_returnflag ORDER BY l_quantity DESC) as qty_rank
+          FROM lineitem
+      ) ranked
+      WHERE qty_rank <= 5;
 
 - id: window_sum
   category: window
@@ -3103,6 +3365,7 @@ queries:
     FROM orders
     ORDER BY o_orderdate
     LIMIT 100;
+  skip_on: [redshift]
 
 # --- Limit with ordering ---
 

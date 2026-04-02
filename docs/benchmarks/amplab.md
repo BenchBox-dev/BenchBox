@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, amplab, custom-benchmark
 ```
 
+> **CLI name:** `amplab` — use `benchbox run --benchmark amplab`
+
 ## Overview
 
 The AMPLab Big Data Benchmark is designed to test the performance of big data processing systems using realistic web analytics workloads. Developed by the AMPLab at UC Berkeley, this benchmark focuses on three core data processing patterns that are fundamental to many big data applications: scanning large datasets, joining multiple tables, and performing complex analytics operations.
@@ -42,7 +44,7 @@ The AMPLab benchmark uses a simple three-table schema that models web analytics 
 
 **USERVISITS Table:**
 - `sourceIP` (VARCHAR(15)) - Visitor IP address
-- `destURL` (VARCHAR(100)) - Destination page URL  
+- `destURL` (VARCHAR(100)) - Destination page URL
 - `visitDate` (DATE) - Visit timestamp
 - `adRevenue` (DECIMAL(8,2)) - Revenue generated from ads
 - `userAgent` (VARCHAR(256)) - Browser user agent string
@@ -61,13 +63,13 @@ The AMPLab benchmark uses a simple three-table schema that models web analytics 
 erDiagram
     RANKINGS ||--o{ USERVISITS : pageURL_destURL
     DOCUMENTS ||--o{ USERVISITS : url_destURL
-    
+
     RANKINGS {
         varchar pageURL PK
         int pageRank
         int avgDuration
     }
-    
+
     USERVISITS {
         varchar sourceIP
         varchar destURL FK
@@ -79,7 +81,7 @@ erDiagram
         varchar searchWord
         int duration
     }
-    
+
     DOCUMENTS {
         varchar url PK
         text contents
@@ -97,17 +99,17 @@ The AMPLab benchmark includes three primary query patterns that test different a
 **Query 1 (Basic Scan)**:
 ```sql
 SELECT pageURL, pageRank
-FROM rankings 
+FROM rankings
 WHERE pageRank > 1000;
 ```
 
 **Query 1A (Aggregated Scan)**:
 ```sql
-SELECT 
+SELECT
     COUNT(*) as total_pages,
     AVG(pageRank) as avg_pagerank,
     MAX(pageRank) as max_pagerank
-FROM rankings 
+FROM rankings
 WHERE pageRank > 1000;
 ```
 
@@ -123,7 +125,7 @@ WHERE pageRank > 1000;
 
 **Query 2 (Revenue Analysis)**:
 ```sql
-SELECT 
+SELECT
     sourceIP,
     SUM(adRevenue) as totalRevenue,
     AVG(pageRank) as avgPageRank
@@ -137,14 +139,14 @@ LIMIT 100;
 
 **Query 2A (Join with Filtering)**:
 ```sql
-SELECT 
+SELECT
     uv.destURL,
     uv.visitDate,
     uv.adRevenue,
     r.pageRank,
     r.avgDuration
 FROM uservisits uv
-JOIN rankings r ON uv.destURL = r.pageURL  
+JOIN rankings r ON uv.destURL = r.pageURL
 WHERE r.pageRank > 1000
   AND uv.visitDate >= '1980-01-01'
 ORDER BY r.pageRank DESC
@@ -163,7 +165,7 @@ LIMIT 100;
 
 **Query 3 (User Behavior Analysis)**:
 ```sql
-SELECT 
+SELECT
     sourceIP,
     COUNT(*) as visit_count,
     SUM(adRevenue) as total_revenue,
@@ -179,10 +181,10 @@ LIMIT 100;
 
 **Query 3A (Document Analysis)**:
 ```sql
-SELECT 
+SELECT
     url,
     LENGTH(contents) as content_length,
-    CASE 
+    CASE
         WHEN contents LIKE '%facebook%' THEN 'social'
         WHEN contents LIKE '%shopping%' THEN 'ecommerce'
         ELSE 'other'
@@ -263,7 +265,7 @@ for table_name, file_name in table_mappings.items():
     if file_path.exists():
         conn.execute(f"""
             INSERT INTO {table_name}
-            SELECT * FROM read_csv('{file_path}', 
+            SELECT * FROM read_csv('{file_path}',
                                   header=true,
                                   auto_detect=true)
         """)
@@ -284,7 +286,7 @@ scan_query = amplab.get_query("1", params=query_params)
 scan_result = conn.execute(scan_query).fetchall()
 print(f"Scan Query: {len(scan_result)} pages with high rankings")
 
-# Query 2: Join performance  
+# Query 2: Join performance
 join_query = amplab.get_query("2", params=query_params)
 join_result = conn.execute(join_query).fetchall()
 print(f"Join Query: {len(join_result)} user revenue summaries")
@@ -313,7 +315,7 @@ amplab = AMPLab(scale_factor=100, output_dir="/data/amplab_sf100")
 data_files = amplab.generate_data()
 
 # Load data into Spark DataFrames with optimizations
-rankings_df = spark.read.csv("/data/amplab_sf100/rankings.csv", 
+rankings_df = spark.read.csv("/data/amplab_sf100/rankings.csv",
                             header=True, inferSchema=True)
 rankings_df = rankings_df.repartition(200, "pageRank")  # Partition by pageRank
 rankings_df.cache()
@@ -322,7 +324,7 @@ rankings_df.createOrReplaceTempView("rankings")
 uservisits_df = spark.read.csv("/data/amplab_sf100/uservisits.csv",
                               header=True, inferSchema=True)
 uservisits_df = uservisits_df.repartition(400, "visitDate")  # Partition by date
-uservisits_df.cache() 
+uservisits_df.cache()
 uservisits_df.createOrReplaceTempView("uservisits")
 
 documents_df = spark.read.csv("/data/amplab_sf100/documents.csv",
@@ -332,7 +334,7 @@ documents_df.createOrReplaceTempView("documents")
 # Run benchmark queries with Spark SQL
 query_params = {
     'pagerank_threshold': 1000,
-    'start_date': '1980-01-01', 
+    'start_date': '1980-01-01',
     'end_date': '1980-04-01',
     'limit_rows': 1000,
     'search_term': 'google',
@@ -374,21 +376,21 @@ class AMPLabPerformanceTester:
     def __init__(self, amplab: AMPLab, connection):
         self.amplab = amplab
         self.connection = connection
-        
+
     def benchmark_query_type(self, query_type: str, iterations: int = 3) -> Dict:
         """Benchmark specific AMPLab query type."""
         query_mappings = {
             'scan': ['1', '1a'],
-            'join': ['2', '2a'], 
+            'join': ['2', '2a'],
             'analytics': ['3', '3a']
         }
-        
+
         if query_type not in query_mappings:
             raise ValueError(f"Invalid query type: {query_type}")
-            
+
         query_ids = query_mappings[query_type]
         results = {}
-        
+
         # Standard parameters for reproducible testing
         params = {
             'pagerank_threshold': 1000,
@@ -398,21 +400,21 @@ class AMPLabPerformanceTester:
             'search_term': 'google',
             'min_visits': 10
         }
-        
+
         for query_id in query_ids:
             print(f"Benchmarking Query {query_id} ({query_type})...")
-            
+
             times = []
             for iteration in range(iterations):
                 query_sql = self.amplab.get_query(query_id, params=params)
-                
+
                 start_time = time.time()
                 result = self.connection.execute(query_sql).fetchall()
                 execution_time = time.time() - start_time
-                
+
                 times.append(execution_time)
                 print(f"  Iteration {iteration + 1}: {execution_time:.3f}s")
-            
+
             results[query_id] = {
                 'type': query_type,
                 'avg_time': mean(times),
@@ -422,25 +424,25 @@ class AMPLabPerformanceTester:
                 'rows_returned': len(result),
                 'times': times
             }
-        
+
         return results
-    
+
     def run_complete_benchmark(self) -> Dict:
         """Run all AMPLab query types and return systematic results."""
         complete_results = {}
-        
+
         # Test each query type
         for query_type in ['scan', 'join', 'analytics']:
             print(f"\\nRunning {query_type.upper()} queries...")
             type_results = self.benchmark_query_type(query_type)
             complete_results[query_type] = type_results
-        
+
         # Calculate summary statistics
         all_times = []
         for type_data in complete_results.values():
             for query_data in type_data.values():
                 all_times.extend(query_data['times'])
-        
+
         complete_results['summary'] = {
             'total_queries': sum(len(type_data) for type_data in complete_results.values() if isinstance(type_data, dict)),
             'total_avg_time': mean(all_times),
@@ -448,30 +450,30 @@ class AMPLabPerformanceTester:
             'total_min_time': min(all_times),
             'total_max_time': max(all_times)
         }
-        
+
         return complete_results
-    
+
     def analyze_scalability(self, scale_factors: List[float]) -> Dict:
         """Test query performance across different scale factors."""
         scalability_results = {}
-        
+
         for scale_factor in scale_factors:
             print(f"\\nTesting scale factor {scale_factor}...")
-            
+
             # Generate data at this scale
             test_amplab = AMPLab(
                 scale_factor=scale_factor,
                 output_dir=f"amplab_sf{scale_factor}"
             )
             test_amplab.generate_data()
-            
+
             # Load data (simplified - would need actual loading logic)
             # ... data loading code ...
-            
+
             # Run benchmark
             results = self.run_complete_benchmark()
             scalability_results[scale_factor] = results
-        
+
         return scalability_results
 
 # Usage
@@ -605,7 +607,7 @@ client.execute(create_tables_sql)
 # Load data using ClickHouse CSV import
 for table_name in ['rankings', 'uservisits', 'documents']:
     file_path = amplab.output_dir / f"{table_name}.csv"
-    
+
     with open(file_path, 'rb') as f:
         client.insert_file(table_name, f, fmt='CSV')
 
@@ -622,7 +624,7 @@ query_params = {
 # Scan query with ClickHouse optimizations
 scan_configured = """
 SELECT pageURL, pageRank
-FROM rankings 
+FROM rankings
 WHERE pageRank > {pagerank_threshold}
 ORDER BY pageRank DESC
 LIMIT 1000;
@@ -633,7 +635,7 @@ print(f"Optimized scan: {len(scan_result.result_rows)} results")
 
 # Join query with ClickHouse optimizations
 join_configured = """
-SELECT 
+SELECT
     sourceIP,
     sum(adRevenue) as totalRevenue,
     avg(pageRank) as avgPageRank,
@@ -709,15 +711,15 @@ print("Hive DDL for AMPLab tables created")
 scan_job = """
 -- Hive query for scan workload
 SELECT pageURL, pageRank
-FROM amplab_benchmark.rankings 
+FROM amplab_benchmark.rankings
 WHERE pageRank > 1000
 ORDER BY pageRank DESC
 LIMIT 1000;
 """
 
 join_job = """
--- Hive query for join workload  
-SELECT 
+-- Hive query for join workload
+SELECT
     uv.sourceIP,
     sum(uv.adRevenue) as totalRevenue,
     avg(r.pageRank) as avgPageRank
@@ -738,7 +740,7 @@ LIMIT 100;
 3. **Optimize file formats** - Use columnar formats (Parquet, ORC) for analytics
 4. **Distribution strategy** - Distribute data evenly across cluster nodes
 
-### Query Optimization  
+### Query Optimization
 1. **Index strategy** - Create indices on frequently filtered columns
 2. **Join optimization** - Ensure proper join order and algorithms
 3. **Parallel execution** - Use system parallelism for large datasets
@@ -765,10 +767,10 @@ CREATE TABLE rankings_configured (
 PARTITIONED BY (pageRank_bucket);
 
 -- Create derived column for better partitioning
-ALTER TABLE rankings_configured 
-ADD COLUMN pageRank_bucket AS (CASE 
+ALTER TABLE rankings_configured
+ADD COLUMN pageRank_bucket AS (CASE
     WHEN pageRank < 100 THEN 'low'
-    WHEN pageRank < 500 THEN 'medium' 
+    WHEN pageRank < 500 THEN 'medium'
     ELSE 'high'
 END);
 ```
@@ -776,7 +778,7 @@ END);
 **Issue: Inefficient joins between large tables**
 ```sql
 -- Solution: Optimize join order and use broadcast joins where appropriate
-SELECT /*+ BROADCAST(r) */ 
+SELECT /*+ BROADCAST(r) */
     uv.sourceIP,
     SUM(uv.adRevenue) as totalRevenue,
     AVG(r.pageRank) as avgPageRank
@@ -802,7 +804,7 @@ amplab = AMPLab(
 **Issue: Slow text processing in analytics queries**
 ```sql
 -- Solution: Use database-specific text processing functions
-SELECT 
+SELECT
     url,
     LENGTH(contents) as content_length,
     REGEXP_EXTRACT(contents, '(facebook|google|amazon)', 1) as company

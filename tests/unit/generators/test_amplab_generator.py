@@ -109,12 +109,9 @@ class TestAMPLabDataGenerator:
         # Rankings table typically has: pageURL, pageRank, avgDuration
         if hasattr(generator, "_generate_rankings_data"):
             try:
-                # Mock the generation
                 with patch.object(generator, "_write_csv_file") as mock_write:
                     generator._generate_rankings_data()
-                    # Check that CSV writing was called
-                    if mock_write.called:
-                        assert True
+                    mock_write.assert_called()
             except (NotImplementedError, AttributeError):
                 pass
 
@@ -128,12 +125,9 @@ class TestAMPLabDataGenerator:
         # UserVisits table typically has: sourceIP, destURL, visitDate, adRevenue, userAgent, countryCode, languageCode, searchWord, duration
         if hasattr(generator, "_generate_uservisits_data"):
             try:
-                # Mock the generation
                 with patch.object(generator, "_write_csv_file") as mock_write:
                     generator._generate_uservisits_data()
-                    # Check that CSV writing was called
-                    if mock_write.called:
-                        assert True
+                    mock_write.assert_called()
             except (NotImplementedError, AttributeError):
                 pass
 

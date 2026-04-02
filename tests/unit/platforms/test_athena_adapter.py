@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,7 +11,7 @@ from benchbox.core.exceptions import ConfigurationError
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.medium,
+    pytest.mark.fast,
 ]
 
 
@@ -564,6 +565,155 @@ class TestAthenaAdapter:
         assert stats == {"lineitem": 100}
         assert per_table_timings is None
         mock_ctas_conversion.assert_called_once()
+
+    def test_build_external_table_statements_normalizes_table_names(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials
+    ):
+        """External-table statements should be keyed by normalized table name."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket", s3_prefix="data", database="analytics")
+
+        with patch.object(
+            adapter,
+            "_create_schema_with_tuning",
+            return_value="""
+                CREATE TABLE "ORDERS" (id INT, amount DECIMAL);
+                CREATE TABLE LINEITEM (line_id BIGINT);
+            """,
+        ):
+            statements = adapter._build_external_table_statements(MagicMock())
+
+        assert sorted(statements) == ["lineitem", "orders"]
+        assert "CREATE EXTERNAL TABLE IF NOT EXISTS orders" in statements["orders"]
+        assert "s3://test-bucket/data/analytics/orders/" in statements["orders"]
+        assert "CREATE EXTERNAL TABLE IF NOT EXISTS lineitem" in statements["lineitem"]
+
+    def test_normalize_parquet_files_filters_non_parquet_and_empty(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials, tmp_path
+    ):
+        """Only existing non-empty Parquet files should be kept for external registration."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket")
+        parquet_file = tmp_path / "orders.parquet"
+        csv_file = tmp_path / "orders.csv"
+        empty_parquet = tmp_path / "empty.parquet"
+        parquet_file.write_bytes(b"PAR1")
+        csv_file.write_text("1,test\n")
+        empty_parquet.write_bytes(b"")
+
+        result = adapter._normalize_parquet_files([parquet_file, csv_file, empty_parquet, tmp_path / "missing.parquet"])
+
+        assert result == [parquet_file]
+
+    @pytest.mark.parametrize(
+        ("is_parquet_mode", "expected"),
+        [
+            (True, "benchbox-data/tpch_staging/lineitem/"),
+            (False, "benchbox-data/tpch/lineitem/"),
+        ],
+    )
+    def test_build_s3_table_path(self, is_parquet_mode, expected, mock_boto3, mock_pyathena, mock_aws_credentials):
+        """Table S3 paths should switch between staging and final prefixes."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket", s3_prefix="benchbox-data", database="tpch")
+
+        assert adapter._build_s3_table_path("lineitem", is_parquet_mode) == expected
+
+    def test_upload_files_to_s3_counts_non_blank_rows(self, mock_boto3, mock_pyathena, mock_aws_credentials, tmp_path):
+        """S3 upload helper should count only non-empty rows and upload each valid file."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket", s3_prefix="benchbox-data", database="tpch")
+        mock_s3 = MagicMock()
+        file_one = tmp_path / "lineitem.tbl"
+        file_two = tmp_path / "lineitem.tbl.1"
+        file_one.write_text("1|a|\n\n2|b|\n")
+        file_two.write_text("3|c|\n")
+
+        uploaded_rows, file_count = adapter._upload_files_to_s3(
+            mock_s3,
+            "lineitem",
+            "lineitem",
+            [file_one, file_two],
+            is_parquet_mode=True,
+        )
+
+        assert uploaded_rows == 3
+        assert file_count == 2
+        upload_calls = [call.args for call in mock_s3.upload_file.call_args_list]
+        assert (str(file_one), "test-bucket", "benchbox-data/tpch_staging/lineitem/lineitem.tbl") in upload_calls
+        assert (str(file_two), "test-bucket", "benchbox-data/tpch_staging/lineitem/lineitem.tbl.1") in upload_calls
+
+    def test_load_text_mode_table_returns_uploaded_rows_when_count_check_fails(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials
+    ):
+        """Text-mode load should fall back to uploaded row count when verification fails."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket")
+        mock_cursor = MagicMock()
+        mock_cursor.execute.side_effect = [None, Exception("count failed")]
+
+        actual_rows, verified = adapter._load_text_mode_table(mock_cursor, "lineitem", 11)
+
+        assert actual_rows == 11
+        assert verified is False
+        mock_cursor.execute.assert_any_call("MSCK REPAIR TABLE lineitem")
+        mock_cursor.execute.assert_any_call("SELECT COUNT(*) FROM lineitem")
+
+    def test_convert_staging_to_parquet_executes_ctas_and_cleanup(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials
+    ):
+        """CTAS conversion should target the parquet location and clean up staging when enabled."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(
+            s3_bucket="test-bucket",
+            s3_prefix="benchbox-data",
+            database="tpch",
+            compression="GZIP",
+            cleanup_staging=True,
+        )
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (9,)
+        mock_s3 = MagicMock()
+
+        with patch.object(adapter, "_cleanup_staging") as mock_cleanup:
+            stats = adapter._convert_staging_to_parquet(mock_cursor, [("lineitem", 9)], mock_s3)
+
+        assert stats == {"lineitem": 9}
+        execute_sql = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
+        assert execute_sql[0] == "DROP TABLE IF EXISTS lineitem"
+        assert any("CREATE TABLE lineitem" in sql for sql in execute_sql)
+        assert any("external_location = 's3://test-bucket/benchbox-data/tpch/lineitem/'" in sql for sql in execute_sql)
+        assert any("parquet_compression = 'GZIP'" in sql for sql in execute_sql)
+        assert execute_sql[-1] == "SELECT COUNT(*) FROM lineitem"
+        mock_cleanup.assert_called_once_with(mock_cursor, mock_s3, "lineitem", "lineitem_staging")
+
+    def test_cleanup_staging_deletes_in_batches(self, mock_boto3, mock_pyathena, mock_aws_credentials):
+        """Staging cleanup should drop the Glue table and batch S3 object deletions."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket", s3_prefix="benchbox-data", database="tpch")
+        mock_cursor = MagicMock()
+        mock_s3 = MagicMock()
+        mock_paginator = MagicMock()
+        first_batch = [{"Key": f"benchbox-data/tpch_staging/lineitem/part-{i}.parquet"} for i in range(1000)]
+        second_batch = [{"Key": "benchbox-data/tpch_staging/lineitem/part-1000.parquet"}]
+        mock_paginator.paginate.return_value = [{"Contents": first_batch + second_batch}]
+        mock_s3.get_paginator.return_value = mock_paginator
+
+        adapter._cleanup_staging(mock_cursor, mock_s3, "lineitem", "lineitem_staging")
+
+        mock_cursor.execute.assert_called_once_with("DROP TABLE IF EXISTS lineitem_staging")
+        delete_calls = mock_s3.delete_objects.call_args_list
+        assert len(delete_calls) == 2
+        assert delete_calls[0].kwargs["Bucket"] == "test-bucket"
+        assert len(delete_calls[0].kwargs["Delete"]["Objects"]) == 1000
+        assert len(delete_calls[1].kwargs["Delete"]["Objects"]) == 1
 
 
 class TestAthenaAdapterExecution:

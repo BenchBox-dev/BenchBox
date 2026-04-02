@@ -7,6 +7,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from benchbox.core.dataframe.tuning import (
+    DataFrameTuningConfiguration,
+    ExecutionConfiguration,
+    MemoryConfiguration,
+    ParallelismConfiguration,
+)
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -102,8 +109,7 @@ class TestLakeSailDataFrameAdapterReal:
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
         adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
-        # Test that class can be instantiated
-        assert hasattr(adapter, "platform_name")
+        assert adapter.platform_name == "LakeSail"
 
     def test_platform_name_value(self):
         """Test the platform_name property returns 'LakeSail'."""
@@ -138,8 +144,8 @@ class TestLakeSailDataFrameAdapterReal:
         """Test that the adapter family is 'expression'."""
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
-        # ExpressionFamilyAdapter sets family = "expression"
-        assert hasattr(LakeSailDataFrameAdapter, "family")
+        adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
+        assert adapter.family == "expression"
 
 
 class TestLakeSailDataFrameAdapterConfig:
@@ -191,3 +197,158 @@ class TestLakeSailDataFrameAdapterConfig:
         assert "driver_memory" in info
         assert "shuffle_partitions" in info
         assert "aqe_enabled" in info
+
+    def test_tuning_config_overrides_shuffle_and_memory(self):
+        """Tuning config should update the locally testable LakeSail settings."""
+        if not PYSPARK_AVAILABLE:
+            pytest.skip("PySpark not available")
+
+        from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
+
+        tuning = DataFrameTuningConfiguration(
+            parallelism=ParallelismConfiguration(thread_count=7),
+            memory=MemoryConfiguration(memory_limit="5GB"),
+            execution=ExecutionConfiguration(streaming_mode=True),
+        )
+
+        adapter = LakeSailDataFrameAdapter(
+            endpoint="sc://localhost:50051",
+            driver_memory="1g",
+            shuffle_partitions=2,
+            tuning_config=tuning,
+        )
+
+        assert adapter._shuffle_partitions == 7
+        assert adapter._driver_memory == "5GB"
+
+        summary = adapter.get_tuning_summary()
+        assert summary["endpoint"] == "sc://localhost:50051"
+        assert summary["driver_memory"] == "5GB"
+        assert summary["shuffle_partitions"] == 7
+
+        adapter.close()
+
+    def test_build_schema_uses_nullable_strings(self):
+        """CSV schema helper should map requested columns to nullable string fields."""
+        if not PYSPARK_AVAILABLE:
+            pytest.skip("PySpark not available")
+
+        from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
+
+        adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
+        schema = adapter._build_schema(["order_id", "customer_name"])
+
+        assert schema.fieldNames() == ["order_id", "customer_name"]
+        assert [field.dataType.simpleString() for field in schema.fields] == ["string", "string"]
+        assert all(field.nullable for field in schema.fields)
+
+
+class TestLakeSailDataFrameAdapterLifecycle:
+    """Tests for mocked LakeSail session lifecycle and helper methods."""
+
+    @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not available")
+    def test_session_builder_uses_endpoint_and_extra_configs(self):
+        """Spark Connect builder should receive endpoint, AQE, and extra config options once."""
+        from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
+
+        mock_session = MagicMock()
+        mock_builder = MagicMock()
+        mock_builder.remote.return_value = mock_builder
+        mock_builder.config.return_value = mock_builder
+        mock_builder.getOrCreate.return_value = mock_session
+        mock_spark_class = MagicMock(builder=mock_builder)
+
+        with patch("benchbox.platforms.dataframe.lakesail_df.SparkSession", mock_spark_class):
+            adapter = LakeSailDataFrameAdapter(
+                endpoint="sc://lakehouse:50051",
+                app_name="BenchBox-LakeSail-Tests",
+                driver_memory="2g",
+                shuffle_partitions=4,
+                enable_aqe=True,
+                verbose=True,
+                spark_sql_catalog_implementation="in-memory",
+            )
+
+            assert adapter.spark is mock_session
+            assert adapter.spark is mock_session
+
+        mock_builder.remote.assert_called_once_with("sc://lakehouse:50051")
+        assert mock_builder.getOrCreate.call_count == 1
+        assert mock_builder.config.call_args_list == [
+            (("spark.app.name", "BenchBox-LakeSail-Tests"), {}),
+            (("spark.sql.shuffle.partitions", "4"), {}),
+            (("spark.sql.adaptive.enabled", "true"), {}),
+            (("spark_sql_catalog_implementation", "in-memory"), {}),
+        ]
+
+    @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not available")
+    def test_session_creation_failure_propagates(self):
+        """Connection failures should bubble up and leave the adapter unbound."""
+        from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
+
+        mock_builder = MagicMock()
+        mock_builder.remote.return_value = mock_builder
+        mock_builder.config.return_value = mock_builder
+        mock_builder.getOrCreate.side_effect = RuntimeError("connect failed")
+        mock_spark_class = MagicMock(builder=mock_builder)
+
+        with patch("benchbox.platforms.dataframe.lakesail_df.SparkSession", mock_spark_class):
+            adapter = LakeSailDataFrameAdapter(endpoint="sc://missing:50051")
+
+            with pytest.raises(RuntimeError, match="connect failed"):
+                _ = adapter.spark
+
+        assert adapter._spark is None
+
+    def test_close_ignores_stop_errors_and_clears_session(self):
+        """close() should swallow stop errors and always clear the cached session."""
+        from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
+
+        adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
+        adapter._spark = MagicMock()
+        adapter._spark.stop.side_effect = RuntimeError("stop failed")
+        adapter.verbose = False
+
+        adapter.close()
+
+        assert adapter._spark is None
+
+    def test_explain_and_get_query_plan_capture_modes(self):
+        """Plan helpers should capture both simple and extended explain output."""
+        from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
+
+        class DummyFrame:
+            def __init__(self):
+                self.calls: list[str] = []
+
+            def explain(self, mode="extended"):
+                self.calls.append(mode)
+                print(f"{mode} plan")
+
+        adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
+        frame = DummyFrame()
+
+        simple = adapter.explain(frame, mode="simple")
+        plans = adapter.get_query_plan(frame)
+
+        assert "simple plan" in simple
+        assert "simple plan" in plans["logical"]
+        assert "extended plan" in plans["physical"]
+        assert frame.calls == ["simple", "simple", "extended"]
+
+    def test_sql_and_register_table_delegate_to_spark_objects(self):
+        """SQL execution and temp-view registration should delegate directly to Spark objects."""
+        from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
+
+        adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
+        expected_result = object()
+        adapter._spark = MagicMock()
+        adapter._spark.sql.return_value = expected_result
+
+        df = MagicMock()
+
+        assert adapter.sql("SELECT 1") is expected_result
+        adapter._spark.sql.assert_called_once_with("SELECT 1")
+
+        adapter.register_table("orders", df)
+        df.createOrReplaceTempView.assert_called_once_with("orders")

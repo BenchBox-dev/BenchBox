@@ -41,6 +41,8 @@ TPCDI_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 MAX_CREDIT_RATING = 10
 MIN_CREDIT_RATING = 1
 DEFAULT_BATCH_ID = 1
+_VECTOR_DATETIME_TYPES = {"DATE", "DATETIME", "TIMESTAMP"}
+_VECTOR_NUMERIC_TYPES = {"BIGINT", "INT", "INTEGER", "FLOAT", "DOUBLE"}
 
 
 class TransformationRule(ABC):
@@ -127,60 +129,54 @@ class DataTypeTransformation(TransformationRule):
     def _apply_vectorized_conversions(self, data: pd.DataFrame) -> pd.DataFrame:
         """Apply vectorized type conversions for better performance."""
         result = data.copy()
+        datetime_cols = self._get_vectorized_columns(
+            lambda col, dtype: dtype.upper() in _VECTOR_DATETIME_TYPES and col in result.columns
+        )
+        numeric_cols = self._get_vectorized_columns(
+            lambda col, dtype: dtype.upper() in _VECTOR_NUMERIC_TYPES and col in result.columns
+        )
+        string_cols = self._get_vectorized_columns(
+            lambda col, dtype: (dtype.upper().startswith("VARCHAR") or dtype.upper() == "TEXT")
+            and col in result.columns
+        )
 
-        # Group conversions by type for vectorized operations
-        datetime_cols = [
-            col
-            for col, dtype in self.type_mappings.items()
-            if dtype.upper() in ["DATE", "DATETIME", "TIMESTAMP"] and col in result.columns
-        ]
-        numeric_cols = [
-            col
-            for col, dtype in self.type_mappings.items()
-            if dtype.upper() in ["BIGINT", "INT", "INTEGER", "FLOAT", "DOUBLE"] and col in result.columns
-        ]
-        string_cols = [
-            col
-            for col, dtype in self.type_mappings.items()
-            if dtype.upper().startswith("VARCHAR") or dtype.upper() == "TEXT" and col in result.columns
-        ]
-
-        # Vectorized datetime conversions
-        if datetime_cols:
-            for col in datetime_cols:
-                try:
-                    target_type = self.type_mappings[col].upper()
-                    if target_type == "DATE":
-                        result[col] = pd.to_datetime(result[col], errors="coerce").dt.date
-                    else:
-                        result[col] = pd.to_datetime(result[col], errors="coerce")
-                except Exception as e:
-                    logger.warning(f"Vectorized datetime conversion failed for {col}: {e}")
-                    result[col] = self._convert_column(result[col], self.type_mappings[col], col)
-
-        # Vectorized numeric conversions
-        if numeric_cols:
-            for col in numeric_cols:
-                try:
-                    target_type = self.type_mappings[col].upper()
-                    if target_type in ["BIGINT", "INT", "INTEGER"]:
-                        result[col] = pd.to_numeric(result[col], errors="coerce").astype("Int64")
-                    else:
-                        result[col] = pd.to_numeric(result[col], errors="coerce")
-                except Exception as e:
-                    logger.warning(f"Vectorized numeric conversion failed for {col}: {e}")
-                    result[col] = self._convert_column(result[col], self.type_mappings[col], col)
-
-        # Vectorized string conversions
-        if string_cols:
-            for col in string_cols:
-                try:
-                    result[col] = result[col].astype(str).replace("nan", "")
-                except Exception as e:
-                    logger.warning(f"Vectorized string conversion failed for {col}: {e}")
-                    result[col] = self._convert_column(result[col], self.type_mappings[col], col)
-
+        self._apply_vectorized_conversion_group(result, datetime_cols, "datetime", self._convert_vectorized_datetime)
+        self._apply_vectorized_conversion_group(result, numeric_cols, "numeric", self._convert_vectorized_numeric)
+        self._apply_vectorized_conversion_group(result, string_cols, "string", self._convert_vectorized_string)
         return result
+
+    def _get_vectorized_columns(self, predicate: Callable[[str, str], bool]) -> list[str]:
+        return [col for col, dtype in self.type_mappings.items() if predicate(col, dtype)]
+
+    def _apply_vectorized_conversion_group(
+        self,
+        result: pd.DataFrame,
+        columns: list[str],
+        group_name: str,
+        converter: Callable[[pd.Series, str], pd.Series],
+    ) -> None:
+        for col in columns:
+            try:
+                result[col] = converter(result[col], self.type_mappings[col].upper())
+            except Exception as e:
+                logger.warning(f"Vectorized {group_name} conversion failed for {col}: {e}")
+                result[col] = self._convert_column(result[col], self.type_mappings[col], col)
+
+    @staticmethod
+    def _convert_vectorized_datetime(series: pd.Series, target_type: str) -> pd.Series:
+        parsed = pd.to_datetime(series, errors="coerce")
+        return parsed.dt.date if target_type == "DATE" else parsed
+
+    @staticmethod
+    def _convert_vectorized_numeric(series: pd.Series, target_type: str) -> pd.Series:
+        numeric = pd.to_numeric(series, errors="coerce")
+        if target_type in {"BIGINT", "INT", "INTEGER"}:
+            return numeric.astype("Int64")
+        return numeric
+
+    @staticmethod
+    def _convert_vectorized_string(series: pd.Series, _target_type: str) -> pd.Series:
+        return series.astype(str).replace("nan", "")
 
     def _convert_column(self, series: pd.Series, target_type: str, column_name: str) -> pd.Series:
         """Convert a pandas Series to the target data type.
@@ -1652,13 +1648,6 @@ class TransformationEngine:
         # Initialize logging
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
-    def _get_worker_pool_config(self) -> dict[str, Any]:
-        """Get simple worker pool configuration."""
-        return {
-            "max_workers": self.parallel_config.max_workers,
-            "use_threads_only": True,  # Simplified to use only ThreadPoolExecutor
-        }
-
         # Optimization settings based on scale factor
         self._configure_performance_settings()
 
@@ -1683,6 +1672,13 @@ class TransformationEngine:
             "FactCashBalance": ["DimDate", "DimCustomer", "DimAccount"],
             "FactMarketHistory": ["DimDate", "DimSecurity"],
             "FactDailyMarket": ["DimDate", "DimSecurity"],
+        }
+
+    def _get_worker_pool_config(self) -> dict[str, Any]:
+        """Get simple worker pool configuration."""
+        return {
+            "max_workers": self.parallel_config.max_workers,
+            "use_threads_only": True,  # Simplified to use only ThreadPoolExecutor
         }
 
     def add_transformation(self, rule: TransformationRule) -> None:

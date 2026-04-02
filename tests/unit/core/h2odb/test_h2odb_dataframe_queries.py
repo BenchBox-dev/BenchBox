@@ -24,7 +24,8 @@ class TestH2ODBQueryRegistry:
     def test_registry_imports_successfully(self):
         from benchbox.core.h2odb.dataframe_queries import H2ODB_DATAFRAME_QUERIES
 
-        assert H2ODB_DATAFRAME_QUERIES is not None
+        assert len(H2ODB_DATAFRAME_QUERIES) > 0
+        assert hasattr(H2ODB_DATAFRAME_QUERIES, "get_query_ids")
 
     def test_registry_has_10_queries(self):
         from benchbox.core.h2odb.dataframe_queries import H2ODB_DATAFRAME_QUERIES

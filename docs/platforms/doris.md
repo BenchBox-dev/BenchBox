@@ -366,7 +366,7 @@ Error: critical CREATE TABLE statement(s) failed
 ### Slow Data Loading
 
 **Solutions:**
-1. Install `requests` to enable Stream Load (the recommended bulk-ingest path; INSERT fallback is row-by-row and significantly slower for large datasets)
+1. Install `requests` to enable Stream Load (the recommended bulk-ingest path; INSERT fallback is row-by-row and typically 10x or more slower for large datasets)
 2. Ensure the FE HTTP port (8030) is accessible for Stream Load
 3. Increase bucket count for better parallelism during loading
 4. Check network latency between BenchBox host and Doris cluster

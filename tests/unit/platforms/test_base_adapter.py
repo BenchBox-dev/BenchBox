@@ -19,7 +19,7 @@ from benchbox.platforms.base import (
     ConnectionConfig,
     PlatformAdapter,
 )
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,
@@ -1686,3 +1686,1078 @@ class TestExecutionMetadataTableMode:
         assert run_config.get("table_format") == "parquet"
         assert run_config.get("table_format_compression") == "zstd"
         assert run_config.get("table_format_partition_cols") == ["region"]
+
+
+class TestTPCExecutionRouting:
+    """Exercise benchmark-family routing for specialized TPC helpers."""
+
+    def test_execute_power_test_detects_tpch_from_display_name(self):
+        adapter = MockPlatformAdapter()
+        adapter._execute_tpch_power_test = Mock(return_value=[{"query_id": "Q1"}])
+        benchmark = SimpleNamespace(_name="adhoc", display_name="tpch smoke", scale_factor=1.0)
+        connection = Mock()
+        run_config = {"iterations": 2}
+
+        results = adapter._execute_power_test(benchmark, connection, run_config)
+
+        adapter._execute_tpch_power_test.assert_called_once_with(benchmark, connection, run_config)
+        assert results == [{"query_id": "Q1"}]
+
+    def test_execute_throughput_test_detects_tpcds_from_display_name(self):
+        adapter = MockPlatformAdapter()
+        adapter._execute_tpcds_throughput_test = Mock(return_value=[{"query_id": "Q99"}])
+        benchmark = SimpleNamespace(_name="custom", display_name="tpcds benchmark")
+
+        results = adapter._execute_throughput_test(benchmark, Mock(), {"num_streams": 4})
+
+        adapter._execute_tpcds_throughput_test.assert_called_once()
+        assert results == [{"query_id": "Q99"}]
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_execute_throughput_test_falls_back_for_unsupported_benchmark(self, mock_console):
+        adapter = MockPlatformAdapter()
+        benchmark = Mock()
+        benchmark._name = "clickbench"
+        benchmark.display_name = "ClickBench"
+        connection = Mock()
+        run_config = {"num_streams": 4}
+        adapter._execute_all_queries = Mock(return_value=[{"query_id": "fallback"}])
+
+        results = adapter._execute_throughput_test(benchmark, connection, run_config)
+
+        adapter._execute_all_queries.assert_called_once_with(benchmark, connection, run_config)
+        assert results == [{"query_id": "fallback"}]
+        assert any("Throughput test not supported" in str(call) for call in mock_console.print.call_args_list)
+
+    def test_execute_maintenance_test_detects_tpch_from_class_name(self):
+        adapter = MockPlatformAdapter()
+        adapter._execute_tpch_maintenance_test = Mock(return_value=[{"query_id": "RF1"}])
+
+        class TPCHSyntheticBenchmark:
+            display_name = ""
+            _name = "synthetic"
+
+        benchmark = TPCHSyntheticBenchmark()
+        results = adapter._execute_maintenance_test(benchmark, Mock(), {"maintenance_pairs": 2})
+
+        adapter._execute_tpch_maintenance_test.assert_called_once()
+        assert results == [{"query_id": "RF1"}]
+
+    def test_execute_combined_test_defaults_to_all_tpch_phases(self):
+        adapter = MockPlatformAdapter()
+        benchmark = Mock()
+        benchmark._name = "tpch"
+        connection = Mock()
+        run_config = {}
+        adapter._execute_tpch_power_test = Mock(return_value=[{"query_id": "power"}])
+        adapter._execute_tpch_throughput_test = Mock(return_value=[{"query_id": "throughput"}])
+        adapter._execute_tpch_maintenance_test = Mock(return_value=[{"query_id": "maintenance"}])
+
+        results = adapter._execute_combined_test(benchmark, connection, run_config)
+
+        adapter._execute_tpch_power_test.assert_called_once_with(benchmark, connection, run_config)
+        adapter._execute_tpch_throughput_test.assert_called_once_with(benchmark, connection, run_config)
+        adapter._execute_tpch_maintenance_test.assert_called_once_with(benchmark, connection, run_config)
+        assert [row["query_id"] for row in results] == ["power", "throughput", "maintenance"]
+
+    def test_execute_combined_test_respects_requested_tpcds_phase_subset(self):
+        adapter = MockPlatformAdapter()
+        benchmark = Mock()
+        benchmark._name = "tpcds"
+        connection = Mock()
+        run_config = {"options": {"requested_phases": ["throughput"]}}
+        adapter._execute_tpcds_power_test = Mock()
+        adapter._execute_tpcds_throughput_test = Mock(return_value=[{"query_id": "stream-1"}])
+        adapter._execute_tpcds_maintenance_test = Mock()
+
+        results = adapter._execute_combined_test(benchmark, connection, run_config)
+
+        adapter._execute_tpcds_power_test.assert_not_called()
+        adapter._execute_tpcds_throughput_test.assert_called_once_with(benchmark, connection, run_config)
+        adapter._execute_tpcds_maintenance_test.assert_not_called()
+        assert results == [{"query_id": "stream-1"}]
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_execute_combined_test_falls_back_for_unsupported_benchmark(self, mock_console):
+        adapter = MockPlatformAdapter()
+        benchmark = Mock()
+        benchmark._name = "ssb"
+        connection = Mock()
+        run_config = {"options": {"requested_phases": ["power"]}}
+        adapter._execute_all_queries = Mock(return_value=[{"query_id": "standard"}])
+
+        results = adapter._execute_combined_test(benchmark, connection, run_config)
+
+        adapter._execute_all_queries.assert_called_once_with(benchmark, connection, run_config)
+        assert results == [{"query_id": "standard"}]
+        assert any("Combined test not supported" in str(call) for call in mock_console.print.call_args_list)
+
+
+class TestTPCHAndTPCDSExecutionHelpers:
+    """Cover warmup, seeded execution, and error conversion in TPC helpers."""
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    @patch("benchbox.core.tpch.power_test.TPCHPowerTest")
+    def test_execute_tpch_power_test_records_warmup_and_failures(self, mock_power_test_cls, mock_console):
+        adapter = MockPlatformAdapterWithDialect()
+        benchmark = Mock()
+        connection = Mock()
+        run_config = {
+            "scale_factor": 0.01,
+            "seed": 11,
+            "validation_mode": "strict",
+            "query_subset": ["1", "2"],
+            "timeout": 12,
+            "iterations": 2,
+            "warm_up_iterations": 1,
+            "power_fail_fast": True,
+        }
+
+        warmup_result = SimpleNamespace(
+            success=True,
+            queries_successful=1,
+            queries_executed=1,
+            power_at_size=10.0,
+            total_time=1.0,
+            errors=[],
+            query_results=[
+                {
+                    "query_id": "1",
+                    "execution_time_seconds": 0.1,
+                    "success": True,
+                    "result_count": 5,
+                    "stream_id": 0,
+                    "position": 1,
+                }
+            ],
+        )
+        measurement_result = SimpleNamespace(
+            success=False,
+            queries_successful=1,
+            queries_executed=2,
+            power_at_size=8.5,
+            total_time=2.0,
+            errors=["query 2 failed"],
+            query_results=[
+                {
+                    "query_id": "1",
+                    "execution_time_seconds": 0.2,
+                    "success": True,
+                    "result_count": 7,
+                    "stream_id": 1,
+                    "position": 1,
+                },
+                {
+                    "query_id": "2",
+                    "execution_time_seconds": 0.4,
+                    "success": False,
+                    "result_count": 0,
+                    "stream_id": 1,
+                    "position": 2,
+                    "error": "timeout",
+                },
+            ],
+        )
+        mock_power_test_cls.return_value.run.side_effect = [warmup_result, measurement_result]
+
+        results = adapter._execute_tpch_power_test(benchmark, connection, run_config)
+
+        assert mock_power_test_cls.call_count == 2
+        first_kwargs = mock_power_test_cls.call_args_list[0].kwargs
+        second_kwargs = mock_power_test_cls.call_args_list[1].kwargs
+        assert first_kwargs["stream_id"] == 0
+        assert second_kwargs["stream_id"] == 1
+        assert first_kwargs["query_subset"] == ["1", "2"]
+        assert second_kwargs["dialect"] == "mock_dialect"
+        assert results[0]["run_type"] == "warmup"
+        assert results[0]["iteration"] == 0
+        assert results[-1]["run_type"] == "measurement"
+        assert results[-1]["iteration"] == 1
+        assert results[-1]["status"] == "FAILED"
+        assert results[-1]["error"] == "timeout"
+        assert adapter._last_power_test_result is measurement_result
+        assert any("fail_fast enabled" in str(call) for call in mock_console.print.call_args_list)
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    @patch("benchbox.core.tpch.power_test.TPCHPowerTest", side_effect=RuntimeError("power init boom"))
+    def test_execute_tpch_power_test_returns_error_result_on_exception(self, _mock_power_test_cls, _mock_console):
+        adapter = MockPlatformAdapterWithDialect()
+
+        results = adapter._execute_tpch_power_test(Mock(), Mock(), {"scale_factor": 0.01})
+
+        assert results == [
+            {
+                "query_id": "power_test_error",
+                "execution_time_seconds": 0.0,
+                "status": "FAILED",
+                "rows_returned": 0,
+                "error": "power init boom",
+                "test_type": "power",
+            }
+        ]
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_execute_tpch_power_test_uses_resolved_validation_policy(self, _mock_console):
+        adapter = MockPlatformAdapterWithDialect()
+        benchmark = Mock()
+        benchmark._name = "tpch"
+        connection = Mock()
+        run_config = {
+            "scale_factor": 1.0,
+            "iterations": 1,
+            "warm_up_iterations": 1,
+        }
+
+        warmup_result = SimpleNamespace(
+            success=True,
+            queries_successful=1,
+            queries_executed=1,
+            power_at_size=10.0,
+            total_time=1.0,
+            errors=[],
+            query_results=[
+                {
+                    "query_id": "1",
+                    "execution_time_seconds": 0.1,
+                    "success": True,
+                    "result_count": 5,
+                    "stream_id": 0,
+                    "position": 1,
+                }
+            ],
+        )
+        measurement_result = SimpleNamespace(
+            success=True,
+            queries_successful=1,
+            queries_executed=1,
+            power_at_size=9.5,
+            total_time=1.0,
+            errors=[],
+            query_results=[
+                {
+                    "query_id": "1",
+                    "execution_time_seconds": 0.2,
+                    "success": True,
+                    "result_count": 6,
+                    "stream_id": 1,
+                    "position": 1,
+                }
+            ],
+        )
+
+        observed_flags: list[tuple[int, bool]] = []
+        power_results = [warmup_result, measurement_result]
+
+        class FakeTPCHPowerTest:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+                # Force a policy that differs from stream_id to prove the adapter
+                # consumes resolved config.validation rather than re-deriving it.
+                self.config = SimpleNamespace(validation=kwargs["stream_id"] == 1)
+
+            def run(self):
+                observed_flags.append((self.kwargs["stream_id"], self.kwargs["connection"]._validate_row_count))
+                return power_results.pop(0)
+
+        with patch("benchbox.core.tpch.power_test.TPCHPowerTest", FakeTPCHPowerTest):
+            adapter._execute_tpch_power_test(benchmark, connection, run_config)
+
+        assert observed_flags == [(0, False), (1, True)]
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    @patch("benchbox.core.expected_results.tpcds_results.set_config_validation_mode")
+    def test_execute_tpcds_power_test_uses_connection_factory_and_fail_fast(
+        self, mock_set_validation_mode, mock_console
+    ):
+        adapter = MockPlatformAdapterWithDialect()
+        adapter.very_verbose = True
+        benchmark = Mock()
+        benchmark._name = "tpcds"
+        connection = Mock()
+        connection.cursor.side_effect = [Mock(name="warmup_cursor"), Mock(name="measurement_cursor")]
+        run_config = {
+            "scale_factor": 0.01,
+            "seed": 7,
+            "validation_mode": "strict",
+            "query_subset": ["1", "2"],
+            "timeout": 30,
+            "iterations": 3,
+            "warm_up_iterations": 1,
+            "power_fail_fast": True,
+        }
+
+        warmup_result = SimpleNamespace(
+            success=True,
+            queries_successful=1,
+            queries_executed=1,
+            power_at_size=42.0,
+            total_time=1.0,
+            errors=[],
+            query_results=[
+                {
+                    "query_id": "1",
+                    "execution_time_seconds": 0.1,
+                    "success": True,
+                    "result_count": 3,
+                    "stream_id": 0,
+                    "position": 1,
+                }
+            ],
+        )
+        measurement_result = SimpleNamespace(
+            success=False,
+            queries_successful=1,
+            queries_executed=2,
+            power_at_size=21.0,
+            total_time=2.0,
+            errors=["query 2 failed"],
+            query_results=[
+                {
+                    "query_id": "1",
+                    "execution_time_seconds": 0.2,
+                    "success": True,
+                    "result_count": 4,
+                    "stream_id": 1,
+                    "position": 1,
+                },
+                {
+                    "query_id": "2",
+                    "execution_time_seconds": 0.3,
+                    "success": False,
+                    "result_count": 0,
+                    "stream_id": 1,
+                    "position": 2,
+                    "error": "timeout",
+                },
+            ],
+        )
+
+        created_kwargs: list[dict[str, Any]] = []
+        power_results = [warmup_result, measurement_result]
+
+        class FakeTPCDSPowerTest:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+                created_kwargs.append(kwargs)
+
+            def run(self):
+                wrapper = self.kwargs["connection_factory"]()
+                self.kwargs["wrapped_connection"] = wrapper
+                return power_results.pop(0)
+
+        with patch("benchbox.core.tpcds.power_test.TPCDSPowerTest", FakeTPCDSPowerTest):
+            results = adapter._execute_tpcds_power_test(benchmark, connection, run_config)
+
+        assert mock_set_validation_mode.call_args.args == ("strict",)
+        assert len(created_kwargs) == 2
+        assert created_kwargs[0]["stream_id"] == 0
+        assert created_kwargs[1]["stream_id"] == 1
+        assert created_kwargs[0]["query_subset"] == ["1", "2"]
+        assert created_kwargs[1]["dialect"] == "mock_dialect"
+        assert created_kwargs[0]["wrapped_connection"].benchmark_type == "tpcds"
+        assert created_kwargs[1]["wrapped_connection"].scale_factor == 0.01
+        assert connection.cursor.call_count == 2
+        assert results[0]["run_type"] == "warmup"
+        assert results[-1]["run_type"] == "measurement"
+        assert results[-1]["error"] == "timeout"
+        assert adapter._last_power_test_result is measurement_result
+        assert any("Target dialect" in str(call) for call in mock_console.print.call_args_list)
+        assert any("fail_fast enabled" in str(call) for call in mock_console.print.call_args_list)
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    @patch("benchbox.core.expected_results.tpcds_results.set_config_validation_mode")
+    def test_execute_tpcds_power_test_returns_error_result_on_exception(self, _mock_set_validation_mode, _mock_console):
+        adapter = MockPlatformAdapterWithDialect()
+
+        class BrokenTPCDSPowerTest:
+            def __init__(self, **kwargs):
+                raise RuntimeError("tpcds power boom")
+
+        with patch("benchbox.core.tpcds.power_test.TPCDSPowerTest", BrokenTPCDSPowerTest):
+            results = adapter._execute_tpcds_power_test(Mock(), Mock(), {"scale_factor": 0.01})
+
+        assert results == [
+            {
+                "query_id": "power_test_error",
+                "execution_time_seconds": 0.0,
+                "status": "FAILED",
+                "rows_returned": 0,
+                "error": "tpcds power boom",
+                "test_type": "power",
+            }
+        ]
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    @patch("benchbox.core.expected_results.tpcds_results.set_config_validation_mode")
+    def test_execute_tpcds_throughput_test_uses_seeded_config_and_preserves_errors(
+        self, mock_set_validation_mode, mock_console
+    ):
+        adapter = MockPlatformAdapterWithDialect()
+        adapter.very_verbose = True
+        benchmark = Mock()
+        connection = Mock()
+        connection.cursor.return_value = Mock(name="stream_cursor")
+        run_config = {"scale_factor": 1.0, "validation_mode": "off", "num_streams": 2, "seed": 17, "verbose": True}
+
+        stream_result = SimpleNamespace(
+            stream_id=3,
+            queries_successful=1,
+            queries_executed=2,
+            query_results=[
+                {"query_id": "7", "execution_time_seconds": 0.6, "success": True, "result_count": 8},
+                {
+                    "query_id": "9",
+                    "execution_time_seconds": 1.4,
+                    "success": False,
+                    "result_count": 0,
+                    "error": "stream timeout",
+                },
+            ],
+        )
+        throughput_result = SimpleNamespace(
+            success=True,
+            throughput_at_size=123.4,
+            streams_executed=2,
+            streams_successful=1,
+            total_time=9.5,
+            errors=[],
+            stream_results=[stream_result],
+        )
+
+        captured: dict[str, Any] = {}
+
+        class FakeTPCDSThroughputTest:
+            def __init__(self, **kwargs):
+                captured["init"] = kwargs
+
+            def run(self, config=None):
+                captured["config"] = config
+                captured["wrapped_connection"] = captured["init"]["connection_factory"]()
+                return throughput_result
+
+        with patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest", FakeTPCDSThroughputTest):
+            results = adapter._execute_tpcds_throughput_test(benchmark, connection, run_config)
+
+        assert mock_set_validation_mode.call_args.args == ("off",)
+        assert captured["init"]["num_streams"] == 2
+        assert captured["init"]["dialect"] == "mock_dialect"
+        assert captured["config"].base_seed == 17
+        assert captured["wrapped_connection"].benchmark_type == "tpcds"
+        assert connection.cursor.call_count == 1
+        assert results == [
+            {
+                "query_id": "7",
+                "execution_time_seconds": 0.6,
+                "status": "SUCCESS",
+                "rows_returned": 8,
+                "test_type": "throughput",
+                "stream_id": 3,
+            },
+            {
+                "query_id": "9",
+                "execution_time_seconds": 1.4,
+                "status": "FAILED",
+                "rows_returned": 0,
+                "test_type": "throughput",
+                "stream_id": 3,
+                "error": "stream timeout",
+            },
+        ]
+        assert adapter._last_throughput_test_result is throughput_result
+        assert any("Target dialect" in str(call) for call in mock_console.print.call_args_list)
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    @patch("benchbox.core.expected_results.tpcds_results.set_config_validation_mode")
+    def test_execute_tpcds_throughput_test_resets_cached_result_on_exception(
+        self, _mock_set_validation_mode, _mock_console
+    ):
+        adapter = MockPlatformAdapterWithDialect()
+        adapter._last_throughput_test_result = object()
+
+        class BrokenTPCDSThroughputTest:
+            def __init__(self, **kwargs):
+                pass
+
+            def run(self, config=None):
+                raise RuntimeError("throughput boom")
+
+        with patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest", BrokenTPCDSThroughputTest):
+            results = adapter._execute_tpcds_throughput_test(Mock(), Mock(), {"scale_factor": 1.0})
+
+        assert adapter._last_throughput_test_result is None
+        assert results == [
+            {
+                "query_id": "throughput_test_error",
+                "execution_time_seconds": 0.0,
+                "status": "FAILED",
+                "rows_returned": 0,
+                "error": "throughput boom",
+                "test_type": "throughput",
+            }
+        ]
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_execute_tpcds_maintenance_test_converts_output_dir_and_operation_errors(self, mock_console, tmp_path):
+        adapter = MockPlatformAdapterWithDialect()
+        benchmark = Mock()
+        connection = Mock()
+        connection.cursor.return_value = Mock(name="maintenance_cursor")
+        run_config = {"scale_factor": 1.0, "verbose": True, "output_dir": str(tmp_path / "maintenance")}
+
+        maintenance_result = {
+            "success": False,
+            "insert_operations": 1,
+            "update_operations": 0,
+            "delete_operations": 1,
+            "total_operations": 2,
+            "successful_operations": 1,
+            "total_time": 5.0,
+            "overall_throughput": 0.4,
+            "errors": ["delete failed"],
+            "operations": [
+                SimpleNamespace(
+                    operation_type="INSERT",
+                    table_name="catalog_sales",
+                    duration=1.5,
+                    success=True,
+                    rows_affected=10,
+                    error=None,
+                ),
+                SimpleNamespace(
+                    operation_type="DELETE",
+                    table_name="store_sales",
+                    duration=3.5,
+                    success=False,
+                    rows_affected=0,
+                    error="lock timeout",
+                ),
+            ],
+        }
+
+        captured: dict[str, Any] = {}
+
+        class FakeTPCDSMaintenanceTest:
+            def __init__(self, **kwargs):
+                captured["init"] = kwargs
+
+            def run(self):
+                captured["wrapped_connection"] = captured["init"]["connection_factory"]()
+                return maintenance_result
+
+        with patch("benchbox.core.tpcds.maintenance_test.TPCDSMaintenanceTest", FakeTPCDSMaintenanceTest):
+            results = adapter._execute_tpcds_maintenance_test(benchmark, connection, run_config)
+
+        assert captured["init"]["output_dir"] == Path(run_config["output_dir"])
+        assert captured["init"]["dialect"] == "mock_dialect"
+        assert captured["wrapped_connection"].benchmark_type == "tpcds"
+        assert connection.cursor.call_count == 1
+        assert results == [
+            {
+                "query_id": "insert_catalog_sales",
+                "execution_time_seconds": 1.5,
+                "status": "SUCCESS",
+                "rows_returned": 10,
+                "test_type": "maintenance",
+                "operation_type": "INSERT",
+                "table_name": "catalog_sales",
+            },
+            {
+                "query_id": "delete_store_sales",
+                "execution_time_seconds": 3.5,
+                "status": "FAILED",
+                "rows_returned": 0,
+                "test_type": "maintenance",
+                "operation_type": "DELETE",
+                "table_name": "store_sales",
+                "error": "lock timeout",
+            },
+        ]
+        assert any("delete failed" in str(call) for call in mock_console.print.call_args_list)
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_execute_tpch_throughput_test_uses_seeded_config(self, _mock_console):
+        adapter = MockPlatformAdapterWithDialect()
+        benchmark = Mock()
+        connection = Mock()
+        connection.cursor.return_value = Mock(name="tpch_stream_cursor")
+        run_config = {"scale_factor": 0.01, "num_streams": 3, "seed": 23, "verbose": True}
+
+        stream_result = SimpleNamespace(
+            stream_id=2,
+            query_results=[
+                {"query_id": "1", "execution_time_seconds": 0.5, "success": True, "result_count": 9},
+                {
+                    "query_id": "2",
+                    "execution_time_seconds": 0.7,
+                    "success": False,
+                    "result_count": 0,
+                    "error": "tpch timeout",
+                },
+            ],
+        )
+        throughput_result = SimpleNamespace(
+            success=True,
+            throughput_at_size=98.7,
+            streams_executed=3,
+            streams_successful=2,
+            total_time=12.0,
+            errors=[],
+            stream_results=[stream_result],
+        )
+
+        captured: dict[str, Any] = {}
+
+        class FakeTPCHThroughputTest:
+            def __init__(self, **kwargs):
+                captured["init"] = kwargs
+
+            def run(self, config=None):
+                captured["config"] = config
+                captured["wrapped_connection"] = captured["init"]["connection_factory"]()
+                return throughput_result
+
+        with patch("benchbox.core.tpch.throughput_test.TPCHThroughputTest", FakeTPCHThroughputTest):
+            results = adapter._execute_tpch_throughput_test(benchmark, connection, run_config)
+
+        assert captured["config"].base_seed == 23
+        assert captured["wrapped_connection"].benchmark_type == "tpch"
+        assert connection.cursor.call_count == 1
+        assert results[-1]["error"] == "tpch timeout"
+        assert adapter._last_throughput_test_result is throughput_result
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_execute_tpch_maintenance_test_passes_rf_intervals_and_integrity_flag(self, _mock_console, tmp_path):
+        adapter = MockPlatformAdapterWithDialect()
+        connection = Mock()
+        connection.cursor.return_value = Mock(name="tpch_maintenance_cursor")
+        run_config = {
+            "scale_factor": 0.1,
+            "verbose": True,
+            "maintenance_pairs": 3,
+            "rf1_interval": 0.25,
+            "rf2_interval": 0.75,
+            "validate_integrity": False,
+            "output_dir": str(tmp_path / "tpch-maint"),
+        }
+
+        result = SimpleNamespace(
+            success=False,
+            total_operations=2,
+            successful_operations=1,
+            failed_operations=1,
+            total_time=4.0,
+            overall_throughput=0.5,
+            errors=["rf2 failed"],
+            operations=[
+                SimpleNamespace(operation_type="RF1", duration=1.0, success=True, rows_affected=100),
+                SimpleNamespace(operation_type="RF2", duration=3.0, success=False, rows_affected=0),
+            ],
+        )
+
+        captured: dict[str, Any] = {}
+
+        class FakeTPCHMaintenanceTest:
+            def __init__(self, **kwargs):
+                captured["init"] = kwargs
+
+            def run_maintenance_test(self, **kwargs):
+                captured["run_kwargs"] = kwargs
+                captured["wrapped_connection"] = captured["init"]["connection_factory"]()
+                return result
+
+        with patch("benchbox.core.tpch.maintenance_test.TPCHMaintenanceTest", FakeTPCHMaintenanceTest):
+            results = adapter._execute_tpch_maintenance_test(Mock(), connection, run_config)
+
+        assert captured["init"]["output_dir"] == Path(run_config["output_dir"])
+        assert captured["run_kwargs"] == {
+            "maintenance_pairs": 3,
+            "concurrent_with_queries": False,
+            "rf1_interval": 0.25,
+            "rf2_interval": 0.75,
+            "validate_integrity": False,
+        }
+        assert captured["wrapped_connection"].benchmark_type == "tpch"
+        assert captured["wrapped_connection"]._maintenance_mode is True
+        assert connection.cursor.call_count == 1
+        assert results == [
+            {
+                "query_id": "RF1",
+                "execution_time_seconds": 1.0,
+                "status": "SUCCESS",
+                "rows_returned": 100,
+                "test_type": "maintenance",
+            },
+            {
+                "query_id": "RF2",
+                "execution_time_seconds": 3.0,
+                "status": "FAILED",
+                "rows_returned": 0,
+                "test_type": "maintenance",
+            },
+        ]
+
+
+class TestExecuteGenericPowerTest:
+    """Tests for _execute_generic_power_test orchestration."""
+
+    def _make_adapter(self):
+        return MockPlatformAdapter()
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_warmup_and_measurement_iterations_tagged_correctly(self, _mock_console):
+        adapter = self._make_adapter()
+        call_count = [0]
+
+        def fake_execute_all(benchmark, connection, run_config):
+            call_count[0] += 1
+            return [
+                {"query_id": "Q1", "execution_time_seconds": 0.5, "status": "SUCCESS", "rows_returned": 10},
+            ]
+
+        adapter._execute_all_queries = fake_execute_all
+        run_config = {"iterations": 2, "warm_up_iterations": 1}
+
+        results = adapter._execute_generic_power_test(Mock(), Mock(), run_config)
+
+        # 1 warmup + 2 measurement = 3 total calls
+        assert call_count[0] == 3
+        warmup_results = [r for r in results if r["run_type"] == "warmup"]
+        measurement_results = [r for r in results if r["run_type"] == "measurement"]
+        assert len(warmup_results) == 1
+        assert len(measurement_results) == 2
+        assert warmup_results[0]["iteration"] == 0
+        assert measurement_results[0]["iteration"] == 1
+        assert measurement_results[1]["iteration"] == 2
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_aborts_remaining_iterations_when_all_queries_fail(self, mock_console):
+        adapter = self._make_adapter()
+        call_count = [0]
+
+        def fake_execute_all(benchmark, connection, run_config):
+            call_count[0] += 1
+            return [{"query_id": "Q1", "execution_time_seconds": 0.0, "status": "FAILED", "rows_returned": 0}]
+
+        adapter._execute_all_queries = fake_execute_all
+        run_config = {"iterations": 3, "warm_up_iterations": 0}
+
+        results = adapter._execute_generic_power_test(Mock(), Mock(), run_config)
+
+        # Should stop after first failed iteration
+        assert call_count[0] == 1
+        assert all(r["status"] == "FAILED" for r in results)
+        assert any("All queries failed" in str(c) for c in mock_console.print.call_args_list)
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_fail_fast_aborts_on_partial_failure(self, mock_console):
+        adapter = self._make_adapter()
+        call_count = [0]
+
+        def fake_execute_all(benchmark, connection, run_config):
+            call_count[0] += 1
+            return [
+                {"query_id": "Q1", "execution_time_seconds": 0.3, "status": "SUCCESS", "rows_returned": 5},
+                {"query_id": "Q2", "execution_time_seconds": 0.0, "status": "FAILED", "rows_returned": 0},
+            ]
+
+        adapter._execute_all_queries = fake_execute_all
+        run_config = {"iterations": 5, "warm_up_iterations": 0, "power_fail_fast": True}
+
+        adapter._execute_generic_power_test(Mock(), Mock(), run_config)
+
+        # fail_fast stops after first iteration with partial failures
+        assert call_count[0] == 1
+        assert any("fail_fast" in str(c) for c in mock_console.print.call_args_list)
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_summary_printed_with_success_rate(self, mock_console):
+        adapter = self._make_adapter()
+
+        def fake_execute_all(benchmark, connection, run_config):
+            return [{"query_id": "Q1", "execution_time_seconds": 1.0, "status": "SUCCESS", "rows_returned": 3}]
+
+        adapter._execute_all_queries = fake_execute_all
+        run_config = {"iterations": 1, "warm_up_iterations": 0}
+
+        results = adapter._execute_generic_power_test(Mock(), Mock(), run_config)
+
+        assert len(results) == 1
+        assert results[0]["status"] == "SUCCESS"
+        printed = " ".join(str(c) for c in mock_console.print.call_args_list)
+        assert "100.0%" in printed
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_no_summary_for_empty_results(self, _mock_console):
+        adapter = self._make_adapter()
+        adapter._execute_all_queries = lambda b, c, r: []
+        run_config = {"iterations": 1, "warm_up_iterations": 0}
+
+        results = adapter._execute_generic_power_test(Mock(), Mock(), run_config)
+
+        assert results == []
+
+
+class TestBuildExecutionPhasesVariants:
+    """Tests for _build_execution_phases throughput path and capture_plans."""
+
+    def _make_query_results(self, n=2, status="SUCCESS"):
+        return [
+            {"query_id": f"Q{i}", "execution_time_seconds": float(i), "status": status, "rows_returned": 10}
+            for i in range(1, n + 1)
+        ]
+
+    def _make_query_executions(self):
+        from benchbox.platforms.base.models import QueryExecution
+
+        return [
+            QueryExecution(
+                query_id="Q1",
+                stream_id="standard",
+                execution_order=1,
+                execution_time_ms=1000.0,
+                status="SUCCESS",
+                rows_returned=10,
+            )
+        ]
+
+    def test_throughput_execution_type_skips_power_test_phase(self):
+        adapter = MockPlatformAdapter()
+        query_results = self._make_query_results()
+        query_executions = self._make_query_executions()
+        run_config = {"test_execution_type": "throughput"}
+
+        execution_phases, total_exec_time, power_test_phase, throughput_test_phase = adapter._build_execution_phases(
+            query_results, query_executions, run_config, setup_phase=None
+        )
+
+        assert power_test_phase is None
+        assert execution_phases.power_test is None
+
+    def test_standard_execution_type_creates_power_test_phase(self):
+        adapter = MockPlatformAdapter()
+        query_results = self._make_query_results()
+        query_executions = self._make_query_executions()
+        run_config = {"test_execution_type": "standard"}
+
+        execution_phases, total_exec_time, power_test_phase, throughput_test_phase = adapter._build_execution_phases(
+            query_results, query_executions, run_config, setup_phase=None
+        )
+
+        assert power_test_phase is not None
+        assert execution_phases.power_test is power_test_phase
+
+    def test_captures_last_power_test_result_power_at_size(self):
+        adapter = MockPlatformAdapter()
+        power_result = SimpleNamespace(power_at_size=99.5)
+        adapter._last_power_test_result = power_result
+        query_results = self._make_query_results()
+        query_executions = self._make_query_executions()
+        run_config = {}
+
+        execution_phases, _, power_test_phase, _ = adapter._build_execution_phases(
+            query_results, query_executions, run_config, setup_phase=None
+        )
+
+        assert power_test_phase.power_at_size == 99.5
+        assert adapter._last_power_test_result is None
+
+    def test_captures_last_throughput_result(self):
+        adapter = MockPlatformAdapter()
+        stream = SimpleNamespace(
+            stream_id=0,
+            start_time="2025-01-01T00:00:00",
+            end_time="2025-01-01T00:01:00",
+            duration=60.0,
+            queries_executed=1,
+            query_results=[{"query_id": "Q1", "execution_time_seconds": 1.0, "success": True}],
+        )
+        throughput_result = SimpleNamespace(
+            stream_results=[stream],
+            total_time=60.0,
+            start_time="2025-01-01T00:00:00",
+            end_time="2025-01-01T00:01:00",
+            config=SimpleNamespace(num_streams=1),
+            throughput_at_size=720.0,
+        )
+        adapter._last_throughput_test_result = throughput_result
+        query_results = self._make_query_results()
+        query_executions = self._make_query_executions()
+        run_config = {"test_execution_type": "throughput"}
+
+        execution_phases, _, _, throughput_test_phase = adapter._build_execution_phases(
+            query_results, query_executions, run_config, setup_phase=None
+        )
+
+        assert throughput_test_phase is not None
+        assert adapter._last_throughput_test_result is None
+
+    def test_capture_plans_path_does_not_raise(self):
+        adapter = MockPlatformAdapter()
+        adapter.capture_plans = True
+        adapter.query_plans_captured = 3
+        adapter.plan_capture_failures = 0
+        query_results = self._make_query_results()
+        query_executions = self._make_query_executions()
+        run_config = {}
+
+        execution_phases, _, _, _ = adapter._build_execution_phases(
+            query_results, query_executions, run_config, setup_phase=None
+        )
+
+        assert execution_phases is not None
+
+    def test_total_exec_time_sums_only_successful_queries(self):
+        adapter = MockPlatformAdapter()
+        query_results = [
+            {"query_id": "Q1", "execution_time_seconds": 2.0, "status": "SUCCESS", "rows_returned": 5},
+            {"query_id": "Q2", "execution_time_seconds": 3.0, "status": "FAILED", "rows_returned": 0},
+        ]
+        query_executions = self._make_query_executions()
+
+        _, total_exec_time, _, _ = adapter._build_execution_phases(
+            query_results, query_executions, {}, setup_phase=None
+        )
+
+        assert total_exec_time == 2.0
+
+
+class TestExceptionPathsForThroughputAndMaintenance:
+    """Error path tests for tpch_throughput, tpcds_maintenance, tpch_maintenance."""
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_execute_tpch_throughput_test_resets_cached_result_on_exception(self, _mock_console):
+        adapter = MockPlatformAdapterWithDialect()
+        adapter._last_throughput_test_result = object()
+
+        class BrokenTPCHThroughputTest:
+            def __init__(self, **kwargs):
+                pass
+
+            def run(self, config=None):
+                raise RuntimeError("tpch throughput boom")
+
+        with patch("benchbox.core.tpch.throughput_test.TPCHThroughputTest", BrokenTPCHThroughputTest):
+            results = adapter._execute_tpch_throughput_test(Mock(), Mock(), {"scale_factor": 1.0})
+
+        assert adapter._last_throughput_test_result is None
+        assert results == [
+            {
+                "query_id": "throughput_test_error",
+                "execution_time_seconds": 0.0,
+                "status": "FAILED",
+                "rows_returned": 0,
+                "error": "tpch throughput boom",
+                "test_type": "throughput",
+            }
+        ]
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_execute_tpcds_maintenance_test_returns_error_on_exception(self, _mock_console):
+        adapter = MockPlatformAdapterWithDialect()
+
+        class BrokenTPCDSMaintenanceTest:
+            def __init__(self, **kwargs):
+                raise RuntimeError("tpcds maintenance boom")
+
+        with patch("benchbox.core.tpcds.maintenance_test.TPCDSMaintenanceTest", BrokenTPCDSMaintenanceTest):
+            results = adapter._execute_tpcds_maintenance_test(Mock(), Mock(), {"scale_factor": 1.0})
+
+        assert results == [
+            {
+                "query_id": "maintenance_test_error",
+                "execution_time_seconds": 0.0,
+                "status": "FAILED",
+                "rows_returned": 0,
+                "error": "tpcds maintenance boom",
+                "test_type": "maintenance",
+            }
+        ]
+
+    @patch("benchbox.platforms.base.adapter.quiet_console")
+    def test_execute_tpch_maintenance_test_returns_error_on_exception(self, _mock_console):
+        adapter = MockPlatformAdapterWithDialect()
+
+        class BrokenTPCHMaintenanceTest:
+            def __init__(self, **kwargs):
+                raise RuntimeError("tpch maintenance boom")
+
+        with patch("benchbox.core.tpch.maintenance_test.TPCHMaintenanceTest", BrokenTPCHMaintenanceTest):
+            results = adapter._execute_tpch_maintenance_test(Mock(), Mock(), {"scale_factor": 1.0})
+
+        assert results == [
+            {
+                "query_id": "maintenance_test_error",
+                "execution_time_seconds": 0.0,
+                "status": "FAILED",
+                "rows_returned": 0,
+                "error": "tpch maintenance boom",
+                "test_type": "maintenance",
+            }
+        ]
+
+
+class TestDataGenerationPhaseEdgeCases:
+    """Additional edge cases for _create_enhanced_data_generation_phase."""
+
+    def test_returns_none_when_benchmark_has_no_tables_attr(self):
+        adapter = MockPlatformAdapter()
+        benchmark = SimpleNamespace()  # no 'tables' attribute
+
+        result = adapter._create_enhanced_data_generation_phase(benchmark)
+
+        assert result is None
+
+    def test_returns_none_when_tables_dict_empty(self):
+        adapter = MockPlatformAdapter()
+        benchmark = SimpleNamespace(tables={})
+
+        result = adapter._create_enhanced_data_generation_phase(benchmark)
+
+        assert result is None
+
+    def test_returns_none_when_tables_is_not_mapping(self):
+        adapter = MockPlatformAdapter()
+        benchmark = SimpleNamespace(tables="not_a_dict")
+
+        result = adapter._create_enhanced_data_generation_phase(benchmark)
+
+        assert result is None
+
+    def test_partial_failure_when_one_table_raises(self):
+        adapter = MockPlatformAdapter()
+
+        class BadTable:
+            def __iter__(self):
+                raise RuntimeError("disk full")
+
+        benchmark = SimpleNamespace(tables={"good": [{"id": 1}, {"id": 2}], "bad": BadTable()})
+
+        result = adapter._create_enhanced_data_generation_phase(benchmark)
+
+        assert result is not None
+        assert result.status == "PARTIAL_FAILURE"
+        assert result.tables_generated == 1
+        assert result.per_table_stats["good"].status == "SUCCESS"
+        assert result.per_table_stats["bad"].status == "FAILED"
+        assert "disk full" in result.per_table_stats["bad"].error_message
+
+    def test_table_with_string_data_skipped(self):
+        adapter = MockPlatformAdapter()
+        # String data is skipped (isinstance check: not (hasattr __iter__ and not str))
+        benchmark = SimpleNamespace(tables={"t": "some_string_path"})
+
+        result = adapter._create_enhanced_data_generation_phase(benchmark)
+
+        assert result is not None
+        assert result.tables_generated == 0
+
+    def test_uses_impl_tables_when_no_direct_tables(self):
+        adapter = MockPlatformAdapter()
+        impl = SimpleNamespace(tables={"lineitem": [{"l_orderkey": 1}]})
+        benchmark = SimpleNamespace(_impl=impl)
+
+        result = adapter._create_enhanced_data_generation_phase(benchmark)
+
+        assert result is not None
+        assert result.tables_generated == 1
+        assert "lineitem" in result.per_table_stats

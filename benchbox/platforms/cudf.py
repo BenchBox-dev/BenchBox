@@ -13,7 +13,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from benchbox.core.gpu import (
+from benchbox.experimental.gpu import (
     GPUInfo,
     GPUMetrics,
     GPUMetricsCollector,
@@ -36,7 +36,7 @@ except ImportError:
 
 # Try to import dask-cudf for distributed GPU processing
 try:
-    import dask_cudf  # type: ignore
+    import dask_cudf  # type: ignore  # noqa: F401  # imported to detect availability via DASK_CUDF_AVAILABLE
 
     DASK_CUDF_AVAILABLE = True
 except ImportError:

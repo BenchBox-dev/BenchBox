@@ -17,7 +17,7 @@ from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig, SystemProfile
 from benchbox.core.tsbs_devops.benchmark import TSBSDevOpsBenchmark
 from benchbox.core.validation import ValidationResult
 from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,

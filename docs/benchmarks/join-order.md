@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, join-order, custom-benchmark
 ```
 
+> **CLI name:** `joinorder` — use `benchbox run --benchmark joinorder`
+
 ## Overview
 
 The Join Order Benchmark (JOB) has been successfully implemented in BenchBox as a systematic test suite for query optimizer join order selection capabilities. Based on the seminal paper "How Good Are Query Optimizers, Really?" by Viktor Leis et al. (VLDB 2015), this benchmark uses a complex IMDB-like schema to stress-test database query optimizers.

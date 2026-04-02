@@ -108,6 +108,34 @@ class TestTPCHCompliance:
         assert set(stream_1_perm) == set(range(1, 23))
         assert set(stream_2_perm) == set(range(1, 23))
 
+    def test_tpch_power_test_disabled_mode_disables_validation(self):
+        """Explicit disabled mode should turn validation off at config resolution time."""
+        from benchbox.core.tpch.power_test import TPCHPowerTest
+
+        power_test = TPCHPowerTest(
+            benchmark=MagicMock(),
+            connection=MagicMock(),
+            stream_id=0,
+            validation_mode="disabled",
+        )
+
+        assert power_test.config.validation is False
+        assert power_test.config.validation_mode == "disabled"
+
+    def test_tpch_power_test_explicit_mode_preserves_non_stream_validation(self):
+        """Explicit validation modes should bypass the auto-disable for non-stream-0 runs."""
+        from benchbox.core.tpch.power_test import TPCHPowerTest
+
+        power_test = TPCHPowerTest(
+            benchmark=MagicMock(),
+            connection=MagicMock(),
+            stream_id=1,
+            validation_mode="loose",
+        )
+
+        assert power_test.config.validation is True
+        assert power_test.config.validation_mode == "loose"
+
     def test_tpch_throughput_test_uses_stream_specific_permutations(self):
         """Test that TPC-H throughput test uses different permutations for different streams."""
         from benchbox.core.tpch.streams import TPCHStreams

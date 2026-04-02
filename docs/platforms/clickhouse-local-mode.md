@@ -71,7 +71,7 @@ benchbox run tpch --platform=clickhouse --mode=server --host=localhost --port=90
 
 #### Mode Selection
 - `--mode=local` - Use embedded ClickHouse via chDB
-- `--mode=server` - Use ClickHouse server (default for backward compatibility)
+- `--mode=server` - Use ClickHouse server (default)
 
 #### Embedded Mode Specific Arguments
 - `--data-path=PATH` - Optional data path for file operations

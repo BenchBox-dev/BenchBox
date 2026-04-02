@@ -30,7 +30,7 @@ from typing import Any
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 from .base import DriverIsolationCapability
-from .postgresql import POSTGRES_DIALECT, PostgreSQLAdapter
+from .postgresql import POSTGRES_DIALECT, PostgreSQLAdapter, _add_postgres_compatible_arguments
 
 logger = logging.getLogger(__name__)
 
@@ -79,41 +79,10 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         if not hasattr(parser, "add_argument"):
             return
         try:
-            # Inherit PostgreSQL connection arguments
-            parser.add_argument(
-                "--timescale-host",
-                dest="host",
-                default="localhost",
-                help="TimescaleDB server hostname",
-            )
-            parser.add_argument(
-                "--timescale-port",
-                dest="port",
-                type=int,
-                default=5432,
-                help="TimescaleDB server port",
-            )
-            parser.add_argument(
-                "--timescale-database",
-                dest="database",
-                help="TimescaleDB database name (auto-generated if not specified)",
-            )
-            parser.add_argument(
-                "--timescale-username",
-                dest="username",
-                default="postgres",
-                help="TimescaleDB username",
-            )
-            parser.add_argument(
-                "--timescale-password",
-                dest="password",
-                help="TimescaleDB password",
-            )
-            parser.add_argument(
-                "--timescale-schema",
-                dest="schema",
-                default="public",
-                help="TimescaleDB schema name",
+            _add_postgres_compatible_arguments(
+                parser,
+                prefix="timescale",
+                platform_label="TimescaleDB",
             )
             # TimescaleDB-specific options
             parser.add_argument(

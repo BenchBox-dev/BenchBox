@@ -43,3 +43,28 @@ def normalize_table_name_in_sql(sql: str) -> str:
     )
 
     return sql
+
+
+def extract_table_name(statement: str) -> str | None:
+    """Extract table name from a CREATE TABLE statement.
+
+    Handles both plain ``CREATE TABLE name`` and
+    ``CREATE TABLE IF NOT EXISTS name`` variants.
+
+    Args:
+        statement: SQL DDL statement.
+
+    Returns:
+        Extracted table name or ``None`` if no match.
+    """
+    try:
+        match = re.search(
+            r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)",
+            statement,
+            re.IGNORECASE,
+        )
+        if match:
+            return match.group(1).strip()
+    except Exception:
+        pass
+    return None

@@ -32,3 +32,6 @@ jobs:
 
       - name: Type check with ty
         run: uv run ty check
+
+      - name: Validate test marker annotations
+        run: make lint-markers

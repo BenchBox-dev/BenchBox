@@ -28,7 +28,9 @@ def test_loader_and_registry_benchmark_ids_match() -> None:
 def test_loader_class_name_mapping_is_defined_for_each_registry_benchmark(benchmark_id: str) -> None:
     """Each registry benchmark should have an explicit core loader class mapping."""
 
-    assert get_core_benchmark_class_name(benchmark_id) is not None
+    class_name = get_core_benchmark_class_name(benchmark_id)
+    assert isinstance(class_name, str)
+    assert len(class_name) > 0
 
 
 @pytest.mark.parametrize("benchmark_id", sorted(list_benchmark_ids()))

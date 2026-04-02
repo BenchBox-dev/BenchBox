@@ -1179,7 +1179,7 @@ class FabricWarehouseAdapter(PlatformAdapter):
     def generate_tuning_clause(
         self,
         table_tuning: Any,
-        constraint_configs: tuple[Any, Any, Any] | None = None,
+        _constraint_configs: tuple[Any, Any, Any] | None = None,
     ) -> str:
         """Generate tuning clause for CREATE TABLE.
 

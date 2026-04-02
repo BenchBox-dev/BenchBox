@@ -15,6 +15,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 from benchbox.core.metadata_primitives.catalog import MetadataQuery, load_metadata_catalog
+from benchbox.core.primitives_utils import get_entry_by_id
 from benchbox.core.query_catalog_base import BaseQueryCatalogMixin
 
 
@@ -55,11 +56,7 @@ class MetadataPrimitivesQueryManager(BaseQueryCatalogMixin):
         Raises:
             ValueError: If query_id is invalid
         """
-        try:
-            return self._entries[query_id]
-        except KeyError as exc:
-            available = ", ".join(sorted(self._queries.keys()))
-            raise ValueError(f"Invalid query ID: {query_id}. Available: {available}") from exc
+        return get_entry_by_id(self._entries, query_id, "query")
 
     def get_all_queries(self) -> dict[str, str]:
         """Get all Metadata Primitives queries.

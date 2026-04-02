@@ -124,7 +124,7 @@ class PlatformHookRegistry:
 
         defaults = cls.get_default_options(platform)
         defaults.update(resolved)
-        return defaults
+        return {name: value for name, value in defaults.items() if value is not None}
 
     @classmethod
     def describe_options(cls, platform: str) -> list[str]:

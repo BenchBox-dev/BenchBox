@@ -34,15 +34,7 @@ def list_tpcds_queries(
     family: str | None = None,
     category: QueryCategory | None = None,
 ) -> list[DataFrameQuery]:
-    """List TPC-DS DataFrame queries with optional filtering.
-
-    Args:
-        family: Filter by family ("expression" or "pandas")
-        category: Filter by query category
-
-    Returns:
-        List of matching DataFrameQuery objects
-    """
+    """List TPC-DS DataFrame queries with optional filtering."""
     return TPCDS_DATAFRAME_QUERIES.list_queries(family=family, category=category)
 
 

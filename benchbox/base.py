@@ -25,7 +25,7 @@ else:
     try:
         import sqlglot
     except ImportError:
-        sqlglot = None  # type: ignore
+        sqlglot = None
 
 
 class BaseBenchmark(VerbosityMixin, ABC):
@@ -567,9 +567,7 @@ class BaseBenchmark(VerbosityMixin, ABC):
         # Apply translation for specific SQL syntax
         try:
             # Use identify=True to quote identifiers and prevent reserved keyword conflicts
-            translated = sqlglot.transpile(  # type: ignore[attr-defined]
-                query, read="postgres", write=normalized_dialect, identify=True
-            )[0]
+            translated = sqlglot.transpile(query, read="postgres", write=normalized_dialect, identify=True)[0]
             return translated
         except (ValueError, AttributeError) as e:
             raise ValueError(f"Error translating to dialect '{dialect}': {e}")

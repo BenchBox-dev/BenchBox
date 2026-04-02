@@ -14,13 +14,18 @@ def get_preferred_format(
     platform_name: str,
     table_mode: str = "native",
     platform_config: Mapping[str, Any] | None = None,
+    *,
+    prefer_platform_defaults: bool = False,
 ) -> str | None:
     """Get preferred format for a table on a platform.
 
     Resolution order:
-    1. Manifest format_preference (user-specified)
+    1. Manifest format_preference (user-selected load order)
     2. Platform default preferences
     3. First available format
+
+    Set ``prefer_platform_defaults=True`` for platform-native loaders that must
+    override manifest order with platform-specific requirements.
 
     Args:
         manifest: ManifestV2 instance
@@ -41,15 +46,27 @@ def get_preferred_format(
     # Get platform supported formats (in preference order)
     platform_formats = get_supported_formats(platform_name, table_mode=table_mode, platform_config=platform_config)
 
-    # Try manifest preference first
-    for fmt in manifest.format_preference:
-        if fmt in available_formats and fmt in platform_formats:
-            return fmt
+    def _manifest_preference() -> str | None:
+        for fmt in manifest.format_preference:
+            if fmt in available_formats and fmt in platform_formats:
+                return fmt
+        return None
 
-    # Try platform preference
-    for fmt in platform_formats:
-        if fmt in available_formats:
-            return fmt
+    def _platform_preference() -> str | None:
+        for fmt in platform_formats:
+            if fmt in available_formats:
+                return fmt
+        return None
+
+    selection_order = (
+        (_platform_preference, _manifest_preference)
+        if prefer_platform_defaults
+        else (_manifest_preference, _platform_preference)
+    )
+    for selector in selection_order:
+        selected = selector()
+        if selected:
+            return selected
 
     # Fallback: first available format
     return available_formats[0]

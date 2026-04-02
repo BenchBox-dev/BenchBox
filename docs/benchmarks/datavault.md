@@ -5,6 +5,8 @@
 ```{tags} advanced, concept, datavault, custom-benchmark
 ```
 
+> **CLI name:** `datavault` — use `benchbox run --benchmark datavault`
+
 ## Overview
 
 The TPC-H Data Vault benchmark tests database performance with Data Vault 2.0 modeling patterns. It transforms TPC-H's 8 normalized tables into 21 Data Vault tables and adapts all 22 TPC-H queries to work with Hub-Link-Satellite joins.

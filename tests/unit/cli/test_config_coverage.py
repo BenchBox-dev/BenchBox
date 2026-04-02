@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import yaml
 
 cfg = importlib.import_module("benchbox.cli.config")
 
@@ -37,6 +38,38 @@ def test_load_config_without_validation(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(cfg, "ConfigManager", lambda config_path=None: manager)
     loaded = cfg.load_config(cli_args={"database": {"preferred": "sqlite"}}, validate=False)
     assert loaded.database["preferred"] == "sqlite"
+
+
+def test_load_config_precedence_cli_over_env_over_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "benchbox.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "database": {"preferred": "sqlite"},
+                "benchmarks": {"default_scale": 0.25},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("BENCHBOX_DATABASE_PREFERRED", "duckdb")
+
+    loaded = cfg.load_config(
+        cli_args={"database": {"preferred": "clickhouse"}},
+        config_file=config_path,
+        validate=False,
+    )
+
+    assert loaded.database["preferred"] == "clickhouse"
+    assert loaded.benchmarks["default_scale"] == 0.25
+
+
+def test_load_config_raises_when_validation_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "benchbox.yaml"
+    config_path.write_text(yaml.safe_dump({"database": {"preferred": "duckdb"}}), encoding="utf-8")
+    monkeypatch.setattr(cfg.ConfigManager, "validate_config", lambda self: False)
+
+    with pytest.raises(ValueError, match="Configuration validation failed"):
+        cfg.load_config(config_file=config_path, validate=True)
 
 
 def test_directory_manager_paths_and_cleanup(tmp_path: Path) -> None:
@@ -101,6 +134,44 @@ tpch:
     mgr.save_unified_tuning_config(u, unified, format="yaml")
     loaded = mgr.load_unified_tuning_config(unified, platform="duckdb")
     assert loaded.primary_keys.enabled is True
+
+
+def test_show_config_prints_path_and_yaml(tmp_path: Path) -> None:
+    mgr = cfg.ConfigManager(config_path=tmp_path / "config.yaml")
+
+    with patch.object(cfg.console, "print") as mock_print:
+        mgr.show_config()
+
+    printed = [call.args[0] for call in mock_print.call_args_list if call.args]
+    assert any("Current Configuration" in str(item) for item in printed)
+    assert any(str(mgr.config_path) in str(item) for item in printed)
+
+
+def test_create_sample_config_writes_comments(tmp_path: Path) -> None:
+    mgr = cfg.ConfigManager(config_path=tmp_path / "config.yaml")
+    sample_path = tmp_path / "sample.yaml"
+
+    with patch.object(cfg.console, "print") as mock_print:
+        mgr.create_sample_config(sample_path)
+
+    content = yaml.safe_load(sample_path.read_text(encoding="utf-8"))
+    assert "_comments" in content
+    assert content["database"]["preferred"] == "duckdb"
+    assert any("Sample configuration created" in str(call) for call in mock_print.call_args_list)
+
+
+def test_instance_apply_environment_overrides_updates_tuning(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    mgr = cfg.ConfigManager(config_path=tmp_path / "config.yaml")
+    mgr.set("tuning.environment_overrides", {"BENCHBOX_TUNING_ENABLED": "enabled", "BENCHBOX_TUNING_PATH": "path"})
+    monkeypatch.setenv("BENCHBOX_TUNING_ENABLED", "true")
+    monkeypatch.setenv("BENCHBOX_TUNING_PATH", "/tmp/tuning.yaml")
+
+    with patch.object(cfg.console, "print") as mock_print:
+        mgr.apply_environment_overrides()
+
+    assert mgr.get("tuning.enabled") is True
+    assert mgr.get("tuning.path") == "/tmp/tuning.yaml"
+    assert any("Applied environment override" in str(call) for call in mock_print.call_args_list)
 
 
 def test_example_argument_parser_helpers(monkeypatch: pytest.MonkeyPatch) -> None:

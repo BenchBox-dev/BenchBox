@@ -70,12 +70,12 @@ class TestCLIMain:
 
     @patch("benchbox.utils.version.get_version_info")
     def test_cli_version_json(self, mock_version_info):
-        """Test CLI version JSON command."""
-        # Provide a consistent version payload independent of docs markers
+        """CLI JSON version output should preserve the version utility payload."""
         mock_version_info.return_value = {
             "benchbox_version": benchbox.__version__,
-            "version_sources": {"package": benchbox.__version__},
             "pyproject_version": benchbox.__version__,
+            "version_consistent": False,
+            "version_message": "synthetic mismatch for passthrough verification",
         }
         runner = CliRunner()
         result = runner.invoke(cli, ["--version-json"])
@@ -83,7 +83,21 @@ class TestCLIMain:
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["benchbox_version"] == benchbox.__version__
+        assert payload["version_consistent"] is False
+        assert payload["version_message"] == "synthetic mismatch for passthrough verification"
+
+    def test_cli_version_json_real_payload(self):
+        """Test CLI version JSON command against the real version metadata path."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["--version-json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["benchbox_version"] == benchbox.__version__
+        assert payload["pyproject_version"] == benchbox.__version__
+        assert payload["expected_version"] == benchbox.__version__
         assert payload["version_consistent"] is True
+        assert payload["version_message"] == f"All version markers aligned at {benchbox.__version__}"
 
     @pytest.mark.skipif(
         sys.version_info < (3, 11),

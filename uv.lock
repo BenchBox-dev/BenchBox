@@ -283,7 +283,7 @@ wheels = [
 
 [[package]]
 name = "benchbox"
-version = "0.1.5"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -596,9 +596,12 @@ dev = [
     { name = "clickhouse-connect" },
     { name = "clickhouse-driver" },
     { name = "cloudpathlib", extra = ["azure", "gs", "s3"] },
+    { name = "codespell" },
+    { name = "dask", extra = ["distributed"] },
     { name = "databricks-sdk" },
     { name = "datafusion", version = "50.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
     { name = "datafusion", version = "51.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
+    { name = "delta-spark" },
     { name = "deltalake" },
     { name = "duckdb" },
     { name = "firebolt-sdk" },
@@ -611,8 +614,10 @@ dev = [
     { name = "myst-parser", version = "5.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pandas" },
     { name = "polars" },
+    { name = "presto-python-client" },
     { name = "psycopg2-binary" },
     { name = "pyiceberg", extra = ["pyarrow", "sql-sqlite"] },
+    { name = "pymysql" },
     { name = "pyspark" },
     { name = "pytest" },
     { name = "pytest-benchmark" },
@@ -821,8 +826,11 @@ dev = [
     { name = "clickhouse-connect", specifier = ">=0.10.0" },
     { name = "clickhouse-driver", specifier = ">=0.2.0" },
     { name = "cloudpathlib", extras = ["s3", "gs", "azure"], specifier = ">=0.15.0" },
+    { name = "codespell", specifier = ">=2.4.2" },
+    { name = "dask", extras = ["distributed"], specifier = ">=2026.1.1" },
     { name = "databricks-sdk", specifier = ">=0.20.0" },
     { name = "datafusion", specifier = ">=40.0.0" },
+    { name = "delta-spark", specifier = ">=4.1.0" },
     { name = "deltalake", specifier = ">=1.2.1" },
     { name = "duckdb", specifier = ">=1.0.0" },
     { name = "firebolt-sdk", specifier = ">=1.18.0" },
@@ -834,8 +842,10 @@ dev = [
     { name = "myst-parser", specifier = ">=3.0.1" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "polars", specifier = ">=1.35.2" },
+    { name = "presto-python-client", specifier = ">=0.8.4" },
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
     { name = "pyiceberg", extras = ["sql-sqlite", "pyarrow"], specifier = ">=0.10.0" },
+    { name = "pymysql", specifier = ">=1.1.2" },
     { name = "pyspark", specifier = ">=3.5.0" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-benchmark", specifier = ">=5.1.0" },
@@ -1285,6 +1295,15 @@ wheels = [
 ]
 
 [[package]]
+name = "codespell"
+version = "2.4.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2d/9d/1d0903dff693160f893ca6abcabad545088e7a2ee0a6deae7c24e958be69/codespell-2.4.2.tar.gz", hash = "sha256:3c33be9ae34543807f088aeb4832dfad8cb2dae38da61cac0a7045dd376cfdf3", size = 352058, upload-time = "2026-03-05T18:10:42.936Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/42/a1/52fa05533e95fe45bcc09bcf8a503874b1c08f221a4e35608017e0938f55/codespell-2.4.2-py3-none-any.whl", hash = "sha256:97e0c1060cf46bd1d5db89a936c98db8c2b804e1fdd4b5c645e82a1ec6b1f886", size = 353715, upload-time = "2026-03-05T18:10:41.398Z" },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -1627,6 +1646,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/21/ac/b32ba1f25d38fc16e7623cc4bfb7bd68db61be2ef27b2d9969ea5c865765/datafusion-51.0.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e76803907150159aa059d5cc9291645bbaac1b6a46d07e56035118d327b741ae", size = 33246117, upload-time = "2026-01-09T13:23:30.981Z" },
     { url = "https://files.pythonhosted.org/packages/0b/4e/437121422ef010690fc3cdd7f080203e986ba00e0e3c3b577e03f5b54ca2/datafusion-51.0.0-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:9d0cfabfe1853994adc2e6e9da5f36c1eb061102e34a2f1101fa935c6991c9e1", size = 31421867, upload-time = "2026-01-09T13:23:34.436Z" },
     { url = "https://files.pythonhosted.org/packages/db/fc/58cf27fcb85b2fd2a698253ae46213b1cbda784407e205c148f4006c1429/datafusion-51.0.0-cp310-abi3-win_amd64.whl", hash = "sha256:fd5f9abfd6669062debf0658d13e4583234c89d4df95faf381927b11cea411f5", size = 32517679, upload-time = "2026-01-09T13:23:39.615Z" },
+]
+
+[[package]]
+name = "delta-spark"
+version = "4.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "importlib-metadata" },
+    { name = "pyspark" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2f/09/d394015eb956c4475f6a949fb5fccedf7af19f97e981acbc81629e868a5e/delta_spark-4.1.0.tar.gz", hash = "sha256:98f73c2744f972919e0472974467f85d157810b617341ebf586374d91b8eadc7", size = 36808, upload-time = "2026-02-20T18:37:59.8Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/03/2e440efd4a49c8ecfbcb665dea7db94583cf33a365d8480e47fb0aa0dc39/delta_spark-4.1.0-py3-none-any.whl", hash = "sha256:d80f6ebca542df48f257f2535f9c8c21bbfda65771b6ec21be843c0087e1dece", size = 43877, upload-time = "2026-02-20T18:37:58.15Z" },
 ]
 
 [[package]]
@@ -2278,7 +2310,7 @@ name = "importlib-metadata"
 version = "8.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp", marker = "python_full_version < '3.12'" },
+    { name = "zipp" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f3/49/3b30cad09e7771a4982d9975a8cbf64f00d4a1ececb53297f1d9a7be1b10/importlib_metadata-8.7.1.tar.gz", hash = "sha256:49fef1ae6440c182052f407c8d34a68f72efc36db9ca90dc0113398f2fdde8bb", size = 57107, upload-time = "2025-12-21T10:00:19.278Z" }
 wheels = [

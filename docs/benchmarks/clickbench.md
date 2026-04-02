@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, clickbench
 ```
 
+> **CLI name:** `clickbench` — use `benchbox run --benchmark clickbench`
+
 ## Overview
 
 ClickBench is a systematic analytics benchmark designed to test the performance of analytical database systems using real-world web analytics data patterns. Originally developed by ClickHouse, this benchmark has become a standard for evaluating OLAP database performance across different systems and architectures.

@@ -43,7 +43,7 @@ def test_get_access_token_refreshes_and_reuses_cached_token() -> None:
         assert adapter._get_access_token() == "abc"
         assert adapter._get_access_token() == "abc"
 
-    cred.get_token.assert_called_once()
+    cred.get_token.assert_called_once_with("https://dev.azuresynapse.net/.default")
 
 
 def test_get_headers_includes_bearer_token() -> None:
@@ -62,7 +62,9 @@ def test_apply_unified_tuning_calls_platform_tuning_when_present() -> None:
 
     adapter.apply_unified_tuning(SimpleNamespace(platform_optimization={"spark.sql.shuffle.partitions": "4"}))
 
-    adapter.apply_platform_tuning.assert_called_once()
+    call_args = adapter.apply_platform_tuning.call_args
+    assert call_args is not None, "apply_platform_tuning should have been called"
+    assert "spark.sql.shuffle.partitions" in str(call_args), "Should pass Spark config"
 
 
 def test_create_schema_default_and_non_default_paths() -> None:
@@ -72,7 +74,9 @@ def test_create_schema_default_and_non_default_paths() -> None:
     adapter.create_schema()
     adapter.create_schema("benchbox")
 
-    adapter._execute_statement.assert_called_once()
+    call_args = adapter._execute_statement.call_args
+    assert call_args is not None, "_execute_statement should have been called"
+    assert "benchbox" in str(call_args).lower(), "Should reference 'benchbox' schema"
 
 
 def test_load_data_validates_source_dir_and_builds_table_uris(tmp_path: Path) -> None:

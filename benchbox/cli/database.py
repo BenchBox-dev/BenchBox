@@ -33,6 +33,14 @@ logger = logging.getLogger(__name__)
 # Platform location categories
 LOCAL_CATEGORIES = {"analytical", "embedded", "distributed", "relational", "timeseries", "dataframe"}
 CLOUD_CATEGORIES = {"cloud"}
+_DRIVER_OPTION_FIELDS = (
+    "driver_version",
+    "driver_version_resolved",
+    "driver_version_actual",
+    "driver_runtime_strategy",
+    "driver_runtime_path",
+    "driver_runtime_python_executable",
+)
 
 
 @dataclass
@@ -46,6 +54,30 @@ class ExecutionStyleFilter:
 
     execution_mode: Literal["sql", "dataframe", "all"] = "all"
     location: Literal["local", "cloud", "all"] = "all"
+
+
+def _sync_driver_options(config: DatabaseConfig, driver_package: str) -> None:
+    """Persist resolved driver metadata into ``config.options``."""
+    if config.options is None:
+        config.options = {}
+
+    config.options["driver_package"] = driver_package
+    for field in _DRIVER_OPTION_FIELDS:
+        value = getattr(config, field)
+        if value:
+            config.options[field] = value
+    config.options["driver_auto_install"] = config.driver_auto_install
+    config.options["driver_auto_install_used"] = config.driver_auto_install_used
+
+
+def _sync_platform_driver_info(platform_info: Any, config: DatabaseConfig) -> None:
+    """Mirror resolved driver metadata onto a platform info record."""
+    if platform_info is None:
+        return
+    platform_info.driver_version_requested = config.driver_version
+    platform_info.driver_version_resolved = config.driver_version_resolved
+    platform_info.driver_version_actual = config.driver_version_actual
+    platform_info.driver_runtime_strategy = config.driver_runtime_strategy
 
 
 class DatabaseManager:
@@ -398,7 +430,11 @@ class DatabaseManager:
             },
         )
 
-        defaults = PlatformHookRegistry.get_default_options(platform_lower)
+        defaults = {
+            name: value
+            for name, value in PlatformHookRegistry.get_default_options(platform_lower).items()
+            if value is not None
+        }
         options = defaults
         if platform_options:
             options = {**defaults, **platform_options}
@@ -434,30 +470,8 @@ class DatabaseManager:
             config.driver_auto_install = auto_install or resolution.auto_install_used
             config.driver_auto_install_used = resolution.auto_install_used
 
-            # Defensive: ensure options is not None before subscript access (Pydantic v2 can set to None if explicitly passed)
-            if config.options is None:
-                config.options = {}
-
-            config.options["driver_package"] = driver_package
-            if config.driver_version:
-                config.options["driver_version"] = config.driver_version
-            if config.driver_version_resolved:
-                config.options["driver_version_resolved"] = config.driver_version_resolved
-            if config.driver_version_actual:
-                config.options["driver_version_actual"] = config.driver_version_actual
-            if config.driver_runtime_strategy:
-                config.options["driver_runtime_strategy"] = config.driver_runtime_strategy
-            if config.driver_runtime_path:
-                config.options["driver_runtime_path"] = config.driver_runtime_path
-            if config.driver_runtime_python_executable:
-                config.options["driver_runtime_python_executable"] = config.driver_runtime_python_executable
-            config.options["driver_auto_install"] = config.driver_auto_install
-            config.options["driver_auto_install_used"] = config.driver_auto_install_used
-            if platform_info:
-                platform_info.driver_version_requested = config.driver_version
-                platform_info.driver_version_resolved = config.driver_version_resolved
-                platform_info.driver_version_actual = config.driver_version_actual
-                platform_info.driver_runtime_strategy = config.driver_runtime_strategy
+            _sync_driver_options(config, driver_package)
+            _sync_platform_driver_info(platform_info, config)
         else:
             config.driver_version_resolved = config.driver_version
 

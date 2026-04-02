@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.platform_info import PlatformInfoInput
 from benchbox.core.runner.dataframe_runner import (
     DataFramePhases,
@@ -26,6 +27,7 @@ from benchbox.core.runner.dataframe_runner import (
     is_dataframe_execution,
     run_dataframe_benchmark,
 )
+from benchbox.core.schemas import BenchmarkConfig
 
 pytestmark = [
     pytest.mark.unit,
@@ -137,11 +139,7 @@ class TestRunDataframeBenchmark:
         # Configure StandardPlatformInfo protocol (MagicMock matches @runtime_checkable on Python 3.10)
         adapter.get_standard_platform_info.return_value = PlatformInfoInput(name="Polars", execution_mode="dataframe")
 
-        # Mock config
-        config = MagicMock()
-        config.name = "tpch"
-        config.display_name = "TPC-H"
-        config.scale_factor = 0.01
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
 
         # Execute with load=False, execute=False (minimal execution)
         phases = DataFramePhases(load=False, execute=False)
@@ -167,10 +165,7 @@ class TestRunDataframeBenchmark:
         # Configure StandardPlatformInfo protocol (MagicMock matches @runtime_checkable on Python 3.10)
         adapter.get_standard_platform_info.return_value = PlatformInfoInput(name="Pandas", execution_mode="dataframe")
 
-        config = MagicMock()
-        config.name = "tpch"
-        config.display_name = "TPC-H"
-        config.scale_factor = 0.01
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
 
         phases = DataFramePhases(load=False, execute=False)
 
@@ -191,10 +186,7 @@ class TestRunDataframeBenchmark:
         adapter.create_context.return_value = MagicMock()
         adapter.get_platform_info.return_value = {}
 
-        config = MagicMock()
-        config.name = "tpch"
-        config.display_name = "TPC-H"
-        config.scale_factor = 0.01
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
 
         # Load enabled but no data available
         phases = DataFramePhases(load=True, execute=False)
@@ -221,11 +213,7 @@ class TestRunDataframeBenchmark:
         adapter.get_standard_platform_info.return_value = PlatformInfoInput(name="Polars", execution_mode="dataframe")
         adapter.load_table.return_value = 2
 
-        config = MagicMock()
-        config.name = "tpch"
-        config.display_name = "TPC-H"
-        config.scale_factor = 1.0
-        config.options = {}
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=1.0)
 
         benchmark_instance = MagicMock()
         benchmark_instance.name = "tpch"
@@ -302,10 +290,7 @@ class TestResultSchemaCompatibility:
         adapter.create_context.return_value = MagicMock()
         adapter.get_platform_info.return_value = {}
 
-        config = MagicMock()
-        config.name = "tpch"
-        config.display_name = "TPC-H"
-        config.scale_factor = 0.01
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
 
         phases = DataFramePhases(load=False, execute=False)
 
@@ -335,10 +320,7 @@ class TestResultSchemaCompatibility:
         adapter.create_context.return_value = MagicMock()
         adapter.get_platform_info.return_value = {}
 
-        config = MagicMock()
-        config.name = "tpch"
-        config.display_name = "TPC-H"
-        config.scale_factor = 0.01
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
 
         phases = DataFramePhases(load=False, execute=False)
 
@@ -364,11 +346,9 @@ class TestMaintenancePhaseValidation:
         adapter.create_context.return_value = MagicMock()
         adapter.get_platform_info.return_value = {}
 
-        config = MagicMock()
-        config.name = "tpch"
-        config.display_name = "TPC-H"
-        config.scale_factor = 0.01
-        config.test_execution_type = "maintenance"
+        config = BenchmarkConfig(
+            name="tpch", display_name="TPC-H", scale_factor=0.01, test_execution_type="maintenance"
+        )
 
         phases = DataFramePhases(load=False, execute=True)
 
@@ -391,11 +371,7 @@ class TestMaintenancePhaseValidation:
         adapter.create_context.return_value = MagicMock()
         adapter.get_platform_info.return_value = {}
 
-        config = MagicMock()
-        config.name = "tpcds"
-        config.display_name = "TPC-DS"
-        config.scale_factor = 0.01
-        config.test_execution_type = "combined"
+        config = BenchmarkConfig(name="tpcds", display_name="TPC-DS", scale_factor=0.01, test_execution_type="combined")
 
         phases = DataFramePhases(load=False, execute=True)
 
@@ -416,11 +392,7 @@ class TestMaintenancePhaseValidation:
         adapter.create_context.return_value = MagicMock()
         adapter.get_platform_info.return_value = {}
 
-        config = MagicMock()
-        config.name = "tpch"
-        config.display_name = "TPC-H"
-        config.scale_factor = 0.01
-        config.test_execution_type = "standard"
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
 
         # Execute with no load/execute to avoid data requirements
         phases = DataFramePhases(load=False, execute=False)
@@ -442,11 +414,7 @@ class TestMaintenancePhaseValidation:
         adapter.create_context.return_value = MagicMock()
         adapter.get_platform_info.return_value = {}
 
-        config = MagicMock()
-        config.name = "tpch"
-        config.display_name = "TPC-H"
-        config.scale_factor = 0.01
-        config.test_execution_type = "power"
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01, test_execution_type="power")
 
         phases = DataFramePhases(load=False, execute=False)
 
@@ -458,6 +426,7 @@ class TestMaintenancePhaseValidation:
         )
 
         assert result is not None
+        assert isinstance(result, BenchmarkResults)
 
     def test_no_test_execution_type_defaults_to_standard(self):
         """Test that missing test_execution_type defaults to standard (no error)."""
@@ -466,12 +435,8 @@ class TestMaintenancePhaseValidation:
         adapter.create_context.return_value = MagicMock()
         adapter.get_platform_info.return_value = {}
 
-        config = MagicMock()
-        config.name = "tpch"
-        config.display_name = "TPC-H"
-        config.scale_factor = 0.01
-        # Simulate missing test_execution_type by having getattr return default
-        del config.test_execution_type
+        # Use SimpleNamespace without test_execution_type to test getattr fallback
+        config = types.SimpleNamespace(name="tpch", display_name="TPC-H", scale_factor=0.01)
 
         phases = DataFramePhases(load=False, execute=False)
 
@@ -483,6 +448,7 @@ class TestMaintenancePhaseValidation:
         )
 
         assert result is not None
+        assert isinstance(result, BenchmarkResults)
 
 
 class _StubTPCDSQueryManager:
@@ -493,9 +459,7 @@ class _StubTPCDSQueryManager:
 
 def test_tpcds_dataframe_requires_variant_parity():
     """TPC-DS DataFrame mode must fail if SQL variants are not implemented."""
-    config = MagicMock()
-    config.name = "tpcds"
-    config.options = {"tpcds_dataframe_variant_fallback": False}
+    config = BenchmarkConfig(name="tpcds", display_name="TPC-DS", options={"tpcds_dataframe_variant_fallback": False})
 
     benchmark_instance = MagicMock()
     benchmark_instance.query_manager = _StubTPCDSQueryManager()

@@ -865,10 +865,11 @@ class TPCDSBenchmark(BaseBenchmark):
         """
         import csv
 
+        normalized_table_name = table_name.lower()
         table_name_upper = table_name.upper()
 
         # Get table schema to determine column count and types
-        table_schema = next((table for table in TABLES if table.name == table_name_upper), None)
+        table_schema = next((table for table in TABLES if table.name.lower() == normalized_table_name), None)
         if not table_schema:
             raise ValueError(f"Unknown table: {table_name}")
 
@@ -921,8 +922,8 @@ class TPCDSBenchmark(BaseBenchmark):
         power_test: bool = True,
         throughput_test: bool = True,
         maintenance_test: bool = True,
-        refresh_functions: Optional[list[str]] = None,
-        data_maintenance: bool = True,
+        _refresh_functions: Optional[list[str]] = None,
+        _data_maintenance: bool = True,
         result_validation: bool = True,
         dialect: str = "standard",
         output_dir: Optional[Union[str, Path]] = None,

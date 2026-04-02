@@ -547,12 +547,168 @@ class TestSynapseLivyStateConstants:
         assert SynapseLivySessionState.ERROR == "error"
         assert SynapseLivySessionState.DEAD == "dead"
 
-    def test_synapse_livy_statement_states(self):
-        """Test SynapseLivyStatementState constants are defined."""
-        from benchbox.platforms.azure.synapse_spark_adapter import SynapseLivyStatementState
+    def test_table_format_default_parquet(self):
+        """Test table_format defaults to parquet."""
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.azure import SynapseSparkAdapter
 
-        assert SynapseLivyStatementState.WAITING == "waiting"
-        assert SynapseLivyStatementState.RUNNING == "running"
-        assert SynapseLivyStatementState.AVAILABLE == "available"
-        assert SynapseLivyStatementState.ERROR == "error"
-        assert SynapseLivyStatementState.CANCELLED == "cancelled"
+            adapter = SynapseSparkAdapter(
+                workspace_name="ws",
+                spark_pool_name="pool",
+                storage_account="sa",
+                storage_container="c",
+            )
+            assert adapter.table_format == "parquet"
+
+    def test_table_format_delta(self):
+        """Test table_format can be set to delta."""
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            adapter = SynapseSparkAdapter(
+                workspace_name="ws",
+                spark_pool_name="pool",
+                storage_account="sa",
+                storage_container="c",
+                table_format="delta",
+            )
+            assert adapter.table_format == "delta"
+
+    def test_table_format_from_config(self):
+        """Test table_format is passed through from_config."""
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            adapter = SynapseSparkAdapter.from_config(
+                {
+                    "workspace_name": "ws",
+                    "spark_pool_name": "pool",
+                    "storage_account": "sa",
+                    "storage_container": "c",
+                    "table_format": "iceberg",
+                }
+            )
+            assert adapter.table_format == "iceberg"
+
+    def test_session_config_delta_extensions(self):
+        """Test Delta Lake extensions are added to session config."""
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+            patch("benchbox.platforms.azure.synapse_spark_adapter.requests") as mock_requests,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": 1}
+            mock_requests.post.return_value = mock_response
+
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            adapter = SynapseSparkAdapter(
+                workspace_name="ws",
+                spark_pool_name="pool",
+                storage_account="sa",
+                storage_container="c",
+                table_format="delta",
+            )
+            adapter._wait_for_session_state = MagicMock()
+            adapter._create_session()
+
+            call_kwargs = mock_requests.post.call_args
+            session_conf = call_kwargs.kwargs["json"]["conf"]
+            assert "io.delta.sql.DeltaSparkSessionExtension" in session_conf["spark.sql.extensions"]
+            assert "DeltaCatalog" in session_conf["spark.sql.catalog.spark_catalog"]
+
+    def test_session_config_iceberg_extensions(self):
+        """Test Iceberg extensions are added to session config."""
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+            patch("benchbox.platforms.azure.synapse_spark_adapter.requests") as mock_requests,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": 1}
+            mock_requests.post.return_value = mock_response
+
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            adapter = SynapseSparkAdapter(
+                workspace_name="ws",
+                spark_pool_name="pool",
+                storage_account="sa",
+                storage_container="c",
+                table_format="iceberg",
+            )
+            adapter._wait_for_session_state = MagicMock()
+            adapter._create_session()
+
+            call_kwargs = mock_requests.post.call_args
+            session_conf = call_kwargs.kwargs["json"]["conf"]
+            assert "IcebergSparkSessionExtensions" in session_conf["spark.sql.extensions"]
+            assert "SparkSessionCatalog" in session_conf["spark.sql.catalog.spark_catalog"]
+            assert session_conf["spark.sql.catalog.spark_catalog.type"] == "hive"
+
+    def test_session_config_parquet_no_extensions(self):
+        """Test parquet (default) does not add format extensions."""
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+            patch("benchbox.platforms.azure.synapse_spark_adapter.requests") as mock_requests,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": 1}
+            mock_requests.post.return_value = mock_response
+
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            adapter = SynapseSparkAdapter(
+                workspace_name="ws",
+                spark_pool_name="pool",
+                storage_account="sa",
+                storage_container="c",
+            )
+            adapter._wait_for_session_state = MagicMock()
+            adapter._create_session()
+
+            call_kwargs = mock_requests.post.call_args
+            session_conf = call_kwargs.kwargs["json"]["conf"]
+            assert "spark.sql.extensions" not in session_conf
+
+    def test_synapse_livy_statement_states(self):
+        """Test LivyStatementState constants are defined (shared across Azure Spark adapters)."""
+        from benchbox.platforms.azure.spark_execution_utils import LivyStatementState
+
+        assert LivyStatementState.WAITING == "waiting"
+        assert LivyStatementState.RUNNING == "running"
+        assert LivyStatementState.AVAILABLE == "available"
+        assert LivyStatementState.ERROR == "error"
+        assert LivyStatementState.CANCELLED == "cancelled"

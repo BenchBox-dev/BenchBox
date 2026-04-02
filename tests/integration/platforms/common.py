@@ -504,6 +504,22 @@ class _Boto3Client:
         self._state.uploads.append((bucket, key))
 
 
+class _RedshiftBoto3Session:
+    """Stub for boto3.Session used by Redshift's _create_s3_client."""
+
+    def __init__(self, state: RedshiftStubState, **_: Any) -> None:
+        self._state = state
+
+    def client(self, service_name: str, **_: Any) -> Any:
+        if service_name == "s3":
+            return _Boto3Client(self._state)
+        raise ValueError(f"Unknown service: {service_name}")
+
+    def get_credentials(self) -> object:
+        """Return a truthy sentinel so _create_s3_client does not raise."""
+        return True
+
+
 def install_redshift_stubs(
     monkeypatch, *, host: str = "example.redshift.amazonaws.com", port: int = 5439
 ) -> RedshiftStubState:
@@ -524,6 +540,7 @@ def install_redshift_stubs(
     extensions_module.ISOLATION_LEVEL_READ_COMMITTED = 1
 
     boto3_module = types.ModuleType("boto3")
+    boto3_module.Session = lambda **kwargs: _RedshiftBoto3Session(state, **kwargs)
     boto3_module.client = lambda *_args, **_kwargs: _Boto3Client(state)
 
     monkeypatch.setitem(sys.modules, "redshift_connector", redshift_module)
@@ -1299,6 +1316,7 @@ __all__ = [
     "install_starrocks_stub",
     "install_databend_stub",
     "install_doris_stub",
+    "install_lakesail_stub",
     "DatabricksStubState",
     "BigQueryStubState",
     "RedshiftStubState",
@@ -1312,6 +1330,7 @@ __all__ = [
     "StarRocksStubState",
     "DatabendStubState",
     "DorisStubState",
+    "LakeSailStubState",
 ]
 
 
@@ -2263,6 +2282,312 @@ def install_doris_stub(
         # Disable requests so load_data uses INSERT fallback (testable without HTTP)
         adapter_module._requests = None
     except ImportError:  # pragma: no cover - defensive
+        pass
+
+    return state
+
+
+# ---------------------------------------------------------------------------
+# LakeSail stub implementation
+
+
+@dataclass
+class LakeSailStubState:
+    endpoint: str = "sc://localhost:50051"
+    database: str = "benchbox_test"
+    statements: list[str] = field(default_factory=list)
+    databases: list[str] = field(default_factory=lambda: ["default", "benchbox_test"])
+    tables: list[str] = field(default_factory=list)
+    row_counts: dict[str, int] = field(default_factory=lambda: {"LINEITEM": 2, "ORDERS": 2})
+
+
+class _LakeSailStubRow:
+    """Stub for a PySpark Row-like object."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        self._values = list(kwargs.values())
+        for key, value in kwargs.items():
+            object.__setattr__(self, key, value)
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __getitem__(self, index):
+        return self._values[index]
+
+
+class _LakeSailStubDataFrame:
+    """Stub for a PySpark DataFrame."""
+
+    def __init__(self, data: list[dict[str, Any]] | None = None, schema: Any = None) -> None:
+        self._data = data or []
+        self._schema = schema
+
+    def collect(self) -> list[Any]:
+        return [_LakeSailStubRow(**row) for row in self._data]
+
+    def count(self) -> int:
+        return len(self._data)
+
+    @property
+    def columns(self) -> list[str]:
+        if self._data:
+            return list(self._data[0].keys())
+        return []
+
+    def first(self) -> Any:
+        if self._data:
+            return _LakeSailStubRow(**self._data[0])
+        return None
+
+    def cache(self) -> _LakeSailStubDataFrame:
+        return self
+
+    def unpersist(self) -> _LakeSailStubDataFrame:
+        return self
+
+    def withColumnRenamed(self, existing: str, new: str) -> _LakeSailStubDataFrame:
+        return _LakeSailStubDataFrame(self._data, self._schema)
+
+    def withColumn(self, name: str, col: Any) -> _LakeSailStubDataFrame:
+        return _LakeSailStubDataFrame(self._data, self._schema)
+
+    def select(self, *cols: Any) -> _LakeSailStubDataFrame:
+        return _LakeSailStubDataFrame(self._data, self._schema)
+
+    def __getitem__(self, key: str) -> Any:
+        class _StubColumn:
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+            def cast(self, data_type: Any) -> _StubColumn:
+                return self
+
+        return _StubColumn(key)
+
+    @property
+    def schema(self) -> Any:
+        return self._schema
+
+    @property
+    def write(self) -> Any:
+        class Writer:
+            def saveAsTable(self, name: str) -> None:
+                pass
+
+            def insertInto(self, name: str) -> None:
+                pass
+
+            def mode(self, m: str) -> Writer:
+                return self
+
+            def format(self, fmt: str) -> Writer:
+                return self
+
+        return Writer()
+
+
+class _LakeSailStubCatalog:
+    """Stub for SparkSession.catalog."""
+
+    def __init__(self, state: LakeSailStubState) -> None:
+        self._state = state
+
+    def listDatabases(self) -> list[Any]:
+        return [_LakeSailStubRow(name=db) for db in self._state.databases]
+
+    def listTables(self, dbName: str | None = None) -> list[Any]:
+        return [_LakeSailStubRow(name=t) for t in self._state.tables]
+
+    def clearCache(self) -> None:
+        pass
+
+
+class _LakeSailStubReader:
+    """Stub for SparkSession.read."""
+
+    def __init__(self, state: LakeSailStubState) -> None:
+        self._state = state
+        self._format = "csv"
+        self._schema = None
+        self._options: dict[str, str] = {}
+
+    def format(self, fmt: str) -> _LakeSailStubReader:
+        self._format = fmt
+        return self
+
+    def schema(self, schema: Any) -> _LakeSailStubReader:
+        self._schema = schema
+        return self
+
+    def option(self, key: str, value: str) -> _LakeSailStubReader:
+        self._options[key] = value
+        return self
+
+    def csv(self, path: Any) -> _LakeSailStubDataFrame:
+        return _LakeSailStubDataFrame([{"col1": "value1"}])
+
+    def parquet(self, path: Any) -> _LakeSailStubDataFrame:
+        return _LakeSailStubDataFrame([{"col1": "value1"}])
+
+    def load(self, path: str | None = None) -> _LakeSailStubDataFrame:
+        return _LakeSailStubDataFrame([{"col1": "value1"}])
+
+
+class _LakeSailStubConf:
+    """Stub for SparkSession.conf."""
+
+    def __init__(self) -> None:
+        self._conf: dict[str, str] = {}
+
+    def set(self, key: str, value: str) -> None:
+        self._conf[key] = value
+
+    def get(self, key: str, default: str | None = None) -> str | None:
+        return self._conf.get(key, default)
+
+
+class _LakeSailStubSession:
+    """Stub for PySpark SparkSession connected via Spark Connect."""
+
+    def __init__(self, state: LakeSailStubState) -> None:
+        self._state = state
+        self.catalog = _LakeSailStubCatalog(state)
+        self.read = _LakeSailStubReader(state)
+        self.conf = _LakeSailStubConf()
+
+    @property
+    def version(self) -> str:
+        return "3.5.0-sail"
+
+    def table(self, table_name: str) -> _LakeSailStubDataFrame:
+        """Return a stub DataFrame for a table (used by SparkDataLoadMixin for schema inference)."""
+        return _LakeSailStubDataFrame([{"col1": "value1"}])
+
+    def sql(self, query: str) -> _LakeSailStubDataFrame:
+        self._state.statements.append(query)
+        lowered = query.strip().lower()
+
+        if lowered == "select 1" or lowered == "select 1 as value":
+            return _LakeSailStubDataFrame([{"value": 1}])
+        elif "count(*)" in lowered or "count(1)" in lowered:
+            for table, count in self._state.row_counts.items():
+                if table.lower() in lowered:
+                    return _LakeSailStubDataFrame([{"count(1)": count}])
+            return _LakeSailStubDataFrame([{"count(1)": 0}])
+        elif "show tables" in lowered or "show databases" in lowered:
+            return _LakeSailStubDataFrame([{"name": t} for t in self._state.tables])
+        elif (
+            "create database" in lowered
+            or "create schema" in lowered
+            or "drop database" in lowered
+            or "drop schema" in lowered
+            or "create table" in lowered
+            or "create external table" in lowered
+            or "drop table" in lowered
+            or "use " in lowered
+        ):
+            return _LakeSailStubDataFrame()
+        else:
+            # Default: return 2 rows for query execution
+            return _LakeSailStubDataFrame([{"col1": "val1"}, {"col1": "val2"}])
+
+    def stop(self) -> None:
+        pass
+
+
+class _LakeSailStubBuilder:
+    """Stub for SparkSession.builder with Spark Connect .remote() support."""
+
+    def __init__(self, state: LakeSailStubState) -> None:
+        self._state = state
+
+    def remote(self, endpoint: str) -> _LakeSailStubBuilder:
+        self._state.endpoint = endpoint
+        return self
+
+    def config(self, key: str, value: str | None = None) -> _LakeSailStubBuilder:
+        return self
+
+    def appName(self, name: str) -> _LakeSailStubBuilder:
+        return self
+
+    def getOrCreate(self) -> _LakeSailStubSession:
+        return _LakeSailStubSession(self._state)
+
+
+def install_lakesail_stub(
+    monkeypatch,
+    *,
+    endpoint: str = "sc://localhost:50051",
+    database: str = "benchbox_test",
+) -> LakeSailStubState:
+    """Install stubs for LakeSail adapter (PySpark Spark Connect)."""
+
+    state = LakeSailStubState(endpoint=endpoint, database=database)
+
+    # Create stub PySpark modules
+    pyspark_module = types.ModuleType("pyspark")
+    pyspark_module.__version__ = "3.5.0"
+
+    pyspark_sql_module = types.ModuleType("pyspark.sql")
+
+    # Create SparkSession class with stub builder
+    class StubSparkSession:
+        builder = _LakeSailStubBuilder(state)
+
+    pyspark_sql_module.SparkSession = StubSparkSession
+
+    # Create stub types module
+    pyspark_types_module = types.ModuleType("pyspark.sql.types")
+    for type_name in [
+        "StructType",
+        "StructField",
+        "StringType",
+        "IntegerType",
+        "LongType",
+        "DoubleType",
+        "DecimalType",
+        "DateType",
+    ]:
+        setattr(pyspark_types_module, type_name, type(type_name, (), {"__init__": lambda self, *a, **kw: None}))
+
+    monkeypatch.setitem(sys.modules, "pyspark", pyspark_module)
+    monkeypatch.setitem(sys.modules, "pyspark.sql", pyspark_sql_module)
+    monkeypatch.setitem(sys.modules, "pyspark.sql.types", pyspark_types_module)
+
+    # Patch the adapter module
+    try:
+        import benchbox.platforms.lakesail as adapter_module
+
+        adapter_module.SparkSession = StubSparkSession
+        for type_name in [
+            "StructType",
+            "StructField",
+            "StringType",
+            "IntegerType",
+            "LongType",
+            "DoubleType",
+            "DecimalType",
+            "DateType",
+        ]:
+            setattr(adapter_module, type_name, getattr(pyspark_types_module, type_name))
+    except ImportError:  # pragma: no cover
+        pass
+
+    # Patch dependency check
+    try:
+        import benchbox.utils.dependencies as dep_utils
+
+        original_check = dep_utils.check_platform_dependencies
+
+        def patched_check(platform: str) -> tuple[bool, list[str]]:
+            if platform in ("spark", "lakesail"):
+                return True, []
+            return original_check(platform)
+
+        monkeypatch.setattr(dep_utils, "check_platform_dependencies", patched_check)
+    except ImportError:  # pragma: no cover
         pass
 
     return state

@@ -18,7 +18,7 @@ Authentication:
   - DATABEND_HOST: Hostname (e.g., tenant--warehouse.gw.databend.com)
   - DATABEND_USER: Username
   - DATABEND_PASSWORD: Password
-- Self-hosted: DSN-based connection (databend://user:pass@host:port/database)
+- Self-hosted: DSN-based connection (databend+http://user:pass@host:port/database)
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -134,7 +134,7 @@ class DatabendAdapter(PlatformAdapter):
         if not self.dsn and not self.host:
             raise ConfigurationError(
                 "Databend configuration is incomplete. Provide either:\n"
-                "  1. DSN: --platform-option dsn=databend://user:pass@host:port/db\n"
+                "  1. DSN: --platform-option dsn=databend+http://user:pass@host:port/db\n"
                 "  2. Individual params: --platform-option host=<host> --platform-option password=<pass>\n"
                 "  3. Environment variables: DATABEND_HOST, DATABEND_USER, DATABEND_PASSWORD\n"
                 "\n"
@@ -252,10 +252,10 @@ class DatabendAdapter(PlatformAdapter):
         """Build connection DSN from individual parameters.
 
         Returns:
-            DSN string in format: databend://user:pass@host:port/database?options
+            DSN string in format: databend+http://user:pass@host:port/database?options
         """
         if self.dsn:
-            return self.dsn
+            return self._normalize_dsn_scheme(self.dsn)
 
         # Determine port
         port = self.port
@@ -267,18 +267,41 @@ class DatabendAdapter(PlatformAdapter):
         if self.password:
             user_part = f"{user_part}:{quote(self.password, safe='')}"
 
-        scheme = "databend" if not self.ssl else "databend+ssl"
+        scheme = "databend+http" if not self.ssl else "databend+https"
 
         dsn = f"{scheme}://{user_part}@{self.host}:{port}/{self.database}"
 
         # Add warehouse parameter for Databend Cloud
         params = []
+        if not self.ssl:
+            params.append("sslmode=disable")
         if self.warehouse:
             params.append(f"warehouse={self.warehouse}")
 
         if params:
             dsn += "?" + "&".join(params)
 
+        return dsn
+
+    @staticmethod
+    def _get_blocking_connection(client: Any) -> Any:
+        """Normalize databend-driver client objects across driver versions."""
+        if all(hasattr(client, method) for method in ("query_row", "query_iter", "exec")):
+            return client
+        if hasattr(client, "get_conn"):
+            return client.get_conn()
+        raise TypeError("BlockingDatabendClient does not expose a usable connection interface")
+
+    @staticmethod
+    def _normalize_dsn_scheme(dsn: str) -> str:
+        """Map legacy BenchBox DSN schemes to the databend-driver variants."""
+        if dsn.startswith("databend+ssl://"):
+            return "databend+https://" + dsn[len("databend+ssl://") :]
+        if dsn.startswith("databend://"):
+            dsn = "databend+http://" + dsn[len("databend://") :]
+        if dsn.startswith("databend+http://") and "sslmode=" not in dsn:
+            separator = "&" if "?" in dsn else "?"
+            return f"{dsn}{separator}sslmode=disable"
         return dsn
 
     def create_connection(self, **connection_config) -> Any:
@@ -294,22 +317,26 @@ class DatabendAdapter(PlatformAdapter):
         dsn = self._build_dsn()
         self.log_very_verbose(f"Databend connection: host={self.host}, database={self.database}")
 
+        connection = None
         try:
             from databend_driver import BlockingDatabendClient
 
             client = BlockingDatabendClient(dsn)
+            connection = self._get_blocking_connection(client)
 
             # Test connection
-            row = client.query_row("SELECT 1")
+            row = connection.query_row("SELECT 1")
             if row is None:
                 raise ConnectionError("Databend connection test returned no result")
 
             self.logger.info(f"Connected to Databend at {self.host}")
             self.log_operation_complete("Databend connection", details=f"Connected to {self.host}")
 
-            return client
+            return connection
 
         except Exception as e:
+            if connection and hasattr(connection, "close"):
+                connection.close()
             self.logger.error(f"Failed to connect to Databend: {e}")
             raise
 
@@ -605,18 +632,22 @@ class DatabendAdapter(PlatformAdapter):
             True if connection successful, False otherwise
         """
         client = None
+        connection = None
         try:
             from databend_driver import BlockingDatabendClient
 
             dsn = self._build_dsn()
             client = BlockingDatabendClient(dsn)
-            row = client.query_row("SELECT 1")
+            connection = self._get_blocking_connection(client)
+            row = connection.query_row("SELECT 1")
             return row is not None
         except Exception as e:
             self.logger.debug(f"Connection test failed: {e}")
             return False
         finally:
-            if client and hasattr(client, "close"):
+            if connection and hasattr(connection, "close"):
+                connection.close()
+            elif client and hasattr(client, "close"):
                 client.close()
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
@@ -677,13 +708,15 @@ class DatabendAdapter(PlatformAdapter):
         database = connection_config.get("database", self.database)
 
         client = None
+        connection = None
         try:
             from databend_driver import BlockingDatabendClient
 
             dsn = self._build_dsn()
             client = BlockingDatabendClient(dsn)
+            connection = self._get_blocking_connection(client)
 
-            rows = client.query_iter("SHOW DATABASES")
+            rows = connection.query_iter("SHOW DATABASES")
             for row in rows:
                 db_name = str(row.values()[0]) if hasattr(row, "values") else str(row)
                 if db_name.lower() == database.lower():
@@ -693,22 +726,29 @@ class DatabendAdapter(PlatformAdapter):
             self.logger.debug(f"Error checking database existence: {e}")
             return False
         finally:
-            if client and hasattr(client, "close"):
+            if connection and hasattr(connection, "close"):
+                connection.close()
+            elif client and hasattr(client, "close"):
                 client.close()
 
     def drop_database(self, **connection_config) -> None:
         """Drop database in Databend."""
         database = connection_config.get("database", self.database)
 
+        connection = None
         try:
             from databend_driver import BlockingDatabendClient
 
             dsn = self._build_dsn()
             client = BlockingDatabendClient(dsn)
-            client.exec(f"DROP DATABASE IF EXISTS {self._quote_identifier(database)}")
+            connection = self._get_blocking_connection(client)
+            connection.exec(f"DROP DATABASE IF EXISTS {self._quote_identifier(database)}")
             self.logger.info(f"Dropped database {database}")
         except Exception as e:
             raise RuntimeError(f"Failed to drop Databend database {database}: {e}") from e
+        finally:
+            if connection and hasattr(connection, "close"):
+                connection.close()
 
     def supports_tuning_type(self, tuning_type) -> bool:
         """Check if Databend supports a specific tuning type.

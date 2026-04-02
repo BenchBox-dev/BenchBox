@@ -10,14 +10,14 @@ from unittest.mock import patch
 
 import pytest
 
-from benchbox.core.gpu.benchmark import (
+from benchbox.experimental.gpu.benchmark import (
     GPU_BENCHMARK_QUERIES,
     GPUBenchmark,
     GPUBenchmarkResults,
     GPUQueryResult,
 )
-from benchbox.core.gpu.capabilities import GPUDevice, GPUInfo, GPUVendor
-from benchbox.core.gpu.metrics import GPUMetricsAggregate
+from benchbox.experimental.gpu.capabilities import GPUDevice, GPUInfo, GPUVendor
+from benchbox.experimental.gpu.metrics import GPUMetricsAggregate
 
 pytestmark = [
     pytest.mark.unit,
@@ -299,7 +299,7 @@ class TestGPUBenchmark:
         assert len(agg_queries) >= 2
         assert "aggregation_simple" in agg_queries
 
-    @patch("benchbox.core.gpu.benchmark.detect_gpu")
+    @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_is_gpu_available_true(self, mock_detect, gpu_benchmark):
         """Should detect GPU available."""
         mock_detect.return_value = GPUInfo(
@@ -309,13 +309,13 @@ class TestGPUBenchmark:
         )
         assert gpu_benchmark.is_gpu_available() is True
 
-    @patch("benchbox.core.gpu.benchmark.detect_gpu")
+    @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_is_gpu_available_false(self, mock_detect, gpu_benchmark):
         """Should detect GPU not available."""
         mock_detect.return_value = GPUInfo(available=False)
         assert gpu_benchmark.is_gpu_available() is False
 
-    @patch("benchbox.core.gpu.benchmark.detect_gpu")
+    @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_get_gpu_info(self, mock_detect, gpu_benchmark):
         """Should get GPU info."""
         expected_info = GPUInfo(available=True, device_count=2)
@@ -338,7 +338,7 @@ class TestGPUBenchmark:
         files = gpu_benchmark.generate_data(output_format="parquet")
         assert "gpu_benchmark_main" in files
 
-    @patch("benchbox.core.gpu.benchmark.detect_gpu")
+    @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_export_benchmark_spec(self, mock_detect, gpu_benchmark):
         """Should export benchmark spec."""
         mock_detect.return_value = GPUInfo(available=True, device_count=1)

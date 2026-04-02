@@ -173,23 +173,32 @@ class SQLETLBackend:
 
     def _build_safe_where_clause(self, table_name: str, condition: str | Any) -> tuple[str, tuple[Any, ...]]:
         if isinstance(condition, dict):
-            if not condition:
-                raise ValueError("SCD2 expire condition dictionary cannot be empty")
-            clauses: list[str] = []
-            values: list[Any] = []
-            for raw_column, value in condition.items():
-                column = self._validate_column_name(table_name, str(raw_column))
-                quoted_column = self._quote_identifier(column)
-                if value is None:
-                    clauses.append(f"{quoted_column} IS NULL")
-                else:
-                    clauses.append(f"{quoted_column} = ?")
-                    values.append(value)
-            return " AND ".join(clauses), tuple(values)
+            return self._build_parameterized_where_clause(table_name, condition)
 
         if not isinstance(condition, str):
             raise TypeError("SCD2 expire condition must be a SQL expression string or dict[str, Any]")
 
+        normalized = self._validate_sql_where_clause(table_name, condition)
+        return normalized, ()
+
+    def _build_parameterized_where_clause(
+        self, table_name: str, condition: dict[str, Any]
+    ) -> tuple[str, tuple[Any, ...]]:
+        if not condition:
+            raise ValueError("SCD2 expire condition dictionary cannot be empty")
+        clauses: list[str] = []
+        values: list[Any] = []
+        for raw_column, value in condition.items():
+            column = self._validate_column_name(table_name, str(raw_column))
+            quoted_column = self._quote_identifier(column)
+            if value is None:
+                clauses.append(f"{quoted_column} IS NULL")
+            else:
+                clauses.append(f"{quoted_column} = ?")
+                values.append(value)
+        return " AND ".join(clauses), tuple(values)
+
+    def _validate_sql_where_clause(self, table_name: str, condition: str) -> str:
         normalized = condition.strip()
         if not normalized:
             raise ValueError("SCD2 expire condition cannot be empty")
@@ -211,6 +220,10 @@ class SQLETLBackend:
         if any(re.search(rf"\b{keyword}\b", upper_condition) for keyword in forbidden):
             raise ValueError("DML/DDL keywords are not allowed in SCD2 expire condition")
 
+        self._validate_where_clause_identifiers(table_name, normalized)
+        return normalized
+
+    def _validate_where_clause_identifiers(self, table_name: str, normalized: str) -> None:
         scrubbed = re.sub(r"'[^']*'", " ", normalized)
         tokens = re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", scrubbed)
         allowed_keywords = {
@@ -228,13 +241,9 @@ class SQLETLBackend:
         allowed_columns = {str(col["name"]).upper() for col in TABLES[table_name]["columns"]}
         for token in tokens:
             token_upper = token.upper()
-            if token_upper in allowed_keywords:
-                continue
-            if token_upper in allowed_columns:
+            if token_upper in allowed_keywords or token_upper in allowed_columns:
                 continue
             raise ValueError(f"Unsupported identifier in SCD2 expire condition: {token}")
-
-        return normalized, ()
 
     def _check_data_completeness(self) -> dict[str, Any]:
         results: dict[str, Any] = {}

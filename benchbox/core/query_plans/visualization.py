@@ -40,6 +40,48 @@ def _format_truncated_list(label: str, items: list[str], max_display: int = 3) -
     return lines
 
 
+def _fmt_left_right(label: str, d: dict) -> str:
+    return f"{label}: {d['left']} ≠ {d['right']}"
+
+
+def _fmt_left_right_list(label: str, d: dict) -> str:
+    left = d["left"] or []
+    right = d["right"] or []
+    return f"{label}: [{', '.join(left)}] ≠ [{', '.join(right)}]"
+
+
+def _fmt_set_diff(label: str, item_noun: str, d: dict) -> str:
+    parts = []
+    left_only = d.get("left_only", [])
+    right_only = d.get("right_only", [])
+    if left_only:
+        parts.append(f"{len(left_only)} {item_noun} only in left")
+    if right_only:
+        parts.append(f"{len(right_only)} {item_noun} only in right")
+    return f"{label}: {', '.join(parts)}"
+
+
+def _fmt_projections(d: dict) -> str:
+    left = d["left"] or []
+    right = d["right"] or []
+    l_str = f"{', '.join(left[:3])}{'...' if len(left) > 3 else ''}"
+    r_str = f"{', '.join(right[:3])}{'...' if len(right) > 3 else ''}"
+    return f"Projections: [{l_str}] ≠ [{r_str}]"
+
+
+_PROPERTY_DIFF_FORMATTERS: dict[str, Any] = {
+    "table_name": lambda d: _fmt_left_right("Table", d),
+    "join_type": lambda d: _fmt_left_right("Join type", d),
+    "filter_expressions": lambda d: _fmt_set_diff("Filters", "filters", d),
+    "aggregation_functions": lambda d: _fmt_set_diff("Aggregations", "aggs", d),
+    "group_by_keys": lambda d: _fmt_left_right_list("Group by", d),
+    "limit_count": lambda d: _fmt_left_right("Limit", d),
+    "offset_count": lambda d: _fmt_left_right("Offset", d),
+    "projection_expressions": _fmt_projections,
+    "properties": lambda _d: "Property differences in operator details",
+}
+
+
 class QueryPlanVisualizer:
     """Renders query plans as ASCII trees."""
 
@@ -334,64 +376,9 @@ class QueryPlanVisualizer:
     def _format_property_diff(self, diff: OperatorDiff) -> str:
         """Format property difference for display."""
         diffs = diff.differences
-
-        # Table name diff
-        if "table_name" in diffs:
-            left = diffs["table_name"]["left"]
-            right = diffs["table_name"]["right"]
-            return f"Table: {left} ≠ {right}"
-
-        # Join type diff
-        if "join_type" in diffs:
-            left = diffs["join_type"]["left"]
-            right = diffs["join_type"]["right"]
-            return f"Join type: {left} ≠ {right}"
-
-        # Filter expressions
-        if "filter_expressions" in diffs:
-            left_only = diffs["filter_expressions"].get("left_only", [])
-            right_only = diffs["filter_expressions"].get("right_only", [])
-            parts = []
-            if left_only:
-                parts.append(f"{len(left_only)} filters only in left")
-            if right_only:
-                parts.append(f"{len(right_only)} filters only in right")
-            return "Filters: " + ", ".join(parts)
-
-        # Aggregation functions
-        if "aggregation_functions" in diffs:
-            left_only = diffs["aggregation_functions"].get("left_only", [])
-            right_only = diffs["aggregation_functions"].get("right_only", [])
-            parts = []
-            if left_only:
-                parts.append(f"{len(left_only)} aggs only in left")
-            if right_only:
-                parts.append(f"{len(right_only)} aggs only in right")
-            return "Aggregations: " + ", ".join(parts)
-
-        # Group by keys (ordered comparison)
-        if "group_by_keys" in diffs:
-            left = diffs["group_by_keys"]["left"] or []
-            right = diffs["group_by_keys"]["right"] or []
-            return f"Group by: [{', '.join(left)}] ≠ [{', '.join(right)}]"
-
-        # Limit/offset
-        if "limit_count" in diffs:
-            return f"Limit: {diffs['limit_count']['left']} ≠ {diffs['limit_count']['right']}"
-
-        if "offset_count" in diffs:
-            return f"Offset: {diffs['offset_count']['left']} ≠ {diffs['offset_count']['right']}"
-
-        # Projection expressions (ordered comparison)
-        if "projection_expressions" in diffs:
-            left = diffs["projection_expressions"]["left"] or []
-            right = diffs["projection_expressions"]["right"] or []
-            return f"Projections: [{', '.join(left[:3])}{'...' if len(left) > 3 else ''}] ≠ [{', '.join(right[:3])}{'...' if len(right) > 3 else ''}]"
-
-        # Generic properties
-        if "properties" in diffs:
-            return "Property differences in operator details"
-
+        for key, formatter in _PROPERTY_DIFF_FORMATTERS.items():
+            if key in diffs:
+                return formatter(diffs[key])
         return "Property mismatch"
 
 

@@ -50,6 +50,7 @@ from ..utils.dependencies import (
 )
 from ..utils.file_format import get_delimiter_for_file
 from .base import DriverIsolationCapability, PlatformAdapter
+from .presto_trino_utils import validate_catalog_exists
 
 try:
     import trino
@@ -524,54 +525,16 @@ class TrinoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin, 
         Raises:
             ConfigurationError: If no catalog available or server unreachable
         """
-        from ..core.exceptions import ConfigurationError
-
-        # Auto-select catalog if not provided
-        if not catalog:
-            catalog = self._auto_select_catalog()
-            if catalog:
-                self._catalog_was_auto_selected = True
-                self.logger.info(f"Auto-selected catalog '{catalog}' for benchmarking")
-            else:
-                # Determine if server unreachable or only system catalogs exist
-                available = self._get_available_catalogs()
-                if available:
-                    # Server reachable but only system catalogs (jmx, system)
-                    catalog_list = ", ".join(sorted(available))
-                    raise ConfigurationError(
-                        f"No usable data catalogs found on Trino server.\n"
-                        f"Available catalogs ({catalog_list}) are system-only and cannot store data.\n"
-                        "Configure a data catalog (hive, iceberg, delta, or memory) on your Trino server,\n"
-                        "or specify a catalog explicitly with --platform-option catalog=<name>"
-                    )
-                else:
-                    # Server unreachable
-                    raise ConfigurationError(
-                        "Trino requires a catalog but server is unreachable.\n"
-                        "Ensure the server is running, then either:\n"
-                        "  1. Run again (catalog will be auto-selected)\n"
-                        "  2. Specify explicitly: --platform-option catalog=<name>\n"
-                        "  3. Configure default: benchbox platforms setup"
-                    )
-
-        # Validate the catalog exists
-        available_catalogs = self._get_available_catalogs()
-
-        if not available_catalogs:
-            # Can't validate - proceed and let connection fail with specific error
-            self.logger.debug("Could not query available catalogs - proceeding with specified catalog")
-            return catalog
-
-        if catalog in available_catalogs:
-            return catalog
-
-        # Catalog doesn't exist - raise helpful error
-        catalog_list = ", ".join(sorted(available_catalogs))
-        raise ConfigurationError(
-            f"Catalog '{catalog}' does not exist on the Trino server.\n"
-            f"Available catalogs: {catalog_list}\n"
-            "Specify a valid catalog with --platform-option catalog=<name> (e.g., --platform-option catalog=hive)"
+        validated_catalog, auto_selected = validate_catalog_exists(
+            catalog,
+            platform_name="Trino",
+            auto_select_catalog=self._auto_select_catalog,
+            get_available_catalogs=self._get_available_catalogs,
+            logger=self.logger,
         )
+        if auto_selected:
+            self._catalog_was_auto_selected = True
+        return validated_catalog
 
     def drop_database(self, **connection_config) -> None:
         """Drop schema in Trino catalog.
@@ -683,49 +646,18 @@ class TrinoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin, 
 
     def create_schema(self, benchmark, connection: Any) -> float:
         """Create schema using Trino-optimized table definitions."""
+        from benchbox.platforms.presto_trino_utils import execute_schema_statements
+
         start_time = mono_time()
-
-        cursor = connection.cursor()
-
-        try:
-            # Use common schema creation helper
-            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
-
-            # Split schema into individual statements and execute
-            statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
-
-            for statement in statements:
-                # Skip empty statements
-                if not statement:
-                    continue
-
-                # Normalize table names to lowercase for Trino consistency
-                statement = self._normalize_table_name_in_sql(statement)
-
-                # Optimize table definition for Trino
-                statement = self._optimize_table_definition(statement)
-
-                try:
-                    cursor.execute(statement)
-                    self.logger.debug(f"Executed schema statement: {statement[:100]}...")
-                except Exception as e:
-                    # If table already exists, drop and recreate
-                    if "already exists" in str(e).lower():
-                        table_name = self._extract_table_name(statement)
-                        if table_name:
-                            cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
-                            cursor.execute(statement)
-                    else:
-                        raise
-
-            self.logger.info("Schema created")
-
-        except Exception as e:
-            self.logger.error(f"Schema creation failed: {e}")
-            raise
-        finally:
-            cursor.close()
-
+        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+        execute_schema_statements(
+            schema_sql=schema_sql,
+            connection=connection,
+            logger=self.logger,
+            normalize_table_name_in_sql=self._normalize_table_name_in_sql,
+            optimize_table_definition=self._optimize_table_definition,
+            extract_table_name=self._extract_table_name,
+        )
         return elapsed_seconds(start_time)
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> dict[str, Any]:
@@ -949,15 +881,9 @@ class TrinoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin, 
 
     def _extract_table_name(self, statement: str) -> str | None:
         """Extract table name from CREATE TABLE statement."""
-        try:
-            import re
+        from benchbox.core.sql_utils import extract_table_name
 
-            match = re.search(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)", statement, re.IGNORECASE)
-            if match:
-                return match.group(1).strip()
-        except Exception:
-            pass
-        return None
+        return extract_table_name(statement)
 
     def _normalize_table_name_in_sql(self, sql: str) -> str:
         """Normalize table names in SQL to lowercase for Trino."""
@@ -992,15 +918,9 @@ class TrinoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin, 
 
     def get_query_plan(self, connection: Any, query: str) -> str:
         """Get query execution plan for analysis."""
-        cursor = connection.cursor()
-        try:
-            cursor.execute(f"EXPLAIN {query}")
-            plan_rows = cursor.fetchall()
-            return "\n".join([str(row[0]) for row in plan_rows])
-        except Exception as e:
-            return f"Could not get query plan: {e}"
-        finally:
-            cursor.close()
+        from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+
+        return get_query_plan_from_cursor(connection, query)
 
     def close_connection(self, connection: Any) -> None:
         """Close Trino connection."""

@@ -660,13 +660,15 @@ class BenchmarkExecutionMixin:
         """
         # Get warmup and iteration counts from config options
         config_options = getattr(benchmark_config, "options", {}) or {}
-        warmup_iterations = int(
-            config_options.get("power_warmup_iterations", GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS)
-            or GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS
+        warmup_iterations_raw = config_options.get("power_warmup_iterations")
+        measurement_iterations_raw = config_options.get("power_iterations")
+        warmup_iterations = (
+            GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS if warmup_iterations_raw is None else int(warmup_iterations_raw)
         )
-        measurement_iterations = int(
-            config_options.get("power_iterations", GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
-            or GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
+        measurement_iterations = (
+            GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
+            if measurement_iterations_raw is None
+            else int(measurement_iterations_raw)
         )
 
         query_filter = self._build_query_filter(benchmark_config)

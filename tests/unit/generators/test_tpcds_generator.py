@@ -189,8 +189,8 @@ class TestTPCDSDataGenerator:
 
         generator = TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir, parallel=8)
 
-        # Check that parallel parameter is stored
-        assert hasattr(generator, "parallel")
+        # Check that parallel parameter is stored with correct value
+        assert generator.parallel == 8
 
 
 @pytest.mark.unit
@@ -258,8 +258,8 @@ class TestGeneratorExtended:
             ext = generator.get_expected_file_extension()
             assert ext in [".dat", ".tbl"]
         else:
-            # Default expectation for TPC-DS is .dat files
-            assert True  # Generator initializes properly
+            # No get_expected_file_extension method — verify generator initialized correctly
+            assert generator.scale_factor == 1.0
 
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
     def test_memory_and_performance_settings(self, mock_find_dsdgen, temp_dir):

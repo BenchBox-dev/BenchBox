@@ -130,6 +130,7 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
         image_version: str = "2.1-debian11",
         timeout_minutes: int = 60,
         create_ephemeral_cluster: bool = False,
+        table_format: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the Dataproc adapter.
@@ -182,6 +183,7 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
         self.image_version = image_version
         self.timeout_minutes = timeout_minutes
         self.create_ephemeral_cluster = create_ephemeral_cluster
+        self.table_format = table_format or "parquet"
 
         # Initialize staging using cloud-spark shared infrastructure
         self._staging: CloudSparkStaging | None = None
@@ -562,7 +564,7 @@ spark.stop()
 
             create_table_query = f"""
                 CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table}
-                USING PARQUET
+                USING {self.table_format.upper()}
                 LOCATION '{table_uri}'
             """
             self._submit_spark_sql_job(create_table_query, wait_for_completion=True)
@@ -688,6 +690,7 @@ spark.stop()
             "num_workers": config.get("num_workers", 2),
             "use_preemptible_workers": config.get("use_preemptible", False),
             "create_ephemeral_cluster": config.get("ephemeral_cluster", False),
+            "table_format": config.get("table_format"),
         }
 
         # Generate cluster name if not provided

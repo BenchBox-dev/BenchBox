@@ -64,8 +64,10 @@ make test-integration
 # or
 uv run -- python -m pytest -m "integration and not live_integration"
 
-# With coverage
-make coverage
+# With coverage (fast tests only - quick feedback)
+make coverage-fast
+# or full suite
+make coverage-all
 # or
 uv run -- python -m pytest --cov=benchbox --cov-report=term-missing
 ```

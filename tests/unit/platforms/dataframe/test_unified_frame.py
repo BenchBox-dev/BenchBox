@@ -925,11 +925,10 @@ class TestUnifiedLazyFrameOperations:
 
     def test_native_property(self, polars_df):
         """Test native property returns underlying DataFrame."""
-        pytest.importorskip("polars")
+        polars = pytest.importorskip("polars")
         df = polars_df["df"]
         native = df.native
-        # Check it's a LazyFrame
-        assert hasattr(native, "collect")
+        assert isinstance(native, polars.LazyFrame)
 
     # NOTE: drop_nulls test skipped - method not yet implemented in UnifiedLazyFrame
 

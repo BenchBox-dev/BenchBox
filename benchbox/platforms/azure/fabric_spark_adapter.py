@@ -98,17 +98,6 @@ class LivySessionState:
     SUCCESS = "success"
 
 
-class LivyStatementState:
-    """Livy statement state constants."""
-
-    WAITING = "waiting"
-    RUNNING = "running"
-    AVAILABLE = "available"
-    ERROR = "error"
-    CANCELLING = "cancelling"
-    CANCELLED = "cancelled"
-
-
 class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
     """Microsoft Fabric Spark platform adapter.
 
@@ -150,6 +139,7 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
         spark_pool_name: str | None = None,
         timeout_minutes: int = 60,
         spark_config: dict[str, str] | None = None,
+        table_format: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the Fabric Spark adapter.
@@ -163,6 +153,7 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
             spark_pool_name: Spark pool name (default: uses workspace default).
             timeout_minutes: Statement timeout in minutes (default: 60).
             spark_config: Additional Spark configuration.
+            table_format: Table format for benchmark tables (delta, parquet, iceberg).
             **kwargs: Additional platform options.
         """
         if not AZURE_IDENTITY_AVAILABLE:
@@ -181,6 +172,7 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
         self.tenant_id = tenant_id
         self.spark_pool_name = spark_pool_name
         self.timeout_minutes = timeout_minutes
+        self.table_format = table_format or "delta"
         self.user_spark_config = spark_config or {}
 
         # Derive Livy endpoint if not provided
@@ -301,6 +293,14 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
                 "spark.sql.adaptive.coalescePartitions.enabled": "true",
             },
         }
+
+        # Table format session extensions (Delta is native on Fabric, no extra config needed)
+        if self.table_format == "iceberg":
+            session_config["conf"]["spark.sql.extensions"] = (
+                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+            )
+            session_config["conf"]["spark.sql.catalog.spark_catalog"] = "org.apache.iceberg.spark.SparkSessionCatalog"
+            session_config["conf"]["spark.sql.catalog.spark_catalog.type"] = "hive"
 
         # Add user-provided Spark config
         session_config["conf"].update(self.user_spark_config)
@@ -430,36 +430,19 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
         Returns:
             The statement result.
         """
+        from benchbox.platforms.azure.spark_execution_utils import execute_livy_statement
+
         session_id = self._ensure_session()
-        statements_url = f"{self.livy_endpoint}/{session_id}/statements"
-
-        statement_data = {
-            "code": code,
-            "kind": kind,
-        }
-
-        start_time = mono_time()
-
-        response = requests.post(
-            statements_url,
-            headers=self._get_headers(),
-            json=statement_data,
-            timeout=60,
+        result, execution_time = execute_livy_statement(
+            livy_endpoint=self.livy_endpoint,
+            session_id=session_id,
+            code=code,
+            kind=kind,
+            get_headers=self._get_headers,
+            timeout_minutes=self.timeout_minutes,
         )
-
-        if response.status_code not in (200, 201):
-            raise ConfigurationError(f"Failed to submit statement: {response.status_code} - {response.text}")
-
-        statement = response.json()
-        statement_id = statement["id"]
-
-        # Wait for statement to complete
-        result = self._wait_for_statement(session_id, statement_id)
-
-        execution_time = elapsed_seconds(start_time)
         self._total_statement_time_seconds += execution_time
         self._query_count += 1
-
         return result
 
     def _wait_for_statement(
@@ -476,35 +459,15 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
         Returns:
             The statement result.
         """
-        timeout_seconds = self.timeout_minutes * 60
-        start_time = mono_time()
-        statement_url = f"{self.livy_endpoint}/{session_id}/statements/{statement_id}"
+        from benchbox.platforms.azure.spark_execution_utils import wait_for_livy_statement
 
-        while elapsed_seconds(start_time) < timeout_seconds:
-            response = requests.get(
-                statement_url,
-                headers=self._get_headers(),
-                timeout=30,
-            )
-
-            if response.status_code != 200:
-                raise ConfigurationError(f"Failed to get statement status: {response.status_code}")
-
-            statement = response.json()
-            state = statement["state"]
-
-            if state == LivyStatementState.AVAILABLE:
-                output = statement.get("output", {})
-                if output.get("status") == "error":
-                    error_value = output.get("evalue", "Unknown error")
-                    raise ConfigurationError(f"Statement failed: {error_value}")
-                return output
-            if state in [LivyStatementState.ERROR, LivyStatementState.CANCELLED]:
-                raise ConfigurationError(f"Statement is in {state} state")
-
-            time.sleep(2)
-
-        raise ConfigurationError(f"Timeout waiting for statement {statement_id} after {timeout_seconds}s")
+        return wait_for_livy_statement(
+            livy_endpoint=self.livy_endpoint,
+            session_id=session_id,
+            statement_id=statement_id,
+            get_headers=self._get_headers,
+            timeout_minutes=self.timeout_minutes,
+        )
 
     def create_connection(self, **kwargs: Any) -> Any:
         """Verify Azure connectivity and workspace access.
@@ -625,20 +588,20 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
                 file_format="parquet",
             )
 
-        # Create Delta tables from uploaded data
+        # Create tables from uploaded data
         per_table_timings: dict[str, Any] = {}
         for table in tables:
             tbl_start = mono_time()
             table_uri = f"{self.onelake_path}/Files/benchbox/tables/{table}"
             create_sql = f"""
                 CREATE TABLE IF NOT EXISTS {table}
-                USING DELTA
+                USING {self.table_format.upper()}
                 LOCATION '{table_uri}'
             """
             try:
                 self._execute_statement(create_sql, kind="sql")
                 per_table_timings[table] = {"total_ms": elapsed_seconds(tbl_start) * 1000}
-                logger.debug("Created Delta table: %s", table)
+                logger.debug("Created %s table: %s", self.table_format, table)
             except Exception as e:
                 logger.warning("Failed to create table %s: %s", table, e)
 
@@ -857,4 +820,5 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
             spark_pool_name=config.get("spark_pool_name"),
             timeout_minutes=config.get("timeout_minutes", 60),
             spark_config=config.get("spark_config"),
+            table_format=config.get("table_format"),
         )

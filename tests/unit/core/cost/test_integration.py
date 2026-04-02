@@ -10,7 +10,7 @@ from benchbox.core.cost.integration import (
     _extract_platform_config_from_results,
     add_cost_estimation_to_results,
 )
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,
@@ -160,7 +160,7 @@ class TestAddCostEstimationToResults:
 
         # Should not raise exception
         updated_results = add_cost_estimation_to_results(results)
-        assert updated_results is not None
+        assert "query_id" in updated_results.query_results[0]
 
 
 class TestExtractPlatformConfigFromResults:

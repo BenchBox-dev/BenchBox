@@ -24,7 +24,8 @@ class TestWritePrimitivesBasic:
     def test_benchmark_initialization(self):
         """Test benchmark can be instantiated."""
         bench = WritePrimitives(scale_factor=0.01, quiet=True)
-        assert bench is not None
+        assert isinstance(bench, WritePrimitives)
+        assert bench.scale_factor == 0.01
 
     def test_get_benchmark_info(self):
         """Test getting benchmark information."""

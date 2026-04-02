@@ -16,6 +16,12 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
+__import__("benchbox.cli.commands.datagen")
+_datagen_module = sys.modules["benchbox.cli.commands.datagen"]
+
+__import__("benchbox.cli.commands.run_official")
+_run_official_module = sys.modules["benchbox.cli.commands.run_official"]
+
 from benchbox.cli.app import cli
 
 pytestmark = [
@@ -143,53 +149,6 @@ class TestAggregateCommand:
             assert result.exit_code == 0
             assert "Aggregation complete" in result.output
             assert output_file.exists()
-
-
-class TestPlotCommand:
-    """Test the plot CLI command."""
-
-    def test_plot_command_exists(self):
-        """Test that the plot command is available."""
-        runner = CliRunner()
-        result = runner.invoke(cli, ["--help"])
-
-        assert result.exit_code == 0
-        assert "plot" in result.output
-
-    def test_plot_help(self):
-        """Test the plot help output."""
-        runner = CliRunner()
-        result = runner.invoke(cli, ["plot", "--help"])
-
-        assert result.exit_code == 0
-        assert "Visualize benchmark performance trends" in result.output
-        assert "--output" in result.output
-        assert "--metric" in result.output
-        assert "--title" in result.output
-
-    def test_plot_requires_csv_file(self):
-        """Test plot command requires valid CSV input file."""
-        runner = CliRunner()
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
-            f.write("timestamp,benchmark,platform\n")
-            f.write("2024-01-01,tpch,duckdb\n")
-            csv_path = f.name
-
-        try:
-            # Test will work if matplotlib is installed, otherwise will show helpful error
-            result = runner.invoke(cli, ["plot", csv_path, "--output", "/tmp/test_plot.png"])
-
-            # Should either succeed (matplotlib installed) or fail with helpful message
-            assert result.exit_code in [0, 1]
-            if result.exit_code == 1 and "matplotlib" in result.output.lower():
-                # Good - shows informative error about missing matplotlib
-                pass
-        finally:
-            Path(csv_path).unlink()
-            # Clean up output file if created
-            if Path("/tmp/test_plot.png").exists():
-                Path("/tmp/test_plot.png").unlink()
 
 
 class TestShellCommand:
@@ -618,6 +577,135 @@ class TestRunOfficialCommand:
 
         assert result.exit_code == 1
         assert "not TPC-compliant" in result.output
+
+
+class TestDatagenParseRunArgs:
+    """Test the _parse_run_args helper directly."""
+
+    def test_benchmark_and_scale(self):
+        from benchbox.cli.commands.datagen import _parse_run_args
+
+        result = _parse_run_args(["--benchmark", "tpch", "--scale", "0.1"])
+        assert result["benchmark"] == "tpch"
+        assert result["scale"] == 0.1
+
+    def test_seed_parsed_as_int(self):
+        from benchbox.cli.commands.datagen import _parse_run_args
+
+        result = _parse_run_args(["--seed", "42"])
+        assert result["seed"] == 42
+
+    def test_verbose_is_boolean_true(self):
+        from benchbox.cli.commands.datagen import _parse_run_args
+
+        result = _parse_run_args(["--verbose"])
+        assert result["verbose"] is True
+
+    def test_all_three_together(self):
+        from benchbox.cli.commands.datagen import _parse_run_args
+
+        result = _parse_run_args(["--benchmark", "tpch", "--scale", "0.1", "--verbose"])
+        assert result["benchmark"] == "tpch"
+        assert result["scale"] == 0.1
+        assert result["verbose"] is True
+
+
+class TestDatagenCommandBranches:
+    """Test datagen CLI branches not covered by existing tests."""
+
+    def test_non_parquet_format_note_in_console(self):
+        """Non-parquet format triggers a console note about default format being used."""
+        # _parse_run_args doesn't encode data_format — the datagen command
+        # prints a note when data_format != 'parquet'. Verify the note is emitted
+        # by checking the console directly with mocked ctx.invoke.
+        from unittest.mock import MagicMock, patch as _patch
+
+        from benchbox.cli.commands.datagen import _parse_run_args
+
+        runner = CliRunner()
+        with (
+            _patch.object(_datagen_module, "console") as mock_console,
+            _patch.object(_datagen_module, "run"),
+        ):
+            calls = []
+            mock_console.print.side_effect = lambda *a, **k: calls.append(str(a))
+            runner.invoke(
+                cli,
+                ["datagen", "--benchmark", "tpch", "--scale", "0.01", "--format", "csv"],
+            )
+        # The note about format not being supported is shown
+        all_output = " ".join(calls)
+        assert "csv" in all_output.lower() or "format" in all_output.lower()
+
+    def test_seed_forwarded_in_run_args(self):
+        from benchbox.cli.commands.datagen import _parse_run_args
+
+        result = _parse_run_args(["--benchmark", "tpch", "--scale", "0.1", "--seed", "99"])
+        assert result["seed"] == 99
+
+
+class TestRunOfficialCommandBranches:
+    """Test run-official validation branches."""
+
+    def test_throughput_without_streams_exits_1(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["run-official", "tpch", "--platform", "duckdb", "--scale", "1", "--phases", "throughput"],
+        )
+        assert result.exit_code == 1
+        assert "streams" in result.output.lower()
+
+    def test_valid_scale_with_mock_run_shows_deprecation(self):
+        runner = CliRunner()
+        with patch.object(_run_official_module, "run") as mock_run:
+            mock_run.return_value = None
+            result = runner.invoke(
+                cli,
+                ["run-official", "tpch", "--platform", "duckdb", "--scale", "1", "--phases", "power", "--seed", "42"],
+                catch_exceptions=False,
+            )
+        assert "deprecated" in result.output.lower() or "DeprecationWarning" in result.output
+
+    def test_tpc_allowed_scale_factors_constant(self):
+        from benchbox.cli.commands.run_official import TPC_ALLOWED_SCALE_FACTORS
+
+        for sf in (1, 10, 100, 1000, 10000):
+            assert sf in TPC_ALLOWED_SCALE_FACTORS
+
+    def test_no_seed_shows_warning(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["run-official", "tpch", "--platform", "duckdb", "--scale", "5", "--phases", "power"],
+        )
+        # Scale 5 is not TPC-allowed so exits 1, but we can still check warnings
+        # OR scale is 1 which is valid and should show seed warning
+        assert "seed" in result.output.lower() or "not TPC-compliant" in result.output
+
+    def test_validate_results_forwarded(self):
+        runner = CliRunner()
+        with patch.object(_run_official_module, "run") as mock_run:
+            mock_run.return_value = None
+            result = runner.invoke(
+                cli,
+                [
+                    "run-official",
+                    "tpch",
+                    "--platform",
+                    "duckdb",
+                    "--scale",
+                    "1",
+                    "--phases",
+                    "power",
+                    "--seed",
+                    "42",
+                    "--validate-results",
+                ],
+                catch_exceptions=False,
+            )
+        # deprecated command still runs; just verify it didn't crash unexpectedly
+        assert result.exit_code in (0, 1)
 
 
 if __name__ == "__main__":

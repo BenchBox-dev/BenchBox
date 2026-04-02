@@ -207,16 +207,16 @@ Results are comparable across implementations when using the same Delta protocol
 ```bash
 # Enable Z-ORDER clustering after load (default on Databricks)
 benchbox run --platform databricks --benchmark tpch --table-format delta \
-  --databricks-clustering-strategy z_order
+  --platform-option databricks_clustering_strategy=z_order
 
 # Skip clustering (measure raw load performance)
 benchbox run --platform databricks --benchmark tpch --table-format delta \
-  --databricks-clustering-strategy none
+  --platform-option databricks_clustering_strategy=none
 
 # Use Liquid Clustering on specific columns
 benchbox run --platform databricks --benchmark tpch --table-format delta \
-  --databricks-clustering-strategy liquid_clustering \
-  --liquid-clustering-columns "l_shipdate,l_orderkey"
+  --platform-option databricks_clustering_strategy=liquid_clustering \
+  --platform-option liquid_clustering_columns=l_shipdate,l_orderkey
 ```
 
 ## See Also

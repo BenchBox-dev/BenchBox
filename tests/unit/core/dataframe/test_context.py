@@ -192,7 +192,8 @@ class TestDataFrameContextProtocol:
 
     def test_protocol_is_runtime_checkable(self):
         """Test that DataFrameContext is runtime checkable."""
-        assert hasattr(DataFrameContext, "_is_runtime_protocol")
+        ctx = ConcreteContext(platform="test", family="pandas")
+        assert isinstance(ctx, DataFrameContext)
 
     def test_concrete_implementation_satisfies_protocol(self):
         """Test that ConcreteContext satisfies the protocol."""

@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, tpc-ds
 ```
 
+> **CLI name:** `tpcds` — use `benchbox run --benchmark tpcds`
+
 ## Overview
 
 The TPC-DS (Transaction Processing Performance Council - Decision Support) benchmark is the most systematic and complex decision support benchmark available today. TPC-DS models a retail data warehouse environment with sophisticated analytical queries that test advanced database features including window functions, recursive queries, OLAP operations, and complex join patterns.
@@ -14,7 +16,7 @@ TPC-DS represents the evolution of decision support benchmarks, designed to addr
 ## Key Features
 
 - **99 analytical queries** with varying complexity and selectivity
-- **24 table schema** representing a systematic retail data warehouse
+- **24 data tables** (plus `dbgen_version` metadata table) representing a systematic retail data warehouse
 - **Advanced-level SQL features** including window functions, recursive CTEs, ROLLUP/CUBE
 - **Complex query patterns** with nested subqueries and multiple aggregation levels
 - **Realistic data distributions** based on real-world retail scenarios
@@ -66,7 +68,7 @@ The TPC-DS schema models a systematic retail data warehouse with three main area
 ```{mermaid}
 erDiagram
     DATE_DIM ||--o{ STORE_SALES : sold_on
-    DATE_DIM ||--o{ CATALOG_SALES : sold_on  
+    DATE_DIM ||--o{ CATALOG_SALES : sold_on
     DATE_DIM ||--o{ WEB_SALES : sold_on
     TIME_DIM ||--o{ STORE_SALES : sold_at
     ITEM ||--o{ STORE_SALES : item_sold
@@ -95,7 +97,7 @@ The 99 TPC-DS queries are organized into different complexity categories and tes
 - Q1, Q6, Q11, Q13: Basic aggregation with simple grouping
 - Focus on fundamental aggregation performance
 
-**Interactive Queries (Medium Complexity):**  
+**Interactive Queries (Medium Complexity):**
 - Q3, Q7, Q19, Q27, Q42: Multi-table joins with moderate complexity
 - Window functions and ranking operations
 - Typical business intelligence patterns
@@ -127,7 +129,7 @@ The 99 TPC-DS queries are organized into different complexity categories and tes
 
 Some queries have variants (e.g., Q14a/Q14b) that test slightly different patterns:
 - **Query 14a/14b**: Different approaches to cross-channel analysis
-- **Query 23a/23b**: Alternative recursive query patterns  
+- **Query 23a/23b**: Alternative recursive query patterns
 - **Query 24a/24b**: Different aggregation strategies
 
 ## Usage Examples
@@ -165,7 +167,7 @@ tpcds = TPCDS(scale_factor=1.0, output_dir="tpcds_sf1", verbose=True)
 # Generate all tables using dsdgen
 data_files = tpcds.generate_data()
 
-# Check generated files 
+# Check generated files
 for table_name in tpcds.get_available_tables():
     table_path = tpcds.output_dir / f"{table_name.lower()}.dat"
     print(f"{table_name}: {table_path} ({table_path.stat().st_size} bytes)")
@@ -239,8 +241,8 @@ for table_name, file_name in table_mappings.items():
     if file_path.exists():
         conn.execute(f"""
             INSERT INTO {table_name}
-            SELECT * FROM read_csv('{file_path}', 
-                                  delim='|', 
+            SELECT * FROM read_csv('{file_path}',
+                                  delim='|',
                                   header=false,
                                   nullstr='',
                                   ignore_errors=true)
@@ -265,8 +267,8 @@ for query_id in sample_queries:
 query_reproducible = tpcds.get_query(42, seed=12345)
 
 # Scale-aware parameter generation
-query_large = tpcds.get_query(42, 
-                              seed=12345, 
+query_large = tpcds.get_query(42,
+                              seed=12345,
                               scale_factor=100.0)
 
 # Stream-based parameter generation
@@ -354,15 +356,15 @@ data_files = tpcds_large.generate_data()
 # Partition-aware data loading (example for Spark)
 for table_name in tpcds_large.get_available_tables():
     table_path = f"/shared/tpcds_sf100/{table_name.lower()}.dat"
-    
+
     # Create partitioned tables
     spark.sql(f"""
         CREATE TABLE {table_name}
         USING DELTA
         PARTITIONED BY (partition_col)
         LOCATION '/delta/{table_name}'
-        AS SELECT *, 
-               CASE 
+        AS SELECT *,
+               CASE
                    WHEN {table_name}_sk % 100 < 10 THEN 'p0'
                    WHEN {table_name}_sk % 100 < 20 THEN 'p1'
                    -- ... more partitions
@@ -383,26 +385,26 @@ class TPCDSBenchmark:
     def __init__(self, tpcds: TPCDS, connection):
         self.tpcds = tpcds
         self.connection = connection
-        
-    def benchmark_query_set(self, query_ids: List[int], 
+
+    def benchmark_query_set(self, query_ids: List[int],
                            iterations: int = 3) -> Dict:
         """Benchmark a set of TPC-DS queries."""
         results = {}
-        
+
         for query_id in query_ids:
             print(f"Benchmarking Q{query_id}...")
             query_results = []
-            
+
             for iteration in range(iterations):
-                query_sql = self.tpcds.get_query(query_id, 
+                query_sql = self.tpcds.get_query(query_id,
                                                 seed=42 + iteration,
                                                 dialect="duckdb")
-                
+
                 start_time = time.time()
                 try:
                     result = self.connection.execute(query_sql).fetchall()
                     execution_time = time.time() - start_time
-                    
+
                     query_results.append({
                         'iteration': iteration,
                         'time': execution_time,
@@ -412,13 +414,13 @@ class TPCDSBenchmark:
                 except Exception as e:
                     execution_time = time.time() - start_time
                     query_results.append({
-                        'iteration': iteration, 
+                        'iteration': iteration,
                         'time': execution_time,
                         'rows': 0,
                         'status': 'error',
                         'error': str(e)
                     })
-            
+
             # Calculate statistics
             successful_runs = [r for r in query_results if r['status'] == 'success']
             if successful_runs:
@@ -439,7 +441,7 @@ class TPCDSBenchmark:
                     'success_rate': 0,
                     'runs': query_results
                 }
-        
+
         return results
 
 # Usage
@@ -588,6 +590,6 @@ in the [tpcds-kit](https://github.com/gregrahn/tpcds-kit) repository.
 ## External Resources
 
 - [TPC-DS Specification](http://www.tpc.org/tpcds/) - Official TPC-DS documentation
-- [TPC-DS Results](http://www.tpc.org/tpcds/results/) - Published benchmark results  
+- [TPC-DS Results](http://www.tpc.org/tpcds/results/) - Published benchmark results
 - [TPC-DS Tools](http://www.tpc.org/tpc_documents_current_versions/current_specifications.asp) - Official C tools download
 - [Query Analysis Papers](http://www.tpc.org/information/white_papers.asp) - Academic research using TPC-DS

@@ -132,7 +132,7 @@ class TestCuDFAdapter:
     @patch("benchbox.platforms.cudf.detect_gpu")
     def test_get_platform_info(self, mock_detect, mock_cudf):
         """Should return platform info."""
-        from benchbox.core.gpu.capabilities import GPUDevice, GPUInfo, GPUVendor
+        from benchbox.experimental.gpu.capabilities import GPUDevice, GPUInfo, GPUVendor
 
         mock_detect.return_value = GPUInfo(
             available=True,
@@ -272,7 +272,7 @@ class TestCuDFAdapterValidation:
     @patch("benchbox.platforms.cudf.detect_gpu")
     def test_validate_capabilities_no_gpu(self, mock_detect, mock_cudf):
         """Should fail validation without GPU."""
-        from benchbox.core.gpu.capabilities import GPUInfo
+        from benchbox.experimental.gpu.capabilities import GPUInfo
 
         mock_detect.return_value = GPUInfo(available=False)
 
@@ -288,7 +288,7 @@ class TestCuDFAdapterValidation:
     @patch("benchbox.platforms.cudf.detect_gpu")
     def test_validate_capabilities_invalid_device(self, mock_detect, mock_cudf):
         """Should fail validation with invalid device ID."""
-        from benchbox.core.gpu.capabilities import GPUInfo
+        from benchbox.experimental.gpu.capabilities import GPUInfo
 
         mock_detect.return_value = GPUInfo(available=True, device_count=1)
 

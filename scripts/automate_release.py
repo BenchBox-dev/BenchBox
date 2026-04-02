@@ -31,6 +31,13 @@ from pathlib import Path
 
 # Import from benchbox and sibling scripts
 sys.path.insert(0, str(Path(__file__).parent.parent))
+from benchbox.release.content_validation import check_content_for_release
+from benchbox.release.workflow import (
+    DEFAULT_MAX_FILE_SIZE_MB,
+    DEFAULT_MAX_TOTAL_SIZE_MB,
+    calculate_release_timestamp,
+    check_release_size,
+)
 from finalize_release import archive_release_artifacts, git_tag_with_timestamp
 from update_version import (
     DOCUMENTATION_PATHS,
@@ -38,14 +45,6 @@ from update_version import (
     update_release_marker,
     update_version_in_init,
     update_version_in_pyproject,
-)
-
-from benchbox.release.content_validation import check_content_for_release
-from benchbox.release.workflow import (
-    DEFAULT_MAX_FILE_SIZE_MB,
-    DEFAULT_MAX_TOTAL_SIZE_MB,
-    calculate_release_timestamp,
-    check_release_size,
 )
 
 
@@ -589,13 +588,13 @@ def run_ci_checks(source: Path) -> bool:
                 "pytest",
                 "tests",
                 "-m",
-                "fast",
+                "fast and not (slow or stress or resource_heavy or live_integration)",
                 "--tb=short",
                 "-p",
                 "pytest_cov",  # Override pytest.ini's -p no:cov
                 "--cov=benchbox",
                 "--cov-report=term-missing",
-                "--cov-fail-under=50",
+                "--cov-fail-under=70",
                 # Exclude PySpark tests - CI runs these separately with Java
                 "--ignore=tests/unit/platforms/dataframe/test_pyspark_df.py",
                 "--ignore=tests/unit/platforms/pyspark",

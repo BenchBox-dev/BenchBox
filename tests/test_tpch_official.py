@@ -43,7 +43,7 @@ class TestTPCHQueryGeneration:
     def test_successful_initialization(self):
         """Test successful initialization with qgen available."""
         queries = TPCHQueries()
-        assert queries.qgen is not None
+        assert hasattr(queries.qgen, "generate")
 
     def test_get_query_all_valid_ids(self):
         """Test get_query for all 22 TPC-H queries."""

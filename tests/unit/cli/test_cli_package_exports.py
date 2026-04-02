@@ -18,6 +18,43 @@ pytestmark = [
 ]
 
 
+@pytest.mark.parametrize(
+    ("symbol", "expected_type"),
+    [
+        ("TPCH_DATAFRAME_QUERIES", "QueryRegistry"),
+        ("TPCDS_DATAFRAME_QUERIES", "QueryRegistry"),
+        ("DATAFRAME_PLATFORMS", "dict"),
+    ],
+)
+def test_public_reexports_accessible_from_benchbox(symbol: str, expected_type: str) -> None:
+    """Public API symbols must be importable from the top-level benchbox package."""
+    # Pre-load benchmark_suite to break the dataframe_queries ↔ benchmark_suite
+    # circular import.  At MCP server runtime these modules are already loaded;
+    # in an isolated test they may not be.
+    importlib.import_module("benchbox.core.dataframe.benchmark_suite")
+
+    benchbox = importlib.import_module("benchbox")
+    obj = getattr(benchbox, symbol)
+    assert type(obj).__name__ == expected_type, f"{symbol} has unexpected type {type(obj)}"
+    assert symbol in benchbox.__all__
+
+
+_EXPERIMENTAL_SUBSYSTEMS = {"nl2sql", "aiml_functions", "multiregion", "gpu", "concurrency"}
+
+
+def test_experimental_modules_not_in_benchmark_registry() -> None:
+    """Experimental subsystems must not appear in the public benchmark registry or __all__."""
+    import benchbox
+
+    registry_modules = {spec.module for spec in benchbox._BENCHMARK_REGISTRY.values()}
+    leaked = _EXPERIMENTAL_SUBSYSTEMS & registry_modules
+    assert not leaked, f"Experimental modules leaked into _BENCHMARK_REGISTRY: {leaked}"
+
+    all_lower = {name.lower() for name in benchbox.__all__}
+    leaked_all = _EXPERIMENTAL_SUBSYSTEMS & all_lower
+    assert not leaked_all, f"Experimental modules leaked into __all__: {leaked_all}"
+
+
 def test_benchmarks_submodule_remains_available_as_package_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
     """Accessing ``benchbox.cli.benchmarks`` should import the real submodule once."""
     monkeypatch.delitem(sys.modules, "benchbox.cli.benchmarks", raising=False)

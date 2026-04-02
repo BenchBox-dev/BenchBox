@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-01
+
+### Added
+
+- **On-demand TPC answer file downloads** — Wheel installs now fetch missing
+  TPC-H and TPC-DS answer files automatically for row-count validation, or
+  pre-populate the cache with `benchbox download-answers` for offline and
+  air-gapped environments. Supports `--benchmark tpch|tpcds|all`, `--force`,
+  `--show-cache-dir`, SHA-256 verification, retries, and `BENCHBOX_NO_DOWNLOAD=1`.
+- **Adaptive Redshift connection timeout** — Connection timeout now adjusts to
+  deployment state: paused or resuming provisioned clusters get a longer timeout,
+  and Serverless gets a cold-start floor to reduce spurious connection failures.
+- **Cloud platform live integration tests** — Added live smoke tests for
+  Firebolt, Starburst Galaxy, MotherDuck, pg_duckdb, and pg_mooncake with
+  per-platform markers, fixtures, Makefile targets, Docker Compose harness for
+  PostgreSQL extensions, and multi-extension comparison orchestration.
+- **Read Primitives Redshift dialect coverage** — Expanded Redshift Read
+  Primitives support from 0 to 40+ queries with dialect-specific rewrites for
+  window functions, fulltext operators, array operations, and statistical
+  functions. Queries without semantically-exact Redshift equivalents are skipped
+  rather than approximated.
+
+### Fixed
+
+- **Redshift data-loading reliability** — Fixed S3 upload retry failures caused
+  by botocore stream rewind errors, `DROP DATABASE` timeouts (extended socket
+  timeout to 300 s and pre-terminate active connections), `Is a directory` errors
+  with multi-format manifests, stale native datagen reuse, Serverless-compatible
+  system table queries (`sys_serverless_usage` vs `stv_cluster_configuration`),
+  and `pg_stat_activity` column references (`procpid` vs `pid`). Platform format
+  preferences now take priority over manifest defaults.
+- **Dask DataFrame `.isin()` runtime errors** — Seven TPC-H queries (Q4, Q16,
+  Q18, Q20, Q21, Q22) and five TPC-DS queries (Q37, Q41, Q45, Q82, Q83) passed
+  lazy Dask Series to `.isin()`, causing `TypeError` at runtime. All call sites
+  now materialize via `.compute()` before `.isin()`.
+- **BigQuery and format loading correctness** — Standardized text files (`.tbl`)
+  as the default load source for SQL platforms while preserving columnar
+  preferences for catalog platforms. Enabled parquet-first native loads on
+  BigQuery and fixed GCS blob naming to preserve compound suffixes
+  (`.parquet.zst` not `.zst`).
+- **Data-source database resolution** — Shared-data benchmarks (e.g. Read
+  Primitives) now resolve the source benchmark's database name instead of
+  generating independent empty databases, fixing silent failures in
+  multi-benchmark workflows.
+- **TPC-H validation noise on measurement runs** — Non-stream-0 power runs no
+  longer emit spurious "Validation skipped" warnings for all 22 queries on every
+  measurement iteration.
+- **Monitoring without optional extras** — Benchmark execution and progress
+  reporting now degrade gracefully when the monitoring extra is not installed
+  instead of failing during import.
+- **Redshift adapter-only validation** — Repaired live test guard and validation
+  logic so adapter-only (non-admin) Redshift connections no longer crash during
+  row-count validation.
+
+### Changed
+
+- **Project status promoted to Beta** — BenchBox is now `Development Status ::
+  4 - Beta` in package metadata.
+- **Release-quality hardening** — Raised the coverage threshold to 80%, added
+  behavioral coverage across adapter SQL generation, CLI paths, credential
+  prompts, and adapter lifecycle flows, removed unreachable code, cleaned up
+  tautological assertions and overspecified mocks, and accelerated
+  `coverage-fast` runs with parallel execution.
+- **Dead code cleanup** — Removed 9 unused platform imports and prefixed 12
+  unused function parameters with `_` across the adapter layer.
+- **Redshift format selection logic** — Scoped Redshift-specific format
+  overrides to native COPY loads only and added platform-preference priority over
+  manifest preferences, fixing incorrect format choices in mixed-format
+  environments.
+
+### Removed
+
+- **Legacy `plot` CLI command** — Removed `benchbox plot` and its undeclared
+  matplotlib dependency. Use `benchbox visualize` for terminal chart rendering.
+- **Snowpark Connect and Onehouse Quanton platforms** — Removed from the
+  supported SQL platform list (31 → 29).
+
 ## [0.1.5] - 2026-03-10
 
 ### Added
@@ -355,3 +432,12 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **Documentation**: [GitHub Repository](https://github.com/joeharris76/benchbox)
 - **Issues**: [Report bugs and request features](https://github.com/joeharris76/benchbox/issues)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
+
+[Unreleased]: https://github.com/joeharris76/benchbox/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/joeharris76/benchbox/compare/v0.1.5...v0.2.0
+[0.1.5]: https://github.com/joeharris76/benchbox/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/joeharris76/benchbox/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/joeharris76/benchbox/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/joeharris76/benchbox/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/joeharris76/benchbox/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/joeharris76/benchbox/releases/tag/v0.1.0

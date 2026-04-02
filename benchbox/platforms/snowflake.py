@@ -34,11 +34,9 @@ from .base.data_loading import DataSourceResolver
 try:
     import snowflake.connector
     from snowflake.connector import DictCursor
-    from snowflake.connector.errors import Error as SnowflakeError
 except ImportError:
     snowflake = None
     DictCursor = None
-    SnowflakeError = Exception
 
 
 class SnowflakeAdapter(PlatformAdapter):

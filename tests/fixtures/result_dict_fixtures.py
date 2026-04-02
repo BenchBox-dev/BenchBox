@@ -11,10 +11,14 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import pytest
+
+from benchbox.core.results.models import BenchmarkResults
 
 
 def make_v2_result_dict(
@@ -157,3 +161,79 @@ def v2_result_file(tmp_path: Path):
         return path, data
 
     return _create
+
+
+def make_benchmark_results(
+    *,
+    benchmark_id: str = "test-benchmark",
+    benchmark_name: str = "Test Benchmark",
+    execution_id: str = "test-exec",
+    platform: str = "cli",
+    scale_factor: float = 0.01,
+    duration_seconds: float = 0.0,
+    timestamp: Optional[datetime] = None,
+    total_queries: int = 0,
+    successful_queries: int = 0,
+    failed_queries: int = 0,
+    query_results: Optional[Iterable[Any]] = None,
+    validation_status: str = "UNKNOWN",
+    validation_details: Optional[dict[str, Any]] = None,
+    execution_metadata: Optional[dict[str, Any]] = None,
+    summary_metrics: Optional[dict[str, Any]] = None,
+    query_subset: Optional[list[str]] = None,
+    concurrency_level: Optional[int] = None,
+    **extras: Any,
+) -> BenchmarkResults:
+    """Create a fully-populated BenchmarkResults instance for tests."""
+
+    field_names = set(BenchmarkResults.__dataclass_fields__.keys())
+
+    init_kwargs: dict[str, Any] = {
+        "benchmark_name": benchmark_name,
+        "platform": platform,
+        "scale_factor": scale_factor,
+        "execution_id": execution_id,
+        "timestamp": timestamp or datetime.now(),
+        "duration_seconds": duration_seconds,
+        "total_queries": total_queries,
+        "successful_queries": successful_queries,
+        "failed_queries": failed_queries,
+        "query_results": list(query_results or []),
+        "validation_status": validation_status,
+        "validation_details": validation_details or {},
+        "execution_metadata": execution_metadata or {},
+    }
+
+    # Pass through known dataclass fields supplied via extras.
+    for key, value in extras.items():
+        if key in field_names:
+            init_kwargs[key] = value
+
+    result = BenchmarkResults(**init_kwargs)
+
+    # Attach optional metadata used by legacy CLI tests.
+    result._benchmark_id_override = benchmark_id
+    result.summary_metrics = summary_metrics or {}
+    if query_subset is not None:
+        result.query_subset = query_subset
+    if concurrency_level is not None:
+        result.concurrency_level = concurrency_level
+
+    # Allow additional loose attributes (e.g., benchmark_version) expected by tests.
+    for key, value in extras.items():
+        if key not in field_names:
+            setattr(result, key, value)
+
+    return result
+
+
+@pytest.fixture
+def make_results():
+    """Factory fixture for creating BenchmarkResults with sensible defaults.
+
+    Usage::
+
+        def test_something(make_results):
+            result = make_results(platform="snowflake", total_queries=22)
+    """
+    return make_benchmark_results

@@ -97,53 +97,51 @@ class FormatSelector:
         Returns:
             List of available format names
         """
-        available = []
+        manifest_formats = FormatSelector._manifest_formats(table_name, manifest_data)
+        if manifest_formats:
+            return manifest_formats
 
-        # If manifest has format information, use that
-        if manifest_data:
-            # Manifest-level formats (v2)
-            if "formats" in manifest_data and isinstance(manifest_data["formats"], list):
-                available.extend(manifest_data["formats"])
+        available = FormatSelector._filesystem_formats(data_dir, table_name)
+        return available if available else ["tbl"]
 
-            # Table-specific formats
-            if "tables" in manifest_data:
-                table_data = manifest_data["tables"].get(table_name, {})
-                if isinstance(table_data, dict):
-                    formats_section = table_data.get("formats")
-                    if isinstance(formats_section, dict):
-                        available.extend(list(formats_section.keys()))
+    @staticmethod
+    def _manifest_formats(table_name: str, manifest_data: dict[str, Any] | None) -> list[str]:
+        """Collect available formats from manifest metadata, if present."""
+        available: list[str] = []
+        if not manifest_data:
+            return available
 
-            if available:
-                return list(dict.fromkeys(available))  # dedupe preserving order
+        if "formats" in manifest_data and isinstance(manifest_data["formats"], list):
+            available.extend(manifest_data["formats"])
 
-        # Otherwise, detect from filesystem
-        # Check for common file patterns
-        # Note: TPC-DS uses .dat files which have the same pipe-delimited format as .tbl
+        table_data = manifest_data.get("tables", {}).get(table_name, {}) if "tables" in manifest_data else {}
+        if isinstance(table_data, dict):
+            formats_section = table_data.get("formats")
+            if isinstance(formats_section, dict):
+                available.extend(list(formats_section.keys()))
+
+        return list(dict.fromkeys(available))
+
+    @staticmethod
+    def _filesystem_formats(data_dir: Path, table_name: str) -> list[str]:
+        """Detect available formats directly from files and table-format directories."""
+        available: list[str] = []
         patterns = {
-            "tbl": [f"{table_name}.tbl*", f"{table_name}.dat*"],  # TPC-H uses .tbl, TPC-DS uses .dat
+            "tbl": [f"{table_name}.tbl*", f"{table_name}.dat*"],
             "csv": [f"{table_name}.csv*"],
             "parquet": [f"{table_name}.parquet*"],
         }
 
         for format_name, pattern_list in patterns.items():
-            for pattern in pattern_list:
-                matches = list(data_dir.glob(pattern))
-                if matches:
-                    available.append(format_name)
-                    break  # Found this format, move to next
+            if any(next(data_dir.glob(pattern), None) is not None for pattern in pattern_list):
+                available.append(format_name)
 
-        # Check for directory-based formats
-        # Delta Lake: <table_name>/_delta_log/ directory
         delta_dir = data_dir / table_name / "_delta_log"
         if delta_dir.exists() and delta_dir.is_dir():
             available.append("delta")
 
-        # Iceberg: <table_name>/metadata/ directory
         iceberg_dir = data_dir / table_name / "metadata"
-        if iceberg_dir.exists() and iceberg_dir.is_dir():
-            # Check for Iceberg metadata files
-            metadata_files = list(iceberg_dir.glob("*.metadata.json"))
-            if metadata_files:
-                available.append("iceberg")
+        if iceberg_dir.exists() and iceberg_dir.is_dir() and list(iceberg_dir.glob("*.metadata.json")):
+            available.append("iceberg")
 
-        return available if available else ["tbl"]  # Default to tbl if nothing found
+        return available

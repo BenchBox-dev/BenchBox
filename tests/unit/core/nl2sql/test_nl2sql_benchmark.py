@@ -8,14 +8,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from benchbox.core.nl2sql.benchmark import (
+from benchbox.experimental.nl2sql.benchmark import (
     PLATFORM_NL2SQL_PROMPTS,
     NL2SQLBenchmark,
     NL2SQLBenchmarkResults,
     NL2SQLQueryResult,
 )
-from benchbox.core.nl2sql.evaluator import SQLMatchType
-from benchbox.core.nl2sql.queries import NL2SQLQueryCategory, QueryDifficulty
+from benchbox.experimental.nl2sql.evaluator import SQLMatchType
+from benchbox.experimental.nl2sql.queries import NL2SQLQueryCategory, QueryDifficulty
 
 pytestmark = [
     pytest.mark.unit,
@@ -539,3 +539,4 @@ class TestNL2SQLBenchmarkRun:
         )
 
         assert results.completed_at is not None
+        assert isinstance(results.query_results, list)

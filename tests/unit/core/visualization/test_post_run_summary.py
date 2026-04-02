@@ -15,7 +15,7 @@ from benchbox.core.visualization.post_run_summary import (
     _should_use_horizontal,
     generate_post_run_summary,
 )
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,

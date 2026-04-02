@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from benchbox.core.concurrency.pool_tester import (
+from benchbox.experimental.concurrency.pool_tester import (
     ConnectionAttempt,
     ConnectionPoolTester,
     PoolTestConfig,

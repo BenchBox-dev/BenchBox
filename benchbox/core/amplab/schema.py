@@ -119,21 +119,15 @@ def get_all_create_table_sql(
     Returns:
         Complete SQL schema creation script
     """
-    # Create tables in dependency order
-    table_order = ["rankings", "documents", "uservisits"]
+    from benchbox.core.schema_utils import collect_create_table_sql
 
-    sql_statements = []
-    for table_name in table_order:
-        sql_statements.append(
-            get_create_table_sql(
-                table_name,
-                dialect,
-                enable_primary_keys=enable_primary_keys,
-                enable_foreign_keys=enable_foreign_keys,
-            )
-        )
-
-    return "\n\n".join(sql_statements)
+    return collect_create_table_sql(
+        ["rankings", "documents", "uservisits"],
+        get_create_table_sql,
+        dialect,
+        enable_primary_keys=enable_primary_keys,
+        enable_foreign_keys=enable_foreign_keys,
+    )
 
 
 def get_tunings() -> BenchmarkTunings:

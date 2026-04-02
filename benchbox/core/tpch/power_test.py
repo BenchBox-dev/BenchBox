@@ -163,6 +163,11 @@ class TPCHPowerTest:
             if verbose:
                 self.logger.info("Using qgen default parameters (-d flag) for answer file parity")
 
+        # Explicit disabled mode must turn validation off at the config layer too,
+        # so downstream executors can honor the benchmark's resolved policy.
+        if validation_mode == "disabled":
+            validation = False
+
         # Answer sets are only defined for stream 0; disable validation unless explicitly requested
         if stream_id != 0 and validation and validation_mode is None:
             validation = False

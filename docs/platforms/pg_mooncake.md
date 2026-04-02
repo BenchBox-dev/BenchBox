@@ -5,6 +5,8 @@
 ```{tags} intermediate, guide, pg-mooncake, sql-platform, postgresql-extension, columnstore
 ```
 
+> **CLI name:** `pg-mooncake` — use `benchbox run --platform pg-mooncake`
+
 pg_mooncake is a PostgreSQL extension that adds native columnstore tables with DuckDB-powered vectorized execution. Data is stored in Parquet format with Iceberg metadata, providing 5-20x columnar compression and top-10 ClickBench performance. BenchBox provides first-class pg_mooncake support for benchmarking columnstore PostgreSQL workloads.
 
 ## Features

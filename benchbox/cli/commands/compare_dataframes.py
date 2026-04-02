@@ -357,23 +357,19 @@ def _run_platform_comparison(
             "results": [r.to_dict() for r in results],
             "summary": summary.to_dict(),
         }
-        output_str = json.dumps(data, indent=2)
-        if output_dir:
-            output_path = output_dir / "comparison.json"
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(output_str, encoding="utf-8")
-            console.print(f"[green]Results saved to {output_path}[/green]")
-        else:
-            console.print(output_str)
+        _write_comparison_output(
+            json.dumps(data, indent=2),
+            output_dir=output_dir,
+            filename="comparison.json",
+            label="Results saved to",
+        )
     elif output_format == "markdown":
-        md_content = suite._generate_markdown_report(results)
-        if output_dir:
-            output_path = output_dir / "comparison.md"
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(md_content, encoding="utf-8")
-            console.print(f"[green]Report saved to {output_path}[/green]")
-        else:
-            console.print(md_content)
+        _write_comparison_output(
+            suite._generate_markdown_report(results),
+            output_dir=output_dir,
+            filename="comparison.md",
+            label="Report saved to",
+        )
 
     # Generate charts if requested
     if generate_charts and output_dir:
@@ -388,6 +384,17 @@ def _run_platform_comparison(
                 console.print("[yellow]No charts generated (insufficient data)[/yellow]")
         except Exception as e:
             console.print(f"[yellow]Chart generation failed: {e}[/yellow]")
+
+
+def _write_comparison_output(content: str, output_dir: Path | None, filename: str, label: str) -> None:
+    """Write comparison output to disk or print it directly."""
+    if output_dir:
+        output_path = output_dir / filename
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(content, encoding="utf-8")
+        console.print(f"[green]{label} {output_path}[/green]")
+        return
+    console.print(content)
 
 
 def _run_sql_vs_dataframe(

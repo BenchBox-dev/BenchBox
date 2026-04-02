@@ -224,39 +224,52 @@ def validate_column_types(
         ValidationResult with type appropriateness issues
     """
     result = ValidationResult()
-
-    # Normalize column names to match schema (case-insensitive lookup)
     schema_lookup = {col.lower(): (col, dtype.upper()) for col, dtype in table_schema.items()}
 
-    def get_column_type(column_name: str) -> Optional[str]:
-        """Get the normalized column type from schema."""
-        col_lower = column_name.lower()
-        if col_lower in schema_lookup:
-            return schema_lookup[col_lower][1]
-        return None
+    _validate_partitioning_types(result, table_tuning, schema_lookup, strict_mode)
+    _validate_clustering_types(result, table_tuning, schema_lookup, strict_mode)
+    _validate_distribution_types(result, table_tuning, schema_lookup)
+    _validate_sorting_types(result, table_tuning, schema_lookup)
 
-    def extract_base_type(sql_type: str) -> str:
-        """Extract base type from SQL type (e.g., VARCHAR(255) -> VARCHAR)."""
-        return sql_type.split("(")[0].strip().upper()
+    return result
 
-    def is_high_cardinality_column(column_name: str) -> bool:
-        """Check if column appears to be high cardinality based on name."""
-        col_lower = column_name.lower()
-        return any(indicator in col_lower for indicator in HIGH_CARDINALITY_INDICATORS)
 
-    def is_low_cardinality_column(column_name: str) -> bool:
-        """Check if column appears to be low cardinality based on name."""
-        col_lower = column_name.lower()
-        return any(indicator in col_lower for indicator in LOW_CARDINALITY_INDICATORS)
+def _get_column_type(column_name: str, schema_lookup: dict[str, tuple[str, str]]) -> Optional[str]:
+    """Get the normalized column type from schema."""
+    entry = schema_lookup.get(column_name.lower())
+    return entry[1] if entry else None
 
-    # Validate partitioning columns
-    partitioning_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
-    for column in partitioning_columns:
-        column_type = get_column_type(column.name)
+
+def _extract_base_type(sql_type: str) -> str:
+    """Extract base type from SQL type (e.g., VARCHAR(255) -> VARCHAR)."""
+    return sql_type.split("(")[0].strip().upper()
+
+
+def _is_high_cardinality_column(column_name: str) -> bool:
+    """Check if column appears to be high cardinality based on name."""
+    col_lower = column_name.lower()
+    return any(indicator in col_lower for indicator in HIGH_CARDINALITY_INDICATORS)
+
+
+def _is_low_cardinality_column(column_name: str) -> bool:
+    """Check if column appears to be low cardinality based on name."""
+    col_lower = column_name.lower()
+    return any(indicator in col_lower for indicator in LOW_CARDINALITY_INDICATORS)
+
+
+def _validate_partitioning_types(
+    result: ValidationResult,
+    table_tuning: TableTuning,
+    schema_lookup: dict[str, tuple[str, str]],
+    strict_mode: bool,
+) -> None:
+    """Validate partitioning column type appropriateness."""
+    for column in table_tuning.get_columns_by_type(TuningType.PARTITIONING):
+        column_type = _get_column_type(column.name, schema_lookup)
         if not column_type:
             continue  # Column existence will be caught by validate_columns_exist
 
-        base_type = extract_base_type(column_type)
+        base_type = _extract_base_type(column_type)
 
         if base_type in TEMPORAL_TYPES:
             result.add_issue(
@@ -291,14 +304,20 @@ def validate_column_types(
                 )
             )
 
-    # Validate clustering columns
-    clustering_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
-    for column in clustering_columns:
-        column_type = get_column_type(column.name)
+
+def _validate_clustering_types(
+    result: ValidationResult,
+    table_tuning: TableTuning,
+    schema_lookup: dict[str, tuple[str, str]],
+    strict_mode: bool,
+) -> None:
+    """Validate clustering column type appropriateness."""
+    for column in table_tuning.get_columns_by_type(TuningType.CLUSTERING):
+        column_type = _get_column_type(column.name, schema_lookup)
         if not column_type:
             continue
 
-        if is_high_cardinality_column(column.name):
+        if _is_high_cardinality_column(column.name):
             result.add_issue(
                 ValidationIssue(
                     level=ValidationLevel.INFO,
@@ -308,7 +327,7 @@ def validate_column_types(
                     tuning_type=TuningType.CLUSTERING,
                 )
             )
-        elif is_low_cardinality_column(column.name):
+        elif _is_low_cardinality_column(column.name):
             level = ValidationLevel.ERROR if strict_mode else ValidationLevel.WARNING
             result.add_issue(
                 ValidationIssue(
@@ -321,14 +340,19 @@ def validate_column_types(
                 )
             )
 
-    # Validate distribution columns
-    distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
-    for column in distribution_columns:
-        column_type = get_column_type(column.name)
+
+def _validate_distribution_types(
+    result: ValidationResult,
+    table_tuning: TableTuning,
+    schema_lookup: dict[str, tuple[str, str]],
+) -> None:
+    """Validate distribution column type appropriateness."""
+    for column in table_tuning.get_columns_by_type(TuningType.DISTRIBUTION):
+        column_type = _get_column_type(column.name, schema_lookup)
         if not column_type:
             continue
 
-        if is_high_cardinality_column(column.name):
+        if _is_high_cardinality_column(column.name):
             result.add_issue(
                 ValidationIssue(
                     level=ValidationLevel.INFO,
@@ -349,14 +373,19 @@ def validate_column_types(
                 )
             )
 
-    # Validate sorting columns
-    sorting_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
-    for column in sorting_columns:
-        column_type = get_column_type(column.name)
+
+def _validate_sorting_types(
+    result: ValidationResult,
+    table_tuning: TableTuning,
+    schema_lookup: dict[str, tuple[str, str]],
+) -> None:
+    """Validate sorting column type appropriateness."""
+    for column in table_tuning.get_columns_by_type(TuningType.SORTING):
+        column_type = _get_column_type(column.name, schema_lookup)
         if not column_type:
             continue
 
-        base_type = extract_base_type(column_type)
+        base_type = _extract_base_type(column_type)
 
         # Sorting is generally good for any frequently queried column
         if base_type in TEMPORAL_TYPES:
@@ -369,8 +398,6 @@ def validate_column_types(
                     tuning_type=TuningType.SORTING,
                 )
             )
-
-    return result
 
 
 def detect_tuning_conflicts(table_tuning: TableTuning, platform: Optional[str] = None) -> ValidationResult:

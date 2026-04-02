@@ -376,7 +376,7 @@ class ConsoleResultFormatter:
     @staticmethod
     def render_comprehensive_execution_summary(
         results: BenchmarkResults,
-        show_query_details: bool = True,
+        _show_query_details: bool = True,
     ) -> None:
         """Render comprehensive execution summary with validation results.
 

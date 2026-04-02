@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from benchbox.core.primitives_utils import get_entry_by_id
 from benchbox.core.write_primitives.catalog import (
     WriteOperation,
     load_write_primitives_catalog,
@@ -63,11 +64,7 @@ class WriteOperationsManager:
         Raises:
             ValueError: If operation_id is invalid
         """
-        try:
-            return self._operations[operation_id]
-        except KeyError as exc:
-            available = ", ".join(sorted(self._operations.keys()))
-            raise ValueError(f"Invalid operation ID: {operation_id}. Available: {available}") from exc
+        return get_entry_by_id(self._operations, operation_id, "operation")
 
     def get_all_operations(self) -> dict[str, WriteOperation]:
         """Get all write operations.

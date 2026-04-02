@@ -157,6 +157,7 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapte
         default_executor_dpu_size: int = 1,
         timeout_minutes: int = 60,
         notebook_version: str | None = None,
+        table_format: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the Athena Spark adapter.
@@ -205,6 +206,7 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapte
         self.default_executor_dpu_size = default_executor_dpu_size
         self.timeout_minutes = timeout_minutes
         self.notebook_version = notebook_version
+        self.table_format = table_format or "parquet"
 
         # Initialize staging using cloud-spark shared infrastructure
         self._staging: CloudSparkStaging | None = None
@@ -591,7 +593,7 @@ result.show(100, truncate=False)
 
             create_table_sql = f"""
                 CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table}
-                USING PARQUET
+                USING {self.table_format.upper()}
                 LOCATION '{table_uri}'
             """
             self._submit_calculation(create_table_sql, code_type="SQL", wait_for_completion=True)
@@ -710,6 +712,7 @@ result.show(100, truncate=False)
             "max_concurrent_dpus": config.get("max_concurrent_dpus", 20),
             "default_executor_dpu_size": config.get("default_executor_dpu_size", 1),
             "timeout_minutes": config.get("timeout_minutes", 60),
+            "table_format": config.get("table_format"),
         }
 
         return cls(**params)

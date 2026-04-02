@@ -138,6 +138,65 @@ class TestDataprocServerlessAdapterInitialization:
             assert adapter.subnetwork_uri == "projects/my-project/regions/us-central1/subnetworks/my-subnet"
 
 
+class TestDataprocServerlessTableFormat:
+    """Test table_format parameter configuration."""
+
+    def test_table_format_default_parquet(self):
+        """Test table_format defaults to parquet."""
+        with (
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.storage", MagicMock()),
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.gcp import DataprocServerlessAdapter
+
+            adapter = DataprocServerlessAdapter(
+                project_id="proj",
+                gcs_staging_dir="gs://bucket/data",
+            )
+            assert adapter.table_format == "parquet"
+
+    def test_table_format_delta(self):
+        """Test table_format can be set to delta."""
+        with (
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.storage", MagicMock()),
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.gcp import DataprocServerlessAdapter
+
+            adapter = DataprocServerlessAdapter(
+                project_id="proj",
+                gcs_staging_dir="gs://bucket/data",
+                table_format="delta",
+            )
+            assert adapter.table_format == "delta"
+
+    def test_table_format_from_config(self):
+        """Test table_format is passed through from_config."""
+        with (
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.storage", MagicMock()),
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.gcp import DataprocServerlessAdapter
+
+            adapter = DataprocServerlessAdapter.from_config(
+                {
+                    "project_id": "proj",
+                    "gcs_staging_dir": "gs://bucket/data",
+                    "table_format": "hudi",
+                }
+            )
+            assert adapter.table_format == "hudi"
+
+
 class TestDataprocServerlessAdapterPlatformInfo:
     """Test platform info methods."""
 

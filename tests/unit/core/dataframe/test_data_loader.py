@@ -769,6 +769,36 @@ class TestDataFrameDataLoader:
         assert "orders" in files
         assert files["customer"] == [Path("/data/customer.tbl")]
 
+    def test_get_source_files_rejects_directory_path(self):
+        """Test that _get_source_files raises when benchmark.tables contains a directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            # Create a directory where a file is expected (contamination scenario)
+            (tmpdir / "customer").mkdir()
+
+            loader = DataFrameDataLoader()
+            benchmark = MagicMock()
+            benchmark.tables = {"customer": str(tmpdir / "customer")}
+
+            with pytest.raises(ValueError, match="customer.*expected file.*found directory"):
+                loader._get_source_files(benchmark, None)
+
+    def test_get_source_files_rejects_directory_in_list(self):
+        """Test that _get_source_files raises when a sharded path list contains a directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            good_file = tmpdir / "orders.tbl.1"
+            good_file.write_text("1|data\n")
+            bad_dir = tmpdir / "orders"
+            bad_dir.mkdir()
+
+            loader = DataFrameDataLoader()
+            benchmark = MagicMock()
+            benchmark.tables = {"orders": [str(good_file), str(bad_dir)]}
+
+            with pytest.raises(ValueError, match="orders.*expected file.*found directory"):
+                loader._get_source_files(benchmark, None)
+
     def test_get_source_files_from_data_dir(self):
         """Test getting source files from data directory."""
         with tempfile.TemporaryDirectory() as tmpdir:

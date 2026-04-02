@@ -370,7 +370,7 @@ class TestDuckDBParserEdgeCasesJSON:
         }"""
         plan = parser.parse_explain_output("q21", json_unicode)
 
-        assert plan is not None
+        assert plan.query_id == "q21"
 
     def test_deeply_nested_json(self) -> None:
         """Test handling of deeply nested JSON structure."""

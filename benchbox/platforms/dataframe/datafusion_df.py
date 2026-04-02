@@ -749,6 +749,21 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
     # Window Functions
     # =========================================================================
 
+    def _datafusion_window_rank(
+        self,
+        rank_method: str,
+        order_by: list[tuple[str, bool]],
+        partition_by: list[str] | None = None,
+    ) -> DataFusionExpr:
+        """Shared DataFusion window-rank dispatch."""
+        order_exprs = self._build_order_exprs(order_by)
+        partition_exprs = [col(c) for c in (partition_by or [])]
+        window = Window(
+            partition_by=partition_exprs if partition_exprs else None,
+            order_by=order_exprs if order_exprs else None,
+        )
+        return getattr(f, rank_method)().over(window)
+
     def window_rank(
         self,
         order_by: list[tuple[str, bool]],
@@ -763,14 +778,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         Returns:
             DataFusion expression for rank within partitions
         """
-        order_exprs = self._build_order_exprs(order_by)
-        partition_exprs = [col(c) for c in (partition_by or [])]
-
-        window = Window(
-            partition_by=partition_exprs if partition_exprs else None,
-            order_by=order_exprs if order_exprs else None,
-        )
-        return f.rank().over(window)
+        return self._datafusion_window_rank("rank", order_by, partition_by)
 
     def window_row_number(
         self,
@@ -786,14 +794,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         Returns:
             DataFusion expression for row number within partitions
         """
-        order_exprs = self._build_order_exprs(order_by)
-        partition_exprs = [col(c) for c in (partition_by or [])]
-
-        window = Window(
-            partition_by=partition_exprs if partition_exprs else None,
-            order_by=order_exprs if order_exprs else None,
-        )
-        return f.row_number().over(window)
+        return self._datafusion_window_rank("row_number", order_by, partition_by)
 
     def window_dense_rank(
         self,
@@ -809,14 +810,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         Returns:
             DataFusion expression for dense rank within partitions
         """
-        order_exprs = self._build_order_exprs(order_by)
-        partition_exprs = [col(c) for c in (partition_by or [])]
-
-        window = Window(
-            partition_by=partition_exprs if partition_exprs else None,
-            order_by=order_exprs if order_exprs else None,
-        )
-        return f.dense_rank().over(window)
+        return self._datafusion_window_rank("dense_rank", order_by, partition_by)
 
     def _build_order_exprs(
         self,

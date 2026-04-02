@@ -6,7 +6,7 @@ This document is the canonical process and registry for tracking backward-compat
 
 ## Release Stage Policy
 
-BenchBox is currently in **alpha**.
+BenchBox is currently in **beta**.
 
 - Alpha:
   - Prioritize canonical API cleanup over compatibility.

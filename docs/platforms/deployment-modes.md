@@ -198,7 +198,7 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0 \
 - Always uses HTTPS (port 8443)
 - Compression enabled by default for network efficiency
 - Result cache disabled by default for accurate benchmarking
-- **Backward compatibility**: `clickhouse:cloud` is aliased to `clickhouse-cloud`
+- **Alias**: `clickhouse:cloud` is also accepted as a platform name
 
 For full documentation, see [ClickHouse Cloud Platform](clickhouse-cloud.md).
 

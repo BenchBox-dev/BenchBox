@@ -725,7 +725,7 @@ def _analyze_datafusion_plan(plan: str) -> list[str]:
     hints = []
     plan_lower = plan.lower()
 
-    if "tableScan" in plan.lower() and "projection" not in plan_lower:
+    if "tablescan" in plan_lower and "projection" not in plan_lower:
         hints.append("Full table scan without projection - select specific columns")
 
     if "HashJoin" in plan and "Build" not in plan:

@@ -51,7 +51,8 @@ class TestTPCDSQueryManagerMinimal:
     def test_queries_initialization(self):
         """Test query manager can be initialized."""
         queries = TPCDSQueryManager()
-        assert hasattr(queries, "dsqgen")
+        assert queries.dsqgen is not None, "dsqgen should be set after initialization"
+        assert queries.get_query(1) is not None, "Should be able to retrieve query 1"
 
     def test_get_query_basic(self):
         """Test getting processed queries."""

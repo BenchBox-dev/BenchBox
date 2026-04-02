@@ -7,6 +7,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import argparse
 from unittest.mock import Mock, patch
 
 import pytest
@@ -133,6 +134,49 @@ class TestTimescaleDBAdapter:
         adapter = TimescaleDBAdapter.from_config(config)
 
         assert adapter.database == "explicit_db"
+
+    def test_add_cli_arguments_registers_postgres_compatible_and_timescale_flags(self, timescale_stubs):
+        """CLI parser should include shared PostgreSQL-compatible and TimescaleDB-specific flags."""
+        parser = argparse.ArgumentParser()
+
+        TimescaleDBAdapter.add_cli_arguments(parser)
+        parsed = parser.parse_args(
+            [
+                "--timescale-host",
+                "timescale.local",
+                "--timescale-port",
+                "5545",
+                "--timescale-database",
+                "metrics",
+                "--timescale-username",
+                "ts_user",
+                "--timescale-password",
+                "ts_secret",
+                "--timescale-schema",
+                "ts_schema",
+                "--timescale-work-mem",
+                "640MB",
+                "--timescale-maintenance-work-mem",
+                "2GB",
+                "--timescale-chunk-interval",
+                "6 hours",
+                "--timescale-compression",
+                "--timescale-compression-after",
+                "14 days",
+            ]
+        )
+
+        assert parsed.host == "timescale.local"
+        assert parsed.port == 5545
+        assert parsed.database == "metrics"
+        assert parsed.username == "ts_user"
+        assert parsed.password == "ts_secret"
+        assert parsed.schema == "ts_schema"
+        assert parsed.work_mem == "640MB"
+        assert parsed.maintenance_work_mem == "2GB"
+        assert parsed.chunk_interval == "6 hours"
+        assert parsed.compression_enabled is True
+        assert parsed.compression_after == "14 days"
 
     def test_inherits_postgresql_connection_params(self, timescale_stubs):
         """TimescaleDB adapter should inherit PostgreSQL connection parameter handling."""

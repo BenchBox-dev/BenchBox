@@ -5,6 +5,8 @@
 ```{tags} advanced, concept, tpc-havoc, tpc-h, custom-benchmark
 ```
 
+> **CLI name:** `tpchavoc` — use `benchbox run --benchmark tpchavoc`
+
 ## Overview
 
 TPC-Havoc is an experimental benchmark designed to stress-test query optimizer robustness through syntactic variations. It generates 10 semantically equivalent but syntactically different versions of each TPC-H query, creating 220 total query variants that should produce identical results but may exhibit different execution plans and performance characteristics.

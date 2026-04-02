@@ -55,6 +55,10 @@ LOCAL_DATAFRAME_PLATFORMS: tuple[str, ...] = (
     "modin-df",
     "cudf-df",
 )
+# Platform/benchmark combos known to fail at runtime (not test bugs).
+# dask-df/tpcds: fixed by materializing Dask Series before .isin() calls.
+# pyspark-df/tpcds: guarded by is_dataframe_available JVM check (skips without Java).
+_DATAFRAME_XFAIL_COMBINATIONS: dict[tuple[str, str], str] = {}
 DATAFRAME_BENCHMARKS: tuple[str, ...] = tuple(
     benchmark
     for benchmark in ALL_BENCHMARKS
@@ -185,7 +189,9 @@ def _service_platform_options(platform_name: str) -> list[str]:
 
 def _phases_for_benchmark(benchmark_name: str, platform_name: str | None = None) -> list[str]:
     """Select phases to validate for a benchmark."""
-    phases = ["generate", "load", "power"]
+    # DataFrame platforms generate data inline during load; there is no separate generate phase.
+    is_dataframe = platform_name is not None and platform_name.endswith("-df")
+    phases = ["load", "power"] if is_dataframe else ["generate", "load", "power"]
     metadata = get_benchmark_metadata(benchmark_name) or {}
     include_throughput = bool(metadata.get("supports_streams")) and os.environ.get(
         "BENCHBOX_ENABLE_THROUGHPUT_MATRIX", ""
@@ -436,6 +442,9 @@ def test_local_dataframe_platform_benchmark_matrix(
         pytest.skip("cudf-df requires NVIDIA GPU with CUDA")
     if not is_dataframe_available(platform_name):
         pytest.skip(f"{platform_name} dependencies not available")
+    xfail_reason = _DATAFRAME_XFAIL_COMBINATIONS.get((platform_name, benchmark_name))
+    if xfail_reason:
+        pytest.xfail(xfail_reason)
 
     if benchmark_name == "tpcds":
         monkeypatch.setenv("BENCHBOX_QUERY_VALIDATION_MODE", "loose")

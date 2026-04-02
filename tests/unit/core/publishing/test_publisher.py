@@ -128,7 +128,7 @@ class TestPublisher:
     def test_default_config(self):
         """Should use default config if not provided."""
         publisher = Publisher()
-        assert publisher.config is not None
+        assert isinstance(publisher.config, PublishingConfig)
 
     def test_creates_local_directory(self, tmp_path):
         """Should create local storage directory."""

@@ -146,19 +146,13 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0 --dry-run 
 | **Authentication** | None | Optional | Required |
 | **Best For** | Development | Production self-hosted | Production cloud |
 
-## Migration from Deployment Mode
+## Platform Syntax
 
-If you were previously using `--platform clickhouse:cloud`, update your commands:
+The canonical platform name is `clickhouse-cloud`. The `clickhouse:cloud` syntax is also accepted as an alias.
 
 ```bash
-# Old syntax (deprecated but still works via alias)
-benchbox run --platform clickhouse:cloud --benchmark tpch --scale 1.0
-
-# New syntax (recommended)
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0
 ```
-
-The `clickhouse:cloud` syntax is aliased to `clickhouse-cloud` for backward compatibility.
 
 ## Troubleshooting
 

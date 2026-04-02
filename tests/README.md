@@ -106,8 +106,10 @@ uv run -- python -m pytest -m fast
 # Run specific benchmark tests
 uv run -- python -m pytest tests/unit/benchmarks/test_tpch_core.py
 
-# Run with coverage
-make coverage
+# Run with coverage (fast tests only — quick feedback)
+make coverage-fast
+# or full suite
+make coverage-all
 # or
 uv run -- python -m pytest --cov=benchbox --cov-report=html
 ```
@@ -261,23 +263,23 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.10', '3.11', '3.12', '3.13']
-    
+
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev]
-    
+
     - name: Run fast tests
       run: |
         uv run -- python tests/utilities/unified_test_runner.py --strategy ci
-    
+
     - name: Upload coverage
       uses: codecov/codecov-action@v3
       with:
@@ -288,7 +290,7 @@ jobs:
 ```groovy
 pipeline {
     agent any
-    
+
     stages {
         stage('Setup') {
             steps {
@@ -296,7 +298,7 @@ pipeline {
                 sh 'pip install -e .[dev]'
             }
         }
-        
+
         stage('Fast Tests') {
             steps {
                 sh 'uv run -- python tests/utilities/unified_test_runner.py --strategy ci --parallel --workers 4 --output junit'
@@ -307,7 +309,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Integration Tests') {
             when {
                 branch 'main'

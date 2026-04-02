@@ -1,0 +1,345 @@
+"""Behavioral tests for the DataFusion platform adapter.
+
+Uses real DataFusion SessionContext instances (no mocking on the connection
+path).  Exercises session creation, table registration, SQL execution,
+EXPLAIN output, and the compat wrappers.
+"""
+
+from __future__ import annotations
+
+import os
+import textwrap
+from pathlib import Path
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
+
+try:
+    import datafusion  # noqa: F401
+
+    HAS_DATAFUSION = True
+except ImportError:
+    HAS_DATAFUSION = False
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+    pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def adapter(tmp_path):
+    from benchbox.platforms.datafusion import DataFusionAdapter
+
+    return DataFusionAdapter(
+        data_format="parquet",
+        memory_limit="256MB",
+        working_dir=str(tmp_path / "df_working"),
+        batch_size=1024,
+    )
+
+
+@pytest.fixture()
+def ctx(adapter):
+    conn = adapter.create_connection()
+    yield conn
+    try:
+        del conn
+    except Exception:
+        pass
+
+
+def _write_parquet(path: Path, table: pa.Table) -> Path:
+    """Write a PyArrow table to a Parquet file and return the path."""
+    pq.write_table(table, str(path))
+    return path
+
+
+# ---------------------------------------------------------------------------
+# DataFusionConnectionCompat
+# ---------------------------------------------------------------------------
+
+
+class TestDataFusionConnectionCompat:
+    def test_execute_returns_cursor_compat(self, ctx):
+        cursor = ctx.execute("SELECT 42 AS answer")
+        assert hasattr(cursor, "fetchone")
+        assert hasattr(cursor, "fetchall")
+
+    def test_fetchone_returns_tuple(self, ctx):
+        cursor = ctx.execute("SELECT 42 AS answer")
+        row = cursor.fetchone()
+        assert row == (42,)
+
+    def test_fetchall_returns_list_of_tuples(self, ctx):
+        cursor = ctx.execute("SELECT 1 AS x UNION ALL SELECT 2")
+        rows = cursor.fetchall()
+        values = sorted(row[0] for row in rows)
+        assert values == [1, 2]
+
+    def test_rowcount_set_after_materialize(self, ctx):
+        cursor = ctx.execute("SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3")
+        assert cursor.rowcount == -1  # before materialize
+        cursor.fetchall()
+        assert cursor.rowcount == 3
+
+    def test_sql_method_available(self, ctx):
+        """The compat wrapper delegates .sql() to the underlying context."""
+        df = ctx.sql("SELECT 100 AS val")
+        # Should return a DataFusion DataFrame-like object
+        batches = df.collect()
+        assert len(batches) > 0
+
+
+# ---------------------------------------------------------------------------
+# _requires_eager_execution
+# ---------------------------------------------------------------------------
+
+
+class TestRequiresEagerExecution:
+    def test_select_not_eager(self):
+        from benchbox.platforms.datafusion import DataFusionConnectionCompat
+
+        assert DataFusionConnectionCompat._requires_eager_execution("SELECT 1") is False
+
+    def test_create_table_is_eager(self):
+        from benchbox.platforms.datafusion import DataFusionConnectionCompat
+
+        assert DataFusionConnectionCompat._requires_eager_execution("CREATE TABLE t (id INT)") is True
+
+    def test_insert_is_eager(self):
+        from benchbox.platforms.datafusion import DataFusionConnectionCompat
+
+        assert DataFusionConnectionCompat._requires_eager_execution("INSERT INTO t VALUES (1)") is True
+
+    def test_drop_is_eager(self):
+        from benchbox.platforms.datafusion import DataFusionConnectionCompat
+
+        assert DataFusionConnectionCompat._requires_eager_execution("DROP TABLE t") is True
+
+    def test_copy_is_eager(self):
+        from benchbox.platforms.datafusion import DataFusionConnectionCompat
+
+        assert DataFusionConnectionCompat._requires_eager_execution("COPY t TO 'file.parquet'") is True
+
+    def test_comment_lines_before_select(self):
+        from benchbox.platforms.datafusion import DataFusionConnectionCompat
+
+        query = "-- This is a comment\n-- Another comment\nSELECT 1"
+        assert DataFusionConnectionCompat._requires_eager_execution(query) is False
+
+    def test_comment_lines_before_create(self):
+        from benchbox.platforms.datafusion import DataFusionConnectionCompat
+
+        query = "-- comment\nCREATE TABLE t (id INT)"
+        assert DataFusionConnectionCompat._requires_eager_execution(query) is True
+
+    def test_single_line_comment_only(self):
+        from benchbox.platforms.datafusion import DataFusionConnectionCompat
+
+        assert DataFusionConnectionCompat._requires_eager_execution("-- just a comment") is False
+
+
+# ---------------------------------------------------------------------------
+# Session config & connection
+# ---------------------------------------------------------------------------
+
+
+class TestSessionCreation:
+    def test_connection_has_information_schema(self, ctx):
+        cursor = ctx.execute("SELECT * FROM information_schema.tables LIMIT 1")
+        # Should not raise; information_schema was enabled
+        rows = cursor.fetchall()
+        assert isinstance(rows, list)
+
+    def test_adapter_platform_name(self, adapter):
+        assert adapter.platform_name == "DataFusion"
+
+    def test_adapter_target_dialect(self, adapter):
+        assert adapter.get_target_dialect() == "datafusion"
+
+    def test_platform_info_contains_version(self, adapter, ctx):
+        info = adapter.get_platform_info(ctx)
+        assert "platform_version" in info
+        # DataFusion version should be a string like "42.1.0"
+        assert info["platform_version"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Table registration from Parquet
+# ---------------------------------------------------------------------------
+
+
+class TestParquetTableRegistration:
+    def test_register_parquet_and_query(self, ctx, tmp_path):
+        table = pa.table({"product_id": [1, 2, 3], "price": [9.99, 19.99, 29.99]})
+        parquet_path = _write_parquet(tmp_path / "products.parquet", table)
+
+        ctx.register_parquet("products", str(parquet_path))
+        cursor = ctx.execute("SELECT COUNT(*) AS cnt FROM products")
+        row = cursor.fetchone()
+        assert row == (3,)
+
+    def test_register_parquet_preserves_schema(self, ctx, tmp_path):
+        table = pa.table(
+            {
+                "order_id": pa.array([100, 200], type=pa.int64()),
+                "amount": pa.array([1.5, 2.5], type=pa.float64()),
+            }
+        )
+        parquet_path = _write_parquet(tmp_path / "orders.parquet", table)
+        ctx.register_parquet("orders", str(parquet_path))
+
+        cursor = ctx.execute("SELECT order_id, amount FROM orders ORDER BY order_id")
+        rows = cursor.fetchall()
+        assert rows == [(100, 1.5), (200, 2.5)]
+
+
+# ---------------------------------------------------------------------------
+# SQL execution and result conversion
+# ---------------------------------------------------------------------------
+
+
+class TestSqlExecution:
+    def test_execute_aggregation(self, adapter, ctx, tmp_path):
+        table = pa.table({"dept": ["eng", "eng", "sales", "sales"], "salary": [100, 150, 90, 110]})
+        parquet_path = _write_parquet(tmp_path / "employees.parquet", table)
+        ctx.register_parquet("employees", str(parquet_path))
+
+        result = adapter.execute_query(
+            connection=ctx,
+            query="SELECT dept, SUM(salary) AS total FROM employees GROUP BY dept ORDER BY dept",
+            query_id="agg_test",
+            validate_row_count=False,
+        )
+        assert result["rows_returned"] == 2
+        assert result.get("error") is None
+
+    def test_execute_join(self, adapter, ctx, tmp_path):
+        regions = pa.table({"region_id": [1, 2], "region_name": ["east", "west"]})
+        sales = pa.table({"region_id": [1, 1, 2], "amount": [10, 20, 30]})
+
+        _write_parquet(tmp_path / "regions.parquet", regions)
+        _write_parquet(tmp_path / "sales.parquet", sales)
+        ctx.register_parquet("regions", str(tmp_path / "regions.parquet"))
+        ctx.register_parquet("sales", str(tmp_path / "sales.parquet"))
+
+        result = adapter.execute_query(
+            connection=ctx,
+            query="SELECT r.region_name, SUM(s.amount) AS total FROM regions r JOIN sales s ON r.region_id = s.region_id GROUP BY r.region_name ORDER BY r.region_name",
+            query_id="join_test",
+            validate_row_count=False,
+        )
+        assert result["rows_returned"] == 2
+        assert result.get("error") is None
+
+    def test_execute_bad_sql_returns_error(self, adapter, ctx):
+        result = adapter.execute_query(
+            connection=ctx,
+            query="SELECTX INVALID SYNTAX",
+            query_id="bad_sql",
+            validate_row_count=False,
+        )
+        assert result["error"] is not None
+
+    def test_execute_empty_result(self, adapter, ctx, tmp_path):
+        table = pa.table({"val": [1, 2, 3]})
+        _write_parquet(tmp_path / "nums.parquet", table)
+        ctx.register_parquet("nums", str(tmp_path / "nums.parquet"))
+
+        result = adapter.execute_query(
+            connection=ctx,
+            query="SELECT * FROM nums WHERE val > 100",
+            query_id="empty_q",
+            validate_row_count=False,
+        )
+        assert result["rows_returned"] == 0
+        assert result.get("error") is None
+
+
+# ---------------------------------------------------------------------------
+# _parse_memory_limit
+# ---------------------------------------------------------------------------
+
+
+class TestParseMemoryLimit:
+    def setup_method(self):
+        from benchbox.platforms.datafusion import DataFusionAdapter
+
+        self.adapter = DataFusionAdapter(memory_limit="256MB", data_format="parquet")
+
+    def test_gigabytes_short(self):
+        assert self.adapter._parse_memory_limit("2G") == str(2 * 1024 * 1024 * 1024)
+
+    def test_gigabytes_long(self):
+        assert self.adapter._parse_memory_limit("2GB") == str(2 * 1024 * 1024 * 1024)
+
+    def test_megabytes(self):
+        assert self.adapter._parse_memory_limit("512MB") == str(512 * 1024 * 1024)
+
+    def test_megabytes_short(self):
+        assert self.adapter._parse_memory_limit("512M") == str(512 * 1024 * 1024)
+
+    def test_kilobytes(self):
+        assert self.adapter._parse_memory_limit("1024KB") == str(1024 * 1024)
+
+    def test_plain_bytes(self):
+        assert self.adapter._parse_memory_limit("1048576") == "1048576"
+
+
+# ---------------------------------------------------------------------------
+# from_config factory
+# ---------------------------------------------------------------------------
+
+
+class TestFromConfig:
+    def test_from_config_creates_adapter(self, tmp_path):
+        from benchbox.platforms.datafusion import DataFusionAdapter
+
+        adapter = DataFusionAdapter.from_config(
+            {
+                "benchmark": "tpch",
+                "scale_factor": 0.01,
+                "output_dir": str(tmp_path),
+                "memory_limit": "128MB",
+                "format": "parquet",
+                "batch_size": 2048,
+            }
+        )
+        conn = adapter.create_connection()
+        cursor = conn.execute("SELECT 1 + 1 AS result")
+        assert cursor.fetchone() == (2,)
+
+    def test_from_config_default_format(self, tmp_path):
+        from benchbox.platforms.datafusion import DataFusionAdapter
+
+        adapter = DataFusionAdapter.from_config(
+            {
+                "benchmark": "ssb",
+                "scale_factor": 0.01,
+                "output_dir": str(tmp_path),
+            }
+        )
+        assert adapter.data_format == "parquet"
+
+
+# ---------------------------------------------------------------------------
+# External table support flag
+# ---------------------------------------------------------------------------
+
+
+class TestExternalTableSupport:
+    def test_supports_external_tables_flag(self, adapter):
+        assert adapter.supports_external_tables is True
+
+    def test_create_external_tables_aliases_load_data(self, adapter):
+        # Verify the method exists (it aliases load_data)
+        assert hasattr(adapter, "create_external_tables")
+        assert callable(adapter.create_external_tables)

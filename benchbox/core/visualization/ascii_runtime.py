@@ -37,6 +37,7 @@ _SUMMARY_LABELS = {
     "total_label": "Total",
     "count_label": "Queries",
 }
+_PHASE_TIMING_KEYS = ("phases", "phase_breakdown", "phase_times")
 
 
 class QueryResultLike(Protocol):
@@ -584,33 +585,42 @@ def _percentile_query_ms(result: Any, pct: float) -> float:
 
 
 def _extract_phase_timings_ms(raw: dict[str, Any]) -> list[tuple[str, float]]:
+    for phase_map in _phase_timing_candidates(raw):
+        parsed = [
+            entry
+            for phase_name, value in phase_map.items()
+            if (entry := _normalize_phase_timing_entry(phase_name, value)) is not None
+        ]
+        if parsed:
+            return parsed
+    return []
+
+
+def _phase_timing_candidates(raw: dict[str, Any]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     if isinstance(raw.get("phases"), dict):
         candidates.append(raw["phases"])
 
     results_block = raw.get("results")
-    if isinstance(results_block, dict):
-        timing = results_block.get("timing")
-        if isinstance(timing, dict):
-            for key in ("phases", "phase_breakdown", "phase_times"):
-                phase_obj = timing.get(key)
-                if isinstance(phase_obj, dict):
-                    candidates.append(phase_obj)
+    if not isinstance(results_block, dict):
+        return candidates
+    timing = results_block.get("timing")
+    if not isinstance(timing, dict):
+        return candidates
+    for key in _PHASE_TIMING_KEYS:
+        phase_obj = timing.get(key)
+        if isinstance(phase_obj, dict):
+            candidates.append(phase_obj)
+    return candidates
 
-    parsed: list[tuple[str, float]] = []
-    for phase_map in candidates:
-        tmp: list[tuple[str, float]] = []
-        for phase_name, value in phase_map.items():
-            if not isinstance(value, (int, float)):
-                continue
-            numeric = float(value)
-            if numeric <= 0:
-                continue
-            if phase_name.endswith("_seconds") or phase_name.endswith("_s"):
-                numeric *= 1000.0
-            clean_name = phase_name.replace("_ms", "").replace("_seconds", "").replace("_s", "").replace("_", " ")
-            tmp.append((clean_name.title(), numeric))
-        if tmp:
-            parsed = tmp
-            break
-    return parsed
+
+def _normalize_phase_timing_entry(phase_name: str, value: Any) -> tuple[str, float] | None:
+    if not isinstance(value, (int, float)):
+        return None
+    numeric = float(value)
+    if numeric <= 0:
+        return None
+    if phase_name.endswith("_seconds") or phase_name.endswith("_s"):
+        numeric *= 1000.0
+    clean_name = phase_name.replace("_ms", "").replace("_seconds", "").replace("_s", "").replace("_", " ")
+    return clean_name.title(), numeric

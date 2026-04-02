@@ -122,9 +122,8 @@ class TestTPCDSDuckDBDialectIntegration:
 
                 try:
                     # Use EXPLAIN to validate syntax without executing
-                    conn.execute(f"EXPLAIN {query}")
-                    # If we get here, syntax is valid
-                    assert True
+                    explain_result = conn.execute(f"EXPLAIN {query}")
+                    assert explain_result is not None, f"Query {query_id}: EXPLAIN returned no result"
                 except Exception as e:
                     # Check if it's a syntax error vs missing table error
                     error_msg = str(e).lower()

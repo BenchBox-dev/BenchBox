@@ -19,7 +19,7 @@ platform_optimizations:
     - customer_id
 ```
 
-For backward compatibility, existing `z_ordering_enabled` configurations continue to work.
+The `z_ordering_enabled` configuration is also supported.
 
 ## Precedence Rules
 
@@ -27,13 +27,13 @@ BenchBox resolves Databricks strategy with explicit precedence:
 
 1. `liquid_clustering_enabled` or non-empty `liquid_clustering_columns`
 2. `databricks_clustering_strategy`
-3. legacy `z_ordering_enabled`
+3. `z_ordering_enabled`
 
-If both liquid settings and legacy Z-ORDER are supplied, liquid clustering wins.
+If both liquid clustering and Z-ORDER settings are supplied, liquid clustering wins.
 
 ## CLI Overrides
 
-You can override the strategy at runtime:
+You can override the strategy at runtime via `--platform-option`.
 
 ```bash
 benchbox run \
@@ -41,14 +41,14 @@ benchbox run \
   --benchmark tpch \
   --scale 1 \
   --tuning ./databricks-tuning.yaml \
-  --databricks-clustering-strategy liquid_clustering \
-  --liquid-clustering-columns event_time,customer_id
+  --platform-option databricks_clustering_strategy=liquid_clustering \
+  --platform-option liquid_clustering_columns=event_time,customer_id
 ```
 
-## Migration Guidance
+## Switching from Z-ORDER to Liquid Clustering
 
 - Keep existing Z-ORDER configs unchanged if you need strict historical comparability.
-- Introduce `databricks_clustering_strategy: liquid_clustering` in a new config variant for A/B runs.
+- Add `databricks_clustering_strategy: liquid_clustering` in a new config variant for A/B runs.
 - Pin explicit `liquid_clustering_columns` to avoid accidental drift between runs.
 
 ## A/B Comparison With Z-ORDER

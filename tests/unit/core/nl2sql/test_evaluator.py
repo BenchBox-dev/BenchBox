@@ -5,7 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 
 import pytest
 
-from benchbox.core.nl2sql.evaluator import (
+from benchbox.experimental.nl2sql.evaluator import (
     AccuracyMetrics,
     NL2SQLEvaluator,
     SQLComparisonResult,

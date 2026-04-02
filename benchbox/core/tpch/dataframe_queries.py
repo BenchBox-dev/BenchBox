@@ -26,6 +26,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from benchbox.core.dataframe.compat import _to_list
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
 
@@ -1162,7 +1163,7 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Find orders with late lineitems
     late_lineitems = lineitem[lineitem["l_commitdate"] < lineitem["l_receiptdate"]]
-    late_orderkeys = late_lineitems["l_orderkey"].unique()
+    late_orderkeys = _to_list(late_lineitems["l_orderkey"].unique())
 
     # Filter orders by date range
     filtered_orders = orders[(orders["o_orderdate"] >= start_date) & (orders["o_orderdate"] < end_date)]
@@ -1684,9 +1685,9 @@ def q16_pandas_impl(ctx: DataFrameContext) -> Any:
     sizes = params["sizes"]
 
     # Find suppliers with complaints
-    complaint_suppliers = supplier[supplier["s_comment"].str.contains("Customer.*Complaints", regex=True, na=False)][
-        "s_suppkey"
-    ]
+    complaint_suppliers = _to_list(
+        supplier[supplier["s_comment"].str.contains("Customer.*Complaints", regex=True, na=False)]["s_suppkey"]
+    )
 
     # Filter parts
     filtered_parts = part[
@@ -1755,7 +1756,7 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Find orders with large total quantity
     order_qty = lineitem.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
-    large_orders = order_qty[order_qty["total_qty"] > quantity_threshold]["l_orderkey"]
+    large_orders = _to_list(order_qty[order_qty["total_qty"] > quantity_threshold]["l_orderkey"])
 
     # Join customer -> orders
     joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
@@ -1854,7 +1855,7 @@ def q20_pandas_impl(ctx: DataFrameContext) -> Any:
     end_date = params["end_date"]
 
     # Find parts with color prefix
-    forest_parts = part[part["p_name"].str.startswith(color_prefix)]["p_partkey"]
+    forest_parts = _to_list(part[part["p_name"].str.startswith(color_prefix)]["p_partkey"])
 
     # Calculate half the quantity shipped per part-supplier combo
     filtered_lineitem = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)]
@@ -1872,7 +1873,7 @@ def q20_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Filter for excess availability
-    excess_suppliers = joined[joined["ps_availqty"] > joined["threshold"]]["ps_suppkey"].unique()
+    excess_suppliers = _to_list(joined[joined["ps_availqty"] > joined["threshold"]]["ps_suppkey"].unique())
 
     # Join supplier -> nation, filter by nation and excess suppliers
     supplier_nation = supplier.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
@@ -1909,7 +1910,7 @@ def q21_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Find orders with multiple suppliers (EXISTS condition)
     order_suppliers = lineitem.groupby("l_orderkey").agg(num_suppliers=("l_suppkey", "nunique"))
-    multi_supplier_orders = order_suppliers[order_suppliers["num_suppliers"] > 1].index
+    multi_supplier_orders = _to_list(order_suppliers[order_suppliers["num_suppliers"] > 1].index)
 
     # Filter to multi-supplier orders
     supplier_late_orders = supplier_late_orders[supplier_late_orders["l_orderkey"].isin(multi_supplier_orders)]
@@ -1965,9 +1966,10 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
     # Calculate average account balance for positive accounts in selected countries
     positive_accounts = customer[(customer["c_acctbal"] > 0) & (customer["cntrycode"].isin(country_codes))]
     avg_balance = positive_accounts["c_acctbal"].mean()
+    avg_balance = avg_balance.compute() if hasattr(avg_balance, "compute") else avg_balance
 
     # Find customers without orders
-    customers_with_orders = orders["o_custkey"].unique()
+    customers_with_orders = _to_list(orders["o_custkey"].unique())
 
     # Filter: in selected countries, above average balance, no orders
     result_customers = customer[

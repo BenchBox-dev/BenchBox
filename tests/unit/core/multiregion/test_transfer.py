@@ -9,8 +9,8 @@ import time
 
 import pytest
 
-from benchbox.core.multiregion.config import CloudProvider
-from benchbox.core.multiregion.transfer import (
+from benchbox.experimental.multiregion.config import CloudProvider
+from benchbox.experimental.multiregion.transfer import (
     TRANSFER_PRICING,
     DataTransfer,
     TransferCostEstimate,

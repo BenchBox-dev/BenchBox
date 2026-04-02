@@ -35,7 +35,20 @@ from benchbox.core.schemas import (
     SystemProfile,
 )
 from benchbox.core.validation import ValidationResult
-from benchbox.monitoring import PerformanceMonitor, ResourceMonitor, attach_snapshot_to_result
+
+try:
+    from benchbox.monitoring import PerformanceMonitor, ResourceMonitor, attach_snapshot_to_result
+
+    _MONITORING_AVAILABLE = True
+except ImportError:
+    _MONITORING_AVAILABLE = False
+    PerformanceMonitor = None  # type: ignore[assignment,misc]
+    ResourceMonitor = None  # type: ignore[assignment,misc]
+
+    def attach_snapshot_to_result(*_args: Any, **_kwargs: Any) -> None:  # type: ignore[misc]
+        pass
+
+
 from benchbox.platforms import get_platform_adapter
 from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
 from benchbox.utils.cloud_storage import create_path_handler
@@ -594,8 +607,8 @@ def run_benchmark_lifecycle(
     validation_opts = validation_opts or ValidationOptions()
 
     # Create default monitor if not provided (deep integration - automatic monitoring)
-    if monitor is None:
-        monitor = PerformanceMonitor()
+    if monitor is None and _MONITORING_AVAILABLE:
+        monitor = PerformanceMonitor()  # type: ignore[misc]
 
     # Start resource monitoring if enabled
     resource_monitor: ResourceMonitor | None = None
@@ -1108,13 +1121,7 @@ def _populate_tables_from_manifest(benchmark: Any, manifest: dict | None = None)
         output_dir = getattr(benchmark, "output_dir", None)
         if not output_dir:
             return None
-        manifest_data = manifest
-        manifest_path = output_dir.joinpath("_datagen_manifest.json")
-        if manifest_data is None:
-            if not hasattr(manifest_path, "exists") or not manifest_path.exists():
-                return None
-            with manifest_path.open("r") as f:
-                manifest_data = json.load(f)
+        manifest_data = _load_manifest_data(output_dir, manifest)
         if manifest_data is None:
             return None
         tbl_map: dict[str, Any] = {}
@@ -1124,7 +1131,7 @@ def _populate_tables_from_manifest(benchmark: Any, manifest: dict | None = None)
             if not entries:
                 continue
             total_files += len(entries)
-            paths = [output_dir.joinpath(e.get("path")) for e in entries if e.get("path")]
+            paths = _resolve_manifest_entry_paths(output_dir, table, entries)
             if not paths:
                 continue
             tbl_map[table] = paths if len(paths) > 1 else paths[0]
@@ -1138,6 +1145,37 @@ def _populate_tables_from_manifest(benchmark: Any, manifest: dict | None = None)
     except Exception:
         # Non-fatal; leave tables as-is
         return None
+
+
+def _load_manifest_data(output_dir: Any, manifest: dict | None) -> dict | None:
+    """Load manifest data from disk unless it was supplied directly."""
+    if manifest is not None:
+        return manifest
+    manifest_path = output_dir.joinpath("_datagen_manifest.json")
+    if not hasattr(manifest_path, "exists") or not manifest_path.exists():
+        return None
+    with manifest_path.open("r") as handle:
+        return json.load(handle)
+
+
+def _resolve_manifest_entry_paths(output_dir: Any, table: str, entries: list[dict[str, Any]]) -> list[Any]:
+    """Resolve manifest file entries to absolute paths with directory guards."""
+    from pathlib import Path
+
+    paths = []
+    for entry in entries:
+        rel_path = entry.get("path")
+        if not rel_path:
+            continue
+        full_path = output_dir.joinpath(rel_path)
+        if isinstance(full_path, Path) and full_path.is_dir() and not entry.get("is_directory", False):
+            logger.warning(
+                "Manifest entry for table '%s' path '%s' is a directory but not marked as is_directory.",
+                table,
+                rel_path,
+            )
+        paths.append(full_path)
+    return paths
 
 
 def _emit_manifest_reuse_message(benchmark: Any, summary: dict[str, Any]) -> None:
@@ -1192,6 +1230,16 @@ def _validate_manifest_if_present(benchmark: Any, config: BenchmarkConfig) -> tu
                 fp = output_dir.joinpath(rel)
                 if not hasattr(fp, "exists") or not fp.exists():
                     return False, None, True
+                # Entry type guard: file-format entry resolving to a directory
+                # (without is_directory flag) indicates corrupted/contaminated state
+                if isinstance(fp, Path) and fp.is_dir() and not entry.get("is_directory", False):
+                    logger.warning(
+                        "Manifest entry for table '%s' path '%s' is a directory "
+                        "but not marked as is_directory. Manifest invalid.",
+                        table_name,
+                        rel,
+                    )
+                    return False, None, True
                 # Use compute_entry_size for directory-aware size comparison
                 # (directories like Delta/Iceberg need recursive file sum)
                 if isinstance(fp, Path) and compute_entry_size(fp) != size:
@@ -1202,6 +1250,34 @@ def _validate_manifest_if_present(benchmark: Any, config: BenchmarkConfig) -> tu
                         logger.warning("Cloud path %s is a directory; size check may be inaccurate", rel)
                     if not hasattr(fp, "stat") or fp.stat().st_size != size:
                         return False, None, True
+        # Check for table-name directory collisions (e.g., stale Iceberg output).
+        # Only check local paths — cloud paths don't have this problem.
+        if isinstance(output_dir, Path):
+            for table_name in tables.keys():
+                table_dir = output_dir / table_name
+                if table_dir.is_dir():
+                    # Check ALL entries across all formats, not just the preferred format.
+                    # get_table_files() only returns the default format's entries, but a
+                    # directory might be tracked in a non-default format (e.g., delta).
+                    # V1 manifests: table_data is a list (no directory entries possible),
+                    # so all_entries stays empty and is_tracked is False — correct.
+                    table_data = tables[table_name]
+                    all_entries: list[dict] = []
+                    if isinstance(table_data, dict):
+                        formats_dict = table_data.get("formats", {})
+                        if isinstance(formats_dict, dict):
+                            for fmt_entries in formats_dict.values():
+                                if isinstance(fmt_entries, list):
+                                    all_entries.extend(fmt_entries)
+                    is_tracked = any(e.get("path") == table_name for e in all_entries)
+                    if not is_tracked:
+                        logger.warning(
+                            "Datagen cache rejected: directory '%s/' collides with table "
+                            "name but is not recorded in manifest. Regenerating.",
+                            table_name,
+                        )
+                        return False, None, True
+
         return True, manifest, True
     except Exception:
         return False, None, bool(locals().get("manifest_found", False))

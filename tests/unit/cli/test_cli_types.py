@@ -11,7 +11,7 @@ import pytest
 
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.schemas import BenchmarkConfig, QueryResult
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,

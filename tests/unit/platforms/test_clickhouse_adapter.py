@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -776,8 +777,12 @@ class TestClickHouseMetadataCoverage:
     def test_get_database_path_variants(self, tmp_path):
         adapter = _DummyClickHouseMetadata(deployment_mode="local")
 
-        assert adapter.get_database_path(database_path="/tmp/db.duckdb").endswith(".chdb")
-        assert adapter.get_database_path(database_path="/tmp/db").endswith(".chdb")
+        duckdb_path = adapter.get_database_path(database_path="/tmp/db.duckdb")
+        bare_path = adapter.get_database_path(database_path="/tmp/db")
+        assert duckdb_path is not None
+        assert bare_path is not None
+        assert duckdb_path.endswith(".chdb")
+        assert bare_path.endswith(".chdb")
 
         assert adapter.get_database_path(database_name="bench_local") is None
 
@@ -832,3 +837,157 @@ class TestClickHouseMetadataCoverage:
         assert info["platform_version"] == "24.9"
         assert info["compute_configuration"]["system_settings"]["max_threads"] == "8"
         assert info["compute_configuration"]["build_options"]["BUILD_TYPE"] == "Release"
+
+
+class TestClickHouseWorkloadCoverage:
+    """Additional coverage-focused tests for workload helpers."""
+
+    @staticmethod
+    def _adapter(deployment_mode: str = "server") -> ClickHouseAdapter:
+        adapter = ClickHouseAdapter.__new__(ClickHouseAdapter)
+        adapter.deployment_mode = deployment_mode
+        logger = logging.getLogger(f"benchbox.tests.clickhouse.{deployment_mode}")
+        logger.debug = Mock()
+        adapter.logger = logger
+        adapter.verbose_enabled = False
+        adapter.very_verbose = False
+        adapter.log_verbose = Mock()
+        adapter.log_very_verbose = Mock()
+        return adapter
+
+    def test_extract_primary_key_columns_handles_inline_and_composite_keys(self):
+        adapter = self._adapter()
+
+        columns = adapter._extract_primary_key_columns(
+            "CREATE TABLE orders (id INT PRIMARY KEY, customer_id INT, PRIMARY KEY (customer_id, order_id))"
+        )
+
+        assert "id" in columns
+        assert "customer_id" in columns
+        assert "order_id" in columns
+
+    def test_get_existing_tables_handles_local_server_and_errors(self):
+        local_adapter = self._adapter(deployment_mode="local")
+        local_connection = Mock()
+        local_connection.execute.return_value = [("Orders",), "LineItem"]
+        assert local_adapter._get_existing_tables(local_connection) == ["orders", "lineitem"]
+
+        server_adapter = self._adapter()
+        server_connection = Mock()
+        server_connection.execute.return_value = [("Orders",), ("LineItem",)]
+        assert server_adapter._get_existing_tables(server_connection) == ["orders", "lineitem"]
+
+        failing_connection = Mock()
+        failing_connection.execute.side_effect = RuntimeError("boom")
+        assert server_adapter._get_existing_tables(failing_connection) == []
+
+    def test_get_constraint_configuration_uses_effective_config(self):
+        adapter = self._adapter()
+        adapter.get_effective_tuning_configuration = Mock(
+            return_value=SimpleNamespace(foreign_keys=SimpleNamespace(enabled=True))
+        )
+
+        assert adapter._get_constraint_configuration() == (True, True)
+
+    def test_validate_data_integrity_covers_success_failure_and_missing_execute(self):
+        adapter = self._adapter()
+
+        healthy_connection = Mock()
+        healthy_connection.execute.return_value = None
+        status, details = adapter._validate_data_integrity(None, healthy_connection, {"orders": 1})
+        assert status == "PASSED"
+        assert details["accessible_tables"] == ["orders"]
+        assert details["constraints_enabled"] is True
+
+        def _execute(sql):
+            if "lineitem" in sql:
+                raise RuntimeError("missing")
+            return None
+
+        flaky_connection = SimpleNamespace(execute=_execute)
+        status, details = adapter._validate_data_integrity(None, flaky_connection, {"orders": 1, "lineitem": 2})
+        assert status == "FAILED"
+        assert details["inaccessible_tables"] == ["lineitem"]
+        assert details["constraints_enabled"] is False
+
+        status, details = adapter._validate_data_integrity(None, SimpleNamespace(execute=None), {"orders": 1})
+        assert status == "FAILED"
+        assert "execute() method" in details["integrity_error"]
+
+    def test_execute_query_adds_row_count_validation_metadata(self):
+        adapter = self._adapter()
+        adapter.verbose_enabled = True
+        adapter.very_verbose = True
+        connection = Mock()
+        connection.execute.return_value = [(1,)]
+
+        transformer = Mock()
+        transformer.transform.return_value = "SELECT 1"
+        transformer.get_transformations_applied.return_value = ["expanded_final"]
+        validation_result = SimpleNamespace(
+            is_valid=True,
+            warning_message="expected row count unavailable",
+            error_message=None,
+            expected_row_count=None,
+        )
+
+        with (
+            patch("benchbox.platforms.clickhouse.workload.ClickHouseQueryTransformer", return_value=transformer),
+            patch("benchbox.core.validation.query_validation.QueryValidator") as validator_cls,
+        ):
+            validator_cls.return_value.validate_query_result.return_value = validation_result
+            result = adapter.execute_query(
+                connection,
+                "SELECT * FROM table",
+                "Q1",
+                benchmark_type="tpch",
+                scale_factor=1.0,
+            )
+
+        assert result["status"] == "SUCCESS"
+        assert result["row_count_validation"]["status"] == "PASSED"
+        assert result["row_count_validation"]["warning"] == "expected row count unavailable"
+        adapter.log_verbose.assert_any_call("Query Q1: Applied transformations: expanded_final")
+
+    def test_execute_query_turns_validation_failures_into_failed_results(self):
+        adapter = self._adapter()
+        connection = Mock()
+        connection.execute.return_value = [(1,), (2,)]
+
+        transformer = Mock()
+        transformer.transform.return_value = "SELECT 1"
+        transformer.get_transformations_applied.return_value = []
+        validation_result = SimpleNamespace(
+            is_valid=False,
+            warning_message=None,
+            error_message="row count mismatch",
+            expected_row_count=5,
+        )
+
+        with (
+            patch("benchbox.platforms.clickhouse.workload.ClickHouseQueryTransformer", return_value=transformer),
+            patch("benchbox.core.validation.query_validation.QueryValidator") as validator_cls,
+        ):
+            validator_cls.return_value.validate_query_result.return_value = validation_result
+            result = adapter.execute_query(connection, "SELECT * FROM table", "Q2", benchmark_type="tpch")
+
+        assert result["status"] == "FAILED"
+        assert result["row_count_validation"]["status"] == "FAILED"
+        assert result["row_count_validation"]["error"] == "row count mismatch"
+        assert result["error"] == "row count mismatch"
+
+    def test_execute_query_returns_failure_payload_on_exceptions(self):
+        adapter = self._adapter()
+        connection = Mock()
+        connection.execute.side_effect = RuntimeError("boom")
+
+        transformer = Mock()
+        transformer.transform.return_value = "SELECT 1"
+        transformer.get_transformations_applied.return_value = []
+
+        with patch("benchbox.platforms.clickhouse.workload.ClickHouseQueryTransformer", return_value=transformer):
+            result = adapter.execute_query(connection, "SELECT * FROM table", "Q3")
+
+        assert result["status"] == "FAILED"
+        assert result["error"] == "boom"
+        assert result["error_type"] == "RuntimeError"

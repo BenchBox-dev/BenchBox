@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
 from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
+from benchbox.core.tpcds.schema import TABLES
 from benchbox.core.validation import ValidationResult
 
 pytestmark = [
@@ -255,3 +257,225 @@ def test_run_official_benchmark_aggregates(tpcds_benchmark, monkeypatch):
     assert result["power_at_size"] == 16.0
     assert result["throughput_at_size"] == 9.0
     assert result["qphds_at_size"] == pytest.approx(12.0)
+
+
+def test_load_table_data_trims_padding_and_null_conversion(tpcds_benchmark, tmp_path):
+    table_schema = next(table for table in TABLES if len(table.columns) >= 3)
+    table_name = table_schema.name.lower()
+    num_columns = len(table_schema.columns)
+    data_file = tmp_path / f"{table_name}.dat"
+
+    first_row = [f"v{i}" for i in range(num_columns)] + ["ignored"]
+    second_row = ["", "x"]
+    data_file.write_text("|".join(first_row) + "\n" + "|".join(second_row) + "\n")
+
+    connection = Mock()
+
+    loaded = tpcds_benchmark._load_table_data(connection, table_name, data_file)
+
+    assert loaded == 2
+    assert connection.execute.call_count == 2
+    first_call = connection.execute.call_args_list[0]
+    second_call = connection.execute.call_args_list[1]
+    assert first_call.args[0].startswith(f"INSERT INTO {table_schema.name.upper()} VALUES")
+    assert len(first_call.args[1]) == num_columns
+    assert len(second_call.args[1]) == num_columns
+    assert second_call.args[1][0] is None
+    assert second_call.args[1][2:] == [None] * (num_columns - 2)
+
+
+def test_load_table_data_raises_for_unknown_table(tpcds_benchmark, tmp_path):
+    data_file = tmp_path / "unknown.dat"
+    data_file.write_text("1|2|3\n")
+
+    with pytest.raises(ValueError, match="Unknown table"):
+        tpcds_benchmark._load_table_data(Mock(), "not_a_table", data_file)
+
+
+def test_load_data_requires_generated_tables(tpcds_benchmark):
+    tpcds_benchmark.tables = {}
+
+    with pytest.raises(ValueError, match="No data has been generated"):
+        tpcds_benchmark._load_data(Mock())
+
+
+def test_load_data_executes_split_schema_and_skips_missing_or_empty_files(tpcds_benchmark, tmp_path, monkeypatch):
+    valid_table = "call_center"
+    empty_table = "catalog_page"
+    missing_table = "customer"
+    valid_file = tmp_path / f"{valid_table}.dat"
+    empty_file = tmp_path / f"{empty_table}.dat"
+    missing_file = tmp_path / f"{missing_table}.dat"
+    valid_file.write_text("1|2|3\n")
+    empty_file.write_text("")
+
+    tpcds_benchmark.tables = {
+        valid_table: valid_file,
+        empty_table: empty_file,
+        missing_table: missing_file,
+    }
+
+    connection = Mock()
+    monkeypatch.setattr(tpcds_benchmark, "get_create_tables_sql", lambda: "CREATE TABLE a; CREATE TABLE b;")
+    monkeypatch.setattr(tpcds_benchmark, "_load_table_data", Mock(return_value=7))
+
+    tpcds_benchmark._load_data(connection)
+
+    assert connection.execute.call_args_list[0].args[0] == "CREATE TABLE a"
+    assert connection.execute.call_args_list[1].args[0] == "CREATE TABLE b"
+    tpcds_benchmark._load_table_data.assert_called_once_with(connection, valid_table, valid_file)
+    assert connection.commit.call_count == 2
+
+
+def test_run_power_phase_records_errors(tpcds_benchmark, monkeypatch):
+    monkeypatch.setattr(tpcds_benchmark, "run_power_test", Mock(side_effect=RuntimeError("power boom")))
+    result = {"errors": [], "success": True, "power_at_size": 0.0}
+
+    tpcds_benchmark._run_power_phase(connection=object(), dialect="duckdb", logger=Mock(), result=result)
+
+    assert result["success"] is False
+    assert result["errors"] == ["Power Test failed: power boom"]
+
+
+def test_run_throughput_phase_records_errors(tpcds_benchmark, monkeypatch):
+    monkeypatch.setattr(tpcds_benchmark, "run_throughput_test", Mock(side_effect=RuntimeError("throughput boom")))
+    result = {"errors": [], "success": True, "throughput_at_size": 0.0}
+
+    tpcds_benchmark._run_throughput_phase(
+        connection_factory=lambda: object(), num_streams=2, logger=Mock(), result=result
+    )
+
+    assert result["success"] is False
+    assert result["errors"] == ["Throughput Test failed: throughput boom"]
+
+
+def test_run_maintenance_phase_records_errors(tpcds_benchmark, monkeypatch):
+    monkeypatch.setattr(tpcds_benchmark, "run_maintenance_test", Mock(side_effect=RuntimeError("maintenance boom")))
+    result = {"errors": [], "success": True}
+
+    tpcds_benchmark._run_maintenance_phase(connection=object(), dialect="duckdb", logger=Mock(), result=result)
+
+    assert result["success"] is False
+    assert result["errors"] == ["Maintenance Test failed: maintenance boom"]
+
+
+def test_finalize_benchmark_result_populates_timing_fields(tpcds_benchmark):
+    result = {
+        "total_time": 0.0,
+        "end_time": None,
+        "power_at_size": 1.0,
+        "throughput_at_size": 2.0,
+        "qphds_at_size": 1.414,
+        "success": True,
+        "errors": [],
+    }
+
+    tpcds_benchmark._finalize_benchmark_result(result, benchmark_start_time=0.0, logger=Mock())
+
+    assert result["total_time"] >= 0
+    assert isinstance(result["end_time"], str)
+
+
+def test_get_available_tables_returns_list(tpcds_benchmark):
+    tables = tpcds_benchmark.get_available_tables()
+    assert isinstance(tables, list)
+    assert len(tables) > 0
+    assert "store_sales" in tables
+
+
+def test_get_available_queries_returns_1_to_99(tpcds_benchmark):
+    queries = tpcds_benchmark.get_available_queries()
+    assert queries == list(range(1, 100))
+
+
+def test_get_table_loading_order_respects_fk_dependencies(tpcds_benchmark):
+    available = ["store_sales", "date_dim", "store", "item"]
+    order = tpcds_benchmark.get_table_loading_order(available)
+    # All requested tables should be returned
+    assert sorted(order) == sorted(available)
+    # date_dim (parent dim) should appear before store_sales (fact)
+    assert order.index("date_dim") < order.index("store_sales")
+
+
+def test_get_table_loading_order_appends_unknown_tables(tpcds_benchmark):
+    available = ["store_sales", "my_custom_table"]
+    order = tpcds_benchmark.get_table_loading_order(available)
+    assert "my_custom_table" in order
+    assert "store_sales" in order
+
+
+def test_get_schema_returns_all_tpcds_tables(tpcds_benchmark):
+    schema = tpcds_benchmark.get_schema()
+    assert isinstance(schema, dict)
+    assert len(schema) > 0
+    # Check structure of one entry
+    first_table = next(iter(schema.values()))
+    assert "name" in first_table
+    assert "columns" in first_table
+    col0 = first_table["columns"][0]
+    assert "name" in col0
+    assert "type" in col0
+    assert "nullable" in col0
+
+
+def test_generate_data_populates_tables(tpcds_benchmark, tmp_path):
+    files = tpcds_benchmark.generate_data()
+    assert isinstance(files, list)
+    assert len(files) > 0
+    # tables dict should be populated
+    assert "store_sales" in tpcds_benchmark.tables
+
+
+def test_aggregate_stream_results_sums_queries():
+    import time
+
+    from benchbox.core.tpcds.benchmark.runner import _aggregate_stream_results
+
+    start = time.time() - 1.0
+    streams = [
+        {"queries_executed": 10, "queries_successful": 8, "queries_failed": 2, "success": True, "error": None},
+        {"queries_executed": 5, "queries_successful": 5, "queries_failed": 0, "success": True, "error": None},
+    ]
+    result = _aggregate_stream_results(streams, start)
+
+    assert result["num_streams"] == 2
+    assert result["streams_executed"] == 2
+    assert result["streams_successful"] == 2
+    assert result["total_queries_executed"] == 15
+    assert result["total_queries_successful"] == 13
+    assert result["total_queries_failed"] == 2
+    assert result["success"] is True
+    assert result["errors"] == []
+    assert result["total_duration"] > 0
+
+
+def test_aggregate_stream_results_with_failures():
+    import time
+
+    from benchbox.core.tpcds.benchmark.runner import _aggregate_stream_results
+
+    start = time.time()
+    streams = [
+        {"queries_executed": 3, "queries_successful": 2, "queries_failed": 1, "success": False, "error": "timeout"},
+    ]
+    result = _aggregate_stream_results(streams, start)
+
+    assert result["success"] is False
+    assert result["errors"] == ["timeout"]
+
+
+def test_translate_query_text_returns_string(tpcds_benchmark):
+    query = "SELECT * FROM store_sales WHERE ss_sold_date_sk = 1"
+    translated = tpcds_benchmark.translate_query_text(query, "netezza", "duckdb")
+    assert isinstance(translated, str)
+    assert len(translated) > 0
+
+
+def test_get_queries_returns_dict_with_string_keys(tpcds_benchmark):
+    queries = tpcds_benchmark.get_queries()
+    assert isinstance(queries, dict)
+    assert len(queries) > 0
+    # Keys should be strings (str(query_id))
+    assert all(isinstance(k, str) for k in queries)
+    # Values should be non-empty strings
+    assert all(isinstance(v, str) and len(v) > 0 for v in queries.values())

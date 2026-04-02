@@ -34,7 +34,7 @@ COMMAND_CATEGORIES: dict[str, tuple[str, list[str]]] = {
     ),
     "visualization": (
         "Visualization",
-        ["visualize", "plot"],
+        ["visualize"],
     ),
     "plans": (
         "Query Plans",

@@ -96,6 +96,66 @@ def test_manifest_reuse_populates_tables_and_logs(
     assert manifest["created_at"] in out
 
 
+def test_manifest_reuse_preserves_directory_format_preference(tmp_path: Path, benchmark_config: BenchmarkConfig):
+    """Manifest reuse should preserve preferred directory formats for platform-specific adapters."""
+    delta_dir = tmp_path / "lineitem"
+    (delta_dir / "_delta_log").mkdir(parents=True)
+    (delta_dir / "_delta_log" / "00000000000000000000.json").write_text("{}")
+    (delta_dir / "part-000.parquet").write_bytes(b"delta")
+
+    tbl_path = tmp_path / "lineitem.tbl"
+    tbl_path.write_text("1|sample\n")
+
+    delta_size = sum(path.stat().st_size for path in delta_dir.rglob("*") if path.is_file())
+    manifest = {
+        "version": 2,
+        "benchmark": "tpcds",
+        "scale_factor": 0.01,
+        "compression": {"enabled": True, "type": "zstd", "level": None},
+        "parallel": 1,
+        "created_at": "2025-01-01T00:00:00Z",
+        "generator_version": "test",
+        "format_preference": ["delta", "tbl"],
+        "tables": {
+            "lineitem": {
+                "formats": {
+                    "delta": [
+                        {
+                            "path": "lineitem",
+                            "size_bytes": delta_size,
+                            "row_count": 1,
+                            "is_directory": True,
+                        }
+                    ],
+                    "tbl": [
+                        {
+                            "path": "lineitem.tbl",
+                            "size_bytes": tbl_path.stat().st_size,
+                            "row_count": 1,
+                        }
+                    ],
+                }
+            }
+        },
+    }
+    with (tmp_path / "_datagen_manifest.json").open("w") as fh:
+        json.dump(manifest, fh)
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = None
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is False, "Expected False when reusing manifest"
+    dummy.generate_data.assert_not_called()
+    assert dummy.tables == {"lineitem": delta_dir}
+
+
 def test_manifest_reuse_prints_when_no_logger(
     tmp_path: Path, benchmark_config: BenchmarkConfig, capsys: pytest.CaptureFixture[str]
 ):
@@ -314,3 +374,147 @@ def test_directory_entry_size_mismatch_detected(tmp_path: Path, benchmark_config
 
     assert result is True, "Size mismatch in directory should trigger regeneration"
     dummy.generate_data.assert_called_once()
+
+
+def test_table_name_directory_collision_invalidates_manifest(tmp_path: Path, benchmark_config: BenchmarkConfig):
+    """Untracked directory sharing a table name should invalidate manifest and trigger regen."""
+    _write_manifest(tmp_path, table_names=["customer", "orders"])
+
+    # Create a stale Iceberg-style directory that collides with a table name
+    stale_dir = tmp_path / "customer"
+    stale_dir.mkdir()
+    (stale_dir / "data").mkdir()
+    (stale_dir / "metadata").mkdir()
+    (stale_dir / "data" / "part-0.parquet").write_bytes(b"stale")
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = None
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is True, "Table-name directory collision should trigger regeneration"
+    dummy.generate_data.assert_called_once()
+
+
+def test_tracked_directory_entry_still_validates(
+    tmp_path: Path, benchmark_config: BenchmarkConfig, capsys: pytest.CaptureFixture[str]
+):
+    """Delta/Iceberg directory IN manifest (with matching path) should NOT be invalidated."""
+    _write_directory_manifest(tmp_path, table_name="lineitem")
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = None
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is False, "Tracked directory entry should validate and reuse"
+    dummy.generate_data.assert_not_called()
+    out = capsys.readouterr().out
+    assert "Reusing benchmark data" in out
+
+
+def test_file_entry_resolving_to_directory_invalidates(tmp_path: Path, benchmark_config: BenchmarkConfig):
+    """Manifest entry without is_directory pointing at a dir should invalidate manifest."""
+    # Write a V2 manifest that records "orders.dat" as a file entry
+    file_path = tmp_path / "orders.dat"
+    file_path.write_text("1|sample\n")
+    size = file_path.stat().st_size
+
+    manifest = {
+        "benchmark": "tpcds",
+        "scale_factor": 0.01,
+        "compression": {"enabled": True, "type": "zstd", "level": None},
+        "parallel": 1,
+        "created_at": "2025-01-01T00:00:00Z",
+        "generator_version": "test",
+        "tables": {"orders": {"formats": {"dat": [{"path": "orders.dat", "size_bytes": size, "row_count": 1}]}}},
+    }
+
+    with (tmp_path / "_datagen_manifest.json").open("w") as fh:
+        json.dump(manifest, fh)
+
+    # Now replace the file with a directory of the same name
+    file_path.unlink()
+    file_path.mkdir()
+    (file_path / "data.parquet").write_bytes(b"x" * size)
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = None
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is True, "File entry resolving to directory should trigger regeneration"
+    dummy.generate_data.assert_called_once()
+
+
+def test_multi_format_tracked_directory_not_flagged_as_collision(
+    tmp_path: Path, benchmark_config: BenchmarkConfig, capsys: pytest.CaptureFixture[str]
+):
+    """Directory tracked in a non-default format should NOT trigger collision invalidation."""
+    # Create a manifest with both tbl (preferred) and delta formats for lineitem
+    tbl_file = tmp_path / "lineitem.tbl"
+    tbl_file.write_text("1|data\n")
+    tbl_size = tbl_file.stat().st_size
+
+    # Create the delta directory (tracked in manifest under delta format)
+    delta_dir = tmp_path / "lineitem"
+    delta_dir.mkdir()
+    (delta_dir / "part-0.parquet").write_bytes(b"x" * 100)
+    delta_log = delta_dir / "_delta_log"
+    delta_log.mkdir()
+    (delta_log / "00000.json").write_bytes(b"z" * 50)
+    delta_size = sum(f.stat().st_size for f in delta_dir.rglob("*") if f.is_file())
+
+    manifest = {
+        "benchmark": "tpcds",
+        "scale_factor": 0.01,
+        "compression": {"enabled": True, "type": "zstd", "level": None},
+        "parallel": 1,
+        "created_at": "2025-01-01T00:00:00Z",
+        "generator_version": "test",
+        "format_preference": ["tbl", "delta"],
+        "tables": {
+            "lineitem": {
+                "formats": {
+                    "tbl": [{"path": "lineitem.tbl", "size_bytes": tbl_size, "row_count": 1}],
+                    "delta": [
+                        {
+                            "path": "lineitem",
+                            "size_bytes": delta_size,
+                            "row_count": 1,
+                            "is_directory": True,
+                        }
+                    ],
+                }
+            }
+        },
+    }
+
+    with (tmp_path / "_datagen_manifest.json").open("w") as fh:
+        json.dump(manifest, fh)
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = None
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is False, "Multi-format tracked directory should validate and reuse"
+    dummy.generate_data.assert_not_called()
+    out = capsys.readouterr().out
+    assert "Reusing benchmark data" in out

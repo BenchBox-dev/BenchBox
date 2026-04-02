@@ -5,7 +5,7 @@
 ```{tags} intermediate, guide, duckdb, embedded-platform
 ```
 
-DuckDB is an in-process analytical database optimized for OLAP workloads. It's included by default with BenchBox and suitable for local development, testing, and small-to-medium scale benchmarks.
+DuckDB is an in-process analytical database optimized for OLAP workloads. Install it via the `[duckdb]` extra and it is ready for local development, testing, and small-to-medium scale benchmarks.
 
 ## Features
 
@@ -15,11 +15,11 @@ DuckDB is an in-process analytical database optimized for OLAP workloads. It's i
 - **SQLite-compatible** - File-based persistence
 - **Parallel execution** - Multi-threaded queries
 
-## Why DuckDB is Included by Default
+## Why DuckDB is the Recommended Starting Point
 
-DuckDB is included with BenchBox by default for convenience:
+DuckDB is available via the `[duckdb]` extra and recommended for most local workloads:
 
-1. **No setup required** - Works out of the box with no external dependencies
+1. **No server setup** - Works with no external dependencies after install
 2. **Native file format support** - Parquet and CSV support
 3. **Local execution** - No network or service variability
 4. **Free and open source** - No licensing costs
@@ -30,11 +30,11 @@ Choose the platform that best fits your specific requirements. See the [Platform
 ## Installation
 
 ```bash
-# DuckDB is included with BenchBox by default
-uv add benchbox
+# Install BenchBox with the DuckDB extra
+uv add benchbox --extra duckdb
 
 # Or with pip
-pip install benchbox
+pip install "benchbox[duckdb]"
 ```
 
 ## Configuration
@@ -186,19 +186,19 @@ benchbox run --platform duckdb --benchmark tpch --scale 10.0 \
 
 DuckDB supports fast data loading from multiple formats:
 
-### Parquet (Default)
+### Default
 
 ```bash
-# BenchBox generates Parquet by default
+# Data is generated as .tbl flat files (zstd-compressed by default) and loaded automatically
 benchbox run --platform duckdb --benchmark tpch --scale 1.0
 ```
 
-### CSV
+### Pre-generated Data
 
 ```bash
-# Generate CSV data, then run benchmark
-benchbox datagen --benchmark tpch --scale 1.0 --format csv --output ./data/tpch_csv
-benchbox run --platform duckdb --benchmark tpch --scale 1.0 --output ./data/tpch_csv
+# Generate data separately, then run benchmark with pre-generated data
+benchbox datagen --benchmark tpch --scale 1.0 --output ./data/tpch
+benchbox run --platform duckdb --benchmark tpch --scale 1.0 --data-dir ./data/tpch
 ```
 
 ### Direct Query (No Load)

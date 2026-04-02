@@ -200,6 +200,80 @@ benchbox run --platform athena-spark --benchmark tpch --scale 1.0 \
 benchbox platforms status clickhouse
 ```
 
+## Table Storage Options
+
+**Table Mode:**
+- `--table-mode [native|external]`: How tables are created (default: `native`)
+  - `native`: Standard materialized tables in the target database
+  - `external`: External table or view references (e.g., Parquet-backed)
+  - **Note:** Incompatible with `--tuning tuned` when set to `external`
+
+**Table Format:**
+- `--table-format TEXT`: Open table format for data files
+  - Format: `FORMAT[:COMPRESSION[:PARTITION:COLS...]]`
+  - Examples: `parquet`, `delta:snappy`, `iceberg:zstd`, `vortex`
+  - Supported formats depend on the platform adapter
+
+**Pre-sorted Data:**
+- `--presort [parquet-sorted|delta-sorted|iceberg-sorted]`: Pre-sort data into open table formats
+  - Only valid for TPC-H and TPC-DS benchmarks
+  - TPC-H sorts on `lineitem.l_shipdate`; TPC-DS sorts on `store_sales.ss_sold_date_sk`
+
+## Cloud Sorted Ingestion Options
+
+These flags control cloud data-organization strategy selection across supported cloud warehouses. They are advanced options — use `--help-topic all` to see them in the CLI help.
+
+- `--sorted-ingestion-mode [off|auto|force]`: Cloud sorted-ingestion strategy mode
+- `--sorted-ingestion-method [auto|ctas|z_order|hilbert|liquid_clustering|vacuum_sort]`: Override the clustering method used during sorted ingestion
+
+```bash
+# Snowflake with forced CTAS-based sorted ingestion
+benchbox run --platform snowflake --benchmark tpch --scale 1 \
+  --sorted-ingestion-mode force \
+  --sorted-ingestion-method ctas
+```
+
+## Databricks Clustering Options
+
+These overrides are Databricks-specific and are passed via `--platform-option`.
+
+- `--platform-option databricks_clustering_strategy=[z_order|liquid_clustering|none]`: SQL tuning strategy for Databricks tables
+- `--platform-option liquid_clustering_columns=col1,col2`: Comma-separated liquid clustering columns
+
+```bash
+# Databricks with Z-order clustering
+benchbox run --platform databricks --benchmark tpch --scale 1 \
+  --platform-option databricks_clustering_strategy=z_order
+
+# Databricks with liquid clustering on specific columns
+benchbox run --platform databricks --benchmark tpch --scale 1 \
+  --platform-option databricks_clustering_strategy=liquid_clustering \
+  --platform-option liquid_clustering_columns=l_shipdate,l_orderkey
+```
+
+## Execution Control Options
+
+These flags control monitoring, progress display, memory handling, and caching behavior. They are advanced options — use `--help-topic all` to see them in the CLI help.
+
+- `--mode [sql|dataframe]`: Force execution mode (validates against platform capabilities)
+- `--no-monitoring`: Disable metrics collection during benchmark execution
+- `--no-progress`: Disable progress bars
+- `--ignore-memory-warnings`: Proceed with execution despite low memory warnings
+- `--global-cache`: Use shared data cache at `~/.benchbox/datagen/` instead of project-local `benchmark_runs/` directory
+
+## Query Plan Capture Options
+
+- `--plan-config TEXT`: Fine-grained control over query plan capture
+  - Format: comma-separated key:value pairs
+  - Keys:
+    - `sample:FLOAT` — fraction of queries to capture plans for (e.g., `sample:0.1` for 10%)
+    - `first:INT` — capture plans for the first N queries only
+    - `queries:ID1,ID2,...` — capture plans for specific query IDs
+    - `strict:true|false` — fail if plan capture encounters errors
+  - Requires `--capture-plans` to also be set
+  - Example: `--capture-plans --plan-config "sample:0.1,strict:true"`
+  - **Note:** On DuckDB, plan capture uses `EXPLAIN (ANALYZE, FORMAT JSON)` which roughly doubles query execution time. Use `--platform-option analyze_plans=false` for estimated plans without the overhead.
+
 ## Related
 
 - [Configuration](configuration.md) - Configuration files and environment variables

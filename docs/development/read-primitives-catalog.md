@@ -88,6 +88,8 @@ Some queries cannot be meaningfully tested on certain platforms due to data limi
 - Platform fundamentally lacks required feature and no reasonable alternative exists
 - Query would always fail due to platform limitations, not bugs
 
+For a complete reference of all current skips, their root causes, and instructions on how to re-enable them, see {doc}`read-primitives-skips-reference`.
+
 **How it works:**
 1. When `get_queries(dialect="duckdb")` is called, queries with `skip_on: [duckdb]` are excluded
 2. `get_query(query_id, dialect="duckdb")` raises `ValueError` if query is in skip_on list

@@ -236,7 +236,7 @@ class TestTPCHParameterCompliance:
             # Test a few seeds in each range
             for seed in [start, (start + end) // 2, end]:
                 sql = tpch.get_query(1, seed=seed)
-                assert isinstance(sql, str)
+                assert "select" in sql.lower() or "with" in sql.lower()
                 assert len(sql) > 50
 
     def test_parameter_immutability(self):

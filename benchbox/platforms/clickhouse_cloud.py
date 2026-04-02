@@ -878,51 +878,17 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
 
     @staticmethod
     def _parse_s3_url(s3_url: str) -> tuple[str, str]:
-        """Parse an S3 URL into (bucket, prefix) components.
+        """Parse an S3 URL into (bucket, prefix) components."""
+        from benchbox.utils.cloud_urls import parse_s3_url
 
-        Args:
-            s3_url: S3 URL like 's3://my-bucket/path/prefix/'
-
-        Returns:
-            Tuple of (bucket_name, key_prefix). Prefix includes trailing slash.
-
-        Examples:
-            >>> ClickHouseCloudAdapter._parse_s3_url("s3://my-bucket/staging/")
-            ('my-bucket', 'staging/')
-            >>> ClickHouseCloudAdapter._parse_s3_url("s3://my-bucket/")
-            ('my-bucket', '')
-        """
-        path = s3_url[5:]  # len("s3://") == 5
-        if "/" in path:
-            bucket, prefix = path.split("/", 1)
-        else:
-            bucket = path
-            prefix = ""
-        return bucket, prefix
+        return parse_s3_url(s3_url)
 
     @staticmethod
     def _parse_gcs_url(gcs_url: str) -> tuple[str, str]:
-        """Parse a GCS URL into (bucket, prefix) components.
+        """Parse a GCS URL into (bucket, prefix) components."""
+        from benchbox.utils.cloud_urls import parse_gcs_url
 
-        Args:
-            gcs_url: GCS URL like 'gs://my-bucket/path/prefix/'
-
-        Returns:
-            Tuple of (bucket_name, key_prefix). Prefix includes trailing slash.
-
-        Examples:
-            >>> ClickHouseCloudAdapter._parse_gcs_url("gs://my-bucket/staging/")
-            ('my-bucket', 'staging/')
-            >>> ClickHouseCloudAdapter._parse_gcs_url("gs://my-bucket/")
-            ('my-bucket', '')
-        """
-        path = gcs_url[5:]  # len("gs://") == 5
-        if "/" in path:
-            bucket, prefix = path.split("/", 1)
-        else:
-            bucket = path
-            prefix = ""
-        return bucket, prefix
+        return parse_gcs_url(gcs_url)
 
 
 def _build_clickhouse_cloud_config(

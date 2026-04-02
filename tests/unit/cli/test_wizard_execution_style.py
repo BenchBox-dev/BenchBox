@@ -311,4 +311,4 @@ class TestSelectDatabaseWithFilter:
         config = db_manager.select_database(style_filter=None)
 
         # Should complete successfully with all platforms available
-        assert config is not None
+        assert isinstance(config.type, str)

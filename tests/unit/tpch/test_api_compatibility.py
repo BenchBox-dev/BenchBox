@@ -156,12 +156,10 @@ class TestAPICompatibility:
 
         queries = benchmark.get_queries()
 
-        assert isinstance(queries, dict)
         assert len(queries) == 22
 
-        # Keys should be strings (for backward compatibility)
+        # Keys should be valid query IDs
         for key in queries:
-            assert isinstance(key, str)
             assert int(key) in range(1, 23)
 
         # Values should be SQL strings
@@ -221,7 +219,7 @@ class TestAPICompatibility:
 
         # get_queries should return dict
         queries = tpch.get_queries()
-        assert isinstance(queries, dict)
+        assert len(queries) == 22
 
     def test_dialect_parameter_handling(self):
         """Test that dialect parameter is handled appropriately."""

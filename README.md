@@ -3,7 +3,7 @@
 # BenchBox
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Alpha Software](https://img.shields.io/badge/Status-Alpha-orange.svg)](https://github.com/joeharris76/benchbox/issues)
+[![Beta Software](https://img.shields.io/badge/Status-Beta-blue.svg)](https://github.com/joeharris76/benchbox/issues)
 [![codecov](https://codecov.io/github/joeharris76/BenchBox/graph/badge.svg?token=3NY6DK7MDO)](https://codecov.io/github/joeharris76/BenchBox)
 [![PyPI Release](https://img.shields.io/pypi/v/benchbox)](https://pypi.org/project/benchbox/)
 [![PyPI Downloads](https://img.shields.io/pepy/dt/benchbox.svg?label=PyPI%20Downloads)](https://pypi.org/project/benchbox/)
@@ -28,13 +28,15 @@ BenchBox _loosely_ follows [Semantic Versioning](https://semver.org/) using the 
 - **MINOR** when we add backward-compatible changes _OR significantly expand functionality_.
 - **PATCH** when we make bug fixes or documentation updates, _bug-fixes may not be backward-compatible_.
 
-Current release: v0.1.5. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
+Current release: v0.2.0. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
 
 **For Developers**: See [Release Automation Guide](release/RELEASE_AUTOMATION.md) for the automated release process with reproducible builds and timestamp normalization.
 
-## Alpha Software
+## Beta Software
 
-> **BenchBox is ALPHA software.** APIs may change, features may be incomplete, and production use is not recommended. See [DISCLAIMER.md](DISCLAIMER.md) for full details on what this means and how to get help.
+> **BenchBox is BETA software.** Core functionality and the CLI are stable. APIs may still change before 1.0. See [DISCLAIMER.md](DISCLAIMER.md) for full details on what this means and how to get help.
+
+The default wheel ships the `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, concurrency subsystems). This namespace is **outside the supported Beta product surface**: it has no stability guarantees, may change or be removed without notice, and is not integrated with the benchmark registry or public CLI. It is present in the wheel for developer convenience only.
 
 ## Features
 
@@ -42,7 +44,7 @@ Current release: v0.1.5. Check your installation with `benchbox --version`, whic
 - **Eighteen Benchmarks**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc, SSB, AMPLab, JoinOrder, ClickBench, H2ODB, NYC Taxi, TSBS DevOps, CoffeeShop, TPC-H Data Vault, Read Primitives, Write Primitives, Transaction Primitives
 - **Cross-Database**: Same benchmarks work on any database platform
 - **DataFrame Mode**: Native DataFrame API benchmarking with Polars, Pandas, and 6 other libraries
-- **SQL Platforms** (31): DuckDB, MotherDuck, SQLite, DataFusion, PostgreSQL, TimescaleDB, Polars, ClickHouse, Firebolt, InfluxDB, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark, Snowpark Connect, Onehouse Quanton
+- **SQL Platforms** (29): DuckDB, MotherDuck, SQLite, DataFusion, PostgreSQL, TimescaleDB, Polars, ClickHouse, Firebolt, InfluxDB, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark
 - **DataFrame Platforms** (7): Polars-DF, Pandas-DF, DataFusion-DF, Modin-DF, Dask-DF, cuDF-DF (GPU), PySpark-DF
 - **Open Table Formats**: Delta Lake, Apache Iceberg, Apache Hudi (via Databricks, Quanton, Trino, Spark platforms)
 - **SQL Translation**: Automatic query conversion between SQL dialects
@@ -109,20 +111,20 @@ Consider LakeBench when evaluating Spark-based lakehouse engines, testing comple
 
 BenchBox ships as a Python package with optional extras that enable specific database platforms. Start with the core installation, then layer in the extras that match your environment.
 
-### Core Installation (DuckDB + SQLite)
+### Local Development (DuckDB + SQLite)
 
-The base package includes everything you need for local development, DuckDB, and SQLite workflows.
+Install the `[duckdb]` extra to get DuckDB and SQLite for local workflows. This is the recommended starting point.
 
-- Embedded DuckDB engine for quick benchmarks
+- DuckDB engine for quick benchmarks (requires `[duckdb]` extra)
 - Local data generators and CLI utilities
 - SQLite integration for lightweight testing
 - **Does not** include remote warehouse connectors (Databricks, Snowflake, etc.)
 
-Install the core package with your preferred tool:
+Install with DuckDB:
 
 **Recommended (using uv):**
 ```bash
-uv add benchbox
+uv add benchbox --extra duckdb
 ```
 
 **Alternative (pip-compatible):**
@@ -134,7 +136,7 @@ python -m pip install "benchbox[duckdb]"
 pipx install "benchbox[duckdb]"
 ```
 
-> **Note:** DuckDB is an optional dependency as of v0.1.4. Use `benchbox[duckdb]` for DuckDB support or `benchbox[all]` for all platforms. A plain `pip install benchbox` installs the core package without any database driver.
+> **Note:** DuckDB is an optional dependency. A plain `uv add benchbox` (no extras) installs the core package with SQLite only — no DuckDB. Use `benchbox[duckdb]` for DuckDB support or `benchbox[all]` for all platforms.
 
 ### Optional Dependency Groups
 
@@ -329,10 +331,9 @@ These libraries are required for every installation and provide complete local b
 - **psutil** – System resource monitoring
 - **pydantic** – Data validation and configuration models
 - **pyyaml** – YAML configuration file support
-- **duckdb** – Embedded analytical database engine
 - **pytest libraries** – Testing framework components for built-in validation
 
-The core package includes all necessary Python dependencies for local benchmarking - DuckDB is embedded and ready to go. No external database servers or system installations are required for basic functionality.
+The core package includes all necessary Python dependencies for running benchmarks. DuckDB is available via `benchbox[duckdb]` — a plain `benchbox` install uses SQLite. No external database servers or system installations are required for basic functionality.
 
 #### Optional Platform Dependencies (installed on demand)
 
@@ -1104,8 +1105,10 @@ make test-integration
 # or
 uv run -- python -m pytest -m "integration and not live_integration"
 
-# With coverage
-make coverage
+# With coverage (fast tests only — quick feedback)
+make coverage-fast
+# or full suite
+make coverage-all
 # or
 uv run -- python -m pytest --cov=benchbox --cov-report=term-missing
 ```
@@ -1212,7 +1215,7 @@ BenchBox/
 
 ## Contributing
 
-As alpha software, BenchBox benefits greatly from community feedback and contributions. Here's how you can help:
+As Beta software, BenchBox benefits greatly from community feedback and contributions. Here's how you can help:
 
 ### Reporting Issues
 
@@ -1229,7 +1232,7 @@ As alpha software, BenchBox benefits greatly from community feedback and contrib
 
 ### Community Guidelines
 
-- **Be patient**: As alpha software, responses may take time
+- **Be patient**: As Beta software, responses may take time
 - **Search first**: Check existing [issues](https://github.com/joeharris76/benchbox/issues) before creating new ones
 - **Be specific**: Detailed reports help us understand and fix issues faster
 - **Stay constructive**: Focus on problems and solutions, not criticism

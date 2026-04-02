@@ -437,19 +437,7 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         Returns:
             MetadataBenchmarkResult with all query timings and summary
         """
-        # Determine which queries to run
-        if query_ids:
-            queries_to_run = query_ids
-        elif categories:
-            queries_to_run = []
-            for category in categories:
-                queries_to_run.extend(self.query_manager.get_queries_by_category(category).keys())
-        else:
-            # Get all queries for the dialect (filtering skip_on)
-            if dialect:
-                queries_to_run = list(self.query_manager.get_queries_for_dialect(dialect).keys())
-            else:
-                queries_to_run = list(self.query_manager.get_all_queries().keys())
+        queries_to_run = self._select_queries_to_run(dialect=dialect, categories=categories, query_ids=query_ids)
 
         result = MetadataBenchmarkResult()
         all_results: list[MetadataQueryResult] = []
@@ -468,35 +456,7 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
 
         result.total_queries = len(all_results)
         result.results = all_results
-
-        # Build category summary
-        category_times: dict[str, list[float]] = {}
-        category_counts: dict[str, int] = {}
-        category_successes: dict[str, int] = {}
-
-        for qr in all_results:
-            cat = qr.category
-            if cat not in category_times:
-                category_times[cat] = []
-                category_counts[cat] = 0
-                category_successes[cat] = 0
-
-            category_times[cat].append(qr.execution_time_ms)
-            category_counts[cat] += 1
-            if qr.success:
-                category_successes[cat] += 1
-
-        for cat in category_times:
-            times = category_times[cat]
-            result.category_summary[cat] = {
-                "total_queries": category_counts[cat],
-                "successful": category_successes[cat],
-                "failed": category_counts[cat] - category_successes[cat],
-                "total_time_ms": sum(times),
-                "avg_time_ms": sum(times) / len(times) if times else 0.0,
-                "min_time_ms": min(times) if times else 0.0,
-                "max_time_ms": max(times) if times else 0.0,
-            }
+        result.category_summary = self._build_category_summary(all_results)
 
         # Run ACL mutation tests at the end (on supported platforms)
         if dialect and supports_acl(dialect):
@@ -505,6 +465,64 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             result.acl_mutation_summary = self._build_acl_summary(acl_results)
 
         return result
+
+    def _select_queries_to_run(
+        self,
+        *,
+        dialect: str | None,
+        categories: list[str] | None,
+        query_ids: list[str] | None,
+    ) -> list[str]:
+        """Resolve the query IDs to execute for a benchmark run."""
+        if query_ids:
+            return query_ids
+        if categories:
+            queries_to_run: list[str] = []
+            for category in categories:
+                queries_to_run.extend(self.query_manager.get_queries_by_category(category).keys())
+            return queries_to_run
+        if dialect:
+            return list(self.query_manager.get_queries_for_dialect(dialect).keys())
+        return list(self.query_manager.get_all_queries().keys())
+
+    def _build_category_summary(self, all_results: list[MetadataQueryResult]) -> dict[str, dict[str, float | int]]:
+        """Aggregate per-category execution statistics."""
+        category_summary: dict[str, dict[str, float | int]] = {}
+        for query_result in all_results:
+            entry = category_summary.setdefault(
+                query_result.category,
+                {
+                    "total_queries": 0,
+                    "successful": 0,
+                    "failed": 0,
+                    "total_time_ms": 0.0,
+                    "avg_time_ms": 0.0,
+                    "min_time_ms": 0.0,
+                    "max_time_ms": 0.0,
+                },
+            )
+            total_queries = int(entry["total_queries"]) + 1
+            total_time_ms = float(entry["total_time_ms"]) + query_result.execution_time_ms
+            min_time_ms = (
+                query_result.execution_time_ms
+                if total_queries == 1
+                else min(float(entry["min_time_ms"]), query_result.execution_time_ms)
+            )
+            max_time_ms = max(float(entry["max_time_ms"]), query_result.execution_time_ms)
+            successful = int(entry["successful"]) + int(query_result.success)
+            failed = total_queries - successful
+            entry.update(
+                {
+                    "total_queries": total_queries,
+                    "successful": successful,
+                    "failed": failed,
+                    "total_time_ms": total_time_ms,
+                    "avg_time_ms": total_time_ms / total_queries,
+                    "min_time_ms": min_time_ms,
+                    "max_time_ms": max_time_ms,
+                }
+            )
+        return category_summary
 
     # =========================================================================
     # Complexity Testing Methods

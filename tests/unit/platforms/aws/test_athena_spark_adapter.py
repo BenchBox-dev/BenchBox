@@ -132,6 +132,62 @@ class TestAthenaSparkAdapterInitialization:
             assert adapter.session_idle_timeout_minutes == 30
 
 
+class TestAthenaSparkTableFormat:
+    """Test table_format parameter configuration."""
+
+    def test_table_format_default_parquet(self):
+        """Test table_format defaults to parquet."""
+        with (
+            patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
+            patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
+            patch("benchbox.platforms.aws.athena_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.aws import AthenaSparkAdapter
+
+            adapter = AthenaSparkAdapter(
+                workgroup="spark-wg",
+                s3_staging_dir="s3://bucket/data",
+            )
+            assert adapter.table_format == "parquet"
+
+    def test_table_format_delta(self):
+        """Test table_format can be set to delta."""
+        with (
+            patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
+            patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
+            patch("benchbox.platforms.aws.athena_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.aws import AthenaSparkAdapter
+
+            adapter = AthenaSparkAdapter(
+                workgroup="spark-wg",
+                s3_staging_dir="s3://bucket/data",
+                table_format="delta",
+            )
+            assert adapter.table_format == "delta"
+
+    def test_table_format_from_config(self):
+        """Test table_format is passed through from_config."""
+        with (
+            patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
+            patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
+            patch("benchbox.platforms.aws.athena_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.aws import AthenaSparkAdapter
+
+            adapter = AthenaSparkAdapter.from_config(
+                {
+                    "workgroup": "spark-wg",
+                    "s3_staging_dir": "s3://bucket/data",
+                    "table_format": "iceberg",
+                }
+            )
+            assert adapter.table_format == "iceberg"
+
+
 class TestAthenaSparkAdapterPlatformInfo:
     """Test platform info methods."""
 

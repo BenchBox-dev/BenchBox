@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, tpc-di
 ```
 
+> **CLI name:** `tpcdi` — use `benchbox run --benchmark tpcdi`
+
 ## Overview
 
 The TPC-DI (Transaction Processing Performance Council - Data Integration) benchmark is designed to test data integration and ETL (Extract, Transform, Load) processes used in data warehousing scenarios. TPC-DI simulates a financial services environment with customer data, account information, and trading activities, focusing on the challenges of transforming and loading data from multiple source systems into a data warehouse.
@@ -15,7 +17,7 @@ Unlike other TPC benchmarks that primarily test query performance, TPC-DI evalua
 
 - **Data Integration focus** - Tests ETL processes rather than just query performance
 - **Financial services domain** - Models trading, customer, and company data
-- **Slowly Changing Dimensions** - Tests SCD Type 1 and Type 2 implementations  
+- **Slowly Changing Dimensions** - Tests SCD Type 1 and Type 2 implementations
 - **Data quality validation** - Includes systematic data validation queries
 - **Multiple data sources** - Simulates various source file formats (CSV, XML, fixed-width)
 - **Historical data loading** - Tests both full loads and incremental updates
@@ -216,7 +218,7 @@ for table_name in tables_to_load:
     if file_path.exists():
         conn.execute(f"""
             INSERT INTO {table_name}
-            SELECT * FROM read_csv('{file_path}', 
+            SELECT * FROM read_csv('{file_path}',
                                   header=true,
                                   auto_detect=true)
         """)
@@ -248,29 +250,29 @@ def process_customer_scd_type2(new_customer_data, existing_dim_customer):
     """
     batch_id = 1001
     effective_date = "2023-06-01"
-    
+
     scd_logic = """
     -- Close existing records that have changed
-    UPDATE DimCustomer 
-    SET IsCurrent = 0, 
+    UPDATE DimCustomer
+    SET IsCurrent = 0,
         EndDate = '{effective_date}'
     WHERE CustomerID IN (
-        SELECT CustomerID 
+        SELECT CustomerID
         FROM new_customer_data n
         JOIN DimCustomer d ON n.CustomerID = d.CustomerID
         WHERE d.IsCurrent = 1
-        AND (n.LastName != d.LastName 
+        AND (n.LastName != d.LastName
              OR n.FirstName != d.FirstName
              OR n.Address != d.Address)
     );
-    
+
     -- Insert new records for changed customers
     INSERT INTO DimCustomer (
         CustomerID, TaxID, Status, LastName, FirstName,
         Address, City, StateProv, Country,
         IsCurrent, BatchID, EffectiveDate, EndDate
     )
-    SELECT 
+    SELECT
         n.CustomerID, n.TaxID, n.Status, n.LastName, n.FirstName,
         n.Address, n.City, n.StateProv, n.Country,
         1 as IsCurrent,
@@ -282,14 +284,14 @@ def process_customer_scd_type2(new_customer_data, existing_dim_customer):
         -- Changed customers
         SELECT CustomerID FROM updated_customers
         UNION
-        -- New customers  
+        -- New customers
         SELECT CustomerID FROM new_customers
     );
     """.format(
         effective_date=effective_date,
         batch_id=batch_id
     )
-    
+
     return scd_logic
 ```
 
@@ -316,7 +318,7 @@ def process_customer_scd_type2(new_customer_data, existing_dim_customer):
 
 **Analytical Queries:**
 - **Interactive (< 5s)**: A1, A3 - Customer and broker analysis
-- **Reporting (5-30s)**: A2, A4 - Company and portfolio analysis  
+- **Reporting (5-30s)**: A2, A4 - Company and portfolio analysis
 - **Analytical (> 30s)**: A5, A6 - Historical trend analysis
 
 ## Configuration Options
@@ -366,7 +368,7 @@ def transform_and_load(**context):
     """Transform and load data into warehouse."""
     tpcdi = TPCDI(scale_factor=1.0)
     batch_id = context['batch_id']
-    
+
     # Run ETL transformations
     results = tpcdi.run_etl_process(
         batch_id=batch_id,
@@ -377,11 +379,11 @@ def transform_and_load(**context):
 def validate_data_quality(**context):
     """Run data quality validation."""
     tpcdi = TPCDI(scale_factor=1.0)
-    
+
     validation_results = {}
     for query_id in ["V1", "V2", "V3", "V4", "V5"]:
         validation_results[query_id] = tpcdi.run_validation_query(query_id)
-    
+
     return validation_results
 
 # Define DAG
@@ -430,7 +432,7 @@ class TPCDIDataQualityFramework:
     def __init__(self, tpcdi: TPCDI, connection):
         self.tpcdi = tpcdi
         self.connection = connection
-        
+
     def run_systematic_validation(self) -> dict:
         """Run all data quality checks."""
         results = {
@@ -439,7 +441,7 @@ class TPCDIDataQualityFramework:
             'referential_integrity': {},
             'business_rules': {}
         }
-        
+
         # Run validation queries
         for query_id in ["V1", "V2", "V3", "V4", "V5"]:
             query_sql = self.tpcdi.get_query(query_id)
@@ -448,7 +450,7 @@ class TPCDIDataQualityFramework:
                 'status': 'PASSED' if len(result) > 0 else 'FAILED',
                 'row_count': len(result)
             }
-        
+
         # Run data quality checks
         dq_checks = {
             'DQ1': self._check_referential_integrity(),
@@ -457,12 +459,12 @@ class TPCDIDataQualityFramework:
             'DQ4': self._check_data_completeness(),
             'DQ5': self._check_duplicate_detection()
         }
-        
+
         for check_id, check_result in dq_checks.items():
             results['data_quality_checks'][check_id] = check_result
-        
+
         return results
-    
+
     def _check_referential_integrity(self) -> dict:
         """Check foreign key relationships."""
         checks = [
@@ -470,7 +472,7 @@ class TPCDIDataQualityFramework:
             ("Trade-Customer", "SELECT COUNT(*) FROM FactTrade t LEFT JOIN DimCustomer c ON t.SK_CustomerID = c.SK_CustomerID WHERE c.SK_CustomerID IS NULL"),
             ("Trade-Security", "SELECT COUNT(*) FROM FactTrade t LEFT JOIN DimSecurity s ON t.SK_SecurityID = s.SK_SecurityID WHERE s.SK_SecurityID IS NULL")
         ]
-        
+
         results = {}
         for check_name, check_sql in checks:
             violation_count = self.connection.execute(check_sql).fetchone()[0]
@@ -478,26 +480,26 @@ class TPCDIDataQualityFramework:
                 'violations': violation_count,
                 'status': 'PASSED' if violation_count == 0 else 'FAILED'
             }
-        
+
         return results
-    
+
     def _check_temporal_consistency(self) -> dict:
         """Check SCD temporal consistency."""
         # Check for overlapping date ranges in SCD Type 2 tables
         overlap_check = """
         SELECT COUNT(*) FROM DimCustomer c1
-        JOIN DimCustomer c2 ON c1.CustomerID = c2.CustomerID 
+        JOIN DimCustomer c2 ON c1.CustomerID = c2.CustomerID
         AND c1.SK_CustomerID != c2.SK_CustomerID
         WHERE c1.EffectiveDate <= COALESCE(c2.EndDate, '9999-12-31')
         AND COALESCE(c1.EndDate, '9999-12-31') >= c2.EffectiveDate
         """
-        
+
         overlaps = self.connection.execute(overlap_check).fetchone()[0]
         return {
             'overlapping_ranges': overlaps,
             'status': 'PASSED' if overlaps == 0 else 'FAILED'
         }
-    
+
     def _check_business_rules(self) -> dict:
         """Check financial industry business rules."""
         rules = [
@@ -505,7 +507,7 @@ class TPCDIDataQualityFramework:
             ("Valid Customer Tiers", "SELECT COUNT(*) FROM DimCustomer WHERE Tier NOT IN (1,2,3)"),
             ("Account Status Values", "SELECT COUNT(*) FROM DimAccount WHERE Status NOT IN ('Active','Inactive','Closed')")
         ]
-        
+
         results = {}
         for rule_name, rule_sql in rules:
             violations = self.connection.execute(rule_sql).fetchone()[0]
@@ -513,9 +515,9 @@ class TPCDIDataQualityFramework:
                 'violations': violations,
                 'status': 'PASSED' if violations == 0 else 'FAILED'
             }
-        
+
         return results
-    
+
     def _check_data_completeness(self) -> dict:
         """Check for missing critical data."""
         completeness_checks = [
@@ -523,7 +525,7 @@ class TPCDIDataQualityFramework:
             ("Trade Prices", "SELECT COUNT(*) FROM FactTrade WHERE TradePrice IS NULL"),
             ("Security Symbols", "SELECT COUNT(*) FROM DimSecurity WHERE Symbol IS NULL")
         ]
-        
+
         results = {}
         for check_name, check_sql in completeness_checks.items():
             missing_count = self.connection.execute(check_sql).fetchone()[0]
@@ -531,27 +533,27 @@ class TPCDIDataQualityFramework:
                 'missing_values': missing_count,
                 'status': 'PASSED' if missing_count == 0 else 'WARNING'
             }
-        
+
         return results
-    
+
     def _check_duplicate_detection(self) -> dict:
         """Check for inappropriate duplicates."""
         duplicate_checks = [
             ("Current Customer Records", """
-                SELECT CustomerID, COUNT(*) 
-                FROM DimCustomer 
-                WHERE IsCurrent = 1 
-                GROUP BY CustomerID 
+                SELECT CustomerID, COUNT(*)
+                FROM DimCustomer
+                WHERE IsCurrent = 1
+                GROUP BY CustomerID
                 HAVING COUNT(*) > 1
             """),
             ("Trade Record Duplicates", """
-                SELECT TradeID, COUNT(*) 
-                FROM FactTrade 
-                GROUP BY TradeID 
+                SELECT TradeID, COUNT(*)
+                FROM FactTrade
+                GROUP BY TradeID
                 HAVING COUNT(*) > 1
             """)
         ]
-        
+
         results = {}
         for check_name, check_sql in duplicate_checks:
             duplicates = self.connection.execute(check_sql).fetchall()
@@ -559,7 +561,7 @@ class TPCDIDataQualityFramework:
                 'duplicate_groups': len(duplicates),
                 'status': 'PASSED' if len(duplicates) == 0 else 'FAILED'
             }
-        
+
         return results
 
 # Usage

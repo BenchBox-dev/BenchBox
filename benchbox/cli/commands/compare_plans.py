@@ -377,7 +377,12 @@ def _output_summary_text(summary: PlanComparisonSummary, return_string: bool = F
     if return_string:
         return text_output
 
-    # Use rich for styled output
+    _render_summary_rich(summary, regressions)
+    return None
+
+
+def _render_summary_rich(summary: PlanComparisonSummary, regressions: list) -> None:
+    """Render comparison summary using Rich console formatting."""
     console.print(Panel.fit("[bold]Plan Comparison Summary[/bold]", border_style="blue"))
     console.print()
     console.print("[bold]Runs Compared:[/bold]")
@@ -438,8 +443,6 @@ def _output_summary_text(summary: PlanComparisonSummary, return_string: bool = F
     else:
         console.print()
         console.print("[green]No regressions detected[/green]")
-
-    return None
 
 
 def _output_summary_json(summary: PlanComparisonSummary, return_string: bool = False) -> str | None:

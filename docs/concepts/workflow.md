@@ -284,8 +284,7 @@ Generating benchmark data separately from execution:
 # Generate multiple scale factors
 for sf in 0.01 0.1 1 10; do
   benchbox datagen --benchmark tpch --scale $sf \
-    --output ./data/tpch_${sf} \
-    --format parquet
+    --output ./data/tpch_${sf}
 done
 
 # Compress for storage

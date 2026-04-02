@@ -982,6 +982,61 @@ class MaintenanceOperations:
             round(self.random_gen.uniform(0.0, 500.0), 2),  # SR_NET_LOSS
         )
 
+    def _generate_returns_from_sale(
+        self,
+        sale_record: tuple,
+        *,
+        field_mapping: tuple[int, int, int, int, int, int, int],
+        channel_fields: tuple[int, ...],
+    ) -> tuple:
+        """Generate a return row by reusing the sale keys required by the TPC-DS spec."""
+        (
+            order_num_idx,
+            item_idx,
+            bill_customer_idx,
+            bill_cdemo_idx,
+            bill_hdemo_idx,
+            bill_addr_idx,
+            quantity_idx,
+        ) = field_mapping
+
+        order_num = sale_record[order_num_idx]
+        item_sk = sale_record[item_idx]
+        bill_cust_sk = sale_record[bill_customer_idx]
+        bill_cdemo_sk = sale_record[bill_cdemo_idx]
+        bill_hdemo_sk = sale_record[bill_hdemo_idx]
+        bill_addr_sk = sale_record[bill_addr_idx]
+        quantity = sale_record[quantity_idx]
+        return_qty = self.random_gen.randint(1, min(100, int(quantity)))
+        channel_values = tuple(sale_record[index] for index in channel_fields)
+
+        return (
+            self._get_random_key("date_dim"),
+            self._get_random_key("time_dim"),
+            item_sk,
+            bill_cust_sk,
+            bill_cdemo_sk,
+            bill_hdemo_sk,
+            bill_addr_sk,
+            bill_cust_sk,
+            bill_cdemo_sk,
+            bill_hdemo_sk,
+            bill_addr_sk,
+            *channel_values,
+            self.random_gen.randint(1, 35),
+            order_num,
+            return_qty,
+            round(self.random_gen.uniform(1.0, 1000.0), 2),
+            round(self.random_gen.uniform(0.0, 100.0), 2),
+            round(self.random_gen.uniform(1.0, 1100.0), 2),
+            round(self.random_gen.uniform(0.0, 50.0), 2),
+            round(self.random_gen.uniform(0.0, 50.0), 2),
+            round(self.random_gen.uniform(0.0, 500.0), 2),
+            round(self.random_gen.uniform(0.0, 500.0), 2),
+            round(self.random_gen.uniform(0.0, 500.0), 2),
+            round(self.random_gen.uniform(0.0, 500.0), 2),
+        )
+
     def _generate_catalog_returns_from_sale(self, sale_record: tuple) -> tuple:
         """Generate a catalog return based on an actual catalog sale.
 
@@ -994,50 +1049,10 @@ class MaintenanceOperations:
         Returns:
             Tuple representing a valid catalog return
         """
-        (
-            order_num,
-            item_sk,
-            bill_cust_sk,
-            bill_cdemo_sk,
-            bill_hdemo_sk,
-            bill_addr_sk,
-            call_center_sk,
-            catalog_page_sk,
-            ship_mode_sk,
-            warehouse_sk,
-            quantity,
-        ) = sale_record
-
-        return_qty = self.random_gen.randint(1, min(100, int(quantity)))
-
-        return (
-            self._get_random_key("date_dim"),  # CR_RETURNED_DATE_SK
-            self._get_random_key("time_dim"),  # CR_RETURNED_TIME_SK
-            item_sk,  # CR_ITEM_SK (must match sale)
-            bill_cust_sk,  # CR_REFUNDED_CUSTOMER_SK (must match sale)
-            bill_cdemo_sk,  # CR_REFUNDED_CDEMO_SK (must match sale)
-            bill_hdemo_sk,  # CR_REFUNDED_HDEMO_SK (must match sale)
-            bill_addr_sk,  # CR_REFUNDED_ADDR_SK (must match sale)
-            bill_cust_sk,  # CR_RETURNING_CUSTOMER_SK (same as refunded)
-            bill_cdemo_sk,  # CR_RETURNING_CDEMO_SK (same as refunded)
-            bill_hdemo_sk,  # CR_RETURNING_HDEMO_SK (same as refunded)
-            bill_addr_sk,  # CR_RETURNING_ADDR_SK (same as refunded)
-            call_center_sk,  # CR_CALL_CENTER_SK (must match sale)
-            catalog_page_sk,  # CR_CATALOG_PAGE_SK (must match sale)
-            ship_mode_sk,  # CR_SHIP_MODE_SK (must match sale)
-            warehouse_sk,  # CR_WAREHOUSE_SK (must match sale)
-            self.random_gen.randint(1, 35),  # CR_REASON_SK
-            order_num,  # CR_ORDER_NUMBER (must match sale)
-            return_qty,  # CR_RETURN_QUANTITY
-            round(self.random_gen.uniform(1.0, 1000.0), 2),  # CR_RETURN_AMOUNT
-            round(self.random_gen.uniform(0.0, 100.0), 2),  # CR_RETURN_TAX
-            round(self.random_gen.uniform(1.0, 1100.0), 2),  # CR_RETURN_AMT_INC_TAX
-            round(self.random_gen.uniform(0.0, 50.0), 2),  # CR_FEE
-            round(self.random_gen.uniform(0.0, 50.0), 2),  # CR_RETURN_SHIP_COST
-            round(self.random_gen.uniform(0.0, 500.0), 2),  # CR_REFUNDED_CASH
-            round(self.random_gen.uniform(0.0, 500.0), 2),  # CR_REVERSED_CHARGE
-            round(self.random_gen.uniform(0.0, 500.0), 2),  # CR_STORE_CREDIT
-            round(self.random_gen.uniform(0.0, 500.0), 2),  # CR_NET_LOSS
+        return self._generate_returns_from_sale(
+            sale_record,
+            field_mapping=(0, 1, 2, 3, 4, 5, 10),
+            channel_fields=(6, 7, 8, 9),
         )
 
     def _generate_web_returns_from_sale(self, sale_record: tuple) -> tuple:
@@ -1051,37 +1066,10 @@ class MaintenanceOperations:
         Returns:
             Tuple representing a valid web return
         """
-        (order_num, item_sk, bill_cust_sk, bill_cdemo_sk, bill_hdemo_sk, bill_addr_sk, web_page_sk, quantity) = (
-            sale_record
-        )
-
-        return_qty = self.random_gen.randint(1, min(100, int(quantity)))
-
-        return (
-            self._get_random_key("date_dim"),  # WR_RETURNED_DATE_SK
-            self._get_random_key("time_dim"),  # WR_RETURNED_TIME_SK
-            item_sk,  # WR_ITEM_SK (must match sale)
-            bill_cust_sk,  # WR_REFUNDED_CUSTOMER_SK (must match sale)
-            bill_cdemo_sk,  # WR_REFUNDED_CDEMO_SK (must match sale)
-            bill_hdemo_sk,  # WR_REFUNDED_HDEMO_SK (must match sale)
-            bill_addr_sk,  # WR_REFUNDED_ADDR_SK (must match sale)
-            bill_cust_sk,  # WR_RETURNING_CUSTOMER_SK (same as refunded)
-            bill_cdemo_sk,  # WR_RETURNING_CDEMO_SK (same as refunded)
-            bill_hdemo_sk,  # WR_RETURNING_HDEMO_SK (same as refunded)
-            bill_addr_sk,  # WR_RETURNING_ADDR_SK (same as refunded)
-            web_page_sk,  # WR_WEB_PAGE_SK (must match sale)
-            self.random_gen.randint(1, 35),  # WR_REASON_SK
-            order_num,  # WR_ORDER_NUMBER (must match sale)
-            return_qty,  # WR_RETURN_QUANTITY
-            round(self.random_gen.uniform(1.0, 1000.0), 2),  # WR_RETURN_AMT
-            round(self.random_gen.uniform(0.0, 100.0), 2),  # WR_RETURN_TAX
-            round(self.random_gen.uniform(1.0, 1100.0), 2),  # WR_RETURN_AMT_INC_TAX
-            round(self.random_gen.uniform(0.0, 50.0), 2),  # WR_FEE
-            round(self.random_gen.uniform(0.0, 50.0), 2),  # WR_RETURN_SHIP_COST
-            round(self.random_gen.uniform(0.0, 500.0), 2),  # WR_REFUNDED_CASH
-            round(self.random_gen.uniform(0.0, 500.0), 2),  # WR_REVERSED_CHARGE
-            round(self.random_gen.uniform(0.0, 500.0), 2),  # WR_ACCOUNT_CREDIT
-            round(self.random_gen.uniform(0.0, 500.0), 2),  # WR_NET_LOSS
+        return self._generate_returns_from_sale(
+            sale_record,
+            field_mapping=(0, 1, 2, 3, 4, 5, 7),
+            channel_fields=(6,),
         )
 
     def _generate_catalog_returns_row(self) -> tuple:

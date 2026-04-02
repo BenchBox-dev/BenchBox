@@ -453,11 +453,27 @@ class InsightGenerator:
         Returns:
             List of query highlight strings
         """
-        highlights = []
+        highlights = self._find_gap_highlights(report.query_comparisons, self.config.performance_threshold)
+        highlights += self._find_surprising_win_highlights(report.query_comparisons, report.rankings, report.platforms)
+        return highlights[: self.config.max_insights_per_category]
 
-        # Find queries with largest performance gaps
+    def _find_gap_highlights(
+        self,
+        query_comparisons: dict[str, Any],
+        threshold: float,
+    ) -> list[str]:
+        """Find queries with largest performance gaps between platforms.
+
+        Args:
+            query_comparisons: Mapping of query ID to QueryComparison
+            threshold: Minimum performance ratio to consider noteworthy
+
+        Returns:
+            List of gap highlight strings (up to 3)
+        """
+        highlights = []
         gap_queries = []
-        for query_id, qc in report.query_comparisons.items():
+        for query_id, qc in query_comparisons.items():
             if len(qc.performance_ratios) >= 2:
                 max_ratio = max(qc.performance_ratios.values())
                 gap_queries.append((query_id, qc, max_ratio))
@@ -465,31 +481,43 @@ class InsightGenerator:
         gap_queries.sort(key=lambda x: x[2], reverse=True)
 
         for query_id, qc, max_ratio in gap_queries[:3]:
-            if max_ratio > self.config.performance_threshold:
+            if max_ratio > threshold:
                 slowest = max(qc.performance_ratios.keys(), key=lambda p: qc.performance_ratios[p])
                 highlights.append(f"Query {query_id}: {qc.winner} excels ({max_ratio:.1f}x faster than {slowest})")
 
-        # Find queries where rankings differ from overall
-        if report.rankings:
-            overall_winner = report.rankings[0].platform
-            surprising_wins = []
-            for query_id, qc in report.query_comparisons.items():
-                if qc.winner != overall_winner and qc.winner in report.platforms:
-                    surprising_wins.append((query_id, qc.winner))
+        return highlights
 
-            if len(surprising_wins) > 0:
-                # Report the platform that wins most queries it's not expected to
-                alt_winner_counts: dict[str, int] = {}
-                for _, winner in surprising_wins:
-                    alt_winner_counts[winner] = alt_winner_counts.get(winner, 0) + 1
+    def _find_surprising_win_highlights(
+        self,
+        query_comparisons: dict[str, Any],
+        rankings: list[Any],
+        platforms: list[str],
+    ) -> list[str]:
+        """Find queries where a non-leader platform wins unexpectedly.
 
-                for platform, count in sorted(alt_winner_counts.items(), key=lambda x: -x[1])[:1]:
-                    if count >= 3:
-                        highlights.append(
-                            f"{platform} wins {count} queries despite ranking behind {overall_winner} overall"
-                        )
+        Args:
+            query_comparisons: Mapping of query ID to QueryComparison
+            rankings: Platform rankings (first entry is overall winner)
+            platforms: List of platform names in the comparison
 
-        return highlights[: self.config.max_insights_per_category]
+        Returns:
+            List of surprising win highlight strings
+        """
+        if not rankings:
+            return []
+
+        overall_winner = rankings[0].platform
+        alt_winner_counts: dict[str, int] = {}
+        for _query_id, qc in query_comparisons.items():
+            if qc.winner != overall_winner and qc.winner in platforms:
+                alt_winner_counts[qc.winner] = alt_winner_counts.get(qc.winner, 0) + 1
+
+        highlights = []
+        for platform, count in sorted(alt_winner_counts.items(), key=lambda x: -x[1])[:1]:
+            if count >= 3:
+                highlights.append(f"{platform} wins {count} queries despite ranking behind {overall_winner} overall")
+
+        return highlights
 
     def _generate_blog_snippet(
         self,

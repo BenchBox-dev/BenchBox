@@ -91,6 +91,7 @@ def save_last_run_config(
     compression_level: Optional[int] = None,
     test_execution_type: str = "power",
     seed: Optional[int] = None,
+    output: Optional[str] = None,
     additional_options: Optional[dict[str, Any]] = None,
 ) -> None:
     """Save the last run configuration for quick restart.
@@ -107,6 +108,7 @@ def save_last_run_config(
         compression_level: Compression level (algorithm-specific)
         test_execution_type: Test type (power, throughput, combined, etc.)
         seed: RNG seed for reproducibility
+        output: Cloud storage output location (for cloud platforms)
         additional_options: Any additional configuration options
     """
     config = {
@@ -123,6 +125,9 @@ def save_last_run_config(
         "seed": seed,
         "timestamp": datetime.now().isoformat(),
     }
+
+    if output:
+        config["output"] = output
 
     if additional_options:
         config.update(additional_options)
@@ -229,6 +234,51 @@ def _is_safe_tuning_path(tuning_path: str) -> bool:
         return False
 
 
+def _format_relative_time(iso_timestamp: str) -> Optional[str]:
+    """Format an ISO timestamp as a human-readable relative time string.
+
+    Args:
+        iso_timestamp: ISO 8601 formatted timestamp string
+
+    Returns:
+        Relative time string like "(2d ago)" or "(just now)", or None if invalid
+    """
+    try:
+        timestamp = datetime.fromisoformat(iso_timestamp)
+    except (ValueError, TypeError):
+        return None
+
+    time_diff = datetime.now() - timestamp
+
+    if time_diff.days > 0:
+        return f"({time_diff.days}d ago)"
+    elif time_diff.seconds > 3600:
+        return f"({time_diff.seconds // 3600}h ago)"
+    elif time_diff.seconds > 60:
+        return f"({time_diff.seconds // 60}m ago)"
+    else:
+        return "(just now)"
+
+
+def _format_tuning_label(tuning: str) -> str:
+    """Map a tuning mode value to its display label.
+
+    Args:
+        tuning: Tuning mode string (e.g., "tuned", "notuning", or a file path)
+
+    Returns:
+        Human-readable tuning label
+    """
+    if tuning == "tuned":
+        return "tuned"
+    elif tuning == "notuning":
+        return "baseline"
+    elif _is_safe_tuning_path(tuning):
+        return "custom config"
+    else:
+        return tuning
+
+
 def format_last_run_summary(config: dict[str, Any]) -> str:
     """Format a human-readable summary of the last run configuration.
 
@@ -238,57 +288,28 @@ def format_last_run_summary(config: dict[str, Any]) -> str:
     Returns:
         Formatted summary string
     """
-    parts = []
+    parts = [
+        f"{config['benchmark'].upper()} on {config['database'].upper()}",
+        f"SF={config['scale']}",
+        _format_tuning_label(config.get("tuning_mode", "tuned")),
+    ]
 
-    # Basic info
-    parts.append(f"{config['benchmark'].upper()} on {config['database'].upper()}")
-    parts.append(f"SF={config['scale']}")
-
-    # Tuning
-    tuning = config.get("tuning_mode", "tuned")
-    if tuning == "tuned":
-        parts.append("tuned")
-    elif tuning == "notuning":
-        parts.append("baseline")
-    elif _is_safe_tuning_path(tuning):
-        parts.append("custom config")
-    else:
-        parts.append(tuning)
-
-    # Phases
     phases = config.get("phases", [])
     if phases:
-        phases_str = "+".join(phases)
-        parts.append(f"phases: {phases_str}")
+        parts.append(f"phases: {'+'.join(phases)}")
 
-    # Table mode (only include when non-default)
     table_mode = str(config.get("table_mode", "native") or "native").lower()
     if table_mode != "native":
         parts.append(f"tables: {table_mode}")
 
-    # Concurrency
     concurrency = config.get("concurrency", 1)
     if concurrency > 1:
         parts.append(f"{concurrency} streams")
 
-    # Timestamp
     if "timestamp" in config:
-        try:
-            timestamp = datetime.fromisoformat(config["timestamp"])
-            time_diff = datetime.now() - timestamp
-
-            if time_diff.days > 0:
-                parts.append(f"({time_diff.days}d ago)")
-            elif time_diff.seconds > 3600:
-                hours = time_diff.seconds // 3600
-                parts.append(f"({hours}h ago)")
-            elif time_diff.seconds > 60:
-                minutes = time_diff.seconds // 60
-                parts.append(f"({minutes}m ago)")
-            else:
-                parts.append("(just now)")
-        except (ValueError, TypeError):
-            pass
+        relative_time = _format_relative_time(config["timestamp"])
+        if relative_time:
+            parts.append(relative_time)
 
     return " | ".join(parts)
 

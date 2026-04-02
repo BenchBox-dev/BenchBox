@@ -329,11 +329,11 @@ class TestManifestUpgrade:
 class TestFormatPreferences:
     """Test format preference resolution."""
 
-    def test_get_preferred_format_manifest_preference(self):
-        """Test format selection using manifest preference."""
+    def test_get_preferred_format_manifest_preference_wins_by_default(self):
+        """Test that manifest preference is the default load-order contract."""
         manifest = ManifestV2(
             version=2,
-            format_preference=["parquet", "tbl"],  # Prefer parquet
+            format_preference=["parquet", "tbl"],  # Manifest prefers parquet
             tables={
                 "customer": TableFormats(
                     formats={
@@ -344,11 +344,39 @@ class TestFormatPreferences:
             },
         )
 
+        # DuckDB supports both formats, so the manifest-selected parquet wins.
         preferred = get_preferred_format(manifest, "customer", "duckdb")
         assert preferred == "parquet"
 
-    def test_get_preferred_format_platform_preference(self):
-        """Test format selection using platform preference."""
+        # The shared helper keeps manifest order by default, even for Redshift.
+        preferred = get_preferred_format(manifest, "customer", "redshift")
+        assert preferred == "parquet"
+
+    def test_get_preferred_format_can_prefer_platform_defaults_when_requested(self):
+        """Test platform-native loaders can opt into platform-first selection."""
+        manifest = ManifestV2(
+            version=2,
+            format_preference=["parquet", "tbl"],
+            tables={
+                "customer": TableFormats(
+                    formats={
+                        "tbl": [ConvertedFileEntry(path="customer.tbl", size_bytes=100, row_count=10)],
+                        "parquet": [ConvertedFileEntry(path="customer.parquet", size_bytes=50, row_count=10)],
+                    }
+                )
+            },
+        )
+
+        preferred = get_preferred_format(
+            manifest,
+            "customer",
+            "redshift",
+            prefer_platform_defaults=True,
+        )
+        assert preferred == "tbl"
+
+    def test_get_preferred_format_platform_preference_no_manifest_pref(self):
+        """Test format selection using platform preference when no manifest preference."""
         manifest = ManifestV2(
             version=2,
             format_preference=[],  # No manifest preference
@@ -362,9 +390,9 @@ class TestFormatPreferences:
             },
         )
 
-        # DuckDB prefers parquet over tbl
+        # DuckDB prefers tbl (text files) over parquet
         preferred = get_preferred_format(manifest, "customer", "duckdb")
-        assert preferred == "parquet"
+        assert preferred == "tbl"
 
     def test_get_preferred_format_external_mode_uses_external_capabilities(self):
         """Test external mode can select external-only formats without affecting native mode."""
@@ -410,6 +438,24 @@ class TestFormatPreferences:
         )
 
         preferred = get_preferred_format(manifest, "customer", "duckdb")
+        assert preferred == "tbl"
+
+    def test_get_preferred_format_unlisted_platform_falls_back_to_first_available(self):
+        """Test unlisted platforms do not blindly follow manifest preference."""
+        manifest = ManifestV2(
+            version=2,
+            format_preference=["delta", "tbl"],
+            tables={
+                "customer": TableFormats(
+                    formats={
+                        "tbl": [ConvertedFileEntry(path="customer.tbl", size_bytes=100, row_count=10)],
+                        "delta": [ConvertedFileEntry(path="customer", size_bytes=50, row_count=10)],
+                    }
+                )
+            },
+        )
+
+        preferred = get_preferred_format(manifest, "customer", "some-unlisted-platform")
         assert preferred == "tbl"
 
     def test_get_preferred_format_missing_table(self):

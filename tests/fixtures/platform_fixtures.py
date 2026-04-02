@@ -1,0 +1,105 @@
+"""Platform-specific test fixtures.
+
+Provides DuckDB stubs, cloud adapter dependency mocks, and database
+connection fixtures. Registered as a pytest plugin in root conftest.py.
+
+Copyright 2026 Joe Harris / BenchBox Project
+
+Licensed under the MIT License. See LICENSE file in the project root for details.
+"""
+
+from __future__ import annotations
+
+from contextlib import ExitStack
+from unittest.mock import patch
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _provide_fake_duckdb(monkeypatch):
+    """Provide a lightweight duckdb stub when the optional dependency is missing."""
+    from benchbox.platforms import duckdb as duckdb_module  # import late to honour patching
+
+    if getattr(duckdb_module, "duckdb", None) is not None:
+        yield
+        return
+
+    class _FakeCursor:
+        def __init__(self):
+            self.statements: list[str] = []
+
+        def execute(self, sql: str):
+            self.statements.append(sql)
+            return self
+
+        def fetchall(self):
+            return []
+
+        def fetchone(self):
+            return None
+
+        def fetchmany(self, size=None):  # pragma: no cover - interface completeness
+            return []
+
+        def close(self):
+            return None
+
+    class _FakeDuckDBModule:
+        __version__ = "0.0-test"
+
+        @staticmethod
+        def connect(_database_path: str):
+            return _FakeCursor()
+
+    monkeypatch.setattr(duckdb_module, "duckdb", _FakeDuckDBModule(), raising=False)
+    yield
+
+
+@pytest.fixture
+def duckdb_memory_db():
+    """Create an in-memory DuckDB database connection."""
+    import duckdb
+
+    conn = duckdb.connect(":memory:")
+    yield conn
+    conn.close()
+
+
+@pytest.fixture(autouse=True)
+def mock_platform_dependency_checks():
+    """Provide default dependency stubs for cloud adapters in unit tests."""
+
+    targets = [
+        "benchbox.platforms.bigquery.check_platform_dependencies",
+        "benchbox.platforms.databricks.adapter.check_platform_dependencies",
+        "benchbox.platforms.clickhouse.check_platform_dependencies",
+        "benchbox.platforms.snowflake.check_platform_dependencies",
+        "benchbox.platforms.redshift.check_platform_dependencies",
+    ]
+
+    with ExitStack() as stack:
+        for target in targets:
+            try:
+                stack.enter_context(patch(target, return_value=(True, [])))
+            except AttributeError:
+                # Skip patching if the attribute doesn't exist (e.g., databricks is now a package)
+                pass
+
+        try:
+            from benchbox.platforms.snowflake import SnowflakeAdapter
+
+            SnowflakeAdapter.add_cli_arguments = staticmethod(lambda parser: None)
+            # Don't stub from_config - we want to test the real implementation
+        except ImportError:
+            pass
+
+        try:
+            from benchbox.platforms.redshift import RedshiftAdapter
+
+            RedshiftAdapter.add_cli_arguments = staticmethod(lambda parser: None)
+            # Don't stub from_config - we want to test the real implementation
+        except ImportError:
+            pass
+
+        yield

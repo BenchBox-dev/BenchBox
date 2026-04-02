@@ -132,6 +132,56 @@ def parse_tpcds_answer_file(answer_file_path: Path) -> int:
     raise RuntimeError(f"Unexpected: no encoding worked for {answer_file_path}")
 
 
+def _find_tpch_answers_dir() -> Path:
+    """Locate the TPC-H answer files directory.
+
+    Checks in order:
+    1. _sources/ directory (development / sdist installs)
+    2. Local cache (~/.cache/benchbox/answers/tpch/)
+    3. Trigger on-demand download if cache miss and download not disabled
+
+    Returns:
+        Path to directory containing q1.out .. q22.out
+
+    Raises:
+        FileNotFoundError: If answer files are not available and cannot be downloaded
+    """
+    from benchbox.core.expected_results.download import (
+        download_tpch_answers,
+        get_tpch_cache_dir,
+        is_download_disabled,
+    )
+
+    # 1. Check _sources/ (development / sdist)
+    try:
+        import benchbox
+
+        package_root = Path(benchbox.__file__).parent.parent
+        src_dir = package_root / "_sources" / "tpc-h" / "dbgen" / "answers"
+        if src_dir.exists():
+            return src_dir
+    except (AttributeError, TypeError):
+        pass
+
+    # 2. Check local cache
+    cache_dir = get_tpch_cache_dir()
+    if cache_dir.exists() and any(cache_dir.glob("q*.out")):
+        return cache_dir
+
+    # 3. Attempt on-demand download
+    if not is_download_disabled():
+        logger.info("TPC-H answer files not found locally; attempting on-demand download...")
+        result = download_tpch_answers()
+        if result is not None and result.exists():
+            return result
+
+    raise FileNotFoundError(
+        "TPC-H answer files not found. "
+        "They are included in source distributions but not in wheel installs. "
+        "To download them: benchbox download-answers --benchmark tpch"
+    )
+
+
 def load_tpch_expected_results(scale_factor: float = 1.0) -> dict[str, int]:
     """Load expected row counts for all TPC-H queries at a given scale factor.
 
@@ -143,7 +193,7 @@ def load_tpch_expected_results(scale_factor: float = 1.0) -> dict[str, int]:
 
     Raises:
         ValueError: If scale_factor != 1.0 (answer files are only for SF=1)
-        FileNotFoundError: If answer files directory not found
+        FileNotFoundError: If answer files directory not found and download unavailable
     """
     if scale_factor != 1.0:
         raise ValueError(
@@ -152,14 +202,7 @@ def load_tpch_expected_results(scale_factor: float = 1.0) -> dict[str, int]:
             f"To use other scale factors, disable validation with validate_results=False."
         )
 
-    # Find TPC-H answer files directory
-    import benchbox
-
-    package_root = Path(benchbox.__file__).parent.parent
-    answers_dir = package_root / "_sources" / "tpc-h" / "dbgen" / "answers"
-
-    if not answers_dir.exists():
-        raise FileNotFoundError(f"TPC-H answers directory not found: {answers_dir}")
+    answers_dir = _find_tpch_answers_dir()
 
     # Parse all answer files (q1.out through q22.out)
     expected_results = {}
@@ -178,6 +221,56 @@ def load_tpch_expected_results(scale_factor: float = 1.0) -> dict[str, int]:
     return expected_results
 
 
+def _find_tpcds_answers_dir() -> Path:
+    """Locate the TPC-DS answer files directory.
+
+    Checks in order:
+    1. _sources/ directory (development / sdist installs)
+    2. Local cache (~/.cache/benchbox/answers/tpcds/)
+    3. Trigger on-demand download if cache miss and download not disabled
+
+    Returns:
+        Path to directory containing 1.ans .. 99.ans
+
+    Raises:
+        FileNotFoundError: If answer files are not available and cannot be downloaded
+    """
+    from benchbox.core.expected_results.download import (
+        download_tpcds_answers,
+        get_tpcds_cache_dir,
+        is_download_disabled,
+    )
+
+    # 1. Check _sources/ (development / sdist)
+    try:
+        import benchbox
+
+        package_root = Path(benchbox.__file__).parent.parent
+        src_dir = package_root / "_sources" / "tpc-ds" / "answer_sets"
+        if src_dir.exists():
+            return src_dir
+    except (AttributeError, TypeError):
+        pass
+
+    # 2. Check local cache
+    cache_dir = get_tpcds_cache_dir()
+    if cache_dir.exists() and any(cache_dir.glob("*.ans")):
+        return cache_dir
+
+    # 3. Attempt on-demand download
+    if not is_download_disabled():
+        logger.info("TPC-DS answer files not found locally; attempting on-demand download...")
+        result = download_tpcds_answers()
+        if result is not None and result.exists():
+            return result
+
+    raise FileNotFoundError(
+        "TPC-DS answer files not found. "
+        "They are included in source distributions but not in wheel installs. "
+        "To download them: benchbox download-answers --benchmark tpcds"
+    )
+
+
 def load_tpcds_expected_results(scale_factor: float = 1.0) -> dict[str, int]:
     """Load expected row counts for all TPC-DS queries at a given scale factor.
 
@@ -189,7 +282,7 @@ def load_tpcds_expected_results(scale_factor: float = 1.0) -> dict[str, int]:
 
     Raises:
         ValueError: If scale_factor != 1.0 (answer files are only for SF=1)
-        FileNotFoundError: If answer files directory not found
+        FileNotFoundError: If answer files directory not found and download unavailable
     """
     if scale_factor != 1.0:
         raise ValueError(
@@ -198,14 +291,7 @@ def load_tpcds_expected_results(scale_factor: float = 1.0) -> dict[str, int]:
             f"To use other scale factors, disable validation with validate_results=False."
         )
 
-    # Find TPC-DS answer files directory
-    import benchbox
-
-    package_root = Path(benchbox.__file__).parent.parent
-    answers_dir = package_root / "_sources" / "tpc-ds" / "answer_sets"
-
-    if not answers_dir.exists():
-        raise FileNotFoundError(f"TPC-DS answers directory not found: {answers_dir}")
+    answers_dir = _find_tpcds_answers_dir()
 
     # Parse all answer files (1.ans through 99.ans)
     # Note: Some queries have variants (e.g., 1_NULLS_FIRST.ans, 1_NULLS_LAST.ans)

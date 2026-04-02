@@ -96,6 +96,56 @@ class TestDataprocAdapterInitialization:
             assert adapter.create_ephemeral_cluster is False
 
 
+class TestDataprocTableFormat:
+    """Test table_format parameter configuration."""
+
+    def test_table_format_default_parquet(self):
+        """Test table_format defaults to parquet."""
+        with (
+            patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.gcp import DataprocAdapter
+
+            adapter = DataprocAdapter(
+                project_id="proj",
+                gcs_staging_dir="gs://bucket/data",
+            )
+            assert adapter.table_format == "parquet"
+
+    def test_table_format_delta(self):
+        """Test table_format can be set to delta."""
+        with (
+            patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.gcp import DataprocAdapter
+
+            adapter = DataprocAdapter(
+                project_id="proj",
+                gcs_staging_dir="gs://bucket/data",
+                table_format="delta",
+            )
+            assert adapter.table_format == "delta"
+
+    def test_table_format_from_config(self):
+        """Test table_format is passed through from_config."""
+        with (
+            patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.gcp import DataprocAdapter
+
+            adapter = DataprocAdapter.from_config(
+                {
+                    "project_id": "proj",
+                    "gcs_staging_dir": "gs://bucket/data",
+                    "table_format": "iceberg",
+                }
+            )
+            assert adapter.table_format == "iceberg"
+
+
 class TestDataprocAdapterPlatformInfo:
     """Test platform info methods."""
 

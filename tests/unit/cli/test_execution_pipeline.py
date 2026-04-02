@@ -22,7 +22,7 @@ from benchbox.core.schemas import (
     RunConfig,
     SystemProfile,
 )
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,

@@ -7,6 +7,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import argparse
 from unittest.mock import Mock, patch
 
 import pytest
@@ -97,6 +98,43 @@ class TestPostgreSQLAdapter:
         params = adapter._get_connection_params(database="override_db")
 
         assert params["dbname"] == "override_db"
+
+    def test_add_cli_arguments_registers_postgres_compatible_flags(self, postgres_stubs):
+        """CLI parser should expose shared PostgreSQL-compatible arguments."""
+        parser = argparse.ArgumentParser()
+
+        PostgreSQLAdapter.add_cli_arguments(parser)
+        parsed = parser.parse_args(
+            [
+                "--postgres-host",
+                "pg.local",
+                "--postgres-port",
+                "5544",
+                "--postgres-database",
+                "benchbox_db",
+                "--postgres-username",
+                "benchbox",
+                "--postgres-password",
+                "secret",
+                "--postgres-schema",
+                "analytics",
+                "--postgres-work-mem",
+                "768MB",
+                "--postgres-maintenance-work-mem",
+                "1GB",
+                "--postgres-enable-timescale",
+            ]
+        )
+
+        assert parsed.host == "pg.local"
+        assert parsed.port == 5544
+        assert parsed.database == "benchbox_db"
+        assert parsed.username == "benchbox"
+        assert parsed.password == "secret"
+        assert parsed.schema == "analytics"
+        assert parsed.work_mem == "768MB"
+        assert parsed.maintenance_work_mem == "1GB"
+        assert parsed.enable_timescale is True
 
     def test_check_server_database_exists_true(self, postgres_stubs):
         """Database existence check returns True when database is found."""
@@ -498,3 +536,223 @@ class TestPostgreSQLDataLoading:
         # Invalid identifier should be skipped with 0 rows
         assert list(stats.values())[0] == 0
         assert not mock_cursor.copy_expert.called
+
+
+class TestPostgreSQLCreateDatabase:
+    """Tests for _create_database helper."""
+
+    def test_create_database_calls_create_if_not_exists(self, postgres_stubs):
+        """_create_database should execute CREATE DATABASE when db doesn't exist."""
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = None  # DB does not exist
+        mock_conn.cursor.return_value = mock_cursor
+        postgres_stubs.connect.return_value = mock_conn
+
+        adapter = PostgreSQLAdapter(database="newdb")
+        adapter._create_database()
+
+        executed = " ".join(str(c) for c in mock_cursor.execute.call_args_list)
+        assert "CREATE DATABASE" in executed
+        assert "newdb" in executed
+
+    def test_create_database_skips_if_already_exists(self, postgres_stubs):
+        """_create_database should skip when DB already exists."""
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = (1,)  # DB already exists
+        mock_conn.cursor.return_value = mock_cursor
+        postgres_stubs.connect.return_value = mock_conn
+
+        adapter = PostgreSQLAdapter(database="existingdb")
+        adapter._create_database()
+
+        executed = " ".join(str(c) for c in mock_cursor.execute.call_args_list)
+        assert "CREATE DATABASE" not in executed
+
+    def test_create_database_rejects_invalid_identifier(self, postgres_stubs):
+        """_create_database should raise ValueError for invalid database names."""
+        adapter = PostgreSQLAdapter(database="valid_db")
+        adapter.database = "invalid; DROP TABLE users"
+
+        with pytest.raises(ValueError, match="Invalid database identifier"):
+            adapter._create_database()
+
+
+class TestPostgreSQLCreateSchema:
+    """Tests for create_schema method."""
+
+    def test_create_schema_executes_statements(self, postgres_stubs):
+        """create_schema should execute all SQL statements from benchmark schema."""
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        class MockBenchmark:
+            def get_schema_sql(self):
+                return "CREATE TABLE foo (id INT); CREATE TABLE bar (id INT)"
+
+        adapter = PostgreSQLAdapter()
+
+        with patch.object(
+            adapter, "_create_schema_with_tuning", return_value="CREATE TABLE foo (id INT); CREATE TABLE bar (id INT)"
+        ):
+            duration = adapter.create_schema(MockBenchmark(), mock_conn)
+
+        assert isinstance(duration, float)
+        assert duration >= 0
+        mock_conn.commit.assert_called()
+
+    def test_create_schema_continues_on_statement_failure(self, postgres_stubs):
+        """create_schema should continue executing remaining statements if one fails."""
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        # First statement fails, second succeeds
+        mock_cursor.execute.side_effect = [Exception("syntax error"), None]
+        mock_conn.cursor.return_value = mock_cursor
+
+        class MockBenchmark:
+            pass
+
+        adapter = PostgreSQLAdapter()
+
+        with patch.object(adapter, "_create_schema_with_tuning", return_value="INVALID SQL; CREATE TABLE bar (id INT)"):
+            duration = adapter.create_schema(MockBenchmark(), mock_conn)
+
+        # Should complete without raising despite first statement error
+        assert isinstance(duration, float)
+        mock_conn.commit.assert_called()
+
+
+class TestPostgreSQLValidatePlatformCapabilities:
+    """Tests for validate_platform_capabilities."""
+
+    def test_valid_capabilities_with_psycopg2(self, postgres_stubs):
+        """Should return valid result when psycopg2 is available."""
+        postgres_stubs.__version__ = "2.9.9"
+
+        adapter = PostgreSQLAdapter(work_mem="256MB")
+        result = adapter.validate_platform_capabilities("tpch")
+
+        assert result is not None
+        assert result.is_valid is True
+        assert result.details["psycopg2_available"] is True
+        assert result.details["benchmark_type"] == "tpch"
+
+    def test_warns_on_low_work_mem(self, postgres_stubs):
+        """Should warn when work_mem is below 64MB."""
+        adapter = PostgreSQLAdapter(work_mem="32MB")
+        result = adapter.validate_platform_capabilities("tpch")
+
+        assert result is not None
+        warning_messages = " ".join(result.warnings)
+        assert "work_mem" in warning_messages
+
+    def test_warns_on_gb_work_mem_not_low(self, postgres_stubs):
+        """Should not warn when work_mem is in GB."""
+        adapter = PostgreSQLAdapter(work_mem="1GB")
+        result = adapter.validate_platform_capabilities("tpch")
+
+        assert result is not None
+        # 1GB = 1024MB, well above 64MB threshold
+        work_mem_warnings = [w for w in result.warnings if "work_mem" in w.lower()]
+        assert len(work_mem_warnings) == 0
+
+
+class TestPostgreSQLValidateConnectionHealth:
+    """Tests for validate_connection_health."""
+
+    def test_healthy_connection(self, postgres_stubs):
+        """Should return valid result for a working connection."""
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.fetchone.side_effect = [
+            (1,),  # SELECT 1
+            ("PostgreSQL 15.2 on x86_64-pc-linux-gnu",),  # SELECT version()
+            ("256MB",),  # SHOW work_mem
+            None,  # timescaledb check
+        ]
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter = PostgreSQLAdapter()
+        result = adapter.validate_connection_health(mock_conn)
+
+        assert result is not None
+        assert result.is_valid is True
+        assert result.details["basic_query_test"] == "passed"
+        assert "PostgreSQL" in result.details["server_version"]
+
+    def test_warns_on_old_postgres_version(self, postgres_stubs):
+        """Should warn when PostgreSQL version is older than 12."""
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.fetchone.side_effect = [
+            (1,),
+            ("PostgreSQL 11.19 on x86_64",),
+            ("256MB",),
+            None,
+        ]
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter = PostgreSQLAdapter()
+        result = adapter.validate_connection_health(mock_conn)
+
+        assert result is not None
+        warning_messages = " ".join(result.warnings)
+        assert "11" in warning_messages or "older" in warning_messages
+
+    def test_failed_connection_returns_invalid_result(self, postgres_stubs):
+        """Should return invalid result when connection health check fails."""
+        mock_conn = Mock()
+        mock_conn.cursor.side_effect = Exception("Connection lost")
+
+        adapter = PostgreSQLAdapter()
+        result = adapter.validate_connection_health(mock_conn)
+
+        assert result is not None
+        assert result.is_valid is False
+        assert len(result.errors) > 0
+
+
+class TestBuildPostgreSQLConfig:
+    """Tests for _build_postgresql_config module-level function."""
+
+    def test_default_values(self, postgres_stubs):
+        """Should populate defaults when options are empty."""
+        from benchbox.platforms.postgresql import _build_postgresql_config
+
+        result = _build_postgresql_config({}, {})
+
+        assert result["host"] == "localhost"
+        assert result["port"] == 5432
+        assert result["username"] == "postgres"
+        assert result["schema"] == "public"
+        assert result["work_mem"] == "256MB"
+        assert result["maintenance_work_mem"] == "512MB"
+        assert result["enable_timescale"] is False
+
+    def test_platform_options_override_defaults(self, postgres_stubs):
+        """Platform options should override defaults."""
+        from benchbox.platforms.postgresql import _build_postgresql_config
+
+        result = _build_postgresql_config(
+            {},
+            {
+                "host": "pg.example.com",
+                "port": 5433,
+                "work_mem": "1GB",
+            },
+        )
+
+        assert result["host"] == "pg.example.com"
+        assert result["port"] == 5433
+        assert result["work_mem"] == "1GB"
+
+    def test_benchmark_config_merged(self, postgres_stubs):
+        """Benchmark config values should be merged into result."""
+        from benchbox.platforms.postgresql import _build_postgresql_config
+
+        result = _build_postgresql_config({"scale_factor": 10.0, "benchmark": "tpch"}, {})
+
+        assert result["scale_factor"] == 10.0
+        assert result["benchmark"] == "tpch"

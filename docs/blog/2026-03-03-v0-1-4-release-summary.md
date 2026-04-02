@@ -79,7 +79,7 @@ benchbox visualize benchmark_runs/results/<result>.json --chart-type power_bar
 
 ### 3. Outlier handling in ASCII charts
 
-**Before**: one very slow query (a cold-cache outlier or a query with a bad plan) could compress everything else in a chart into a few characters at the left edge, making the chart useless for comparing the rest of the queries.
+**Before**: one extreme outlier (a cold-cache query taking seconds while others finished in milliseconds, or a query with a bad plan) could compress everything else in a chart into a few characters at the left edge, making the chart useless for comparing the rest of the queries.
 
 **Now**: we apply outlier truncation across all chart types. Values beyond the capping threshold are marked with a truncation indicator; the axis scales to the non-outlier range.
 

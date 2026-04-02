@@ -14,7 +14,7 @@ import csv
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Callable, Optional, Union, cast
 
 import pandas as pd
 import sqlglot
@@ -45,6 +45,42 @@ class TPCDIDataLoader:
         self.dialect = dialect
         self.batch_size = batch_size
 
+    def _load_data(
+        self,
+        table_name: str,
+        data: Union[list[dict], pd.DataFrame, Any],
+        table_kind: str,
+        insert_fn: Callable[[str, list[dict]], int],
+    ) -> LoadResult:
+        """Load normalized data into a table using the provided insert strategy."""
+        logger.info(f"Loading data into {table_kind} table {table_name}")
+
+        result = LoadResult(table_name=table_name)
+        start_time = mono_time()
+
+        try:
+            result.pre_load_count = self._get_table_count(table_name)
+            records = self._normalize_data_format(data)
+
+            if not records:
+                logger.warning(f"No data to load for table {table_name}")
+                result.success = True
+                return result
+
+            loaded_count = insert_fn(table_name, records)
+            result.post_load_count = self._get_table_count(table_name)
+            result.records_loaded = loaded_count
+            result.load_time = elapsed_seconds(start_time)
+            result.success = True
+
+            logger.info(f"Successfully loaded {loaded_count:,} records into {table_name} in {result.load_time:.2f}s")
+        except Exception as e:
+            result.error_message = str(e)
+            result.load_time = elapsed_seconds(start_time)
+            logger.error(f"Failed to load data into {table_name}: {e}")
+
+        return result
+
     def load_dimension_data(self, table_name: str, data: Union[list[dict], pd.DataFrame, Any]) -> LoadResult:
         """Load data into dimension table.
 
@@ -55,41 +91,12 @@ class TPCDIDataLoader:
         Returns:
             LoadResult with loading statistics
         """
-        logger.info(f"Loading data into dimension table {table_name}")
-
-        result = LoadResult(table_name=table_name)
-        start_time = mono_time()
-
-        try:
-            # Get pre-load count
-            result.pre_load_count = self._get_table_count(table_name)
-
-            # Convert data to standard format
-            records = self._normalize_data_format(data)
-
-            if not records:
-                logger.warning(f"No data to load for table {table_name}")
-                result.success = True
-                return result
-
-            # Perform bulk insert
-            loaded_count = self._bulk_insert(table_name, records)
-
-            # Get post-load count
-            result.post_load_count = self._get_table_count(table_name)
-
-            result.records_loaded = loaded_count
-            result.load_time = elapsed_seconds(start_time)
-            result.success = True
-
-            logger.info(f"Successfully loaded {loaded_count:,} records into {table_name} in {result.load_time:.2f}s")
-
-        except Exception as e:
-            result.error_message = str(e)
-            result.load_time = elapsed_seconds(start_time)
-            logger.error(f"Failed to load data into {table_name}: {e}")
-
-        return result
+        return self._load_data(
+            table_name=table_name,
+            data=data,
+            table_kind="dimension",
+            insert_fn=self._bulk_insert,
+        )
 
     def load_fact_data(self, table_name: str, data: Union[list[dict], pd.DataFrame, Any]) -> LoadResult:
         """Load data into fact table.
@@ -101,41 +108,12 @@ class TPCDIDataLoader:
         Returns:
             LoadResult with loading statistics
         """
-        logger.info(f"Loading data into fact table {table_name}")
-
-        result = LoadResult(table_name=table_name)
-        start_time = mono_time()
-
-        try:
-            # Get pre-load count
-            result.pre_load_count = self._get_table_count(table_name)
-
-            # Convert data to standard format
-            records = self._normalize_data_format(data)
-
-            if not records:
-                logger.warning(f"No data to load for table {table_name}")
-                result.success = True
-                return result
-
-            # For fact tables, use batch loading
-            loaded_count = self._batch_insert_fact_data(table_name, records)
-
-            # Get post-load count
-            result.post_load_count = self._get_table_count(table_name)
-
-            result.records_loaded = loaded_count
-            result.load_time = elapsed_seconds(start_time)
-            result.success = True
-
-            logger.info(f"Successfully loaded {loaded_count:,} records into {table_name} in {result.load_time:.2f}s")
-
-        except Exception as e:
-            result.error_message = str(e)
-            result.load_time = elapsed_seconds(start_time)
-            logger.error(f"Failed to load data into {table_name}: {e}")
-
-        return result
+        return self._load_data(
+            table_name=table_name,
+            data=data,
+            table_kind="fact",
+            insert_fn=self._batch_insert_fact_data,
+        )
 
     def load_csv_file(self, table_name: str, file_path: Path, delimiter: str = ",") -> LoadResult:
         """Load data from CSV file into table.

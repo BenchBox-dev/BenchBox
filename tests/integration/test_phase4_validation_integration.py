@@ -30,7 +30,6 @@ from benchbox.core.tpcdi.specification_validator import (
 )
 
 
-@pytest.mark.integration
 class TestPhase4ValidationIntegration:
     """Integration tests for Phase 4 validation and testing."""
 

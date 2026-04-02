@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from benchbox.core.gpu.capabilities import GPUInfo
+from benchbox.experimental.gpu.capabilities import GPUInfo
 from benchbox.platforms import cudf as cudf_module
 
 pytestmark = [

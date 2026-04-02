@@ -22,15 +22,10 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 # DuckDB ignores env vars; patched in pytest_configure below.
 
 import sys
-import tempfile
 import time
 import warnings
-from collections.abc import Generator, Iterable
-from contextlib import ExitStack
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
-from unittest.mock import patch
+from typing import Any
 
 import pytest
 
@@ -44,17 +39,14 @@ try:
 except (ImportError, AttributeError):
     pass
 
-from benchbox.core.results.models import BenchmarkResults
-
-# zstandard is a runtime dependency (always available)
-ZSTD_AVAILABLE = True
-
 # Register fixture plugins - this must come before any imports from those modules
 # to allow pytest to rewrite assertions in the fixture modules
 pytest_plugins = [
     "tests.fixtures.database_fixtures",
     "tests.fixtures.test_data_fixtures",
     "tests.fixtures.result_dict_fixtures",
+    "tests.fixtures.platform_fixtures",
+    "tests.fixtures.utility_fixtures",
 ]
 
 # ── Parallel test run mutual exclusion ──────────────────────────────────────
@@ -217,82 +209,6 @@ def pytest_unconfigure(config) -> None:
         _test_lock_fd = None
 
 
-def make_benchmark_results(
-    *,
-    benchmark_id: str = "test-benchmark",
-    benchmark_name: str = "Test Benchmark",
-    execution_id: str = "test-exec",
-    platform: str = "cli",
-    scale_factor: float = 0.01,
-    duration_seconds: float = 0.0,
-    timestamp: Optional[datetime] = None,
-    total_queries: int = 0,
-    successful_queries: int = 0,
-    failed_queries: int = 0,
-    query_results: Optional[Iterable[Any]] = None,
-    validation_status: str = "UNKNOWN",
-    validation_details: Optional[dict[str, Any]] = None,
-    execution_metadata: Optional[dict[str, Any]] = None,
-    summary_metrics: Optional[dict[str, Any]] = None,
-    query_subset: Optional[list[str]] = None,
-    concurrency_level: Optional[int] = None,
-    **extras: Any,
-) -> BenchmarkResults:
-    """Create a fully-populated BenchmarkResults instance for tests."""
-
-    field_names = set(BenchmarkResults.__dataclass_fields__.keys())
-
-    init_kwargs: dict[str, Any] = {
-        "benchmark_name": benchmark_name,
-        "platform": platform,
-        "scale_factor": scale_factor,
-        "execution_id": execution_id,
-        "timestamp": timestamp or datetime.now(),
-        "duration_seconds": duration_seconds,
-        "total_queries": total_queries,
-        "successful_queries": successful_queries,
-        "failed_queries": failed_queries,
-        "query_results": list(query_results or []),
-        "validation_status": validation_status,
-        "validation_details": validation_details or {},
-        "execution_metadata": execution_metadata or {},
-    }
-
-    # Pass through known dataclass fields supplied via extras.
-    for key, value in extras.items():
-        if key in field_names:
-            init_kwargs[key] = value
-
-    result = BenchmarkResults(**init_kwargs)
-
-    # Attach optional metadata used by legacy CLI tests.
-    result._benchmark_id_override = benchmark_id
-    result.summary_metrics = summary_metrics or {}
-    if query_subset is not None:
-        result.query_subset = query_subset
-    if concurrency_level is not None:
-        result.concurrency_level = concurrency_level
-
-    # Allow additional loose attributes (e.g., benchmark_version) expected by tests.
-    for key, value in extras.items():
-        if key not in field_names:
-            setattr(result, key, value)
-
-    return result
-
-
-@pytest.fixture
-def make_results():
-    """Factory fixture for creating BenchmarkResults with sensible defaults.
-
-    Usage::
-
-        def test_something(make_results):
-            result = make_results(platform="snowflake", total_queries=22)
-    """
-    return make_benchmark_results
-
-
 def pytest_runtest_setup(item) -> None:
     """Set up test-specific configurations based on markers."""
     # Set timeouts based on speed markers
@@ -309,96 +225,6 @@ def pytest_runtest_setup(item) -> None:
 
     if item.get_closest_marker("local_only") and os.environ.get("CI"):
         pytest.skip("Local-only test skipped in CI")
-
-
-@pytest.fixture(autouse=True)
-def _provide_fake_duckdb(monkeypatch):
-    """Provide a lightweight duckdb stub when the optional dependency is missing."""
-    from benchbox.platforms import duckdb as duckdb_module  # import late to honour patching
-
-    if getattr(duckdb_module, "duckdb", None) is not None:
-        yield
-        return
-
-    class _FakeCursor:
-        def __init__(self):
-            self.statements: list[str] = []
-
-        def execute(self, sql: str):
-            self.statements.append(sql)
-            return self
-
-        def fetchall(self):
-            return []
-
-        def fetchone(self):
-            return None
-
-        def fetchmany(self, size=None):  # pragma: no cover - interface completeness
-            return []
-
-        def close(self):
-            return None
-
-    class _FakeDuckDBModule:
-        __version__ = "0.0-test"
-
-        @staticmethod
-        def connect(_database_path: str):
-            return _FakeCursor()
-
-    monkeypatch.setattr(duckdb_module, "duckdb", _FakeDuckDBModule(), raising=False)
-    yield
-
-
-@pytest.fixture
-def temp_dir() -> Generator[Path, None, None]:
-    """Create a temporary directory for test data."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        yield Path(tmpdir)
-
-
-@pytest.fixture
-def available_compression_type() -> str:
-    """Return a compression type that is available on this system.
-
-    Returns 'zstd' if zstandard is installed, otherwise 'gzip'.
-    This is useful for tests that need compression but don't specifically
-    require zstd.
-    """
-    return "zstd" if ZSTD_AVAILABLE else "gzip"
-
-
-@pytest.fixture
-def zstd_available() -> bool:
-    """Return whether zstandard library is available."""
-    return ZSTD_AVAILABLE
-
-
-# Scale factor fixtures are now consolidated in benchmark_fixtures.py
-# These are kept for backward compatibility but deprecated
-@pytest.fixture
-def small_scale_factor() -> float:
-    """Return a small scale factor for quick testing.
-
-    DEPRECATED: Use scale_factor fixture from benchmark_fixtures.py instead.
-    """
-    return 1.0
-
-
-@pytest.fixture
-def medium_scale_factor() -> float:
-    """Return a medium scale factor for more thorough testing.
-
-    DEPRECATED: Use scale_factor fixture from benchmark_fixtures.py instead.
-    """
-    return 1.0
-
-
-@pytest.fixture(params=["sqlite", "postgres", "mysql", "bigquery", "snowflake"])
-def sql_dialect(request) -> str:
-    """Parameterized fixture for testing different SQL dialects."""
-    return request.param
 
 
 def pytest_sessionstart(session) -> None:
@@ -481,52 +307,3 @@ def pytest_terminal_summary(terminalreporter, exitstatus) -> None:
     except Exception as e:  # pragma: no cover - best-effort warning path
         # If coverage data/lib isn't available, don't break the test run.
         terminalreporter.write_line(f"Note: Coverage warning check skipped: {e}")
-
-
-@pytest.fixture
-def duckdb_memory_db():
-    """Create an in-memory DuckDB database connection."""
-    import duckdb
-
-    conn = duckdb.connect(":memory:")
-    yield conn
-    conn.close()
-
-
-@pytest.fixture(autouse=True)
-def mock_platform_dependency_checks():
-    """Provide default dependency stubs for cloud adapters in unit tests."""
-
-    targets = [
-        "benchbox.platforms.bigquery.check_platform_dependencies",
-        "benchbox.platforms.databricks.adapter.check_platform_dependencies",
-        "benchbox.platforms.clickhouse.check_platform_dependencies",
-        "benchbox.platforms.snowflake.check_platform_dependencies",
-        "benchbox.platforms.redshift.check_platform_dependencies",
-    ]
-
-    with ExitStack() as stack:
-        for target in targets:
-            try:
-                stack.enter_context(patch(target, return_value=(True, [])))
-            except AttributeError:
-                # Skip patching if the attribute doesn't exist (e.g., databricks is now a package)
-                pass
-
-        try:
-            from benchbox.platforms.snowflake import SnowflakeAdapter
-
-            SnowflakeAdapter.add_cli_arguments = staticmethod(lambda parser: None)
-            # Don't stub from_config - we want to test the real implementation
-        except ImportError:
-            pass
-
-        try:
-            from benchbox.platforms.redshift import RedshiftAdapter
-
-            RedshiftAdapter.add_cli_arguments = staticmethod(lambda parser: None)
-            # Don't stub from_config - we want to test the real implementation
-        except ImportError:
-            pass
-
-        yield

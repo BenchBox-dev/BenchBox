@@ -142,3 +142,4 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 
 ci-log.txt
 /site/
+/.claude/worktrees

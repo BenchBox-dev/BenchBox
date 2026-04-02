@@ -25,7 +25,8 @@ class TestNYCTaxiQueryRegistry:
         """Test that the registry can be imported."""
         from benchbox.core.nyctaxi.dataframe_queries import NYCTAXI_DATAFRAME_QUERIES
 
-        assert NYCTAXI_DATAFRAME_QUERIES is not None
+        assert len(NYCTAXI_DATAFRAME_QUERIES) > 0
+        assert hasattr(NYCTAXI_DATAFRAME_QUERIES, "get_query_ids")
 
     def test_registry_has_25_queries(self):
         """Test that all 25 NYC Taxi queries are registered."""

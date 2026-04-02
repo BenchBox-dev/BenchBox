@@ -55,9 +55,6 @@ def version_json_callback(ctx: click.Context, param: click.Parameter, value: boo
         from benchbox.utils.version import get_version_info
 
         payload = get_version_info()
-        payload["version_consistent"] = payload.get("version_sources", {}).get("package") == payload.get(
-            "pyproject_version"
-        )
         click.echo(json.dumps(payload, indent=2))
     except ImportError:
         click.echo(json.dumps({"benchbox_version": benchbox.__version__}))

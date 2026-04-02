@@ -352,7 +352,7 @@ class TestDataFusionSmoke:
         """Test that DataFusion adapter can be imported."""
         from benchbox.platforms.datafusion import DataFusionAdapter
 
-        assert DataFusionAdapter is not None
+        assert callable(DataFusionAdapter)
 
     def test_adapter_creation(self):
         """Test that DataFusion adapter can be instantiated."""

@@ -365,7 +365,8 @@ class TestDuckDBBranchingDetection:
             (ORDER_BY_QUERY, "q_order"),
         ]:
             plan = parser.parse_explain_output(query_id, explain)
-            assert plan is not None, f"Linear plan {query_id} should parse successfully"
+            assert plan.query_id == query_id, f"Linear plan {query_id} should parse successfully"
+            assert plan.logical_root is not None, f"Linear plan {query_id} should have a root operator"
 
     def test_detect_union_operator(self) -> None:
         """Test that UNION operators are detected as branching."""

@@ -84,7 +84,9 @@ _CLOUD_CREDENTIAL_VARS: dict[str, Sequence[str]] = {
     "redshift": ("REDSHIFT_HOST", "REDSHIFT_USER"),
     "athena": ("AWS_ACCESS_KEY_ID", "AWS_REGION"),
     "databricks": ("DATABRICKS_HOST", "DATABRICKS_TOKEN"),
-    "firebolt": ("FIREBOLT_USER", "FIREBOLT_PASSWORD"),
+    "firebolt": ("FIREBOLT_CLIENT_ID", "FIREBOLT_CLIENT_SECRET"),
+    "motherduck": ("MOTHERDUCK_TOKEN",),
+    "starburst": ("STARBURST_HOST", "STARBURST_USER"),
 }
 
 F = TypeVar("F", bound=Callable[..., object])
@@ -130,7 +132,14 @@ def is_dataframe_available(platform: str) -> bool:
     """
     if platform not in DATAFRAME_PLATFORMS:
         return False
-    return is_platform_available(platform)
+    if not is_platform_available(platform):
+        return False
+    # PySpark requires a working JVM to run; importing pyspark alone is not
+    # sufficient. Guard against CI environments where pyspark is installed but
+    # no Java is present (SparkSession would fail at startup).
+    if platform == "pyspark-df" and shutil.which("java") is None:
+        return False
+    return True
 
 
 def is_gpu_available() -> bool:
@@ -155,12 +164,28 @@ def is_gpu_available() -> bool:
 def has_cloud_credentials(platform: str) -> bool:
     """Check if required cloud credentials are configured.
 
+    Checks ~/.benchbox/credentials.yaml first, then falls back to environment
+    variables. The credentials file is the primary storage for cloud platform
+    credentials (set via `benchbox platforms setup`).
+
     Args:
         platform: Cloud platform name (e.g., 'snowflake', 'bigquery')
 
     Returns:
-        True if required environment variables are set
+        True if credentials are available from any source
     """
+    # Check credentials file first
+    try:
+        from benchbox.security.credentials import CredentialManager
+
+        creds = CredentialManager().get_platform_credentials(platform)
+        metadata_keys = {"last_updated", "status", "error_message"}
+        if creds and any(k not in metadata_keys for k in creds):
+            return True
+    except Exception:
+        pass
+
+    # Fall back to environment variables
     required_vars = _CLOUD_CREDENTIAL_VARS.get(platform)
     if required_vars is None:
         return False

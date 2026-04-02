@@ -147,7 +147,7 @@ class TestDuckDBTextFormatVersions:
         parser = DuckDBQueryPlanParser()
         plan = parser.parse_explain_output("q05", DUCKDB_0_9_ORDER_BY)
 
-        assert plan is not None
+        assert plan.query_id == "q05"
 
     def _collect_operators(self, root):
         """Helper to collect all operators in tree."""

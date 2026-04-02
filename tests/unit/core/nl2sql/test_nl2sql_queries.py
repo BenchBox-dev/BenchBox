@@ -5,7 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 
 import pytest
 
-from benchbox.core.nl2sql.queries import (
+from benchbox.experimental.nl2sql.queries import (
     NL2SQLQuery,
     NL2SQLQueryCategory,
     NL2SQLQueryManager,

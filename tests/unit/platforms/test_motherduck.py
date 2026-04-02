@@ -200,3 +200,106 @@ class TestMotherDuckAdapterFactory:
         name3, _, _ = _normalize_platform_name("motherduck")
 
         assert name1 == name2 == name3 == "motherduck"
+
+
+class TestMotherDuckFromConfig:
+    """Test from_config classmethod."""
+
+    def test_from_config_sets_database(self):
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter.from_config(
+            {
+                "motherduck_database": "test_db",
+                "motherduck_token": "tok123",
+            }
+        )
+        assert adapter.database == "test_db"
+        assert adapter.token == "tok123"
+
+    def test_from_config_with_memory_limit(self):
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter.from_config(
+            {
+                "motherduck_token": "tok123",
+                "memory_limit": "8GB",
+            }
+        )
+        assert adapter.memory_limit == "8GB"
+
+
+class TestMotherDuckCreateConnection:
+    """Test create_connection with a mocked duckdb.connect."""
+
+    def test_create_connection_uses_md_scheme(self):
+        from unittest.mock import MagicMock, patch
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="mytoken", database="mydb")
+
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchone.return_value = (1,)
+
+        with patch("benchbox.platforms.motherduck.duckdb") as mock_duckdb:
+            mock_duckdb.connect.return_value = mock_conn
+            conn = adapter.create_connection()
+
+        call_args = mock_duckdb.connect.call_args[0][0]
+        assert "md:mydb" in call_args
+        assert "mytoken" in call_args
+        assert conn is mock_conn
+        assert adapter.connection is mock_conn
+
+    def test_create_connection_cached(self):
+        """Second call should return the same connection without reconnecting."""
+        from unittest.mock import MagicMock, patch
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="mytoken")
+        mock_conn = MagicMock()
+        adapter.connection = mock_conn
+
+        with patch("benchbox.platforms.motherduck.duckdb") as mock_duckdb:
+            conn = adapter.create_connection()
+
+        mock_duckdb.connect.assert_not_called()
+        assert conn is mock_conn
+
+
+class TestMotherDuckAddCliArguments:
+    """Test add_cli_arguments registers expected flags."""
+
+    def test_motherduck_database_arg_added(self):
+        import argparse
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        parser = argparse.ArgumentParser()
+        MotherDuckAdapter.add_cli_arguments(parser)
+        args = parser.parse_args(["--motherduck-database", "mydb"])
+        assert args.motherduck_database == "mydb"
+
+    def test_motherduck_token_arg_added(self):
+        import argparse
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        parser = argparse.ArgumentParser()
+        MotherDuckAdapter.add_cli_arguments(parser)
+        args = parser.parse_args(["--motherduck-token", "tok"])
+        assert args.motherduck_token == "tok"
+
+
+class TestMotherDuckGetPlatformInfo:
+    """Test get_platform_info returns expected keys."""
+
+    def test_get_platform_info_has_name_and_version(self):
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        info = adapter.get_platform_info()
+        assert info["platform_name"] == "MotherDuck"
+        assert "platform_version" in info

@@ -36,7 +36,6 @@ class TestTPCHBenchmarkIntegration:
 
         # Test basic query generation
         sql = benchmark.get_query(1)
-        assert isinstance(sql, str)
         assert len(sql) > 50
         assert "select" in sql.lower() or "with" in sql.lower()
 
@@ -55,7 +54,7 @@ class TestTPCHBenchmarkIntegration:
 
         # Test with scale factor
         sql_sf = benchmark.get_query(1, scale_factor=0.5)
-        assert isinstance(sql_sf, str)
+        assert "select" in sql_sf.lower() or "with" in sql_sf.lower()
         assert len(sql_sf) > 50
 
     def test_benchmark_scale_factor_inheritance(self):
@@ -65,12 +64,12 @@ class TestTPCHBenchmarkIntegration:
 
         # Query should work with inherited scale factor
         sql = benchmark.get_query(1)
-        assert isinstance(sql, str)
+        assert "select" in sql.lower() or "with" in sql.lower()
         assert len(sql) > 50
 
         # Explicit scale factor should override
         sql_override = benchmark.get_query(1, scale_factor=0.1)
-        assert isinstance(sql_override, str)
+        assert "select" in sql_override.lower() or "with" in sql_override.lower()
         assert len(sql_override) > 50
 
     def test_benchmark_get_parameterized_query_compatibility(self):
@@ -79,17 +78,17 @@ class TestTPCHBenchmarkIntegration:
 
         # Test old-style call with params=None
         sql_old = benchmark.get_query(1, params=None)
-        assert isinstance(sql_old, str)
+        assert "select" in sql_old.lower() or "with" in sql_old.lower()
         assert len(sql_old) > 50
 
         # Test new-style call with seed
         sql_new = benchmark.get_query(1, seed=12345)
-        assert isinstance(sql_new, str)
+        assert "select" in sql_new.lower() or "with" in sql_new.lower()
         assert len(sql_new) > 50
 
         # Test mixed call
         sql_mixed = benchmark.get_query(1, params=None, seed=12345, dialect="duckdb")
-        assert isinstance(sql_mixed, str)
+        assert "select" in sql_mixed.lower() or "with" in sql_mixed.lower()
         assert len(sql_mixed) > 50
 
     def test_benchmark_get_queries_batch(self):
@@ -98,17 +97,15 @@ class TestTPCHBenchmarkIntegration:
 
         queries = benchmark.get_queries()
 
-        assert isinstance(queries, dict)
         assert len(queries) == 22
 
-        # Keys should be strings for backward compatibility
+        # Keys should be valid query IDs
         for key in queries:
-            assert isinstance(key, str)
             assert int(key) in range(1, 23)
 
         # Values should be SQL strings
         for sql in queries.values():
-            assert isinstance(sql, str)
+            assert "select" in sql.lower() or "with" in sql.lower()
             assert len(sql) > 50
 
     def test_benchmark_all_queries_generation(self):
@@ -117,7 +114,7 @@ class TestTPCHBenchmarkIntegration:
 
         for query_id in range(1, 23):
             sql = benchmark.get_query(query_id)
-            assert isinstance(sql, str)
+            assert "select" in sql.lower() or "with" in sql.lower()
             assert len(sql) > 50
             assert f"Query {query_id} failed", f"Query {query_id} should generate successfully"
 
@@ -141,7 +138,7 @@ class TestTPCHBenchmarkIntegration:
         for sf in scale_factors:
             benchmark = TPCHBenchmark(scale_factor=sf)
             sql = benchmark.get_query(1)
-            assert isinstance(sql, str)
+            assert "select" in sql.lower() or "with" in sql.lower()
             assert len(sql) > 50
 
 
@@ -161,12 +158,12 @@ class TestTopLevelTPCHIntegration:
 
         # Test basic query generation
         sql = tpch.get_query(1)
-        assert isinstance(sql, str)
+        assert "select" in sql.lower() or "with" in sql.lower()
         assert len(sql) > 50
 
         # Test with parameters
         sql_with_seed = tpch.get_query(1, seed=12345)
-        assert isinstance(sql_with_seed, str)
+        assert "select" in sql_with_seed.lower() or "with" in sql_with_seed.lower()
         assert len(sql_with_seed) > 50
 
     def test_tpch_parameterized_query_compatibility(self):
@@ -175,12 +172,12 @@ class TestTopLevelTPCHIntegration:
 
         # Test old-style call
         sql_old = tpch.get_query(1, params=None, dialect="duckdb")
-        assert isinstance(sql_old, str)
+        assert "select" in sql_old.lower() or "with" in sql_old.lower()
         assert len(sql_old) > 50
 
         # Test new-style call
         sql_new = tpch.get_query(1, seed=12345, dialect="duckdb")
-        assert isinstance(sql_new, str)
+        assert "select" in sql_new.lower() or "with" in sql_new.lower()
         assert len(sql_new) > 50
 
     def test_tpch_get_queries_batch(self):
@@ -189,12 +186,11 @@ class TestTopLevelTPCHIntegration:
 
         queries = tpch.get_queries()
 
-        assert isinstance(queries, dict)
         assert len(queries) == 22
 
         for key, sql in queries.items():
-            assert isinstance(key, str)
-            assert isinstance(sql, str)
+            assert int(key) in range(1, 23)
+            assert "select" in sql.lower() or "with" in sql.lower()
             assert len(sql) > 50
 
     def test_tpch_scale_factor_inheritance(self):
@@ -203,12 +199,12 @@ class TestTopLevelTPCHIntegration:
 
         # Should use inherited scale factor
         sql = tpch.get_query(1)
-        assert isinstance(sql, str)
+        assert "select" in sql.lower() or "with" in sql.lower()
         assert len(sql) > 50
 
         # Should allow override
         sql_override = tpch.get_query(1, scale_factor=2.0)
-        assert isinstance(sql_override, str)
+        assert "select" in sql_override.lower() or "with" in sql_override.lower()
         assert len(sql_override) > 50
 
     def test_tpch_all_queries_integration(self):
@@ -218,7 +214,7 @@ class TestTopLevelTPCHIntegration:
         # Test subset of queries for performance
         for query_id in [1, 5, 10, 15, 20]:
             sql = tpch.get_query(query_id, seed=42)
-            assert isinstance(sql, str)
+            assert "select" in sql.lower() or "with" in sql.lower()
             assert len(sql) > 50
             assert ":1" not in sql  # No parameter placeholders
 
@@ -274,8 +270,8 @@ class TestCrossComponentIntegration:
         sql_benchmark = benchmark.get_query(1)
         sql_tpch = tpch.get_query(1)
 
-        assert isinstance(sql_benchmark, str)
-        assert isinstance(sql_tpch, str)
+        assert "select" in sql_benchmark.lower() or "with" in sql_benchmark.lower()
+        assert "select" in sql_tpch.lower() or "with" in sql_tpch.lower()
         assert len(sql_benchmark) > 50
         assert len(sql_tpch) > 50
 
@@ -307,7 +303,7 @@ class TestCrossComponentIntegration:
             sql_benchmark = benchmark.get_query(1, **params)
             sql_tpch = tpch.get_query(1, **params)
 
-            assert isinstance(sql_benchmark, str)
-            assert isinstance(sql_tpch, str)
+            assert "select" in sql_benchmark.lower() or "with" in sql_benchmark.lower()
+            assert "select" in sql_tpch.lower() or "with" in sql_tpch.lower()
             assert len(sql_benchmark) > 50
             assert len(sql_tpch) > 50

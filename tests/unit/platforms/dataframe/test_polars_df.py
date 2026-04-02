@@ -11,6 +11,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -218,6 +219,71 @@ class TestPolarsAggregationMethods:
 
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
+class TestPolarsWindowFunctions:
+    """Tests for Polars window-function helpers."""
+
+    def test_window_functions_without_partitions(self):
+        """Test ranking, running, and distribution windows without partitions."""
+        adapter = PolarsDataFrameAdapter()
+        lf = pl.LazyFrame({"val": [10, 20, 30, 40], "ord": [1, 2, 3, 4]})
+
+        result = lf.select(
+            adapter.window_row_number(order_by=[("ord", True)]).alias("row_number"),
+            adapter.window_rank(order_by=[("val", False)]).alias("rank"),
+            adapter.window_dense_rank(order_by=[("val", False)]).alias("dense_rank"),
+            adapter.window_sum("val").alias("sum_all"),
+            adapter.window_sum("val", order_by=[("ord", True)]).alias("sum_running"),
+            adapter.window_avg("val", order_by=[("ord", True)]).alias("avg_running"),
+            adapter.window_count("val", order_by=[("ord", True)]).alias("count_running"),
+            adapter.window_min("val").alias("min_all"),
+            adapter.window_max("val").alias("max_all"),
+            adapter.window_lag("val", order_by=[("ord", True)]).alias("lag"),
+            adapter.window_lead("val", order_by=[("ord", True)]).alias("lead"),
+            adapter.window_ntile(2, order_by=[("val", False)]).alias("ntile"),
+            adapter.window_percent_rank(order_by=[("val", False)]).alias("percent_rank"),
+            adapter.window_cume_dist(order_by=[("val", False)]).alias("cume_dist"),
+        ).collect()
+
+        assert result["row_number"].to_list() == [1, 2, 3, 4]
+        assert result["rank"].to_list() == [4, 3, 2, 1]
+        assert result["dense_rank"].to_list() == [4, 3, 2, 1]
+        assert result["sum_all"].to_list() == [100, 100, 100, 100]
+        assert result["sum_running"].to_list() == [10, 30, 60, 100]
+        assert result["avg_running"].to_list() == pytest.approx([10.0, 15.0, 20.0, 25.0])
+        assert result["count_running"].to_list() == [1, 2, 3, 4]
+        assert result["min_all"].to_list() == [10, 10, 10, 10]
+        assert result["max_all"].to_list() == [40, 40, 40, 40]
+        assert result["lag"].to_list() == [None, 10, 20, 30]
+        assert result["lead"].to_list() == [20, 30, 40, None]
+        assert result["ntile"].to_list() == [2, 2, 1, 1]
+        assert result["percent_rank"].to_list() == pytest.approx([1.0, 2 / 3, 1 / 3, 0.0])
+        assert result["cume_dist"].to_list() == pytest.approx([1.0, 0.75, 0.5, 0.25])
+
+    def test_window_functions_with_partitions(self):
+        """Test partition-aware window helpers on grouped data."""
+        adapter = PolarsDataFrameAdapter()
+        lf = pl.LazyFrame({"grp": ["A", "A", "B"], "val": [10, 20, 5], "ord": [1, 2, 1]})
+
+        result = lf.select(
+            adapter.window_row_number(order_by=[("ord", True)], partition_by=["grp"]).alias("row_number"),
+            adapter.window_sum("val", partition_by=["grp"]).alias("sum_partition"),
+            adapter.window_count("val", partition_by=["grp"], order_by=[("ord", True)]).alias("count_running"),
+            adapter.window_lag("val", partition_by=["grp"], order_by=[("ord", True)]).alias("lag"),
+            adapter.window_lead("val", partition_by=["grp"], order_by=[("ord", True)]).alias("lead"),
+            adapter.window_percent_rank(order_by=[("val", False)], partition_by=["grp"]).alias("percent_rank"),
+        ).collect()
+
+        assert result["row_number"].to_list() == [1, 2, 1]
+        assert result["sum_partition"].to_list() == [30, 30, 5]
+        assert result["count_running"].to_list() == [1, 2, 1]
+        assert result["lag"].to_list() == [None, 10, None]
+        assert result["lead"].to_list() == [20, None, None]
+        percent_rank = result["percent_rank"].to_list()
+        assert percent_rank[:2] == pytest.approx([1.0, 0.0])
+        assert math.isnan(percent_rank[2])
+
+
+@pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestPolarsDataLoading:
     """Tests for Polars data loading methods."""
 
@@ -267,6 +333,17 @@ class TestPolarsDataLoading:
         df = lf.collect()
         assert df.columns == ["id", "name", "amount"]
 
+    def test_read_csv_respects_n_rows(self, tmp_path):
+        """Test CSV scanning honors the adapter row limit."""
+        adapter = PolarsDataFrameAdapter(n_rows=2)
+
+        csv_path = tmp_path / "limited.csv"
+        csv_path.write_text("id,name\n1,Alice\n2,Bob\n3,Charlie\n")
+
+        df = adapter.read_csv(csv_path).collect()
+
+        assert df["id"].to_list() == [1, 2]
+
     def test_read_parquet(self, tmp_path):
         """Test reading a Parquet file."""
         adapter = PolarsDataFrameAdapter()
@@ -289,6 +366,23 @@ class TestPolarsDataLoading:
         df = lf.collect()
         assert len(df) == 3
 
+    def test_read_parquet_casts_categorical_to_string(self, tmp_path):
+        """Test parquet scans cast dictionary-like categorical columns back to strings."""
+        adapter = PolarsDataFrameAdapter()
+
+        parquet_path = tmp_path / "categorical.parquet"
+        pl.DataFrame(
+            {
+                "category": pl.Series(["A", "B"], dtype=pl.Categorical),
+                "value": [1, 2],
+            }
+        ).write_parquet(parquet_path)
+
+        df = adapter.read_parquet(parquet_path).collect()
+
+        assert df.schema["category"] == pl.String
+        assert df["category"].to_list() == ["A", "B"]
+
     def test_collect_lazy_frame(self):
         """Test collecting a LazyFrame."""
         adapter = PolarsDataFrameAdapter()
@@ -298,6 +392,15 @@ class TestPolarsDataLoading:
 
         assert isinstance(df, pl.DataFrame)
         assert len(df) == 3
+
+    def test_collect_lazy_frame_with_streaming(self):
+        """Test collecting a LazyFrame when streaming mode is enabled."""
+        adapter = PolarsDataFrameAdapter(streaming=True)
+
+        df = adapter.collect(pl.LazyFrame({"a": [1, 2, 3]}))
+
+        assert isinstance(df, pl.DataFrame)
+        assert df["a"].to_list() == [1, 2, 3]
 
     def test_collect_eager_frame(self):
         """Test collect on already eager DataFrame."""
@@ -338,6 +441,30 @@ class TestPolarsDataLoading:
         df = combined.collect()
 
         assert len(df) == 4
+
+    def test_union_all_requires_at_least_one_dataframe(self):
+        """Test union_all validates at least one input frame."""
+        adapter = PolarsDataFrameAdapter()
+
+        with pytest.raises(ValueError, match="At least one DataFrame required for union"):
+            adapter.union_all()
+
+    def test_union_all_single_dataframe_returns_same_frame(self):
+        """Test union_all returns the only input frame unchanged."""
+        adapter = PolarsDataFrameAdapter()
+        frame = pl.LazyFrame({"a": [1, 2]})
+
+        result = adapter.union_all(frame)
+
+        assert result is frame
+
+    def test_rename_columns(self):
+        """Test rename_columns operation."""
+        adapter = PolarsDataFrameAdapter()
+
+        result = adapter.rename_columns(pl.LazyFrame({"old_name": [1, 2]}), {"old_name": "new_name"}).collect()
+
+        assert result.columns == ["new_name"]
 
     def test_get_first_row(self):
         """Test getting first row."""
@@ -657,6 +784,14 @@ class TestPolarsScalarExtraction:
         result = ctx.scalar(df)
 
         assert result == 999
+
+    def test_scalar_to_df(self):
+        """Test creating a single-row DataFrame from scalar values."""
+        adapter = PolarsDataFrameAdapter()
+
+        df = adapter.scalar_to_df({"total": 99, "label": "ok"})
+
+        assert df.to_dict(as_series=False) == {"total": [99], "label": ["ok"]}
 
     def test_scalar_multiple_rows_raises(self):
         """Test that scalar extraction on multi-row DataFrame raises.

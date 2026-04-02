@@ -22,7 +22,7 @@ from benchbox.core.results.query_plan_models import (
     QueryPlanDAG,
 )
 from benchbox.core.results.schema import build_plans_payload, build_result_payload
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,

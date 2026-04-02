@@ -54,6 +54,19 @@ _DIM_STATIC_ROLE: dict[str, str] = {
     "ship_mode": "ship_mode_",
     "warehouse": "warehouse_",
 }
+_IDENTIFIER_DEFAULT_FACT_TABLES = {
+    "ss_": "store_sales",
+    "sr_": "store_returns",
+    "ws_": "web_sales",
+    "wr_": "web_returns",
+    "cs_": "catalog_sales",
+    "cr_": "catalog_returns",
+}
+_CHANNEL_FACT_TABLES = {
+    "store": "store_sales",
+    "web": "web_sales",
+    "catalog": "catalog_sales",
+}
 
 
 @dataclass(frozen=True)
@@ -934,7 +947,7 @@ class QueryConverter:
         role_map: dict[str, str],
         dim_table: str,
         fact_table: str,
-        dim_col: str,
+        _dim_col: str,
         fact_col: str,
         dim_alias: str | None,
         fact_alias: str | None,
@@ -1006,27 +1019,16 @@ class QueryConverter:
 
     def _map_identifier_default(self, value: str, channel: str | None) -> str | None:
         lowered = value.lower()
-        table_hint: str | None = None
-        if lowered.startswith("ss_"):
-            table_hint = "store_sales"
-        elif lowered.startswith("sr_"):
-            table_hint = "store_returns"
-        elif lowered.startswith("ws_"):
-            table_hint = "web_sales"
-        elif lowered.startswith("wr_"):
-            table_hint = "web_returns"
-        elif lowered.startswith("cs_"):
-            table_hint = "catalog_sales"
-        elif lowered.startswith("cr_"):
-            table_hint = "catalog_returns"
-
+        table_hint = next(
+            (table for prefix, table in _IDENTIFIER_DEFAULT_FACT_TABLES.items() if lowered.startswith(prefix)), None
+        )
         if table_hint:
             mapped = self.mapper.map_fact(table_hint, lowered)
             if mapped:
                 return mapped
 
         if channel:
-            table_hint = {"store": "store_sales", "web": "web_sales", "catalog": "catalog_sales"}.get(channel)
+            table_hint = _CHANNEL_FACT_TABLES.get(channel)
             if table_hint:
                 mapped = self.mapper.map_fact(table_hint, lowered)
                 if mapped:

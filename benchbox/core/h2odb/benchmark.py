@@ -16,6 +16,7 @@ from benchbox.core.h2odb.generator import H2ODataGenerator
 from benchbox.core.h2odb.queries import H2OQueryManager
 from benchbox.core.h2odb.schema import TABLES, get_all_create_table_sql
 from benchbox.core.query_catalog_base import TranslatableQueryMixin
+from benchbox.core.query_utils import get_queries_with_translation
 from benchbox.core.utils.tuning import extract_constraint_flags
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
@@ -109,16 +110,7 @@ class H2OBenchmark(TranslatableQueryMixin, DataGenerationMixin, BaseBenchmark):
         Returns:
             A dictionary mapping query identifiers to their SQL text
         """
-        queries = self.query_manager.get_all_queries()
-
-        if dialect:
-            # Translate each query to the target dialect
-            translated_queries = {}
-            for query_id, query_sql in queries.items():
-                translated_queries[query_id] = self.translate_query_text(query_sql, dialect)
-            return translated_queries
-
-        return queries
+        return get_queries_with_translation(self.query_manager, dialect, self.translate_query_text)
 
     # translate_query_text() is inherited from TranslatableQueryMixin
 

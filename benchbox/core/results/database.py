@@ -33,6 +33,11 @@ DEFAULT_DB_PATH = Path.home() / ".benchbox" / "results.db"
 
 # Schema version for migrations
 SCHEMA_VERSION = 1
+_RANKING_METRIC_CONFIG = {
+    "geometric_mean": ("geometric_mean_ms", "ASC"),
+    "power_at_size": ("power_at_size", "DESC"),
+    "cost_efficiency": ("total_cost / NULLIF(successful_queries, 0)", "ASC"),
+}
 
 
 @dataclass
@@ -647,19 +652,7 @@ class ResultDatabase:
             cursor = conn.cursor()
 
             # Build query based on metric
-            if config.metric == "geometric_mean":
-                metric_col = "geometric_mean_ms"
-                order = "ASC"  # Lower is better
-            elif config.metric == "power_at_size":
-                metric_col = "power_at_size"
-                order = "DESC"  # Higher is better
-            elif config.metric == "cost_efficiency":
-                # Cost per query (lower is better)
-                metric_col = "total_cost / NULLIF(successful_queries, 0)"
-                order = "ASC"
-            else:
-                metric_col = "geometric_mean_ms"
-                order = "ASC"
+            metric_col, order = _RANKING_METRIC_CONFIG.get(config.metric, _RANKING_METRIC_CONFIG["geometric_mean"])
 
             validation_filter = ""
             if config.require_success:
@@ -721,33 +714,7 @@ class ResultDatabase:
                 platform = row["platform"]
                 current_score = row["avg_score"]
                 prev_score = previous_scores.get(platform)
-
-                # Calculate trend
-                if prev_score is None:
-                    trend = "new"
-                    trend_change = None
-                elif prev_score == 0:
-                    trend = "stable"
-                    trend_change = 0.0
-                else:
-                    change_pct = ((current_score - prev_score) / prev_score) * 100
-                    trend_change = change_pct
-                    if config.metric in ("geometric_mean", "cost_efficiency"):
-                        # Lower is better
-                        if change_pct < -5:
-                            trend = "up"  # Improved (got faster/cheaper)
-                        elif change_pct > 5:
-                            trend = "down"  # Regressed (got slower/more expensive)
-                        else:
-                            trend = "stable"
-                    else:
-                        # Higher is better
-                        if change_pct > 5:
-                            trend = "up"
-                        elif change_pct < -5:
-                            trend = "down"
-                        else:
-                            trend = "stable"
+                trend, trend_change = self._calculate_ranking_trend(current_score, prev_score, config.metric)
 
                 rankings.append(
                     PlatformRanking(
@@ -765,6 +732,32 @@ class ResultDatabase:
                 )
 
             return rankings
+
+    @staticmethod
+    def _calculate_ranking_trend(
+        current_score: float,
+        previous_score: float | None,
+        metric: str,
+    ) -> tuple[str, float | None]:
+        """Determine the trend between the current and previous ranking windows."""
+        if previous_score is None:
+            return "new", None
+        if previous_score == 0:
+            return "stable", 0.0
+
+        change_pct = ((current_score - previous_score) / previous_score) * 100
+        if metric in ("geometric_mean", "cost_efficiency"):
+            if change_pct < -5:
+                return "up", change_pct
+            if change_pct > 5:
+                return "down", change_pct
+            return "stable", change_pct
+
+        if change_pct > 5:
+            return "up", change_pct
+        if change_pct < -5:
+            return "down", change_pct
+        return "stable", change_pct
 
     def get_performance_trends(
         self,

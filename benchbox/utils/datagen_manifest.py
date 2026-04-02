@@ -372,7 +372,13 @@ def load_manifest(manifest_path: Path | CloudPath) -> dict[str, Any]:
         return json.load(f)
 
 
-def get_table_files(manifest: dict[str, Any], table_name: str, format: str | None = None) -> list[dict[str, Any]]:
+def get_table_files(
+    manifest: dict[str, Any],
+    table_name: str,
+    format: str | None = None,
+    *,
+    skip_directory_only_formats: bool = False,
+) -> list[dict[str, Any]]:
     """Get file entries for a table from manifest.
 
     Args:
@@ -380,6 +386,8 @@ def get_table_files(manifest: dict[str, Any], table_name: str, format: str | Non
         table_name: Name of the table
         format: Optional format to filter by (e.g., 'tbl', 'parquet').
                If None, returns files from all formats (v1) or default format (v2).
+        skip_directory_only_formats: When True, prefer file-based formats over
+               directory-only formats for callers that require uploadable files.
 
     Returns:
         List of file entry dictionaries
@@ -392,20 +400,43 @@ def get_table_files(manifest: dict[str, Any], table_name: str, format: str | Non
     if not isinstance(table_data, dict):
         return []
 
-    formats_dict = table_data.get("formats", {}) if isinstance(table_data, dict) else {}
+    formats_dict = table_data.get("formats", {})
 
     if format:
         # Return entries for specific format
         return formats_dict.get(format, [])
 
-    # Choose default format: manifest format_preference > manifest formats list > first available
+    def _all_directory(entries: list) -> bool:
+        return bool(entries) and all(isinstance(e, dict) and e.get("is_directory", False) for e in entries)
+
     preferred_order = manifest.get("format_preference") or manifest.get("formats") or []
+    if not skip_directory_only_formats:
+        if preferred_order:
+            for fmt in preferred_order:
+                entries = formats_dict.get(fmt)
+                if entries:
+                    return entries
+
+        for entries in formats_dict.values():
+            if entries:
+                return entries
+        return []
+
+    # Choose default format: manifest format_preference > manifest formats list > first available.
+    # Skip directory-only formats (e.g. delta, iceberg) so file-based callers never
+    # receive directory entries unless no file-based format exists.
     if preferred_order:
         for fmt in preferred_order:
-            if fmt in formats_dict and formats_dict[fmt]:
-                return formats_dict[fmt]
+            entries = formats_dict.get(fmt)
+            if entries and not _all_directory(entries):
+                return entries
 
-    # Fallback to any available format
+    # Fallback to any available non-directory format
+    for entries in formats_dict.values():
+        if entries and not _all_directory(entries):
+            return entries
+
+    # Last resort: return first available even if directory-based
     for entries in formats_dict.values():
         if entries:
             return entries

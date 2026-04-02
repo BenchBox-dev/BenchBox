@@ -26,8 +26,8 @@ if TYPE_CHECKING:
 
 PathLike = Union[Path, "CloudPath", "DatabricksPath"]
 
+from benchbox.core.manifest_utils import write_generator_manifest
 from benchbox.utils.compression_mixin import CompressionMixin
-from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
 
 from .schema import JoinOrderSchema
 
@@ -63,7 +63,7 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         if output_dir is None:
             # This will be set by the benchmark's BaseBenchmark.__init__ via self.output_dir
             # For standalone use, create a default path
-            from benchbox.utils.scale_factor_utils import format_scale_factor
+            from benchbox.utils.scale_factor import format_scale_factor
 
             sf_str = format_scale_factor(scale_factor)
             output_dir = Path.cwd() / "benchmark_runs" / "datagen" / f"joinorder_{sf_str}"
@@ -634,24 +634,7 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
     def _write_manifest(self, table_paths: dict[str, Path]) -> None:
         """Write manifest describing generated Join Order dataset."""
-
-        if not table_paths:
-            return
-
-        manifest = DataGenerationManifest(
-            output_dir=self.output_dir,
-            benchmark="joinorder",
-            scale_factor=self.scale_factor,
-            compression=resolve_compression_metadata(self),
-            parallel=1,
-            seed=None,
-        )
-
-        for table, path in table_paths.items():
-            row_count = self._manifest_row_counts.get(table, 0)
-            manifest.add_entry(table, path, row_count=row_count)
-
-        manifest.write()
+        write_generator_manifest(self, "joinorder", table_paths, self._manifest_row_counts)
 
     def get_table_row_count(self, table_name: str) -> int:
         """Get expected row count for a table.

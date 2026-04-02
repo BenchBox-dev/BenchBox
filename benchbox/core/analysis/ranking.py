@@ -11,7 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from benchbox.core.analysis.models import (
     ComparisonReport,
@@ -174,42 +174,14 @@ class PlatformRanker:
         Returns:
             RankingResult ordered by geometric mean (lower is better)
         """
-        rankings = []
-
-        for platform in report.platforms:
-            # Collect all query times for this platform
-            times = []
-            for qc in report.query_comparisons.values():
-                if platform in qc.metrics:
-                    times.append(qc.metrics[platform].mean)
-
-            geo_mean = calculate_geometric_mean(times) if times else float("inf")
-            total_time = sum(times) if times else 0.0
-            win_rate = report.win_loss_matrix.get(platform, None)
-
-            rankings.append(
-                PlatformRanking(
-                    platform=platform,
-                    rank=0,
-                    score=geo_mean,
-                    geometric_mean_time=geo_mean,
-                    total_time=total_time,
-                    win_rate=win_rate.win_rate if win_rate else 0.0,
-                )
-            )
-
-        # Sort by geometric mean (lower is better)
-        rankings.sort(key=lambda r: r.score)
-
-        # Assign ranks and detect ties
-        ties_detected, tie_groups = self._assign_ranks_with_ties(rankings)
-
-        return RankingResult(
-            rankings=rankings,
-            strategy_used=RankingStrategy.GEOMETRIC_MEAN,
-            ties_detected=ties_detected,
-            tie_groups=tie_groups,
-            metadata={"metric": "geometric_mean_ms"},
+        return self._rank_by_metric(
+            report=report,
+            strategy=RankingStrategy.GEOMETRIC_MEAN,
+            metric_name="geometric_mean_ms",
+            metric_fn=calculate_geometric_mean,
+            empty_score=float("inf"),
+            empty_geometric_mean=float("inf"),
+            empty_total_time=0.0,
         )
 
     def _rank_by_total_time(self, report: ComparisonReport) -> RankingResult:
@@ -221,40 +193,57 @@ class PlatformRanker:
         Returns:
             RankingResult ordered by total time (lower is better)
         """
+        return self._rank_by_metric(
+            report=report,
+            strategy=RankingStrategy.TOTAL_TIME,
+            metric_name="total_time_ms",
+            metric_fn=sum,
+            empty_score=float("inf"),
+            empty_geometric_mean=0.0,
+            empty_total_time=float("inf"),
+        )
+
+    def _rank_by_metric(
+        self,
+        report: ComparisonReport,
+        strategy: RankingStrategy,
+        metric_name: str,
+        metric_fn: Callable[[list[float]], float],
+        empty_score: float,
+        empty_geometric_mean: float,
+        empty_total_time: float,
+    ) -> RankingResult:
+        """Rank platforms by a derived metric while preserving common metadata."""
         rankings = []
 
         for platform in report.platforms:
-            times = []
-            for qc in report.query_comparisons.values():
-                if platform in qc.metrics:
-                    times.append(qc.metrics[platform].mean)
-
-            total_time = sum(times) if times else float("inf")
-            geo_mean = calculate_geometric_mean(times) if times else 0.0
+            times = _extract_platform_times(report, platform)
+            score = metric_fn(times) if times else empty_score
+            geo_mean = calculate_geometric_mean(times) if times else empty_geometric_mean
+            total_time = sum(times) if times else empty_total_time
             win_rate = report.win_loss_matrix.get(platform, None)
 
             rankings.append(
                 PlatformRanking(
                     platform=platform,
                     rank=0,
-                    score=total_time,
+                    score=score,
                     geometric_mean_time=geo_mean,
                     total_time=total_time,
                     win_rate=win_rate.win_rate if win_rate else 0.0,
                 )
             )
 
-        # Sort by total time (lower is better)
         rankings.sort(key=lambda r: r.score)
 
         ties_detected, tie_groups = self._assign_ranks_with_ties(rankings)
 
         return RankingResult(
             rankings=rankings,
-            strategy_used=RankingStrategy.TOTAL_TIME,
+            strategy_used=strategy,
             ties_detected=ties_detected,
             tie_groups=tie_groups,
-            metadata={"metric": "total_time_ms"},
+            metadata={"metric": metric_name},
         )
 
     def _rank_by_win_rate(self, report: ComparisonReport) -> RankingResult:

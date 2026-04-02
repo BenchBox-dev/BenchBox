@@ -32,10 +32,10 @@ This runs all 22 TPC-H queries using Polars' DataFrame API.
 
 ```bash
 # SQL execution (DuckDB)
-benchbox run --platform duckdb --benchmark tpch --scale 0.1 -o sql.json
+benchbox run --platform duckdb --benchmark tpch --scale 0.1 --output sql.json
 
 # DataFrame execution (Polars)
-benchbox run --platform polars-df --benchmark tpch --scale 0.1 -o polars.json
+benchbox run --platform polars-df --benchmark tpch --scale 0.1 --output polars.json
 
 # Compare
 benchbox compare sql.json polars.json
@@ -74,17 +74,17 @@ Both produce identical results.
 Enable auto-tuning for optimal performance:
 
 ```bash
-benchbox run --platform polars-df --benchmark tpch --df-tuning auto
+benchbox run --platform polars-df --benchmark tpch --tuning auto
 ```
 
 Or use a custom configuration:
 
 ```bash
 # View available settings
-benchbox df-tuning show-defaults --platform polars
+benchbox tuning show-defaults --platform polars
 
 # Use custom tuning
-benchbox run --platform polars-df --benchmark tpch --df-tuning tuning.yaml
+benchbox run --platform polars-df --benchmark tpch --tuning tuning.yaml
 ```
 
 ## Pandas Example
@@ -101,9 +101,9 @@ benchbox run --platform pandas-df --benchmark tpch --scale 0.01
 
 ```bash
 # Compare DataFrame platforms
-benchbox run --platform polars-df --benchmark tpch -o polars.json
-benchbox run --platform pandas-df --benchmark tpch -o pandas.json
-benchbox run --platform datafusion-df --benchmark tpch -o datafusion.json
+benchbox run --platform polars-df --benchmark tpch --output polars.json
+benchbox run --platform pandas-df --benchmark tpch --output pandas.json
+benchbox run --platform datafusion-df --benchmark tpch --output datafusion.json
 
 benchbox compare polars.json pandas.json datafusion.json
 ```

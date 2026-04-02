@@ -92,6 +92,15 @@ class TestBenchmarkFiltering:
 class TestBenchmarkDisplay:
     """Test unified benchmark display functionality."""
 
+    def test_list_available_benchmarks_prints_tree(self):
+        """list_available_benchmarks should render the benchmark tree."""
+        manager = BenchmarkManager()
+
+        with patch("benchbox.cli.benchmarks.console") as mock_console:
+            manager.list_available_benchmarks()
+
+        assert mock_console.print.called
+
     def test_display_all_benchmarks_structure(self):
         """Test that display returns all benchmarks with proper structure."""
         manager = BenchmarkManager()
@@ -177,6 +186,57 @@ class TestBenchmarkPreview:
 
         panel_arg = mock_console.print.call_args[0][0]
         assert isinstance(panel_arg, Panel)
+
+    def test_show_sample_queries_renders_loaded_queries(self):
+        """Sample query preview should render heading and SQL snippets."""
+        manager = BenchmarkManager()
+
+        class StubBenchmark:
+            def __init__(self, scale_factor):
+                self.scale_factor = scale_factor
+                self.queries = {
+                    "Q1": "SELECT 1",
+                    "Q2": "SELECT 2",
+                }
+
+        with (
+            patch("benchbox.core.benchmark_loader.get_benchmark_class", return_value=StubBenchmark),
+            patch("benchbox.cli.benchmarks.console") as mock_console,
+        ):
+            manager._show_sample_queries("tpch", limit=1)
+
+        printed = [str(call.args[0]) for call in mock_console.print.call_args_list if call.args]
+        assert any("Sample Queries" in item for item in printed)
+        assert any("Query Q1:" in item for item in printed)
+
+    def test_show_sample_queries_without_queries_warns(self):
+        """Benchmarks without a queries mapping should emit a warning."""
+        manager = BenchmarkManager()
+
+        class StubBenchmark:
+            def __init__(self, scale_factor):
+                self.scale_factor = scale_factor
+                self.queries = {}
+
+        with (
+            patch("benchbox.core.benchmark_loader.get_benchmark_class", return_value=StubBenchmark),
+            patch("benchbox.cli.benchmarks.console") as mock_console,
+        ):
+            manager._show_sample_queries("tpch")
+
+        assert any("No queries available for preview" in str(call) for call in mock_console.print.call_args_list)
+
+    def test_show_sample_queries_load_failure_warns(self):
+        """Benchmark loading failures should be surfaced as a warning."""
+        manager = BenchmarkManager()
+
+        with (
+            patch("benchbox.core.benchmark_loader.get_benchmark_class", side_effect=RuntimeError("boom")),
+            patch("benchbox.cli.benchmarks.console") as mock_console,
+        ):
+            manager._show_sample_queries("tpch")
+
+        assert any("Could not load sample queries" in str(call) for call in mock_console.print.call_args_list)
 
 
 class TestBenchmarkSelectionIntegration:

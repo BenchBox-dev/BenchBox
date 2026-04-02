@@ -158,14 +158,14 @@ class TestQ3Query:
         from benchbox.core.tpcds.dataframe_queries import get_tpcds_query
 
         query = get_tpcds_query("Q3")
-        assert query.expression_impl is not None
+        assert callable(query.expression_impl)
 
     def test_q3_pandas_impl_exists(self):
         """Test that Q3 pandas implementation exists."""
         from benchbox.core.tpcds.dataframe_queries import get_tpcds_query
 
         query = get_tpcds_query("Q3")
-        assert query.pandas_impl is not None
+        assert callable(query.pandas_impl)
 
     def test_q3_categories(self):
         """Test Q3 query categories."""
@@ -185,14 +185,14 @@ class TestQ42Query:
         from benchbox.core.tpcds.dataframe_queries import get_tpcds_query
 
         query = get_tpcds_query("Q42")
-        assert query.expression_impl is not None
+        assert callable(query.expression_impl)
 
     def test_q42_pandas_impl_exists(self):
         """Test that Q42 pandas implementation exists."""
         from benchbox.core.tpcds.dataframe_queries import get_tpcds_query
 
         query = get_tpcds_query("Q42")
-        assert query.pandas_impl is not None
+        assert callable(query.pandas_impl)
 
 
 class TestQ52Query:

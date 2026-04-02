@@ -13,7 +13,7 @@ from rich.console import Console
 from benchbox.cli.execution import BenchmarkExecutor
 from benchbox.core.schemas import BenchmarkConfig, QueryResult
 from benchbox.utils.printing import quiet_console
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,
@@ -666,6 +666,7 @@ class TestBenchmarkExecutorResultCreation:
                     )
 
         assert executor._benchmark_instance is not None
+        assert isinstance(executor._benchmark_instance, Mock)
 
     def test_display_execution_info_with_queries_subset(self):
         """Test display when queries attribute exists."""
@@ -673,11 +674,9 @@ class TestBenchmarkExecutorResultCreation:
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", queries=["Q1", "Q6", "Q17"], scale_factor=0.01)
         db_config = Mock(name="test_db")
 
-        with patch("benchbox.cli.execution.console.print"):
+        with patch("benchbox.cli.execution.console.print") as mock_print:
             executor._display_execution_info(config, db_config)
-
-        # Verify method executes without error
-        assert True
+            mock_print.assert_called()
 
     def test_display_execution_info_with_high_concurrency(self):
         """Test display with concurrency > 1."""
@@ -685,8 +684,6 @@ class TestBenchmarkExecutorResultCreation:
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", concurrency=4, scale_factor=0.01)
         db_config = Mock(name="test_db")
 
-        with patch("benchbox.cli.execution.console.print"):
+        with patch("benchbox.cli.execution.console.print") as mock_print:
             executor._display_execution_info(config, db_config)
-
-        # Verify method executes without error
-        assert True
+            mock_print.assert_called()

@@ -682,6 +682,46 @@ class DataFrameBenchmarkSuite:
                 error_message=str(e),
             )
 
+    def _build_speedup_matrix(self, platforms: list[str], geomeans: dict[str, float]) -> dict[str, dict[str, float]]:
+        """Build pairwise speedup matrix from geometric means.
+
+        For each (p1, p2) pair, computes geomeans[p2] / geomeans[p1] when both
+        platforms have valid geometric means; defaults to 1.0 otherwise.
+        """
+        speedup_matrix: dict[str, dict[str, float]] = {}
+        for p1 in platforms:
+            speedup_matrix[p1] = {}
+            for p2 in platforms:
+                if p1 in geomeans and p2 in geomeans and geomeans[p1] > 0:
+                    speedup_matrix[p1][p2] = geomeans[p2] / geomeans[p1]
+                else:
+                    speedup_matrix[p1][p2] = 1.0
+        return speedup_matrix
+
+    def _find_query_winners(self, results: list[PlatformBenchmarkResult]) -> dict[str, str]:
+        """Find the fastest platform for each query across all results.
+
+        Returns a mapping of query_id to the platform name that achieved the
+        lowest mean execution time for that query (SUCCESS results only).
+        """
+        all_query_ids: set[str] = set()
+        for result in results:
+            for qr in result.query_results:
+                all_query_ids.add(qr.query_id)
+
+        query_winners: dict[str, str] = {}
+        for query_id in all_query_ids:
+            best_time = float("inf")
+            best_platform = ""
+            for result in results:
+                for qr in result.query_results:
+                    if qr.query_id == query_id and qr.status == "SUCCESS" and qr.mean_time_ms < best_time:
+                        best_time = qr.mean_time_ms
+                        best_platform = result.platform
+            if best_platform:
+                query_winners[query_id] = best_platform
+        return query_winners
+
     def get_summary(self, results: list[PlatformBenchmarkResult]) -> ComparisonSummary:
         """Generate comparison summary from benchmark results.
 
@@ -700,33 +740,9 @@ class DataFrameBenchmarkSuite:
         fastest = min(geomeans, key=geomeans.get) if geomeans else platforms[0]
         slowest = max(geomeans, key=geomeans.get) if geomeans else platforms[0]
 
-        # Build speedup matrix
-        speedup_matrix: dict[str, dict[str, float]] = {}
-        for p1 in platforms:
-            speedup_matrix[p1] = {}
-            for p2 in platforms:
-                if p1 in geomeans and p2 in geomeans and geomeans[p1] > 0:
-                    speedup_matrix[p1][p2] = geomeans[p2] / geomeans[p1]
-                else:
-                    speedup_matrix[p1][p2] = 1.0
-
-        # Find query winners
-        query_winners: dict[str, str] = {}
-        all_query_ids = set()
-        for result in results:
-            for qr in result.query_results:
-                all_query_ids.add(qr.query_id)
-
-        for query_id in all_query_ids:
-            best_time = float("inf")
-            best_platform = ""
-            for result in results:
-                for qr in result.query_results:
-                    if qr.query_id == query_id and qr.status == "SUCCESS" and qr.mean_time_ms < best_time:
-                        best_time = qr.mean_time_ms
-                        best_platform = result.platform
-            if best_platform:
-                query_winners[query_id] = best_platform
+        speedup_matrix = self._build_speedup_matrix(platforms, geomeans)
+        query_winners = self._find_query_winners(results)
+        all_query_ids = {qr.query_id for r in results for qr in r.query_results}
 
         return ComparisonSummary(
             platforms=platforms,

@@ -294,12 +294,12 @@ class TestTPCDIScalabilityPerformance:
                     f"  ETL Rate: {metrics['etl_processing_rate_rps']:.1f} rec/s (not validated, only {metrics['etl_records_processed']} records)"
                 )
 
-            # Memory usage should be reasonable
-            # Note: Base overhead set to 600MB to account for Python + pandas + ETL processing,
-            # test infrastructure (pytest, psutil, xdist workers), and CI/dev environment variability.
-            max_memory_mb = 1000 * scale_factor + 600  # Base overhead for Python/pandas/test environment
-            assert metrics["peak_memory_mb"] <= max_memory_mb, (
-                f"Memory usage too high at SF {scale_factor}: {metrics['peak_memory_mb']:.1f}MB"
+            # Memory growth (delta from start_memory) should be reasonable.
+            # Calibrated at 100MB base (2x observed max of ~4MB + floor), which subtracts out
+            # the ~350MB of OS/Python/xdist baseline so regressions are actually detectable.
+            max_growth_mb = 1000 * scale_factor + 100
+            assert metrics["memory_growth_mb"] <= max_growth_mb, (
+                f"Memory growth too high at SF {scale_factor}: {metrics['memory_growth_mb']:.1f}MB"
             )
 
             # At least half of sample queries should succeed
@@ -308,7 +308,7 @@ class TestTPCDIScalabilityPerformance:
 
             print(f"  Data Rate: {metrics['data_generation_rate_mbps']:.1f} MB/s ✅")
             print(f"  ETL Rate: {metrics['etl_processing_rate_rps']:.1f} rec/s ✅")
-            print(f"  Memory: {metrics['peak_memory_mb']:.1f}MB ✅")
+            print(f"  Memory Growth: {metrics['memory_growth_mb']:.1f}MB ✅")
             print(f"  Query Success: {query_success_rate:.1%} ✅")
 
     def _save_performance_baseline(self, results: dict[str, dict], output_dir: Path):

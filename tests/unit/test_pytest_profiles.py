@@ -42,11 +42,11 @@ def test_ci_profile_includes_full_instrumentation():
     section = _load_pytest_section("pytest-ci.ini")
     addopts = _tokenize_addopts(section["addopts"])
 
-    assert "--cov=benchbox" in addopts
-    assert "--cov-branch" in addopts
-    assert "--cov-report=html:htmlcov" in addopts
+    # Coverage source/branch flags live in Makefile targets (coverage-fast, coverage-all, test-ci)
+    # so each target controls its own scope. The profile still wires up the coverage config and JUnit.
+    assert "--cov-config=.coveragerc_core" in addopts
     assert "--junit-xml=test-results.xml" in section["addopts"]
+    assert "no:cov" not in addopts
 
     required_plugins = {line.strip() for line in section["required_plugins"].splitlines() if line.strip()}
     assert any("pytest-cov" in plugin for plugin in required_plugins)
-    assert "no:cov" not in addopts

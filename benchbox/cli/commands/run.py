@@ -103,6 +103,41 @@ def _reject_external_tuned(console: Any, logger: logging.Logger | None, ctx: cli
     ctx.exit(1)
 
 
+def _apply_platform_optimization_overrides(
+    unified_tuning: Any,
+    *,
+    sorted_ingestion_mode: str | None,
+    sorted_ingestion_method: str | None,
+    parsed_platform_options: dict[str, Any] | None = None,
+) -> None:
+    """Apply CLI and platform-option overrides to platform optimization settings."""
+    platform_optimizations = unified_tuning.platform_optimizations
+    platform_options = parsed_platform_options or {}
+
+    if sorted_ingestion_mode:
+        platform_optimizations.sorted_ingestion_mode = sorted_ingestion_mode.lower()
+    if sorted_ingestion_method:
+        platform_optimizations.sorted_ingestion_method = sorted_ingestion_method.lower()
+    if (
+        platform_optimizations.sorted_ingestion_mode == "off"
+        and platform_optimizations.sorted_ingestion_method != "auto"
+    ):
+        raise ValueError("--sorted-ingestion-method requires --sorted-ingestion-mode auto or force")
+
+    resolved_strategy = platform_options.get("databricks_clustering_strategy")
+    if resolved_strategy:
+        strategy = str(resolved_strategy).lower()
+        platform_optimizations.databricks_clustering_strategy = strategy
+        platform_optimizations.liquid_clustering_enabled = strategy == "liquid_clustering"
+
+    resolved_liquid_columns = platform_options.get("liquid_clustering_columns")
+    if resolved_liquid_columns:
+        columns = [column.strip() for column in str(resolved_liquid_columns).split(",") if column.strip()]
+        platform_optimizations.liquid_clustering_columns = columns
+        if columns:
+            platform_optimizations.liquid_clustering_enabled = True
+
+
 def _build_data_organization_from_tuning(unified_tuning: Any) -> dict[str, Any] | None:
     """Build data organization payload from unified tuning configuration."""
     if unified_tuning is None:
@@ -335,7 +370,7 @@ class PlatformOptionParamType(click.ParamType):
 
     name = "key=value"
 
-    def convert(self, value: str, param, ctx) -> tuple[str, str]:  # type: ignore[override]
+    def convert(self, value: str, param, ctx) -> tuple[str, str]:
         if "=" not in value:
             self.fail("Expected KEY=VALUE format", param, ctx)
         key, raw = value.split("=", 1)
@@ -411,18 +446,6 @@ from benchbox.cli.verbose_logging import setup_verbose_logging as setup_verbose_
     type=click.Choice(["auto", "ctas", "z_order", "hilbert", "liquid_clustering", "vacuum_sort"], case_sensitive=False),
     default=None,
     help="Cloud sorted-ingestion method override",
-)
-@advanced_option(
-    "--databricks-clustering-strategy",
-    type=click.Choice(["z_order", "liquid_clustering", "none"], case_sensitive=False),
-    default=None,
-    help="Databricks clustering strategy override for SQL tuning",
-)
-@advanced_option(
-    "--liquid-clustering-columns",
-    type=str,
-    default=None,
-    help="Comma-separated Databricks liquid clustering columns",
 )
 @click.option(
     "--dry-run",
@@ -538,8 +561,6 @@ def run(
     table_mode: str,
     sorted_ingestion_mode: str | None,
     sorted_ingestion_method: str | None,
-    databricks_clustering_strategy: str | None,
-    liquid_clustering_columns: str | None,
     dry_run: str | None,
     force: ForceConfig | None,
     verbose: int,
@@ -1035,27 +1056,16 @@ def run(
         if logger:
             logger.debug(f"Using basic unified config for mode: {tuning_resolution.mode.value}")
 
-    # Apply explicit sorted-ingestion strategy flags from CLI (if provided).
-    if sorted_ingestion_mode:
-        loaded_unified_config.platform_optimizations.sorted_ingestion_mode = sorted_ingestion_mode.lower()
-    if sorted_ingestion_method:
-        loaded_unified_config.platform_optimizations.sorted_ingestion_method = sorted_ingestion_method.lower()
-    if (
-        loaded_unified_config.platform_optimizations.sorted_ingestion_mode == "off"
-        and loaded_unified_config.platform_optimizations.sorted_ingestion_method != "auto"
-    ):
-        console.print("[red]❌ --sorted-ingestion-method requires --sorted-ingestion-mode auto or force[/red]")
+    try:
+        _apply_platform_optimization_overrides(
+            loaded_unified_config,
+            sorted_ingestion_mode=sorted_ingestion_mode,
+            sorted_ingestion_method=sorted_ingestion_method,
+            parsed_platform_options=parsed_platform_options,
+        )
+    except ValueError as exc:
+        console.print(f"[red]❌ {exc}[/red]")
         ctx.exit(1)
-
-    if databricks_clustering_strategy:
-        strategy = databricks_clustering_strategy.lower()
-        loaded_unified_config.platform_optimizations.databricks_clustering_strategy = strategy
-        loaded_unified_config.platform_optimizations.liquid_clustering_enabled = strategy == "liquid_clustering"
-    if liquid_clustering_columns:
-        columns = [c.strip() for c in liquid_clustering_columns.split(",") if c.strip()]
-        loaded_unified_config.platform_optimizations.liquid_clustering_columns = columns
-        if columns:
-            loaded_unified_config.platform_optimizations.liquid_clustering_enabled = True
 
     data_organization_payload = _build_data_organization_from_tuning(loaded_unified_config)
     try:
@@ -1198,6 +1208,10 @@ def run(
             )
             error_handler.handle_error(e, context)
             ctx.exit(1)
+
+    # Initialize configs — assigned in all live-run paths below; asserted non-None before use.
+    database_config: DatabaseConfig | None = None
+    benchmark_config: BenchmarkConfig | None = None
 
     # Handle dry run mode
     if dry_run:
@@ -1608,6 +1622,7 @@ def run(
                 compression_level=compression_level,
                 test_execution_type=test_execution_type,
                 seed=seed,
+                output=output,
                 additional_options={"table_mode": table_mode},
             )
         else:
@@ -1851,6 +1866,7 @@ def run(
                 compression_level=compression_level,
                 test_execution_type=test_execution_type,
                 seed=seed,
+                output=output,
                 additional_options={"table_mode": table_mode},
             )
         else:
@@ -1923,6 +1939,9 @@ def run(
             scale = last_run["scale"]
             tuning = last_run.get("tuning_mode", "tuned")
             phases = last_run.get("phases", ["load", "power"])
+            # Restore output location (critical for cloud platforms)
+            if not output:
+                output = last_run.get("output")
             # Preserve explicit CLI --table-mode over saved quick-restart preference.
             if not table_mode_cli_supplied:
                 table_mode = str(last_run.get("table_mode", table_mode) or "native").lower()
@@ -2262,6 +2281,7 @@ def run(
     # Note: In interactive mode, this should not be reached since prompt handles it
     # This is a safety check for edge cases and non-interactive mode
     assert database_config is not None  # Set by platform/benchmark selection above
+    assert benchmark_config is not None  # Set by platform/benchmark selection above
     if PlatformRegistry.requires_cloud_storage(database_config.type) and not output:
         console.print()
         console.print("[red]❌ Error: Cloud platform requires --output parameter[/red]")
@@ -2339,8 +2359,6 @@ def run(
             presort=presort,
             sorted_ingestion_mode=sorted_ingestion_mode,
             sorted_ingestion_method=sorted_ingestion_method,
-            databricks_clustering_strategy=databricks_clustering_strategy,
-            liquid_clustering_columns=liquid_clustering_columns,
             global_cache=global_cache,
         )
 
@@ -2433,6 +2451,7 @@ def run(
             compression_level=benchmark_config.compression_level,
             test_execution_type=benchmark_config.test_execution_type,
             seed=seed,
+            output=output,
             additional_options={"table_mode": table_mode},
         )
     else:

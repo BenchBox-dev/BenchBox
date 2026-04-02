@@ -1,4 +1,4 @@
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 """Tests for CLI display functionality.
 

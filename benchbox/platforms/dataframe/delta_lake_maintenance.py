@@ -27,12 +27,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 try:
-    import deltalake
     from deltalake import DeltaTable, write_deltalake
 
     DELTA_AVAILABLE = True
 except ImportError:
-    deltalake = None  # type: ignore[assignment]
     DeltaTable = None  # type: ignore[assignment, misc]
     write_deltalake = None  # type: ignore[assignment]
     DELTA_AVAILABLE = False

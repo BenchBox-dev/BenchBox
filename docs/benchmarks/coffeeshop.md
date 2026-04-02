@@ -5,6 +5,8 @@
 ```{tags} beginner, concept, coffeeshop, custom-benchmark
 ```
 
+> **CLI name:** `coffeeshop` — use `benchbox run --benchmark coffeeshop`
+
 ## Overview
 
 The CoffeeShop benchmark provides a realistic point-of-sale and retail analytics workload based on a coffee shop business model. It features a compact star schema with temporal, regional, and pricing dynamics that mirror real-world retail operations.

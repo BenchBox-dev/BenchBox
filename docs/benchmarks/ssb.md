@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, ssb
 ```
 
+> **CLI name:** `ssb` — use `benchbox run --benchmark ssb`
+
 ## Overview
 
 The Star Schema Benchmark (SSB) is a simplified variant of TPC-H specifically designed for testing OLAP (Online Analytical Processing) systems and data warehouses. Created by O'Neil et al., SSB transforms the normalized TPC-H schema into a denormalized star schema that better represents typical data warehouse designs and enables more focused testing of analytical query performance.
@@ -46,7 +48,7 @@ SSB transforms TPC-H's normalized schema by:
 
 1. **Combining ORDERS and LINEITEM** → **LINEORDER** fact table
 2. **Denormalizing CUSTOMER** → Includes region and nation information
-3. **Denormalizing SUPPLIER** → Includes region and nation information  
+3. **Denormalizing SUPPLIER** → Includes region and nation information
 4. **Flattening PART hierarchy** → Simplified part categorization
 5. **Removing PARTSUPP** → Part-supplier relationships embedded in fact table
 6. **Simplified DATE** → Calendar dimension without complex hierarchies
@@ -59,7 +61,7 @@ erDiagram
     CUSTOMER ||--o{ LINEORDER : lo_custkey
     SUPPLIER ||--o{ LINEORDER : lo_suppkey
     PART ||--o{ LINEORDER : lo_partkey
-    
+
     DATE {
         int d_datekey PK
         string d_date
@@ -73,7 +75,7 @@ erDiagram
         int d_holidayfl
         int d_weekdayfl
     }
-    
+
     CUSTOMER {
         int c_custkey PK
         string c_name
@@ -84,7 +86,7 @@ erDiagram
         string c_phone
         string c_mktsegment
     }
-    
+
     SUPPLIER {
         int s_suppkey PK
         string s_name
@@ -94,7 +96,7 @@ erDiagram
         string s_region
         string s_phone
     }
-    
+
     PART {
         int p_partkey PK
         string p_name
@@ -106,7 +108,7 @@ erDiagram
         int p_size
         string p_container
     }
-    
+
     LINEORDER {
         int lo_orderkey
         int lo_linenumber
@@ -287,7 +289,7 @@ conn.execute(schema_sql)
 # Load SSB tables
 table_mappings = {
     'date': 'date.csv',
-    'customer': 'customer.csv', 
+    'customer': 'customer.csv',
     'supplier': 'supplier.csv',
     'part': 'part.csv',
     'lineorder': 'lineorder.csv'
@@ -298,7 +300,7 @@ for table_name, file_name in table_mappings.items():
     if file_path.exists():
         conn.execute(f"""
             INSERT INTO {table_name}
-            SELECT * FROM read_csv('{file_path}', 
+            SELECT * FROM read_csv('{file_path}',
                                   header=true,
                                   auto_detect=true)
         """)
@@ -317,7 +319,7 @@ for query_id in flight_1_queries:
         'quantity_min': 26,
         'quantity_max': 35
     })
-    
+
     result = conn.execute(query_sql).fetchall()
     print(f"{query_id}: {len(result)} rows, Revenue: {result[0][0] if result else 0}")
 ```
@@ -332,7 +334,7 @@ class SSBPerformanceTester:
     def __init__(self, ssb: SSB, connection):
         self.ssb = ssb
         self.connection = connection
-        
+
     def run_flight_benchmark(self, flight_number: int, iterations: int = 3) -> Dict:
         """Benchmark a specific SSB flight."""
         flight_queries = {
@@ -341,27 +343,27 @@ class SSBPerformanceTester:
             3: ["Q3.1", "Q3.2", "Q3.3", "Q3.4"],
             4: ["Q4.1", "Q4.2", "Q4.3"]
         }
-        
+
         if flight_number not in flight_queries:
             raise ValueError(f"Invalid flight number: {flight_number}")
-            
+
         query_ids = flight_queries[flight_number]
         results = {}
-        
+
         for query_id in query_ids:
             print(f"Benchmarking {query_id}...")
-            
+
             times = []
             for iteration in range(iterations):
                 # Get parameterized query
                 query_sql = self.ssb.get_query(query_id, seed=42)
-                
+
                 start_time = time.time()
                 result = self.connection.execute(query_sql).fetchall()
                 execution_time = time.time() - start_time
-                
+
                 times.append(execution_time)
-            
+
             results[query_id] = {
                 'avg_time': sum(times) / len(times),
                 'min_time': min(times),
@@ -369,9 +371,9 @@ class SSBPerformanceTester:
                 'rows_returned': len(result),
                 'times': times
             }
-        
+
         return results
-    
+
     def _get_query_with_custom_params(self, query_id: str) -> str:
         """Example of getting query with custom parameters."""
         # Example custom parameters for each query type
@@ -393,31 +395,31 @@ class SSBPerformanceTester:
             'nation2': 'JAPAN',
             'city': 'UNITED KI1'
         }
-        
+
         return self.ssb.get_query(query_id, params=custom_params)
-    
+
     def run_complete_benchmark(self) -> Dict:
         """Run all SSB flights and return systematic results."""
         complete_results = {}
-        
+
         for flight_num in range(1, 5):
             print(f"Running Flight {flight_num}...")
             flight_results = self.run_flight_benchmark(flight_num)
             complete_results[f"Flight_{flight_num}"] = flight_results
-        
+
         # Calculate summary statistics
         all_times = []
         for flight_data in complete_results.values():
             for query_data in flight_data.values():
                 all_times.extend(query_data['times'])
-        
+
         complete_results['summary'] = {
             'total_queries': sum(len(flight) for flight in complete_results.values() if isinstance(flight, dict)),
             'total_avg_time': sum(all_times) / len(all_times),
             'total_min_time': min(all_times),
             'total_max_time': max(all_times)
         }
-        
+
         return complete_results
 
 # Usage
@@ -441,14 +443,14 @@ complete_results = performance_tester.run_complete_benchmark()
 
 def optimize_for_columnar(ssb: SSB, connection):
     """Optimize SSB for columnar database performance."""
-    
+
     # Create column-store configured tables
     optimization_sql = """
     -- Optimize fact table for columnar access
     CREATE TABLE lineorder_configured AS
-    SELECT 
+    SELECT
         lo_orderdate,
-        lo_custkey, 
+        lo_custkey,
         lo_partkey,
         lo_suppkey,
         lo_quantity,
@@ -459,20 +461,20 @@ def optimize_for_columnar(ssb: SSB, connection):
         lo_tax
     FROM lineorder
     ORDER BY lo_orderdate, lo_custkey;
-    
+
     -- Create projection indices for common query patterns
     CREATE INDEX idx_lineorder_date ON lineorder_configured(lo_orderdate);
     CREATE INDEX idx_lineorder_cust ON lineorder_configured(lo_custkey);
     CREATE INDEX idx_lineorder_part ON lineorder_configured(lo_partkey);
     CREATE INDEX idx_lineorder_supp ON lineorder_configured(lo_suppkey);
-    
+
     -- Optimize dimension tables
     CREATE INDEX idx_date_year ON date(d_year);
     CREATE INDEX idx_customer_region ON customer(c_region);
     CREATE INDEX idx_supplier_region ON supplier(s_region);
     CREATE INDEX idx_part_category ON part(p_category);
     """
-    
+
     connection.execute(optimization_sql)
     print("Applied columnar optimizations")
 
@@ -568,10 +570,10 @@ data_files = ssb.generate_data()
 tables = ['date', 'customer', 'supplier', 'part', 'lineorder']
 for table_name in tables:
     file_path = f"/data/ssb_sf10/{table_name}.csv"
-    
+
     df = spark.read.csv(file_path, header=True, inferSchema=True)
     df.createOrReplaceTempView(table_name)
-    
+
     # Cache dimension tables for better join performance
     if table_name != 'lineorder':
         df.cache()
@@ -586,7 +588,7 @@ for query_id in flight_2_queries:
         'brand_max': 'MFGR#2228',
         'brand': 'MFGR#2221'
     })
-    
+
     result_df = spark.sql(query_sql)
     result_df.show(10)
     print(f"{query_id} execution plan:")
@@ -652,7 +654,7 @@ client.execute(create_tables_sql)
 # Load data using ClickHouse CSV import
 for table_name in ['customer', 'supplier', 'part', 'date', 'lineorder']:
     file_path = ssb.output_dir / f"{table_name}.csv"
-    
+
     # Use ClickHouse's configured CSV import
     with open(file_path, 'rb') as f:
         client.insert_file(table_name, f, fmt='CSV')
@@ -670,7 +672,7 @@ for query_id in ["Q1.1", "Q1.2", "Q1.3"]:
         'quantity_min': 26,
         'quantity_max': 35
     })
-    
+
     result = client.query(query_sql)
     flight_1_results[query_id] = result.result_rows
     print(f"{query_id}: {len(result.result_rows)} rows")

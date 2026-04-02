@@ -657,18 +657,11 @@ class TestTPCHBenchmark:
             assert "1998-06-15" in result
 
     def test_run_benchmark_result_structure(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test run_benchmark result structure before NotImplementedError."""
-        # Mock data generation to avoid external dependencies
+        """Test run_benchmark accepts parameters and returns a result dict."""
         with patch.object(tpch_benchmark, "generate_data", return_value=["table1.tbl", "table2.tbl"]):
             with patch.object(tpch_benchmark, "setup_database"):
-                try:
-                    tpch_benchmark.run_benchmark("connection_string", query_ids=[1, 2])
-                except NotImplementedError:
-                    pass  # Expected
-
-        # We can't easily test the result structure since it raises NotImplementedError,
-        # but we can test that the method accepts the parameters correctly
-        assert True  # If we get here, parameters were accepted
+                result = tpch_benchmark.run_benchmark("connection_string", query_ids=[1, 2])
+        assert isinstance(result, dict), f"Expected dict result, got {type(result)}"
 
     def test_run_query_parameter_handling(self, tpch_benchmark: TPCHBenchmark) -> None:
         """Test run_query parameter handling before NotImplementedError."""

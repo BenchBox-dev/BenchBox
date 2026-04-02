@@ -24,6 +24,11 @@ if TYPE_CHECKING:
 from benchbox.base import BaseBenchmark
 from benchbox.core.connection import DatabaseConnection
 from benchbox.core.operations import OperationExecutor
+from benchbox.core.primitives_benchmark_utils import (
+    build_tpch_staging_tables_sql,
+    quote_identifier,
+    table_exists,
+)
 from benchbox.core.transaction_primitives.generator import TransactionPrimitivesDataGenerator
 from benchbox.core.transaction_primitives.operations import TransactionOperationsManager
 from benchbox.core.transaction_primitives.schema import STAGING_TABLES, get_all_staging_tables_sql, get_create_table_sql
@@ -323,21 +328,7 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             - Quotes with double quotes (SQL standard for identifiers)
             - Escapes any existing double quotes by doubling them
         """
-        # Validate identifier contains only safe characters
-        # Allow: alphanumeric, underscore (standard SQL identifier characters)
-        import re
-
-        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", identifier):
-            raise ValueError(
-                f"Invalid SQL identifier: {identifier}. "
-                "Only alphanumeric and underscore allowed, must start with letter or underscore."
-            )
-
-        # Escape any double quotes by doubling them (SQL standard)
-        escaped = identifier.replace('"', '""')
-
-        # Return quoted identifier
-        return f'"{escaped}"'
+        return quote_identifier(identifier)
 
     def _table_exists(self, connection: DatabaseConnection, table_name: str) -> bool:
         """Check if a table exists in the database.
@@ -361,33 +352,7 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         Security:
             Table name is quoted using _quote_identifier() to prevent SQL injection.
         """
-        try:
-            # Quote table name to prevent SQL injection
-            quoted_table = self._quote_identifier(table_name)
-
-            # Attempt to select from table with no rows returned
-            # LIMIT 0 is supported by: DuckDB, PostgreSQL, MySQL, SQLite
-            # SQL Server uses TOP 0 instead, but we primarily target DuckDB
-            connection.execute(f"SELECT 1 FROM {quoted_table} LIMIT 0")
-            return True
-        except ValueError as e:
-            # Invalid identifier - log and return False
-            self.log_verbose(f"Invalid table name '{table_name}': {e}")
-            return False
-        except Exception as e:
-            # Table doesn't exist or other error occurred
-            # Check if this looks like a "table doesn't exist" error
-            error_msg = str(e).lower()
-            if any(
-                phrase in error_msg
-                for phrase in ["does not exist", "doesn't exist", "no such table", "unknown table", "not found"]
-            ):
-                # Expected error - table doesn't exist
-                return False
-            else:
-                # Unexpected error - log it but return False for safety
-                self.log_verbose(f"Unexpected error checking table '{table_name}': {type(e).__name__}: {e}")
-                return False
+        return table_exists(connection, table_name, self.log_verbose)
 
     def _populate_staging_table(self, connection: DatabaseConnection, staging_table: str, source_table: str) -> None:
         """Populate staging table from TPC-H source table.
@@ -751,41 +716,12 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         Returns:
             Complete SQL schema creation script
         """
-        from benchbox.core.tpch.schema import get_create_all_tables_sql as get_tpch_ddl
-
-        # Extract constraint settings from tuning configuration
-        # Default to False (no constraints) when no tuning config provided
-        enable_primary_keys = False
-        enable_foreign_keys = False
-
-        if tuning_config is not None:
-            # Get constraint configuration from tuning config
-            pk_config = getattr(tuning_config, "primary_keys", None)
-            fk_config = getattr(tuning_config, "foreign_keys", None)
-
-            enable_primary_keys = getattr(pk_config, "enabled", False)
-            enable_foreign_keys = getattr(fk_config, "enabled", False)
-
-        # Generate TPC-H base tables DDL
-        tpch_ddl = get_tpch_ddl(
-            enable_primary_keys=enable_primary_keys,
-            enable_foreign_keys=enable_foreign_keys,
+        return build_tpch_staging_tables_sql(
+            dialect=dialect,
+            tuning_config=tuning_config,
+            staging_heading="Transaction Primitives Staging Tables",
+            get_staging_tables_sql=get_all_staging_tables_sql,
         )
-
-        # Generate Transaction Primitives staging tables DDL
-        staging_ddl = get_all_staging_tables_sql(dialect)
-
-        # Combine with clear separation
-        return f"""{tpch_ddl}
-
--- ============================================================
--- Transaction Primitives Staging Tables
--- ============================================================
--- These tables are created empty and populated via setup()
--- after TPC-H base data is loaded
--- ============================================================
-
-{staging_ddl}"""
 
     def get_benchmark_info(self) -> dict[str, Any]:
         """Get information about the benchmark.

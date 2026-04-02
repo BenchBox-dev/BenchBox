@@ -18,10 +18,17 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
+from benchbox.core.dataframe.tuning import (
+    DataFrameTuningConfiguration,
+    ExecutionConfiguration,
+    MemoryConfiguration,
+    ParallelismConfiguration,
+)
 from benchbox.platforms.pyspark import (
     PYSPARK_AVAILABLE,
     ensure_compatible_java,
@@ -173,6 +180,108 @@ class TestPySparkDataFrameAdapter:
 
 
 @pytest.mark.skipif(_SKIP_PYSPARK, reason=_SKIP_REASON)
+class TestPySparkDataFrameAdapterConfigAndLifecycle:
+    """Targeted configuration and lifecycle tests for the adapter stub behavior."""
+
+    def test_tuning_config_overrides_parallelism_and_memory(self):
+        """Tuning config should adjust local master, partitions, and driver memory."""
+        tuning = DataFrameTuningConfiguration(
+            parallelism=ParallelismConfiguration(thread_count=6),
+            memory=MemoryConfiguration(memory_limit="3GB"),
+            execution=ExecutionConfiguration(streaming_mode=True),
+        )
+
+        adapter = PySparkDataFrameAdapter(
+            master="local[2]",
+            driver_memory="1g",
+            shuffle_partitions=2,
+            tuning_config=tuning,
+            verbose=False,
+        )
+
+        assert adapter._master == "local[6]"
+        assert adapter._shuffle_partitions == 6
+        assert adapter._driver_memory == "3GB"
+
+        summary = adapter.get_tuning_summary()
+        assert summary["master"] == "local[6]"
+        assert summary["driver_memory"] == "3GB"
+        assert summary["shuffle_partitions"] == 6
+
+        adapter.close()
+
+    @patch("benchbox.platforms.dataframe.pyspark_df.SparkSessionManager.release")
+    @patch("benchbox.platforms.dataframe.pyspark_df.SparkSessionManager.get_or_create")
+    def test_lazy_session_creation_passes_expected_settings(self, mock_get_or_create, mock_release):
+        """SparkSessionManager should be called once with the adapter's resolved settings."""
+        mock_session = MagicMock()
+        mock_session.sparkContext.master = "local[3]"
+        mock_get_or_create.return_value = mock_session
+
+        adapter = PySparkDataFrameAdapter(
+            master="local[3]",
+            app_name="BenchBox-PySpark-Stub",
+            driver_memory="2g",
+            executor_memory="1g",
+            shuffle_partitions=5,
+            enable_aqe=False,
+            verbose=True,
+            spark_sql_catalog_implementation="in-memory",
+        )
+
+        assert adapter._spark is None
+        assert adapter._session_claimed is False
+
+        session = adapter.spark
+
+        assert session is mock_session
+        assert adapter.spark is mock_session
+        mock_get_or_create.assert_called_once_with(
+            master="local[3]",
+            app_name="BenchBox-PySpark-Stub",
+            driver_memory="2g",
+            executor_memory="1g",
+            shuffle_partitions=5,
+            enable_aqe=False,
+            extra_configs={"spark_sql_catalog_implementation": "in-memory"},
+            verbose=True,
+        )
+        assert adapter._session_claimed is True
+
+        adapter.close()
+        adapter.close()
+
+        mock_release.assert_called_once_with()
+        assert adapter._spark is None
+        assert adapter._session_claimed is False
+
+    @patch("benchbox.platforms.dataframe.pyspark_df.SparkSessionManager.get_or_create")
+    def test_session_creation_failure_does_not_claim_session(self, mock_get_or_create):
+        """Failed session creation should bubble up without mutating lifecycle state."""
+        mock_get_or_create.side_effect = RuntimeError("spark init failed")
+
+        adapter = PySparkDataFrameAdapter(master="local[1]", driver_memory="512m")
+
+        with pytest.raises(RuntimeError, match="spark init failed"):
+            _ = adapter.spark
+
+        assert adapter._spark is None
+        assert adapter._session_claimed is False
+
+    def test_build_schema_uses_string_fields(self):
+        """CSV schema helper should map every requested column to nullable strings."""
+        adapter = PySparkDataFrameAdapter(master="local[1]", driver_memory="512m")
+
+        schema = adapter._build_schema(["order_id", "customer_name"])
+
+        assert schema.fieldNames() == ["order_id", "customer_name"]
+        assert [field.dataType.simpleString() for field in schema.fields] == ["string", "string"]
+        assert all(field.nullable for field in schema.fields)
+
+        adapter.close()
+
+
+@pytest.mark.skipif(_SKIP_PYSPARK, reason=_SKIP_REASON)
 class TestPySparkExpressionMethods:
     """Tests for PySpark expression methods."""
 
@@ -189,44 +298,44 @@ class TestPySparkExpressionMethods:
     def test_col(self, adapter):
         """Test col() creates a PySpark column expression."""
         expr = adapter.col("amount")
-
-        # PySpark returns Column type
-        assert hasattr(expr, "alias")
+        aliased = expr.alias("amt")
+        assert aliased is not None
+        assert str(aliased) != str(expr)  # alias changes repr
 
     def test_lit_integer(self, adapter):
         """Test lit() with integer value."""
         expr = adapter.lit(100)
-        assert hasattr(expr, "alias")
+        assert expr.alias("v") is not None
 
     def test_lit_string(self, adapter):
         """Test lit() with string value."""
         expr = adapter.lit("test")
-        assert hasattr(expr, "alias")
+        assert expr.alias("v") is not None
 
     def test_lit_float(self, adapter):
         """Test lit() with float value."""
         expr = adapter.lit(3.14)
-        assert hasattr(expr, "alias")
+        assert expr.alias("v") is not None
 
     def test_cast_date(self, adapter):
         """Test cast_date() method."""
         expr = adapter.cast_date(adapter.col("date_str"))
-        assert hasattr(expr, "alias")
+        assert expr.alias("d") is not None
 
     def test_cast_string(self, adapter):
         """Test cast_string() method."""
         expr = adapter.cast_string(adapter.col("number"))
-        assert hasattr(expr, "alias")
+        assert expr.alias("s") is not None
 
     def test_date_sub(self, adapter):
         """Test date_sub() method."""
         expr = adapter.date_sub(adapter.col("date"), 7)
-        assert hasattr(expr, "alias")
+        assert expr.alias("ds") is not None
 
     def test_date_add(self, adapter):
         """Test date_add() method."""
         expr = adapter.date_add(adapter.col("date"), 30)
-        assert hasattr(expr, "alias")
+        assert expr.alias("da") is not None
 
 
 @pytest.mark.skipif(_SKIP_PYSPARK, reason=_SKIP_REASON)
@@ -246,47 +355,47 @@ class TestPySparkAggregationMethods:
     def test_sum(self, adapter):
         """Test sum() method."""
         expr = adapter.sum("amount")
-        assert hasattr(expr, "alias")
+        assert expr.alias("total") is not None
 
     def test_mean(self, adapter):
         """Test mean() method."""
         expr = adapter.mean("amount")
-        assert hasattr(expr, "alias")
+        assert expr.alias("avg") is not None
 
     def test_count(self, adapter):
         """Test count() method."""
         expr = adapter.count("amount")
-        assert hasattr(expr, "alias")
+        assert expr.alias("cnt") is not None
 
     def test_count_star(self, adapter):
         """Test count() method without column (COUNT(*))."""
         expr = adapter.count()
-        assert hasattr(expr, "alias")
+        assert expr.alias("cnt") is not None
 
     def test_min(self, adapter):
         """Test min() method."""
         expr = adapter.min("amount")
-        assert hasattr(expr, "alias")
+        assert expr.alias("min_val") is not None
 
     def test_max(self, adapter):
         """Test max() method."""
         expr = adapter.max("amount")
-        assert hasattr(expr, "alias")
+        assert expr.alias("max_val") is not None
 
     def test_when(self, adapter):
         """Test when() conditional method."""
         when_expr = adapter.when(adapter.col("amount") > adapter.lit(100))
-        assert hasattr(when_expr, "alias")
+        assert when_expr.alias("flag") is not None
 
     def test_concat_str(self, adapter):
         """Test concat_str() method."""
         expr = adapter.concat_str("first", "last", separator=" ")
-        assert hasattr(expr, "alias")
+        assert expr.alias("full_name") is not None
 
     def test_concat_str_no_separator(self, adapter):
         """Test concat_str() method without separator."""
         expr = adapter.concat_str("first", "last")
-        assert hasattr(expr, "alias")
+        assert expr.alias("combined") is not None
 
     def test_aggregation_in_groupby(self, adapter):
         """Test aggregation methods work in group_by operations."""

@@ -44,11 +44,9 @@ from .base.data_loading import DataSourceResolver, FileFormatRegistry
 try:
     import boto3
     from pyathena import connect as athena_connect
-    from pyathena.cursor import Cursor as AthenaCursor
 except ImportError:
     boto3 = None
     athena_connect = None
-    AthenaCursor = None
 
 
 class AthenaAdapter(PlatformAdapter):
@@ -1192,15 +1190,9 @@ class AthenaAdapter(PlatformAdapter):
 
     def get_query_plan(self, connection: Any, query: str) -> str:
         """Get query execution plan."""
-        cursor = connection.cursor()
-        try:
-            cursor.execute(f"EXPLAIN {query}")
-            plan_rows = cursor.fetchall()
-            return "\n".join([str(row[0]) for row in plan_rows])
-        except Exception as e:
-            return f"Could not get query plan: {e}"
-        finally:
-            cursor.close()
+        from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+
+        return get_query_plan_from_cursor(connection, query)
 
     def close_connection(self, connection: Any) -> None:
         """Close Athena connection."""

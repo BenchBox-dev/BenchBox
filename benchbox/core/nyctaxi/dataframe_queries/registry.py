@@ -28,15 +28,7 @@ def list_nyctaxi_queries(
     family: str | None = None,
     category: QueryCategory | None = None,
 ) -> list[DataFrameQuery]:
-    """List NYC Taxi DataFrame queries with optional filtering.
-
-    Args:
-        family: Filter by family ("expression" or "pandas")
-        category: Filter by query category
-
-    Returns:
-        List of matching DataFrameQuery objects
-    """
+    """List NYC Taxi DataFrame queries with optional filtering."""
     return NYCTAXI_DATAFRAME_QUERIES.list_queries(family=family, category=category)
 
 

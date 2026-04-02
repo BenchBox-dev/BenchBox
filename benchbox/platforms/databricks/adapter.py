@@ -39,10 +39,8 @@ from benchbox.utils.file_format import COMPRESSION_EXTENSIONS, is_tpc_format
 
 try:
     from databricks import sql as databricks_sql
-    from databricks.sql.client import Connection as DatabricksConnection
 except ImportError:
     databricks_sql = None
-    DatabricksConnection = None
 
 
 def _select_databricks_warehouse(warehouses: list, very_verbose: bool, logger: logging.Logger):
@@ -671,8 +669,6 @@ class DatabricksAdapter(PlatformAdapter):
             if "cursor" in locals():
                 cursor.close()
 
-        return elapsed_seconds(start_time)
-
     def _ensure_uc_volume_exists(self, uc_volume_path: str, connection: Any) -> None:
         """Ensure UC Volume exists, creating it if necessary.
 
@@ -1016,41 +1012,33 @@ class DatabricksAdapter(PlatformAdapter):
                 if rel:
                     mapping[table] = f"{uc_volume_path.rstrip('/')}/{rel}"
                 continue
-            # Try to detect a common sharded pattern: base.N[.ext]
             names = [str(e.get("path")) for e in entries if e.get("path")]
             if not names:
                 continue
-
-            # Derive wildcard: if all names share same prefix/suffix around a numeric segment
-            # e.g., customer.tbl.1.zst -> base='customer.tbl', ext='.zst' => customer.tbl.*.zst
-            def pattern_for(name: str) -> tuple[str, str, str]:
-                parts = name.split(".")
-                if len(parts) >= 3 and parts[-2].isdigit():
-                    base = ".".join(parts[:-2])
-                    ext = "." + parts[-1]
-                    return base, ".*", ext
-                if len(parts) >= 2 and parts[-1].isdigit():
-                    base = ".".join(parts[:-1])
-                    return base, ".*", ""
-                # Fallback: wildcard whole name
-                stem = Path(name).stem
-                return stem, ".*", Path(name).suffix
-
-            base0, star, ext0 = pattern_for(names[0])
-            # Verify others align
-            ok = True
-            for n in names[1:]:
-                b, s, e = pattern_for(n)
-                if b != base0 or e != ext0:
-                    ok = False
-                    break
-            if ok:
-                wildcard = f"{base0}{star}{ext0}"
+            wildcard = self._detect_manifest_wildcard(names)
+            if wildcard:
                 mapping[table] = f"{uc_volume_path.rstrip('/')}/{wildcard}"
             else:
-                # Fallback to first file
                 mapping[table] = f"{uc_volume_path.rstrip('/')}/{names[0]}"
         return mapping
+
+    @staticmethod
+    def _manifest_pattern_for_name(name: str) -> tuple[str, str]:
+        parts = name.split(".")
+        if len(parts) >= 3 and parts[-2].isdigit():
+            return ".".join(parts[:-2]), "." + parts[-1]
+        if len(parts) >= 2 and parts[-1].isdigit():
+            return ".".join(parts[:-1]), ""
+        stem = Path(name).stem
+        return stem, Path(name).suffix
+
+    def _detect_manifest_wildcard(self, names: list[str]) -> str | None:
+        base0, ext0 = self._manifest_pattern_for_name(names[0])
+        for name in names[1:]:
+            base, ext = self._manifest_pattern_for_name(name)
+            if base != base0 or ext != ext0:
+                return None
+        return f"{base0}.*{ext0}"
 
     def load_data(
         self, benchmark, connection: Any, data_dir: Path

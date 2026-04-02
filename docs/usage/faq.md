@@ -15,7 +15,9 @@ BenchBox is a benchmarking toolbox that makes it simple to benchmark analytical 
 
 ### Is BenchBox production-ready?
 
-BenchBox is currently **alpha software**. While core functionality works well (TPC-H, TPC-DS with DuckDB and major cloud platforms), APIs may change between versions, and some features are experimental. We recommend thorough testing before using BenchBox in production. See the main README for details on alpha status.
+BenchBox is currently **Beta software**. Core functionality is stable (TPC-H, TPC-DS with DuckDB and major cloud platforms). APIs may still change before 1.0. We recommend thorough testing before using BenchBox in production. See the main README for details on Beta status.
+
+The default wheel includes a `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, concurrency). This namespace is **not part of the supported Beta surface** — it has no stability guarantees and is not integrated with the benchmark registry or CLI. Use it at your own risk.
 
 ### Which databases does BenchBox support?
 
@@ -27,12 +29,11 @@ See the [Platform Selection Guide](../platforms/platform-selection-guide.md) and
 
 ### Which benchmarks are available?
 
-BenchBox includes twelve benchmarks:
-- **TPC Standards**: TPC-H, TPC-DS, TPC-DI
+BenchBox includes eighteen benchmarks:
+- **TPC Standards**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc
 - **Academic Benchmarks**: SSB, AMPLab, JoinOrder
-- **Industry Benchmarks**: ClickBench, H2ODB, CoffeeShop
-- **BenchBox Primitives**: Read Primitives, Write Primitives, Transaction Primitives
-- **BenchBox Experimental**: TPC-Havoc
+- **Industry Benchmarks**: ClickBench, H2ODB, NYC Taxi, TSBS DevOps, CoffeeShop
+- **BenchBox Primitives**: Read Primitives, Write Primitives, Transaction Primitives, TPC-H Data Vault
 
 See the [Benchmarks Catalog](../benchmarks/index.md) for feature details and selection guidance.
 
@@ -79,9 +80,10 @@ No. BenchBox includes pre-compiled TPC-H and TPC-DS data generation tools (`dbge
 
 ### Can I run BenchBox without any database installed?
 
-Yes! BenchBox works with DuckDB out of the box, which requires no separate installation. DuckDB is automatically installed as a dependency and creates databases in-process.
+Yes! Install BenchBox with the `[duckdb]` extra and you can run benchmarks immediately — DuckDB creates databases in-process with no server setup.
 
 ```bash
+uv add benchbox --extra duckdb
 uv run benchbox run --platform duckdb --benchmark tpch --scale 0.01
 ```
 
@@ -396,7 +398,7 @@ For questions not covered in the documentation:
 2. Open a new discussion or issue
 3. Provide context and specific details
 
-Support is provided on a best-effort basis during alpha development.
+Support is provided on a best-effort basis during Beta development.
 
 ## See Also
 

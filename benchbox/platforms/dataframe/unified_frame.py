@@ -582,85 +582,43 @@ class UnifiedDtExpr:
         self._is_pyspark = is_pyspark
         self._is_datafusion = is_datafusion
 
-    def year(self) -> UnifiedExpr:
-        """Extract year from date/datetime.
+    def _extract_date_part(self, part: str, pyspark_fn_name: str | None = None) -> UnifiedExpr:
+        """Multi-platform date-part extraction.
 
-        Returns:
-            UnifiedExpr with year as integer
+        Args:
+            part: Date part name (year, month, day, hour, minute).
+            pyspark_fn_name: PySpark function name override (e.g. ``"dayofmonth"``
+                instead of ``"day"``).  Defaults to *part*.
         """
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
-            return UnifiedExpr(F.year(self._expr))
+            return UnifiedExpr(getattr(F, pyspark_fn_name or part)(self._expr))
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
 
-            return UnifiedExpr(df_f.date_part(df_lit("year"), self._expr))
-        return UnifiedExpr(self._expr.dt.year())
+            return UnifiedExpr(df_f.date_part(df_lit(part), self._expr))
+        return UnifiedExpr(getattr(self._expr.dt, part)())
+
+    def year(self) -> UnifiedExpr:
+        """Extract year from date/datetime."""
+        return self._extract_date_part("year")
 
     def month(self) -> UnifiedExpr:
-        """Extract month from date/datetime.
-
-        Returns:
-            UnifiedExpr with month as integer (1-12)
-        """
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.month(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
-
-            return UnifiedExpr(df_f.date_part(df_lit("month"), self._expr))
-        return UnifiedExpr(self._expr.dt.month())
+        """Extract month from date/datetime."""
+        return self._extract_date_part("month")
 
     def day(self) -> UnifiedExpr:
-        """Extract day from date/datetime.
-
-        Returns:
-            UnifiedExpr with day as integer (1-31)
-        """
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.dayofmonth(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
-
-            return UnifiedExpr(df_f.date_part(df_lit("day"), self._expr))
-        return UnifiedExpr(self._expr.dt.day())
+        """Extract day from date/datetime."""
+        return self._extract_date_part("day", pyspark_fn_name="dayofmonth")
 
     def hour(self) -> UnifiedExpr:
-        """Extract hour from datetime.
-
-        Returns:
-            UnifiedExpr with hour as integer (0-23)
-        """
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.hour(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
-
-            return UnifiedExpr(df_f.date_part(df_lit("hour"), self._expr))
-        return UnifiedExpr(self._expr.dt.hour())
+        """Extract hour from datetime."""
+        return self._extract_date_part("hour")
 
     def minute(self) -> UnifiedExpr:
-        """Extract minute from datetime.
-
-        Returns:
-            UnifiedExpr with minute as integer (0-59)
-        """
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.minute(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
-
-            return UnifiedExpr(df_f.date_part(df_lit("minute"), self._expr))
-        return UnifiedExpr(self._expr.dt.minute())
+        """Extract minute from datetime."""
+        return self._extract_date_part("minute")
 
     def weekday(self) -> UnifiedExpr:
         """Extract weekday from datetime.
@@ -857,6 +815,19 @@ class UnifiedExpr:
                     exprs.append(o)
             return UnifiedExpr(F.concat(*exprs))
 
+        if self._is_datafusion:
+            from datafusion import functions as df_f, lit as df_lit
+
+            exprs = [self._expr]
+            for o in others:
+                if isinstance(o, str):
+                    exprs.append(df_lit(o))
+                elif isinstance(o, UnifiedExpr):
+                    exprs.append(o._expr)
+                else:
+                    exprs.append(o)
+            return UnifiedExpr(df_f.concat(*exprs), _is_string_literal=True)
+
         # Polars uses + for string concat
         import polars as pl
 
@@ -1015,29 +986,31 @@ class UnifiedExpr:
     # Aggregation Methods (Polars-style API)
     # =========================================================================
 
-    def sum(self) -> UnifiedExpr:
-        """Sum aggregation."""
+    def _apply_aggregation(self, pyspark_name: str, datafusion_name: str, polars_name: str) -> UnifiedExpr:
+        """Multi-platform aggregation dispatch.
+
+        Args:
+            pyspark_name: PySpark ``functions.{name}`` attribute.
+            datafusion_name: DataFusion ``functions.{name}`` attribute.
+            polars_name: Polars expression method name.
+        """
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
-            return UnifiedExpr(F.sum(self._expr))
+            return UnifiedExpr(getattr(F, pyspark_name)(self._expr))
         if self._is_datafusion:
             from datafusion import functions as df_f
 
-            return UnifiedExpr(df_f.sum(self._expr))
-        return UnifiedExpr(self._expr.sum())
+            return UnifiedExpr(getattr(df_f, datafusion_name)(self._expr))
+        return UnifiedExpr(getattr(self._expr, polars_name)())
+
+    def sum(self) -> UnifiedExpr:
+        """Sum aggregation."""
+        return self._apply_aggregation("sum", "sum", "sum")
 
     def mean(self) -> UnifiedExpr:
         """Mean/average aggregation."""
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.avg(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            return UnifiedExpr(df_f.avg(self._expr))
-        return UnifiedExpr(self._expr.mean())
+        return self._apply_aggregation("avg", "avg", "mean")
 
     def avg(self) -> UnifiedExpr:
         """Average aggregation (alias for mean)."""
@@ -1045,105 +1018,31 @@ class UnifiedExpr:
 
     def count(self) -> UnifiedExpr:
         """Count aggregation."""
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.count(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            return UnifiedExpr(df_f.count(self._expr))
-        return UnifiedExpr(self._expr.count())
+        return self._apply_aggregation("count", "count", "count")
 
     def min(self) -> UnifiedExpr:
         """Minimum aggregation."""
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.min(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            return UnifiedExpr(df_f.min(self._expr))
-        return UnifiedExpr(self._expr.min())
+        return self._apply_aggregation("min", "min", "min")
 
     def max(self) -> UnifiedExpr:
         """Maximum aggregation."""
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.max(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            return UnifiedExpr(df_f.max(self._expr))
-        return UnifiedExpr(self._expr.max())
+        return self._apply_aggregation("max", "max", "max")
 
     def first(self) -> UnifiedExpr:
         """First value aggregation."""
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.first(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            return UnifiedExpr(df_f.first_value(self._expr))
-        return UnifiedExpr(self._expr.first())
+        return self._apply_aggregation("first", "first_value", "first")
 
     def last(self) -> UnifiedExpr:
         """Last value aggregation."""
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.last(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            return UnifiedExpr(df_f.last_value(self._expr))
-        return UnifiedExpr(self._expr.last())
+        return self._apply_aggregation("last", "last_value", "last")
 
     def std(self) -> UnifiedExpr:
-        """Standard deviation aggregation.
-
-        Provides unified stddev:
-        - Polars: Uses .std()
-        - PySpark: Uses F.stddev()
-        - DataFusion: Uses functions.stddev()
-
-        Returns:
-            UnifiedExpr with standard deviation
-        """
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.stddev(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            return UnifiedExpr(df_f.stddev(self._expr))
-        return UnifiedExpr(self._expr.std())
+        """Standard deviation aggregation."""
+        return self._apply_aggregation("stddev", "stddev", "std")
 
     def var(self) -> UnifiedExpr:
-        """Variance aggregation.
-
-        Provides unified variance:
-        - Polars: Uses .var()
-        - PySpark: Uses F.variance()
-        - DataFusion: Uses functions.var_samp()
-
-        Returns:
-            UnifiedExpr with variance
-        """
-        if self._is_pyspark:
-            from pyspark.sql import functions as F  # noqa: N812
-
-            return UnifiedExpr(F.variance(self._expr))
-        if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            return UnifiedExpr(df_f.var_samp(self._expr))
-        return UnifiedExpr(self._expr.var())
+        """Variance aggregation."""
+        return self._apply_aggregation("variance", "var_samp", "var")
 
     def quantile(self, q: float) -> UnifiedExpr:
         """Quantile/percentile aggregation.
@@ -1273,6 +1172,36 @@ class UnifiedExpr:
         """Alias for cast_float64()."""
         return self.cast_float64()
 
+    def _apply_cast(self, target_type: str) -> UnifiedExpr:
+        """Multi-platform casting helper for common numeric target types."""
+        if self._is_pyspark:
+            from pyspark.sql.types import DoubleType, IntegerType, LongType
+
+            pyspark_types = {
+                "float64": DoubleType,
+                "int32": IntegerType,
+                "int64": LongType,
+            }
+            return UnifiedExpr(self._expr.cast(pyspark_types[target_type]()))
+        if self._is_datafusion:
+            import pyarrow as pa
+
+            datafusion_types = {
+                "float64": pa.float64,
+                "int32": pa.int32,
+                "int64": pa.int64,
+            }
+            return UnifiedExpr(self._expr.cast(datafusion_types[target_type]()))
+
+        import polars as pl
+
+        polars_types = {
+            "float64": pl.Float64,
+            "int32": pl.Int32,
+            "int64": pl.Int64,
+        }
+        return UnifiedExpr(self._expr.cast(polars_types[target_type]))
+
     def cast_float64(self) -> UnifiedExpr:
         """Cast to Float64/DoubleType.
 
@@ -1284,18 +1213,7 @@ class UnifiedExpr:
         Returns:
             UnifiedExpr with float values
         """
-        if self._is_pyspark:
-            from pyspark.sql.types import DoubleType
-
-            return UnifiedExpr(self._expr.cast(DoubleType()))
-        if self._is_datafusion:
-            import pyarrow as pa
-
-            return UnifiedExpr(self._expr.cast(pa.float64()))
-
-        import polars as pl
-
-        return UnifiedExpr(self._expr.cast(pl.Float64))
+        return self._apply_cast("float64")
 
     def cast_string(self) -> UnifiedExpr:
         """Cast to String/Utf8 type.
@@ -1332,18 +1250,7 @@ class UnifiedExpr:
         Returns:
             UnifiedExpr with integer values
         """
-        if self._is_pyspark:
-            from pyspark.sql.types import IntegerType
-
-            return UnifiedExpr(self._expr.cast(IntegerType()))
-        if self._is_datafusion:
-            import pyarrow as pa
-
-            return UnifiedExpr(self._expr.cast(pa.int32()))
-
-        import polars as pl
-
-        return UnifiedExpr(self._expr.cast(pl.Int32))
+        return self._apply_cast("int32")
 
     def cast_int64(self) -> UnifiedExpr:
         """Cast to Int64/LongType.
@@ -1356,18 +1263,7 @@ class UnifiedExpr:
         Returns:
             UnifiedExpr with 64-bit integer values
         """
-        if self._is_pyspark:
-            from pyspark.sql.types import LongType
-
-            return UnifiedExpr(self._expr.cast(LongType()))
-        if self._is_datafusion:
-            import pyarrow as pa
-
-            return UnifiedExpr(self._expr.cast(pa.int64()))
-
-        import polars as pl
-
-        return UnifiedExpr(self._expr.cast(pl.Int64))
+        return self._apply_cast("int64")
 
     def cast_int(self) -> UnifiedExpr:
         """Cast to integer (alias for cast_int32)."""
@@ -3998,7 +3894,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         elif _is_polars_df(self._df):
             result = self._df.explode(column)
         elif _is_datafusion_df(self._df):
-            result = self._df.unnest_column(column)
+            result = self._df.unnest_columns(column)
         else:
             # Fallback
             result = self._df.explode(column)

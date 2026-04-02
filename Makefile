@@ -1,7 +1,7 @@
 # BenchBox Makefile
 # This makefile provides commands for building, testing and development
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint install develop coverage coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json codex-skills-sync codex-skills-check mutation-test
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json codex-skills-sync codex-skills-check mutation-test
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -93,7 +93,7 @@ test-window:
 
 # CI/CD testing
 test-ci:
-	uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or flaky or local_only)"
+	uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or flaky or local_only)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml
 
 # Fast CI feedback (excludes cloud platform tests for speed)
 test-no-cloud:
@@ -132,9 +132,185 @@ test-live-all:
 	@echo "Running all live integration tests (requires credentials for all platforms)"
 	uv run -- python -m pytest -m "live_integration" --tb=short -v
 
+test-live-redshift:
+	@echo "Running Redshift live tests (requires REDSHIFT_HOST)"
+	uv run -- python -m pytest -m "live_redshift" --tb=short -v
+
+test-live-athena:
+	@echo "Running Athena live tests (requires ATHENA_REGION)"
+	uv run -- python -m pytest -m "live_athena" --tb=short -v
+
+test-live-firebolt:
+	@echo "Running Firebolt live tests (requires FIREBOLT_CLIENT_ID)"
+	uv run -- python -m pytest -m "live_firebolt" --tb=short -v
+
+test-live-starburst:
+	@echo "Running Starburst Galaxy live tests (requires STARBURST_HOST)"
+	uv run -- python -m pytest -m "live_starburst" --tb=short -v
+
+test-live-motherduck:
+	@echo "Running MotherDuck live tests (requires MOTHERDUCK_TOKEN)"
+	uv run -- python -m pytest -m "live_motherduck" --tb=short -v
+
+test-live-pg-duckdb:
+	@echo "Running pg_duckdb live tests (requires Docker PostgreSQL with pg_duckdb)"
+	uv run -- python -m pytest -m "live_pg_duckdb" --tb=short -v
+
+test-live-pg-mooncake:
+	@echo "Running pg_mooncake live tests (requires Docker PostgreSQL with pg_mooncake)"
+	uv run -- python -m pytest -m "live_pg_mooncake" --tb=short -v
+
+test-docker-up-pg-extensions:
+	@echo "Starting pg_duckdb (port 5432) and pg_mooncake (port 5433)..."
+	@set -e; \
+		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
+		project_file="$$state_dir/pg-extensions.project"; \
+		mkdir -p "$$state_dir"; \
+		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
+		if [ -z "$$project_name" ]; then \
+			project_name="benchbox-pg-extensions-test-$$(date +%s)-$$RANDOM"; \
+		fi; \
+		status=1; \
+		cleanup() { \
+			if [ $$status -ne 0 ]; then \
+				docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml down -v >/dev/null 2>&1 || true; \
+				rm -f "$$project_file"; \
+			fi; \
+		}; \
+		trap cleanup EXIT INT TERM; \
+		docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml up -d --wait; \
+		printf '%s\n' "$$project_name" > "$$project_file"; \
+		status=0
+
+test-docker-down-pg-extensions:
+	@set -e; \
+		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
+		project_file="$$state_dir/pg-extensions.project"; \
+		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
+		if [ -z "$$project_name" ]; then \
+			echo "No tracked Docker test stack for pg-extensions"; \
+			exit 0; \
+		fi; \
+		docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml down -v; \
+		rm -f "$$project_file"
+
+test-docker-pg-extensions:
+	@echo "Running pg_duckdb and pg_mooncake Docker integration tests"
+	@set -e; \
+		project_name="benchbox-pg-extensions-test-$$(date +%s)-$$RANDOM"; \
+		cleanup() { docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml down -v || true; }; \
+		trap cleanup EXIT INT TERM; \
+		docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml up -d --wait; \
+		uv run -- python -m pytest -m "live_pg_duckdb or live_pg_mooncake" --tb=short -v -n 0
+
+# Docker-based integration tests (requires Docker and docker compose)
+DOCKER_PLATFORMS := clickhouse trino presto postgresql starrocks doris databend influxdb
+DOCKER_TEST_STATE_DIR ?= /tmp/benchbox-docker-projects
+
+test-docker-up-%:
+	@set -e; \
+		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
+		project_file="$$state_dir/$*.project"; \
+		mkdir -p "$$state_dir"; \
+		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
+		if [ -z "$$project_name" ]; then \
+			project_name="benchbox-$*-test-$$(date +%s)-$$RANDOM"; \
+		fi; \
+		status=1; \
+		cleanup() { \
+			if [ $$status -ne 0 ]; then \
+				docker compose -p "$$project_name" -f docker/$*/docker-compose.yml down -v >/dev/null 2>&1 || true; \
+				rm -f "$$project_file"; \
+			fi; \
+		}; \
+		trap cleanup EXIT INT TERM; \
+		docker compose -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
+		printf '%s\n' "$$project_name" > "$$project_file"; \
+		status=0
+
+test-docker-down-%:
+	@set -e; \
+		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
+		project_file="$$state_dir/$*.project"; \
+		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
+		if [ -z "$$project_name" ]; then \
+			echo "No tracked Docker test stack for $*"; \
+			exit 0; \
+		fi; \
+		docker compose -p "$$project_name" -f docker/$*/docker-compose.yml down -v; \
+		rm -f "$$project_file"
+
+test-docker-%:
+	@echo "Running $* Docker integration tests"
+	@set -e; \
+		project_name="benchbox-$*-test-$$(date +%s)-$$RANDOM"; \
+		cleanup() { docker compose -p "$$project_name" -f docker/$*/docker-compose.yml down -v || true; }; \
+		trap cleanup EXIT INT TERM; \
+		docker compose -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
+		uv run -- python -m pytest -m "live_$*" --tb=short -v -n 0
+
+test-docker-up-all:
+	@set -e; \
+		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
+		mkdir -p "$$state_dir"; \
+		run_id="$$(date +%s)-$$RANDOM"; \
+		status=1; \
+		cleanup() { \
+			if [ $$status -ne 0 ]; then \
+				echo "Cleaning up partially started Docker services..."; \
+				for p in $(DOCKER_PLATFORMS); do \
+					project_file="$$state_dir/$$p.project"; \
+					project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
+					if [ -n "$$project_name" ]; then \
+						docker compose -p "$$project_name" -f docker/$$p/docker-compose.yml down -v >/dev/null 2>&1 || true; \
+						rm -f "$$project_file"; \
+					fi; \
+				done; \
+			fi; \
+		}; \
+		trap cleanup EXIT INT TERM; \
+		for p in $(DOCKER_PLATFORMS); do \
+			project_file="$$state_dir/$$p.project"; \
+			project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
+			if [ -z "$$project_name" ]; then \
+				project_name="benchbox-$$p-test-$$run_id"; \
+				printf '%s\n' "$$project_name" > "$$project_file"; \
+			fi; \
+			echo "Starting $$p..."; \
+			docker compose -p "$$project_name" -f docker/$$p/docker-compose.yml up -d --wait; \
+		done; \
+		status=0
+
+test-docker-down-all:
+	@set -e; \
+		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
+		for p in $(DOCKER_PLATFORMS); do \
+			project_file="$$state_dir/$$p.project"; \
+			project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
+			if [ -z "$$project_name" ]; then \
+				echo "Skipping $$p (no tracked Docker test stack)"; \
+				continue; \
+			fi; \
+			echo "Stopping $$p..."; \
+			docker compose -p "$$project_name" -f docker/$$p/docker-compose.yml down -v; \
+			rm -f "$$project_file"; \
+		done
+
+test-docker-all:
+	@echo "Running all Docker integration tests (requires Docker)"
+	@for p in $(DOCKER_PLATFORMS); do \
+		echo "=== Testing $$p ==="; \
+		$(MAKE) test-docker-$$p || exit 1; \
+	done
+
 # Coverage commands using pytest
-coverage:
-	uv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-report=term-missing
+coverage-fast:
+	uv run -- python -m pytest -c pytest-ci.ini -m "fast and not (slow or stress or resource_heavy or live_integration or cloud_import)" --cov=benchbox --cov-report=term-missing:skip-covered
+
+coverage-all:
+	uv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml
+
+coverage: coverage-all
 
 coverage-html:
 	uv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-report=html:htmlcov
@@ -175,6 +351,11 @@ clean:
 lint:
 	uv run ruff check .
 
+# Validate test marker annotations — fails on speed-lane conflicts or fast-incompatible pairs.
+# Uses --collect-only so no tests run; the conflict-detection hook fires at collection time.
+lint-markers:
+	uv run -- python -m pytest --collect-only -q -p no:warnings
+
 # Sync/check repo-local shared skill mirrors for Codex portability
 codex-skills-sync:
 	uv run -- python _project/scripts/sync_codex_shared_skills.py sync
@@ -208,14 +389,15 @@ ci-lint:
 	uv run ruff format --check .
 	uv run ty check
 	uv run -- python _project/scripts/sync_codex_shared_skills.py check
+	$(MAKE) lint-markers
 	@echo "✅ CI lint checks passed"
 
 # CI test check - exact match for test.yml workflow (fast tests with coverage)
 # Note: -p pytest_cov re-enables pytest-cov which is disabled by default in pytest.ini
-# Suite-wide coverage threshold set to 60%
+# Suite-wide coverage threshold set to 70%
 ci-test:
 	@echo "Running CI test suite..."
-	uv run -- python -m pytest tests -m "fast" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=60
+	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
 	@echo "✅ CI test suite passed"
 
 # CI docs build - exact match for docs.yml workflow
@@ -323,7 +505,7 @@ format:
 # Build Sphinx documentation locally
 docs-build:
 	@echo "Building documentation..."
-	@cd docs && sphinx-build -b html --keep-going . _build/html
+	@cd docs && uv run sphinx-build -b html --keep-going . _build/html
 	@echo "✅ Docs built: docs/_build/html/index.html"
 
 # Build and serve documentation on http://localhost:8000
@@ -445,12 +627,14 @@ help:
 	@echo "  make run-test TEST=path Run a specific test file"
 	@echo ""
 	@echo "Coverage:"
-	@echo "  make coverage        Run tests with coverage report"
+	@echo "  make coverage-fast   Run fast-marked tests with coverage (quick feedback)"
+	@echo "  make coverage-all    Run full test suite with coverage report"
 	@echo "  make coverage-html   Generate HTML coverage report"
 	@echo "  make coverage-report Generate comprehensive coverage reports"
 	@echo ""
 	@echo "Development:"
 	@echo "  make lint            Check code style"
+	@echo "  make lint-markers    Validate test marker annotations (catches speed-lane conflicts)"
 	@echo "  make typecheck       Run type checking with ty"
 	@echo "  make typecheck-uv    Run type checking with uv (development)"
 	@echo "  make validate-imports Validate import structure and detect circular dependencies"

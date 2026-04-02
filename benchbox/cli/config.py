@@ -33,6 +33,37 @@ from benchbox.utils.scale_factor import format_scale_factor
 
 console = quiet_console
 
+# (key_path, default, check_fn, error_msg) — used by validate_config to loop
+# over numeric threshold guards. Most require > 0; warm_up_iterations and
+# max_retries allow 0 (>= 0).
+_CONFIG_VALIDATION_RULES: list[tuple[str, int, Any, str]] = [
+    ("benchmarks.default_scale", 0, lambda v: v > 0, "Invalid default scale factor"),
+    ("benchmarks.timeout_minutes", 0, lambda v: v > 0, "Invalid timeout value"),
+    ("execution.max_workers", 0, lambda v: v > 0, "Invalid max workers value"),
+    ("execution.power_run.iterations", 4, lambda v: v > 0, "Invalid power run iterations value"),
+    ("execution.power_run.warm_up_iterations", 0, lambda v: v >= 0, "Invalid power run warm-up iterations value"),
+    (
+        "execution.power_run.timeout_per_iteration_minutes",
+        60,
+        lambda v: v > 0,
+        "Invalid power run timeout value",
+    ),
+    ("execution.concurrent_queries.max_concurrent", 2, lambda v: v > 0, "Invalid max concurrent queries value"),
+    (
+        "execution.concurrent_queries.query_timeout_seconds",
+        300,
+        lambda v: v > 0,
+        "Invalid concurrent query timeout value",
+    ),
+    (
+        "execution.concurrent_queries.stream_timeout_seconds",
+        3600,
+        lambda v: v > 0,
+        "Invalid concurrent stream timeout value",
+    ),
+    ("execution.concurrent_queries.max_retries", 3, lambda v: v >= 0, "Invalid max retries value"),
+]
+
 
 def load_config(
     cli_args: Optional[dict[str, Any]] = None,
@@ -359,55 +390,10 @@ class ConfigManager:
     def validate_config(self) -> bool:
         """Validate current configuration."""
         try:
-            # Basic validation
-            if self.get("benchmarks.default_scale", 0) <= 0:
-                console.print("[red]❌ Invalid default scale factor[/red]")
-                return False
-
-            if self.get("benchmarks.timeout_minutes", 0) <= 0:
-                console.print("[red]❌ Invalid timeout value[/red]")
-                return False
-
-            if self.get("execution.max_workers", 0) <= 0:
-                console.print("[red]❌ Invalid max workers value[/red]")
-                return False
-
-            # Power run validation
-            power_iterations = self.get("execution.power_run.iterations", 4)
-            if power_iterations <= 0:
-                console.print("[red]❌ Invalid power run iterations value[/red]")
-                return False
-
-            power_warm_up = self.get("execution.power_run.warm_up_iterations", 0)
-            if power_warm_up < 0:
-                console.print("[red]❌ Invalid power run warm-up iterations value[/red]")
-                return False
-
-            power_timeout = self.get("execution.power_run.timeout_per_iteration_minutes", 60)
-            if power_timeout <= 0:
-                console.print("[red]❌ Invalid power run timeout value[/red]")
-                return False
-
-            # Concurrent queries validation
-            max_concurrent = self.get("execution.concurrent_queries.max_concurrent", 2)
-            if max_concurrent <= 0:
-                console.print("[red]❌ Invalid max concurrent queries value[/red]")
-                return False
-
-            query_timeout = self.get("execution.concurrent_queries.query_timeout_seconds", 300)
-            if query_timeout <= 0:
-                console.print("[red]❌ Invalid concurrent query timeout value[/red]")
-                return False
-
-            stream_timeout = self.get("execution.concurrent_queries.stream_timeout_seconds", 3600)
-            if stream_timeout <= 0:
-                console.print("[red]❌ Invalid concurrent stream timeout value[/red]")
-                return False
-
-            max_retries = self.get("execution.concurrent_queries.max_retries", 3)
-            if max_retries < 0:
-                console.print("[red]❌ Invalid max retries value[/red]")
-                return False
+            for key_path, default, check_fn, error_msg in _CONFIG_VALIDATION_RULES:
+                if not check_fn(self.get(key_path, default)):
+                    console.print(f"[red]❌ {error_msg}[/red]")
+                    return False
 
             console.print("[green]✅ Configuration validation passed[/green]")
             return True

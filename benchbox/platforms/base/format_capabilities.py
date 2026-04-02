@@ -100,8 +100,10 @@ DELTA_CAPABILITY = FormatCapability(
         "dataproc": SupportLevel.EXTENSION,  # via delta-spark on Dataproc
         "dataproc-serverless": SupportLevel.EXTENSION,  # via delta-spark on Dataproc Serverless
         "fabric-spark": SupportLevel.NATIVE,  # delta native on Fabric
+        "synapse-spark": SupportLevel.NATIVE,  # delta native on Synapse Spark pools
+        "athena-spark": SupportLevel.EXTENSION,  # via delta-spark on Athena Spark
         "quanton": SupportLevel.EXTENSION,  # via delta-spark on Quanton
-        # NOTE: snowflake, clickhouse, redshift, bigquery, fabric-lakehouse, synapse-spark
+        # NOTE: snowflake, clickhouse, redshift, bigquery, fabric-lakehouse
         # support delta on the platform but BenchBox default loading flows still lack
         # safe end-to-end format selection for those adapters.
     },
@@ -127,6 +129,9 @@ ICEBERG_CAPABILITY = FormatCapability(
         "emr-serverless": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on EMR
         "dataproc": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on Dataproc
         "dataproc-serverless": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on Dataproc Serverless
+        "synapse-spark": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on Synapse
+        "fabric-spark": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on Fabric
+        "athena-spark": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on Athena Spark
         "quanton": SupportLevel.NATIVE,  # Iceberg is primary format
         # NOTE: snowflake, clickhouse support iceberg on the platform but BenchBox
         # does not yet expose mode-aware format selection for those adapters.
@@ -199,28 +204,44 @@ CAPABILITIES_REGISTRY: dict[str, FormatCapability] = {
 
 # Platform format preferences (which format to prefer when multiple available)
 PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
-    "duckdb": ["parquet", "ducklake", "vortex", "delta", "tbl", "csv"],
-    "datafusion": ["parquet", "delta", "iceberg", "vortex", "tbl", "csv"],
-    "clickhouse": ["parquet", "tbl", "csv"],
-    "clickhouse-cloud": ["parquet", "tbl", "csv"],
-    "databricks": ["delta", "parquet", "tbl", "csv"],
-    "snowflake": ["parquet", "tbl", "csv"],
+    # SQL databases: text files (tbl) preferred — always available from TPC generators,
+    # no conversion step required. Parquet preferred over csv as fallback (faster,
+    # schema-aware). Users can override via platform config.
+    "duckdb": ["tbl", "parquet", "csv", "ducklake", "vortex", "delta"],
+    "datafusion": ["tbl", "parquet", "csv", "delta", "iceberg", "vortex"],
+    "clickhouse": ["tbl", "parquet", "csv"],
+    "clickhouse-cloud": ["tbl", "parquet", "csv"],
+    "snowflake": ["tbl", "parquet", "csv"],
+    "redshift": ["tbl", "parquet", "csv"],
+    "postgresql": ["tbl", "parquet", "csv"],
+    "sqlite": ["tbl", "parquet", "csv"],
+    # Cloud warehouses: parquet preferred — BigQuery native load jobs support parquet,
+    # and columnar input avoids text parsing / schema inference overhead.
     "bigquery": ["parquet", "tbl", "csv"],
-    "redshift": ["parquet", "tbl", "csv"],
-    "postgresql": ["parquet", "tbl", "csv"],
-    "sqlite": ["parquet", "tbl", "csv"],
+    # Catalog/lakehouse platforms: columnar formats required or strongly preferred
+    "databricks": ["delta", "parquet", "tbl", "csv"],
     "trino": ["iceberg", "delta", "parquet", "tbl", "csv"],
     "presto": ["iceberg", "delta", "parquet", "tbl", "csv"],
     "spark": ["delta", "iceberg", "hudi", "parquet", "tbl", "csv"],
     "emr-serverless": ["delta", "iceberg", "hudi", "parquet", "tbl", "csv"],
     "dataproc": ["delta", "iceberg", "hudi", "parquet", "tbl", "csv"],
     "dataproc-serverless": ["delta", "iceberg", "hudi", "parquet", "tbl", "csv"],
-    "synapse-spark": ["parquet", "tbl", "csv"],
-    "athena-spark": ["parquet", "tbl", "csv"],
+    "synapse-spark": ["delta", "iceberg", "parquet", "tbl", "csv"],
+    "athena-spark": ["delta", "iceberg", "parquet", "tbl", "csv"],
+    # fabric-lakehouse is read-only (SQL endpoint); data loaded via fabric-spark
     "fabric-lakehouse": ["parquet", "tbl", "csv"],
-    "fabric-spark": ["delta", "parquet", "tbl", "csv"],
-    "quanton": ["iceberg", "hudi", "delta", "parquet", "tbl", "csv"],
+    "fabric-spark": ["delta", "iceberg", "parquet", "tbl", "csv"],
+    # lakesail uses Spark-based loading; parquet/orc are its native table formats
     "lakesail": ["parquet", "tbl", "csv"],
+    "quanton": ["iceberg", "hudi", "delta", "parquet", "tbl", "csv"],
+}
+
+# Platforms whose native loaders have strong operational requirements for
+# platform-preferred format order (e.g., Redshift COPY is most reliable with
+# delimited text).  For these platforms in native mode, PLATFORM_FORMAT_PREFERENCES
+# takes priority over manifest format_preference when selecting data files.
+PREFER_PLATFORM_FORMAT_ORDER: set[str] = {
+    "redshift",
 }
 
 EXTERNAL_PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {

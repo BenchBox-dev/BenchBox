@@ -331,7 +331,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         """
         if isinstance(df, pl.LazyFrame):
             if self.streaming:
-                return df.collect(streaming=True)
+                return df.collect(engine="streaming")
             return df.collect()
         return df
 
@@ -529,91 +529,58 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
     # Window Functions
     # =========================================================================
 
+    def _polars_window_rank(
+        self,
+        method: str,
+        order_by: list[tuple[str, bool]],
+        partition_by: list[str] | None = None,
+    ) -> PolarsExpr:
+        """Shared Polars rank-window implementation.
+
+        Args:
+            method: Polars rank method — ``"min"`` (RANK), ``"ordinal"``
+                (ROW_NUMBER), or ``"dense"`` (DENSE_RANK).
+            order_by: List of (column_name, ascending) tuples for ordering.
+            partition_by: Columns to partition by (optional).
+
+        Returns:
+            Polars expression for rank within partitions.
+        """
+        order_col, ascending = order_by[0]
+        expr = pl.col(order_col)
+
+        if ascending:
+            rank_expr = expr.rank(method=method)
+        else:
+            rank_expr = expr.rank(method=method, descending=True)
+
+        if partition_by:
+            return rank_expr.over(partition_by)
+        return rank_expr
+
     def window_rank(
         self,
         order_by: list[tuple[str, bool]],
         partition_by: list[str] | None = None,
     ) -> PolarsExpr:
-        """Create a RANK() window function expression.
-
-        Args:
-            order_by: List of (column_name, ascending) tuples for ordering
-            partition_by: Columns to partition by (optional)
-
-        Returns:
-            Polars expression for rank within partitions
-        """
-        # Build the order-by column for ranking
-        order_col, ascending = order_by[0]
-        expr = pl.col(order_col)
-
-        # Rank with method='min' matches SQL RANK() behavior (ties get same rank, gaps after)
-        if ascending:
-            rank_expr = expr.rank(method="min")
-        else:
-            # For descending, we sort descending then rank
-            rank_expr = expr.rank(method="min", descending=True)
-
-        # Apply partition if specified
-        if partition_by:
-            return rank_expr.over(partition_by)
-        return rank_expr
+        """Create a RANK() window function expression."""
+        return self._polars_window_rank("min", order_by, partition_by)
 
     def window_row_number(
         self,
         order_by: list[tuple[str, bool]],
         partition_by: list[str] | None = None,
     ) -> PolarsExpr:
-        """Create a ROW_NUMBER() window function expression.
-
-        Args:
-            order_by: List of (column_name, ascending) tuples for ordering
-            partition_by: Columns to partition by (optional)
-
-        Returns:
-            Polars expression for row number within partitions
-        """
-        # Build the order-by column for row numbering
-        order_col, ascending = order_by[0]
-        expr = pl.col(order_col)
-
-        # Row number using ordinal rank (no ties, sequential)
-        if ascending:
-            row_num_expr = expr.rank(method="ordinal")
-        else:
-            row_num_expr = expr.rank(method="ordinal", descending=True)
-
-        # Apply partition if specified
-        if partition_by:
-            return row_num_expr.over(partition_by)
-        return row_num_expr
+        """Create a ROW_NUMBER() window function expression."""
+        return self._polars_window_rank("ordinal", order_by, partition_by)
 
     def window_dense_rank(
         self,
         order_by: list[tuple[str, bool]],
         partition_by: list[str] | None = None,
     ) -> PolarsExpr:
-        """Create a DENSE_RANK() window function expression.
-
-        Args:
-            order_by: List of (column_name, ascending) tuples for ordering
-            partition_by: Columns to partition by (optional)
-
-        Returns:
-            Polars expression for dense rank within partitions
-        """
-        order_col, ascending = order_by[0]
-        expr = pl.col(order_col)
-
-        # Dense rank: no gaps between ranks for ties
-        if ascending:
-            dense_rank_expr = expr.rank(method="dense")
-        else:
-            dense_rank_expr = expr.rank(method="dense", descending=True)
-
-        if partition_by:
-            return dense_rank_expr.over(partition_by)
-        return dense_rank_expr
+        """Create a DENSE_RANK() window function expression."""
+        return self._polars_window_rank("dense", order_by, partition_by)
 
     def window_sum(
         self,

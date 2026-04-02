@@ -5,6 +5,8 @@
 ```{tags} advanced, concept, ai-primitives, custom-benchmark
 ```
 
+> **CLI name:** `ai_primitives` — use `benchbox run --benchmark ai_primitives`
+
 The AI/ML Primitives benchmark tests SQL-based AI functions across cloud data platforms. It enables consistent evaluation of AI capabilities in Snowflake Cortex, BigQuery ML, and Databricks AI Functions using TPC-H data.
 
 ## Overview

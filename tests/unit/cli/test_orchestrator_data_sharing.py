@@ -9,7 +9,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -124,6 +124,40 @@ class TestOrchestratorDataSharing:
 
         # Custom output should be used
         assert output_root == custom_path, "Custom output path should override data sharing"
+
+    def test_get_platform_config_resolves_data_source_benchmark(self):
+        """_get_platform_config should override benchmark_name with data source name."""
+        orchestrator = BenchmarkOrchestrator()
+        benchmark = Mock()
+        benchmark.get_data_source_benchmark.return_value = "tpch"
+
+        with patch("benchbox.cli.orchestrator._core_get_platform_config", return_value={}) as mock_core:
+            orchestrator._get_platform_config(
+                database_config=Mock(),
+                system_profile=Mock(),
+                benchmark_name="read_primitives",
+                scale_factor=1.0,
+                benchmark=benchmark,
+            )
+
+        assert mock_core.call_args.kwargs["benchmark_name"] == "tpch"
+
+    def test_get_platform_config_passes_through_when_no_data_source(self):
+        """_get_platform_config should keep original benchmark_name when no data source."""
+        orchestrator = BenchmarkOrchestrator()
+        benchmark = Mock()
+        benchmark.get_data_source_benchmark.return_value = None
+
+        with patch("benchbox.cli.orchestrator._core_get_platform_config", return_value={}) as mock_core:
+            orchestrator._get_platform_config(
+                database_config=Mock(),
+                system_profile=Mock(),
+                benchmark_name="tpch",
+                scale_factor=1.0,
+                benchmark=benchmark,
+            )
+
+        assert mock_core.call_args.kwargs["benchmark_name"] == "tpch"
 
     def test_data_sharing_with_different_scale_factors(self):
         """Test that data sharing works correctly with different scale factors."""

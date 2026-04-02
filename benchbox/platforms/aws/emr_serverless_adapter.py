@@ -127,6 +127,7 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
         create_application: bool = False,
         application_name: str | None = None,
         initial_capacity: dict[str, Any] | None = None,
+        table_format: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the EMR Serverless adapter.
@@ -178,6 +179,7 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
         self.create_application = create_application
         self.application_name = application_name or f"benchbox-{uuid.uuid4().hex[:8]}"
         self.initial_capacity = initial_capacity
+        self.table_format = table_format or "parquet"
 
         # Initialize staging using cloud-spark shared infrastructure
         self._staging: CloudSparkStaging | None = None
@@ -439,21 +441,28 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
                 logger.debug(f"Table {table} already exists in Glue catalog")
             except ClientError as e:
                 if e.response.get("Error", {}).get("Code") == "EntityNotFoundException":
-                    glue_client.create_table(
-                        DatabaseName=self.database,
-                        TableInput={
-                            "Name": table,
-                            "StorageDescriptor": {
-                                "Location": table_uri,
-                                "InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
-                                "OutputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
-                                "SerdeInfo": {
-                                    "SerializationLibrary": "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+                    if self.table_format == "parquet":
+                        glue_client.create_table(
+                            DatabaseName=self.database,
+                            TableInput={
+                                "Name": table,
+                                "StorageDescriptor": {
+                                    "Location": table_uri,
+                                    "InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
+                                    "OutputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
+                                    "SerdeInfo": {
+                                        "SerializationLibrary": "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+                                    },
                                 },
+                                "TableType": "EXTERNAL_TABLE",
                             },
-                            "TableType": "EXTERNAL_TABLE",
-                        },
-                    )
+                        )
+                    else:
+                        create_sql = (
+                            f"CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table} "
+                            f"USING {self.table_format.upper()} LOCATION '{table_uri}'"
+                        )
+                        self._submit_job_run(create_sql)
                     logger.info(f"Created table {self.database}.{table}")
                 else:
                     raise
@@ -704,6 +713,7 @@ spark.stop()
             "database": config.get("database", "benchbox"),
             "release_label": config.get("release_label", "emr-7.0.0"),
             "create_application": config.get("create_application", False),
+            "table_format": config.get("table_format"),
         }
 
         return cls(**params)

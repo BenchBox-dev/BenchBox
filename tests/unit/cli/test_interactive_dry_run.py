@@ -676,13 +676,15 @@ class TestDisplayInteractivePreviewAllParams:
             validation="full",
             verbose=2,
             console_obj=console,
-            platform_options={"driver_version": "1.2.0"},
+            platform_options={
+                "driver_version": "1.2.0",
+                "databricks_clustering_strategy": "liquid_clustering",
+                "liquid_clustering_columns": "col1,col2",
+            },
             plan_config="sample:0.1,first:5",
             presort="delta-sorted",
             sorted_ingestion_mode="force",
             sorted_ingestion_method="z_order",
-            databricks_clustering_strategy="liquid_clustering",
-            liquid_clustering_columns="col1,col2",
             global_cache=True,
         )
 
@@ -710,8 +712,8 @@ class TestDisplayInteractivePreviewAllParams:
         assert "--presort delta-sorted" in result
         assert "--sorted-ingestion-mode force" in result
         assert "--sorted-ingestion-method z_order" in result
-        assert "--databricks-clustering-strategy liquid_clustering" in result
-        assert "--liquid-clustering-columns col1,col2" in result
+        assert "--platform-option databricks_clustering_strategy=liquid_clustering" in result
+        assert "--platform-option liquid_clustering_columns=col1,col2" in result
         assert "--global-cache" in result
 
     def test_preview_compression_zstd_not_dropped(self):

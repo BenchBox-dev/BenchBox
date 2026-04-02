@@ -7,7 +7,7 @@ from benchbox.core.cost.integration import (
     add_cost_estimation_to_results,
     validate_platform_config,
 )
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,

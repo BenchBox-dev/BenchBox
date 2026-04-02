@@ -72,6 +72,43 @@ class TPCDISQLGenerator:
             self.temp_connection.close()
             self.temp_connection = None
 
+    @staticmethod
+    def _build_dimension_sql(
+        table_name: str,
+        num_records: int,
+        select_columns: list[str],
+        cross_joins: list[str],
+    ) -> str:
+        """Build INSERT SELECT SQL for an SCD-2 dimension table.
+
+        Centralises the shared SQL structure: INSERT INTO with generate_series,
+        CROSS JOIN lookups, and the IsCurrent/BatchID/EffectiveDate/EndDate
+        trailer columns.
+
+        Args:
+            table_name: Dimension table name (e.g. ``"DimCompany"``).
+            num_records: Number of rows to generate via ``generate_series``.
+            select_columns: Domain-specific column expressions (no trailing comma).
+            cross_joins: CROSS JOIN subquery clauses (without the ``CROSS JOIN`` keyword).
+
+        Returns:
+            Complete INSERT SELECT SQL string.
+        """
+        cols = ",\n                ".join(select_columns)
+        joins = "\n                ".join(f"CROSS JOIN {cj}" for cj in cross_joins)
+        return f"""
+            INSERT INTO {table_name}
+            SELECT
+                {cols},
+                true as IsCurrent,
+                1 as BatchID,
+                DATE '2023-01-01' as EffectiveDate,
+                DATE '9999-12-31' as EndDate
+            FROM
+                generate_series(1, {num_records}) s
+                {joins}
+        """
+
     def _generate_table(
         self,
         conn: Any,
@@ -267,119 +304,109 @@ class TPCDISQLGenerator:
         """Generate company dimension using SQL."""
         num_companies = int(self.base_companies * self.scale_factor)
 
-        insert_sql = f"""
-            INSERT INTO DimCompany
-            SELECT
-                s.generate_series as SK_CompanyID,
-                s.generate_series as CompanyID,
-                st.status as Status,
-                cn.name || ' ' || s.generate_series as Name,
-                ind.industry as Industry,
-                rating.rating as SPrating,
-                CASE WHEN rating.rating IN ('BBB-', 'BB+', 'BB', 'BB-') THEN true ELSE false END as IsLowGrade,
-                'CEO ' || lpad(CAST(s.generate_series AS VARCHAR), 4, '0') as CEO,
-                CAST((random() * 9898 + 1)::INTEGER AS VARCHAR) || ' Business Blvd' as AddressLine1,
-                CASE WHEN random() < 0.3 THEN 'Suite ' || CAST((random() * 899 + 100)::INTEGER AS VARCHAR) ELSE NULL END as AddressLine2,
-                lpad(CAST((random() * 89999 + 10000)::INTEGER AS VARCHAR), 5, '0') as PostalCode,
-                'City' || CAST((s.generate_series % 100) AS VARCHAR) as City,
-                state.state as StateProv,
-                'USA' as Country,
-                'Leading company in ' || ind.industry as Description,
-                make_date((random() * 70 + 1950)::INTEGER, (random() * 11 + 1)::INTEGER, (random() * 27 + 1)::INTEGER) as FoundingDate,
-                true as IsCurrent,
-                1 as BatchID,
-                DATE '2023-01-01' as EffectiveDate,
-                DATE '9999-12-31' as EndDate
-            FROM
-                generate_series(1, {num_companies}) s(generate_series)
-                CROSS JOIN (SELECT status FROM lookup_statuses ORDER BY random() LIMIT 1) st
-                CROSS JOIN (SELECT name FROM lookup_company_names ORDER BY random() LIMIT 1) cn
-                CROSS JOIN (SELECT industry FROM lookup_industries ORDER BY random() LIMIT 1) ind
-                CROSS JOIN (SELECT rating FROM lookup_sp_ratings ORDER BY random() LIMIT 1) rating
-                CROSS JOIN (SELECT state FROM lookup_us_states ORDER BY random() LIMIT 1) state
-        """
+        insert_sql = self._build_dimension_sql(
+            "DimCompany",
+            num_companies,
+            [
+                "s as SK_CompanyID",
+                "s as CompanyID",
+                "st.status as Status",
+                "cn.name || ' ' || s as Name",
+                "ind.industry as Industry",
+                "rating.rating as SPrating",
+                "CASE WHEN rating.rating IN ('BBB-', 'BB+', 'BB', 'BB-') THEN true ELSE false END as IsLowGrade",
+                "'CEO ' || lpad(CAST(s AS VARCHAR), 4, '0') as CEO",
+                "CAST((random() * 9898 + 1)::INTEGER AS VARCHAR) || ' Business Blvd' as AddressLine1",
+                "CASE WHEN random() < 0.3 THEN 'Suite ' || CAST((random() * 899 + 100)::INTEGER AS VARCHAR) ELSE NULL END as AddressLine2",
+                "lpad(CAST((random() * 89999 + 10000)::INTEGER AS VARCHAR), 5, '0') as PostalCode",
+                "'City' || CAST((s % 100) AS VARCHAR) as City",
+                "state.state as StateProv",
+                "'USA' as Country",
+                "'Leading company in ' || ind.industry as Description",
+                "make_date((random() * 70 + 1950)::INTEGER, (random() * 11 + 1)::INTEGER, (random() * 27 + 1)::INTEGER) as FoundingDate",
+            ],
+            [
+                "(SELECT status FROM lookup_statuses ORDER BY random() LIMIT 1) st",
+                "(SELECT name FROM lookup_company_names ORDER BY random() LIMIT 1) cn",
+                "(SELECT industry FROM lookup_industries ORDER BY random() LIMIT 1) ind",
+                "(SELECT rating FROM lookup_sp_ratings ORDER BY random() LIMIT 1) rating",
+                "(SELECT state FROM lookup_us_states ORDER BY random() LIMIT 1) state",
+            ],
+        )
         return self._generate_table(conn, "DimCompany", insert_sql, num_records=num_companies)
 
     def generate_security_dimension(self, conn: Any) -> int:
         """Generate security dimension using SQL."""
         num_securities = int(self.base_securities * self.scale_factor)
 
-        insert_sql = f"""
-            INSERT INTO DimSecurity
-            SELECT
-                s as SK_SecurityID,
-                'SYM' || lpad(CAST(s AS VARCHAR), 4, '0') as Symbol,
-                'S' as Issue,  -- Stock
-                st.status as Status,
-                'Security ' || lpad(CAST(s AS VARCHAR), 4, '0') as Name,
-                exchange.exchange_id as ExchangeID,
-                (random() * (SELECT MAX(SK_CompanyID) FROM DimCompany) + 1)::INTEGER as SK_CompanyID,
-                (random() * (1000000000 - 1000000) + 1000000)::INTEGER as SharesOutstanding,
-                make_date((random() * (2020 - 2000) + 2000)::INTEGER, (random() * (12 - 1) + 1)::INTEGER, (random() * (28 - 1) + 1)::INTEGER) as FirstTrade,
-                make_date((random() * (2020 - 2000) + 2000)::INTEGER, (random() * (12 - 1) + 1)::INTEGER, (random() * (28 - 1) + 1)::INTEGER) as FirstTradeOnExchange,
-                round((random() * 5.0), 2) as Dividend,
-                true as IsCurrent,
-                1 as BatchID,
-                DATE '2023-01-01' as EffectiveDate,
-                DATE '9999-12-31' as EndDate
-            FROM
-                generate_series(1, {num_securities}) s
-                CROSS JOIN (SELECT status FROM lookup_statuses ORDER BY random() LIMIT 1) st
-                CROSS JOIN (SELECT unnest(['NYSE', 'NASDAQ', 'AMEX']) as exchange_id ORDER BY random() LIMIT 1) exchange
-        """
+        insert_sql = self._build_dimension_sql(
+            "DimSecurity",
+            num_securities,
+            [
+                "s as SK_SecurityID",
+                "'SYM' || lpad(CAST(s AS VARCHAR), 4, '0') as Symbol",
+                "'S' as Issue",
+                "st.status as Status",
+                "'Security ' || lpad(CAST(s AS VARCHAR), 4, '0') as Name",
+                "exchange.exchange_id as ExchangeID",
+                "(random() * (SELECT MAX(SK_CompanyID) FROM DimCompany) + 1)::INTEGER as SK_CompanyID",
+                "(random() * (1000000000 - 1000000) + 1000000)::INTEGER as SharesOutstanding",
+                "make_date((random() * (2020 - 2000) + 2000)::INTEGER, (random() * (12 - 1) + 1)::INTEGER, (random() * (28 - 1) + 1)::INTEGER) as FirstTrade",
+                "make_date((random() * (2020 - 2000) + 2000)::INTEGER, (random() * (12 - 1) + 1)::INTEGER, (random() * (28 - 1) + 1)::INTEGER) as FirstTradeOnExchange",
+                "round((random() * 5.0), 2) as Dividend",
+            ],
+            [
+                "(SELECT status FROM lookup_statuses ORDER BY random() LIMIT 1) st",
+                "(SELECT unnest(['NYSE', 'NASDAQ', 'AMEX']) as exchange_id ORDER BY random() LIMIT 1) exchange",
+            ],
+        )
         return self._generate_table(conn, "DimSecurity", insert_sql, num_records=num_securities)
 
     def generate_customer_dimension(self, conn: Any) -> int:
         """Generate customer dimension using SQL."""
         num_customers = int(self.base_customers * self.scale_factor)
 
-        insert_sql = f"""
-            INSERT INTO DimCustomer
-            SELECT
-                s as SK_CustomerID,
-                s as CustomerID,
-                'TAX' || lpad(CAST(s AS VARCHAR), 6, '0') as TaxID,
-                st.status as Status,
-                ln.name as LastName,
-                fn.name as FirstName,
-                chr((random() * (90 - 65) + 65)::INTEGER) as MiddleInitial,  -- Random A-Z
-                CASE WHEN random() < 0.5 THEN 'M' ELSE 'F' END as Gender,
-                (random() * (3 - 1) + 1)::INTEGER as Tier,
-                make_date((random() * (2000 - 1950) + 1950)::INTEGER, (random() * (12 - 1) + 1)::INTEGER, (random() * (28 - 1) + 1)::INTEGER) as DOB,
-                CAST((random() * (9999 - 100) + 100)::INTEGER AS INTEGER) || ' Customer St' as AddressLine1,
-                CASE WHEN random() < 0.3 THEN 'Apt ' || CAST((random() * (999 - 1) + 1)::INTEGER AS INTEGER) ELSE NULL END as AddressLine2,
-                lpad(CAST((random() * (99999 - 10000) + 10000)::INTEGER AS INTEGER), 5, '0') as PostalCode,
-                'City' || CAST((s::INTEGER % 500) AS VARCHAR) as City,
-                state.state as StateProv,
-                'USA' as Country,
-                '555-' || lpad(CAST((random() * (999 - 100) + 100)::INTEGER AS INTEGER), 3, '0') || '-' ||
-                lpad(CAST((random() * (9999 - 1000) + 1000)::INTEGER AS INTEGER), 4, '0') as Phone1,
-                CASE WHEN random() < 0.2 THEN
-                    '555-' || lpad(CAST((random() * (999 - 100) + 100)::INTEGER AS INTEGER), 3, '0') || '-' ||
-                    lpad(CAST((random() * (9999 - 1000) + 1000)::INTEGER AS INTEGER), 4, '0')
-                ELSE NULL END as Phone2,
-                NULL as Phone3,
-                'customer' || s || '@example.com' as Email1,
-                CASE WHEN random() < 0.1 THEN 'customer' || s || '.alt@example.com' ELSE NULL END as Email2,
-                'Federal Tax' as NationalTaxRateDesc,
-                0.25 as NationalTaxRate,
-                'State Tax' as LocalTaxRateDesc,
-                0.08 as LocalTaxRate,
-                'AGENCY' || lpad(CAST((random() * (10 - 1) + 1)::INTEGER AS INTEGER), 2, '0') as AgencyID,
-                (random() * (850 - 300) + 300)::INTEGER as CreditRating,
-                (random() * (10000000 - 10000) + 10000)::INTEGER as NetWorth,
-                'Customer Segment ' || (random() * (5 - 1) + 1)::INTEGER as MarketingNameplate,
-                true as IsCurrent,
-                1 as BatchID,
-                DATE '2023-01-01' as EffectiveDate,
-                DATE '9999-12-31' as EndDate
-            FROM
-                generate_series(1, {num_customers}) s
-                CROSS JOIN (SELECT status FROM lookup_statuses ORDER BY random() LIMIT 1) st
-                CROSS JOIN (SELECT name FROM lookup_first_names ORDER BY random() LIMIT 1) fn
-                CROSS JOIN (SELECT name FROM lookup_last_names ORDER BY random() LIMIT 1) ln
-                CROSS JOIN (SELECT state FROM lookup_us_states ORDER BY random() LIMIT 1) state
-        """
+        insert_sql = self._build_dimension_sql(
+            "DimCustomer",
+            num_customers,
+            [
+                "s as SK_CustomerID",
+                "s as CustomerID",
+                "'TAX' || lpad(CAST(s AS VARCHAR), 6, '0') as TaxID",
+                "st.status as Status",
+                "ln.name as LastName",
+                "fn.name as FirstName",
+                "chr((random() * (90 - 65) + 65)::INTEGER) as MiddleInitial",
+                "CASE WHEN random() < 0.5 THEN 'M' ELSE 'F' END as Gender",
+                "(random() * (3 - 1) + 1)::INTEGER as Tier",
+                "make_date((random() * (2000 - 1950) + 1950)::INTEGER, (random() * (12 - 1) + 1)::INTEGER, (random() * (28 - 1) + 1)::INTEGER) as DOB",
+                "CAST((random() * (9999 - 100) + 100)::INTEGER AS INTEGER) || ' Customer St' as AddressLine1",
+                "CASE WHEN random() < 0.3 THEN 'Apt ' || CAST((random() * (999 - 1) + 1)::INTEGER AS INTEGER) ELSE NULL END as AddressLine2",
+                "lpad(CAST((random() * (99999 - 10000) + 10000)::INTEGER AS INTEGER), 5, '0') as PostalCode",
+                "'City' || CAST((s::INTEGER % 500) AS VARCHAR) as City",
+                "state.state as StateProv",
+                "'USA' as Country",
+                "'555-' || lpad(CAST((random() * (999 - 100) + 100)::INTEGER AS INTEGER), 3, '0') || '-' || lpad(CAST((random() * (9999 - 1000) + 1000)::INTEGER AS INTEGER), 4, '0') as Phone1",
+                "CASE WHEN random() < 0.2 THEN '555-' || lpad(CAST((random() * (999 - 100) + 100)::INTEGER AS INTEGER), 3, '0') || '-' || lpad(CAST((random() * (9999 - 1000) + 1000)::INTEGER AS INTEGER), 4, '0') ELSE NULL END as Phone2",
+                "NULL as Phone3",
+                "'customer' || s || '@example.com' as Email1",
+                "CASE WHEN random() < 0.1 THEN 'customer' || s || '.alt@example.com' ELSE NULL END as Email2",
+                "'Federal Tax' as NationalTaxRateDesc",
+                "0.25 as NationalTaxRate",
+                "'State Tax' as LocalTaxRateDesc",
+                "0.08 as LocalTaxRate",
+                "'AGENCY' || lpad(CAST((random() * (10 - 1) + 1)::INTEGER AS INTEGER), 2, '0') as AgencyID",
+                "(random() * (850 - 300) + 300)::INTEGER as CreditRating",
+                "(random() * (10000000 - 10000) + 10000)::INTEGER as NetWorth",
+                "'Customer Segment ' || (random() * (5 - 1) + 1)::INTEGER as MarketingNameplate",
+            ],
+            [
+                "(SELECT status FROM lookup_statuses ORDER BY random() LIMIT 1) st",
+                "(SELECT name FROM lookup_first_names ORDER BY random() LIMIT 1) fn",
+                "(SELECT name FROM lookup_last_names ORDER BY random() LIMIT 1) ln",
+                "(SELECT state FROM lookup_us_states ORDER BY random() LIMIT 1) state",
+            ],
+        )
         return self._generate_table(conn, "DimCustomer", insert_sql, num_records=num_customers)
 
     def generate_account_dimension(self, conn: Any) -> int:
@@ -387,24 +414,22 @@ class TPCDISQLGenerator:
         num_customers = int(self.base_customers * self.scale_factor)
         num_accounts = int(num_customers * 1.5)  # 1.5 accounts per customer average
 
-        insert_sql = f"""
-            INSERT INTO DimAccount
-            SELECT
-                s as SK_AccountID,
-                s as AccountID,
-                (random() * (100 - 1) + 1)::INTEGER as SK_BrokerID,  -- Assume 100 brokers
-                (random() * (SELECT MAX(SK_CustomerID) FROM DimCustomer) + 1)::INTEGER as SK_CustomerID,
-                st.status as Status,
-                'Account ' || lpad(CAST(s AS VARCHAR), 6, '0') as AccountDesc,
-                (random() * (2 - 0) + 0)::INTEGER as TaxStatus,  -- 0=Taxable, 1=Tax Deferred, 2=Tax Free
-                true as IsCurrent,
-                1 as BatchID,
-                DATE '2023-01-01' as EffectiveDate,
-                DATE '9999-12-31' as EndDate
-            FROM
-                generate_series(1, {num_accounts}) s
-                CROSS JOIN (SELECT status FROM lookup_statuses ORDER BY random() LIMIT 1) st
-        """
+        insert_sql = self._build_dimension_sql(
+            "DimAccount",
+            num_accounts,
+            [
+                "s as SK_AccountID",
+                "s as AccountID",
+                "(random() * (100 - 1) + 1)::INTEGER as SK_BrokerID",
+                "(random() * (SELECT MAX(SK_CustomerID) FROM DimCustomer) + 1)::INTEGER as SK_CustomerID",
+                "st.status as Status",
+                "'Account ' || lpad(CAST(s AS VARCHAR), 6, '0') as AccountDesc",
+                "(random() * (2 - 0) + 0)::INTEGER as TaxStatus",
+            ],
+            [
+                "(SELECT status FROM lookup_statuses ORDER BY random() LIMIT 1) st",
+            ],
+        )
         return self._generate_table(conn, "DimAccount", insert_sql, num_records=num_accounts)
 
     def generate_trade_facts(self, conn: Any) -> int:

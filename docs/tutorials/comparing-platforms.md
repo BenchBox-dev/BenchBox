@@ -14,7 +14,7 @@ BenchBox makes it easy to compare platforms because:
 
 ### Shared Parquet Data
 
-BenchBox generates benchmark data as Parquet files once, then every platform reads from the same dataset. This gives you an apples-to-apples comparison — differences in results reflect engine performance, not data differences. When you run the same benchmark at the same scale factor across DuckDB, DataFusion, Polars, and others, they all query identical Parquet files from a shared data directory.
+BenchBox generates benchmark data as Parquet files once, then every platform reads from the same dataset. This gives you an apples-to-apples comparison: differences in results reflect engine performance, not data differences. When you run the same benchmark at the same scale factor across DuckDB, DataFusion, Polars, and others, they all query identical Parquet files from a shared data directory.
 
 ### Choosing Table Mode
 

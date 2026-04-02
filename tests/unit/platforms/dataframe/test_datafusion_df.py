@@ -254,6 +254,19 @@ class TestDataFusionDataLoading:
         assert isinstance(result, pa.Table)
         assert result.num_rows == 3
 
+    def test_collect_empty_dataframe(self):
+        """Test collecting an empty DataFusion result returns an empty table."""
+        adapter = DataFusionDataFrameAdapter()
+
+        adapter.register_table("test", pa.table({"a": [1, 2, 3]}))
+        df = adapter.sql("SELECT * FROM test WHERE a > 10")
+
+        result = adapter.collect(df)
+
+        assert isinstance(result, pa.Table)
+        assert result.num_rows == 0
+        assert result.num_columns == 0
+
     def test_get_row_count_dataframe(self):
         """Test getting row count from DataFrame."""
         adapter = DataFusionDataFrameAdapter()
@@ -559,6 +572,32 @@ class TestDataFusionSpecificFeatures:
 
         assert result.num_rows == 3
 
+    def test_register_table_from_lazy_dataframe(self):
+        """Test registering a DataFusion DataFrame for SQL access."""
+        adapter = DataFusionDataFrameAdapter()
+
+        adapter.register_table("source", pa.table({"x": [1, 2, 3]}))
+        lazy_df = adapter.sql("SELECT x FROM source WHERE x >= 2")
+
+        adapter.register_table("copied", lazy_df)
+        result = adapter.collect(adapter.sql("SELECT * FROM copied"))
+
+        assert result.to_pydict() == {"x": [2, 3]}
+
+    def test_register_parquet_table(self, tmp_path):
+        """Test registering a parquet file as a SQL table."""
+        adapter = DataFusionDataFrameAdapter()
+
+        parquet_path = tmp_path / "events.parquet"
+        import pyarrow.parquet as pq
+
+        pq.write_table(pa.table({"event_id": [1, 2], "amount": [10, 20]}), parquet_path)
+
+        adapter.register_parquet_table("events", parquet_path)
+        result = adapter.collect(adapter.sql("SELECT event_id FROM events WHERE amount >= 20"))
+
+        assert result.to_pydict() == {"event_id": [2]}
+
     def test_to_pandas(self):
         """Test conversion to pandas DataFrame."""
         adapter = DataFusionDataFrameAdapter()
@@ -571,6 +610,60 @@ class TestDataFusionSpecificFeatures:
 
         assert len(pandas_df) == 3
         assert "a" in pandas_df.columns
+
+    def test_to_pandas_from_lazy_dataframe(self):
+        """Test conversion to pandas from a lazy DataFusion DataFrame."""
+        adapter = DataFusionDataFrameAdapter()
+
+        adapter.register_table("test", pa.table({"a": [1, 2, 3]}))
+        pandas_df = adapter.to_pandas(adapter.sql("SELECT a FROM test WHERE a >= 2"))
+
+        assert pandas_df.to_dict(orient="list") == {"a": [2, 3]}
+
+    def test_to_polars_from_lazy_dataframe(self):
+        """Test conversion to Polars from a lazy DataFusion DataFrame."""
+        adapter = DataFusionDataFrameAdapter()
+
+        adapter.register_table("test", pa.table({"a": [1, 2, 3]}))
+        polars_df = adapter.to_polars(adapter.sql("SELECT a FROM test WHERE a >= 2"))
+
+        assert polars_df.to_dict(as_series=False) == {"a": [2, 3]}
+
+    def test_lit_returns_existing_expression(self):
+        """Test lit() returns DataFusion expressions without double-wrapping."""
+        adapter = DataFusionDataFrameAdapter()
+
+        expr = adapter.col("value")
+
+        assert adapter.lit(expr) is expr
+
+    def test_get_logical_plan_contains_filter_and_scan(self):
+        """Test logical-plan inspection on a filtered SQL query."""
+        adapter = DataFusionDataFrameAdapter()
+
+        adapter.register_table("test", pa.table({"x": [1, 2, 3], "y": [10, 20, 30]}))
+        plan = adapter.get_logical_plan(adapter.sql("SELECT x FROM test WHERE y > 15"))
+
+        assert "Filter" in plan
+        assert "TableScan" in plan
+
+    def test_parse_memory_limit_variants(self):
+        """Test memory-limit parsing accepts common unit suffixes."""
+        adapter = DataFusionDataFrameAdapter()
+
+        assert adapter._parse_memory_limit("1.5GB") == 1610612736
+        assert adapter._parse_memory_limit("512M") == 536870912
+        assert adapter._parse_memory_limit("64K") == 65536
+        assert adapter._parse_memory_limit("128") == 128
+
+    def test_get_first_row_from_lazy_dataframe(self):
+        """Test first-row extraction auto-collects lazy DataFrames."""
+        adapter = DataFusionDataFrameAdapter()
+
+        adapter.register_table("test", pa.table({"id": [1, 2], "name": ["A", "B"]}))
+        first_row = adapter._get_first_row(adapter.sql("SELECT * FROM test ORDER BY id"))
+
+        assert first_row == (1, "A")
 
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")

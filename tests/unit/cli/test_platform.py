@@ -8,11 +8,14 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import shutil
 import sys
 import tempfile
+from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 from click.testing import CliRunner
+from rich.console import Console
 
 from benchbox.cli.platform import (
     PLATFORM_ALIASES,
@@ -27,6 +30,7 @@ from benchbox.cli.platform import (
     list_platforms,
     normalize_platform_name,
     platform_status,
+    setup_platforms,
 )
 
 pytestmark = [
@@ -473,6 +477,155 @@ class TestPlatformManager:
         guide = self.manager.get_installation_guide("nonexistent")
         assert guide is None
 
+    def test_display_platform_status_renders_rows_and_summary(self):
+        """Status table should render grouped rows and the aggregate summary."""
+        stream = StringIO()
+        self.manager.console = Console(file=stream, force_terminal=False, color_system=None, width=120)
+
+        with patch.object(self.manager, "detect_platforms") as mock_detect:
+            mock_detect.return_value = {
+                "duckdb": PlatformInfo(
+                    name="duckdb",
+                    display_name="DuckDB",
+                    description="Embedded OLAP",
+                    libraries=[LibraryInfo(name="duckdb", version="1.0.0", installed=True)],
+                    available=True,
+                    enabled=True,
+                    requirements=[],
+                    installation_command="uv add duckdb",
+                    category="analytical",
+                ),
+                "snowflake": PlatformInfo(
+                    name="snowflake",
+                    display_name="Snowflake",
+                    description="Cloud warehouse",
+                    libraries=[LibraryInfo(name="snowflake", version=None, installed=False)],
+                    available=False,
+                    enabled=False,
+                    requirements=["snowflake-connector-python"],
+                    installation_command="uv add snowflake-connector-python",
+                    category="cloud",
+                ),
+                "sqlite": PlatformInfo(
+                    name="sqlite",
+                    display_name="SQLite",
+                    description="Embedded row store",
+                    libraries=[LibraryInfo(name="sqlite3", version="3.45.0", installed=True)],
+                    available=True,
+                    enabled=False,
+                    requirements=[],
+                    installation_command="builtin",
+                    category="embedded",
+                ),
+            }
+
+            self.manager.display_platform_status()
+
+        output = stream.getvalue()
+        assert "DuckDB" in output
+        assert "Snowflake" in output
+        assert "SQLite" in output
+        assert "Summary:" in output
+        assert "1 enabled, 2 available, 3 total" in output
+
+    def test_display_platform_list_hides_unavailable_when_show_all_false(self):
+        """Simple list output should omit unavailable platforms unless show_all=True."""
+        stream = StringIO()
+        self.manager.console = Console(file=stream, force_terminal=False, color_system=None, width=120)
+
+        with patch.object(self.manager, "detect_platforms") as mock_detect:
+            mock_detect.return_value = {
+                "duckdb": PlatformInfo(
+                    name="duckdb",
+                    display_name="DuckDB",
+                    description="Embedded OLAP",
+                    libraries=[],
+                    available=True,
+                    enabled=True,
+                    requirements=[],
+                    installation_command="uv add duckdb",
+                    category="analytical",
+                ),
+                "snowflake": PlatformInfo(
+                    name="snowflake",
+                    display_name="Snowflake",
+                    description="Cloud warehouse",
+                    libraries=[],
+                    available=False,
+                    enabled=False,
+                    requirements=["snowflake-connector-python"],
+                    installation_command="uv add snowflake-connector-python",
+                    category="cloud",
+                ),
+            }
+
+            self.manager.display_platform_list(show_all=False)
+
+        output = stream.getvalue()
+        assert "DuckDB" in output
+        assert "Snowflake" not in output
+
+    @patch("benchbox.cli.platform.PlatformRegistry.get_platform_capabilities")
+    def test_display_platform_deployments_renders_modes_and_requirements(self, mock_caps):
+        """Deployment mode table should include CLI names and requirement hints."""
+        stream = StringIO()
+        self.manager.console = Console(file=stream, force_terminal=False, color_system=None, width=120)
+
+        with patch.object(self.manager, "detect_platforms") as mock_detect:
+            mock_detect.return_value = {
+                "clickhouse": PlatformInfo(
+                    name="clickhouse",
+                    display_name="ClickHouse",
+                    description="Columnar OLAP",
+                    libraries=[],
+                    available=True,
+                    enabled=True,
+                    requirements=[],
+                    installation_command="uv add clickhouse-connect",
+                    category="analytical",
+                ),
+                "duckdb": PlatformInfo(
+                    name="duckdb",
+                    display_name="DuckDB",
+                    description="Embedded OLAP",
+                    libraries=[],
+                    available=True,
+                    enabled=True,
+                    requirements=[],
+                    installation_command="uv add duckdb",
+                    category="analytical",
+                ),
+            }
+            mock_caps.side_effect = lambda name: (
+                SimpleNamespace(
+                    default_deployment="cloud",
+                    deployment_modes={
+                        "cloud": SimpleNamespace(
+                            mode="cloud",
+                            requires_credentials=True,
+                            requires_cloud_storage=True,
+                            requires_network=True,
+                        ),
+                        "local": SimpleNamespace(
+                            mode="local",
+                            requires_credentials=False,
+                            requires_cloud_storage=False,
+                            requires_network=False,
+                        ),
+                    },
+                )
+                if name == "clickhouse"
+                else None
+            )
+
+            self.manager.display_platform_deployments()
+
+        output = stream.getvalue()
+        assert "clickhouse:cloud" in output
+        assert "clickhouse:local" in output
+        assert "credentials, cloud storage, network" in output
+        assert "Usage: benchbox run --platform <platform>:<mode>" in output
+
 
 @skip_py310_cli_mock
 class TestCLICommands:
@@ -511,6 +664,18 @@ class TestCLICommands:
         mock_manager.display_platform_list.assert_called_once_with(show_all=True)
 
     @patch("benchbox.cli.platform.get_platform_manager")
+    def test_list_platforms_show_deployments(self, mock_get_manager):
+        """Test list platforms command with deployment mode output."""
+        mock_manager = Mock()
+        mock_get_manager.return_value = mock_manager
+
+        result = self.runner.invoke(list_platforms, ["--show-deployments"])
+
+        assert result.exit_code == 0
+        mock_manager.display_platform_deployments.assert_called_once()
+        mock_manager.display_platform_status.assert_not_called()
+
+    @patch("benchbox.cli.platform.get_platform_manager")
     def test_platform_status_all(self, mock_get_manager):
         """Test platform status command for all platforms."""
         mock_manager = Mock()
@@ -547,6 +712,40 @@ class TestCLICommands:
         assert result.exit_code == 0
         assert "DuckDB" in result.output
         assert "High-performance database" in result.output
+
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_platform_status_missing_dependencies_shows_installation_details(self, mock_get_manager):
+        """Missing platform details should include import errors and install guidance."""
+        mock_manager = Mock()
+        mock_lib = LibraryInfo(
+            name="snowflake.connector",
+            version=None,
+            installed=False,
+            import_error="No module named 'snowflake.connector'",
+        )
+        mock_manager.detect_platforms.return_value = {
+            "snowflake": PlatformInfo(
+                name="snowflake",
+                display_name="Snowflake",
+                description="Cloud data warehouse",
+                libraries=[mock_lib],
+                available=False,
+                enabled=False,
+                requirements=["snowflake-connector-python>=3.0.0"],
+                installation_command="uv add snowflake-connector-python",
+                category="cloud",
+            )
+        }
+        mock_get_manager.return_value = mock_manager
+
+        result = self.runner.invoke(platform_status, ["snowflake"])
+
+        assert result.exit_code == 0
+        assert "Missing Dependencies" in result.output
+        assert "snowflake.connector" in result.output
+        assert "No module named 'snowflake.connector'" in result.output
+        assert "uv add snowflake-connector-python" in result.output
+        assert "snowflake-connector-python>=3.0.0" in result.output
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_platform_status_unknown(self, mock_get_manager):
@@ -639,6 +838,34 @@ class TestCLICommands:
         assert "uv add missing" in result.output
 
     @patch("benchbox.cli.platform.get_platform_manager")
+    def test_enable_platform_force_allows_missing_dependencies(self, mock_get_manager):
+        """Force mode should enable a missing platform after alias normalization."""
+        mock_manager = Mock()
+        mock_platforms = {
+            "datafusion": PlatformInfo(
+                name="datafusion",
+                display_name="DataFusion",
+                description="",
+                libraries=[],
+                available=False,
+                enabled=False,
+                requirements=["datafusion>=0.0.0"],
+                installation_command="uv add datafusion",
+                category="analytical",
+            )
+        }
+        mock_manager.detect_platforms.return_value = mock_platforms
+        mock_manager.enable_platform.return_value = True
+        mock_get_manager.return_value = mock_manager
+
+        result = self.runner.invoke(enable_platform, ["fusion", "--force"])
+
+        assert result.exit_code == 0
+        assert "Enabled platform: DataFusion" in result.output
+        assert "dependencies missing" in result.output
+        mock_manager.enable_platform.assert_called_once_with("datafusion")
+
+    @patch("benchbox.cli.platform.get_platform_manager")
     def test_disable_platform_success(self, mock_get_manager):
         """Test disabling platform successfully."""
         mock_manager = Mock()
@@ -664,6 +891,32 @@ class TestCLICommands:
         assert result.exit_code == 0
         assert "Disabled platform: DuckDB" in result.output
         mock_manager.disable_platform.assert_called_once_with("duckdb")
+
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_disable_platform_cancelled_by_user(self, mock_get_manager):
+        """Declining the confirmation should leave the platform unchanged."""
+        mock_manager = Mock()
+        mock_platforms = {
+            "duckdb": PlatformInfo(
+                name="duckdb",
+                display_name="DuckDB",
+                description="",
+                libraries=[],
+                available=True,
+                enabled=True,
+                requirements=[],
+                installation_command="",
+                category="analytical",
+            )
+        }
+        mock_manager.detect_platforms.return_value = mock_platforms
+        mock_get_manager.return_value = mock_manager
+
+        result = self.runner.invoke(disable_platform, ["duck"], input="n\n")
+
+        assert result.exit_code == 0
+        assert "Cancelled" in result.output
+        mock_manager.disable_platform.assert_not_called()
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_install_platform_available(self, mock_get_manager):
@@ -708,6 +961,27 @@ class TestCLICommands:
         assert "Missing dependencies" in result.output
         assert "uv add clickhouse-driver" in result.output
         assert "clickhouse_driver" in result.output
+
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_install_platform_dry_run_reports_no_install(self, mock_get_manager):
+        """Dry-run mode should stop after showing installation instructions."""
+        mock_manager = Mock()
+        mock_manager.get_installation_guide.return_value = {
+            "platform": "ClickHouse",
+            "description": "Columnar database",
+            "category": "analytical",
+            "available": False,
+            "installation_command": "uv add clickhouse-driver",
+            "requirements": ["clickhouse-driver>=0.2.0"],
+            "missing_libraries": ["clickhouse_driver"],
+        }
+        mock_get_manager.return_value = mock_manager
+
+        result = self.runner.invoke(install_platform, ["clickhouse", "--dry-run"])
+
+        assert result.exit_code == 0
+        assert "Dry run mode: No installation performed" in result.output
+        assert "After installation, run" not in result.output
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_check_platforms_all_ready(self, mock_get_manager):
@@ -775,6 +1049,19 @@ class TestCLICommands:
         assert "Missing Platform: Missing dependencies" in result.output
         assert "Some platforms need attention" in result.output
 
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_check_platforms_enabled_only_with_none_enabled(self, mock_get_manager):
+        """Enabled-only mode should short-circuit when nothing is enabled."""
+        mock_manager = Mock()
+        mock_manager.detect_platforms.return_value = {}
+        mock_manager.get_enabled_platforms.return_value = []
+        mock_get_manager.return_value = mock_manager
+
+        result = self.runner.invoke(check_platforms, ["--enabled-only"])
+
+        assert result.exit_code == 0
+        assert "No platforms to check" in result.output
+
 
 class TestGlobalPlatformManager:
     """Test global platform manager function."""
@@ -789,3 +1076,117 @@ class TestGlobalPlatformManager:
         """Test that get_platform_manager returns PlatformManager instance."""
         manager = get_platform_manager()
         assert isinstance(manager, PlatformManager)
+
+
+@skip_py310_cli_mock
+class TestSetupPlatformsCommand:
+    """Test the interactive and non-interactive setup wizard branches."""
+
+    def setup_method(self):
+        self.runner = CliRunner()
+
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_setup_platforms_non_interactive_enables_available_disabled_platforms(self, mock_get_manager):
+        mock_manager = Mock()
+        mock_manager.detect_platforms.return_value = {
+            "duckdb": PlatformInfo(
+                name="duckdb",
+                display_name="DuckDB",
+                description="",
+                libraries=[],
+                available=True,
+                enabled=False,
+                requirements=[],
+                installation_command="uv add duckdb",
+                category="analytical",
+            ),
+            "sqlite": PlatformInfo(
+                name="sqlite",
+                display_name="SQLite",
+                description="",
+                libraries=[],
+                available=True,
+                enabled=True,
+                requirements=[],
+                installation_command="builtin",
+                category="embedded",
+            ),
+            "snowflake": PlatformInfo(
+                name="snowflake",
+                display_name="Snowflake",
+                description="",
+                libraries=[],
+                available=False,
+                enabled=False,
+                requirements=[],
+                installation_command="uv add snowflake-connector-python",
+                category="cloud",
+            ),
+        }
+        mock_manager.enable_platform.return_value = True
+        mock_get_manager.return_value = mock_manager
+
+        result = self.runner.invoke(setup_platforms, ["--non-interactive"])
+
+        assert result.exit_code == 0
+        mock_manager.enable_platform.assert_called_once_with("duckdb")
+        assert "Enabled: DuckDB" in result.output
+        assert "Enabled 1 platforms" in result.output
+
+    @patch("benchbox.cli.platform.get_platform_manager")
+    @patch("benchbox.cli.platform.NumberedSelectPrompt.ask")
+    def test_setup_platforms_status_branch_displays_current_status(self, mock_ask, mock_get_manager):
+        mock_manager = Mock()
+        mock_manager.detect_platforms.return_value = {}
+        mock_get_manager.return_value = mock_manager
+        mock_ask.side_effect = ["status", "done"]
+
+        result = self.runner.invoke(setup_platforms, ["--interactive"])
+
+        assert result.exit_code == 0
+        mock_manager.display_platform_status.assert_called_once()
+
+    @patch("benchbox.cli.platform.numbered_platform_select", return_value=None)
+    @patch("benchbox.cli.platform.get_platform_manager")
+    @patch("benchbox.cli.platform.NumberedSelectPrompt.ask")
+    def test_setup_platforms_install_branch_reports_no_missing_platforms(self, mock_ask, mock_get_manager, mock_select):
+        mock_manager = Mock()
+        mock_manager.detect_platforms.return_value = {}
+        mock_get_manager.return_value = mock_manager
+        mock_ask.side_effect = ["install", "done"]
+
+        result = self.runner.invoke(setup_platforms, ["--interactive"])
+
+        assert result.exit_code == 0
+        mock_select.assert_called_once()
+        assert "No platforms with missing dependencies." in result.output
+
+    @patch("benchbox.cli.platform.numbered_platform_select", return_value=None)
+    @patch("benchbox.cli.platform.get_platform_manager")
+    @patch("benchbox.cli.platform.NumberedSelectPrompt.ask")
+    def test_setup_platforms_enable_branch_reports_no_candidates(self, mock_ask, mock_get_manager, mock_select):
+        mock_manager = Mock()
+        mock_manager.detect_platforms.return_value = {}
+        mock_get_manager.return_value = mock_manager
+        mock_ask.side_effect = ["enable", "done"]
+
+        result = self.runner.invoke(setup_platforms, ["--interactive"])
+
+        assert result.exit_code == 0
+        mock_select.assert_called_once()
+        assert "No available platforms to enable." in result.output
+
+    @patch("benchbox.cli.platform.numbered_platform_select", return_value=None)
+    @patch("benchbox.cli.platform.get_platform_manager")
+    @patch("benchbox.cli.platform.NumberedSelectPrompt.ask")
+    def test_setup_platforms_disable_branch_reports_no_enabled_platforms(self, mock_ask, mock_get_manager, mock_select):
+        mock_manager = Mock()
+        mock_manager.detect_platforms.return_value = {}
+        mock_get_manager.return_value = mock_manager
+        mock_ask.side_effect = ["disable", "done"]
+
+        result = self.runner.invoke(setup_platforms, ["--interactive"])
+
+        assert result.exit_code == 0
+        mock_select.assert_called_once()
+        assert "No enabled platforms to disable." in result.output

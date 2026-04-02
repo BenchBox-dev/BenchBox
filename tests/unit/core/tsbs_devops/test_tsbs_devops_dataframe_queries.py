@@ -24,7 +24,8 @@ class TestTSBSDevOpsQueryRegistry:
     def test_registry_imports_successfully(self):
         from benchbox.core.tsbs_devops.dataframe_queries import TSBS_DEVOPS_DATAFRAME_QUERIES
 
-        assert TSBS_DEVOPS_DATAFRAME_QUERIES is not None
+        assert len(TSBS_DEVOPS_DATAFRAME_QUERIES) > 0
+        assert hasattr(TSBS_DEVOPS_DATAFRAME_QUERIES, "get_query_ids")
 
     def test_registry_has_18_queries(self):
         from benchbox.core.tsbs_devops.dataframe_queries import TSBS_DEVOPS_DATAFRAME_QUERIES

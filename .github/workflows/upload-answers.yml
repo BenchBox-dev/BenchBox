@@ -1,0 +1,146 @@
+name: Upload TPC Answer Files
+
+# Packages TPC-H and TPC-DS answer files as tar.gz archives and uploads them
+# to the stable 'answers-v1' GitHub release tag.
+#
+# The 'answers-v1' tag is intentionally separate from version tags (v*).
+# Answer files are TPC specification data and do not change between BenchBox
+# releases, so using a stable tag keeps the download URL constant across all
+# package versions.
+#
+# Uploaded assets:
+#   tpch-answers.tar.gz   — 22 TPC-H answer files (q1.out … q22.out)
+#   tpcds-answers.tar.gz  — TPC-DS answer files (*.ans) from answer_sets/
+#   checksums.sha256      — SHA256 digests for both archives
+#
+# Run this workflow:
+#   1. When answer files are updated in _sources/ (rare — TPC spec changes)
+#   2. After initial repository setup (create the answers-v1 release for the first time)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — build archives but do not upload"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  upload-answers:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to create/update releases and upload assets
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify answer file sources exist
+        run: |
+          echo "Checking TPC-H answer files..."
+          count=$(find _sources/tpc-h/dbgen/answers -maxdepth 1 -name 'q*.out' -type f | wc -l)
+          echo "  Found $count TPC-H answer files"
+          if [ "$count" -ne 22 ]; then
+            echo "ERROR: Expected 22 TPC-H answer files, found $count"
+            exit 1
+          fi
+
+          echo "Checking TPC-DS answer files..."
+          count=$(find _sources/tpc-ds/answer_sets -maxdepth 1 -name '*.ans' -type f | wc -l)
+          echo "  Found $count TPC-DS answer files"
+          if [ "$count" -lt 99 ]; then
+            echo "ERROR: Expected at least 99 TPC-DS answer files, found $count"
+            exit 1
+          fi
+
+      - name: Build answer archives
+        run: |
+          mkdir -p dist-answers
+
+          echo "Creating tpch-answers.tar.gz..."
+          tar -czf dist-answers/tpch-answers.tar.gz \
+            -C _sources/tpc-h/dbgen/answers .
+          ls -lh dist-answers/tpch-answers.tar.gz
+
+          echo "Creating tpcds-answers.tar.gz..."
+          tar -czf dist-answers/tpcds-answers.tar.gz \
+            -C _sources/tpc-ds/answer_sets .
+          ls -lh dist-answers/tpcds-answers.tar.gz
+
+      - name: Generate checksums
+        run: |
+          cd dist-answers
+          sha256sum tpch-answers.tar.gz tpcds-answers.tar.gz > checksums.sha256
+          echo "checksums.sha256:"
+          cat checksums.sha256
+
+      - name: Verify archives are extractable
+        run: |
+          tmp=$(mktemp -d)
+          echo "Verifying tpch-answers.tar.gz..."
+          tar -tzf dist-answers/tpch-answers.tar.gz | grep -c "\.out$" | \
+            xargs -I{} echo "  {} .out files"
+          tar -xzf dist-answers/tpch-answers.tar.gz -C "$tmp"
+          count=$(ls "$tmp"/*.out 2>/dev/null | wc -l)
+          echo "  Extracted $count TPC-H answer files"
+
+          echo "Verifying tpcds-answers.tar.gz..."
+          tar -tzf dist-answers/tpcds-answers.tar.gz | grep -c "\.ans$" | \
+            xargs -I{} echo "  {} .ans files"
+
+          rm -rf "$tmp"
+
+      - name: Upload to GitHub Release (answers-v1)
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create the 'answers-v1' release if it doesn't exist yet
+          if ! gh release view answers-v1 &>/dev/null; then
+            echo "Creating answers-v1 release..."
+            gh release create answers-v1 \
+              --title "TPC Answer Files" \
+              --notes "$(cat <<'EOF'
+          Stable release containing TPC-H and TPC-DS answer files for
+          row-count validation. This tag is not versioned — answer files
+          are TPC specification data that rarely change.
+
+          These files are downloaded automatically by BenchBox when running
+          from a wheel install and validation is enabled (SF=1.0). You can
+          also pre-populate the local cache with:
+
+              benchbox download-answers
+
+          To use a custom URL:
+
+              export BENCHBOX_ANSWERS_URL=https://your-cdn.example.com/answers-v1
+          EOF
+          )" \
+              --prerelease=false
+          fi
+
+          echo "Uploading archives to answers-v1 release..."
+          gh release upload answers-v1 \
+            dist-answers/tpch-answers.tar.gz \
+            dist-answers/tpcds-answers.tar.gz \
+            dist-answers/checksums.sha256 \
+            --clobber
+
+          echo "Done. Assets now available at:"
+          echo "  https://github.com/${{ github.repository }}/releases/download/answers-v1/tpch-answers.tar.gz"
+          echo "  https://github.com/${{ github.repository }}/releases/download/answers-v1/tpcds-answers.tar.gz"
+          echo "  https://github.com/${{ github.repository }}/releases/download/answers-v1/checksums.sha256"
+
+      - name: Dry run summary
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "DRY RUN — archives were built but not uploaded."
+          echo ""
+          echo "Archives:"
+          ls -lh dist-answers/
+          echo ""
+          echo "Checksums:"
+          cat dist-answers/checksums.sha256
+          echo ""
+          echo "To upload, re-run this workflow with dry_run=false."

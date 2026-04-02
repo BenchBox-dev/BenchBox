@@ -126,6 +126,59 @@ class TestEMRServerlessAdapterInitialization:
             assert adapter.create_application is False
 
 
+class TestEMRServerlessTableFormat:
+    """Test table_format parameter configuration."""
+
+    def test_table_format_default_parquet(self):
+        """Test table_format defaults to parquet."""
+        with (
+            patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.aws import EMRServerlessAdapter
+
+            adapter = EMRServerlessAdapter(
+                application_id="app-123",
+                s3_staging_dir="s3://bucket/data",
+                execution_role_arn="arn:aws:iam::123:role/R",
+            )
+            assert adapter.table_format == "parquet"
+
+    def test_table_format_delta(self):
+        """Test table_format can be set to delta."""
+        with (
+            patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.aws import EMRServerlessAdapter
+
+            adapter = EMRServerlessAdapter(
+                application_id="app-123",
+                s3_staging_dir="s3://bucket/data",
+                execution_role_arn="arn:aws:iam::123:role/R",
+                table_format="delta",
+            )
+            assert adapter.table_format == "delta"
+
+    def test_table_format_from_config(self):
+        """Test table_format is passed through from_config."""
+        with (
+            patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.aws import EMRServerlessAdapter
+
+            adapter = EMRServerlessAdapter.from_config(
+                {
+                    "application_id": "app-123",
+                    "s3_staging_dir": "s3://bucket/data",
+                    "execution_role_arn": "arn:aws:iam::123:role/R",
+                    "table_format": "iceberg",
+                }
+            )
+            assert adapter.table_format == "iceberg"
+
+
 class TestEMRServerlessAdapterPlatformInfo:
     """Test platform info methods."""
 

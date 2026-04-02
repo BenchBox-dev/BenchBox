@@ -5,6 +5,8 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import json
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, call, patch
@@ -15,13 +17,19 @@ from benchbox.platforms.redshift import RedshiftAdapter
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.slow,
+    pytest.mark.fast,
     pytest.mark.cloud_import,
 ]
 
 
 class TestRedshiftAdapter:
     """Test Redshift platform adapter functionality."""
+
+    @pytest.fixture(autouse=True)
+    def _skip_cluster_state_check(self):
+        """Prevent real boto3 API calls in _resolve_connect_timeout."""
+        with patch.object(RedshiftAdapter, "_resolve_connect_timeout", return_value=10):
+            yield
 
     def test_initialization_success(self):
         """Test successful adapter initialization."""
@@ -118,6 +126,34 @@ class TestRedshiftAdapter:
         assert params["password"] == "test_pass"
         assert params["sslmode"] == "require"
 
+    def test_create_s3_client_uses_retry_safe_checksum_mode(self):
+        """S3 uploads should opt out of optional flexible checksums."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                aws_region="us-east-2",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_session = Mock()
+        mock_session.get_credentials.return_value = object()
+        mock_client = Mock()
+        mock_session.client.return_value = mock_client
+        with patch("benchbox.platforms.redshift.boto3.Session", return_value=mock_session) as mock_session_ctor:
+            created_client = adapter._create_s3_client()
+
+        assert created_client is mock_client
+        session_kwargs = mock_session_ctor.call_args.kwargs
+        assert session_kwargs["region_name"] == "us-east-2"
+        client_args = mock_session.client.call_args.args
+        client_kwargs = mock_session.client.call_args.kwargs
+        assert client_args == ("s3",)
+        assert client_kwargs["config"].request_checksum_calculation == "when_required"
+
         # Test with overrides
         override_params = adapter._get_connection_params(
             host="override-cluster.redshift.amazonaws.com", database="override_db"
@@ -126,6 +162,72 @@ class TestRedshiftAdapter:
         assert override_params["database"] == "override_db"
         assert override_params["user"] == "test_user"  # Should keep original
         assert "database" in override_params
+
+    def test_create_s3_client_raises_when_credentials_missing(self):
+        """S3 client creation should fail fast when boto3 cannot resolve credentials."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_session = Mock()
+        mock_session.get_credentials.return_value = None
+        with patch("benchbox.platforms.redshift.boto3.Session", return_value=mock_session):
+            with pytest.raises(ValueError, match="AWS credentials not found"):
+                adapter._create_s3_client()
+
+    @pytest.mark.parametrize(
+        "key_id, secret",
+        [("AKID_ONLY", None), (None, "SECRET_ONLY")],
+        ids=["key_without_secret", "secret_without_key"],
+    )
+    def test_create_s3_client_rejects_asymmetric_credentials(self, key_id, secret):
+        """S3 client creation should reject one credential without the other."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                aws_access_key_id=key_id,
+                aws_secret_access_key=secret,
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        with pytest.raises(ValueError, match="both aws_access_key_id and aws_secret_access_key"):
+            adapter._create_s3_client()
+
+    def test_create_s3_client_passes_session_token_to_boto3(self):
+        """Session token should be forwarded to boto3.Session."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                aws_access_key_id="AKID",
+                aws_secret_access_key="SECRET",
+                aws_session_token="TOK123",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_session = Mock()
+        mock_session.get_credentials.return_value = object()
+        mock_session.client.return_value = Mock()
+        with patch("benchbox.platforms.redshift.boto3.Session", return_value=mock_session) as mock_ctor:
+            adapter._create_s3_client()
+
+        session_kwargs = mock_ctor.call_args.kwargs
+        assert session_kwargs["aws_access_key_id"] == "AKID"
+        assert session_kwargs["aws_secret_access_key"] == "SECRET"
+        assert session_kwargs["aws_session_token"] == "TOK123"
 
     def test_create_admin_connection(self):
         """Test admin connection creation."""
@@ -172,6 +274,60 @@ class TestRedshiftAdapter:
 
         assert connection == mock_connection
 
+    def test_create_admin_connection_uses_shared_driver_helper(self):
+        """Test admin connection delegates to the shared driver helper."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                admin_database="admin_db",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_connection = Mock()
+
+        with patch.object(adapter, "_connect_with_driver", return_value=mock_connection) as mock_connect:
+            connection = adapter._create_admin_connection(connect_timeout=27)
+
+        assert connection == mock_connection
+        mock_connect.assert_called_once_with(
+            application_name="BenchBox-Admin",
+            connect_timeout=27,
+            database="admin_db",
+        )
+
+    def test_create_admin_connection_uses_adaptive_timeout_by_default(self):
+        """Test admin connection defaults to the adaptive timeout."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                admin_database="admin_db",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_connection = Mock()
+
+        with (
+            patch.object(adapter, "_resolve_connect_timeout", return_value=42) as mock_timeout,
+            patch.object(adapter, "_connect_with_driver", return_value=mock_connection) as mock_connect,
+        ):
+            connection = adapter._create_admin_connection()
+
+        assert connection == mock_connection
+        mock_timeout.assert_called_once_with()
+        mock_connect.assert_called_once_with(
+            application_name="BenchBox-Admin",
+            connect_timeout=42,
+            database="admin_db",
+        )
+
     def test_create_direct_connection(self):
         """Test direct connection creation for validation."""
         try:
@@ -206,6 +362,93 @@ class TestRedshiftAdapter:
         assert connection == mock_connection
 
         # Verify WLM queue was set (single quotes escaped for SQL injection protection)
+        mock_cursor.execute.assert_called_with("SET query_group TO 'validation_queue'")
+        mock_cursor.close.assert_called_once()
+
+    def test_create_direct_connection_uses_shared_driver_helper(self):
+        """Test validation connection delegates to the shared driver helper."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                wlm_query_queue_name="validation_queue",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        with patch.object(adapter, "_connect_with_driver", return_value=mock_connection) as mock_connect:
+            connection = adapter._create_direct_connection(database="target_db", connect_timeout=17)
+
+        assert connection == mock_connection
+        mock_connect.assert_called_once_with(
+            application_name="BenchBox-Validation",
+            connect_timeout=17,
+            database="target_db",
+        )
+        mock_cursor.execute.assert_called_with("SET query_group TO 'validation_queue'")
+        mock_cursor.close.assert_called_once()
+
+    def test_create_direct_connection_adaptive_timeout_no_queue(self):
+        """Without explicit connect_timeout, _create_direct_connection uses _resolve_connect_timeout."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_connection = Mock()
+        mock_connection.cursor.return_value = Mock()
+
+        with patch.object(adapter, "_connect_with_driver", return_value=mock_connection) as mock_connect:
+            adapter._create_direct_connection(database="target_db")
+
+        # The autouse fixture sets _resolve_connect_timeout to return 10
+        mock_connect.assert_called_once_with(
+            application_name="BenchBox-Validation",
+            connect_timeout=10,
+            database="target_db",
+        )
+
+    def test_create_direct_connection_uses_adaptive_timeout_by_default(self):
+        """Test validation connection defaults to the adaptive timeout."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                wlm_query_queue_name="validation_queue",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        with (
+            patch.object(adapter, "_resolve_connect_timeout", return_value=42) as mock_timeout,
+            patch.object(adapter, "_connect_with_driver", return_value=mock_connection) as mock_connect,
+        ):
+            connection = adapter._create_direct_connection(database="target_db")
+
+        assert connection == mock_connection
+        mock_timeout.assert_called_once_with()
+        mock_connect.assert_called_once_with(
+            application_name="BenchBox-Validation",
+            connect_timeout=42,
+            database="target_db",
+        )
         mock_cursor.execute.assert_called_with("SET query_group TO 'validation_queue'")
         mock_cursor.close.assert_called_once()
 
@@ -361,6 +604,161 @@ class TestRedshiftAdapter:
 
         # Verify autocommit was enabled
         assert mock_connection.autocommit is True
+
+    def test_drop_database_uses_long_running_timeout(self):
+        """Test DROP DATABASE uses the long-running timeout helper."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_connection = Mock()
+        mock_connection.cursor.return_value = Mock()
+
+        with (
+            patch.object(adapter, "check_server_database_exists", return_value=True),
+            patch.object(adapter, "_long_running_timeout", return_value=321) as mock_timeout,
+            patch.object(adapter, "_create_admin_connection", return_value=mock_connection) as mock_admin_conn,
+        ):
+            adapter.drop_database(database="test_db")
+
+        mock_timeout.assert_called_once_with()
+        mock_admin_conn.assert_called_once_with(connect_timeout=321)
+
+    def test_drop_database_retry_on_active_connection(self):
+        """Retry path opens a fresh connection when DROP DATABASE fails with SQLSTATE 55006.
+
+        redshift_connector raises ProgrammingError with args[0] = server wire-protocol dict
+        where key 'C' is the SQLSTATE code.  SQLSTATE 55006 means the database still has
+        active connections.  The fix must open a new connection rather than reusing the
+        corrupted one (error 25001 on the same connection after a failed DDL).
+        """
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        first_cursor = Mock()
+        second_cursor = Mock()
+        first_connection = Mock()
+        second_connection = Mock()
+        first_connection.cursor.return_value = first_cursor
+        second_connection.cursor.return_value = second_cursor
+
+        # Simulate redshift_connector's wire-protocol error dict with SQLSTATE 55006
+        def drop_side_effect(sql, *args):
+            if "DROP DATABASE" in sql:
+                raise Exception({"C": "55006", "M": "database is being accessed by other users"})
+
+        first_cursor.execute.side_effect = drop_side_effect
+
+        with (
+            patch.object(adapter, "check_server_database_exists", return_value=True),
+            patch.object(adapter, "_long_running_timeout", return_value=60),
+            patch.object(
+                adapter,
+                "_create_admin_connection",
+                side_effect=[first_connection, second_connection],
+            ) as mock_admin_conn,
+        ):
+            adapter.drop_database(database="test_db")
+
+        # Fresh connection must be created for the retry
+        assert mock_admin_conn.call_count == 2, "Expected two admin connections: initial + retry"
+        # Retry connection must also have autocommit enabled
+        assert second_connection.autocommit is True
+        # First (corrupted) cursor and connection must be closed before the retry
+        first_cursor.close.assert_called_once()
+        first_connection.close.assert_called_once()
+        # DROP DATABASE must be issued on the retry cursor
+        drop_calls = [c for c in second_cursor.execute.call_args_list if "DROP DATABASE" in str(c)]
+        assert len(drop_calls) == 1, "DROP DATABASE should be executed exactly once on the retry cursor"
+
+    def test_drop_database_non_retryable_sqlstate_re_raises(self):
+        """DROP DATABASE errors with non-55006 SQLSTATE codes are re-raised immediately without retry."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        # SQLSTATE 42501 = insufficient_privilege — should not trigger retry
+        mock_cursor.execute.side_effect = [
+            None,  # pg_terminate_backend succeeds
+            Exception({"C": "42501", "M": "permission denied to drop database"}),
+        ]
+
+        with (
+            patch.object(adapter, "check_server_database_exists", return_value=True),
+            patch.object(adapter, "_long_running_timeout", return_value=60),
+            patch.object(adapter, "_create_admin_connection", return_value=mock_connection) as mock_admin_conn,
+        ):
+            with pytest.raises(RuntimeError, match="Failed to drop Redshift database"):
+                adapter.drop_database(database="test_db")
+
+        # Only one admin connection should have been created — no retry
+        mock_admin_conn.assert_called_once()
+
+    def test_drop_database_retry_drop_failure_propagates(self):
+        """If DROP DATABASE fails again on the retry connection, the error propagates as RuntimeError."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        first_cursor = Mock()
+        second_cursor = Mock()
+        first_connection = Mock()
+        second_connection = Mock()
+        first_connection.cursor.return_value = first_cursor
+        second_connection.cursor.return_value = second_cursor
+
+        # First DROP: 55006, triggers retry; second DROP: also fails
+        def first_drop_side_effect(sql, *args):
+            if "DROP DATABASE" in sql:
+                raise Exception({"C": "55006", "M": "database is being accessed by other users"})
+
+        def second_drop_side_effect(sql, *args):
+            if "DROP DATABASE" in sql:
+                raise Exception({"C": "55006", "M": "database is still being accessed"})
+
+        first_cursor.execute.side_effect = first_drop_side_effect
+        second_cursor.execute.side_effect = second_drop_side_effect
+
+        with (
+            patch.object(adapter, "check_server_database_exists", return_value=True),
+            patch.object(adapter, "_long_running_timeout", return_value=60),
+            patch.object(
+                adapter,
+                "_create_admin_connection",
+                side_effect=[first_connection, second_connection],
+            ),
+        ):
+            with pytest.raises(RuntimeError, match="Failed to drop Redshift database"):
+                adapter.drop_database(database="test_db")
 
     def test_create_connection_success(self):
         """Test successful connection creation."""
@@ -625,6 +1023,9 @@ class TestRedshiftAdapter:
         finally:
             parquet_path.unlink()
 
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="Windows reports st_size=0 for directories, breaking _filter_valid_files"
+    )
     def test_external_table_mode_generates_delta_spectrum_sql(self):
         """External mode should emit Delta-flavored Spectrum SQL for Delta directories."""
         try:
@@ -715,6 +1116,292 @@ class TestRedshiftAdapter:
         finally:
             csv_path.unlink()
 
+    def test_load_data_native_path_uses_manifest_files_when_benchmark_tables_are_directories(self):
+        """Native Redshift loads should fall back to manifest-selected files on data reuse."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                s3_bucket="benchbox-test-bucket",
+                iam_role="arn:aws:iam::123456789012:role/benchbox-redshift",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            table_dir = data_dir / "orders"
+            delta_log_dir = table_dir / "_delta_log"
+            delta_log_dir.mkdir(parents=True)
+            (delta_log_dir / "00000000000000000000.json").write_text("{}")
+            (table_dir / "part-00000.parquet").write_bytes(b"PAR1")
+            delta_dir_size = sum(path.stat().st_size for path in table_dir.rglob("*") if path.is_file())
+
+            tbl_path = data_dir / "orders.tbl"
+            tbl_path.write_text("1|2024-01-01|O|1.00|\n")
+
+            manifest = {
+                "benchmark": "tpch",
+                "scale_factor": 1.0,
+                "format_preference": ["delta", "tbl"],
+                "tables": {
+                    "orders": {
+                        "formats": {
+                            "delta": [
+                                {
+                                    "path": "orders",
+                                    "size_bytes": delta_dir_size,
+                                    "row_count": 1,
+                                    "is_directory": True,
+                                }
+                            ],
+                            "tbl": [
+                                {
+                                    "path": "orders.tbl",
+                                    "size_bytes": tbl_path.stat().st_size,
+                                    "row_count": 1,
+                                }
+                            ],
+                        }
+                    }
+                },
+            }
+            (data_dir / "_datagen_manifest.json").write_text(json.dumps(manifest))
+
+            mock_benchmark = Mock()
+            mock_benchmark.tables = {"orders": [table_dir]}
+
+            with (
+                patch.object(adapter, "_create_s3_client", return_value=Mock()),
+                patch.object(adapter, "_load_table_via_s3", return_value=7) as mock_copy_loader,
+            ):
+                table_stats, _, _ = adapter.load_data(mock_benchmark, mock_connection, data_dir)
+
+        assert table_stats["orders"] == 7
+        assert mock_copy_loader.call_args.args[2] == "orders"
+        assert mock_copy_loader.call_args.args[3] == [tbl_path]
+
+    def test_build_s3_copy_source_uses_manifest_for_multiple_files(self):
+        """Multiple staged files should be loaded via a manifest path."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                s3_bucket="benchbox-test-bucket",
+                s3_prefix="benchbox",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_s3_client = Mock()
+        s3_uris = [
+            "s3://benchbox-test-bucket/benchbox/orders_0.csv",
+            "s3://benchbox-test-bucket/benchbox/orders_1.csv",
+        ]
+
+        copy_from_path, manifest_option = adapter._build_s3_copy_source(mock_s3_client, s3_uris, "orders")
+
+        assert copy_from_path == "s3://benchbox-test-bucket/benchbox/orders_manifest.json"
+        assert manifest_option == "manifest"
+        mock_s3_client.put_object.assert_called_once()
+        put_kwargs = mock_s3_client.put_object.call_args.kwargs
+        assert put_kwargs["Bucket"] == "benchbox-test-bucket"
+        assert put_kwargs["Key"] == "benchbox/orders_manifest.json"
+        assert json.loads(put_kwargs["Body"]) == {"entries": [{"url": uri, "mandatory": True} for uri in s3_uris]}
+
+    def test_get_copy_credentials_clause_prefers_role_then_keys_then_default(self):
+        """COPY credentials should prefer IAM role, then explicit keys, then cluster default auth."""
+        try:
+            role_adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                iam_role="arn:aws:iam::123456789012:role/benchbox-redshift",
+                aws_access_key_id="AKIA123",
+                aws_secret_access_key="secret123",
+            )
+            key_adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                aws_access_key_id="AKIA123",
+                aws_secret_access_key="secret123",
+            )
+            default_adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        assert (
+            role_adapter._get_copy_credentials_clause() == "IAM_ROLE 'arn:aws:iam::123456789012:role/benchbox-redshift'"
+        )
+        assert key_adapter._get_copy_credentials_clause() == "ACCESS_KEY_ID 'AKIA123' SECRET_ACCESS_KEY 'secret123'"
+        assert default_adapter._get_copy_credentials_clause() == ""
+
+    @pytest.mark.parametrize(
+        "kwargs, match_name",
+        [
+            ({"iam_role": "arn:role/legit'; DROP TABLE users--"}, "iam_role"),
+            (
+                {"aws_access_key_id": "AKID'BAD", "aws_secret_access_key": "good"},
+                "aws_access_key_id",
+            ),
+            (
+                {"aws_access_key_id": "AKID", "aws_secret_access_key": "sec'ret"},
+                "aws_secret_access_key",
+            ),
+            (
+                {
+                    "aws_access_key_id": "AKID",
+                    "aws_secret_access_key": "secret",
+                    "aws_session_token": "tok'en",
+                },
+                "aws_session_token",
+            ),
+        ],
+        ids=["iam_role", "access_key_id", "secret_access_key", "session_token"],
+    )
+    def test_rejects_credential_with_single_quote(self, kwargs, match_name):
+        """Credential values containing single quotes must be rejected to prevent COPY SQL injection."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                **kwargs,
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        with pytest.raises(ValueError, match="single-quote"):
+            adapter._get_copy_credentials_clause()
+
+    def test_load_table_via_s3_with_tbl_zst_from_preference_chain(self):
+        """End-to-end: manifest preference selects .tbl.zst → _load_table_via_s3 builds correct COPY SQL."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                schema="public",
+                s3_bucket="benchbox-bucket",
+                s3_prefix="data",
+                iam_role="arn:aws:iam::123456789012:role/redshift-role",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = (150,)
+        mock_connection = Mock()
+        mock_s3_client = Mock()
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".tbl.zst", delete=False) as f:
+            f.write(b"\x28\xb5\x2f\xfd")  # zstd magic bytes
+            tbl_zst_file = Path(f.name)
+
+        try:
+            with patch.object(
+                adapter,
+                "_upload_file_to_s3",
+                return_value="s3://benchbox-bucket/data/customer_0.tbl.zst",
+            ):
+                row_count = adapter._load_table_via_s3(
+                    mock_cursor,
+                    mock_s3_client,
+                    "customer",
+                    [tbl_zst_file],
+                    mock_connection,
+                )
+        finally:
+            tbl_zst_file.unlink()
+
+        assert row_count == 150
+        copy_sql = str(mock_cursor.execute.call_args_list[0].args[0])
+        assert "COPY public.customer" in copy_sql
+        assert "ZSTD" in copy_sql
+        assert "DELIMITER '|'" in copy_sql
+        assert "FORMAT AS PARQUET" not in copy_sql
+
+    def test_load_table_via_s3_builds_copy_sql_with_manifest_and_gzip(self):
+        """COPY SQL should include manifest loading, compression, credentials, and ANALYZE."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                schema="analytics",
+                s3_bucket="benchbox-test-bucket",
+                s3_prefix="benchbox",
+                iam_role="arn:aws:iam::123456789012:role/benchbox-redshift",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = (17,)
+        mock_connection = Mock()
+        mock_s3_client = Mock()
+
+        with (
+            tempfile.NamedTemporaryFile(mode="wb", suffix=".csv.gz", delete=False) as f1,
+            tempfile.NamedTemporaryFile(mode="wb", suffix=".csv.gz", delete=False) as f2,
+        ):
+            f1.write(b"id,name\n1,one\n")
+            f2.write(b"id,name\n2,two\n")
+            file_one = Path(f1.name)
+            file_two = Path(f2.name)
+
+        try:
+            with patch.object(
+                adapter,
+                "_upload_file_to_s3",
+                side_effect=[
+                    "s3://benchbox-test-bucket/benchbox/orders_0.csv.gz",
+                    "s3://benchbox-test-bucket/benchbox/orders_1.csv.gz",
+                ],
+            ):
+                row_count = adapter._load_table_via_s3(
+                    mock_cursor,
+                    mock_s3_client,
+                    "orders",
+                    [file_one, file_two],
+                    mock_connection,
+                )
+        finally:
+            file_one.unlink()
+            file_two.unlink()
+
+        assert row_count == 17
+        copy_sql = str(mock_cursor.execute.call_args_list[0].args[0])
+        assert "COPY analytics.orders" in copy_sql
+        assert "FROM 's3://benchbox-test-bucket/benchbox/orders_manifest.json'" in copy_sql
+        assert "IAM_ROLE 'arn:aws:iam::123456789012:role/benchbox-redshift'" in copy_sql
+        assert "manifest" in copy_sql
+        assert "GZIP" in copy_sql
+        assert "DELIMITER ','" in copy_sql
+        assert "COMPUPDATE PRESET" in copy_sql
+        assert mock_cursor.execute.call_args_list[1].args[0] == "SELECT COUNT(*) FROM analytics.orders"
+        assert mock_cursor.execute.call_args_list[2].args[0] == "ANALYZE analytics.orders"
+        mock_s3_client.put_object.assert_called_once()
+
     def test_configure_for_benchmark_olap(self):
         """Test OLAP benchmark configuration with Redshift optimizations."""
         try:
@@ -733,17 +1420,20 @@ class TestRedshiftAdapter:
         mock_connection.cursor.return_value = mock_cursor
         # Mock table list query result
         mock_cursor.fetchall.return_value = [("public", "table1"), ("public", "table2")]
+        mock_cursor.fetchone.return_value = ("off",)
 
-        adapter.configure_for_benchmark(mock_connection, "olap")
+        # Patch _connect_with_driver so VACUUM/ANALYZE maintenance connection is mocked
+        maint_conn = Mock()
+        maint_conn.autocommit = True
+        maint_conn.cursor.return_value = Mock()
+        with patch.object(adapter, "_connect_with_driver", return_value=maint_conn):
+            adapter.configure_for_benchmark(mock_connection, "olap")
 
-        # Should execute Redshift OLAP optimizations
+        # Should execute Redshift OLAP optimizations on the main cursor
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
         assert any("enable_result_cache_for_session" in call for call in execute_calls)
         assert any("query_group" in call for call in execute_calls)
         assert any("enable_case_sensitive_identifier" in call for call in execute_calls)
-
-        # cursor.close() called twice: once for configure, once for validation
-        assert mock_cursor.close.call_count == 2
 
     def test_configure_for_benchmark_with_wlm(self):
         """Test benchmark configuration with WLM settings."""
@@ -764,8 +1454,14 @@ class TestRedshiftAdapter:
         mock_connection.cursor.return_value = mock_cursor
         # Mock table list query result
         mock_cursor.fetchall.return_value = [("public", "table1"), ("public", "table2")]
+        mock_cursor.fetchone.return_value = ("off",)
 
-        adapter.configure_for_benchmark(mock_connection, "tpch")
+        # Patch _connect_with_driver so VACUUM/ANALYZE maintenance connection is mocked
+        maint_conn = Mock()
+        maint_conn.autocommit = True
+        maint_conn.cursor.return_value = Mock()
+        with patch.object(adapter, "_connect_with_driver", return_value=maint_conn):
+            adapter.configure_for_benchmark(mock_connection, "tpch")
 
         # Should execute optimization settings (WLM is applied during connection creation)
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
@@ -1106,6 +1802,54 @@ class TestRedshiftAdapter:
             # Should generate DISTSTYLE EVEN when no specific distribution columns
             assert "DISTSTYLE EVEN" in clause
 
+    @pytest.mark.parametrize(
+        ("column_type", "expected"),
+        [
+            ("DECIMAL(15,2)", "DECIMAL(15,2)"),
+            ("varchar(128)", "VARCHAR(128)"),
+            ("bigint", "BIGINT"),
+            ("smallint", "SMALLINT"),
+            ("int", "INTEGER"),
+            ("double", "DOUBLE PRECISION"),
+            ("float", "REAL"),
+            ("date", "DATE"),
+            ("bool", "BOOLEAN"),
+            ("GEOMETRY", "VARCHAR(65535)"),
+            ("", "VARCHAR(65535)"),
+        ],
+    )
+    def test_map_external_column_type(self, column_type, expected):
+        """External table type mapping should normalize supported types and safely fall back."""
+        assert RedshiftAdapter._map_external_column_type(column_type) == expected
+
+    @pytest.mark.parametrize(
+        ("statement", "expected"),
+        [
+            (
+                "CREATE TABLE public.orders (id INTEGER)",
+                "CREATE TABLE public.orders (id INTEGER) DISTSTYLE AUTO SORTKEY AUTO",
+            ),
+            (
+                "CREATE TABLE public.orders (id INTEGER) DISTSTYLE EVEN SORTKEY (id)",
+                "CREATE TABLE public.orders (id INTEGER) DISTSTYLE EVEN SORTKEY (id)",
+            ),
+            ("DROP TABLE public.orders", "DROP TABLE public.orders"),
+        ],
+    )
+    def test_optimize_table_definition(self, statement, expected):
+        """Redshift CREATE TABLE optimization should add default dist/sort keys only when absent."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        assert adapter._optimize_table_definition(statement) == expected
+
     def test_generate_tuning_clause_none(self):
         """Test tuning clause generation with None input."""
         try:
@@ -1277,6 +2021,50 @@ class TestRedshiftAdapter:
         assert adapter_verify.sslmode == "verify-full"
         assert adapter_verify.sslrootcert == "/path/to/cert.pem"
 
+    def test_shared_connector_helper_omits_prefer_sslmode_for_redshift_connector(self):
+        """Test unsupported sslmode values are not forwarded to redshift_connector."""
+        import benchbox.platforms.redshift as redshift_module
+
+        if not redshift_module.redshift_connector:
+            pytest.skip("redshift_connector not installed")
+
+        adapter = RedshiftAdapter(
+            host="test-cluster.redshift.amazonaws.com",
+            database="test_db",
+            username="test_user",
+            password="test_pass",
+            sslmode="prefer",
+        )
+
+        with patch.object(redshift_module.redshift_connector, "connect", return_value=Mock()) as mock_connect:
+            adapter._connect_with_driver(application_name="BenchBox-Validation", connect_timeout=15)
+
+        call_kwargs = mock_connect.call_args.kwargs
+        assert call_kwargs["ssl"] is True
+        assert call_kwargs["timeout"] == 15
+        assert "sslmode" not in call_kwargs
+
+    def test_shared_connector_helper_passes_supported_sslmode_for_redshift_connector(self):
+        """Test supported certificate-verification modes are forwarded to redshift_connector."""
+        import benchbox.platforms.redshift as redshift_module
+
+        if not redshift_module.redshift_connector:
+            pytest.skip("redshift_connector not installed")
+
+        adapter = RedshiftAdapter(
+            host="test-cluster.redshift.amazonaws.com",
+            database="test_db",
+            username="test_user",
+            password="test_pass",
+            sslmode="verify-full",
+        )
+
+        with patch.object(redshift_module.redshift_connector, "connect", return_value=Mock()) as mock_connect:
+            adapter._connect_with_driver(application_name="BenchBox-Validation", connect_timeout=15)
+
+        call_kwargs = mock_connect.call_args.kwargs
+        assert call_kwargs["sslmode"] == "verify-full"
+
     def test_file_format_detection_for_chunked_files(self):
         """Test that chunked TPC-H data files (.tbl.1, .tbl.2, etc.) are detected as pipe-delimited.
 
@@ -1429,3 +2217,933 @@ class TestRedshiftAdapter:
         assert adapter.compupdate == "ON"
         assert adapter.auto_vacuum is False
         assert adapter.auto_analyze is False
+
+
+def _make_adapter(**kwargs):
+    """Create a RedshiftAdapter with test defaults, skip if driver missing."""
+    try:
+        from benchbox.platforms.redshift import RedshiftAdapter
+    except ImportError:
+        pytest.skip("Redshift drivers not installed")
+
+    defaults = {
+        "host": "test-cluster.redshift.amazonaws.com",
+        "database": "test_db",
+        "username": "test_user",
+        "password": "test_pass",
+        "strict_validation": False,
+    }
+    defaults.update(kwargs)
+    return RedshiftAdapter(**defaults)
+
+
+class TestDeploymentTypeDetection:
+    """Test hostname-based deployment type and metadata extraction."""
+
+    def test_detect_serverless_hostname(self):
+        adapter = _make_adapter()
+        result = adapter._detect_deployment_type("my-workgroup.123456789.us-east-1.redshift-serverless.amazonaws.com")
+        assert result == "serverless"
+
+    def test_detect_provisioned_hostname(self):
+        adapter = _make_adapter()
+        result = adapter._detect_deployment_type("my-cluster.us-west-2.redshift.amazonaws.com")
+        assert result == "provisioned"
+
+    def test_detect_unknown_hostname(self):
+        adapter = _make_adapter()
+        result = adapter._detect_deployment_type("some-database.example.com")
+        assert result == "unknown"
+
+    def test_detect_empty_hostname(self):
+        adapter = _make_adapter()
+        result = adapter._detect_deployment_type("")
+        assert result == "unknown"
+
+    def test_detect_none_hostname(self):
+        adapter = _make_adapter()
+        result = adapter._detect_deployment_type(None)
+        assert result == "unknown"
+
+    def test_extract_region_serverless(self):
+        adapter = _make_adapter()
+        region = adapter._extract_region_from_hostname(
+            "my-workgroup.123456789.us-west-2.redshift-serverless.amazonaws.com", "serverless"
+        )
+        assert region == "us-west-2"
+
+    def test_extract_region_provisioned(self):
+        adapter = _make_adapter()
+        region = adapter._extract_region_from_hostname("my-cluster.eu-central-1.redshift.amazonaws.com", "provisioned")
+        assert region == "eu-central-1"
+
+    def test_extract_region_unknown_returns_none(self):
+        adapter = _make_adapter()
+        region = adapter._extract_region_from_hostname("some-host.example.com", "unknown")
+        assert region is None
+
+    def test_extract_region_empty_hostname_returns_none(self):
+        adapter = _make_adapter()
+        region = adapter._extract_region_from_hostname("", "serverless")
+        assert region is None
+
+    def test_extract_region_none_hostname_returns_none(self):
+        adapter = _make_adapter()
+        region = adapter._extract_region_from_hostname(None, "provisioned")
+        assert region is None
+
+    def test_extract_identifier_serverless(self):
+        adapter = _make_adapter()
+        identifier = adapter._extract_identifier_from_hostname(
+            "my-workgroup.123456789.us-east-1.redshift-serverless.amazonaws.com", "serverless"
+        )
+        assert identifier == "my-workgroup"
+
+    def test_extract_identifier_provisioned(self):
+        adapter = _make_adapter()
+        identifier = adapter._extract_identifier_from_hostname(
+            "my-cluster.us-west-2.redshift.amazonaws.com", "provisioned"
+        )
+        assert identifier == "my-cluster"
+
+    def test_extract_identifier_unknown_returns_none(self):
+        adapter = _make_adapter()
+        identifier = adapter._extract_identifier_from_hostname("some-host.example.com", "unknown")
+        assert identifier is None
+
+    def test_extract_identifier_empty_hostname_returns_none(self):
+        adapter = _make_adapter()
+        identifier = adapter._extract_identifier_from_hostname("", "serverless")
+        assert identifier is None
+
+    def test_extract_identifier_none_hostname_returns_none(self):
+        adapter = _make_adapter()
+        identifier = adapter._extract_identifier_from_hostname(None, "provisioned")
+        assert identifier is None
+
+
+class TestCopySqlGeneration:
+    """Test COPY command SQL generation with various configurations."""
+
+    def test_copy_sql_single_file_no_compression(self):
+        """Single uncompressed CSV should produce direct COPY without manifest."""
+        import tempfile
+
+        adapter = _make_adapter(
+            schema="analytics",
+            s3_bucket="my-bucket",
+            s3_prefix="data",
+            iam_role="arn:aws:iam::111111111111:role/RedshiftCopy",
+            compupdate="OFF",
+            auto_analyze=False,
+        )
+
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = (50,)
+        mock_connection = Mock()
+        mock_s3_client = Mock()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            f.write("1,alpha\n2,beta\n")
+            csv_path = Path(f.name)
+
+        try:
+            with patch.object(
+                adapter,
+                "_upload_file_to_s3",
+                return_value="s3://my-bucket/data/orders_0.csv",
+            ):
+                row_count = adapter._load_table_via_s3(
+                    mock_cursor, mock_s3_client, "orders", [csv_path], mock_connection
+                )
+        finally:
+            csv_path.unlink()
+
+        assert row_count == 50
+        copy_sql = mock_cursor.execute.call_args_list[0].args[0]
+        assert "COPY analytics.orders" in copy_sql
+        assert "FROM 's3://my-bucket/data/orders_0.csv'" in copy_sql
+        assert "IAM_ROLE 'arn:aws:iam::111111111111:role/RedshiftCopy'" in copy_sql
+        assert "COMPUPDATE OFF" in copy_sql
+        assert "DELIMITER ','" in copy_sql
+        # Single file should not use manifest
+        assert "manifest" not in copy_sql.lower().split("from")[0]
+        # No GZIP or ZSTD for uncompressed file
+        assert "GZIP" not in copy_sql
+        assert "ZSTD" not in copy_sql
+        # Should not call ANALYZE since auto_analyze is False
+        analyze_calls = [str(c) for c in mock_cursor.execute.call_args_list if "ANALYZE" in str(c)]
+        assert len(analyze_calls) == 0
+
+    def test_copy_sql_zstd_compression(self):
+        """ZSTD-compressed files should include ZSTD in COPY command."""
+        import tempfile
+
+        adapter = _make_adapter(
+            schema="public",
+            s3_bucket="my-bucket",
+            s3_prefix="staging",
+            iam_role="arn:aws:iam::222222222222:role/Role",
+            auto_analyze=True,
+        )
+
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = (99,)
+        mock_connection = Mock()
+        mock_s3_client = Mock()
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".csv.zst", delete=False) as f:
+            f.write(b"dummy")
+            zst_path = Path(f.name)
+
+        try:
+            with patch.object(
+                adapter,
+                "_upload_file_to_s3",
+                return_value="s3://my-bucket/staging/lineitem_0.csv.zst",
+            ):
+                row_count = adapter._load_table_via_s3(
+                    mock_cursor, mock_s3_client, "lineitem", [zst_path], mock_connection
+                )
+        finally:
+            zst_path.unlink()
+
+        assert row_count == 99
+        copy_sql = mock_cursor.execute.call_args_list[0].args[0]
+        assert "COPY public.lineitem" in copy_sql
+        assert "ZSTD" in copy_sql
+        # Should call ANALYZE since auto_analyze is True
+        analyze_sql = mock_cursor.execute.call_args_list[2].args[0]
+        assert analyze_sql == "ANALYZE public.lineitem"
+
+    def test_copy_sql_parquet_omits_delimiter_and_compupdate(self):
+        """Parquet COPY should use columnar syntax without text-only options."""
+        import tempfile
+
+        adapter = _make_adapter(
+            schema="analytics",
+            s3_bucket="my-bucket",
+            s3_prefix="data",
+            iam_role="arn:aws:iam::111111111111:role/RedshiftCopy",
+            compupdate="OFF",
+            auto_analyze=False,
+        )
+
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = (12,)
+        mock_connection = Mock()
+        mock_s3_client = Mock()
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".parquet", delete=False) as f:
+            f.write(b"PAR1")
+            parquet_path = Path(f.name)
+
+        try:
+            with patch.object(
+                adapter,
+                "_upload_file_to_s3",
+                return_value="s3://my-bucket/data/orders_0.parquet",
+            ):
+                row_count = adapter._load_table_via_s3(
+                    mock_cursor, mock_s3_client, "orders", [parquet_path], mock_connection
+                )
+        finally:
+            parquet_path.unlink()
+
+        assert row_count == 12
+        copy_sql = mock_cursor.execute.call_args_list[0].args[0]
+        assert "COPY analytics.orders" in copy_sql
+        assert "FORMAT AS PARQUET" in copy_sql
+        assert "COMPUPDATE" not in copy_sql
+        assert "DELIMITER" not in copy_sql
+        assert "GZIP" not in copy_sql
+        assert "ZSTD" not in copy_sql
+
+    def test_copy_sql_rejects_mixed_file_formats(self):
+        """Mixed parquet and delimited inputs should fail before upload."""
+        import tempfile
+
+        adapter = _make_adapter(
+            schema="analytics",
+            s3_bucket="my-bucket",
+            s3_prefix="data",
+            iam_role="arn:aws:iam::111111111111:role/RedshiftCopy",
+        )
+
+        mock_cursor = Mock()
+        mock_connection = Mock()
+        mock_s3_client = Mock()
+
+        with (
+            tempfile.NamedTemporaryFile(mode="wb", suffix=".parquet", delete=False) as parquet_file,
+            tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as csv_file,
+        ):
+            parquet_file.write(b"PAR1")
+            csv_file.write("1,alpha\n")
+            parquet_path = Path(parquet_file.name)
+            csv_path = Path(csv_file.name)
+
+        try:
+            with patch.object(adapter, "_upload_file_to_s3") as mock_upload:
+                with pytest.raises(ValueError, match="uniform source format"):
+                    adapter._load_table_via_s3(
+                        mock_cursor,
+                        mock_s3_client,
+                        "orders",
+                        [parquet_path, csv_path],
+                        mock_connection,
+                    )
+        finally:
+            parquet_path.unlink()
+            csv_path.unlink()
+
+        mock_upload.assert_not_called()
+
+    def test_copy_sql_with_access_key_credentials(self):
+        """COPY should use ACCESS_KEY_ID / SECRET_ACCESS_KEY when no IAM role."""
+        import tempfile
+
+        adapter = _make_adapter(
+            schema="public",
+            s3_bucket="my-bucket",
+            s3_prefix="data",
+            aws_access_key_id="AKIAEXAMPLE",
+            aws_secret_access_key="secretEXAMPLE",
+            auto_analyze=False,
+        )
+
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = (10,)
+        mock_connection = Mock()
+        mock_s3_client = Mock()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            f.write("1,x\n")
+            csv_path = Path(f.name)
+
+        try:
+            with patch.object(
+                adapter,
+                "_upload_file_to_s3",
+                return_value="s3://my-bucket/data/nation_0.csv",
+            ):
+                adapter._load_table_via_s3(mock_cursor, mock_s3_client, "nation", [csv_path], mock_connection)
+        finally:
+            csv_path.unlink()
+
+        copy_sql = mock_cursor.execute.call_args_list[0].args[0]
+        assert "ACCESS_KEY_ID 'AKIAEXAMPLE'" in copy_sql
+        assert "SECRET_ACCESS_KEY 'secretEXAMPLE'" in copy_sql
+
+
+class TestS3CopySourceBuilding:
+    """Test _build_s3_copy_source manifest vs. direct path."""
+
+    def test_single_file_returns_direct_uri(self):
+        adapter = _make_adapter(s3_bucket="bkt", s3_prefix="pfx")
+        mock_s3 = Mock()
+        path, option = adapter._build_s3_copy_source(mock_s3, ["s3://bkt/pfx/orders_0.csv"], "orders")
+        assert path == "s3://bkt/pfx/orders_0.csv"
+        assert option == ""
+        mock_s3.put_object.assert_not_called()
+
+    def test_multiple_files_creates_manifest(self):
+        adapter = _make_adapter(s3_bucket="bkt", s3_prefix="pfx")
+        mock_s3 = Mock()
+        uris = ["s3://bkt/pfx/t_0.csv", "s3://bkt/pfx/t_1.csv", "s3://bkt/pfx/t_2.csv"]
+        path, option = adapter._build_s3_copy_source(mock_s3, uris, "t")
+        assert path == "s3://bkt/pfx/t_manifest.json"
+        assert option == "manifest"
+        put_kwargs = mock_s3.put_object.call_args.kwargs
+        manifest = json.loads(put_kwargs["Body"])
+        assert len(manifest["entries"]) == 3
+        for i, entry in enumerate(manifest["entries"]):
+            assert entry["url"] == uris[i]
+            assert entry["mandatory"] is True
+
+
+class TestCopyCredentialsClause:
+    """Test _get_copy_credentials_clause generation."""
+
+    def test_iam_role_takes_precedence_over_keys(self):
+        adapter = _make_adapter(
+            iam_role="arn:aws:iam::999:role/R",
+            aws_access_key_id="AK",
+            aws_secret_access_key="SK",
+        )
+        clause = adapter._get_copy_credentials_clause()
+        assert clause == "IAM_ROLE 'arn:aws:iam::999:role/R'"
+
+    def test_access_keys_when_no_iam_role(self):
+        adapter = _make_adapter(aws_access_key_id="AK123", aws_secret_access_key="SK456")
+        clause = adapter._get_copy_credentials_clause()
+        assert clause == "ACCESS_KEY_ID 'AK123' SECRET_ACCESS_KEY 'SK456'"
+
+    def test_temporary_access_keys_include_session_token(self):
+        adapter = _make_adapter(
+            aws_access_key_id="AK123",
+            aws_secret_access_key="SK456",
+            aws_session_token="TOKEN789",
+        )
+        clause = adapter._get_copy_credentials_clause()
+        assert clause == "ACCESS_KEY_ID 'AK123' SECRET_ACCESS_KEY 'SK456' SESSION_TOKEN 'TOKEN789'"
+
+    def test_empty_when_no_credentials(self):
+        adapter = _make_adapter()
+        clause = adapter._get_copy_credentials_clause()
+        assert clause == ""
+
+
+class TestCtasSortSql:
+    """Test _build_ctas_sort_sql for Redshift vacuum_sort and ctas methods."""
+
+    def test_vacuum_sort_method(self):
+        adapter = _make_adapter(schema="analytics")
+        mock_col = Mock()
+        mock_col.name = "o_orderdate"
+
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "vacuum_sort")):
+            result = adapter._build_ctas_sort_sql("orders", [mock_col])
+
+        assert result == "VACUUM SORT ONLY analytics.orders"
+
+    def test_ctas_method_generates_three_statements(self):
+        adapter = _make_adapter(schema="public")
+        col1 = Mock()
+        col1.name = "l_orderkey"
+        col2 = Mock()
+        col2.name = "l_linenumber"
+
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "ctas")):
+            result = adapter._build_ctas_sort_sql("lineitem", [col1, col2])
+
+        assert isinstance(result, list)
+        assert len(result) == 3
+        assert result[0] == (
+            "CREATE TABLE public.lineitem__ctas_sort AS SELECT * FROM public.lineitem ORDER BY l_orderkey, l_linenumber"
+        )
+        assert result[1] == "DROP TABLE public.lineitem"
+        assert result[2] == "ALTER TABLE public.lineitem__ctas_sort RENAME TO lineitem"
+
+    def test_off_mode_returns_none(self):
+        adapter = _make_adapter()
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("off", "auto")):
+            result = adapter._build_ctas_sort_sql("orders", [Mock()])
+        assert result is None
+
+    def test_unsupported_method_raises(self):
+        adapter = _make_adapter()
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "cluster_by")):
+            with pytest.raises(ValueError, match="not supported for Redshift"):
+                adapter._build_ctas_sort_sql("orders", [Mock()])
+
+
+class TestOptimizeTableDefinition:
+    """Test _optimize_table_definition SQL generation."""
+
+    def test_adds_diststyle_auto_and_sortkey_auto(self):
+        adapter = _make_adapter()
+        result = adapter._optimize_table_definition("CREATE TABLE t (id INT)")
+        assert result == "CREATE TABLE t (id INT) DISTSTYLE AUTO SORTKEY AUTO"
+
+    def test_preserves_existing_diststyle(self):
+        adapter = _make_adapter()
+        result = adapter._optimize_table_definition("CREATE TABLE t (id INT) DISTSTYLE ALL")
+        assert "DISTSTYLE ALL" in result
+        assert "DISTSTYLE AUTO" not in result
+        assert "SORTKEY AUTO" in result
+
+    def test_preserves_existing_sortkey(self):
+        adapter = _make_adapter()
+        result = adapter._optimize_table_definition("CREATE TABLE t (id INT) SORTKEY (id)")
+        assert "SORTKEY (id)" in result
+        assert "SORTKEY AUTO" not in result
+        assert "DISTSTYLE AUTO" in result
+
+    def test_preserves_both_existing_dist_and_sort(self):
+        adapter = _make_adapter()
+        stmt = "CREATE TABLE t (id INT) DISTSTYLE KEY DISTKEY (id) SORTKEY (created_at)"
+        result = adapter._optimize_table_definition(stmt)
+        assert result == stmt
+
+    def test_non_create_statement_unchanged(self):
+        adapter = _make_adapter()
+        stmt = "ALTER TABLE t ADD COLUMN x INT"
+        assert adapter._optimize_table_definition(stmt) == stmt
+
+    def test_drop_table_unchanged(self):
+        adapter = _make_adapter()
+        assert adapter._optimize_table_definition("DROP TABLE t") == "DROP TABLE t"
+
+    def test_case_insensitive_detection(self):
+        adapter = _make_adapter()
+        result = adapter._optimize_table_definition("CREATE TABLE t (id INT) diststyle even")
+        assert "DISTSTYLE AUTO" not in result
+        assert "SORTKEY AUTO" in result
+
+
+class TestExternalColumnTypeMapping:
+    """Test _map_external_column_type for Redshift Spectrum types."""
+
+    @pytest.mark.parametrize(
+        ("input_type", "expected"),
+        [
+            ("SUPER", "VARCHAR(65535)"),
+            ("GEOMETRY", "VARCHAR(65535)"),
+            ("TIMESTAMPTZ", "TIMESTAMPTZ"),
+            ("TIMESTAMP WITH TIME ZONE", "TIMESTAMP WITH TIME ZONE"),
+            ("NUMERIC(10,4)", "NUMERIC(10,4)"),
+            ("CHAR(1)", "CHAR(1)"),
+            ("REAL", "REAL"),
+            ("FLOAT4", "REAL"),
+            ("DOUBLE PRECISION", "DOUBLE PRECISION"),
+            ("BOOLEAN", "BOOLEAN"),
+            ("BOOL", "BOOLEAN"),
+            ("INTEGER", "INTEGER"),
+            ("  bigint  ", "BIGINT"),
+            ("smallint", "SMALLINT"),
+            ("DATE", "DATE"),
+            ("   ", "VARCHAR(65535)"),
+        ],
+    )
+    def test_type_mapping(self, input_type, expected):
+        assert RedshiftAdapter._map_external_column_type(input_type) == expected
+
+
+class TestBuildExternalColumnDefinitions:
+    """Test _build_external_column_definitions generates correct DDL fragments."""
+
+    def test_generates_column_defs_from_schema(self):
+        adapter = _make_adapter()
+        mock_benchmark = Mock()
+        mock_benchmark.get_schema.return_value = {
+            "orders": {
+                "columns": [
+                    {"name": "O_ORDERKEY", "type": "BIGINT"},
+                    {"name": "O_TOTALPRICE", "type": "DECIMAL(15,2)"},
+                    {"name": "O_ORDERDATE", "type": "DATE"},
+                ]
+            }
+        }
+        result = adapter._build_external_column_definitions(mock_benchmark, "orders")
+        assert "o_orderkey BIGINT" in result
+        assert "o_totalprice DECIMAL(15,2)" in result
+        assert "o_orderdate DATE" in result
+
+    def test_raises_for_missing_schema(self):
+        adapter = _make_adapter()
+        mock_benchmark = Mock()
+        mock_benchmark.get_schema.return_value = {}
+        with pytest.raises(ValueError, match="No schema definition found"):
+            adapter._build_external_column_definitions(mock_benchmark, "missing_table")
+
+    def test_raises_for_empty_columns(self):
+        adapter = _make_adapter()
+        mock_benchmark = Mock()
+        mock_benchmark.get_schema.return_value = {"orders": {"columns": []}}
+        with pytest.raises(ValueError, match="No columns found"):
+            adapter._build_external_column_definitions(mock_benchmark, "orders")
+
+    def test_raises_when_benchmark_has_no_get_schema(self):
+        adapter = _make_adapter()
+        mock_benchmark = Mock(spec=[])  # no get_schema attribute
+        with pytest.raises(ValueError, match="schema metadata unavailable"):
+            adapter._build_external_column_definitions(mock_benchmark, "orders")
+
+
+class TestValidateExternalTableRequirements:
+    """Test validate_external_table_requirements error messages."""
+
+    def test_missing_s3_bucket_raises(self):
+        adapter = _make_adapter()
+        adapter.s3_bucket = None
+        with pytest.raises(ValueError, match="requires S3 staging"):
+            adapter.validate_external_table_requirements()
+
+    def test_missing_iam_role_raises(self):
+        adapter = _make_adapter(s3_bucket="my-bucket")
+        adapter.iam_role = None
+        with pytest.raises(ValueError, match="requires IAM role credentials"):
+            adapter.validate_external_table_requirements()
+
+    def test_passes_with_both_configured(self):
+        adapter = _make_adapter(
+            s3_bucket="my-bucket",
+            iam_role="arn:aws:iam::123:role/R",
+        )
+        adapter.validate_external_table_requirements()  # Should not raise
+
+
+class TestConfigureForBenchmarkSql:
+    """Test configure_for_benchmark generates expected SQL settings."""
+
+    def _run_configure(self, adapter, benchmark_type):
+        """Run configure_for_benchmark with mocked connection and return executed SQL list."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []  # No tables
+        mock_cursor.fetchone.return_value = ("off",)
+
+        adapter.configure_for_benchmark(mock_connection, benchmark_type)
+
+        return [call_obj.args[0] for call_obj in mock_cursor.execute.call_args_list]
+
+    def test_olap_settings_include_case_sensitivity_and_datestyle(self):
+        adapter = _make_adapter(disable_result_cache=True)
+        sqls = self._run_configure(adapter, "tpch")
+
+        assert "SET enable_result_cache_for_session TO OFF" in sqls
+        assert "SET query_group TO 'benchbox'" in sqls
+        assert "SET enable_case_sensitive_identifier TO OFF" in sqls
+        assert "SET datestyle TO 'ISO, MDY'" in sqls
+        assert "SET extra_float_digits TO 0" in sqls
+        assert "SET statement_timeout TO '1800000'" in sqls
+
+    def test_non_olap_skips_case_sensitivity(self):
+        adapter = _make_adapter(disable_result_cache=False)
+        sqls = self._run_configure(adapter, "custom")
+
+        assert "SET enable_result_cache_for_session TO ON" in sqls
+        assert "SET query_group TO 'benchbox'" in sqls
+        assert not any("enable_case_sensitive_identifier" in s for s in sqls)
+
+    def test_olap_variant_types_recognized(self):
+        adapter = _make_adapter()
+        for btype in ["olap", "analytics", "tpcds"]:
+            sqls = self._run_configure(adapter, btype)
+            assert any("enable_case_sensitive_identifier" in s for s in sqls), f"Failed for {btype}"
+
+
+class TestConnectionConfigValidation:
+    """Test connection configuration defaults and validation."""
+
+    def test_default_port_is_5439(self):
+        adapter = _make_adapter()
+        assert adapter.port == 5439
+
+    def test_custom_port(self):
+        adapter = _make_adapter(port=5440)
+        assert adapter.port == 5440
+
+    def test_default_database_is_dev(self):
+        adapter = _make_adapter(database=None)
+        assert adapter.database == "dev"
+
+    def test_default_schema_is_public(self):
+        adapter = _make_adapter(schema=None)
+        assert adapter.schema == "public"
+
+    def test_default_ssl_settings(self):
+        adapter = _make_adapter()
+        assert adapter.ssl_enabled is True
+        assert adapter.ssl_insecure is False
+        assert adapter.sslmode == "require"
+
+    def test_ssl_insecure_mode(self):
+        adapter = _make_adapter(ssl_insecure=True)
+        assert adapter.ssl_insecure is True
+
+    def test_default_aws_region(self):
+        adapter = _make_adapter()
+        assert adapter.aws_region == "us-east-1"
+
+    def test_custom_aws_region(self):
+        adapter = _make_adapter(aws_region="ap-southeast-1")
+        assert adapter.aws_region == "ap-southeast-1"
+
+    def test_default_wlm_slot_count(self):
+        adapter = _make_adapter()
+        assert adapter.wlm_query_slot_count == 1
+
+    def test_default_connect_timeout(self):
+        adapter = _make_adapter()
+        assert adapter.connect_timeout == 10
+
+    def test_default_statement_timeout(self):
+        adapter = _make_adapter()
+        assert adapter.statement_timeout == 0
+
+    def test_missing_host_raises(self):
+        from benchbox.core.exceptions import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="host"):
+            _make_adapter(host=None)
+
+    def test_missing_username_raises(self):
+        from benchbox.core.exceptions import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="username"):
+            _make_adapter(username=None)
+
+    def test_missing_password_raises(self):
+        from benchbox.core.exceptions import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="password"):
+            _make_adapter(password=None)
+
+    def test_compupdate_default_preset(self):
+        adapter = _make_adapter()
+        assert adapter.compupdate == "PRESET"
+
+    def test_compupdate_case_normalization(self):
+        adapter = _make_adapter(compupdate="on")
+        assert adapter.compupdate == "ON"
+
+    def test_compupdate_invalid_value_raises(self):
+        with pytest.raises(ValueError, match="Invalid COMPUPDATE value"):
+            _make_adapter(compupdate="ALWAYS")
+
+    def test_result_cache_default_disabled(self):
+        adapter = _make_adapter()
+        assert adapter.disable_result_cache is True
+
+    def test_admin_database_default(self):
+        adapter = _make_adapter()
+        assert adapter.admin_database == "dev"
+
+    def test_admin_database_custom(self):
+        adapter = _make_adapter(admin_database="shared_admin")
+        assert adapter.admin_database == "shared_admin"
+
+
+class TestLongRunningTimeout:
+    """Test _long_running_timeout() composes adaptive timeout with floor."""
+
+    @pytest.mark.parametrize(
+        "adaptive, floor, expected",
+        [
+            (10, 300, 300),  # floor wins when adaptive < floor
+            (300, 300, 300),  # equal
+            (600, 300, 600),  # adaptive wins when adaptive > floor
+            (10, 60, 60),  # custom floor
+        ],
+    )
+    def test_returns_max_of_adaptive_and_floor(self, adaptive, floor, expected):
+        adapter = _make_adapter()
+        with patch.object(RedshiftAdapter, "_resolve_connect_timeout", return_value=adaptive):
+            assert adapter._long_running_timeout(floor=floor) == expected
+
+    def test_default_floor_is_300(self):
+        adapter = _make_adapter()
+        with patch.object(RedshiftAdapter, "_resolve_connect_timeout", return_value=10):
+            assert adapter._long_running_timeout() == 300
+
+
+class TestGetConnectionParams:
+    """Test _get_connection_params builds correct dictionaries."""
+
+    def test_default_params(self):
+        adapter = _make_adapter()
+        params = adapter._get_connection_params()
+        assert params["host"] == "test-cluster.redshift.amazonaws.com"
+        assert params["port"] == 5439
+        assert params["database"] == "test_db"
+        assert params["user"] == "test_user"
+        assert params["password"] == "test_pass"
+        assert params["sslmode"] == "require"
+
+    def test_override_params(self):
+        adapter = _make_adapter()
+        params = adapter._get_connection_params(host="override.com", database="other_db")
+        assert params["host"] == "override.com"
+        assert params["database"] == "other_db"
+        # Non-overridden fields stay the same
+        assert params["user"] == "test_user"
+        assert params["port"] == 5439
+
+
+class TestQueryPlanGeneration:
+    """Test get_query_plan SQL generation."""
+
+    def test_explain_sql(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [
+            ("XN Seq Scan on orders  (cost=0.00..15.00 rows=1500 width=36)",),
+            ("  Output: o_orderkey, o_custkey",),
+        ]
+
+        plan = adapter.get_query_plan(mock_conn, "SELECT * FROM orders")
+        mock_cursor.execute.assert_called_once_with("EXPLAIN SELECT * FROM orders")
+        assert "XN Seq Scan on orders" in plan
+        assert "Output: o_orderkey, o_custkey" in plan
+        mock_cursor.close.assert_called_once()
+
+    def test_explain_failure_returns_error_message(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = Exception("permission denied")
+
+        plan = adapter.get_query_plan(mock_conn, "SELECT 1")
+        assert "Could not get query plan" in plan
+        assert "permission denied" in plan
+        mock_cursor.close.assert_called_once()
+
+
+class TestTuningClauseGeneration:
+    """Test generate_tuning_clause for various distribution/sorting configs."""
+
+    def test_distribution_and_sorting_combined(self):
+        adapter = _make_adapter()
+        mock_tuning = Mock()
+        mock_tuning.has_any_tuning.return_value = True
+
+        dist_col = Mock()
+        dist_col.name = "l_orderkey"
+        dist_col.order = 1
+        sort_col1 = Mock()
+        sort_col1.name = "l_shipdate"
+        sort_col1.order = 1
+        sort_col2 = Mock()
+        sort_col2.name = "l_returnflag"
+        sort_col2.order = 2
+
+        with patch("benchbox.core.tuning.interface.TuningType") as TT:
+            TT.DISTRIBUTION = "distribution"
+            TT.SORTING = "sorting"
+            TT.PARTITIONING = "partitioning"
+            TT.CLUSTERING = "clustering"
+
+            def get_cols(tt):
+                if tt == TT.DISTRIBUTION:
+                    return [dist_col]
+                if tt == TT.SORTING:
+                    return [sort_col2, sort_col1]  # out of order deliberately
+                return []
+
+            mock_tuning.get_columns_by_type.side_effect = get_cols
+            clause = adapter.generate_tuning_clause(mock_tuning)
+
+        assert "DISTSTYLE KEY" in clause
+        assert "DISTKEY (l_orderkey)" in clause
+        # Sort columns should be ordered by .order attribute
+        assert "SORTKEY (l_shipdate, l_returnflag)" in clause
+
+    def test_no_distribution_uses_even(self):
+        adapter = _make_adapter()
+        mock_tuning = Mock()
+        mock_tuning.has_any_tuning.return_value = True
+
+        with patch("benchbox.core.tuning.interface.TuningType") as TT:
+            TT.DISTRIBUTION = "distribution"
+            TT.SORTING = "sorting"
+            TT.PARTITIONING = "partitioning"
+            TT.CLUSTERING = "clustering"
+
+            mock_tuning.get_columns_by_type.return_value = []
+            clause = adapter.generate_tuning_clause(mock_tuning)
+
+        assert "DISTSTYLE EVEN" in clause
+        assert "DISTKEY" not in clause
+
+    def test_none_tuning_returns_empty(self):
+        adapter = _make_adapter()
+        assert adapter.generate_tuning_clause(None) == ""
+
+    def test_no_tuning_returns_empty(self):
+        adapter = _make_adapter()
+        mock_tuning = Mock()
+        mock_tuning.has_any_tuning.return_value = False
+        assert adapter.generate_tuning_clause(mock_tuning) == ""
+
+
+class TestGetPlatformInfo:
+    """Test get_platform_info without connection returns basic info."""
+
+    def test_basic_info_without_connection(self):
+        adapter = _make_adapter(
+            s3_bucket="mybkt",
+            iam_role="arn:aws:iam::999:role/R",
+        )
+        info = adapter.get_platform_info(connection=None)
+        assert info["platform_type"] == "redshift"
+        assert info["platform_name"] == "Redshift"
+        assert info["connection_mode"] == "remote"
+        assert info["cloud_provider"] == "AWS"
+        assert info["host"] == "test-cluster.redshift.amazonaws.com"
+        assert info["port"] == 5439
+        assert info["configuration"]["database"] == "test_db"
+        assert info["configuration"]["s3_bucket"] == "mybkt"
+        assert info["configuration"]["iam_role"] == "arn:aws:iam::999:role/R"
+        assert info["configuration"]["result_cache_enabled"] is False
+        assert info["configuration"]["deployment_type"] == "provisioned"
+        assert info["platform_version"] is None
+
+
+class TestUploadFileToS3:
+    """Test _upload_file_to_s3 key construction."""
+
+    def test_simple_csv_key(self):
+        import tempfile
+
+        adapter = _make_adapter(s3_bucket="bkt", s3_prefix="pfx")
+        mock_s3 = Mock()
+
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+            f.write(b"data")
+            fpath = Path(f.name)
+
+        try:
+            uri = adapter._upload_file_to_s3(mock_s3, fpath, "orders", 0)
+        finally:
+            fpath.unlink()
+
+        assert uri == "s3://bkt/pfx/orders_0.csv"
+        mock_s3.upload_file.assert_called_once_with(str(fpath), "bkt", "pfx/orders_0.csv")
+
+    def test_chunked_tbl_file_preserves_suffix(self):
+        import tempfile
+
+        adapter = _make_adapter(s3_bucket="bkt", s3_prefix="pfx")
+        mock_s3 = Mock()
+
+        # Simulate a file named "lineitem.tbl.1.zst"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fpath = Path(tmpdir) / "lineitem.tbl.1.zst"
+            fpath.write_bytes(b"data")
+
+            uri = adapter._upload_file_to_s3(mock_s3, fpath, "lineitem", 2)
+
+        assert uri == "s3://bkt/pfx/lineitem_2.tbl.1.zst"
+
+
+class TestFromConfigDatabaseGeneration:
+    """Test from_config database name generation."""
+
+    def test_explicit_database_preserved(self):
+        config = {
+            "host": "test-cluster.redshift.amazonaws.com",
+            "username": "u",
+            "password": "p",
+            "database": "my_explicit_db",
+            "benchmark": "tpch",
+            "scale_factor": 1.0,
+        }
+        adapter = RedshiftAdapter.from_config(config)
+        assert adapter.database == "my_explicit_db"
+
+    def test_generated_database_name_when_not_provided(self):
+        config = {
+            "host": "test-cluster.redshift.amazonaws.com",
+            "username": "u",
+            "password": "p",
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+        }
+        adapter = RedshiftAdapter.from_config(config)
+        # Should generate a name containing the benchmark name
+        assert "tpch" in adapter.database.lower()
+
+    def test_staging_root_s3_parsing(self):
+        adapter = _make_adapter(staging_root="s3://my-staging-bucket/some/prefix")
+        assert adapter.s3_bucket == "my-staging-bucket"
+        assert adapter.s3_prefix == "some/prefix"
+
+    def test_staging_root_non_s3_raises(self):
+        with pytest.raises(ValueError, match="requires S3"):
+            _make_adapter(staging_root="gs://gcs-bucket/path")

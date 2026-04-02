@@ -27,7 +27,8 @@ class TestTPCHSkewQueryRegistry:
     def test_registry_imports_successfully(self):
         from benchbox.core.tpch_skew.dataframe_queries import TPCH_SKEW_DATAFRAME_QUERIES
 
-        assert TPCH_SKEW_DATAFRAME_QUERIES is not None
+        assert len(TPCH_SKEW_DATAFRAME_QUERIES) > 0
+        assert hasattr(TPCH_SKEW_DATAFRAME_QUERIES, "get_query_ids")
 
     def test_registry_has_22_queries(self):
         from benchbox.core.tpch_skew.dataframe_queries import TPCH_SKEW_DATAFRAME_QUERIES

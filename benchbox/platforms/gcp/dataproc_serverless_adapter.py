@@ -134,6 +134,7 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, Platfor
         subnetwork_uri: str | None = None,
         timeout_minutes: int = 60,
         spark_config: dict[str, str] | None = None,
+        table_format: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the Dataproc Serverless adapter.
@@ -179,6 +180,7 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, Platfor
         self.network_uri = network_uri
         self.subnetwork_uri = subnetwork_uri
         self.timeout_minutes = timeout_minutes
+        self.table_format = table_format or "parquet"
 
         # Initialize staging using cloud-spark shared infrastructure
         self._staging: CloudSparkStaging | None = None
@@ -453,7 +455,7 @@ spark.stop()
 
             create_table_query = f"""
                 CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table}
-                USING PARQUET
+                USING {self.table_format.upper()}
                 LOCATION '{table_uri}'
             """
             self._submit_spark_sql_batch(create_table_query, wait_for_completion=True)
@@ -565,6 +567,7 @@ spark.stop()
             "network_uri": config.get("network_uri"),
             "subnetwork_uri": config.get("subnetwork_uri"),
             "timeout_minutes": config.get("timeout_minutes", 60),
+            "table_format": config.get("table_format"),
         }
 
         return cls(**params)

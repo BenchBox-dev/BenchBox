@@ -41,7 +41,7 @@ Use TigerData managed PostgreSQL service.
 - Requires SSL (`sslmode=require` by default)
 - Skips DROP/CREATE database management for managed environments
 - Uses `timescaledb:cloud` platform syntax
-- `TIGERDATA_*` environment variables are primary, `TIMESCALE_*` remain backward-compatible fallback
+- `TIGERDATA_*` environment variables are primary; `TIMESCALE_*` are also accepted as fallback
 
 ## Cloud Connection Setup
 
@@ -72,7 +72,7 @@ export TIGERDATA_DATABASE='tsdb'         # optional (default: tsdb)
 benchbox run --platform timescaledb:cloud --benchmark tpch --scale 0.01 --non-interactive
 ```
 
-Backward-compatible fallback (supported if `TIGERDATA_*` is unset):
+Fallback (used if `TIGERDATA_*` is unset):
 
 ```bash
 export TIMESCALE_HOST='abc123.rc8ft3nbrw.tsdb.cloud.timescale.com'

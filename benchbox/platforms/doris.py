@@ -45,6 +45,7 @@ from ..utils.dependencies import (
 )
 from ..utils.file_format import get_delimiter_for_file, is_tpc_format
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.sql_execution import execute_sql_query
 
 # Doris dialect for SQLGlot
 DORIS_DIALECT = "doris"
@@ -827,52 +828,17 @@ class DorisAdapter(PlatformAdapter):
         stream_id: int | None = None,
     ) -> dict[str, Any]:
         """Execute a single query and return detailed results."""
-        start_time = mono_time()
-        self.log_verbose(f"Executing query {query_id}")
-
-        try:
-            cursor = connection.cursor()
-            cursor.execute(query)
-            results = cursor.fetchall()
-            cursor.close()
-
-            execution_time = elapsed_seconds(start_time)
-            actual_row_count = len(results)
-
-            # Validate row count if enabled
-            validation_result = None
-            if validate_row_count and benchmark_type:
-                from benchbox.core.validation.query_validation import QueryValidator
-
-                validator = QueryValidator()
-                validation_result = validator.validate_query_result(
-                    benchmark_type=benchmark_type,
-                    query_id=query_id,
-                    actual_row_count=actual_row_count,
-                    scale_factor=scale_factor,
-                    stream_id=stream_id,
-                )
-
-            result = self._build_query_result_with_validation(
-                query_id=query_id,
-                execution_time=execution_time,
-                actual_row_count=actual_row_count,
-                first_row=results[0] if results else None,
-                validation_result=validation_result,
-            )
-
-            return result
-
-        except Exception as e:
-            execution_time = elapsed_seconds(start_time)
-            return {
-                "query_id": query_id,
-                "status": "FAILED",
-                "execution_time_seconds": execution_time,
-                "rows_returned": 0,
-                "error": str(e),
-                "error_type": type(e).__name__,
-            }
+        return execute_sql_query(
+            connection,
+            query,
+            query_id,
+            log_verbose=self.log_verbose,
+            build_query_result_with_validation=self._build_query_result_with_validation,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
 
     def get_query_plan(
         self,

@@ -7,7 +7,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import pytest
 
-from benchbox.core.aiml_functions.data import AIMLDataGenerator, LongText, SampleText
+from benchbox.experimental.aiml_functions.data import AIMLDataGenerator, LongText, SampleText
 
 pytestmark = [
     pytest.mark.unit,

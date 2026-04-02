@@ -15,7 +15,7 @@ from benchbox.core.data_organization.sorting import SortedParquetWriter
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.fast,
+    pytest.mark.medium,
     pytest.mark.resource_heavy,
 ]
 

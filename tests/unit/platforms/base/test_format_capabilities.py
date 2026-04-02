@@ -163,8 +163,10 @@ class TestFormatCapabilities:
             assert DELTA_CAPABILITY.supported_platforms[platform] == level, (
                 f"Expected {level} delta support for {platform}"
             )
+        # synapse-spark now has native delta support via table_format parameter
+        assert DELTA_CAPABILITY.supported_platforms["synapse-spark"] == SupportLevel.NATIVE
         # Platforms that require mode-aware external handling stay out of the native registry
-        for platform in ["snowflake", "clickhouse", "redshift", "bigquery", "fabric-lakehouse", "synapse-spark"]:
+        for platform in ["snowflake", "clickhouse", "redshift", "bigquery", "fabric-lakehouse"]:
             assert platform not in DELTA_CAPABILITY.supported_platforms, (
                 f"{platform} should not be registered in native capabilities"
             )
@@ -262,21 +264,21 @@ class TestPlatformFormatPreferences:
         assert "hudi" in prefs
 
     def test_synapse_spark_preferences(self):
-        """Test Synapse Spark only parquet (no adapter loading code for delta)."""
+        """Test Synapse Spark supports delta and iceberg via table_format parameter."""
         prefs = PLATFORM_FORMAT_PREFERENCES["synapse-spark"]
-        assert prefs[0] == "parquet"
-        assert "delta" not in prefs
-        assert "iceberg" not in prefs
+        assert prefs[0] == "delta"
+        assert "iceberg" in prefs
+        assert "parquet" in prefs
 
     def test_athena_spark_preferences(self):
-        """Test Athena Spark only supports parquet (no delta/iceberg)."""
+        """Test Athena Spark supports delta and iceberg via table_format parameter."""
         prefs = PLATFORM_FORMAT_PREFERENCES["athena-spark"]
-        assert prefs[0] == "parquet"
-        assert "delta" not in prefs
-        assert "iceberg" not in prefs
+        assert prefs[0] == "delta"
+        assert "iceberg" in prefs
+        assert "parquet" in prefs
 
     def test_fabric_lakehouse_preferences(self):
-        """Test Fabric Lakehouse only parquet (no adapter loading code for delta)."""
+        """Test Fabric Lakehouse prefers parquet (read-only SQL endpoint, data loaded via Spark)."""
         prefs = PLATFORM_FORMAT_PREFERENCES["fabric-lakehouse"]
         assert prefs[0] == "parquet"
         assert "delta" not in prefs
@@ -289,7 +291,7 @@ class TestPlatformFormatPreferences:
         assert "delta" in prefs
 
     def test_lakesail_preferences(self):
-        """Test LakeSail only supports parquet (adapter restricts to parquet/orc)."""
+        """Test LakeSail prefers parquet (Spark-based, parquet/orc are native table formats)."""
         prefs = PLATFORM_FORMAT_PREFERENCES["lakesail"]
         assert prefs[0] == "parquet"
         assert "delta" not in prefs
@@ -306,6 +308,8 @@ class TestPlatformFormatPreferences:
     def test_bigquery_native_preferences_exclude_delta(self):
         """Test BigQuery native preferences stay conservative."""
         prefs = PLATFORM_FORMAT_PREFERENCES["bigquery"]
+        assert prefs[0] == "parquet"
+        assert prefs.index("tbl") < prefs.index("csv")
         assert "parquet" in prefs
         assert "delta" not in prefs
 
@@ -314,6 +318,7 @@ class TestPlatformFormatPreferences:
         prefs = PLATFORM_FORMAT_PREFERENCES["redshift"]
         assert "parquet" in prefs
         assert "delta" not in prefs
+        assert prefs.index("tbl") < prefs.index("parquet")
 
     def test_clickhouse_native_preferences_exclude_delta_or_iceberg(self):
         """Test ClickHouse native preferences stay conservative."""
@@ -332,8 +337,8 @@ class TestGetSupportedFormats:
         assert "parquet" in formats
         assert "delta" in formats
         assert "tbl" in formats
-        # Check ordering (should be by preference)
-        assert formats.index("parquet") < formats.index("tbl")
+        # Text files preferred over binary formats for native loading
+        assert formats.index("tbl") < formats.index("parquet")
 
     def test_datafusion_supported_formats(self):
         """Test DataFusion supported formats."""
@@ -455,9 +460,9 @@ class TestGetPreferredFormat:
 
     def test_duckdb_preferred_format(self):
         """Test DuckDB preferred format."""
-        # No available formats specified - returns most preferred
+        # No available formats specified - returns most preferred (text files)
         preferred = get_preferred_format("duckdb")
-        assert preferred == "parquet"
+        assert preferred == "tbl"
 
     def test_duckdb_with_available_formats(self):
         """Test DuckDB with specific available formats."""
@@ -465,9 +470,9 @@ class TestGetPreferredFormat:
         preferred = get_preferred_format("duckdb", ["tbl", "csv"])
         assert preferred == "tbl"
 
-        # When parquet available
+        # When both available, text files preferred
         preferred = get_preferred_format("duckdb", ["tbl", "parquet"])
-        assert preferred == "parquet"
+        assert preferred == "tbl"
 
     def test_databricks_preferred_format(self):
         """Test Databricks preferred format."""
@@ -495,7 +500,7 @@ class TestGetPreferredFormat:
         """Test fallback to most preferred when no available formats specified."""
         # When no available formats specified, returns most preferred supported format
         preferred = get_preferred_format("duckdb", [])
-        assert preferred == "parquet"  # DuckDB's most preferred format
+        assert preferred == "tbl"  # DuckDB's most preferred format (text files)
 
     def test_fallback_to_first_available(self):
         """Test fallback to first available format."""

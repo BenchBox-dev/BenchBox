@@ -22,6 +22,27 @@ from benchbox.core.analysis.models import (
 # Minimum sample size for reliable statistical tests
 MIN_SAMPLE_SIZE = 3
 
+# T-critical values for common confidence levels (two-tailed).
+# Each confidence level maps to a sorted list of (max_n, t_value) tuples.
+# The first entry whose threshold >= n is selected; the final entry
+# (math.inf) serves as the large-sample z-value fallback.
+_T_CRITICAL: dict[float, list[tuple[float, float]]] = {
+    0.95: [
+        (5, 2.776),
+        (10, 2.262),
+        (20, 2.093),
+        (30, 2.045),
+        (math.inf, 1.96),
+    ],
+    0.99: [
+        (5, 4.604),
+        (10, 3.250),
+        (20, 2.861),
+        (30, 2.756),
+        (math.inf, 2.576),
+    ],
+}
+
 # P-value thresholds for significance levels
 P_VALUE_SIGNIFICANT = 0.05
 P_VALUE_HIGHLY_SIGNIFICANT = 0.01
@@ -160,6 +181,22 @@ def calculate_coefficient_of_variation(values: list[float]) -> float:
     return std_dev / mean
 
 
+def _lookup_t_critical(confidence_level: float, n: int) -> float:
+    """Look up the t-critical value for a given confidence level and sample size.
+
+    Falls back to the 95% z-value (1.96) for unsupported confidence levels.
+    """
+    thresholds = _T_CRITICAL.get(confidence_level)
+    if thresholds is None:
+        return 1.96
+    for max_n, t_value in thresholds:
+        if n <= max_n:
+            return t_value
+    # Should not be reached since the last entry uses math.inf,
+    # but return the final value as a safeguard.
+    return thresholds[-1][1]
+
+
 def calculate_confidence_interval(
     values: list[float],
     confidence_level: float = 0.95,
@@ -190,34 +227,7 @@ def calculate_confidence_interval(
     std_dev = calculate_std_dev(values, mean)
     std_err = std_dev / math.sqrt(n)
 
-    # T-critical values for common confidence levels (two-tailed)
-    # Using degrees of freedom = n - 1
-    # These are approximations; for n >= 30, these converge to z-values
-    if confidence_level == 0.95:
-        if n <= 5:
-            t_critical = 2.776
-        elif n <= 10:
-            t_critical = 2.262
-        elif n <= 20:
-            t_critical = 2.093
-        elif n <= 30:
-            t_critical = 2.045
-        else:
-            t_critical = 1.96  # z-value approximation
-    elif confidence_level == 0.99:
-        if n <= 5:
-            t_critical = 4.604
-        elif n <= 10:
-            t_critical = 3.250
-        elif n <= 20:
-            t_critical = 2.861
-        elif n <= 30:
-            t_critical = 2.756
-        else:
-            t_critical = 2.576
-    else:
-        # Default to 95% CI z-value
-        t_critical = 1.96
+    t_critical = _lookup_t_critical(confidence_level, n)
 
     margin_of_error = t_critical * std_err
 

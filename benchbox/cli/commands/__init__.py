@@ -17,10 +17,10 @@ from .config import validate
 from .convert import convert
 from .datagen import datagen
 from .df_tuning import df_tuning_group
+from .download_answers import download_answers
 from .export import export
 from .metrics import metrics_group
 from .plan_history import plan_history
-from .plot import plot
 from .profile import profile
 from .report import report
 from .results import results
@@ -44,7 +44,6 @@ COMMANDS = (
     show_plan,
     datagen,
     aggregate,
-    plot,
     metrics_group,  # New unified metrics group
     calculate_qphh,  # Deprecated: hidden, kept for backwards compatibility
     shell,
@@ -56,6 +55,7 @@ COMMANDS = (
     df_tuning_group,  # Deprecated: hidden, kept for backwards compatibility
     export,
     check_dependencies,
+    download_answers,
     results,
     report,
     setup_credentials,
@@ -83,7 +83,6 @@ __all__ = [
     "show_plan",
     "datagen",
     "aggregate",
-    "plot",
     "metrics_group",
     "calculate_qphh",
     "shell",
@@ -95,6 +94,7 @@ __all__ = [
     "df_tuning_group",
     "export",
     "check_dependencies",
+    "download_answers",
     "results",
     "report",
     "setup_credentials",

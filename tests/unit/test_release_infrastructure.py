@@ -8,6 +8,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -409,3 +410,145 @@ class TestPackageMetadata:
         project = config["project"]
         assert "scripts" in project
         assert "benchbox" in project["scripts"]
+
+
+class TestBetaReleaseSurface:
+    """Ratchet tests for Beta release-surface coherence.
+
+    These assertions prevent the status/install/packaging drift that was
+    found in the 2026-04-01 pre-Beta review from recurring silently.
+    """
+
+    REPO_ROOT = Path(__file__).parent.parent.parent
+
+    # Canonical current-state entry-point docs where release status must be Beta.
+    STATUS_DOCS = [
+        "README.md",
+        "docs/usage/faq.md",
+    ]
+
+    # Canonical install docs that must not claim DuckDB ships with the plain install.
+    INSTALL_DOCS = [
+        "README.md",
+        "docs/usage/installation.md",
+        "docs/platforms/platform-selection-guide.md",
+        "docs/platforms/duckdb.md",
+        "docs/usage/faq.md",
+    ]
+
+    # Stale phrases that must not appear in canonical install docs.
+    DUCKDB_DEFAULT_PHRASES = [
+        "DuckDB is included with BenchBox by default",
+        "included by default with BenchBox",
+        "DuckDB is automatically installed as a dependency",
+        "works with DuckDB out of the box",
+        "DuckDB is embedded and ready to go",
+    ]
+
+    def test_pyproject_has_beta_classifier(self):
+        """pyproject.toml must carry the Beta Development Status classifier."""
+        pyproject_path = self.REPO_ROOT / "pyproject.toml"
+        with open(pyproject_path, "rb") as f:
+            config = tomllib.load(f)
+        classifiers = config["project"].get("classifiers", [])
+        beta_classifiers = [c for c in classifiers if "4 - Beta" in c]
+        assert beta_classifiers, (
+            "pyproject.toml must have a '4 - Beta' Development Status classifier. "
+            "Found classifiers: " + str(classifiers)
+        )
+
+    def test_canonical_docs_say_beta_not_alpha(self):
+        """README and FAQ must describe Beta status, not Alpha."""
+        alpha_pattern = re.compile(
+            r"\b(alpha software|is ALPHA software|Status-Alpha|## Alpha Software)\b",
+            re.IGNORECASE,
+        )
+        for rel_path in self.STATUS_DOCS:
+            path = self.REPO_ROOT / rel_path
+            if not path.exists():
+                continue
+            content = path.read_text(encoding="utf-8")
+            match = alpha_pattern.search(content)
+            assert match is None, (
+                f"{rel_path} still contains Alpha status language: {match.group()!r}. "
+                "Update it to Beta before releasing."
+            )
+
+    def test_install_docs_do_not_claim_duckdb_is_default(self):
+        """Install docs must not claim DuckDB ships with the plain base install."""
+        for rel_path in self.INSTALL_DOCS:
+            path = self.REPO_ROOT / rel_path
+            if not path.exists():
+                continue
+            content = path.read_text(encoding="utf-8")
+            for phrase in self.DUCKDB_DEFAULT_PHRASES:
+                assert phrase not in content, (
+                    f"{rel_path} claims DuckDB is a default dependency ({phrase!r}). "
+                    "DuckDB is an optional extra ([duckdb]). "
+                    "Fix the docs or update pyproject.toml dependencies to match."
+                )
+
+    def test_duckdb_is_optional_in_pyproject(self):
+        """DuckDB must be listed as an optional extra, not a core dependency."""
+        pyproject_path = self.REPO_ROOT / "pyproject.toml"
+        with open(pyproject_path, "rb") as f:
+            config = tomllib.load(f)
+        core_deps = config["project"].get("dependencies", [])
+        duckdb_in_core = [d for d in core_deps if d.startswith("duckdb")]
+        assert not duckdb_in_core, (
+            "DuckDB must stay in [project.optional-dependencies], not [project.dependencies]. "
+            "If you intentionally restored it to core deps, also update all install docs "
+            "to remove the [duckdb] extra requirement."
+        )
+        optional_deps = config["project"].get("optional-dependencies", {})
+        assert "duckdb" in optional_deps, (
+            "Expected a 'duckdb' entry in [project.optional-dependencies]. "
+            "If the extra was renamed or removed, update this test and all install docs."
+        )
+
+    def test_experimental_not_in_benchbox_all(self):
+        """benchbox.experimental must not be re-exported via benchbox.__all__."""
+        import benchbox
+
+        public_exports = getattr(benchbox, "__all__", [])
+        experimental_exports = [name for name in public_exports if "experimental" in name.lower()]
+        assert not experimental_exports, "benchbox.__all__ must not expose the experimental namespace: " + str(
+            experimental_exports
+        )
+
+    def test_experimental_namespace_has_unsupported_docstring(self):
+        """benchbox/experimental/__init__.py must document that it is unsupported."""
+        exp_init = self.REPO_ROOT / "benchbox" / "experimental" / "__init__.py"
+        assert exp_init.exists(), "benchbox/experimental/__init__.py must exist"
+        content = exp_init.read_text(encoding="utf-8")
+        assert "unsupported" in content.lower(), (
+            "benchbox/experimental/__init__.py must contain the word 'unsupported' "
+            "to document the Beta support boundary. "
+            "Do not silently expand the supported product surface."
+        )
+
+    @pytest.mark.slow
+    def test_ty_clean_on_beta_critical_entrypoints(self):
+        """Release-critical entrypoints must produce zero ty diagnostics.
+
+        Keeps the targeted typecheck gate durable without expanding to the
+        full repository backlog.  Mark @slow so it only runs in CI and on
+        explicit slow-test invocations, not on every fast-test pass.
+        """
+        import subprocess
+
+        beta_critical = [
+            "benchbox/cli/commands/run.py",
+            "benchbox/base.py",
+            "benchbox/__init__.py",
+        ]
+        result = subprocess.run(
+            ["uv", "run", "ty", "check", *beta_critical],
+            cwd=self.REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, (
+            "ty check reported diagnostics on Beta-critical entrypoints.\n"
+            "Fix the diagnostics before releasing Beta:\n" + result.stdout + result.stderr
+        )

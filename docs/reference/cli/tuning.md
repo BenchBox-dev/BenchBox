@@ -10,10 +10,6 @@ Commands for creating and managing tuning configurations for SQL and DataFrame p
 
 Generate sample unified tuning configurations for specific platforms.
 
-```{note}
-The `create-sample-tuning` command is deprecated. Use `tuning init` instead.
-```
-
 ### Options
 
 - `--platform TEXT`: Target platform (required) - duckdb, databricks, snowflake, etc.
@@ -30,78 +26,46 @@ benchbox tuning init --platform snowflake \
   --output ./configs/snowflake-tuning.yaml
 ```
 
-(cli-df-tuning)=
-## `df-tuning` - DataFrame Tuning Configuration
+(cli-tuning-dataframe)=
+## DataFrame Tuning via `tuning` Commands
 
-Manage tuning configurations for DataFrame platforms. Create sample configurations, validate existing configs, and view smart defaults for your system.
+The unified `tuning` command group handles both SQL and DataFrame platforms.
+Use `--mode dataframe` (or let it auto-detect from the platform name).
 
-### Subcommands
-
-#### `df-tuning create-sample` - Create Sample Configuration
-
-Generate a sample tuning configuration file for a specific DataFrame platform.
-
-**Options:**
-- `--platform TEXT`: Target DataFrame platform (required): `polars`, `pandas`, `dask`, `modin`, `cudf`
-- `--output TEXT`: Output file path (default: `{platform}_tuning.yaml`)
-- `--smart-defaults`: Include auto-detected system-optimal settings
-
-**Usage Examples:**
+### Create DataFrame Tuning Configuration
 
 ```bash
-# Create sample Polars tuning config
-benchbox df-tuning create-sample --platform polars
+# Create sample Polars tuning config (auto-detects DataFrame mode)
+benchbox tuning init --platform polars
 
 # Create with smart defaults based on your system
-benchbox df-tuning create-sample --platform polars --smart-defaults
+benchbox tuning init --platform polars --smart-defaults
+
+# Explicit DataFrame mode with profile
+benchbox tuning init --platform pandas --mode dataframe --profile memory-constrained
 
 # Custom output path
-benchbox df-tuning create-sample --platform pandas --output ./configs/pandas_tuning.yaml
+benchbox tuning init --platform dask --output ./configs/dask_tuning.yaml
 ```
 
-#### `df-tuning validate` - Validate Configuration
+**Options for DataFrame mode:**
 
-Validate a DataFrame tuning configuration file for errors and warnings.
+- `--platform TEXT`: Target platform (`polars`, `pandas`, `dask`, `modin`, `cudf`)
+- `--mode [sql|dataframe|auto]`: Tuning mode (default: auto)
+- `--profile [default|optimized|streaming|memory-constrained|gpu]`: Configuration profile
+- `--output TEXT`: Output file path
+- `--smart-defaults`: Use auto-detected system-optimal settings
 
-**Options:**
-- `CONFIG_FILE`: Path to configuration file to validate (required)
-- `--platform TEXT`: Target platform for validation (auto-detected from config if not specified)
-
-**Usage Examples:**
+### Validate Configuration
 
 ```bash
-# Validate a configuration file
-benchbox df-tuning validate polars_tuning.yaml
-
-# Validate with explicit platform
-benchbox df-tuning validate my_config.yaml --platform polars
+benchbox tuning validate polars_tuning.yaml --platform polars
 ```
 
-#### `df-tuning show-defaults` - Show Smart Defaults
-
-Display recommended tuning settings based on your system profile.
-
-**Options:**
-- `--platform TEXT`: Target DataFrame platform (required)
-
-**Usage Examples:**
+### Show Smart Defaults
 
 ```bash
-# Show defaults for Polars
-benchbox df-tuning show-defaults --platform polars
-
-# Show defaults for Dask
-benchbox df-tuning show-defaults --platform dask
-```
-
-#### `df-tuning list-platforms` - List Supported Platforms
-
-List all DataFrame platforms that support tuning configuration.
-
-**Usage:**
-
-```bash
-benchbox df-tuning list-platforms
+benchbox tuning defaults --platform polars
 ```
 
 ## Configuration Categories

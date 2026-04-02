@@ -15,7 +15,8 @@ from __future__ import annotations
 import json
 import os
 import sys
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 import yaml
@@ -38,6 +39,13 @@ def cred_file(tmp_path):
         return CredentialManager(credentials_path=path)
 
     return _make
+
+
+def _make_module(name: str, **attrs) -> ModuleType:
+    module = ModuleType(name)
+    for key, value in attrs.items():
+        setattr(module, key, value)
+    return module
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +273,72 @@ class TestSnowflakeValidation:
             monkeypatch.delenv(var, raising=False)
         assert snowflake._auto_detect_snowflake(console) is None
 
+    def test_validation_succeeds_with_schema_and_role(self, cred_file, monkeypatch):
+        from benchbox.platforms.credentials import snowflake
+
+        mgr = cred_file(
+            {
+                "snowflake": {
+                    "account": "org-acct",
+                    "username": "user",
+                    "password": "pwd",
+                    "warehouse": "COMPUTE_WH",
+                    "database": "BENCHBOX",
+                    "schema": "ANALYTICS",
+                    "role": "REPORTING",
+                }
+            }
+        )
+        cursor = Mock()
+        connection = Mock()
+        connection.cursor.return_value = cursor
+        connector = _make_module("snowflake.connector", connect=Mock(return_value=connection))
+        snowflake_pkg = _make_module("snowflake", connector=connector)
+
+        monkeypatch.setitem(sys.modules, "snowflake", snowflake_pkg)
+        monkeypatch.setitem(sys.modules, "snowflake.connector", connector)
+
+        ok, err = snowflake.validate_snowflake_credentials(mgr)
+
+        assert (ok, err) == (True, None)
+        connect_kwargs = connector.connect.call_args.kwargs
+        assert connect_kwargs["user"] == "user"
+        assert connect_kwargs["schema"] == "ANALYTICS"
+        assert connect_kwargs["role"] == "REPORTING"
+        assert [call.args[0] for call in cursor.execute.call_args_list] == [
+            "SELECT 1",
+            "SELECT CURRENT_WAREHOUSE()",
+            "SELECT CURRENT_DATABASE()",
+        ]
+
+    def test_validation_maps_authentication_errors(self, cred_file, monkeypatch):
+        from benchbox.platforms.credentials import snowflake
+
+        mgr = cred_file(
+            {
+                "snowflake": {
+                    "account": "org-acct",
+                    "username": "user",
+                    "password": "bad-password",
+                    "warehouse": "COMPUTE_WH",
+                    "database": "BENCHBOX",
+                }
+            }
+        )
+        connector = _make_module(
+            "snowflake.connector",
+            connect=Mock(side_effect=Exception("Incorrect username or password was specified")),
+        )
+        snowflake_pkg = _make_module("snowflake", connector=connector)
+
+        monkeypatch.setitem(sys.modules, "snowflake", snowflake_pkg)
+        monkeypatch.setitem(sys.modules, "snowflake.connector", connector)
+
+        ok, err = snowflake.validate_snowflake_credentials(mgr)
+
+        assert ok is False
+        assert err == "Authentication failed. Check your username and password."
+
 
 class TestDatabricksValidation:
     def test_missing_credentials(self, cred_file):
@@ -282,6 +356,133 @@ class TestDatabricksValidation:
         ok, err = dbx.validate_databricks_credentials(mgr)
         assert ok is False
         assert "Missing required fields" in err
+
+    def test_validation_succeeds_and_uses_catalog(self, cred_file, monkeypatch):
+        from benchbox.platforms.databricks import credentials as dbx
+
+        mgr = cred_file(
+            {
+                "databricks": {
+                    "server_hostname": "workspace.cloud.databricks.com",
+                    "http_path": "/sql/1.0/warehouses/abc123",
+                    "access_token": "token",
+                    "catalog": "main",
+                }
+            }
+        )
+        cursor = Mock()
+        connection = Mock()
+        connection.cursor.return_value = cursor
+        sql_module = _make_module("databricks.sql", connect=Mock(return_value=connection))
+        databricks_pkg = _make_module("databricks", sql=sql_module)
+
+        monkeypatch.setitem(sys.modules, "databricks", databricks_pkg)
+        monkeypatch.setitem(sys.modules, "databricks.sql", sql_module)
+
+        ok, err = dbx.validate_databricks_credentials(mgr)
+
+        assert (ok, err) == (True, None)
+        assert [call.args[0] for call in cursor.execute.call_args_list] == ["SELECT 1", "USE CATALOG main"]
+
+    def test_validation_maps_catalog_errors(self, cred_file, monkeypatch):
+        from benchbox.platforms.databricks import credentials as dbx
+
+        mgr = cred_file(
+            {
+                "databricks": {
+                    "server_hostname": "workspace.cloud.databricks.com",
+                    "http_path": "/sql/1.0/warehouses/abc123",
+                    "access_token": "token",
+                    "catalog": "finance",
+                }
+            }
+        )
+        cursor = Mock()
+        cursor.execute.side_effect = [None, Exception("Catalog finance not found")]
+        connection = Mock()
+        connection.cursor.return_value = cursor
+        sql_module = _make_module("databricks.sql", connect=Mock(return_value=connection))
+        databricks_pkg = _make_module("databricks", sql=sql_module)
+
+        monkeypatch.setitem(sys.modules, "databricks", databricks_pkg)
+        monkeypatch.setitem(sys.modules, "databricks.sql", sql_module)
+
+        ok, err = dbx.validate_databricks_credentials(mgr)
+
+        assert ok is False
+        assert err == "Catalog 'finance' not found or not accessible."
+
+
+class TestDatabricksAutoDetect:
+    def test_auto_detect_returns_none_for_missing_sql_warehouses(self, monkeypatch):
+        from benchbox.platforms.databricks import credentials as dbx
+
+        workspace = SimpleNamespace(
+            config=SimpleNamespace(host="https://workspace.cloud.databricks.com", token="token"),
+            api_client=object(),
+        )
+
+        class FakeWarehousesAPI:
+            def __init__(self, api_client):
+                self.api_client = api_client
+
+            def list(self):
+                return []
+
+        sdk_module = _make_module("databricks.sdk", WorkspaceClient=lambda: workspace)
+        sql_service_module = _make_module("databricks.sdk.service.sql", WarehousesAPI=FakeWarehousesAPI)
+        service_module = _make_module("databricks.sdk.service", sql=sql_service_module)
+        databricks_pkg = _make_module("databricks", sdk=sdk_module)
+        sdk_module.service = service_module
+
+        monkeypatch.setitem(sys.modules, "databricks", databricks_pkg)
+        monkeypatch.setitem(sys.modules, "databricks.sdk", sdk_module)
+        monkeypatch.setitem(sys.modules, "databricks.sdk.service", service_module)
+        monkeypatch.setitem(sys.modules, "databricks.sdk.service.sql", sql_service_module)
+
+        result = dbx._auto_detect_databricks(SimpleNamespace(print=lambda *a, **k: None))
+
+        assert result == {
+            "server_hostname": "workspace.cloud.databricks.com",
+            "http_path": None,
+            "access_token": "token",
+        }
+
+    def test_auto_detect_selects_running_warehouse(self, monkeypatch):
+        from benchbox.platforms.databricks import credentials as dbx
+
+        workspace = SimpleNamespace(
+            config=SimpleNamespace(host="https://workspace.cloud.databricks.com", token="token"),
+            api_client=object(),
+        )
+        warehouse = SimpleNamespace(name="Analytics", cluster_size="2X-Small", id="abc123", state="RUNNING")
+
+        class FakeWarehousesAPI:
+            def __init__(self, api_client):
+                self.api_client = api_client
+
+            def list(self):
+                return [warehouse]
+
+        sdk_module = _make_module("databricks.sdk", WorkspaceClient=lambda: workspace)
+        sql_service_module = _make_module("databricks.sdk.service.sql", WarehousesAPI=FakeWarehousesAPI)
+        service_module = _make_module("databricks.sdk.service", sql=sql_service_module)
+        databricks_pkg = _make_module("databricks", sdk=sdk_module)
+        sdk_module.service = service_module
+
+        monkeypatch.setitem(sys.modules, "databricks", databricks_pkg)
+        monkeypatch.setitem(sys.modules, "databricks.sdk", sdk_module)
+        monkeypatch.setitem(sys.modules, "databricks.sdk.service", service_module)
+        monkeypatch.setitem(sys.modules, "databricks.sdk.service.sql", sql_service_module)
+        monkeypatch.setattr(dbx.IntPrompt, "ask", lambda *args, **kwargs: 1)
+
+        result = dbx._auto_detect_databricks(SimpleNamespace(print=lambda *a, **k: None))
+
+        assert result == {
+            "server_hostname": "workspace.cloud.databricks.com",
+            "http_path": "/sql/1.0/warehouses/abc123",
+            "access_token": "token",
+        }
 
 
 class TestBigQueryValidation:
@@ -349,6 +550,118 @@ class TestBigQueryValidation:
         assert detected["dataset_id"] == "benchbox"
         assert detected["location"] == "US"
 
+    def test_credentials_path_must_be_a_file(self, cred_file, tmp_path):
+        from benchbox.platforms.credentials import bigquery
+
+        creds_dir = tmp_path / "creds-dir"
+        creds_dir.mkdir()
+        mgr = cred_file(
+            {
+                "bigquery": {
+                    "project_id": "p",
+                    "credentials_path": str(creds_dir),
+                }
+            }
+        )
+
+        ok, err = bigquery.validate_bigquery_credentials(mgr)
+
+        assert ok is False
+        assert err == f"Credentials path is not a file: {creds_dir}"
+
+    def test_validation_maps_permission_denied_errors(self, cred_file, monkeypatch, tmp_path):
+        from benchbox.platforms.credentials import bigquery
+
+        creds_file = tmp_path / "svc.json"
+        creds_file.write_text(json.dumps({"type": "service_account"}))
+        mgr = cred_file(
+            {
+                "bigquery": {
+                    "project_id": "proj",
+                    "credentials_path": str(creds_file),
+                }
+            }
+        )
+        client = Mock()
+        client.query.side_effect = Exception("403 Permission denied")
+        bigquery_module = _make_module(
+            "google.cloud.bigquery",
+            Client=SimpleNamespace(from_service_account_json=Mock(return_value=client)),
+        )
+        cloud_module = _make_module("google.cloud", bigquery=bigquery_module)
+        google_module = _make_module("google", cloud=cloud_module)
+
+        monkeypatch.setitem(sys.modules, "google", google_module)
+        monkeypatch.setitem(sys.modules, "google.cloud", cloud_module)
+        monkeypatch.setitem(sys.modules, "google.cloud.bigquery", bigquery_module)
+
+        ok, err = bigquery.validate_bigquery_credentials(mgr)
+
+        assert ok is False
+        assert err == "Permission denied. Service account needs BigQuery Data Editor and BigQuery Job User roles."
+
+    def test_validation_checks_storage_bucket_access(self, cred_file, monkeypatch, tmp_path):
+        from benchbox.platforms.credentials import bigquery
+
+        creds_file = tmp_path / "svc.json"
+        creds_file.write_text(json.dumps({"type": "service_account"}))
+        mgr = cred_file(
+            {
+                "bigquery": {
+                    "project_id": "proj",
+                    "credentials_path": str(creds_file),
+                    "storage_bucket": "benchbox-data",
+                }
+            }
+        )
+        first_job = Mock()
+        first_job.result.return_value = []
+        second_job = Mock()
+        second_job.result.return_value = [SimpleNamespace(project="proj")]
+        query_client = Mock()
+        query_client.query.side_effect = [first_job, second_job]
+        query_client.list_datasets.return_value = []
+
+        bucket = Mock()
+        bucket.reload.side_effect = Exception("403 forbidden")
+        storage_client = Mock()
+        storage_client.bucket.return_value = bucket
+
+        bigquery_module = _make_module(
+            "google.cloud.bigquery",
+            Client=SimpleNamespace(from_service_account_json=Mock(return_value=query_client)),
+        )
+        storage_module = _make_module(
+            "google.cloud.storage",
+            Client=SimpleNamespace(from_service_account_json=Mock(return_value=storage_client)),
+        )
+        cloud_module = _make_module("google.cloud", bigquery=bigquery_module, storage=storage_module)
+        google_module = _make_module("google", cloud=cloud_module)
+
+        monkeypatch.setitem(sys.modules, "google", google_module)
+        monkeypatch.setitem(sys.modules, "google.cloud", cloud_module)
+        monkeypatch.setitem(sys.modules, "google.cloud.bigquery", bigquery_module)
+        monkeypatch.setitem(sys.modules, "google.cloud.storage", storage_module)
+
+        ok, err = bigquery.validate_bigquery_credentials(mgr)
+
+        assert ok is False
+        assert err == (
+            "No access to Cloud Storage bucket 'benchbox-data'. Service account needs Storage Object Admin role"
+        )
+
+    def test_auto_detect_returns_none_when_credentials_file_is_missing(self, monkeypatch, tmp_path):
+        from benchbox.platforms.credentials import bigquery
+
+        console = Mock()
+        monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(tmp_path / "missing.json"))
+        monkeypatch.setenv("BIGQUERY_PROJECT", "proj")
+
+        detected = bigquery._auto_detect_bigquery(console)
+
+        assert detected is None
+        assert "Credentials file not found" in str(console.print.call_args_list[0])
+
 
 class TestRedshiftValidation:
     def test_missing_credentials(self, cred_file):
@@ -380,6 +693,206 @@ class TestRedshiftValidation:
         assert detected is not None
         assert detected["port"] == 5439
 
+    def test_auto_detect_invalid_port_falls_back_to_default(self, monkeypatch):
+        from benchbox.platforms.credentials import redshift as rs
+
+        console = SimpleNamespace(print=lambda *a, **k: None)
+        monkeypatch.setenv("REDSHIFT_HOST", "cluster.redshift.amazonaws.com")
+        monkeypatch.setenv("REDSHIFT_DATABASE", "dev")
+        monkeypatch.setenv("REDSHIFT_USERNAME", "admin")
+        monkeypatch.setenv("REDSHIFT_PASSWORD", "pw")
+        monkeypatch.setenv("REDSHIFT_PORT", "not-a-port")
+
+        detected = rs._auto_detect_redshift(console)
+
+        assert detected is not None
+        assert detected["port"] == 5439
+
+    def test_validation_returns_timeout_when_tcp_check_fails(self, cred_file, monkeypatch):
+        from benchbox.platforms.credentials import redshift as rs
+
+        mgr = cred_file(
+            {
+                "redshift": {
+                    "host": "cluster.redshift.amazonaws.com",
+                    "username": "admin",
+                    "password": "secret",
+                }
+            }
+        )
+
+        class FailingSocket:
+            def settimeout(self, timeout):
+                self.timeout = timeout
+
+            def connect_ex(self, addr):
+                return 111
+
+            def close(self):
+                return None
+
+        connector = _make_module("redshift_connector", connect=Mock())
+        monkeypatch.setitem(sys.modules, "redshift_connector", connector)
+        monkeypatch.setattr(rs.socket, "socket", lambda *args, **kwargs: FailingSocket())
+
+        ok, err = rs.validate_redshift_credentials(mgr, console=None)
+
+        assert ok is False
+        assert err == "Connection timeout. Check VPC/security group settings and network connectivity."
+
+    def test_validation_maps_authentication_errors(self, cred_file, monkeypatch):
+        from benchbox.platforms.credentials import redshift as rs
+
+        mgr = cred_file(
+            {
+                "redshift": {
+                    "host": "cluster.redshift.amazonaws.com",
+                    "username": "admin",
+                    "password": "bad-secret",
+                    "database": "dev",
+                }
+            }
+        )
+
+        class ReachableSocket:
+            def settimeout(self, timeout):
+                self.timeout = timeout
+
+            def connect_ex(self, addr):
+                return 0
+
+            def close(self):
+                return None
+
+        adapter = Mock()
+        adapter._create_direct_connection.side_effect = Exception("password authentication failed for user admin")
+
+        monkeypatch.setattr(rs, "_build_redshift_adapter", lambda creds: adapter)
+        monkeypatch.setattr(rs.socket, "socket", lambda *args, **kwargs: ReachableSocket())
+
+        ok, err = rs.validate_redshift_credentials(mgr, console=None)
+
+        assert ok is False
+        assert err == "Authentication failed. Check your username and password."
+
+    def test_validation_uses_shared_adapter_connection_path(self, cred_file, monkeypatch):
+        from benchbox.platforms.credentials import redshift as rs
+
+        mgr = cred_file(
+            {
+                "redshift": {
+                    "host": "cluster.redshift.amazonaws.com",
+                    "username": "admin",
+                    "password": "secret",
+                    "database": "dev",
+                }
+            }
+        )
+
+        class ReachableSocket:
+            def settimeout(self, timeout):
+                self.timeout = timeout
+
+            def connect_ex(self, addr):
+                return 0
+
+            def close(self):
+                return None
+
+        cursor = Mock()
+        connection = Mock()
+        connection.cursor.return_value = cursor
+
+        adapter = Mock()
+        adapter._create_direct_connection.return_value = connection
+
+        monkeypatch.setattr(rs, "_build_redshift_adapter", lambda creds: adapter)
+        monkeypatch.setattr(rs.socket, "socket", lambda *args, **kwargs: ReachableSocket())
+
+        ok, err = rs.validate_redshift_credentials(mgr, console=None)
+
+        assert (ok, err) == (True, None)
+        adapter._create_direct_connection.assert_called_once_with(database="dev", connect_timeout=10)
+        assert [call.args[0] for call in cursor.execute.call_args_list] == [
+            "SELECT 1",
+            "SELECT version()",
+            "SELECT current_database()",
+        ]
+
+    def test_validation_maps_server_refuses_ssl_to_friendly_message(self, cred_file, monkeypatch):
+        from benchbox.platforms.credentials import redshift as rs
+
+        mgr = cred_file(
+            {
+                "redshift": {
+                    "host": "cluster.redshift.amazonaws.com",
+                    "username": "admin",
+                    "password": "secret",
+                    "database": "dev",
+                }
+            }
+        )
+
+        class ReachableSocket:
+            def settimeout(self, timeout):
+                self.timeout = timeout
+
+            def connect_ex(self, addr):
+                return 0
+
+            def close(self):
+                return None
+
+        adapter = Mock()
+        adapter._create_direct_connection.side_effect = Exception("Server refuses SSL")
+
+        monkeypatch.setattr(rs, "_build_redshift_adapter", lambda creds: adapter)
+        monkeypatch.setattr(rs.socket, "socket", lambda *args, **kwargs: ReachableSocket())
+
+        ok, err = rs.validate_redshift_credentials(mgr, console=None)
+
+        assert ok is False
+        assert (
+            err
+            == "SSL negotiation failed. Check that the endpoint is a Redshift endpoint that accepts TLS on port 5439."
+        )
+
+    def test_validation_maps_timed_out_errors_to_network_guidance(self, cred_file, monkeypatch):
+        from benchbox.platforms.credentials import redshift as rs
+
+        mgr = cred_file(
+            {
+                "redshift": {
+                    "host": "cluster.redshift.amazonaws.com",
+                    "username": "admin",
+                    "password": "secret",
+                    "database": "dev",
+                }
+            }
+        )
+
+        class ReachableSocket:
+            def settimeout(self, timeout):
+                self.timeout = timeout
+
+            def connect_ex(self, addr):
+                return 0
+
+            def close(self):
+                return None
+
+        adapter = Mock()
+        adapter._create_direct_connection.side_effect = Exception("The read operation timed out")
+
+        monkeypatch.setattr(rs, "_build_redshift_adapter", lambda creds: adapter)
+        monkeypatch.setattr(rs.socket, "socket", lambda *args, **kwargs: ReachableSocket())
+        monkeypatch.setattr(rs.time, "sleep", lambda _: None)
+
+        ok, err = rs.validate_redshift_credentials(mgr, console=None)
+
+        assert ok is False
+        assert err == "Connection timeout. Check VPC/security group settings and network connectivity."
+
     def test_env_var_credentials_through_real_manager(self, tmp_path, monkeypatch):
         """Full path: env var in YAML -> CredentialManager substitution -> validation."""
         from benchbox.platforms.credentials import redshift as rs
@@ -407,7 +920,19 @@ class TestRedshiftValidation:
         assert creds["username"] == "admin"
         assert creds["password"] == "s3cret"
 
-        # Validation should get past the "missing fields" check
+        class FailingSocket:
+            def settimeout(self, timeout):
+                self.timeout = timeout
+
+            def connect_ex(self, addr):
+                return 111
+
+            def close(self):
+                return None
+
+        monkeypatch.setattr(rs.socket, "socket", lambda *args, **kwargs: FailingSocket())
+
+        # Validation should get past the "missing fields" check.
         ok, err = rs.validate_redshift_credentials(mgr, console=None)
-        # Will fail at driver import, but should NOT fail at missing fields
+        # It will fail later in validation, but should NOT fail at missing fields.
         assert "Missing required fields" not in (err or "")

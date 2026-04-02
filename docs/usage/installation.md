@@ -30,7 +30,8 @@ Extras keep the base install lean.
 
 | Extra | Enables | Recommended (uv) | Alternative (pip-compatible) |
 | --- | --- | --- | --- |
-| `(none)` | DuckDB + SQLite for local development | `uv add benchbox` | `uv pip install benchbox` |
+| `(none)` | SQLite only (core package, no DuckDB) | `uv add benchbox` | `uv pip install benchbox` |
+| `[duckdb]` | DuckDB for local analytics | `uv add benchbox --extra duckdb` | `uv pip install "benchbox[duckdb]"` |
 | `[cloudstorage]` | Cloud path helpers (S3, GCS, Azure) | `uv add benchbox --extra cloudstorage` | `uv pip install "benchbox[cloudstorage]"` |
 | `[cloud]` | Databricks, BigQuery, Redshift, Snowflake connectors | `uv add benchbox --extra cloud` | `uv pip install "benchbox[cloud]"` |
 | `[clickhouse]` | ClickHouse native driver | `uv add benchbox --extra clickhouse` | `uv pip install "benchbox[clickhouse]"` |

@@ -50,8 +50,6 @@ def generate_cli_command(
     presort: str | None = None,
     sorted_ingestion_mode: str | None = None,
     sorted_ingestion_method: str | None = None,
-    databricks_clustering_strategy: str | None = None,
-    liquid_clustering_columns: str | None = None,
     global_cache: bool = False,
 ) -> str:
     """Generate equivalent CLI command from interactive wizard configuration.
@@ -79,8 +77,6 @@ def generate_cli_command(
         presort: Pre-sort mode (parquet-sorted, delta-sorted, iceberg-sorted)
         sorted_ingestion_mode: Cloud sorted-ingestion strategy (off, auto, force)
         sorted_ingestion_method: Cloud sorted-ingestion method override
-        databricks_clustering_strategy: Databricks clustering strategy override
-        liquid_clustering_columns: Databricks liquid clustering columns
         global_cache: Use global DataFrame cache
 
     Returns:
@@ -93,11 +89,14 @@ def generate_cli_command(
     if scale != 0.01:
         parts.append(f"--scale {scale}")
 
-    # List-value flags (join with comma)
-    if phases and phases != ["power"]:
-        parts.append(f"--phases {','.join(phases)}")
-    if queries:
-        parts.append(f"--queries {','.join(queries)}")
+    # List-value flags: (value, flag, skip_value) — joined with comma
+    _LIST_PARAMS = [
+        (phases, "--phases", ["power"]),
+        (queries, "--queries", None),
+    ]
+    for value, flag, skip in _LIST_PARAMS:
+        if value and value != skip:
+            parts.append(f"{flag} {','.join(value)}")
 
     # Simple value flags: (value, flag, skip_value)
     _VALUE_PARAMS = [
@@ -114,8 +113,6 @@ def generate_cli_command(
         (presort, "--presort", None),
         (sorted_ingestion_mode, "--sorted-ingestion-mode", "off"),
         (sorted_ingestion_method, "--sorted-ingestion-method", None),
-        (databricks_clustering_strategy, "--databricks-clustering-strategy", None),
-        (liquid_clustering_columns, "--liquid-clustering-columns", None),
     ]
     for value, flag, skip in _VALUE_PARAMS:
         if value is not None and value != skip:
@@ -126,21 +123,49 @@ def generate_cli_command(
         for key, val in sorted(platform_options.items()):
             parts.append(f"--platform-option {key}={val}")
 
-    # Boolean flags
-    for flag_value, flag in [
+    # Boolean flags: (value, flag)
+    _BOOL_PARAMS = [
         (official, "--official"),
         (capture_plans, "--capture-plans"),
         (global_cache, "--global-cache"),
-    ]:
+    ]
+    for flag_value, flag in _BOOL_PARAMS:
         if flag_value:
             parts.append(flag)
 
-    if verbose == 1:
-        parts.append("-v")
-    elif verbose >= 2:
-        parts.append("-vv")
+    # Verbose flags (-v, -vv)
+    if verbose > 0:
+        parts.append("-" + "v" * min(verbose, 2))
 
     return " \\\n    ".join(parts)
+
+
+def _format_compression_str(
+    compress_data: bool,
+    compression_type: str | None,
+    compression_level: int | None,
+    default_type: str | None = None,
+) -> str | None:
+    """Format compression type and level into a display string."""
+    if not compress_data:
+        return None
+    comp_str = compression_type or default_type
+    if comp_str is None:
+        return None
+    if compression_level:
+        comp_str += f":{compression_level}"
+    return comp_str
+
+
+def _resolve_cli_table_format(options: dict[str, Any]) -> str | None:
+    """Resolve table format with optional compression suffix for CLI display."""
+    table_format = options.get("table_format")
+    if not table_format:
+        return None
+    fmt_compression = options.get("table_format_compression")
+    if fmt_compression and fmt_compression != "snappy":
+        table_format = f"{table_format}:{fmt_compression}"
+    return table_format
 
 
 def display_interactive_preview(
@@ -162,8 +187,6 @@ def display_interactive_preview(
     presort: str | None = None,
     sorted_ingestion_mode: str | None = None,
     sorted_ingestion_method: str | None = None,
-    databricks_clustering_strategy: str | None = None,
-    liquid_clustering_columns: str | None = None,
     global_cache: bool = False,
 ) -> None:
     """Display a preview summary for interactive wizard users.
@@ -190,8 +213,6 @@ def display_interactive_preview(
         presort: Pre-sort mode
         sorted_ingestion_mode: Cloud sorted-ingestion strategy
         sorted_ingestion_method: Cloud sorted-ingestion method override
-        databricks_clustering_strategy: Databricks clustering strategy override
-        liquid_clustering_columns: Databricks liquid clustering columns
         global_cache: Use global DataFrame cache
     """
     display_console = console_obj or console
@@ -228,54 +249,44 @@ def display_interactive_preview(
         num_queries = getattr(benchmark_config, "options", {}).get("num_queries", "all")
         table.add_row("Queries:", str(num_queries) if num_queries != "all" else "All")
 
-    # Tuning
-    if tuning:
-        table.add_row("Tuning:", tuning)
-
-    # Seed
-    if seed is not None:
-        table.add_row("Seed:", str(seed))
-
-    # Output
-    if output:
-        table.add_row("Output:", output)
-
-    table.add_row("Table Mode:", table_mode)
-
-    # Compression
-    if benchmark_config.compress_data:
-        comp_str = benchmark_config.compression_type or "zstd"
-        if benchmark_config.compression_level:
-            comp_str += f":{benchmark_config.compression_level}"
-        table.add_row("Compression:", comp_str)
-
-    # Format conversion
+    # Data-driven optional rows to reduce per-field branching
     options = getattr(benchmark_config, "options", {})
     table_fmt = options.get("table_format")
-    if table_fmt:
-        fmt_compression = options.get("table_format_compression", "snappy")
-        table.add_row("Table Format:", f"{table_fmt.capitalize()} ({fmt_compression})")
+    optional_rows: list[tuple[str, str | None]] = [
+        ("Tuning:", tuning),
+        ("Seed:", str(seed) if seed is not None else None),
+        ("Output:", output),
+        ("Table Mode:", table_mode),
+        (
+            "Compression:",
+            _format_compression_str(
+                benchmark_config.compress_data,
+                benchmark_config.compression_type,
+                benchmark_config.compression_level,
+                default_type="zstd",
+            ),
+        ),
+        (
+            "Table Format:",
+            f"{table_fmt.capitalize()} ({options.get('table_format_compression', 'snappy')})" if table_fmt else None,
+        ),
+        ("Pre-sort:", presort),
+        (
+            "Sorted Ingestion:",
+            sorted_ingestion_mode if sorted_ingestion_mode and sorted_ingestion_mode != "off" else None,
+        ),
+        ("Ingestion Method:", sorted_ingestion_method),
+        ("Plan Config:", plan_config),
+        ("Global Cache:", "Enabled" if global_cache else None),
+    ]
+    for label, value in optional_rows:
+        if value is not None:
+            table.add_row(label, value)
 
-    # Advanced options
-    if presort:
-        table.add_row("Pre-sort:", presort)
-    if sorted_ingestion_mode and sorted_ingestion_mode != "off":
-        table.add_row("Sorted Ingestion:", sorted_ingestion_mode)
-    if sorted_ingestion_method:
-        table.add_row("Ingestion Method:", sorted_ingestion_method)
-    if databricks_clustering_strategy:
-        table.add_row("Clustering:", databricks_clustering_strategy)
-    if liquid_clustering_columns:
-        table.add_row("Liquid Columns:", liquid_clustering_columns)
-    if plan_config:
-        table.add_row("Plan Config:", plan_config)
     if platform_options:
         for key, val in sorted(platform_options.items()):
             table.add_row(f"Platform ({key}):", val)
-    if global_cache:
-        table.add_row("Global Cache:", "Enabled")
 
-    # Estimated resources from benchmark options
     time_range = options.get("estimated_time_range")
     if time_range:
         table.add_row("Est. Time:", f"{time_range[0]}-{time_range[1]} minutes")
@@ -286,20 +297,12 @@ def display_interactive_preview(
     display_console.print()
     display_console.print("[bold]Equivalent CLI command:[/bold]")
 
-    # Extract table_format from options if present
-    table_format = options.get("table_format")
-    # Include compression suffix in table_format when it differs from the default
-    cli_fmt_compression = options.get("table_format_compression")
-    if table_format and cli_fmt_compression and cli_fmt_compression != "snappy":
-        table_format = f"{table_format}:{cli_fmt_compression}"
-
-    # Only pass compression when the user explicitly enabled it (compress_data=True).
-    # Never skip based on the compression value itself — "zstd" is a valid explicit choice.
-    compression_str = None
-    if benchmark_config.compress_data and benchmark_config.compression_type:
-        compression_str = benchmark_config.compression_type
-        if benchmark_config.compression_level:
-            compression_str += f":{benchmark_config.compression_level}"
+    table_format = _resolve_cli_table_format(options)
+    compression_str = _format_compression_str(
+        benchmark_config.compress_data,
+        benchmark_config.compression_type,
+        benchmark_config.compression_level,
+    )
 
     cli_cmd = generate_cli_command(
         platform=database_config.type,
@@ -324,8 +327,6 @@ def display_interactive_preview(
         presort=presort,
         sorted_ingestion_mode=sorted_ingestion_mode,
         sorted_ingestion_method=sorted_ingestion_method,
-        databricks_clustering_strategy=databricks_clustering_strategy,
-        liquid_clustering_columns=liquid_clustering_columns,
         global_cache=global_cache,
     )
 

@@ -87,48 +87,4 @@ def calculate_qphh(ctx, power_results, throughput_results, scale_factor, output_
     _emit_qphh_output(result, output_format, output_file)
 
 
-def _format_text_output(result: dict) -> str:
-    """Format QphH calculation as human-readable text."""
-    lines = []
-
-    lines.append("=" * 70)
-    lines.append("TPC-H QphH@Size CALCULATION")
-    lines.append("=" * 70)
-    lines.append("")
-    lines.append(f"Benchmark:        {result['benchmark']}")
-    lines.append(f"Scale Factor:     {result['scale_factor']}")
-    lines.append(f"Num Streams:      {result['num_streams']}")
-    lines.append("")
-    lines.append("-" * 70)
-    lines.append("TEST EXECUTION TIMES")
-    lines.append("-" * 70)
-    power_time = result.get("power_test_time")
-    throughput_time = result.get("throughput_test_time")
-    if power_time is not None:
-        lines.append(f"Power Test:       {power_time:.3f} seconds")
-    else:
-        lines.append("Power Test:       n/a")
-    if throughput_time is not None:
-        lines.append(f"Throughput Test:  {throughput_time:.3f} seconds")
-    else:
-        lines.append("Throughput Test:  n/a")
-    lines.append("")
-    lines.append("-" * 70)
-    lines.append("TPC-H METRICS")
-    lines.append("-" * 70)
-    lines.append(f"Power@Size:       {result['power_at_size']:,.2f}")
-    lines.append(f"Throughput@Size:  {result['throughput_at_size']:,.2f}")
-    lines.append("")
-    lines.append("=" * 70)
-    lines.append(f"QphH@Size:        {result['qphh_at_size']:,.2f}")
-    lines.append("=" * 70)
-    lines.append("")
-    lines.append("Formula: QphH@Size = sqrt(Power@Size × Throughput@Size)")
-    lines.append("  Power@Size = 3600 × SF / Power_Test_Time")
-    lines.append("  Throughput@Size = Num_Streams × 3600 × SF / Throughput_Test_Time")
-    lines.append("")
-
-    return "\n".join(lines)
-
-
 __all__ = ["calculate_qphh"]

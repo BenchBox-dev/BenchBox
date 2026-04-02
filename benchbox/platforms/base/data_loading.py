@@ -226,6 +226,14 @@ class ManifestFileSource:
 
         return None
 
+    @staticmethod
+    def _prefer_platform_defaults(platform_name: str, table_mode: str) -> bool:
+        """Return True when a native loader must override manifest order."""
+        from benchbox.platforms.base.format_capabilities import PREFER_PLATFORM_FORMAT_ORDER, normalize_platform_key
+
+        normalized_mode = (table_mode or "native").strip().lower()
+        return normalized_mode == "native" and normalize_platform_key(platform_name) in PREFER_PLATFORM_FORMAT_ORDER
+
     def _try_manifest_v2(self, manifest_path: Path, benchmark: Any, data_dir: Path) -> DataSource | None:
         """Attempt to load data source using manifest v2 format."""
         try:
@@ -249,6 +257,7 @@ class ManifestFileSource:
                     platform_name,
                     table_mode=table_mode,
                     platform_config=platform_config,
+                    prefer_platform_defaults=self._prefer_platform_defaults(platform_name, table_mode),
                 )
 
                 if preferred_format:
@@ -1963,64 +1972,17 @@ class DataLoader:
             file_path_or_paths = data_files[table_name]
             table_start = mono_time()
 
-            # Handle both single file and sharded (list of files) cases
-            # When data is generated with parallel>1, tables may be sharded into multiple files
             if isinstance(file_path_or_paths, list):
-                # Multiple shards — delegate to handler's bulk-load method.
-                # DuckDB handlers override load_table_bulk() with native multi-file
-                # read_csv/read_parquet; the default falls back to sequential calls.
-                shard_paths = [Path(p) for p in file_path_or_paths if Path(p).exists()]
-                shard_count = len(shard_paths)
-
-                if not shard_paths:
-                    table_stats[table_name] = 0
-                else:
-                    handler = None
-                    if self.handler_factory:
-                        handler = self.handler_factory(shard_paths[0], self.adapter, self.benchmark)
-                    if not handler:
-                        handler = FileFormatRegistry.get_handler(shard_paths[0])
-
-                    if not handler:
-                        quiet_console.print(
-                            f"⚠️  Skipping {table_name} - unsupported file format: {shard_paths[0].suffix}"
-                        )
-                        total_rows = 0
-                    else:
-                        try:
-                            total_rows = handler.load_table_bulk(
-                                table_name, shard_paths, self.connection, self.benchmark, self.adapter.logger
-                            )
-                        except Exception as e:
-                            quiet_console.print(f"  ❌ Failed to bulk-load {table_name}: {e}")
-                            total_rows = 0
-
-                    table_stats[table_name] = total_rows
-                    if total_rows > 0:
-                        table_time = elapsed_seconds(table_start)
-                        if self.adapter.verbose_enabled:
-                            quiet_console.print(
-                                f"  ✅ Loaded {total_rows:,} rows into {table_name} "
-                                f"in {table_time:.2f}s from {shard_count} shard(s)"
-                            )
-                        else:
-                            quiet_console.print(
-                                f"  ✅ Loaded {total_rows:,} rows into {table_name} from {shard_count} shard(s)"
-                            )
+                row_count = self._load_sharded_table(table_name, file_path_or_paths)
+                source_desc = f"{len(file_path_or_paths)} shard(s)"
             else:
-                # Single file
                 file_path = Path(file_path_or_paths)
                 row_count = self._load_single_file(table_name, file_path)
-                table_stats[table_name] = row_count
-                if row_count > 0:
-                    table_time = elapsed_seconds(table_start)
-                    if self.adapter.verbose_enabled:
-                        quiet_console.print(
-                            f"  ✅ Loaded {row_count:,} rows into {table_name} "
-                            f"in {table_time:.2f}s from {file_path.name}"
-                        )
-                    else:
-                        quiet_console.print(f"  ✅ Loaded {row_count:,} rows into {table_name} from {file_path.name}")
+                source_desc = file_path.name
+
+            table_stats[table_name] = row_count
+            if row_count > 0:
+                self._log_table_loaded(table_name, row_count, table_start, source_desc)
 
             # Apply CTAS-based sorting after loading when tuning config is present.
             # PlatformAdapter guarantees apply_ctas_sort; unsupported platforms no-op.
@@ -2028,6 +1990,75 @@ class DataLoader:
                 self.adapter.apply_ctas_sort(table_name, self.tuning_config, self.connection)
 
         return table_stats
+
+    def _log_table_loaded(self, table_name: str, row_count: int, start_time: float, source: str) -> None:
+        """Log a table loading completion message."""
+        if self.adapter.verbose_enabled:
+            table_time = elapsed_seconds(start_time)
+            quiet_console.print(f"  ✅ Loaded {row_count:,} rows into {table_name} in {table_time:.2f}s from {source}")
+        else:
+            quiet_console.print(f"  ✅ Loaded {row_count:,} rows into {table_name} from {source}")
+
+    def _load_sharded_table(self, table_name: str, file_path_or_paths: list) -> int:
+        """Load a sharded table from multiple files.
+
+        Categorizes shard paths into files, directories, and missing, raising
+        on any contamination. Delegates to the handler's bulk-load method.
+
+        Args:
+            table_name: Name of the table to load into
+            file_path_or_paths: List of shard paths
+
+        Returns:
+            Number of rows loaded
+
+        Raises:
+            DataLoadingError: If any shard is a directory or missing
+        """
+        shard_paths = []
+        dir_shards = []
+        missing_shards = []
+        for p in file_path_or_paths:
+            pp = Path(p)
+            if pp.is_file():
+                shard_paths.append(pp)
+            elif pp.is_dir():
+                dir_shards.append(pp)
+            else:
+                missing_shards.append(pp)
+
+        if dir_shards:
+            logger.warning(
+                "Table '%s': %d shard path(s) are directories, not files: %s",
+                table_name,
+                len(dir_shards),
+                [str(p) for p in dir_shards[:3]],
+            )
+
+        if dir_shards or missing_shards:
+            raise DataLoadingError(
+                f"Table '{table_name}': {len(file_path_or_paths)} shard(s) listed "
+                f"but {len(dir_shards)} directories and {len(missing_shards)} missing "
+                f"({len(shard_paths)} valid files). Use --force datagen to regenerate."
+            )
+
+        handler = None
+        if self.handler_factory:
+            handler = self.handler_factory(shard_paths[0], self.adapter, self.benchmark)
+        if not handler:
+            handler = FileFormatRegistry.get_handler(shard_paths[0])
+
+        if not handler:
+            quiet_console.print(f"⚠️  Skipping {table_name} - unsupported file format: {shard_paths[0].suffix}")
+            return 0
+
+        try:
+            return handler.load_table_bulk(
+                table_name, shard_paths, self.connection, self.benchmark, self.adapter.logger
+            )
+        except Exception as e:
+            quiet_console.print(f"  ❌ Failed to bulk-load {table_name}: {e}")
+            return 0
 
     def _load_single_file(self, table_name: str, file_path: Path) -> int:
         """Load data from a single file into a table.
@@ -2037,11 +2068,21 @@ class DataLoader:
             file_path: Path to the data file
 
         Returns:
-            Number of rows loaded, or 0 if loading failed
+            Number of rows loaded
+
+        Raises:
+            DataLoadingError: If path is a directory or does not exist
         """
+        if file_path.is_dir():
+            raise DataLoadingError(
+                f"Table '{table_name}': expected file but found directory at {file_path}. "
+                f"This may indicate stale data from a previous conversion. "
+                f"Use --force datagen to regenerate."
+            )
         if not file_path.exists():
-            quiet_console.print(f"⚠️  Skipping {table_name} - file not found: {file_path}")
-            return 0
+            raise DataLoadingError(
+                f"Table '{table_name}': data file not found at {file_path}. Use --force datagen to regenerate."
+            )
 
         try:
             # Get appropriate file format handler

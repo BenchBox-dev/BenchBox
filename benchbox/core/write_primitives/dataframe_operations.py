@@ -33,6 +33,7 @@ from benchbox.core.dataframe.maintenance_interface import (
     MaintenanceResult,
     get_maintenance_operations_for_platform,
 )
+from benchbox.core.dataframe_manager_factory import get_dataframe_manager
 
 if TYPE_CHECKING:
     pass
@@ -885,19 +886,14 @@ def get_dataframe_write_manager(
         DataFrameWriteOperationsManager if platform supports DataFrame writes,
         None if platform is not a DataFrame platform.
     """
-    platform_lower = platform_name.lower()
-
-    # Check if this is a DataFrame platform
-    df_platforms = ("polars-df", "polars", "pandas-df", "pandas", "pyspark-df", "pyspark")
-    if not any(p in platform_lower for p in df_platforms):
-        logger.debug(f"Platform {platform_name} is not a DataFrame platform")
-        return None
-
-    try:
-        return DataFrameWriteOperationsManager(platform_name, spark_session=spark_session)
-    except Exception as e:
-        logger.warning(f"Failed to create write manager for {platform_name}: {e}")
-        return None
+    return get_dataframe_manager(
+        platform_name,
+        manager_class=DataFrameWriteOperationsManager,
+        supported_platforms=("polars-df", "polars", "pandas-df", "pandas", "pyspark-df", "pyspark"),
+        logger=logger,
+        manager_label="write",
+        spark_session=spark_session,
+    )
 
 
 __all__ = [

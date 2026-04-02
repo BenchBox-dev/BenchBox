@@ -17,8 +17,10 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.fast
-
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.fast,
+]
 
 # Include the project root to the Python path
 project_root = Path(__file__).parent
@@ -34,7 +36,6 @@ except ImportError as e:
     sys.exit(1)
 
 
-@pytest.mark.integration
 def test_tpcds_init():
     """Test TPCDS initialization."""
     # Test with default parameters
@@ -49,7 +50,6 @@ def test_tpcds_init():
     )
 
 
-@pytest.mark.integration
 def test_tpcds_schema():
     """Test TPCDS schema."""
     tpcds = TPCDS()
@@ -67,7 +67,6 @@ def test_tpcds_schema():
     print(f"Generated SQL with {len(sql)} characters")
 
 
-@pytest.mark.integration
 @pytest.mark.slow
 @pytest.mark.skipif(sys.platform == "win32", reason="dsqgen binary does not work on Windows")
 def test_tpcds_queries():

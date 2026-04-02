@@ -60,7 +60,7 @@ benchbox run --platform databend --benchmark tpch --scale 0.01 \
 ```bash
 # Self-hosted via DSN
 benchbox run --platform databend --benchmark tpch --scale 0.01 \
-    --platform-option dsn=databend://root:@localhost:8000/benchbox
+    --platform-option dsn=databend+http://benchbox:benchbox@localhost:8000/benchbox?sslmode=disable
 ```
 
 ## Configuration Options
@@ -82,12 +82,12 @@ benchbox run --platform databend --benchmark tpch --scale 0.01 \
 The DSN (Data Source Name) follows the format:
 
 ```
-databend+ssl://user:password@host:port/database?warehouse=name
-databend://user:password@host:port/database
+databend+https://user:password@host:port/database?warehouse=name
+databend+http://user:password@host:port/database?sslmode=disable
 ```
 
-- `databend+ssl://` is used when SSL is enabled (default for cloud)
-- `databend://` is used when SSL is disabled (typical for self-hosted)
+- `databend+https://` is used when SSL is enabled (default for cloud)
+- `databend+http://` is used when SSL is disabled (typical for self-hosted) and should include `sslmode=disable`
 - Special characters in username/password are automatically URL-encoded
 
 ## Data Loading
@@ -194,7 +194,7 @@ DatabendAdapter
     |
     +-- databend-driver (DB-API 2.0)
     |       - BlockingDatabendClient
-    |       - DSN-based connection (databend:// or databend+ssl://)
+    |       - DSN-based connection (databend+http:// or databend+https://)
     |
     +-- Databend Cloud (HTTPS, port 443)
     |       - tenant--warehouse.gw.databend.com

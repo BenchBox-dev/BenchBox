@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, nyctaxi, custom-benchmark
 ```
 
+> **CLI name:** `nyctaxi` — use `benchbox run --benchmark nyctaxi`
+
 ## Overview
 
 The NYC Taxi OLAP Benchmark uses real-world NYC Taxi & Limousine Commission (TLC) trip record data for comprehensive OLAP analytics testing. Unlike synthetic benchmarks, this benchmark leverages actual transportation data from New York City, providing realistic distributions, seasonal patterns, and geographic analytics opportunities.

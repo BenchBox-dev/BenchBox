@@ -20,13 +20,9 @@ from benchbox.utils.dependencies import get_install_command, get_package_install
 
 try:
     from cloudpathlib import CloudPath
-    from cloudpathlib.exceptions import (
-        CloudPathNotExistsError,
-        MissingCredentialsError,
-    )
+    from cloudpathlib.exceptions import MissingCredentialsError
 except ImportError:
     CloudPath = None  # type: ignore
-    CloudPathNotExistsError = Exception  # type: ignore
     MissingCredentialsError = Exception  # type: ignore
 
 logger = logging.getLogger(__name__)

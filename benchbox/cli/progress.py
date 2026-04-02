@@ -23,7 +23,13 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from benchbox.monitoring import PerformanceMonitor
+try:
+    from benchbox.monitoring import PerformanceMonitor
+
+    _MONITORING_AVAILABLE = True
+except ImportError:
+    _MONITORING_AVAILABLE = False
+    PerformanceMonitor = None  # type: ignore[assignment,misc]
 
 
 class BenchmarkProgress:
@@ -59,8 +65,8 @@ class BenchmarkProgress:
 
         # Create monitor if enabled
         self.monitor: PerformanceMonitor | None = None
-        if enable_monitoring:
-            self.monitor = PerformanceMonitor()
+        if enable_monitoring and _MONITORING_AVAILABLE:
+            self.monitor = PerformanceMonitor()  # type: ignore[misc]
 
         # Create progress bar
         self.progress = Progress(

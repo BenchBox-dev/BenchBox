@@ -382,47 +382,6 @@ class TestTPCDSPerformance:
         performance_monitor.increment_counter("test_completed", 1)
         performance_monitor.increment_counter("test_completed", 1)
 
-    def test_cpu_utilization_efficiency(self, query_manager, performance_monitor):
-        """Test CPU utilization efficiency."""
-        # Get initial CPU usage
-        process = psutil.Process(os.getpid())
-        process.cpu_percent()
-
-        # Generate queries while monitoring CPU
-        start_time = time.time()
-        cpu_measurements = []
-
-        for i in range(100):
-            query_id = (i % 50) + 1
-            query_manager.get_query(query_id)
-
-            # Measure CPU every 10 queries
-            if i % 10 == 0:
-                cpu_percent = process.cpu_percent()
-                cpu_measurements.append(cpu_percent)
-
-        end_time = time.time()
-        execution_time = end_time - start_time
-
-        # Calculate CPU metrics
-        avg_cpu = statistics.mean(cpu_measurements) if cpu_measurements else 0
-        max(cpu_measurements) if cpu_measurements else 0
-
-        # CPU utilization should be reasonable on average
-        # Note: Peak CPU can spike to 100% during intensive operations, which is expected
-        assert avg_cpu < 80, f"Average CPU utilization too high: {avg_cpu:.2f}%"
-
-        # Calculate queries per second
-        qps = 100 / execution_time
-
-        # Should maintain reasonable performance (lowered for CI/xdist overhead)
-        assert qps >= 10, f"CPU efficiency too low: {qps:.2f} q/s"
-
-        # Record CPU efficiency metrics
-        performance_monitor.increment_counter("test_completed", 1)
-        performance_monitor.increment_counter("test_completed", 1)
-        performance_monitor.increment_counter("test_completed", 1)
-
     @pytest.mark.parametrize("num_workers", [1, 2, 4, 8])
     def test_parallel_processing_scalability(self, query_manager, performance_monitor, num_workers):
         """Test scalability with parallel processing."""

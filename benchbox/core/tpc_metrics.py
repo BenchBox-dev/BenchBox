@@ -107,6 +107,13 @@ class MetricsResult:
     validation_errors: list[str] = field(default_factory=list)
 
 
+# Range validation rules for power test results: (attribute, min, max, label)
+_POWER_TEST_VALIDATION_RULES: list[tuple[str, float, float, str]] = [
+    ("scale_factor", 0.01, 100000.0, "Scale factor"),
+    ("total_time", 0.001, 86400.0, "Total time"),
+]
+
+
 class MetricsValidator:
     """Validates TPC metric calculations and test results."""
 
@@ -121,19 +128,13 @@ class MetricsValidator:
         """Validate power test results according to TPC specifications."""
         errors = []
 
-        # Scale factor validation
-        if results.scale_factor < MetricsValidator.MIN_SCALE_FACTOR:
-            errors.append(f"Scale factor {results.scale_factor} is below minimum {MetricsValidator.MIN_SCALE_FACTOR}")
-
-        if results.scale_factor > MetricsValidator.MAX_SCALE_FACTOR:
-            errors.append(f"Scale factor {results.scale_factor} exceeds maximum {MetricsValidator.MAX_SCALE_FACTOR}")
-
-        # Time validation
-        if results.total_time < MetricsValidator.MIN_EXECUTION_TIME:
-            errors.append(f"Total time {results.total_time} is below minimum {MetricsValidator.MIN_EXECUTION_TIME}")
-
-        if results.total_time > MetricsValidator.MAX_EXECUTION_TIME:
-            errors.append(f"Total time {results.total_time} exceeds maximum {MetricsValidator.MAX_EXECUTION_TIME}")
+        # Scale factor and total time range validation
+        for attr, min_val, max_val, label in _POWER_TEST_VALIDATION_RULES:
+            value = getattr(results, attr)
+            if value < min_val:
+                errors.append(f"{label} {value} is below minimum {min_val}")
+            if value > max_val:
+                errors.append(f"{label} {value} exceeds maximum {max_val}")
 
         # Test completeness validation
         failed_tests = [r for r in results.test_results if not r.success]
@@ -586,7 +587,7 @@ class MetricsReporter:
     """Formats and reports TPC metrics results."""
 
     @staticmethod
-    def format_metrics_report(result: MetricsResult, include_details: bool = True) -> str:
+    def format_metrics_report(result: MetricsResult, _include_details: bool = True) -> str:
         """
         Format a comprehensive metrics report.
 

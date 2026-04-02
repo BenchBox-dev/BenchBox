@@ -284,7 +284,7 @@ class TestTopLevelInterface:
         """Should be importable from benchbox."""
         from benchbox import NYCTaxi
 
-        assert NYCTaxi is not None
+        assert callable(NYCTaxi)
 
     def test_nyctaxi_interface(self, seed):
         """NYCTaxi interface should work correctly."""

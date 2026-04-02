@@ -11,15 +11,17 @@ import shutil
 import sys
 import tempfile
 from datetime import datetime
+from io import StringIO
 from pathlib import Path
 from typing import Any, Optional
 from unittest.mock import Mock, patch
 
 import pytest
+from rich.console import Console
 
 from benchbox.cli.output import ConsoleResultFormatter, ResultExporter
 from benchbox.core.schemas import QueryResult
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,
@@ -261,6 +263,109 @@ class TestConsoleResultFormatter:
         assert mock_console.print.called
         calls = [str(call) for call in mock_console.print.call_args_list]
         assert any("Query Details" in call for call in calls)
+
+    def _render_summary_output(self, result) -> str:
+        output = StringIO()
+        render_console = Console(file=output, width=120, force_terminal=False)
+        with patch("benchbox.cli.output.console", render_console):
+            ConsoleResultFormatter.render_comprehensive_execution_summary(result)
+        return output.getvalue()
+
+    def test_render_comprehensive_execution_summary_shows_breakdown_and_failures(self):
+        """Comprehensive summary should render validation counts and failed query details."""
+        result = make_benchmark_results(
+            benchmark_name="TPC-H",
+            platform="duckdb",
+            execution_id="exec_summary_fail",
+            duration_seconds=5.0,
+            total_queries=3,
+            successful_queries=1,
+            failed_queries=2,
+            query_results=[
+                {
+                    "query_id": "Q1",
+                    "status": "SUCCESS",
+                    "execution_time_seconds": 0.5,
+                    "row_count_validation": {"status": "PASSED"},
+                },
+                {
+                    "query_id": "Q2",
+                    "status": "ERROR",
+                    "error": "row count mismatch on customer table",
+                    "execution_time_seconds": 1.2,
+                    "row_count_validation": {"status": "FAILED", "expected": 10, "actual": 8},
+                },
+                {
+                    "query_id": "Q3",
+                    "status": "ERROR",
+                    "error": "permission denied while reading parquet metadata",
+                    "execution_time_seconds": 1.4,
+                    "row_count_validation": {"status": "SKIPPED"},
+                },
+            ],
+            validation_status="FAILED",
+            total_execution_time=3.1,
+            average_query_time=3.1,
+        )
+
+        output = self._render_summary_output(result)
+
+        assert "Execution Summary" in output
+        assert "Validation Breakdown" in output
+        assert "FAILED" in output
+        assert "SKIPPED" in output
+        assert "Top Query Failures" in output
+        assert "Query Q2" in output
+        assert "Expected 10 rows, got 8" in output
+        assert "Benchmark completed with 2 failures" in output
+
+    def test_render_comprehensive_execution_summary_partial_validation(self):
+        """Partial validation should keep the success path but show the partial recommendations."""
+        result = make_benchmark_results(
+            benchmark_name="TPC-DS",
+            platform="snowflake",
+            execution_id="exec_summary_partial",
+            duration_seconds=4.0,
+            total_queries=2,
+            successful_queries=2,
+            failed_queries=0,
+            query_results=[
+                {
+                    "query_id": "Q1",
+                    "status": "SUCCESS",
+                    "execution_time_seconds": 1.0,
+                    "row_count_validation": {"status": "PASSED"},
+                },
+                {
+                    "query_id": "Q2",
+                    "status": "SUCCESS",
+                    "execution_time_seconds": 1.5,
+                    "row_count_validation": {"status": "SKIPPED"},
+                },
+            ],
+            validation_status="PARTIAL",
+            total_execution_time=2.5,
+            average_query_time=1.25,
+        )
+
+        output = self._render_summary_output(result)
+
+        assert "Validation Breakdown" in output
+        assert "Note: Validation is typically skipped when scale factor" in output
+        assert "Benchmark completed with partial validation" in output
+        assert "Run at scale factor 1.0 for full validation" in output
+
+    def test_render_overall_status_unclear_branch(self):
+        """Unknown validation states should surface the fallback status message."""
+        output = StringIO()
+        render_console = Console(file=output, width=100, force_terminal=False)
+
+        with patch("benchbox.cli.output.console", render_console):
+            ConsoleResultFormatter._render_overall_status("UNKNOWN", 0, 0)
+
+        rendered = output.getvalue()
+        assert "Benchmark status unclear" in rendered
+        assert "Validation: UNKNOWN, Queries: 0/0" in rendered
 
 
 class TestResultExporter:

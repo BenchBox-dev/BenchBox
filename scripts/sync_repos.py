@@ -2,11 +2,11 @@
 """Bidirectional sync between private (BenchBox) and public (BenchBox-public) repositories.
 
 This is a convenience wrapper script. The actual implementation is in
-benchbox.release.sync. You can also use the installed entry point:
+benchbox.release.sync. Run from the source checkout:
 
-    benchbox-sync status
-    benchbox-sync push --message "Sync bug fixes"
-    benchbox-sync pull
+    uv run -- python -m benchbox.release.sync status
+    uv run -- python -m benchbox.release.sync push --message "Sync bug fixes"
+    uv run -- python -m benchbox.release.sync pull
 """
 
 from __future__ import annotations

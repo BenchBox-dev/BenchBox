@@ -124,10 +124,10 @@ class TestGenerateAsciiChart:
         series = [float(i) for i in range(10)]
         chart = generate_ascii_chart(series, width=20, height=5)
         rendered = chart.render()
-        # Should have asterisks
+        # Should have data point markers
         assert "*" in rendered
-        # Should show time axis
-        assert "time" in rendered.lower()
+        # Should show X-axis
+        assert "→" in rendered or "+" in rendered
 
     def test_constant_series(self):
         """Should handle constant values."""
@@ -170,6 +170,23 @@ class TestGenerateAsciiChart:
         series = [10.0, 20.0, 30.0]
         chart = generate_ascii_chart(series, width=60)
         assert "*" in chart.render()
+
+    def test_use_unicode_false(self):
+        """Should render with ASCII fallback when unicode disabled."""
+        series = [10.0, 50.0, 90.0]
+        chart = generate_ascii_chart(series, width=40, use_unicode=False)
+        rendered = chart.render()
+        assert len(rendered) > 0
+        # ASCII fallback uses -> instead of →, ^ instead of ↑
+        assert "→" not in rendered
+        assert "->" in rendered
+
+    def test_use_color_true(self):
+        """Should include ANSI escape codes when color enabled."""
+        series = [10.0, 50.0, 90.0]
+        chart = generate_ascii_chart(series, width=40, use_color=True)
+        rendered = chart.render()
+        assert "\033[" in rendered
 
 
 class TestResourceReporter:
@@ -216,6 +233,16 @@ class TestResourceReporter:
         assert reporter.chart_width == 80
         assert reporter.chart_height == 15
         assert reporter.detector is detector
+
+    def test_color_unicode_passthrough(self, sample_timeline):
+        """Should pass color/unicode options through to charts."""
+        reporter = ResourceReporter(use_color=False, use_unicode=False)
+        report = reporter.generate_report(sample_timeline, include_charts=True)
+        cpu_chart = report.charts[ResourceType.CPU]
+        rendered = cpu_chart.render()
+        # ASCII fallback uses -> instead of →
+        assert "→" not in rendered
+        assert "->" in rendered
 
     def test_generate_report(self, reporter, sample_timeline):
         """Should generate complete report."""

@@ -50,12 +50,12 @@ class TestDatabendAdapterInitialization:
         """Test initialization with DSN string."""
         try:
             adapter = DatabendAdapter(
-                dsn="databend://root:@localhost:8000/test_db",
+                dsn="databend+http://root:@localhost:8000/test_db",
             )
         except ImportError:
             pytest.skip("databend-driver not installed")
 
-        assert adapter.dsn == "databend://root:@localhost:8000/test_db"
+        assert adapter.dsn == "databend+http://root:@localhost:8000/test_db"
         assert adapter.database == "benchbox"  # default when not set separately
 
     def test_initialization_with_cloud_config(self):
@@ -141,7 +141,7 @@ class TestDatabendDSNBuilding:
             pytest.skip("databend-driver not installed")
 
         dsn = adapter._build_dsn()
-        assert dsn.startswith("databend+ssl://")
+        assert dsn.startswith("databend+https://")
         assert "user:pass@example.com" in dsn
         assert "/mydb" in dsn
         assert ":443/" in dsn
@@ -160,8 +160,9 @@ class TestDatabendDSNBuilding:
             pytest.skip("databend-driver not installed")
 
         dsn = adapter._build_dsn()
-        assert dsn.startswith("databend://")
+        assert dsn.startswith("databend+http://")
         assert ":8000/" in dsn
+        assert "sslmode=disable" in dsn
 
     def test_build_dsn_with_warehouse(self):
         """Test DSN building with warehouse parameter."""
@@ -197,12 +198,23 @@ class TestDatabendDSNBuilding:
         """Test that explicit DSN is returned as-is."""
         try:
             adapter = DatabendAdapter(
+                dsn="databend+http://custom:dsn@host/db",
+            )
+        except ImportError:
+            pytest.skip("databend-driver not installed")
+
+        assert adapter._build_dsn() == "databend+http://custom:dsn@host/db?sslmode=disable"
+
+    def test_build_dsn_normalizes_legacy_explicit_dsn(self):
+        """Test that legacy BenchBox DSN schemes are normalized for the driver."""
+        try:
+            adapter = DatabendAdapter(
                 dsn="databend://custom:dsn@host/db",
             )
         except ImportError:
             pytest.skip("databend-driver not installed")
 
-        assert adapter._build_dsn() == "databend://custom:dsn@host/db"
+        assert adapter._build_dsn() == "databend+http://custom:dsn@host/db?sslmode=disable"
 
 
 class TestDatabendConnection:
@@ -230,6 +242,30 @@ class TestDatabendConnection:
 
         assert connection == mock_client
         mock_client.query_row.assert_called_with("SELECT 1")
+
+    def test_create_connection_with_get_conn(self):
+        """Test connection creation with the current databend-driver API."""
+        try:
+            adapter = DatabendAdapter(host="localhost", ssl=False, password="")
+        except ImportError:
+            pytest.skip("databend-driver not installed")
+
+        mock_connection = Mock(spec=["query_row", "close"])
+        mock_connection.query_row.return_value = Mock()
+        mock_client = Mock(spec=["get_conn"])
+        mock_client.get_conn.return_value = mock_connection
+
+        with (
+            patch.object(adapter, "handle_existing_database"),
+            patch("benchbox.platforms.databend.adapter.databend_driver") as mock_dd,
+        ):
+            mock_dd.BlockingDatabendClient.return_value = mock_client
+            with patch.dict("sys.modules", {"databend_driver": mock_dd}):
+                connection = adapter.create_connection()
+
+        assert connection == mock_connection
+        mock_client.get_conn.assert_called_once()
+        mock_connection.query_row.assert_called_with("SELECT 1")
 
     def test_close_connection(self):
         """Test connection closing."""
@@ -750,7 +786,7 @@ class TestDatabendFromConfig:
     def test_from_config_with_dsn(self):
         """Test from_config() with DSN."""
         config = {
-            "dsn": "databend://root:@localhost:8000/mydb",
+            "dsn": "databend+http://root:@localhost:8000/mydb",
             "benchmark": "tpch",
             "scale_factor": 1.0,
         }
@@ -760,7 +796,7 @@ class TestDatabendFromConfig:
         except ImportError:
             pytest.skip("databend-driver not installed")
 
-        assert adapter.dsn == "databend://root:@localhost:8000/mydb"
+        assert adapter.dsn == "databend+http://root:@localhost:8000/mydb"
 
     def test_from_config_generates_database_name(self):
         """Test from_config() generates database name from benchmark config."""
@@ -890,6 +926,27 @@ class TestDatabendResourceCleanup:
         assert result is False
         mock_client.close.assert_called_once()
 
+    def test_test_connection_closes_connection_from_get_conn(self):
+        """test_connection should close the connection returned by get_conn."""
+        mock_connection = Mock(spec=["query_row", "close"])
+        mock_connection.query_row.return_value = (1,)
+        mock_client = Mock(spec=["get_conn"])
+        mock_client.get_conn.return_value = mock_connection
+
+        try:
+            adapter = DatabendAdapter(host="localhost")
+        except ImportError:
+            pytest.skip("databend-driver not installed")
+
+        with patch("benchbox.platforms.databend.adapter.databend_driver") as mock_dd:
+            mock_dd.BlockingDatabendClient.return_value = mock_client
+            with patch.dict("sys.modules", {"databend_driver": mock_dd}):
+                result = adapter.test_connection()
+
+        assert result is True
+        mock_client.get_conn.assert_called_once()
+        mock_connection.close.assert_called_once()
+
     def test_check_server_database_exists_closes_client(self):
         """check_server_database_exists should close the BlockingDatabendClient."""
         mock_row = Mock()
@@ -951,24 +1008,25 @@ class TestDatabendDsnConstruction:
     """Tests for DSN construction including URL-encoding and SSL scheme."""
 
     def test_dsn_defaults_to_ssl(self):
-        """DSN uses databend+ssl scheme by default."""
+        """DSN uses databend+https scheme by default."""
         try:
             adapter = DatabendAdapter(host="myhost", username="user", password="pass", database="db")
         except ImportError:
             pytest.skip("databend-driver not installed")
         dsn = adapter._build_dsn()
-        assert dsn.startswith("databend+ssl://")
+        assert dsn.startswith("databend+https://")
         assert ":443/" in dsn
 
     def test_dsn_uses_plain_scheme_when_ssl_disabled(self):
-        """DSN uses databend:// scheme when ssl=False."""
+        """DSN uses databend+http scheme when ssl=False."""
         try:
             adapter = DatabendAdapter(host="myhost", username="user", password="pass", database="db", ssl=False)
         except ImportError:
             pytest.skip("databend-driver not installed")
         dsn = adapter._build_dsn()
-        assert dsn.startswith("databend://")
+        assert dsn.startswith("databend+http://")
         assert ":8000/" in dsn
+        assert "sslmode=disable" in dsn
 
     def test_dsn_url_encodes_password_with_special_chars(self):
         """Password with special characters is URL-encoded in DSN."""

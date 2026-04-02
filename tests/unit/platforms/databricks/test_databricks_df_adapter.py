@@ -16,7 +16,7 @@ from benchbox.platforms.databricks.dataframe_adapter import (
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.slow,
+    pytest.mark.fast,
     pytest.mark.cloud_import,
 ]
 
@@ -207,7 +207,8 @@ class TestDatabricksDataFrameAdapterPlatformInfo:
             cluster_id="test-cluster",
         )
 
-        info = adapter.get_platform_info()
+        with patch.dict("sys.modules", {"databricks.sdk": MagicMock()}):
+            info = adapter.get_platform_info()
 
         assert "execution_mode" in info
         assert "cluster_id" in info

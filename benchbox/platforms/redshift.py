@@ -32,9 +32,9 @@ from ..utils.dependencies import (
     get_dependency_error_message,
     get_dependency_group_packages,
 )
-from ..utils.file_format import detect_compression, get_delimiter_for_file
+from ..utils.file_format import detect_compression, get_delimiter_for_file, is_parquet_format
 from .base import DriverIsolationCapability, PlatformAdapter
-from .base.data_loading import DataSourceResolver, FileFormatRegistry
+from .base.data_loading import DataSourceResolver, FileFormatRegistry, ManifestFileSource
 
 try:
     import redshift_connector
@@ -49,6 +49,7 @@ except ImportError:
 
 try:
     import boto3
+    from botocore.config import Config as BotocoreConfig
     from botocore.exceptions import ClientError, NoCredentialsError
 except ImportError:
     boto3 = None
@@ -137,6 +138,7 @@ class RedshiftAdapter(PlatformAdapter):
         self.iam_role = config.get("iam_role")
         self.aws_access_key_id = config.get("aws_access_key_id")
         self.aws_secret_access_key = config.get("aws_secret_access_key")
+        self.aws_session_token = config.get("aws_session_token")
         self.aws_region = config.get("aws_region") or "us-east-1"
 
         # Redshift optimization settings
@@ -163,6 +165,9 @@ class RedshiftAdapter(PlatformAdapter):
 
         # Validation strictness - raise errors if cache control validation fails
         self.strict_validation = config.get("strict_validation", True)
+
+        # Cache deployment type for Serverless vs Provisioned branching
+        self.deployment_type = self._detect_deployment_type(self.host or "")
 
         if not all([self.host, self.username, self.password]):
             missing = []
@@ -254,6 +259,7 @@ class RedshiftAdapter(PlatformAdapter):
             "staging_root",
             "aws_access_key_id",
             "aws_secret_access_key",
+            "aws_session_token",
             "aws_region",
             "cluster_identifier",
             "admin_database",
@@ -289,8 +295,8 @@ class RedshiftAdapter(PlatformAdapter):
         Uses fallback chain: AWS API → SQL queries → hostname parsing
         Gracefully degrades if permissions are insufficient or AWS credentials unavailable.
         """
-        # Step 1: Detect deployment type from hostname
-        deployment_type = self._detect_deployment_type(self.host)
+        # Step 1: Use cached deployment type
+        deployment_type = self.deployment_type
         region = self._extract_region_from_hostname(self.host, deployment_type) or self.aws_region
         identifier = self._extract_identifier_from_hostname(self.host, deployment_type)
 
@@ -706,6 +712,144 @@ class RedshiftAdapter(PlatformAdapter):
             "sslmode": connection_config.get("sslmode", self.sslmode),
         }
 
+    def _connect_with_driver(
+        self,
+        *,
+        application_name: str,
+        connect_timeout: int | None = None,
+        tcp_keepalive: bool = False,
+        tcp_keepalive_idle: int | None = None,
+        tcp_keepalive_interval: int | None = None,
+        tcp_keepalive_count: int | None = None,
+        **connection_config,
+    ) -> Any:
+        """Create a Redshift connection using the configured driver."""
+        params = self._get_connection_params(**connection_config)
+
+        if redshift_connector:
+            connect_kwargs: dict[str, Any] = {
+                "host": params["host"],
+                "port": params["port"],
+                "database": params["database"],
+                "user": params["user"],
+                "password": params["password"],
+                "ssl": self.ssl_enabled,
+                "application_name": application_name,
+            }
+
+            if connect_timeout is not None:
+                connect_kwargs["timeout"] = connect_timeout
+
+            # redshift_connector only implements certificate verification modes explicitly.
+            if self.ssl_enabled and params["sslmode"] in {"verify-ca", "verify-full"}:
+                connect_kwargs["sslmode"] = params["sslmode"]
+
+            if self.ssl_insecure:
+                connect_kwargs["ssl_insecure"] = True
+
+            if tcp_keepalive:
+                connect_kwargs["tcp_keepalive"] = True
+                if tcp_keepalive_idle is not None:
+                    connect_kwargs["tcp_keepalive_idle"] = tcp_keepalive_idle
+                if tcp_keepalive_interval is not None:
+                    connect_kwargs["tcp_keepalive_interval"] = tcp_keepalive_interval
+                if tcp_keepalive_count is not None:
+                    connect_kwargs["tcp_keepalive_count"] = tcp_keepalive_count
+
+            return redshift_connector.connect(**connect_kwargs)
+
+        # psycopg2 supports keepalives/keepalives_idle/keepalives_interval/keepalives_count
+        # but the old code never passed them; tcp_keepalive params are silently ignored here.
+        connect_kwargs = {
+            "host": params["host"],
+            "port": params["port"],
+            "database": params["database"],
+            "user": params["user"],
+            "password": params["password"],
+            "sslmode": params["sslmode"],
+            "application_name": application_name,
+        }
+
+        if connect_timeout is not None:
+            connect_kwargs["connect_timeout"] = connect_timeout
+        if self.sslrootcert:
+            connect_kwargs["sslrootcert"] = self.sslrootcert
+
+        return psycopg2.connect(**connect_kwargs)
+
+    def _resolve_connect_timeout(self) -> int:
+        """Determine appropriate connection timeout based on cluster state.
+
+        For provisioned clusters, queries AWS API to detect paused/resuming status
+        and extends the timeout accordingly. For serverless clusters, the compute
+        warmth cannot be queried via API (the workgroup status is always AVAILABLE
+        even when compute is cold), so a fixed extended timeout is used to cover
+        cold-start latency (~15-30s for Serverless).
+
+        Result is cached on the instance so the API is only hit once per adapter.
+
+        Returns:
+            Connection timeout in seconds.
+        """
+        if hasattr(self, "_cached_connect_timeout"):
+            return self._cached_connect_timeout
+
+        timeout = self._compute_connect_timeout()
+        self._cached_connect_timeout = timeout
+        return timeout
+
+    def _compute_connect_timeout(self) -> int:
+        """Internal: compute timeout by checking cluster state via AWS API."""
+        if not boto3 or not self.host:
+            return self.connect_timeout
+
+        deployment_type = self.deployment_type
+        region = self._extract_region_from_hostname(self.host, deployment_type)
+        identifier = self._extract_identifier_from_hostname(self.host, deployment_type)
+
+        if not region or not identifier:
+            return self.connect_timeout
+
+        if deployment_type == "provisioned":
+            try:
+                client = boto3.client("redshift", region_name=region)
+                response = client.describe_clusters(ClusterIdentifier=identifier)
+                clusters = response.get("Clusters", [])
+                if clusters:
+                    status = clusters[0].get("ClusterStatus", "unknown").lower()
+                    if status == "available":
+                        return self.connect_timeout
+                    elif status in ("resuming", "rebooting"):
+                        self.log_verbose(f"Provisioned cluster is {status} — using extended timeout (120s)")
+                        return max(self.connect_timeout, 120)
+                    elif status == "paused":
+                        self.logger.warning(
+                            f"Redshift cluster '{identifier}' is paused. "
+                            "Resume it via the AWS console or: "
+                            f"aws redshift resume-cluster --cluster-identifier {identifier}"
+                        )
+                        return max(self.connect_timeout, 120)
+            except Exception as e:
+                self.logger.debug(f"Could not check provisioned cluster status: {e}")
+
+        elif deployment_type == "serverless":
+            # Serverless compute warmth is not queryable via the AWS API.
+            # The workgroup is always AVAILABLE even when compute is cold (auto-paused).
+            # Use an extended timeout to accommodate cold-start latency.
+            self.logger.debug("Serverless cluster: using extended timeout (60s) to cover potential cold-start")
+            return max(self.connect_timeout, 60)
+
+        return self.connect_timeout
+
+    def _long_running_timeout(self, floor: int = 300) -> int:
+        """Timeout for long-running DDL operations (DROP DATABASE, VACUUM, ANALYZE).
+
+        Returns the adaptive timeout with a minimum floor, since these operations
+        routinely exceed normal connection timeouts. Uses the adaptive timeout as a
+        base so that cluster-state awareness (paused, resuming, cold-start) is preserved.
+        """
+        return max(self._resolve_connect_timeout(), floor)
+
     def _create_admin_connection(self, **connection_config) -> Any:
         """Create Redshift connection for admin operations.
 
@@ -713,31 +857,15 @@ class RedshiftAdapter(PlatformAdapter):
         require connecting to an existing database. This uses self.admin_database
         (default: "dev") instead of the target database to avoid circular dependencies.
         """
-        params = self._get_connection_params(**connection_config)
+        connect_timeout = connection_config.pop("connect_timeout", self._resolve_connect_timeout())
+        admin_config = connection_config.copy()
+        admin_config["database"] = self.admin_database
 
-        # Override database with admin database for admin operations
-        # This prevents trying to connect to the target database to check if it exists
-        admin_params = params.copy()
-        admin_params["database"] = self.admin_database
-
-        # Use same driver as main connection
-        if redshift_connector:
-            # Use redshift_connector (preferred)
-            # Note: redshift_connector doesn't support connect_timeout or sslmode parameters
-            # It only accepts ssl=True/False (not sslmode like psycopg2)
-            return redshift_connector.connect(
-                host=admin_params["host"],
-                port=admin_params["port"],
-                database=admin_params["database"],
-                user=admin_params["user"],
-                password=admin_params["password"],
-                ssl=self.ssl_enabled,
-                application_name="BenchBox-Admin",
-            )
-        else:
-            # Fall back to psycopg2
-            admin_params["connect_timeout"] = 30
-            return psycopg2.connect(**admin_params)
+        return self._connect_with_driver(
+            application_name="BenchBox-Admin",
+            connect_timeout=connect_timeout,
+            **admin_config,
+        )
 
     def _create_direct_connection(self, **connection_config) -> Any:
         """Create direct connection to target database for validation.
@@ -758,25 +886,12 @@ class RedshiftAdapter(PlatformAdapter):
         Raises:
             Exception: If connection fails (database doesn't exist, auth fails, etc.)
         """
-        # Get connection parameters for target database
-        params = self._get_connection_params(**connection_config)
-
-        # Use redshift_connector if available, otherwise fall back to psycopg2
-        if redshift_connector:
-            # Note: redshift_connector only accepts ssl=True/False (not sslmode like psycopg2)
-            connection = redshift_connector.connect(
-                host=params["host"],
-                database=params["database"],
-                port=params["port"],
-                user=params["user"],
-                password=params["password"],
-                ssl=self.ssl_enabled,
-                application_name="BenchBox-Validation",
-            )
-        else:
-            # Fall back to psycopg2
-            params["connect_timeout"] = 30
-            connection = psycopg2.connect(**params)
+        connect_timeout = connection_config.pop("connect_timeout", self._resolve_connect_timeout())
+        connection = self._connect_with_driver(
+            application_name="BenchBox-Validation",
+            connect_timeout=connect_timeout,
+            **connection_config,
+        )
 
         # Apply WLM queue settings if configured
         if self.wlm_query_queue_name:
@@ -821,6 +936,11 @@ class RedshiftAdapter(PlatformAdapter):
         Connects to admin database to drop the target database.
         Note: DROP DATABASE must run with autocommit enabled.
         Note: Redshift doesn't support IF EXISTS for DROP DATABASE, so we check first.
+        Note: If DROP DATABASE fails with SQLSTATE 55006 (database still has active connections),
+              the method terminates backends again and retries on a *fresh* connection.
+              redshift_connector v2.1.x enters an aborted transaction state after a failed DDL
+              even with autocommit=True, causing any subsequent DDL on the same connection to
+              fail with error 25001.  Opening a new connection guarantees clean driver state.
         """
         database = connection_config.get("database", self.database)
 
@@ -830,41 +950,83 @@ class RedshiftAdapter(PlatformAdapter):
             return
 
         try:
-            # Connect to admin database (not target database)
-            connection = self._create_admin_connection()
+            # Connect to admin database with extended timeout — DROP DATABASE
+            # can take 30-120+ seconds on Redshift depending on cluster state.
+            connection = self._create_admin_connection(connect_timeout=self._long_running_timeout())
             connection.autocommit = True  # Enable autocommit for DROP DATABASE
-            cursor = connection.cursor()
 
-            # Try to drop database first (graceful approach)
-            # Quote identifier for SQL safety
+            # Terminate any existing connections first to avoid "being accessed" errors
+            # and to speed up the DROP.  This is safe because we only kill sessions
+            # attached to the *target* database, not the admin database we're on.
+            cursor = connection.cursor()
+            self.log_verbose(f"Terminating existing connections to {database}...")
+            cursor.execute(
+                """
+                SELECT pg_terminate_backend(procpid)
+                FROM pg_stat_activity
+                WHERE datname = %s AND procpid <> pg_backend_pid()
+                """,
+                (database,),
+            )
+
+            # Drop the database (quote identifier for SQL safety)
             try:
                 cursor.execute(f'DROP DATABASE "{database}"')
             except Exception as drop_error:
-                # If drop fails due to active connections, terminate them and retry
-                error_msg = str(drop_error).lower()
-                if "active connection" in error_msg or "being accessed" in error_msg:
-                    self.log_verbose("Database has active connections, terminating them...")
-                    # Terminate existing connections as fallback
-                    # Note: Use 'pid' column (not deprecated 'procpid')
-                    cursor.execute(
-                        """
-                        SELECT pg_terminate_backend(pid)
-                        FROM pg_stat_activity
-                        WHERE datname = %s AND pid <> pg_backend_pid()
-                    """,
-                        (database,),
-                    )
-                    # Retry drop after terminating connections (quoted for SQL safety)
-                    cursor.execute(f'DROP DATABASE "{database}"')
+                # Re-raise if not SQLSTATE 55006 (object_in_use / database has active connections).
+                # Check structured error code first (redshift_connector stores the server dict in
+                # args[0] with key 'C'; psycopg2 exposes it as pgcode).  Fall back to substring
+                # matching only for unknown exception types so future driver versions don't silently
+                # skip the retry.
+                sqlstate = None
+                first_arg = drop_error.args[0] if drop_error.args else None
+                if isinstance(first_arg, dict):
+                    sqlstate = first_arg.get("C")  # redshift_connector wire-protocol dict
+                if sqlstate is None:
+                    sqlstate = getattr(drop_error, "pgcode", None)  # psycopg2
+                if sqlstate is not None:
+                    if sqlstate != "55006":
+                        raise
                 else:
-                    # Re-raise if not a connection issue
-                    raise
+                    # Unknown driver — fall back to message text
+                    error_msg = str(drop_error).lower()
+                    if "active connection" not in error_msg and "being accessed" not in error_msg:
+                        raise
+                # Retry with a fresh connection — redshift_connector can enter an aborted
+                # transaction state after a failed DDL, causing subsequent DDL to fail with
+                # error 25001 even when autocommit=True.  A fresh connection guarantees clean state.
+                self.log_verbose("Database still has active connections after terminate, retrying...")
+                cursor.close()
+                try:
+                    connection.close()
+                except Exception:
+                    pass  # best-effort; fresh connection is the goal
+                connection = self._create_admin_connection(connect_timeout=self._long_running_timeout())
+                connection.autocommit = True
+                cursor = connection.cursor()
+                cursor.execute(
+                    """
+                    SELECT pg_terminate_backend(procpid)
+                    FROM pg_stat_activity
+                    WHERE datname = %s AND procpid <> pg_backend_pid()
+                    """,
+                    (database,),
+                )
+                cursor.execute(f'DROP DATABASE "{database}"')
 
         except Exception as e:
             raise RuntimeError(f"Failed to drop Redshift database {database}: {e}") from e
         finally:
+            if "cursor" in locals():
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
             if "connection" in locals() and connection:
-                connection.close()
+                try:
+                    connection.close()
+                except Exception:
+                    pass
 
     def create_connection(self, **connection_config) -> Any:
         """Create optimized Redshift connection."""
@@ -908,40 +1070,19 @@ class RedshiftAdapter(PlatformAdapter):
         self.log_very_verbose(f"Redshift connection params: host={params.get('host')}, database={target_database}")
 
         try:
-            if redshift_connector:
-                # Use redshift_connector (preferred)
-                # Note: redshift_connector only accepts ssl=True/False (not sslmode like psycopg2)
-                connection = redshift_connector.connect(
-                    host=params["host"],
-                    port=params["port"],
-                    database=params["database"],
-                    user=params["user"],
-                    password=params["password"],
-                    ssl=self.ssl_enabled,
-                    # Connection optimization
-                    application_name="BenchBox",
-                    tcp_keepalive=True,
-                    tcp_keepalive_idle=600,
-                    tcp_keepalive_interval=30,
-                    tcp_keepalive_count=3,
-                )
-                # Enable autocommit immediately after connection creation (before any SQL operations)
-                connection.autocommit = True
-            else:
-                # Fall back to psycopg2 (already imported at top of file)
-                connection = psycopg2.connect(
-                    host=params["host"],
-                    port=params["port"],
-                    database=params["database"],
-                    user=params["user"],
-                    password=params["password"],
-                    sslmode=params["sslmode"],
-                    application_name="BenchBox",
-                    connect_timeout=self.connect_timeout,
-                )
-
-                # Enable autocommit for benchmark workloads (no transactions needed)
-                connection.autocommit = True
+            connect_timeout = connection_config.get("connect_timeout", self._resolve_connect_timeout())
+            connect_config = {k: v for k, v in connection_config.items() if k != "connect_timeout"}
+            connection = self._connect_with_driver(
+                application_name="BenchBox",
+                connect_timeout=connect_timeout,
+                tcp_keepalive=True,
+                tcp_keepalive_idle=600,
+                tcp_keepalive_interval=30,
+                tcp_keepalive_count=3,
+                **connect_config,
+            )
+            # Enable autocommit immediately after connection creation (before any SQL operations)
+            connection.autocommit = True
 
             # Apply WLM settings and schema search path
             cursor = connection.cursor()
@@ -1037,18 +1178,68 @@ class RedshiftAdapter(PlatformAdapter):
             platform_config=getattr(self, "__dict__", None),
         )
         data_source = resolver.resolve(benchmark, data_dir)
+        if self._should_use_manifest_selected_files(data_source):
+            manifest_source = next((p for p in resolver.providers if isinstance(p, ManifestFileSource)), None)
+            if manifest_source is not None:
+                manifest_data_source = manifest_source.get_data_source(benchmark, data_dir)
+                if manifest_data_source and manifest_data_source.tables:
+                    self.log_verbose(
+                        "Redshift native mode detected directory-valued benchmark tables; "
+                        "using manifest-selected native files instead"
+                    )
+                    data_source = manifest_data_source
         if not data_source or not data_source.tables:
             raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
         return data_source.tables
 
+    def _should_use_manifest_selected_files(self, data_source: Any) -> bool:
+        """Use manifest-selected files when native benchmark tables only point at directories."""
+        if getattr(self, "table_mode", "native") == "external":
+            return False
+        if not data_source or getattr(data_source, "source_type", None) not in {
+            "benchmark_tables",
+            "benchmark_impl_tables",
+        }:
+            return False
+
+        for table_paths in data_source.tables.values():
+            normalized_paths = table_paths if isinstance(table_paths, list) else [table_paths]
+            for path_like in normalized_paths:
+                path = Path(path_like)
+                if path.exists() and path.is_dir():
+                    return True
+        return False
+
     def _create_s3_client(self):
         """Create S3 client with explicit error handling."""
         try:
-            return boto3.client(
-                "s3",
+            # XOR check: reject partial credentials — both key ID and secret must be
+            # provided together, or both omitted (to fall back to environment/IAM).
+            if bool(self.aws_access_key_id) != bool(self.aws_secret_access_key):
+                raise ValueError(
+                    "Explicit S3 upload credentials require both aws_access_key_id and aws_secret_access_key."
+                )
+
+            session = boto3.Session(
                 aws_access_key_id=self.aws_access_key_id,
                 aws_secret_access_key=self.aws_secret_access_key,
+                aws_session_token=self.aws_session_token,
                 region_name=self.aws_region,
+            )
+            if session.get_credentials() is None:
+                raise ValueError(
+                    "AWS credentials not found. Configure credentials via:\n"
+                    "  1. Explicit S3 upload credentials in config\n"
+                    "  2. AWS CLI (aws configure)\n"
+                    "  3. Environment variables (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY)"
+                )
+
+            # request_checksum_calculation="when_required" prevents botocore from wrapping
+            # upload streams in AwsChunkedWrapper (introduced in botocore 1.35+). Without this,
+            # retried uploads fail with "Need to rewind the stream... but stream is not seekable".
+            return session.client(
+                "s3",
+                config=BotocoreConfig(request_checksum_calculation="when_required"),
             )
         except NoCredentialsError as e:
             raise ValueError(
@@ -1118,12 +1309,26 @@ class RedshiftAdapter(PlatformAdapter):
         else:
             return s3_uris[0], ""
 
+    @staticmethod
+    def _sanitize_copy_credential(value: str, name: str) -> str:
+        """Reject credential values containing single quotes to prevent COPY SQL injection."""
+        if "'" in value:
+            raise ValueError(
+                f"Credential '{name}' contains a single-quote character, which is not allowed in COPY SQL."
+            )
+        return value
+
     def _get_copy_credentials_clause(self) -> str:
         """Build credentials clause for Redshift COPY command."""
         if self.iam_role:
-            return f"IAM_ROLE '{self.iam_role}'"
+            return f"IAM_ROLE '{self._sanitize_copy_credential(self.iam_role, 'iam_role')}'"
         elif self.aws_access_key_id and self.aws_secret_access_key:
-            return f"ACCESS_KEY_ID '{self.aws_access_key_id}' SECRET_ACCESS_KEY '{self.aws_secret_access_key}'"
+            key_id = self._sanitize_copy_credential(self.aws_access_key_id, "aws_access_key_id")
+            secret = self._sanitize_copy_credential(self.aws_secret_access_key, "aws_secret_access_key")
+            if self.aws_session_token:
+                token = self._sanitize_copy_credential(self.aws_session_token, "aws_session_token")
+                return f"ACCESS_KEY_ID '{key_id}' SECRET_ACCESS_KEY '{secret}' SESSION_TOKEN '{token}'"
+            return f"ACCESS_KEY_ID '{key_id}' SECRET_ACCESS_KEY '{secret}'"
         else:
             self.log_verbose("No explicit credentials configured for COPY; using cluster default IAM role")
             return ""
@@ -1131,12 +1336,17 @@ class RedshiftAdapter(PlatformAdapter):
     def _load_table_via_s3(self, cursor, s3_client, table_name: str, valid_files: list[Path], connection: Any) -> int:
         """Upload files to S3 and load a single table via COPY command. Returns row count."""
         table_name_lower = table_name.lower()
+        parquet_modes = {is_parquet_format(file_path) for file_path in valid_files}
+        if len(parquet_modes) > 1:
+            raise ValueError(
+                f"Redshift COPY requires a uniform source format per table; received mixed parquet and delimited "
+                f"files for '{table_name_lower}'."
+            )
+        is_parquet_copy = parquet_modes == {True}
 
         # Upload all files to S3 and collect S3 URIs
         s3_uris = []
         for file_idx, file_path in enumerate(valid_files):
-            file_path = Path(file_path)
-            delimiter = get_delimiter_for_file(file_path)
             s3_uris.append(self._upload_file_to_s3(s3_client, file_path, table_name, file_idx))
 
         copy_from_path, manifest_option = self._build_s3_copy_source(s3_client, s3_uris, table_name)
@@ -1151,20 +1361,29 @@ class RedshiftAdapter(PlatformAdapter):
             compression_option = ""
 
         credentials_clause = self._get_copy_credentials_clause()
-        delimiter = get_delimiter_for_file(valid_files[0])
 
         # Build and execute COPY command
         qualified_table = f"{self.schema}.{table_name_lower}"
-        copy_sql = f"""
-            COPY {qualified_table}
-            FROM '{copy_from_path}'
-            {credentials_clause}
-            {manifest_option}
-            {compression_option}
-            DELIMITER '{delimiter}'
-            IGNOREHEADER 0
-            COMPUPDATE {self.compupdate}
-        """
+        if is_parquet_copy:
+            copy_sql = f"""
+                COPY {qualified_table}
+                FROM '{copy_from_path}'
+                {credentials_clause}
+                {manifest_option}
+                FORMAT AS PARQUET
+            """
+        else:
+            delimiter = get_delimiter_for_file(valid_files[0])
+            copy_sql = f"""
+                COPY {qualified_table}
+                FROM '{copy_from_path}'
+                {credentials_clause}
+                {manifest_option}
+                {compression_option}
+                DELIMITER '{delimiter}'
+                IGNOREHEADER 0
+                COMPUPDATE {self.compupdate}
+            """
 
         cursor.execute(copy_sql)
 
@@ -1544,30 +1763,86 @@ class RedshiftAdapter(PlatformAdapter):
                         f"Cache control validated successfully: cache_disabled={validation_result['cache_disabled']}"
                     )
 
-            # Run VACUUM and ANALYZE on all tables if configured
+            # Run VACUUM and ANALYZE on all tables if configured.
+            # These operations use a **separate connection** because they are
+            # long-running DDL operations that can trigger socket-level timeouts
+            # (e.g. on paused serverless clusters).  A socket timeout permanently
+            # breaks the underlying TCP connection — rollback() cannot recover it
+            # because the socket itself is dead.  By isolating VACUUM/ANALYZE on
+            # their own connection, a timeout only destroys the disposable
+            # connection while the main benchmark connection stays healthy.
             if self.auto_vacuum or self.auto_analyze:
-                cursor.execute(f"""
-                    SELECT schemaname, tablename
-                    FROM pg_tables
-                    WHERE schemaname = '{self.schema}'
-                """)
-                tables = cursor.fetchall()
-
-                for _schema, table in tables:
-                    if self.auto_vacuum:
-                        try:
-                            cursor.execute(f"VACUUM {table}")
-                        except Exception as e:
-                            self.logger.warning(f"VACUUM failed for {table}: {e}")
-
-                    if self.auto_analyze:
-                        try:
-                            cursor.execute(f"ANALYZE {table}")
-                        except Exception as e:
-                            self.logger.warning(f"ANALYZE failed for {table}: {e}")
+                self._run_vacuum_analyze_isolated(connection)
 
         finally:
             cursor.close()
+
+    def _run_vacuum_analyze_isolated(self, main_connection: Any) -> None:
+        """Run VACUUM/ANALYZE on a dedicated connection to protect the main one.
+
+        VACUUM and ANALYZE are long-running DDL operations that can trigger
+        socket-level timeouts, especially on paused serverless clusters.
+        A socket timeout permanently breaks the TCP connection, so these
+        operations must be isolated from the benchmark connection.
+
+        Args:
+            main_connection: The main benchmark connection (used only to
+                query the table list; VACUUM/ANALYZE run on a separate conn).
+        """
+        # Query table list using the main connection (fast metadata query)
+        main_cursor = main_connection.cursor()
+        try:
+            main_cursor.execute(f"""
+                SELECT schemaname, tablename
+                FROM pg_tables
+                WHERE schemaname = '{self.schema}'
+            """)
+            tables = main_cursor.fetchall()
+        finally:
+            main_cursor.close()
+
+        if not tables:
+            return
+
+        # Create a separate connection for VACUUM/ANALYZE.
+        # The finally block is the single owner of cleanup — error paths
+        # just return and let finally close the connection.
+        maint_conn = None
+        try:
+            maint_conn = self._connect_with_driver(
+                application_name="BenchBox-Maintenance",
+                connect_timeout=self._long_running_timeout(),
+            )
+            maint_conn.autocommit = True
+            maint_cursor = maint_conn.cursor()
+            # Set search_path to match the main connection
+            maint_cursor.execute(f'SET search_path TO "{self.schema}"')
+
+            for _schema, table in tables:
+                ops = []
+                if self.auto_vacuum:
+                    ops.append(("VACUUM", f'VACUUM "{table}"'))
+                if self.auto_analyze:
+                    ops.append(("ANALYZE", f'ANALYZE "{table}"'))
+
+                for op_name, sql in ops:
+                    try:
+                        maint_cursor.execute(sql)
+                    except Exception as e:
+                        self.logger.warning(f"{op_name} failed for {table}: {e}")
+                        self.logger.warning(
+                            f"Maintenance connection lost during {op_name} — skipping remaining VACUUM/ANALYZE"
+                        )
+                        return
+
+        except Exception as e:
+            self.logger.warning(f"Could not create maintenance connection for VACUUM/ANALYZE: {e}")
+        finally:
+            if maint_conn is not None:
+                try:
+                    maint_conn.close()
+                except Exception:
+                    pass
 
     def validate_session_cache_control(self, connection: Any) -> dict[str, Any]:
         """Validate that session-level cache control settings were successfully applied.
@@ -1690,24 +1965,10 @@ class RedshiftAdapter(PlatformAdapter):
             cursor.close()
 
     def _extract_table_name(self, statement: str) -> str | None:
-        """Extract table name from CREATE TABLE statement.
+        """Extract table name from CREATE TABLE statement."""
+        from benchbox.core.sql_utils import extract_table_name
 
-        Args:
-            statement: CREATE TABLE SQL statement
-
-        Returns:
-            Table name or None if not found
-        """
-        try:
-            # Simple extraction: find text between "CREATE TABLE" and "("
-            import re
-
-            match = re.search(r"CREATE\s+TABLE\s+([^\s(]+)", statement, re.IGNORECASE)
-            if match:
-                return match.group(1).strip()
-        except Exception:
-            pass
-        return None
+        return extract_table_name(statement)
 
     def _normalize_table_name_in_sql(self, sql: str) -> str:
         """Normalize table names in SQL to lowercase for Redshift."""
@@ -1748,24 +2009,42 @@ class RedshiftAdapter(PlatformAdapter):
             result = cursor.fetchone()
             metadata["redshift_version"] = result[0] if result else "unknown"
 
-            # Get cluster information
-            cursor.execute("""
-                SELECT
-                    node_type,
-                    num_nodes,
-                    cluster_version,
-                    publicly_accessible
-                FROM stv_cluster_configuration
-                LIMIT 1
-            """)
-            result = cursor.fetchone()
-            if result:
-                metadata["cluster_info"] = {
-                    "node_type": result[0],
-                    "num_nodes": result[1],
-                    "cluster_version": result[2],
-                    "publicly_accessible": result[3],
-                }
+            # Get cluster information (STV tables unavailable on Serverless)
+            try:
+                if self.deployment_type == "serverless":
+                    cursor.execute("""
+                        SELECT compute_capacity
+                        FROM sys_serverless_usage
+                        ORDER BY start_time DESC
+                        LIMIT 1
+                    """)
+                    result = cursor.fetchone()
+                    if result:
+                        metadata["cluster_info"] = {
+                            "deployment_type": "serverless",
+                            "compute_capacity_rpu": result[0],
+                        }
+                else:
+                    cursor.execute("""
+                        SELECT
+                            node_type,
+                            num_nodes,
+                            cluster_version,
+                            publicly_accessible
+                        FROM stv_cluster_configuration
+                        LIMIT 1
+                    """)
+                    result = cursor.fetchone()
+                    if result:
+                        metadata["cluster_info"] = {
+                            "deployment_type": "provisioned",
+                            "node_type": result[0],
+                            "num_nodes": result[1],
+                            "cluster_version": result[2],
+                            "publicly_accessible": result[3],
+                        }
+            except Exception as e:
+                self.logger.debug(f"Could not query cluster information: {e}")
 
             # Get current session information
             cursor.execute("""
@@ -1867,28 +2146,54 @@ class RedshiftAdapter(PlatformAdapter):
 
             redshift_query_id = result[0]
 
-            # Query STL tables for query statistics using the actual Redshift query ID
-            cursor.execute(
-                """
-                SELECT
-                    query,
-                    DATEDIFF('microseconds', starttime, endtime) as duration_microsecs,
-                    DATEDIFF('microseconds', starttime, endtime) as cpu_time_microsecs,
-                    0 as bytes_scanned,
-                    0 as bytes_returned,
-                    1 as slots,
-                    1 as wlm_slots,
-                    aborted
-                FROM stl_query
-                WHERE query = %s
-                ORDER BY starttime DESC
-                LIMIT 1
-            """,
-                (redshift_query_id,),
-            )
+            # Query system tables for statistics (STL unavailable on Serverless)
+            if self.deployment_type == "serverless":
+                cursor.execute(
+                    """
+                    SELECT
+                        query_id,
+                        DATEDIFF('microseconds', start_time, end_time) as duration_microsecs,
+                        DATEDIFF('microseconds', start_time, end_time) as cpu_time_microsecs,
+                        0 as bytes_scanned,
+                        0 as bytes_returned,
+                        1 as slots,
+                        1 as wlm_slots,
+                        status
+                    FROM sys_query_history
+                    WHERE query_id = %s
+                    ORDER BY start_time DESC
+                    LIMIT 1
+                """,
+                    (redshift_query_id,),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT
+                        query,
+                        DATEDIFF('microseconds', starttime, endtime) as duration_microsecs,
+                        DATEDIFF('microseconds', starttime, endtime) as cpu_time_microsecs,
+                        0 as bytes_scanned,
+                        0 as bytes_returned,
+                        1 as slots,
+                        1 as wlm_slots,
+                        aborted
+                    FROM stl_query
+                    WHERE query = %s
+                    ORDER BY starttime DESC
+                    LIMIT 1
+                """,
+                    (redshift_query_id,),
+                )
             result = cursor.fetchone()
 
             if result:
+                # sys_query_history returns status string; stl_query returns aborted int
+                raw_aborted = result[7]
+                if isinstance(raw_aborted, str):
+                    aborted = raw_aborted not in ("success", "running")
+                else:
+                    aborted = bool(raw_aborted) if raw_aborted is not None else False
                 return {
                     "query_id": str(result[0]),
                     "duration_microsecs": result[1] or 0,
@@ -1897,7 +2202,7 @@ class RedshiftAdapter(PlatformAdapter):
                     "bytes_returned": result[4] or 0,
                     "slots": result[5] or 1,
                     "wlm_slots": result[6] or 1,
-                    "aborted": bool(result[7]) if result[7] is not None else False,
+                    "aborted": aborted,
                 }
             else:
                 return {}
@@ -2299,6 +2604,7 @@ def _build_redshift_config(
         "iam_role": merged_options.get("iam_role"),
         "aws_access_key_id": merged_options.get("aws_access_key_id"),
         "aws_secret_access_key": merged_options.get("aws_secret_access_key"),
+        "aws_session_token": merged_options.get("aws_session_token"),
         "aws_region": merged_options.get("aws_region"),
         # Optional settings
         "cluster_identifier": merged_options.get("cluster_identifier"),

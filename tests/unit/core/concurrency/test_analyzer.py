@@ -7,13 +7,13 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import pytest
 
-from benchbox.core.concurrency.analyzer import (
+from benchbox.experimental.concurrency.analyzer import (
     ConcurrencyAnalyzer,
     ContentionAnalysis,
     QueueAnalysis,
     ScalingAnalysis,
 )
-from benchbox.core.concurrency.executor import (
+from benchbox.experimental.concurrency.executor import (
     ConcurrentLoadResult,
     QueryExecution,
     StreamResult,

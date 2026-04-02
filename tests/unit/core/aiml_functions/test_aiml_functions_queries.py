@@ -7,8 +7,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import pytest
 
-from benchbox.core.aiml_functions.functions import AIMLFunctionCategory
-from benchbox.core.aiml_functions.queries import AIMLQuery, AIMLQueryManager
+from benchbox.experimental.aiml_functions.functions import AIMLFunctionCategory
+from benchbox.experimental.aiml_functions.queries import AIMLQuery, AIMLQueryManager
 
 pytestmark = [
     pytest.mark.unit,

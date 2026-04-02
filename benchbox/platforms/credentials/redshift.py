@@ -9,7 +9,7 @@ import contextlib
 import os
 import socket
 import time
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from rich.console import Console
 from rich.prompt import Confirm, IntPrompt
@@ -265,6 +265,103 @@ def _prompt_default_output_location(
     )
 
 
+_REDSHIFT_ADAPTER_CREDENTIAL_KEYS = (
+    "host",
+    "port",
+    "database",
+    "username",
+    "password",
+    "schema",
+    "s3_bucket",
+    "s3_prefix",
+    "staging_root",
+    "iam_role",
+    "aws_access_key_id",
+    "aws_secret_access_key",
+    "aws_region",
+    "cluster_identifier",
+    "admin_database",
+    "connect_timeout",
+    "statement_timeout",
+    "sslmode",
+    "ssl_enabled",
+    "ssl_insecure",
+    "sslrootcert",
+    "wlm_query_slot_count",
+    "wlm_query_queue_name",
+    "wlm_config",
+    "compupdate",
+    "auto_vacuum",
+    "auto_analyze",
+)
+
+
+def _build_redshift_adapter(creds: dict[str, Any]) -> Any:
+    """Build a Redshift adapter from saved credentials."""
+    from benchbox.platforms.redshift import RedshiftAdapter
+
+    adapter_kwargs = {key: creds[key] for key in _REDSHIFT_ADAPTER_CREDENTIAL_KEYS if key in creds}
+    return RedshiftAdapter(**adapter_kwargs)
+
+
+def _probe_redshift_connection(adapter: Any, *, database: str, connect_timeout: int) -> None:
+    """Open a direct validation connection and run smoke queries."""
+    connection = None
+    cursor = None
+
+    try:
+        connection = adapter._create_direct_connection(database=database, connect_timeout=connect_timeout)
+        cursor = connection.cursor()
+
+        cursor.execute("SELECT 1")
+        cursor.fetchall()
+
+        cursor.execute("SELECT version()")
+        cursor.fetchall()
+
+        cursor.execute("SELECT current_database()")
+        cursor.fetchall()
+    finally:
+        if cursor:
+            with contextlib.suppress(Exception):
+                cursor.close()
+        if connection:
+            with contextlib.suppress(Exception):
+                connection.close()
+
+
+def _is_timeout_error(error_msg: str) -> bool:
+    """Return True when the driver reported a timeout-style failure."""
+    error_lower = error_msg.lower()
+    return "timeout" in error_lower or "timed out" in error_lower
+
+
+def _is_retryable_error(error_msg: str) -> bool:
+    """Return True for transient errors worth retrying (timeout, connection refused)."""
+    error_lower = error_msg.lower()
+    return _is_timeout_error(error_msg) or "could not connect" in error_lower or "connection refused" in error_lower
+
+
+def _format_redshift_validation_error(error_msg: str, database: str) -> str:
+    """Map driver errors to user-facing Redshift setup guidance."""
+    error_lower = error_msg.lower()
+
+    if _is_timeout_error(error_msg):
+        return "Connection timeout. Check VPC/security group settings and network connectivity."
+    if "could not connect" in error_lower or "connection refused" in error_lower:
+        return "Connection refused. Check cluster endpoint, VPC/security group settings, and network connectivity."
+    if "password authentication failed" in error_lower or "authentication" in error_lower:
+        return "Authentication failed. Check your username and password."
+    if "cluster" in error_lower and "not found" in error_lower:
+        return "Cluster endpoint is invalid or cluster does not exist."
+    if "database" in error_lower and "does not exist" in error_lower:
+        return f"Database '{database}' not found. It will be created during benchmark setup."
+    if "server refuses ssl" in error_lower:
+        return "SSL negotiation failed. Check that the endpoint is a Redshift endpoint that accepts TLS on port 5439."
+
+    return f"Connection failed: {error_msg}"
+
+
 def validate_redshift_credentials(
     cred_manager: CredentialManager, console: Optional[Union[Console, QuietConsoleProxy]] = None
 ) -> tuple[bool, Optional[str]]:
@@ -291,23 +388,14 @@ def validate_redshift_credentials(
     host = creds["host"]
     port = creds.get("port", 5439)
     database = creds.get("database", "dev")
-    username = creds["username"]
-    password = creds["password"]
     aws_access_key_id = creds.get("aws_access_key_id")
     aws_secret_access_key = creds.get("aws_secret_access_key")
     aws_region = creds.get("aws_region", "us-east-1")
 
-    # Try to import Redshift connector (prefer redshift-connector, fallback to psycopg2)
-    redshift_connector = None
-    psycopg2 = None
-
     try:
-        import redshift_connector
-    except ImportError:
-        try:
-            import psycopg2
-        except ImportError:
-            return False, "Redshift connector not installed. Run: pip install redshift-connector (or psycopg2)"
+        adapter = _build_redshift_adapter(creds)
+    except ImportError as e:
+        return False, str(e)
 
     # Step 1: Test TCP connectivity first (quick check)
     if console:
@@ -341,7 +429,6 @@ def validate_redshift_credentials(
     retry_delays = [0, 2, 5]  # seconds between retries
 
     last_error = None
-    connection = None
 
     for attempt in range(max_retries):
         try:
@@ -353,77 +440,17 @@ def validate_redshift_credentials(
             # Attempt connection with progressive timeout
             timeout = 10 + (attempt * 10)  # 10s, 20s, 30s
 
-            if redshift_connector:
-                # Use official Amazon Redshift connector
-                connection = redshift_connector.connect(
-                    host=host,
-                    port=port,
-                    database=database,
-                    user=username,
-                    password=password,
-                    ssl=True,
-                    sslmode="prefer",
-                    timeout=timeout,
-                )
-            else:
-                # Fallback to psycopg2 (PostgreSQL-compatible)
-                connection = psycopg2.connect(
-                    host=host,
-                    port=port,
-                    database=database,
-                    user=username,
-                    password=password,
-                    sslmode="require",
-                    connect_timeout=timeout,
-                )
-
-            cursor = connection.cursor()
-
-            # Test basic query
-            cursor.execute("SELECT 1")
-            cursor.fetchall()
-
-            # Test version access
-            cursor.execute("SELECT version()")
-            cursor.fetchall()
-
-            # Test database access
-            cursor.execute("SELECT current_database()")
-            cursor.fetchall()
-
-            cursor.close()
-            connection.close()
-
-            # Success!
+            _probe_redshift_connection(adapter, database=database, connect_timeout=timeout)
             return True, None
 
         except Exception as e:
             last_error = e
-            error_msg = str(e)
 
-            # Check if this is a retryable error
-            is_timeout = "timeout" in error_msg.lower()
-            is_connection_error = "could not connect" in error_msg.lower() or "connection refused" in error_msg.lower()
-
-            # Don't retry auth errors or other non-transient errors
-            if "password authentication failed" in error_msg.lower() or "authentication" in error_msg.lower():
-                return False, "Authentication failed. Check your username and password."
-            elif "cluster" in error_msg.lower() and "not found" in error_msg.lower():
-                return False, "Cluster endpoint is invalid or cluster does not exist."
-            elif "database" in error_msg.lower() and "does not exist" in error_msg.lower():
-                return False, f"Database '{database}' not found. It will be created during benchmark setup."
-
-            # Continue retrying for timeout/connection errors
-            if attempt < max_retries - 1 and (is_timeout or is_connection_error):
+            # Only retry transient errors (timeout, connection refused) with attempts remaining
+            if attempt < max_retries - 1 and _is_retryable_error(str(e)):
                 continue
-            else:
-                # Last attempt failed
-                break
 
-        finally:
-            if connection:
-                with contextlib.suppress(Exception):
-                    connection.close()
+            break
 
     # All retries exhausted
     error_msg = str(last_error)
@@ -434,16 +461,7 @@ def validate_redshift_credentials(
         _format_diagnostic_output(console, host, port, aws_region, diagnostics)
         _format_remediation_steps(console, host, port, aws_region, diagnostics, tcp_reachable)
 
-    # Make error more user-friendly
-    if "timeout" in error_msg.lower():
-        return False, "Connection timeout. Check VPC/security group settings and network connectivity."
-    elif "could not connect" in error_msg.lower() or "connection refused" in error_msg.lower():
-        return (
-            False,
-            "Connection refused. Check cluster endpoint, VPC/security group settings, and network connectivity.",
-        )
-    else:
-        return False, f"Connection failed: {error_msg}"
+    return False, _format_redshift_validation_error(error_msg, database)
 
 
 def _auto_detect_redshift(console: Union[Console, QuietConsoleProxy]) -> Optional[dict]:

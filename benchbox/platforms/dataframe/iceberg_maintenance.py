@@ -32,7 +32,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 try:
-    import pyiceberg
     from pyiceberg.catalog import Catalog, load_catalog
     from pyiceberg.expressions import (
         AlwaysTrue,
@@ -47,7 +46,6 @@ try:
 
     ICEBERG_AVAILABLE = True
 except ImportError:
-    pyiceberg = None  # type: ignore[assignment]
     Catalog = None  # type: ignore[assignment, misc]
     load_catalog = None  # type: ignore[assignment]
     Table = None  # type: ignore[assignment, misc]

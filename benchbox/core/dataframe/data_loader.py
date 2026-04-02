@@ -926,35 +926,44 @@ class DataFrameDataLoader:
         Returns:
             Dictionary mapping table name to list of file paths
         """
-        # First try benchmark.tables attribute
-        if hasattr(benchmark, "tables") and benchmark.tables:
-            tables = benchmark.tables
-            if isinstance(tables, dict):
-                resolved: dict[str, list[Path]] = {}
-                for name, path in tables.items():
-                    if isinstance(path, list):
-                        resolved[name] = [Path(p) if not isinstance(p, Path) else p for p in path]
-                    else:
-                        resolved[name] = [Path(path) if not isinstance(path, Path) else path]
-                return resolved
+        resolved = self._resolve_table_paths(getattr(benchmark, "tables", None))
 
-        # Then try data_dir
-        if data_dir and data_dir.exists():
+        # Then try data_dir (_discover_files already filters directories at scan time)
+        if not resolved and data_dir and data_dir.exists():
             return self._discover_files(data_dir)
 
         # Finally try benchmark._impl.tables
-        if hasattr(benchmark, "_impl") and hasattr(benchmark._impl, "tables"):
-            tables = benchmark._impl.tables
-            if isinstance(tables, dict):
-                resolved: dict[str, list[Path]] = {}
-                for name, path in tables.items():
-                    if isinstance(path, list):
-                        resolved[name] = [Path(p) if not isinstance(p, Path) else p for p in path]
-                    else:
-                        resolved[name] = [Path(path) if not isinstance(path, Path) else path]
-                return resolved
+        if not resolved and hasattr(benchmark, "_impl"):
+            resolved = self._resolve_table_paths(getattr(benchmark._impl, "tables", None))
 
-        return {}
+        if not resolved:
+            return {}
+
+        # Guard: reject directory paths from manifest-populated sources.
+        # Manifest validation should catch contamination first, but if a
+        # directory path leaks through, fail early instead of surfacing
+        # IsADirectoryError from pandas/polars.
+        for name, paths in resolved.items():
+            dir_paths = [p for p in paths if p.is_dir()]
+            if dir_paths:
+                raise ValueError(
+                    f"Table '{name}': expected file path(s) but found directory: {dir_paths[0]}. "
+                    f"This may indicate stale data from a previous format conversion. "
+                    f"Use --force datagen to regenerate."
+                )
+
+        return resolved
+
+    def _resolve_table_paths(self, tables: Any) -> dict[str, list[Path]]:
+        """Normalize a benchmark table mapping into ``dict[str, list[Path]]``."""
+        if not isinstance(tables, dict):
+            return {}
+
+        resolved: dict[str, list[Path]] = {}
+        for name, path in tables.items():
+            entries = path if isinstance(path, list) else [path]
+            resolved[name] = [entry if isinstance(entry, Path) else Path(entry) for entry in entries]
+        return resolved
 
     def _expected_benchmark_tables(self, benchmark: Any) -> set[str]:
         """Infer expected table names for a benchmark run when available."""
@@ -1341,12 +1350,11 @@ class DataFrameDataLoader:
                 schema = benchmark.get_schema()
                 for table_name, table_schema in schema.items():
                     columns = table_schema.get("columns", [])
-                    col_types = {}
-                    for c in columns:
-                        sql_type = c.get("type", "")
-                        arrow_type = SchemaMapper.PYARROW_TYPE_MAP.get(sql_type)
-                        if arrow_type:
-                            col_types[c["name"]] = arrow_type
+                    col_types = self._extract_arrow_types(
+                        columns,
+                        get_name=lambda column: column["name"],
+                        get_sql_type=lambda column: column.get("type", ""),
+                    )
                     if col_types:
                         type_info[table_name.lower()] = col_types
             except Exception:
@@ -1358,17 +1366,26 @@ class DataFrameDataLoader:
 
             for table in TABLES:
                 if table.name.lower() not in type_info:
-                    col_types = {}
-                    for col in table.columns:
-                        arrow_type = SchemaMapper.PYARROW_TYPE_MAP.get(col.data_type.value)
-                        if arrow_type:
-                            col_types[col.name] = arrow_type
+                    col_types = self._extract_arrow_types(
+                        table.columns,
+                        get_name=lambda column: column.name,
+                        get_sql_type=lambda column: column.data_type.value,
+                    )
                     if col_types:
                         type_info[table.name.lower()] = col_types
         except ImportError:
             pass
 
         return type_info
+
+    def _extract_arrow_types(self, columns: Any, get_name, get_sql_type) -> dict[str, str]:
+        """Extract supported Arrow types from a schema column iterable."""
+        col_types: dict[str, str] = {}
+        for column in columns:
+            arrow_type = SchemaMapper.PYARROW_TYPE_MAP.get(get_sql_type(column))
+            if arrow_type:
+                col_types[get_name(column)] = arrow_type
+        return col_types
 
 
 def get_tpch_column_names() -> dict[str, list[str]]:

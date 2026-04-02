@@ -50,8 +50,8 @@ class TestEMRServerlessCoverage:
         client.get_application.return_value = {"application": {"state": "CREATED"}}
         with patch.object(adapter, "_wait_for_application_state") as waiter:
             adapter._ensure_application_started()
-            client.start_application.assert_called_once()
-            waiter.assert_called_once()
+            client.start_application.assert_called_once_with(applicationId="app-123")
+            waiter.assert_called_once_with("app-123", ["STARTED"])
 
         client.get_application.return_value = {"application": {"state": "STARTED"}}
         adapter._ensure_application_started()

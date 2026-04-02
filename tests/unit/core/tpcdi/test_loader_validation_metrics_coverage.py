@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+import benchbox.utils.printing as printing
 from benchbox.core.tpcdi.etl.results import ETLPhaseResult, ETLResult
 from benchbox.core.tpcdi.loader import TPCDIDataLoader
 from benchbox.core.tpcdi.metrics import BenchmarkMetrics, TPCDIMetrics
@@ -138,6 +139,8 @@ def test_loader_bulk_insert_and_count_fallbacks():
 
 
 def test_validator_run_paths_and_aggregate(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
+    monkeypatch.setattr(printing, "_QUIET", False)
+    monkeypatch.setattr(printing, "_STD_CONSOLE", None)
     validator = TPCDIValidator(_ExecBySqlConn(fetch_value=(0,)), dialect="duckdb")
     validator.validation_rules = [
         ValidationRule("ok", "select 0", 0, "ok desc", category="integrity"),
@@ -171,7 +174,9 @@ def test_validator_run_paths_and_aggregate(monkeypatch: pytest.MonkeyPatch, caps
     assert "TPC-DI DATA QUALITY VALIDATION RESULTS" in capsys.readouterr().out
 
 
-def test_metrics_calculations_and_exports(capsys: pytest.CaptureFixture[str]):
+def test_metrics_calculations_and_exports(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
+    monkeypatch.setattr(printing, "_QUIET", False)
+    monkeypatch.setattr(printing, "_STD_CONSOLE", None)
     start = datetime(2026, 2, 1, 10, 0, 0)
     end = start + timedelta(seconds=30)
     historical = ETLPhaseResult(

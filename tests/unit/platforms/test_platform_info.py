@@ -6,13 +6,13 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.slow,
+    pytest.mark.fast,
     pytest.mark.cloud_import,
 ]
 
@@ -254,7 +254,14 @@ class TestCloudPlatformInfo(TestPlatformInfoBase):
         fake_databricks_sql = types.ModuleType("databricks.sql")
         fake_databricks.sql = fake_databricks_sql
         with (
-            patch.dict("sys.modules", {"databricks": fake_databricks, "databricks.sql": fake_databricks_sql}),
+            patch.dict(
+                "sys.modules",
+                {
+                    "databricks": fake_databricks,
+                    "databricks.sql": fake_databricks_sql,
+                    "databricks.sdk": MagicMock(),
+                },
+            ),
             patch("benchbox.platforms.databricks.adapter.check_platform_dependencies", return_value=(True, [])),
         ):
             adapter = DatabricksAdapter(

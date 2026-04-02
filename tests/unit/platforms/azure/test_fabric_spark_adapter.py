@@ -545,9 +545,112 @@ class TestFabricSparkLivySessionConstants:
         assert LivySessionState.ERROR == "error"
         assert LivySessionState.DEAD == "dead"
 
+    def test_table_format_default_delta(self):
+        """Test table_format defaults to delta on Fabric."""
+        with (
+            patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.REQUESTS_AVAILABLE", True),
+        ):
+            from benchbox.platforms.azure import FabricSparkAdapter
+
+            adapter = FabricSparkAdapter(
+                workspace_id="ws-123",
+                lakehouse_id="lh-456",
+            )
+            assert adapter.table_format == "delta"
+
+    def test_table_format_iceberg(self):
+        """Test table_format can be set to iceberg."""
+        with (
+            patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.REQUESTS_AVAILABLE", True),
+        ):
+            from benchbox.platforms.azure import FabricSparkAdapter
+
+            adapter = FabricSparkAdapter(
+                workspace_id="ws-123",
+                lakehouse_id="lh-456",
+                table_format="iceberg",
+            )
+            assert adapter.table_format == "iceberg"
+
+    def test_table_format_from_config(self):
+        """Test table_format is passed through from_config."""
+        with (
+            patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.REQUESTS_AVAILABLE", True),
+        ):
+            from benchbox.platforms.azure import FabricSparkAdapter
+
+            adapter = FabricSparkAdapter.from_config(
+                {
+                    "workspace_id": "ws-123",
+                    "lakehouse_id": "lh-456",
+                    "table_format": "parquet",
+                }
+            )
+            assert adapter.table_format == "parquet"
+
+    def test_session_config_iceberg_extensions(self):
+        """Test Iceberg extensions are added to session config."""
+        with (
+            patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.requests") as mock_requests,
+        ):
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": 1}
+            mock_requests.post.return_value = mock_response
+
+            from benchbox.platforms.azure import FabricSparkAdapter
+
+            adapter = FabricSparkAdapter(
+                workspace_id="ws-123",
+                lakehouse_id="lh-456",
+                table_format="iceberg",
+            )
+            adapter._wait_for_session_state = MagicMock()
+            adapter._create_session()
+
+            call_kwargs = mock_requests.post.call_args
+            session_conf = call_kwargs.kwargs["json"]["conf"]
+            assert "IcebergSparkSessionExtensions" in session_conf["spark.sql.extensions"]
+            assert "SparkSessionCatalog" in session_conf["spark.sql.catalog.spark_catalog"]
+
+    def test_session_config_delta_no_extensions(self):
+        """Test delta (default on Fabric) does not add extra extensions since Delta is native."""
+        with (
+            patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.requests") as mock_requests,
+        ):
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": 1}
+            mock_requests.post.return_value = mock_response
+
+            from benchbox.platforms.azure import FabricSparkAdapter
+
+            adapter = FabricSparkAdapter(
+                workspace_id="ws-123",
+                lakehouse_id="lh-456",
+            )
+            adapter._wait_for_session_state = MagicMock()
+            adapter._create_session()
+
+            call_kwargs = mock_requests.post.call_args
+            session_conf = call_kwargs.kwargs["json"]["conf"]
+            assert "spark.sql.extensions" not in session_conf
+
     def test_livy_statement_states(self):
         """Test LivyStatementState constants are defined."""
-        from benchbox.platforms.azure.fabric_spark_adapter import LivyStatementState
+        from benchbox.platforms.azure.spark_execution_utils import LivyStatementState
 
         assert LivyStatementState.WAITING == "waiting"
         assert LivyStatementState.RUNNING == "running"

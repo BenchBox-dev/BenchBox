@@ -291,7 +291,7 @@ class TestTopLevelInterface:
         """Should be importable from benchbox."""
         from benchbox import TSBSDevOps
 
-        assert TSBSDevOps is not None
+        assert callable(TSBSDevOps)
 
     def test_tsbs_devops_interface(self, seed, start_time):
         """TSBSDevOps interface should work correctly."""

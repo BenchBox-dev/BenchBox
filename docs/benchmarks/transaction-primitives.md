@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, transaction-primitives, custom-benchmark
 ```
 
+> **CLI name:** `transaction_primitives` — use `benchbox run --benchmark transaction_primitives`
+
 ## Overview
 
 The Transaction Primitives benchmark provides focused testing of database transaction capabilities including ACID guarantees, isolation levels, and advanced transaction control. It tests fundamental transaction operations that require full ACID support.

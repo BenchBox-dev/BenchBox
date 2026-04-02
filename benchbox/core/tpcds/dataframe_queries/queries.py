@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from benchbox.core.dataframe.compat import _to_list
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 
@@ -1854,7 +1855,7 @@ def q82_pandas_impl(ctx: DataFrameContext) -> Any:
     ]
 
     # Get items that exist in store_sales (semi-join via unique item_sk set)
-    ss_items = store_sales["ss_item_sk"].unique()
+    ss_items = _to_list(store_sales["ss_item_sk"].unique())
 
     # Join filtered tables
     merged = item_filtered.merge(inv_filtered, left_on="i_item_sk", right_on="inv_item_sk")
@@ -2019,7 +2020,7 @@ def q37_pandas_impl(ctx: DataFrameContext) -> Any:
     ]
 
     # Get items that exist in catalog_sales (semi-join via unique item_sk set)
-    cs_items = catalog_sales["cs_item_sk"].unique()
+    cs_items = _to_list(catalog_sales["cs_item_sk"].unique())
 
     # Join filtered tables
     merged = item_filtered.merge(inv_filtered, left_on="i_item_sk", right_on="inv_item_sk")
@@ -3122,7 +3123,7 @@ def q45_pandas_impl(ctx: DataFrameContext) -> Any:
     item = ctx.get_table("item")
 
     # Get item IDs for the specified item_sks
-    item_ids = item[item["i_item_sk"].isin(item_sks)]["i_item_id"].unique().tolist()
+    item_ids = _to_list(item[item["i_item_sk"].isin(item_sks)]["i_item_id"].unique())
 
     # Join tables
     merged = web_sales.merge(customer, left_on="ws_bill_customer_sk", right_on="c_customer_sk")
@@ -3737,10 +3738,10 @@ def q83_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Get week sequences for the return dates
     date_dim["d_date_str"] = date_dim["d_date"].astype(str)
-    target_weeks = date_dim[date_dim["d_date_str"].str[:10].isin(return_dates)]["d_week_seq"].unique()
+    target_weeks = _to_list(date_dim[date_dim["d_date_str"].str[:10].isin(return_dates)]["d_week_seq"].unique())
 
     # Get all dates in those week sequences
-    valid_date_sks = date_dim[date_dim["d_week_seq"].isin(target_weeks)]["d_date_sk"].unique()
+    valid_date_sks = _to_list(date_dim[date_dim["d_week_seq"].isin(target_weeks)]["d_date_sk"].unique())
 
     # CTE 1: sr_items - Store Returns by item
     sr_merged = store_returns.merge(item, left_on="sr_item_sk", right_on="i_item_sk")
@@ -3863,7 +3864,7 @@ def q41_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Get manufacturers that have matching items
-    matching_manufacts = item[condition]["i_manufact"].unique()
+    matching_manufacts = _to_list(item[condition]["i_manufact"].unique())
 
     # Filter i1 to items whose manufacturer has matching items
     result = i1[i1["i_manufact"].isin(matching_manufacts)][["i_product_name"]].drop_duplicates()

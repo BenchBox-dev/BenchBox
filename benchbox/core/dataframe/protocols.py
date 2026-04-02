@@ -327,16 +327,16 @@ class DataFrameGroupBy(Protocol[DF]):
         DF: The concrete DataFrame type
     """
 
-    def agg(self, *aggregations: Any, **named_aggregations: Any) -> DataFrameOps[DF]:
+    def agg(self, *_aggregations: Any, **_named_aggregations: Any) -> DataFrameOps[DF]:
         """Apply aggregation functions to grouped data.
 
         Supports both positional and keyword arguments for flexibility
         across different family syntaxes.
 
         Args:
-            *aggregations: Aggregation expressions (Expression family)
+            *_aggregations: Aggregation expressions (Expression family)
                 or list of column/function pairs (Pandas family)
-            **named_aggregations: Named aggregations as output_col=expr
+            **_named_aggregations: Named aggregations as output_col=expr
 
         Returns:
             Aggregated DataFrame

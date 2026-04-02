@@ -209,21 +209,14 @@ class TestDataGenerationErrors:
         # Only test benchmark initialization and file handling, not generation
         ClickBench(scale_factor=0.01, output_dir=temp_dir)
 
-        # Create a corrupted data file
+        # Create a corrupted data file with actual invalid UTF-8 bytes
         corrupted_file = temp_dir / "corrupted.csv"
-        corrupted_file.write_bytes(b"\\x00\\xFF\\x00corrupted data")
+        corrupted_file.write_bytes(b"\x00\xff\xfe\x80corrupted data")
 
-        # Test file detection and basic error handling
         assert corrupted_file.exists()
-        try:
-            # Test reading the corrupted file directly
+        with pytest.raises((UnicodeDecodeError, OSError)):
             with open(corrupted_file, encoding="utf-8") as f:
                 f.read()
-            # If we get here, the file wasn't actually corrupted enough
-            assert True
-        except (UnicodeDecodeError, OSError):
-            # Expected errors when dealing with corrupted files
-            assert True  # This is the expected behavior
 
     def test_memory_exhaustion_simulation(self, temp_dir):
         """Test handling of memory exhaustion during data generation."""
@@ -442,15 +435,10 @@ class TestResourceExhaustionScenarios:
 
         # Mock network operations to simulate timeout - test error handling only
         with patch("urllib.request.urlopen", side_effect=TimeoutError("Network timeout")):
-            try:
-                # Test a simple network operation rather than full data generation
+            with pytest.raises(TimeoutError, match="Network timeout"):
                 import urllib.request
 
                 urllib.request.urlopen("http://example.com")
-                raise AssertionError("Should have raised TimeoutError")
-            except TimeoutError:
-                # Expected behavior - timeout handled correctly
-                assert True
 
 
 @pytest.mark.unit

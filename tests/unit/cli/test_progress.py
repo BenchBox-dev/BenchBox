@@ -64,7 +64,7 @@ def test_benchmark_progress_add_task():
     progress = BenchmarkProgress(console)
 
     task_id = progress.add_task("Test task", total=100)
-    assert task_id is not None
+    assert isinstance(task_id, int)
 
 
 def test_benchmark_progress_update_task():
@@ -116,7 +116,7 @@ def test_phase_progress_context_manager():
     progress = BenchmarkProgress(console)
 
     with progress, phase_progress(progress, "Test phase", total=10) as task_id:
-        assert task_id is not None
+        assert isinstance(task_id, int)
         progress.update(task_id, advance=5)
 
 
@@ -133,7 +133,7 @@ def test_phase_progress_without_total():
     progress = BenchmarkProgress(console)
 
     with progress, phase_progress(progress, "Test phase", total=None) as task_id:
-        assert task_id is not None
+        assert isinstance(task_id, int)
 
 
 def test_should_show_progress_tty():

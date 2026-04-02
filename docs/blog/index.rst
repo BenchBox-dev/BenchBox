@@ -36,3 +36,6 @@ Browse by:
    2026-02-23-v0-1-3-release-summary
    2026-03-03-v0-1-4-release-summary
    2026-03-03-duckdb-tpch-extension-vs-benchbox
+   2026-03-10-extracting-textcharts
+   2026-03-10-v0-1-5-release-summary
+   2026-04-01-v0-2-0-release-summary

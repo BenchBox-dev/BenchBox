@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, write-primitives, custom-benchmark, performance
 ```
 
+> **CLI name:** `write_primitives` — use `benchbox run --benchmark write_primitives`
+
 ## Overview
 
 The Write Primitives benchmark provides comprehensive testing of fundamental database write operations using TPC-H schema as foundation. It tests INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, and DDL operations across a wide range of platforms.

@@ -48,6 +48,7 @@ from benchbox.core.dataframe.maintenance_interface import (
     TransactionIsolation,
     get_maintenance_operations_for_platform,
 )
+from benchbox.core.dataframe_manager_factory import get_dataframe_manager
 
 logger = logging.getLogger(__name__)
 
@@ -1213,29 +1214,24 @@ def get_dataframe_transaction_manager(
         DataFrameTransactionOperationsManager if platform is recognized,
         None if platform is not a DataFrame platform.
     """
-    platform_lower = platform_name.lower()
-
-    # Check if this is a DataFrame platform
-    df_platforms = (
-        "polars-df",
-        "polars",
-        "pandas-df",
-        "pandas",
-        "pyspark-df",
-        "pyspark",
-        "delta-lake",
-        "delta",
-        "iceberg",
+    return get_dataframe_manager(
+        platform_name,
+        manager_class=DataFrameTransactionOperationsManager,
+        supported_platforms=(
+            "polars-df",
+            "polars",
+            "pandas-df",
+            "pandas",
+            "pyspark-df",
+            "pyspark",
+            "delta-lake",
+            "delta",
+            "iceberg",
+        ),
+        logger=logger,
+        manager_label="transaction",
+        spark_session=spark_session,
     )
-    if not any(p in platform_lower for p in df_platforms):
-        logger.debug(f"Platform {platform_name} is not a DataFrame platform")
-        return None
-
-    try:
-        return DataFrameTransactionOperationsManager(platform_name, spark_session=spark_session)
-    except Exception as e:
-        logger.warning(f"Failed to create transaction manager for {platform_name}: {e}")
-        return None
 
 
 def validate_transaction_primitives_platform(platform_name: str) -> tuple[bool, str]:

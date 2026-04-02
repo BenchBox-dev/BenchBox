@@ -19,7 +19,6 @@ pytestmark = [
 ]
 
 
-@pytest.mark.integration
 @pytest.mark.duckdb
 @pytest.mark.tsbs_devops
 class TestTSBSDevOpsDuckDBIntegration:

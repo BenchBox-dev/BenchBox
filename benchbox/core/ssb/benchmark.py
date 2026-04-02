@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 from benchbox.base import BaseBenchmark
 from benchbox.core.benchmark_mixins import DataGenerationMixin
 from benchbox.core.query_catalog_base import TranslatableQueryMixin
+from benchbox.core.query_utils import get_queries_with_translation
 from benchbox.core.simple_benchmark_mixin import SimpleBenchmarkMixin
 from benchbox.core.ssb.generator import SSBDataGenerator
 from benchbox.core.ssb.queries import SSBQueryManager
@@ -115,16 +116,7 @@ class SSBBenchmark(TranslatableQueryMixin, SimpleBenchmarkMixin, DataGenerationM
         Returns:
             A dictionary mapping query identifiers to their SQL text
         """
-        queries = self.query_manager.get_all_queries()
-
-        if dialect:
-            # Translate each query to the target dialect
-            translated_queries = {}
-            for query_id, query_sql in queries.items():
-                translated_queries[query_id] = self.translate_query_text(query_sql, dialect)
-            return translated_queries
-
-        return queries
+        return get_queries_with_translation(self.query_manager, dialect, self.translate_query_text)
 
     # translate_query_text() is inherited from TranslatableQueryMixin
 

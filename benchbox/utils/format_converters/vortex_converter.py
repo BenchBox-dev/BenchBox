@@ -122,6 +122,28 @@ class VortexConverter(BaseFormatConverter):
             f"{provider_text}"
         )
 
+    def _write_vortex_file(self, combined_table: Any, output_path: Path, opts: ConversionOptions) -> str:
+        """Write table data to Vortex format, trying DuckDB extension first.
+
+        Returns the writer name used ('duckdb-extension' or 'python-bindings').
+        """
+        duckdb_ok, duckdb_error = self._write_with_duckdb_vortex(combined_table, output_path)
+        if duckdb_ok:
+            return "duckdb-extension"
+
+        if opts.metadata.get("require_duckdb_writer", False):
+            raise ConversionError(
+                f"DuckDB vortex extension is required for this conversion but failed: {duckdb_error}. "
+                "Ensure the DuckDB vortex extension is installed and loadable, "
+                "or use --table-mode native to load data into DuckDB tables directly."
+            )
+        logger.info("DuckDB vortex extension unavailable, using Python Vortex bindings")
+        vortex = self._get_vortex_module()
+        array_builder, writer = self._get_vortex_writer_functions(vortex)
+        vortex_array = array_builder(combined_table)
+        writer(vortex_array, str(output_path))
+        return "python-bindings"
+
     def convert(
         self,
         source_files: list[Path],
@@ -180,29 +202,10 @@ class VortexConverter(BaseFormatConverter):
         try:
             if progress_callback:
                 progress_callback("Writing Vortex file", 0.9)
-
-            duckdb_ok, duckdb_error = self._write_with_duckdb_vortex(combined_table, output_path)
-            if duckdb_ok:
-                vortex_writer = "duckdb-extension"
-            else:
-                require_duckdb = opts.metadata.get("require_duckdb_writer", False)
-                if require_duckdb:
-                    raise ConversionError(
-                        f"DuckDB vortex extension is required for this conversion but failed: {duckdb_error}. "
-                        "Ensure the DuckDB vortex extension is installed and loadable, "
-                        "or use --table-mode native to load data into DuckDB tables directly."
-                    )
-                logger.info("DuckDB vortex extension unavailable, using Python Vortex bindings")
-                vortex = self._get_vortex_module()
-                array_builder, writer = self._get_vortex_writer_functions(vortex)
-                vortex_array = array_builder(combined_table)
-                writer(vortex_array, str(output_path))
-                vortex_writer = "python-bindings"
-
+            vortex_writer = self._write_vortex_file(combined_table, output_path, opts)
         except ConversionError:
             raise
         except Exception as e:
-            # Clean up partial file if write failed
             if output_path.exists():
                 with contextlib.suppress(Exception):
                     output_path.unlink()

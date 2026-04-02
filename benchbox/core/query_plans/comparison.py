@@ -573,6 +573,15 @@ class PlanComparisonSummary:
         }
 
 
+def _build_execution_map(results: Any) -> dict[str, Any]:
+    """Collect the first execution per query ID across all phases."""
+    execution_map: dict[str, Any] = {}
+    for phase_results in results.phases.values():
+        for execution in phase_results.queries:
+            execution_map.setdefault(execution.query_id, execution)
+    return execution_map
+
+
 def generate_plan_comparison_summary(
     baseline_results: Any,  # BenchmarkResults
     current_results: Any,  # BenchmarkResults
@@ -594,20 +603,8 @@ def generate_plan_comparison_summary(
         PlanComparisonSummary with detailed comparison information
     """
     # Build execution maps for both runs
-    baseline_map: dict[str, Any] = {}
-    current_map: dict[str, Any] = {}
-
-    # Extract all executions from all phases
-    for phase_results in baseline_results.phases.values():
-        for execution in phase_results.queries:
-            # Use first execution per query_id
-            if execution.query_id not in baseline_map:
-                baseline_map[execution.query_id] = execution
-
-    for phase_results in current_results.phases.values():
-        for execution in phase_results.queries:
-            if execution.query_id not in current_map:
-                current_map[execution.query_id] = execution
+    baseline_map = _build_execution_map(baseline_results)
+    current_map = _build_execution_map(current_results)
 
     # Find common queries
     common_queries = set(baseline_map.keys()) & set(current_map.keys())

@@ -355,6 +355,30 @@ def generate_database_filename(
     return f"{name}{ext}"
 
 
+_KNOWN_EXTENSIONS = [
+    ".duckdb", ".sqlite", ".chdb", ".datafusion",
+    ".polars-df", ".polars", ".pandas-df", ".pandas",
+    ".cudf-df", ".cudf", ".modin-df", ".dask-df", ".spark",
+]  # fmt: skip
+
+_TUNING_KEYWORDS = {"notuning": "notuning", "tuned": "tuned", "custom": "custom"}
+_CONSTRAINT_KEYWORDS = {"pk", "fk", "uniq", "check", "noconstraints"}
+_OPTIMIZATION_KEYWORDS = {"part", "clust", "sort", "dist", "zorder", "autoopt", "matview"}
+
+
+def _parse_scale_factor(part: str) -> float | None:
+    """Parse a scale factor from a 'sfN' part, or return None."""
+    if not part.startswith("sf"):
+        return None
+    scale_str = part[2:]
+    try:
+        if scale_str.startswith("0") and len(scale_str) > 1:
+            return float("0." + scale_str[1:])
+        return float(scale_str)
+    except ValueError:
+        return None
+
+
 def parse_database_name(database_name: str) -> dict[str, Any]:
     """Parse a database name to extract configuration characteristics.
 
@@ -364,32 +388,16 @@ def parse_database_name(database_name: str) -> dict[str, Any]:
     Returns:
         Dictionary with parsed characteristics
     """
-    # Strip file extension if present
-    # Order matters: check longer extensions first to avoid partial matches
     name = database_name
-    known_extensions = [
-        ".duckdb",
-        ".sqlite",
-        ".chdb",
-        ".datafusion",
-        ".polars-df",
-        ".polars",
-        ".pandas-df",
-        ".pandas",
-        ".cudf-df",
-        ".cudf",
-        ".modin-df",
-        ".dask-df",
-        ".spark",
-    ]
-    for ext in known_extensions:
+    for ext in _KNOWN_EXTENSIONS:
         if name.endswith(ext):
             name = name[: -len(ext)]
             break
 
     parts = name.split("_")
+    parts_set = set(parts)
 
-    result = {
+    result: dict[str, Any] = {
         "original_name": database_name,
         "parsed_parts": parts,
         "benchmark": parts[0] if parts else "",
@@ -400,50 +408,26 @@ def parse_database_name(database_name: str) -> dict[str, Any]:
         "characteristics": [],
     }
 
-    # Try to parse scale factor
     for part in parts:
-        if part.startswith("sf"):
-            scale_str = part[2:]  # Strip 'sf' prefix
-            try:
-                if scale_str.startswith("0") and len(scale_str) > 1:
-                    # sf01 -> 0.1, sf001 -> 0.01
-                    scale_val = float("0." + scale_str[1:])
-                else:
-                    # sf1 -> 1.0, sf10 -> 10.0
-                    scale_val = float(scale_str)
-                result["scale_factor"] = scale_val
-            except ValueError:
-                pass
+        sf = _parse_scale_factor(part)
+        if sf is not None:
+            result["scale_factor"] = sf
+            break
 
-    # Identify tuning mode
-    if "notuning" in parts:
-        result["tuning_mode"] = "notuning"
-    elif "tuned" in parts:
-        result["tuning_mode"] = "tuned"
-    elif "custom" in parts:
-        result["tuning_mode"] = "custom"
+    for keyword, mode in _TUNING_KEYWORDS.items():
+        if keyword in parts_set:
+            result["tuning_mode"] = mode
+            break
 
-    # Identify constraints
-    constraint_keywords = ["pk", "fk", "uniq", "check", "noconstraints"]
     for part in parts:
-        if part in constraint_keywords:
+        if part in _CONSTRAINT_KEYWORDS:
             result["has_constraints"] = part != "noconstraints"
             result["characteristics"].append(part)
 
-    # Identify optimizations
-    optimization_keywords = [
-        "part",
-        "clust",
-        "sort",
-        "dist",
-        "zorder",
-        "autoopt",
-        "matview",
-    ]
-    for part in parts:
-        if part in optimization_keywords:
-            result["has_optimizations"] = True
-            result["characteristics"].append(part)
+    matched_opts = parts_set & _OPTIMIZATION_KEYWORDS
+    if matched_opts:
+        result["has_optimizations"] = True
+        result["characteristics"].extend(p for p in parts if p in matched_opts)
 
     return result
 

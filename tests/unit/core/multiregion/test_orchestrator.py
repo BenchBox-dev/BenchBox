@@ -7,10 +7,10 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import pytest
 
-from benchbox.core.multiregion.config import (
+from benchbox.experimental.multiregion.config import (
     MultiRegionConfig,
 )
-from benchbox.core.multiregion.orchestrator import (
+from benchbox.experimental.multiregion.orchestrator import (
     MultiRegionBenchmark,
     MultiRegionResult,
     RegionBenchmarkResult,
@@ -237,7 +237,7 @@ class TestMultiRegionBenchmark:
         )
         result = benchmark.run(parallel=False, measure_latency=False)
 
-        assert result.transfer_summary is not None
+        assert isinstance(result.transfer_summary.total_transfers, int)
 
 
 class TestMultiRegionBenchmarkEdgeCases:

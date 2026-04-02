@@ -29,6 +29,8 @@ from benchbox.core.tpcdi.source_generators import TPCDISourceDataGenerator
 class SourceDataFormat(ABC):
     """Abstract base class for source data format generators."""
 
+    _generator: Optional[TPCDISourceDataGenerator]
+
     @abstractmethod
     def generate_data(self, table_name: str, record_count: int, **kwargs: Any) -> Any:
         """Generate source data in the specific format.
@@ -42,6 +44,39 @@ class SourceDataFormat(ABC):
             Generated data in the appropriate format
         """
         ...
+
+    def _run_generator(
+        self,
+        gen_method_name: str,
+        record_count: int,
+        default_scale_divisor: float,
+        **kwargs: Any,
+    ) -> str:
+        """Shared generator initialisation and invocation.
+
+        Args:
+            gen_method_name: Name of the ``TPCDISourceDataGenerator`` method to call
+                (e.g. ``"_generate_oltp_data"``).
+            record_count: Passed from the caller's ``record_count`` parameter.
+            default_scale_divisor: Divisor for the default scale factor
+                (``record_count / default_scale_divisor``).
+            **kwargs: Forwarded from the caller (may contain ``scale_factor``,
+                ``output_dir``).
+
+        Returns:
+            First generated file path, or ``""`` if no files were produced.
+        """
+        scale_factor = kwargs.get("scale_factor", record_count / default_scale_divisor)
+        output_dir = kwargs.get("output_dir", Path.cwd() / "tpcdi_source_data")
+
+        if self._generator is None:
+            self._generator = TPCDISourceDataGenerator(
+                scale_factor=scale_factor,
+                output_dir=output_dir,
+            )
+
+        files = getattr(self._generator, gen_method_name)()
+        return files[0] if files else ""
 
 
 class CSVSourceFormat(SourceDataFormat):
@@ -75,21 +110,7 @@ class CSVSourceFormat(SourceDataFormat):
         Returns:
             Path to generated CSV file as string
         """
-        scale_factor = kwargs.get("scale_factor", record_count / 50000)
-        output_dir = kwargs.get("output_dir", Path.cwd() / "tpcdi_source_data")
-
-        # Initialize generator if needed
-        if self._generator is None:
-            self._generator = TPCDISourceDataGenerator(
-                scale_factor=scale_factor,
-                output_dir=output_dir,
-            )
-
-        # Generate OLTP CSV data (customer, account, trade extracts)
-        csv_files = self._generator._generate_oltp_data()
-
-        # Return first file path (matches interface expectation)
-        return csv_files[0] if csv_files else ""
+        return self._run_generator("_generate_oltp_data", record_count, 50000, **kwargs)
 
     def write_to_file(self, data: pd.DataFrame, file_path: Path) -> None:
         """Write dataframe to CSV file.
@@ -136,21 +157,7 @@ class XMLSourceFormat(SourceDataFormat):
         Returns:
             Path to generated XML file as string
         """
-        scale_factor = kwargs.get("scale_factor", record_count / 500)
-        output_dir = kwargs.get("output_dir", Path.cwd() / "tpcdi_source_data")
-
-        # Initialize generator if needed
-        if self._generator is None:
-            self._generator = TPCDISourceDataGenerator(
-                scale_factor=scale_factor,
-                output_dir=output_dir,
-            )
-
-        # Generate HR XML data (employee/broker data)
-        xml_files = self._generator._generate_hr_data()
-
-        # Return first file path (matches interface expectation)
-        return xml_files[0] if xml_files else ""
+        return self._run_generator("_generate_hr_data", record_count, 500, **kwargs)
 
     def write_to_file(self, data: pd.DataFrame, file_path: Path) -> None:
         """Write dataframe to XML file.
@@ -197,21 +204,7 @@ class FixedWidthSourceFormat(SourceDataFormat):
         Returns:
             Path to generated fixed-width file as string
         """
-        scale_factor = kwargs.get("scale_factor", record_count / 50000)
-        output_dir = kwargs.get("output_dir", Path.cwd() / "tpcdi_source_data")
-
-        # Initialize generator if needed
-        if self._generator is None:
-            self._generator = TPCDISourceDataGenerator(
-                scale_factor=scale_factor,
-                output_dir=output_dir,
-            )
-
-        # Generate external data (contains various formats including fixed-width)
-        external_files = self._generator._generate_external_data()
-
-        # Return first file path (matches interface expectation)
-        return external_files[0] if external_files else ""
+        return self._run_generator("_generate_external_data", record_count, 50000, **kwargs)
 
     def write_to_file(self, data: pd.DataFrame, file_path: Path) -> None:
         """Write dataframe to fixed-width file.

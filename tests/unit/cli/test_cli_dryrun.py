@@ -500,12 +500,11 @@ class TestDryRunExecutor:
         # Include queries attribute for display - should be dict, not list
         result.queries = {"Q1": "SELECT 1", "Q2": "SELECT 2", "Q3": "SELECT 3"}
 
-        # Display results
-        self.executor.display_dry_run_results(result)
-
-        # Verify console was called to display output - the executor uses its own console
-        # So we just verify that the method completed without error
-        assert True  # If we got here without exception, the display worked
+        # Display results — should complete without raising
+        try:
+            self.executor.display_dry_run_results(result)
+        except Exception as exc:
+            pytest.fail(f"display_dry_run_results raised {type(exc).__name__}: {exc}")
 
     def test_save_dry_run_results(self):
         """Test saving dry run results to files."""
@@ -952,6 +951,186 @@ class TestDryRunDisplayConfigurationSummary:
         assert "zstd:9" in output
 
 
+class TestDryRunDisplayBehavioral:
+    """Behavioral coverage for branch-heavy dry-run rendering helpers."""
+
+    def _make_result(self, **overrides):
+        from benchbox.core.schemas import DryRunResult
+
+        base = {
+            "benchmark_config": {
+                "name": "tpch",
+                "scale_factor": 1.0,
+                "concurrency": 1,
+                "compress_data": False,
+                "compression_type": "zstd",
+                "compression_level": None,
+                "options": {},
+            },
+            "database_config": {"type": "duckdb", "name": "DuckDB"},
+            "system_profile": {"cpu_cores_logical": 8, "memory_total_gb": 16.0, "os_name": "Darwin"},
+            "platform_config": {},
+            "queries": {"Q1": "SELECT 1"},
+            "execution_mode": "sql",
+            "constraint_config": {"enable_primary_keys": False, "enable_foreign_keys": False},
+            "query_preview": {
+                "test_execution_type": "standard",
+                "execution_context": "Sequential execution",
+            },
+            "warnings": [],
+        }
+        base.update(overrides)
+        return DryRunResult(**base)
+
+    def _render(self, result):
+        from io import StringIO
+
+        from rich.console import Console
+
+        from benchbox.cli.dryrun import DryRunDisplay
+
+        buf = StringIO()
+        display = DryRunDisplay(console=Console(file=buf, force_terminal=False, width=140))
+        display.display_dry_run_results(result)
+        return buf.getvalue()
+
+    def test_display_dry_run_results_renders_dataframe_preview_and_maintenance_ops(self):
+        """DataFrame previews should filter internal entries and show maintenance SQL separately."""
+        long_query = "pl.scan_parquet('lineitem.parquet').filter(pl.col('l_quantity') > 10)\n" * 20
+        result = self._make_result(
+            database_config={"type": "polars-df", "name": "Polars"},
+            execution_mode="dataframe",
+            queries={
+                "Q1": long_query,
+                "Q2": "orders.group_by('o_orderstatus').agg(pl.len())",
+                "Q3": "customer.join(orders, on='c_custkey')",
+                "Q4": "lineitem.sort('l_orderkey')",
+                "RF1": "DELETE FROM lineitem WHERE l_orderkey < 10",
+                "_error": "internal planning failure",
+            },
+            dataframe_schema="import polars as pl\nschema = {'l_orderkey': pl.Int64}",
+            query_preview={
+                "test_execution_type": "standard",
+                "execution_context": "Vectorized execution",
+            },
+        )
+
+        output = self._render(result)
+
+        assert "DataFrame Query Preview" in output
+        assert "Vectorized execution" in output
+        assert "DataFrame Query Q1" in output
+        assert "... [truncated]" in output
+        assert "... and 1 more queries" in output
+        assert "TPC-H Maintenance Operations" in output
+        assert "Refresh Function RF1" in output
+        assert "_error" not in output
+        assert "DataFrame Schema" in output
+
+    def test_display_dry_run_results_renders_tuning_ddl_post_load_resources_and_warnings(self):
+        """Dry-run results should include tuning, DDL, post-load SQL, resource pressure, and warnings."""
+        result = self._make_result(
+            schema_sql="CREATE TABLE orders (id INT);",
+            tuning_config={
+                "constraints": {
+                    "primary_keys": {"enabled": True, "enforce_uniqueness": True, "nullable": False},
+                    "foreign_keys": {"enabled": True, "enforce_referential_integrity": True},
+                },
+                "table_tunings": {
+                    "orders": {
+                        "partitioning": [{"name": "order_date", "type": "date"}],
+                        "sorting": [{"name": "o_orderkey", "type": "bigint"}],
+                    }
+                },
+                "platform_optimizations": {"cluster_by_date": True, "z_order": False},
+                "dataframe_tuning": {
+                    "parallelism": {"workers": 8},
+                    "memory": {"target_gb": 16},
+                    "execution": {"streaming": True},
+                    "write": {
+                        "sort_by": [{"name": "order_date", "order": "asc"}],
+                        "partition_by": [{"name": "ship_mode", "strategy": "hash"}],
+                        "row_group_size": 100000,
+                        "repartition_count": 4,
+                        "compression": "zstd",
+                        "compression_level": 3,
+                        "dictionary_columns": ["ship_mode"],
+                    },
+                },
+            },
+            ddl_preview={
+                "orders": {
+                    "tuning_summary": {"sort_by": "order_date", "partition_by": "ship_mode"},
+                    "ddl_clauses": "ORDER BY order_date",
+                }
+            },
+            post_load_statements={"orders": ["VACUUM orders", "ANALYZE orders"]},
+            estimated_resources={
+                "estimated_data_size_mb": 2048.0,
+                "estimated_memory_usage_mb": 950.0,
+                "memory_gb_available": 1.0,
+                "estimated_runtime_minutes": 12.0,
+                "cpu_cores_available": 8,
+            },
+            warnings=["First warning", "Second warning"],
+        )
+
+        output = self._render(result)
+
+        assert "Tuning Configuration" in output
+        assert "Primary Keys" in output
+        assert "Table Organization Tunings" in output
+        assert "orders" in output
+        assert "Platform Optimizations" in output
+        assert "Cluster By Date" in output
+        assert "DataFrame Tuning Configuration" in output
+        assert "Write Layout" in output
+        assert "Sort By" in output
+        assert "DDL Preview (Tuning Clauses)" in output
+        assert "Tuning: Sort: order_date | Partition: ship_mode" in output
+        assert "Post-Load Operations" in output
+        assert "VACUUM orders" in output
+        assert "Resource Estimates" in output
+        assert "Warning: Estimated memory usage is close to available memory" in output
+        assert "Warnings (2)" in output
+        assert "First warning" in output
+
+    def test_display_helper_formatters_cover_stream_and_maintenance_paths(self):
+        """Helper methods should format execution and stream identifiers consistently."""
+        from io import StringIO
+
+        from rich.console import Console
+
+        from benchbox.cli.dryrun import DryRunDisplay
+
+        display = DryRunDisplay(console=Console(file=StringIO(), force_terminal=False))
+
+        power_config = Mock()
+        power_config.test_execution_type = "power"
+        power_config.name = "tpcds"
+        throughput_config = Mock()
+        throughput_config.test_execution_type = "throughput"
+        throughput_config.name = "tpch"
+        maintenance_config = Mock()
+        maintenance_config.test_execution_type = "maintenance"
+        maintenance_config.name = "tpch"
+
+        assert display._get_execution_context(power_config, 99) == (
+            "TPC-DS PowerTest stream permutation (99 queries in randomized order)"
+        )
+        assert display._get_execution_context(throughput_config, 88) == "Throughput test execution (concurrent streams)"
+        assert display._get_execution_context(maintenance_config, 2) == "Maintenance test execution (data operations)"
+        assert display._format_test_execution_type("throughput") == "ThroughputTest (Concurrent Streams)"
+        assert display._get_preview_title("maintenance", 2) == "MaintenanceTest Operations Preview"
+        assert display._format_query_display_title("RF1", "maintenance") == "Operation RF1"
+        assert display._format_query_display_title("Stream_2_Position_5_Query_17", "power") == (
+            "Stream 2 Position 5 Query 17"
+        )
+        assert display._format_query_display_title("Position_3_Query_8", "power") == "Stream Position 3 Query 8"
+        assert display._format_panel_title("Stream_2_Position_5_Query_17", "power") == ("Stream 2 Position 5: Query 17")
+        assert display._format_panel_title("Position_3_Query_8", "power") == "Stream Position 3: Query 8"
+
+
 class TestGenerateCliCommandNewParams:
     """Test the new parameters added to generate_cli_command."""
 
@@ -1047,9 +1226,9 @@ class TestGenerateCliCommandNewParams:
             platform="databricks",
             benchmark="tpch",
             scale=0.01,
-            databricks_clustering_strategy="liquid_clustering",
+            platform_options={"databricks_clustering_strategy": "liquid_clustering"},
         )
-        assert "--databricks-clustering-strategy liquid_clustering" in cmd
+        assert "--platform-option databricks_clustering_strategy=liquid_clustering" in cmd
 
     def test_liquid_clustering_columns_rendered(self):
         from benchbox.cli.dryrun import generate_cli_command
@@ -1058,9 +1237,9 @@ class TestGenerateCliCommandNewParams:
             platform="databricks",
             benchmark="tpch",
             scale=0.01,
-            liquid_clustering_columns="col1,col2",
+            platform_options={"liquid_clustering_columns": "col1,col2"},
         )
-        assert "--liquid-clustering-columns col1,col2" in cmd
+        assert "--platform-option liquid_clustering_columns=col1,col2" in cmd
 
     def test_global_cache_rendered(self):
         from benchbox.cli.dryrun import generate_cli_command
@@ -1103,13 +1282,15 @@ class TestGenerateCliCommandNewParams:
             platform="databricks",
             benchmark="tpch",
             scale=1.0,
-            platform_options={"driver_version": "1.0.0"},
+            platform_options={
+                "driver_version": "1.0.0",
+                "databricks_clustering_strategy": "z_order",
+                "liquid_clustering_columns": "col1",
+            },
             plan_config="sample:0.5",
             presort="delta-sorted",
             sorted_ingestion_mode="auto",
             sorted_ingestion_method="ctas",
-            databricks_clustering_strategy="z_order",
-            liquid_clustering_columns="col1",
             global_cache=True,
             capture_plans=True,
         )
@@ -1118,8 +1299,8 @@ class TestGenerateCliCommandNewParams:
         assert "--presort delta-sorted" in cmd
         assert "--sorted-ingestion-mode auto" in cmd
         assert "--sorted-ingestion-method ctas" in cmd
-        assert "--databricks-clustering-strategy z_order" in cmd
-        assert "--liquid-clustering-columns col1" in cmd
+        assert "--platform-option databricks_clustering_strategy=z_order" in cmd
+        assert "--platform-option liquid_clustering_columns=col1" in cmd
         assert "--global-cache" in cmd
         assert "--capture-plans" in cmd
 

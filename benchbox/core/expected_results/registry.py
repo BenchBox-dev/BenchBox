@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from typing import Dict
 
 from benchbox.core.expected_results.models import BenchmarkExpectedResults, ExpectedQueryResult
@@ -34,12 +35,12 @@ class ExpectedResultsRegistry:
     def __init__(self):
         """Initialize the registry with empty cache and thread safety."""
         self._cache: Dict[str, Dict[float, BenchmarkExpectedResults]] = {}
-        self._providers: Dict[str, callable] = {}
+        self._providers: Dict[str, Callable] = {}
         self._lock = threading.Lock()  # Protects cache and provider registry
         self._loading: Dict[str, Dict[float, threading.Event]] = {}  # Tracks in-progress loads
         self._logged_stream_skips: set = set()  # Track (benchmark, stream) combos we've logged about
 
-    def register_provider(self, benchmark_name: str, provider: callable) -> None:
+    def register_provider(self, benchmark_name: str, provider: Callable) -> None:
         """Register a provider function for a benchmark.
 
         Thread-safe: Uses lock to prevent concurrent registration races.
@@ -243,23 +244,13 @@ class ExpectedResultsRegistry:
             if benchmark_key in self._cache and scale_factor in self._cache[benchmark_key]:
                 return self._cache[benchmark_key][scale_factor]
 
-            # Only cache successful non-None results
             if benchmark_key not in self._cache:
                 self._cache[benchmark_key] = {}
 
-            if results is not None:
-                self._cache[benchmark_key][scale_factor] = results
-                logger.debug(
-                    f"Loaded and cached expected results for benchmark '{benchmark_key}' at scale factor {scale_factor}"
-                )
-            else:
-                # Provider intentionally returned None (e.g., SF not supported)
-                # Cache this to avoid repeated provider calls for unsupported SFs
-                self._cache[benchmark_key][scale_factor] = None
-                logger.info(
-                    f"Provider returned None for benchmark '{benchmark_key}' at SF={scale_factor}. "
-                    f"Cached for this scale factor; validation will be skipped."
-                )
+            self._cache[benchmark_key][scale_factor] = results
+            logger.debug(
+                f"Loaded and cached expected results for benchmark '{benchmark_key}' at scale factor {scale_factor}"
+            )
 
             return results
 
@@ -298,7 +289,7 @@ def get_registry() -> ExpectedResultsRegistry:
     return _global_registry
 
 
-def register_benchmark_provider(benchmark_name: str, provider: callable) -> None:
+def register_benchmark_provider(benchmark_name: str, provider: Callable) -> None:
     """Register a provider for a benchmark.
 
     This is a convenience function that registers a provider with the global registry.

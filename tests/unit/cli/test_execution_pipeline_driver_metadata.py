@@ -4,7 +4,7 @@ import pytest
 
 from benchbox.cli.execution_pipeline import ExecutionContext, ExecutionEngine
 from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,

@@ -211,17 +211,18 @@ class TestSchemaValidator:
     """Test SchemaValidator."""
 
     def test_validate_no_benchmark_instance(self):
-        """Test validation with no benchmark instance fails."""
+        """Test validation with no benchmark instance skips gracefully."""
         mock_adapter = Mock(spec=["benchmark_instance"])
         mock_adapter.benchmark_instance = None
 
         validator = SchemaValidator(mock_adapter, {})
         result = validator.validate(Mock())
 
-        # Should fail when benchmark_instance is missing
-        assert result.is_valid is False
-        assert len(result.errors) == 1
-        assert "benchmark_instance not set" in result.errors[0]
+        # Missing benchmark_instance is treated as skipped (not invalid)
+        assert result.is_valid is True
+        assert len(result.errors) == 0
+        assert len(result.warnings) == 1
+        assert "benchmark_instance not set" in result.warnings[0]
 
     def test_validate_all_tables_present(self):
         """Test validation when all expected tables are present."""

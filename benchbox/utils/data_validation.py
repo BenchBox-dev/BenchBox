@@ -465,8 +465,44 @@ class BenchmarkDataValidator:
         except Exception:
             return False
 
+    @staticmethod
+    def _validate_manifest_entries(
+        entries: list[dict],
+        table_name: str,
+        data_dir: Path,
+        *,
+        reject_empty: bool = False,
+    ) -> tuple[bool, list[str], dict[str, int], int]:
+        """Validate manifest entries for a single table.
+
+        Returns (ok, issues, file_sizes, total_row_count).
+        """
+        from benchbox.utils.datagen_manifest import compute_entry_size
+
+        ok = True
+        issues: list[str] = []
+        file_sizes: dict[str, int] = {}
+        total_rows = 0
+
+        for e in entries:
+            rel = e.get("path")
+            size = int(e.get("size_bytes", -1))
+            total_rows += int(e.get("row_count", 0))
+            if not rel or size < 0:
+                ok = False
+                issues.append(f"Invalid manifest entry for {table_name}")
+                continue
+            fp = data_dir / rel
+            if (not fp.exists()) or compute_entry_size(fp) != size or (reject_empty and size == 0):
+                ok = False
+                issue_msg = f"Missing/empty file {rel}" if reject_empty else f"File missing or size mismatch: {rel}"
+                issues.append(issue_msg)
+            file_sizes[rel] = max(size, 0)
+
+        return ok, issues, file_sizes, total_rows
+
     def _validate_with_manifest(self, data_dir: Path, manifest: dict) -> DataValidationResult:
-        from benchbox.utils.datagen_manifest import compute_entry_size, get_table_files
+        from benchbox.utils.datagen_manifest import get_table_files
 
         tables_validated: dict[str, bool] = {}
         missing_tables: list[str] = []
@@ -474,63 +510,39 @@ class BenchmarkDataValidator:
         file_size_info: dict[str, int] = {}
         issues: list[str] = []
 
-        # If we have concrete expectations, validate them against manifest entries
         if self.table_expectations:
             for table_name, expectation in self.table_expectations.items():
-                # Use get_table_files to read canonical manifest file entries
                 entries = get_table_files(manifest, table_name)
                 if not entries:
                     missing_tables.append(table_name)
                     issues.append(f"Missing manifest entries for table {table_name}")
                     tables_validated[table_name] = False
                     continue
-                table_ok = True
-                actual_rows_total = 0
-                for e in entries:
-                    rel = e.get("path")
-                    size = int(e.get("size_bytes", -1))
-                    rc = int(e.get("row_count", 0))
-                    if rel is None or size < 0:
-                        table_ok = False
-                        issues.append(f"Invalid manifest entry for {table_name}")
-                        continue
-                    fp = data_dir / rel
-                    if (not fp.exists()) or compute_entry_size(fp) != size:
-                        table_ok = False
-                        issues.append(f"File missing or size mismatch: {rel}")
-                    file_size_info[rel] = size
-                    actual_rows_total += rc
-                # Row count tolerance check when available
-                if table_ok and expectation.expected_rows > 0 and actual_rows_total > 0:
+                table_ok, entry_issues, entry_sizes, actual_rows = self._validate_manifest_entries(
+                    entries, table_name, data_dir
+                )
+                issues.extend(entry_issues)
+                file_size_info.update(entry_sizes)
+                if table_ok and expectation.expected_rows > 0 and actual_rows > 0:
                     tol = max(1, int(expectation.expected_rows * 0.05))
-                    if abs(actual_rows_total - expectation.expected_rows) > tol:
-                        row_count_mismatches[table_name] = (
-                            expectation.expected_rows,
-                            actual_rows_total,
-                        )
+                    if abs(actual_rows - expectation.expected_rows) > tol:
+                        row_count_mismatches[table_name] = (expectation.expected_rows, actual_rows)
                         table_ok = False
                         issues.append(
-                            f"Table {table_name}: expected ~{expectation.expected_rows} rows, manifest has {actual_rows_total} rows"
+                            f"Table {table_name}: expected ~{expectation.expected_rows} rows, "
+                            f"manifest has {actual_rows} rows"
                         )
                 tables_validated[table_name] = table_ok
         else:
-            # Unknown benchmarks: ensure manifest files exist and are non-empty
             any_files = False
             for table_name in manifest.get("tables", {}).keys():
                 entries = get_table_files(manifest, table_name)
-                table_ok = True
-                for e in entries:
-                    rel = e.get("path")
-                    size = int(e.get("size_bytes", -1))
-                    if not rel:
-                        table_ok = False
-                        issues.append(f"Invalid manifest entry for {table_name}")
-                        continue
-                    fp = data_dir / rel
-                    if (not fp.exists()) or compute_entry_size(fp) != size or size == 0:
-                        table_ok = False
-                        issues.append(f"Missing/empty file {rel}")
-                    file_size_info[rel] = max(size, 0)
+                table_ok, entry_issues, entry_sizes, _ = self._validate_manifest_entries(
+                    entries, table_name, data_dir, reject_empty=True
+                )
+                issues.extend(entry_issues)
+                file_size_info.update(entry_sizes)
+                if entries:
                     any_files = True
                 tables_validated[table_name] = table_ok
             if not any_files:

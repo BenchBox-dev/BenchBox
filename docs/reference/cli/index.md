@@ -27,10 +27,19 @@ BenchBox provides the following commands:
 | `benchmarks`           | Manage benchmark suites                            | [utilities](utilities.md#benchmarks)      |
 | `validate`             | Validate configuration files                       | [utilities](utilities.md#validate)        |
 | `tuning init`          | Generate sample tuning configurations              | [tuning](tuning.md#tuning-init)           |
-| `df-tuning`            | Manage DataFrame platform tuning configurations    | [tuning](tuning.md#df-tuning)             |
+| `tuning` (DataFrame)   | DataFrame tuning via unified tuning commands        | [tuning](tuning.md#tuning-dataframe)      |
 | `export`               | Export benchmark results to various formats        | [results](results.md#export)              |
 | `results`              | Display exported benchmark results                 | [results](results.md#results)             |
 | `compare`              | Compare benchmark results for regression detection | [results](results.md#compare)             |
+| `visualize`            | Generate ASCII charts from benchmark results       | [visualize](visualize.md)                 |
+| `report`               | Historical analysis, rankings, and regressions     | [report](report.md)                       |
+| `metrics`              | Calculate TPC performance metrics (QphH)           | [metrics](metrics.md)                     |
+| `aggregate`            | Aggregate results into CSV performance trends      | [aggregate](aggregate.md)                 |
+| `datagen`              | Generate benchmark data without running queries    | [datagen](datagen.md)                     |
+| `setup`                | Interactive cloud platform credential setup        | [setup](setup.md)                         |
+| `show-plan`            | Display query plan as ASCII tree                   | [query-plans](query-plans.md)             |
+| `plan-history`         | Show query plan evolution across runs              | [query-plans](query-plans.md)             |
+| `download-answers`     | Pre-download TPC answer files for validation       | [download-answers](download-answers.md)   |
 
 ## Quick Start
 
@@ -57,6 +66,14 @@ platforms
 utilities
 tuning
 results
+visualize
+report
+metrics
+aggregate
+datagen
+setup
+query-plans
+download-answers
 configuration
 workflows
 ```

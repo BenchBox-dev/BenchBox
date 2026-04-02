@@ -13,7 +13,7 @@ from click.testing import CliRunner
 
 from benchbox.cli.main import cli
 from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,

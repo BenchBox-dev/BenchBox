@@ -68,6 +68,54 @@ and reporting automation.
 
 Checks optional platform dependencies and prints installation guidance.
 
+### `benchbox visualize`
+
+Generates ASCII charts from benchmark result JSON files. Auto-discovers
+recent results if no files are specified. Supports chart type selection,
+templates, themes, and pipe-friendly output modes.
+
+### `benchbox report`
+
+Historical result analysis with subcommands: `rankings` (platform
+comparisons), `trends` (performance over time), `regressions` (detect
+slowdowns), `import` (load results into database), `stats`, and `list`.
+
+### `benchbox metrics qphh`
+
+Calculates the TPC-H QphH@Size composite metric from power and throughput
+test results. Auto-detects scale factor from result files.
+
+### `benchbox aggregate`
+
+Aggregates multiple result JSON files into a CSV with geometric mean,
+p50/p95/p99 statistics per run. Useful for trend tracking.
+
+### `benchbox datagen`
+
+Standalone data generation (wrapper for `benchbox run --phases generate`).
+Supports benchmark, scale, format, and seed options.
+
+### `benchbox setup`
+
+Interactive cloud credential configuration for Databricks, Snowflake,
+BigQuery, Redshift, and Athena. Includes validation, status checks,
+and Redshift connectivity diagnostics.
+
+### `benchbox show-plan`
+
+Displays a query execution plan from benchmark results as an ASCII tree,
+summary, or JSON. Requires plans captured with `--capture-plans`.
+
+### `benchbox plan-history`
+
+Shows query plan evolution across runs with fingerprint tracking and
+optional plan flapping detection.
+
+### `benchbox download-answers`
+
+Pre-downloads TPC-H and TPC-DS answer files to a local cache for
+offline row-count validation.
+
 ## Notes
 
 - Cloud platforms may require explicit output/staging roots.

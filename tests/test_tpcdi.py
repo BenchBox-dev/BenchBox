@@ -13,13 +13,14 @@ from pathlib import Path
 import duckdb
 import pytest
 
-pytestmark = pytest.mark.medium
-
-
 pytest.importorskip("pandas")
 
 from benchbox import TPCDI
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+
+pytestmark = [
+    pytest.mark.medium,
+]
 
 
 class TestTPCDI:

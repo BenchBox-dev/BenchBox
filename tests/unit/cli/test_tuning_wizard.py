@@ -210,7 +210,7 @@ def test_render_summary_and_simple_summary(monkeypatch: pytest.MonkeyPatch) -> N
     cfg.enable_platform_optimization(TuningType.CLUSTERING)
     monkeypatch.setattr(t.console, "print", lambda *a, **k: None)
     tbl = t.render_tuning_summary(cfg, "snowflake")
-    assert tbl is not None
+    assert tbl.row_count > 0
     t._show_simple_summary(cfg, {}, "snowflake")
 
 

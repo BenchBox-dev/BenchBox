@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     )
 
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
-from benchbox.utils.file_format import detect_compression, get_delimiter_for_file
+from benchbox.utils.file_format import detect_compression, detect_data_format, get_delimiter_for_file
 from benchbox.utils.printing import emit
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
@@ -53,6 +53,7 @@ class BigQueryAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
+    _DELIMITED_FORMATS = frozenset({"tbl", "csv"})
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -1006,12 +1007,12 @@ class BigQueryAdapter(PlatformAdapter):
         """Normalize table file paths to a list."""
         return file_paths if isinstance(file_paths, list) else [file_paths]
 
-    def _filter_valid_files(self, file_paths: Any, *, allow_cloud: bool) -> list[Path]:
+    def _filter_valid_files(self, file_paths: Any, *, allow_cloud: bool) -> list[Any]:
         """Filter valid file inputs for load operations."""
-        valid_files: list[Path] = []
+        valid_files: list[Any] = []
         for file_path in self._ensure_file_list(file_paths):
             if allow_cloud and is_cloud_path(str(file_path)):
-                valid_files.append(Path(file_path))
+                valid_files.append(file_path)
                 continue
             path = Path(file_path)
             if path.exists() and path.stat().st_size > 0:
@@ -1069,9 +1070,8 @@ class BigQueryAdapter(PlatformAdapter):
 
         for file_idx, file_path in enumerate(valid_files):
             chunk_info = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
-            delimiter = get_delimiter_for_file(file_path)
 
-            blob_name = f"{self.storage_prefix}/{table_name}_{file_idx}{file_path.suffix}"
+            blob_name = f"{self.storage_prefix}/{table_name}_{file_idx}{''.join(file_path.suffixes)}"
             self.log_very_verbose(f"Uploading to Cloud Storage{chunk_info}: {blob_name}")
             blob = bucket.blob(blob_name)
             blob.upload_from_filename(str(file_path))
@@ -1079,13 +1079,10 @@ class BigQueryAdapter(PlatformAdapter):
             write_disposition = (
                 bigquery.WriteDisposition.WRITE_TRUNCATE if file_idx == 0 else bigquery.WriteDisposition.WRITE_APPEND
             )
-            job_config = bigquery.LoadJobConfig(
-                source_format=bigquery.SourceFormat.CSV,
-                skip_leading_rows=0,
-                autodetect=False,
-                field_delimiter=delimiter,
-                allow_quoted_newlines=True,
+            job_config = self._build_load_job_config(
+                file_path,
                 write_disposition=write_disposition,
+                allow_quoted_newlines=True,
             )
             uri = f"gs://{self.storage_bucket}/{blob_name}"
             load_job = connection.load_table_from_uri(uri, table_ref, job_config=job_config)
@@ -1101,22 +1098,52 @@ class BigQueryAdapter(PlatformAdapter):
         for file_idx, file_path in enumerate(valid_files):
             chunk_info = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
             self.log_very_verbose(f"Loading {table_name}{chunk_info} from {file_path.name}")
-            delimiter = get_delimiter_for_file(file_path)
             write_disposition = (
                 bigquery.WriteDisposition.WRITE_TRUNCATE if file_idx == 0 else bigquery.WriteDisposition.WRITE_APPEND
             )
-            job_config = bigquery.LoadJobConfig(
-                source_format=bigquery.SourceFormat.CSV,
-                field_delimiter=delimiter,
-                skip_leading_rows=0,
-                autodetect=False,
-                write_disposition=write_disposition,
-            )
+            job_config = self._build_load_job_config(file_path, write_disposition=write_disposition)
             with open(file_path, "rb") as source_file:
                 load_job = connection.load_table_from_file(source_file, table_ref, job_config=job_config)
             load_job.result()
 
         return self._get_table_row_count(connection, table_name_upper)
+
+    def _build_load_job_config(
+        self,
+        file_path: Path | str,
+        *,
+        write_disposition: bigquery.WriteDisposition,
+        allow_quoted_newlines: bool = False,
+    ) -> bigquery.LoadJobConfig:
+        """Build a native BigQuery load job config for parquet or delimited text.
+
+        ``allow_quoted_newlines`` applies only to CSV configs; it is ignored for parquet.
+        """
+        data_format = detect_data_format(file_path)
+        if data_format == "parquet":
+            return bigquery.LoadJobConfig(
+                source_format=bigquery.SourceFormat.PARQUET,
+                autodetect=False,
+                write_disposition=write_disposition,
+            )
+
+        if data_format not in self._DELIMITED_FORMATS:
+            self.logger.warning(
+                "Unrecognized data format %r for %s — falling back to CSV load job config",
+                data_format,
+                Path(file_path).name,
+            )
+
+        config_kwargs: dict[str, Any] = {
+            "source_format": bigquery.SourceFormat.CSV,
+            "field_delimiter": get_delimiter_for_file(file_path),
+            "skip_leading_rows": 0,
+            "autodetect": False,
+            "write_disposition": write_disposition,
+        }
+        if allow_quoted_newlines:
+            config_kwargs["allow_quoted_newlines"] = True
+        return bigquery.LoadJobConfig(**config_kwargs)
 
     def _load_tables_via_cloud_storage(
         self,

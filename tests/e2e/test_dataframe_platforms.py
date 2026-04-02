@@ -76,10 +76,6 @@ class TestDaskDataFrameE2E:
     @pytest.mark.e2e_dataframe
     @pytest.mark.slow
     @pytest.mark.stress
-    @pytest.mark.xfail(
-        reason="Dask TPCH full execution currently fails on isin expressions for multiple queries.",
-        strict=False,
-    )
     def test_tpch_full_execution(self, tmp_path: Path) -> None:
         """Test full TPC-H benchmark execution with Dask DataFrame at SF 0.01."""
         if not is_dataframe_available("dask-df"):

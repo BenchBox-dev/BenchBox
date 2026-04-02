@@ -13,12 +13,12 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import math
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
 
+from benchbox.core.tpc_patterns import generate_official_benchmark_audit_trail
 from benchbox.core.tpch.benchmark import TPCHBenchmark
 from benchbox.core.tpch.maintenance_test import (
     TPCHMaintenanceTestResult,
@@ -226,35 +226,11 @@ class TPCHOfficialBenchmark:
         Returns:
             Path to generated audit trail file
         """
-        if output_file is None:
-            if result.config.output_dir:
-                # User specified an output directory, use it
-                output_dir = result.config.output_dir
-            else:
-                # No output directory specified, default to benchmark_results
-                output_dir = Path.cwd() / "benchmark_results"
-            output_file = output_dir / f"tpch_audit_trail_{int(time.time())}.txt"
-
-        output_path = Path(output_file)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(output_path, "w") as f:
-            f.write("TPC-H Official Benchmark Audit Trail\n")
-            f.write("=" * 50 + "\n\n")
-            f.write(f"Scale Factor: {result.config.scale_factor}\n")
-            f.write(f"Number of Streams: {result.config.num_streams}\n")
-            f.write(f"Start Time: {result.start_time}\n")
-            f.write(f"End Time: {result.end_time}\n")
-            f.write(f"Total Time: {result.total_time:.3f} seconds\n\n")
-
-            f.write(f"Power@Size: {result.power_at_size:.2f}\n")
-            f.write(f"Throughput@Size: {result.throughput_at_size:.2f}\n")
-            f.write(f"QphH@Size: {result.qphh_at_size:.2f}\n\n")
-
-            f.write(f"Success: {result.success}\n")
-            if result.errors:
-                f.write("Errors:\n")
-                for error in result.errors:
-                    f.write(f"  - {error}\n")
-
-        return output_path
+        return generate_official_benchmark_audit_trail(
+            result=result,
+            benchmark_title="TPC-H",
+            benchmark_slug="tpch",
+            qph_label="QphH@Size",
+            qph_attr="qphh_at_size",
+            output_file=output_file,
+        )

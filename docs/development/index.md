@@ -43,6 +43,7 @@ Documentation for contributors and developers working on BenchBox.
 ## Reference
 
 - [Read Primitives Catalog](read-primitives-catalog.md) - Catalog of primitive read operations
+- [Read Primitives: Platform Skip Reference](read-primitives-skips-reference.md) - Why each query is skipped per platform and how to re-enable
 
 ## Related Documentation
 
@@ -64,6 +65,7 @@ tpc-compilation-guide
 testing
 pytest-xdist-safety
 read-primitives-catalog
+read-primitives-skips-reference
 runtime-modules
 run-lifecycle-map
 data-sharing

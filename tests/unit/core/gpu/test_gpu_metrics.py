@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from benchbox.core.gpu.metrics import (
+from benchbox.experimental.gpu.metrics import (
     GPUMemoryTracker,
     GPUMetrics,
     GPUMetricsAggregate,

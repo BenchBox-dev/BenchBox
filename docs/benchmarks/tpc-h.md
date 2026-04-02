@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, tpc-h
 ```
 
+> **CLI name:** `tpch` — use `benchbox run --benchmark tpch`
+
 ## Overview
 
 TPC-H tests data warehouse performance using 22 analytical queries.
@@ -100,7 +102,7 @@ The 22 TPC-H queries test different aspects of query processing:
 ### Complexity Patterns
 
 - **Simple Queries** (Q1, Q6): Single table aggregation
-- **Medium Queries** (Q3, Q5, Q10): Multi-table joins with aggregation  
+- **Medium Queries** (Q3, Q5, Q10): Multi-table joins with aggregation
 - **Complex Queries** (Q2, Q15, Q20, Q21): Nested subqueries, correlated queries
 - **Analytical Queries** (Q7, Q8, Q9): Time-series and trend analysis
 
@@ -144,7 +146,7 @@ for file_path in data_files:
 ```python
 # Get query in different SQL dialects
 query_postgres = tpch.get_query(1, dialect="postgres")
-query_duckdb = tpch.get_query(1, dialect="duckdb") 
+query_duckdb = tpch.get_query(1, dialect="duckdb")
 query_mysql = tpch.get_query(1, dialect="mysql")
 
 # Queries are automatically translated via sqlglot
@@ -169,12 +171,12 @@ conn.execute(schema_sql)
 for table_name in tpch.get_available_tables():
     file_path = tpch.tables[table_name.upper()]
     table_name_lower = table_name.lower()
-    
+
     # Load TBL file with pipe delimiter
     conn.execute(f"""
         INSERT INTO {table_name_upper}
-        SELECT * FROM read_csv('{file_path}', 
-                              delim='|', 
+        SELECT * FROM read_csv('{file_path}',
+                              delim='|',
                               header=false)
     """)
 
@@ -302,29 +304,29 @@ def benchmark_queries(tpch, connection, query_list=None):
     """Run TPC-H performance benchmark."""
     if query_list is None:
         query_list = range(1, 23)
-    
+
     results = {}
-    
+
     for query_id in query_list:
         times = []
-        
+
         # Run each query 3 times
         for run in range(3):
             query_sql = tpch.get_query(query_id, dialect="duckdb")
-            
+
             start_time = time.time()
             result = connection.execute(query_sql).fetchall()
             execution_time = time.time() - start_time
-            
+
             times.append(execution_time)
-        
+
         results[query_id] = {
             'times': times,
             'mean': mean(times),
             'median': median(times),
             'rows': len(result)
         }
-    
+
     return results
 
 # Usage
@@ -337,7 +339,7 @@ for query_id, stats in results.items():
 
 ### Data Generation
 1. **Use appropriate scale factors** for your testing needs
-2. **Generate data once** and reuse for multiple test runs  
+2. **Generate data once** and reuse for multiple test runs
 3. **Parallel generation** for large scale factors (SF ≥ 10)
 4. **Validate data integrity** after generation
 

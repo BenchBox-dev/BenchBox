@@ -224,6 +224,9 @@ class TestDataLoaderTuningConfig:
         )
         loader._load_single_file = Mock(return_value=5)
 
+        # Create shard files so they pass the file-existence check
+        (tmp_path / "lineitem.csv").write_text("1|data\n")
+        (tmp_path / "orders.csv").write_text("1|data\n")
         files = {
             "lineitem": [tmp_path / "lineitem.csv"],
             "orders": [tmp_path / "orders.csv"],

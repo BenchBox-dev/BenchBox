@@ -180,8 +180,6 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             # Restore original output directory
             self.output_dir = original_output_dir
 
-        return file_paths
-
     def _generate_date_data(self) -> str:
         """Generate the DATE dimension data."""
         filename = self.get_compressed_filename("date.tbl")

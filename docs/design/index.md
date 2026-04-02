@@ -15,6 +15,9 @@ System components and design patterns.
 ### [Project Structure](structure.md)
 Code organization and directories.
 
+### [Future State Proposals](future-state/index.md)
+End-state extraction and refactoring targets tied to active planning TODOs.
+
 ##  Design Principles
 
 **Self-contained** - No external dependencies.
@@ -85,4 +88,5 @@ Code organization and directories.
 
 architecture
 structure
+future-state/index
 ```

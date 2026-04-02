@@ -5,6 +5,8 @@
 ```{tags} advanced, concept, tpc-ds-obt, tpc-ds, experimental
 ```
 
+> **CLI name:** `tpcds_obt` — use `benchbox run --benchmark tpcds_obt`
+
 ## Overview
 
 The TPC-DS-OBT (One Big Table) benchmark adapts the standard TPC-DS benchmark to run against a single denormalized table instead of the traditional 25-table normalized schema. This experimental benchmark tests how databases handle wide tables with hundreds of columns, a pattern increasingly common in modern data warehouses and lakehouse architectures.

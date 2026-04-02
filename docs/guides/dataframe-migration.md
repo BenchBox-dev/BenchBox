@@ -87,13 +87,13 @@ DataFrame platforms support performance tuning:
 
 ```bash
 # View platform defaults
-benchbox df-tuning show-defaults --platform polars
+benchbox tuning show-defaults --platform polars
 
 # Auto-detect optimal settings
-benchbox run --platform polars-df --benchmark tpch --df-tuning auto
+benchbox run --platform polars-df --benchmark tpch --tuning auto
 
 # Custom configuration
-benchbox run --platform polars-df --benchmark tpch --df-tuning ./tuning.yaml
+benchbox run --platform polars-df --benchmark tpch --tuning ./tuning.yaml
 ```
 
 Example tuning file:

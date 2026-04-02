@@ -16,7 +16,7 @@ from benchbox.monitoring import (
     PerformanceTracker,
     attach_snapshot_to_result,
 )
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,

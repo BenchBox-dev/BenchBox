@@ -25,7 +25,6 @@ pytestmark = [
 ]
 
 
-@pytest.mark.integration
 @pytest.mark.duckdb
 class TestTPCHSkewDuckDBIntegration:
     """Integration tests for TPC-H Skew with DuckDB."""

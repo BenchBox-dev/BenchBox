@@ -124,6 +124,126 @@ def _resolve_external_table_sources(benchmark: Any, data_dir: Path) -> dict[str,
     return table_sources
 
 
+def _try_delta_scan(
+    connection: Any,
+    source_paths: list[Path],
+    ext_loaded: bool,
+) -> tuple[str, bool] | None:
+    """Try Delta scan if source is a single directory with _delta_log."""
+    from benchbox.platforms.base.data_loading import escape_sql_string_literal
+
+    if len(source_paths) != 1 or not source_paths[0].is_dir() or not (source_paths[0] / "_delta_log").is_dir():
+        return None
+    if not ext_loaded:
+        connection.execute("INSTALL delta")
+        connection.execute("LOAD delta")
+    escaped = escape_sql_string_literal(str(source_paths[0]))
+    return f"delta_scan('{escaped}')", True
+
+
+def _try_iceberg_scan(
+    connection: Any,
+    source_paths: list[Path],
+    ext_loaded: bool,
+) -> tuple[str, bool] | None:
+    """Try Iceberg scan if source is a single directory with metadata/."""
+    from benchbox.platforms.base.data_loading import escape_sql_string_literal
+
+    if len(source_paths) != 1 or not source_paths[0].is_dir() or not (source_paths[0] / "metadata").is_dir():
+        return None
+    if not ext_loaded:
+        connection.execute("INSTALL iceberg")
+        connection.execute("LOAD iceberg")
+    escaped = escape_sql_string_literal(str(source_paths[0]))
+    return f"iceberg_scan('{escaped}')", True
+
+
+def _try_vortex_scan(
+    connection: Any,
+    source_paths: list[Path],
+    ext_loaded: bool,
+) -> tuple[str, bool] | None:
+    """Try Vortex scan if any source paths are .vortex files."""
+    from benchbox.platforms.base.data_loading import escape_sql_string_literal
+
+    vortex_paths: list[Path] = []
+    for path in source_paths:
+        if path.is_dir():
+            vortex_paths.extend(sorted(path.glob("*.vortex")))
+        elif path.suffix.lower() == ".vortex":
+            vortex_paths.append(path)
+    if not vortex_paths:
+        return None
+
+    if not ext_loaded:
+        try:
+            connection.execute("INSTALL vortex")
+            connection.execute("LOAD vortex")
+        except Exception as e:
+            raise RuntimeError(
+                "DuckDB external table mode for Vortex files requires the DuckDB vortex extension. "
+                "Install/load failed. Ensure your DuckDB runtime supports the extension, "
+                "or use --table-mode native."
+            ) from e
+
+    escaped_paths = [escape_sql_string_literal(str(p)) for p in vortex_paths]
+    if len(escaped_paths) == 1:
+        scan_expr = f"read_vortex('{escaped_paths[0]}')"
+    else:
+        union_terms = [f"SELECT * FROM read_vortex('{p}')" for p in escaped_paths]
+        scan_expr = "(" + " UNION ALL ".join(union_terms) + ")"
+
+    try:
+        connection.execute(f"SELECT * FROM {scan_expr} LIMIT 1").fetchall()
+    except Exception as probe_error:
+        raise RuntimeError(
+            "DuckDB cannot read these Vortex files. This typically occurs when files were "
+            "written by Python Vortex bindings instead of the DuckDB vortex extension. "
+            "Re-run with --force datagen to regenerate files using the DuckDB extension writer, "
+            "or use --table-mode native to load data into DuckDB tables directly."
+        ) from probe_error
+
+    return scan_expr, True
+
+
+def _try_parquet_scan(source_paths: list[Path]) -> str | None:
+    """Try Parquet scan if any source paths are .parquet files."""
+    from benchbox.platforms.base.data_loading import escape_sql_string_literal
+
+    parquet_paths: list[Path] = []
+    for path in source_paths:
+        if path.is_dir():
+            parquet_paths.extend(sorted(path.glob("*.parquet")))
+        elif path.suffix.lower() == ".parquet":
+            parquet_paths.append(path)
+    if not parquet_paths:
+        return None
+
+    escaped = [escape_sql_string_literal(str(p)) for p in parquet_paths]
+    if len(escaped) == 1:
+        return f"read_parquet('{escaped[0]}')"
+    path_array = "[" + ", ".join(f"'{p}'" for p in escaped) + "]"
+    return f"read_parquet({path_array})"
+
+
+def _try_text_scan(source_paths: list[Path], column_names: list[str] | None) -> tuple[str, str] | None:
+    """Try text file scan (TBL/CSV/DAT) if any source paths match."""
+    from benchbox.utils.file_format import detect_data_format
+
+    text_paths: list[Path] = []
+    detected_fmt = "csv"
+    for path in source_paths:
+        if not path.is_dir():
+            fmt = detect_data_format(path)
+            if fmt in ("tbl", "csv"):
+                text_paths.append(path)
+                detected_fmt = fmt
+    if not text_paths:
+        return None
+
+    return _build_csv_scan_expression(text_paths, column_names), detected_fmt
+
+
 def _build_duckdb_external_scan_expression(
     connection: Any,
     source_paths: list[Path],
@@ -143,121 +263,25 @@ def _build_duckdb_external_scan_expression(
         Tuple of (scan_expression, delta_ext_loaded, vortex_ext_loaded, iceberg_ext_loaded, format_name)
         where format_name is one of "parquet", "vortex", "delta", "iceberg", "tbl", or "csv".
     """
-    from benchbox.platforms.base.data_loading import escape_sql_string_literal
-    from benchbox.utils.file_format import detect_data_format
+    result = _try_delta_scan(connection, source_paths, delta_extension_loaded)
+    if result:
+        return result[0], True, vortex_extension_loaded, iceberg_extension_loaded, "delta"
 
-    def _build_parquet_scan_expression(parquet_paths: list[Path]) -> str:
-        escaped_paths = [escape_sql_string_literal(str(path)) for path in parquet_paths]
-        if len(escaped_paths) == 1:
-            return f"read_parquet('{escaped_paths[0]}')"
-        path_array = "[" + ", ".join(f"'{path}'" for path in escaped_paths) + "]"
-        return f"read_parquet({path_array})"
+    result = _try_iceberg_scan(connection, source_paths, iceberg_extension_loaded)
+    if result:
+        return result[0], delta_extension_loaded, vortex_extension_loaded, True, "iceberg"
 
-    # Delta table directory: use delta_scan() with duckdb delta extension.
-    if len(source_paths) == 1 and source_paths[0].is_dir() and (source_paths[0] / "_delta_log").is_dir():
-        if not delta_extension_loaded:
-            connection.execute("INSTALL delta")
-            connection.execute("LOAD delta")
-            delta_extension_loaded = True
-        escaped_delta_path = escape_sql_string_literal(str(source_paths[0]))
-        return (
-            f"delta_scan('{escaped_delta_path}')",
-            delta_extension_loaded,
-            vortex_extension_loaded,
-            iceberg_extension_loaded,
-            "delta",
-        )
+    result = _try_vortex_scan(connection, source_paths, vortex_extension_loaded)
+    if result:
+        return result[0], delta_extension_loaded, True, iceberg_extension_loaded, "vortex"
 
-    # Iceberg table directory: use iceberg_scan() with duckdb iceberg extension.
-    if len(source_paths) == 1 and source_paths[0].is_dir() and (source_paths[0] / "metadata").is_dir():
-        if not iceberg_extension_loaded:
-            connection.execute("INSTALL iceberg")
-            connection.execute("LOAD iceberg")
-            iceberg_extension_loaded = True
-        escaped_iceberg_path = escape_sql_string_literal(str(source_paths[0]))
-        return (
-            f"iceberg_scan('{escaped_iceberg_path}')",
-            delta_extension_loaded,
-            vortex_extension_loaded,
-            iceberg_extension_loaded,
-            "iceberg",
-        )
+    parquet_expr = _try_parquet_scan(source_paths)
+    if parquet_expr:
+        return parquet_expr, delta_extension_loaded, vortex_extension_loaded, iceberg_extension_loaded, "parquet"
 
-    # Vortex files: use read_vortex() with DuckDB vortex extension.
-    vortex_paths: list[Path] = []
-    for path in source_paths:
-        if path.is_dir():
-            vortex_paths.extend(sorted(path.glob("*.vortex")))
-        elif path.suffix.lower() == ".vortex":
-            vortex_paths.append(path)
-
-    if vortex_paths:
-        if not vortex_extension_loaded:
-            try:
-                connection.execute("INSTALL vortex")
-                connection.execute("LOAD vortex")
-                vortex_extension_loaded = True
-            except Exception as e:
-                raise RuntimeError(
-                    "DuckDB external table mode for Vortex files requires the DuckDB vortex extension. "
-                    "Install/load failed. Ensure your DuckDB runtime supports the extension, "
-                    "or use --table-mode native."
-                ) from e
-
-        escaped_paths = [escape_sql_string_literal(str(path)) for path in vortex_paths]
-        if len(escaped_paths) == 1:
-            scan_expr = f"read_vortex('{escaped_paths[0]}')"
-        else:
-            union_terms = [f"SELECT * FROM read_vortex('{path}')" for path in escaped_paths]
-            scan_expr = "(" + " UNION ALL ".join(union_terms) + ")"
-
-        try:
-            connection.execute(f"SELECT * FROM {scan_expr} LIMIT 1").fetchall()
-        except Exception as probe_error:
-            raise RuntimeError(
-                "DuckDB cannot read these Vortex files. This typically occurs when files were "
-                "written by Python Vortex bindings instead of the DuckDB vortex extension. "
-                "Re-run with --force datagen to regenerate files using the DuckDB extension writer, "
-                "or use --table-mode native to load data into DuckDB tables directly."
-            ) from probe_error
-
-        return scan_expr, delta_extension_loaded, vortex_extension_loaded, iceberg_extension_loaded, "vortex"
-
-    # Parquet files (self-describing format, no column_names needed).
-    parquet_paths: list[Path] = []
-    for path in source_paths:
-        if path.is_dir():
-            parquet_paths.extend(sorted(path.glob("*.parquet")))
-        elif path.suffix.lower() == ".parquet":
-            parquet_paths.append(path)
-
-    if parquet_paths:
-        return (
-            _build_parquet_scan_expression(parquet_paths),
-            delta_extension_loaded,
-            vortex_extension_loaded,
-            iceberg_extension_loaded,
-            "parquet",
-        )
-
-    # Delimited text files (TBL, CSV, DAT) — use DuckDB read_csv().
-    text_paths: list[Path] = []
-    detected_fmt = "csv"
-    for path in source_paths:
-        if not path.is_dir():
-            fmt = detect_data_format(path)
-            if fmt in ("tbl", "csv"):
-                text_paths.append(path)
-                detected_fmt = fmt
-
-    if text_paths:
-        return (
-            _build_csv_scan_expression(text_paths, column_names),
-            delta_extension_loaded,
-            vortex_extension_loaded,
-            iceberg_extension_loaded,
-            detected_fmt,
-        )
+    text_result = _try_text_scan(source_paths, column_names)
+    if text_result:
+        return text_result[0], delta_extension_loaded, vortex_extension_loaded, iceberg_extension_loaded, text_result[1]
 
     formatted_sources = ", ".join(str(path) for path in source_paths)
     raise RuntimeError(

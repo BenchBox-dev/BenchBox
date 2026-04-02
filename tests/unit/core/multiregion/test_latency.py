@@ -9,7 +9,7 @@ import time
 
 import pytest
 
-from benchbox.core.multiregion.latency import (
+from benchbox.experimental.multiregion.latency import (
     LatencyMeasurement,
     LatencyMeasurer,
     LatencyProfile,

@@ -33,7 +33,7 @@ class TestFormatSelector:
             available_formats=["tbl", "parquet"],
             user_preference=None,
         )
-        assert result == "parquet"  # DuckDB prefers Parquet
+        assert result == "tbl"  # DuckDB prefers text files
 
     def test_select_format_databricks_prefers_delta(self):
         """Test that Databricks prefers Delta over Parquet."""
@@ -82,9 +82,9 @@ class TestFormatSelector:
             platform_name="duckdb",
             available_formats=["tbl", "parquet", "csv"],
         )
-        # Should be in order of preference
-        assert chain[0] == "parquet"
-        assert "tbl" in chain
+        # Should be in order of preference (tbl first, then parquet before csv)
+        assert chain[0] == "tbl"
+        assert chain.index("parquet") < chain.index("csv")
         assert "csv" in chain
 
     def test_get_fallback_chain_databricks(self):
@@ -97,6 +97,15 @@ class TestFormatSelector:
         # Delta should be first
         assert chain[0] == "delta"
         assert chain[1] == "parquet"
+
+    def test_get_fallback_chain_bigquery_prefers_parquet(self):
+        """Test fallback chain for BigQuery prefers parquet over text sources."""
+        selector = FormatSelector()
+        chain = selector.get_fallback_chain(
+            platform_name="bigquery",
+            available_formats=["tbl", "parquet", "csv"],
+        )
+        assert chain == ["parquet", "tbl", "csv"]
 
     def test_detect_available_formats_from_manifest(self):
         """Test format detection from manifest data."""

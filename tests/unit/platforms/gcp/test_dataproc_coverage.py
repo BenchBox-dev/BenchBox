@@ -66,7 +66,7 @@ def test_close_deletes_cluster_when_created_by_us() -> None:
     with patch.object(adapter, "_delete_cluster") as mock_delete:
         adapter.close()
 
-    mock_delete.assert_called_once()
+    mock_delete.assert_called_once_with()
 
 
 def test_apply_tuning_configuration_collects_results() -> None:

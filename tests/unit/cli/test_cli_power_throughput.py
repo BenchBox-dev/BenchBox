@@ -15,7 +15,7 @@ from benchbox.cli.main import cli
 from benchbox.cli.orchestrator import BenchmarkOrchestrator
 from benchbox.cli.system import SystemProfile
 from benchbox.core.schemas import DatabaseConfig
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,

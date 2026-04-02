@@ -7,7 +7,10 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from benchbox.base import BaseBenchmark
 
 from benchbox.cli.config import DirectoryManager
 from benchbox.core.benchmark_loader import (
@@ -106,8 +109,16 @@ class BenchmarkOrchestrator:
         benchmark_name: Optional[str] = None,
         scale_factor: Optional[float] = None,
         tuning_config: Optional[Any] = None,
+        benchmark: Optional["BaseBenchmark"] = None,
     ) -> dict[str, Any]:
         """Build platform configuration using core helper."""
+        # For benchmarks that share another benchmark's data (e.g., read_primitives → tpch),
+        # use the data source name for database naming so the existing database is reused.
+        if benchmark is not None:
+            data_source = getattr(benchmark, "get_data_source_benchmark", lambda: None)()
+            if data_source:
+                benchmark_name = data_source
+
         return _core_get_platform_config(
             database_config,
             system_profile,
@@ -171,6 +182,7 @@ class BenchmarkOrchestrator:
                     benchmark_name=config.name,
                     scale_factor=config.scale_factor,
                     tuning_config=config.options.get("unified_tuning_configuration") if config.options else None,
+                    benchmark=benchmark,
                 )
                 if database_config is not None
                 else None

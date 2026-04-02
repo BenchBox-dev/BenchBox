@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 
 from benchbox.core.schemas import QueryResult
-from tests.conftest import make_benchmark_results
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
     pytest.mark.unit,

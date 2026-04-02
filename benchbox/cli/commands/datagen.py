@@ -62,8 +62,8 @@ def datagen(ctx, benchmark, scale, output_dir, data_format, seed, verbose):
         # Generate TPC-DS data with specific seed
         benchbox datagen --benchmark tpcds --scale 1 --seed 42 --output ./data/tpcds_1
 
-        # Generate data in CSV format
-        benchbox datagen --benchmark clickbench --scale 1 --format csv --output ./data/clickbench
+        # Generate ClickBench data
+        benchbox datagen --benchmark clickbench --scale 1 --output ./data/clickbench
 
         # Generate with verbose logging
         benchbox datagen --benchmark tpch --scale 0.01 --output ./data --verbose

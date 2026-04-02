@@ -10,8 +10,7 @@ from click.testing import CliRunner
 
 from benchbox.cli.app import cli
 from benchbox.core.results.database import ResultDatabase
-from tests.conftest import make_benchmark_results
-from tests.fixtures.result_dict_fixtures import make_v2_result_dict
+from tests.fixtures.result_dict_fixtures import make_benchmark_results, make_v2_result_dict
 
 pytestmark = [
     pytest.mark.unit,

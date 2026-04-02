@@ -997,29 +997,10 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
     @staticmethod
     def _parse_s3_url(s3_url: str) -> tuple[str, str]:
-        """Parse an S3 URL into (bucket, prefix) components.
+        """Parse an S3 URL into (bucket, prefix) components."""
+        from benchbox.utils.cloud_urls import parse_s3_url
 
-        Args:
-            s3_url: S3 URL like 's3://my-bucket/path/prefix/'
-
-        Returns:
-            Tuple of (bucket_name, key_prefix). Prefix includes trailing slash.
-
-        Examples:
-            >>> FireboltAdapter._parse_s3_url("s3://my-bucket/staging/")
-            ('my-bucket', 'staging/')
-            >>> FireboltAdapter._parse_s3_url("s3://my-bucket/")
-            ('my-bucket', '')
-        """
-        # Strip the s3:// prefix
-        path = s3_url[5:]  # len("s3://") == 5
-        # Split on first slash to separate bucket from prefix
-        if "/" in path:
-            bucket, prefix = path.split("/", 1)
-        else:
-            bucket = path
-            prefix = ""
-        return bucket, prefix
+        return parse_s3_url(s3_url)
 
     def _execute_batch_insert(self, cursor: Any, insert_sql: str, rows: list[tuple[Any, ...]]) -> None:
         """Execute batch inserts with executemany fallback."""
@@ -1062,13 +1043,9 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
     def _extract_table_name(self, statement: str) -> str | None:
         """Extract table name from CREATE TABLE statement."""
-        try:
-            match = re.search(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)", statement, re.IGNORECASE)
-            if match:
-                return match.group(1).strip()
-        except Exception:
-            pass
-        return None
+        from benchbox.core.sql_utils import extract_table_name
+
+        return extract_table_name(statement)
 
     def _normalize_table_name_in_sql(self, sql: str) -> str:
         """Normalize table names in SQL to lowercase for Firebolt."""
@@ -1123,15 +1100,9 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
     def get_query_plan(self, connection: Any, query: str) -> str:
         """Get query execution plan for analysis."""
-        cursor = connection.cursor()
-        try:
-            cursor.execute(f"EXPLAIN {query}")
-            plan_rows = cursor.fetchall()
-            return "\n".join([str(row[0]) for row in plan_rows])
-        except Exception as e:
-            return f"Could not get query plan: {e}"
-        finally:
-            cursor.close()
+        from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+
+        return get_query_plan_from_cursor(connection, query)
 
     def close_connection(self, connection: Any) -> None:
         """Close Firebolt connection."""
@@ -1230,24 +1201,9 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         Firebolt tuning is primarily handled at table creation time.
         Post-creation optimization is limited.
         """
-        if not table_tuning or not table_tuning.has_any_tuning():
-            return
+        from benchbox.platforms.base.tuning_utils import log_partition_tunings
 
-        table_name = table_tuning.table_name.lower()
-        self.logger.info(f"Applying Firebolt tunings for table: {table_name}")
-
-        # Log configuration for informational purposes
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
-            if partition_columns:
-                sorted_cols = sorted(partition_columns, key=lambda col: col.order)
-                column_names = [col.name for col in sorted_cols]
-                self.logger.info(f"Partitioning for {table_name}: {', '.join(column_names)}")
-
-        except ImportError:
-            self.logger.warning("Tuning interface not available - skipping tuning application")
+        log_partition_tunings(table_tuning, self.logger, "Firebolt")
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to Firebolt."""

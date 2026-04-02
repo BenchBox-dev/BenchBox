@@ -21,8 +21,8 @@ BenchBox's expansion roadmap focuses on three strategic areas:
 
 | Category | Current | Planned |
 |----------|---------|---------|
-| SQL Platforms | 28 | +6 |
-| DataFrame Platforms | 7 | +0 |
+| SQL Platforms | 33 | +6 |
+| DataFrame Platforms | 8 | +0 |
 | Benchmarks | 12 | +6 |
 | DataFrame-enabled Benchmarks | 2 (TPC-H, TPC-DS) | +13 |
 

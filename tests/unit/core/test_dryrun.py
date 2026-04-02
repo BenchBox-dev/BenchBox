@@ -637,3 +637,43 @@ class TestDryRunPlatformConfigInjection:
             assert call_kwargs[1].get("dry_run") is True or (
                 len(call_kwargs[0]) > 1 and call_kwargs[0][1].get("dry_run") is True
             )
+
+    def test_get_platform_config_resolves_data_source_benchmark(self):
+        """_get_platform_config should override benchmark_name with data source name."""
+        executor = DryRunExecutor()
+        benchmark_config = MagicMock()
+        benchmark_config.name = "read_primitives"
+        benchmark_config.scale_factor = 1.0
+
+        benchmark = MagicMock()
+        benchmark.get_data_source_benchmark.return_value = "tpch"
+
+        with patch("benchbox.core.platform_config.get_platform_config", return_value={}) as mock_core:
+            executor._get_platform_config(
+                database_config=MagicMock(),
+                system_profile=MagicMock(),
+                benchmark_config=benchmark_config,
+                benchmark=benchmark,
+            )
+
+        assert mock_core.call_args[0][2] == "tpch"
+
+    def test_get_platform_config_passes_through_when_no_data_source(self):
+        """_get_platform_config should keep original benchmark_name when no data source."""
+        executor = DryRunExecutor()
+        benchmark_config = MagicMock()
+        benchmark_config.name = "tpch"
+        benchmark_config.scale_factor = 0.01
+
+        benchmark = MagicMock()
+        benchmark.get_data_source_benchmark.return_value = None
+
+        with patch("benchbox.core.platform_config.get_platform_config", return_value={}) as mock_core:
+            executor._get_platform_config(
+                database_config=MagicMock(),
+                system_profile=MagicMock(),
+                benchmark_config=benchmark_config,
+                benchmark=benchmark,
+            )
+
+        assert mock_core.call_args[0][2] == "tpch"

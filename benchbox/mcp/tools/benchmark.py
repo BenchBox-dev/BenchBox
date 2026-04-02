@@ -701,13 +701,30 @@ def _get_dataframe_family_for_platform(platform: str | None) -> str | None:
     if platform is None:
         return None
 
-    from benchbox.platforms.dataframe.platform_checker import DATAFRAME_PLATFORMS
+    from benchbox import DATAFRAME_PLATFORMS
 
     base = platform.lower().replace("-df", "")
     info = DATAFRAME_PLATFORMS.get(base)
     if info is not None:
         return info.family.value
     return None
+
+
+def _resolve_dataframe_impl(df_query: Any, family: str | None) -> tuple[Any | None, str | None]:
+    """Resolve the best DataFrame implementation for the given family.
+
+    Returns (impl, resolved_family) where resolved_family is set only when
+    family was None and we auto-detected which implementation to use.
+    """
+    if family == "expression" and df_query.expression_impl is not None:
+        return df_query.expression_impl, None
+    if family == "pandas" and df_query.pandas_impl is not None:
+        return df_query.pandas_impl, None
+    if df_query.expression_impl is not None:
+        return df_query.expression_impl, "expression" if family is None else None
+    if df_query.pandas_impl is not None:
+        return df_query.pandas_impl, "pandas" if family is None else None
+    return None, None
 
 
 def _populate_dataframe_query_details(
@@ -727,11 +744,11 @@ def _populate_dataframe_query_details(
     df_query = None
 
     if benchmark == "tpch":
-        from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
+        from benchbox import TPCH_DATAFRAME_QUERIES
 
         df_query = TPCH_DATAFRAME_QUERIES.get(registry_id)
     elif benchmark == "tpcds":
-        from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
+        from benchbox import TPCDS_DATAFRAME_QUERIES
 
         df_query = TPCDS_DATAFRAME_QUERIES.get(registry_id)
 
@@ -744,19 +761,9 @@ def _populate_dataframe_query_details(
     response["has_expression_impl"] = df_query.has_expression_impl()
     response["has_pandas_impl"] = df_query.has_pandas_impl()
 
-    impl = None
-    if family == "expression" and df_query.expression_impl is not None:
-        impl = df_query.expression_impl
-    elif family == "pandas" and df_query.pandas_impl is not None:
-        impl = df_query.pandas_impl
-    elif df_query.expression_impl is not None:
-        impl = df_query.expression_impl
-        if family is None:
-            response["dataframe_family"] = "expression"
-    elif df_query.pandas_impl is not None:
-        impl = df_query.pandas_impl
-        if family is None:
-            response["dataframe_family"] = "pandas"
+    impl, resolved_family = _resolve_dataframe_impl(df_query, family)
+    if resolved_family:
+        response["dataframe_family"] = resolved_family
 
     if impl is not None:
         try:

@@ -124,7 +124,7 @@ This must remain an **early** hook. Re-implementing the cap in
 [`tests/conftest.py`](../../tests/conftest.py) patches `worker_title` to a
 no-op on macOS in xdist worker processes. The implementation uses stack walking
 because xdist's `remote.py` executes in an `execnet` `__channelexec__`
-namespace — `import xdist.remote` loads a different module object than the one
+namespace: `import xdist.remote` loads a different module object than the one
 actually executing. The stack walk only patches frames whose `__name__` is
 `"__channelexec__"` and that have a callable `worker_title`, so unrelated
 frames with a `worker_title` name are ignored.

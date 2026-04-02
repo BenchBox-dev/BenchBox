@@ -133,8 +133,8 @@ class TestDataFrameOpsProtocol:
     """Tests for DataFrameOps protocol compliance."""
 
     def test_protocol_is_runtime_checkable(self):
-        """Test that DataFrameOps is runtime checkable."""
-        assert hasattr(DataFrameOps, "__protocol_attrs__") or hasattr(DataFrameOps, "_is_runtime_protocol")
+        """Test that DataFrameOps is runtime checkable via isinstance()."""
+        assert isinstance(DataFrameOps, type), "DataFrameOps should be a type (protocol class)"
 
     def test_mock_implementation_satisfies_protocol(self):
         """Test that a mock implementation satisfies the protocol."""
@@ -232,8 +232,8 @@ class TestDataFrameGroupByProtocol:
     """Tests for DataFrameGroupBy protocol compliance."""
 
     def test_protocol_is_runtime_checkable(self):
-        """Test that DataFrameGroupBy is runtime checkable."""
-        assert hasattr(DataFrameGroupBy, "__protocol_attrs__") or hasattr(DataFrameGroupBy, "_is_runtime_protocol")
+        """Test that DataFrameGroupBy is runtime checkable via isinstance()."""
+        assert isinstance(DataFrameGroupBy, type), "DataFrameGroupBy should be a type (protocol class)"
 
     def test_mock_groupby_satisfies_protocol(self):
         """Test that a mock GroupBy implementation satisfies the protocol."""

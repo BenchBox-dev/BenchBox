@@ -5,10 +5,14 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+from pathlib import Path
+from unittest.mock import MagicMock
+
 import pytest
 from click.testing import CliRunner
 
 from benchbox.cli.app import cli
+from benchbox.cli.commands.tuning import create_sample_tuning
 
 pytestmark = [
     pytest.mark.unit,
@@ -145,6 +149,35 @@ class TestDeprecatedCommands:
         cmd = cli.commands.get("tuning")
         assert cmd is not None, "tuning should be registered"
         assert not cmd.hidden, "tuning should not be hidden"
+
+    def test_create_sample_tuning_command_success(self, runner, tmp_path: Path):
+        """Deprecated command should still create a sample tuning file."""
+        config_manager = MagicMock()
+        output_path = tmp_path / "sample.yaml"
+
+        result = runner.invoke(
+            create_sample_tuning,
+            ["--platform", "duckdb", "--output", str(output_path)],
+            obj={"config": config_manager},
+        )
+
+        assert result.exit_code == 0
+        assert "deprecated" in result.output.lower()
+        config_manager.create_sample_unified_tuning_config.assert_called_once_with(output_path, "duckdb")
+
+    def test_create_sample_tuning_command_failure_exits_nonzero(self, runner, tmp_path: Path):
+        """Deprecated command should surface configuration creation failures."""
+        config_manager = MagicMock()
+        config_manager.create_sample_unified_tuning_config.side_effect = RuntimeError("boom")
+
+        result = runner.invoke(
+            create_sample_tuning,
+            ["--platform", "snowflake", "--output", str(tmp_path / "sample.yaml")],
+            obj={"config": config_manager},
+        )
+
+        assert result.exit_code == 1
+        assert "Failed to create tuning configuration: boom" in result.output
 
 
 class TestCommandCategorization:

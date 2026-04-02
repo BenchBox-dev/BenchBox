@@ -424,7 +424,7 @@ class TPCValidator:
         else:
             return TPCValidationResult.FAIL
 
-    def validate_test_result(self, test_result) -> dict[str, TPCValidationResult]:
+    def validate_test_result(self, _test_result) -> dict[str, TPCValidationResult]:
         """Validate test result."""
         return {
             "execution_time": TPCValidationResult.PASS,

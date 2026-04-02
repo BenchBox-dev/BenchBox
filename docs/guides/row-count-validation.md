@@ -90,6 +90,8 @@ Validation was skipped because no expected result is available for this query/sc
 **Common reasons:**
 - Scale factor other than 1.0 (expected results only available for SF=1.0 currently)
 - Query variant not in answer files
+- Answer files not available locally and download failed or was disabled
+  - run `benchbox download-answers` to pre-populate the cache
 - Non-standard benchmark
 
 ## Supported Benchmarks
@@ -262,6 +264,81 @@ results = adapter.run_throughput_test(
 - Registry uses `threading.Lock` to protect cache and provider registry
 - Double-check locking pattern for efficient concurrent access
 - Slow provider loads happen outside locks
+
+## Installation and Answer File Availability
+
+### How Answer Files Are Distributed
+
+TPC-H and TPC-DS answer files (~4.2 MB total) are distributed separately from
+the BenchBox package:
+
+| Installation method | Answer file availability |
+|---------------------|--------------------------|
+| `git clone` / `uv sync` (dev) | ✅ Included in `_sources/` |
+| `pip install benchbox` (wheel) | ⬇️ Downloaded on-demand |
+| `BENCHBOX_NO_DOWNLOAD=1` set | ⚠️ Skipped (validation disabled) |
+
+For wheel installs, BenchBox automatically downloads a cached copy of the answer
+files the first time validation is needed. Subsequent runs use the local cache
+with no network overhead.
+
+### Cache Location
+
+Downloaded answer files are stored in:
+
+```
+$XDG_CACHE_HOME/benchbox/answers/    # if XDG_CACHE_HOME is set
+~/.cache/benchbox/answers/            # otherwise (default)
+```
+
+Subdirectories:
+
+```
+~/.cache/benchbox/answers/
+├── tpch/          # q1.out … q22.out
+└── tpcds/         # 1.ans … 99.ans + NULLS variants
+```
+
+### Pre-Downloading Answer Files
+
+To populate the cache before your first benchmark run (e.g., in a CI
+environment without internet access during the run itself):
+
+```bash
+benchbox download-answers                        # Both TPC-H and TPC-DS
+benchbox download-answers --benchmark tpch       # TPC-H only
+benchbox download-answers --benchmark tpcds      # TPC-DS only
+benchbox download-answers --force                # Re-download even if cached
+benchbox download-answers --show-cache-dir       # Print cache location and exit
+```
+
+### Disabling Automatic Downloads
+
+To opt out of all automatic downloads (air-gapped environments, CI pipelines
+where networking is blocked):
+
+```bash
+export BENCHBOX_NO_DOWNLOAD=1
+```
+
+With this set, BenchBox skips the download attempt and logs an INFO message
+instead of attempting a network connection. Validation is gracefully skipped for
+queries whose answer files are not available locally; the benchmark still runs,
+only correctness validation is omitted.
+
+### Using a Custom Answer File URL
+
+To serve answer files from a private CDN or internal mirror:
+
+```bash
+export BENCHBOX_ANSWERS_URL=https://your-cdn.example.com/benchbox/answers-v1
+```
+
+The downloader will fetch `tpch-answers.tar.gz`, `tpcds-answers.tar.gz`, and
+`checksums.sha256` from this URL instead of the default GitHub releases URL.
+See `.github/workflows/upload-answers.yml` for the expected archive layout.
+
+---
 
 ## Troubleshooting
 
@@ -448,6 +525,11 @@ Planned improvements to row count validation:
 5. **Differential Validation**: Compare results across platforms
 6. **Configuration Options**: Toggle validation on/off per query or benchmark
 
+> **Note**: On-demand answer file download for wheel installs (item 7 from the
+> original list) has been implemented. See the
+> [Installation and Answer File Availability](#installation-and-answer-file-availability)
+> section above.
+
 ## References
 
 - TPC-H Specification: https://www.tpc.org/tpch/
@@ -459,4 +541,3 @@ Planned improvements to row count validation:
 
 *Generated as part of Phase D: Testing & Documentation*
 *Implementation Phases A-C: Bug fixes, security, robustness*
-

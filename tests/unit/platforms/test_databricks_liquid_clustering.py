@@ -11,7 +11,7 @@ from benchbox.platforms.databricks import DatabricksAdapter
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.slow,
+    pytest.mark.fast,
     pytest.mark.cloud_import,
 ]
 
@@ -168,9 +168,9 @@ def test_apply_table_tunings_liquid_clustering_falls_back_to_sort_columns(_mock_
     assert any("ALTER TABLE TEST_TABLE CLUSTER BY (ship_date, order_key)" in call for call in execute_calls)
 
 
-@pytest.mark.slow
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")
-def test_platform_metadata_includes_clustering_strategy_and_operations(_mock_databricks_sql):
+@patch("databricks.sdk.WorkspaceClient")
+def test_platform_metadata_includes_clustering_strategy_and_operations(_mock_workspace_client, _mock_databricks_sql):
     adapter = DatabricksAdapter(
         server_hostname="test.cloud.databricks.com",
         http_path="/sql/1.0/warehouses/test",

@@ -1050,40 +1050,9 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         Returns:
             Dictionary mapping table name to row count
         """
-        from benchbox.platforms.base.data_loading import DataSourceResolver
+        from benchbox.platforms.dataframe.shared_loading import load_tables_from_data_source_impl
 
-        resolver = DataSourceResolver()
-
-        # Create a minimal benchmark object for the resolver
-        class MinimalBenchmark:
-            tables = {}
-
-        benchmark = MinimalBenchmark()
-        data_source = resolver.resolve(benchmark, data_dir)
-
-        if not data_source or not data_source.tables:
-            raise ValueError(f"No data files found in {data_dir}")
-
-        table_stats = {}
-        for table_name, file_paths in data_source.tables.items():
-            # Normalize file paths
-            valid_files = [Path(f) if not isinstance(f, Path) else f for f in file_paths]
-            valid_files = [f for f in valid_files if f.exists()]
-
-            if not valid_files:
-                self._log_verbose(f"Skipping {table_name} - no valid data files")
-                continue
-
-            # Get column names from schema if available
-            column_names = None
-            if schema_info and table_name.lower() in schema_info:
-                columns = schema_info[table_name.lower()].get("columns", [])
-                column_names = [col["name"] for col in columns if "name" in col]
-
-            row_count = self.load_table(ctx, table_name.lower(), valid_files, column_names)
-            table_stats[table_name.lower()] = row_count
-
-        return table_stats
+        return load_tables_from_data_source_impl(self, ctx, data_dir, schema_info)
 
     def execute_query(
         self,

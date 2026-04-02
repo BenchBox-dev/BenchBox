@@ -10,6 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from textcharts.base import ChartOptions
+from textcharts.line_chart import LineChart, LinePoint
+
 from .bottleneck import BottleneckAnalysis, BottleneckDetector
 from .profiler import ResourceTimeline, ResourceType, ResourceUtilization, calculate_utilization
 
@@ -39,12 +42,47 @@ class ResourceChart:
         return self.render()
 
 
+def _series_to_line_chart(
+    series: list[float],
+    width: int,
+    height: int,
+    unit: str,
+    use_color: bool = False,
+    use_unicode: bool = True,
+) -> str:
+    """Render a time series using textcharts LineChart.
+
+    Args:
+        series: List of values to chart.
+        width: Chart width in characters.
+        height: Chart height in rows.
+        unit: Unit label for Y-axis.
+        use_color: Whether to include ANSI color codes.
+        use_unicode: Whether to use unicode box-drawing characters.
+
+    Returns:
+        Rendered chart string (no title — caller handles title).
+    """
+    points = [LinePoint(series="value", x=float(i), y=v) for i, v in enumerate(series)]
+    options = ChartOptions(
+        width=width,
+        height=height,
+        use_color=use_color,
+        use_unicode=use_unicode,
+        show_legend=False,
+    )
+    chart = LineChart(points, title="", y_label=unit, options=options)
+    return chart.render()
+
+
 def generate_ascii_chart(
     series: list[float],
     width: int = 60,
     height: int = 10,
     title: str = "",
     unit: str = "",
+    use_color: bool = False,
+    use_unicode: bool = True,
 ) -> ResourceChart:
     """Generate an ASCII chart from a time series.
 
@@ -54,81 +92,25 @@ def generate_ascii_chart(
         height: Chart height in rows.
         title: Optional chart title.
         unit: Unit label for values.
+        use_color: Whether to include ANSI color codes.
+        use_unicode: Whether to use unicode box-drawing characters.
 
     Returns:
         ResourceChart with rendered ASCII chart.
     """
     if not series:
-        chart = ResourceChart(
-            resource_type=ResourceType.CPU,
-            width=width,
-            height=height,
-            title=title,
-            chart_lines=["(no data)"],
+        return ResourceChart(
+            resource_type=ResourceType.CPU, width=width, height=height, title=title, chart_lines=["(no data)"]
         )
-        return chart
 
     min_val = min(series)
     max_val = max(series)
+    rendered = _series_to_line_chart(
+        series, width=width, height=height, unit=unit, use_color=use_color, use_unicode=use_unicode
+    )
+    chart_lines = rendered.split("\n")
 
-    # Normalize to chart height
-    if max_val == min_val:
-        normalized = [height // 2] * len(series)
-    else:
-        normalized = [int((v - min_val) / (max_val - min_val) * (height - 1)) for v in series]
-
-    # Resample to chart width if needed
-    if len(normalized) > width:
-        step = len(normalized) / width
-        resampled = []
-        for i in range(width):
-            idx = int(i * step)
-            resampled.append(normalized[idx])
-        normalized = resampled
-    elif len(normalized) < width:
-        # Stretch to fill width
-        resampled = []
-        for i in range(width):
-            idx = int(i * len(normalized) / width)
-            resampled.append(normalized[idx])
-        normalized = resampled
-
-    # Build chart lines (top to bottom)
-    chart_lines = []
-
-    # Y-axis label width
-    label_width = 8
-
-    for row in range(height - 1, -1, -1):
-        # Y-axis label
-        if row == height - 1:
-            label = f"{max_val:>{label_width - 1}.1f}"
-        elif row == 0:
-            label = f"{min_val:>{label_width - 1}.1f}"
-        elif row == height // 2:
-            mid = (max_val + min_val) / 2
-            label = f"{mid:>{label_width - 1}.1f}"
-        else:
-            label = " " * (label_width - 1)
-
-        line_chars = []
-        for col in range(len(normalized)):
-            if normalized[col] >= row:
-                line_chars.append("*")
-            else:
-                line_chars.append(" ")
-
-        chart_lines.append(f"{label}|{''.join(line_chars)}")
-
-    # X-axis
-    chart_lines.append(" " * (label_width - 1) + "+" + "-" * len(normalized))
-    chart_lines.append(" " * label_width + f"0{' ' * (len(normalized) - 10)}time ->{' ' * 5}")
-
-    # Add unit if provided
-    if unit:
-        chart_lines.insert(0, f"  [{unit}]")
-
-    chart = ResourceChart(
+    return ResourceChart(
         resource_type=ResourceType.CPU,
         width=width,
         height=height,
@@ -137,7 +119,6 @@ def generate_ascii_chart(
         min_value=min_val,
         max_value=max_val,
     )
-    return chart
 
 
 @dataclass
@@ -254,6 +235,8 @@ class ResourceReporter:
         chart_width: int = 60,
         chart_height: int = 10,
         detector: BottleneckDetector | None = None,
+        use_color: bool = False,
+        use_unicode: bool = True,
     ):
         """Initialize resource reporter.
 
@@ -261,10 +244,14 @@ class ResourceReporter:
             chart_width: Width of ASCII charts.
             chart_height: Height of ASCII charts.
             detector: Optional custom bottleneck detector.
+            use_color: Whether to include ANSI color codes in charts.
+            use_unicode: Whether to use unicode box-drawing characters.
         """
         self.chart_width = chart_width
         self.chart_height = chart_height
         self.detector = detector or BottleneckDetector()
+        self.use_color = use_color
+        self.use_unicode = use_unicode
 
     def generate_report(
         self,
@@ -309,6 +296,8 @@ class ResourceReporter:
                         height=self.chart_height,
                         title=title,
                         unit=unit,
+                        use_color=self.use_color,
+                        use_unicode=self.use_unicode,
                     )
                     chart.resource_type = resource_type
                     charts[resource_type] = chart

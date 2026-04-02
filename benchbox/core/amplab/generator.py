@@ -24,9 +24,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
+from benchbox.core.manifest_utils import write_generator_manifest
 from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 from benchbox.utils.compression_mixin import CompressionMixin
-from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
 
 if TYPE_CHECKING:
     from cloudpathlib import CloudPath
@@ -389,21 +389,4 @@ class AMPLabDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
     def _write_manifest(self, table_paths: dict[str, Path]) -> None:
         """Write manifest describing generated AMPLab datasets."""
-
-        if not table_paths:
-            return
-
-        manifest = DataGenerationManifest(
-            output_dir=self.output_dir,
-            benchmark="amplab",
-            scale_factor=self.scale_factor,
-            compression=resolve_compression_metadata(self),
-            parallel=1,
-            seed=None,
-        )
-
-        for table, path in table_paths.items():
-            row_count = self._table_row_counts.get(table, 0)
-            manifest.add_entry(table, path, row_count=row_count)
-
-        manifest.write()
+        write_generator_manifest(self, "amplab", table_paths, self._table_row_counts)

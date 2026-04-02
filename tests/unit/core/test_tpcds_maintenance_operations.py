@@ -147,3 +147,62 @@ def test_delete_queries_rowcount_branch():
     deleted_returns = ops._delete_old_returns(conn, estimated_rows=9)
     assert deleted_sales > 0
     assert deleted_returns > 0
+
+
+def test_generate_catalog_returns_from_sale_preserves_sale_keys():
+    ops = MaintenanceOperations()
+    ops.random_gen.seed(7)
+    ops._get_random_key = lambda _name: 42
+
+    sale_record = (1001, 2002, 3003, 4004, 5005, 6006, 7007, 8008, 9009, 10010, 12)
+
+    result = ops._generate_catalog_returns_from_sale(sale_record)
+
+    assert len(result) == 27
+    assert result[0] == 42
+    assert result[1] == 42
+    assert result[2:15] == (
+        2002,
+        3003,
+        4004,
+        5005,
+        6006,
+        3003,
+        4004,
+        5005,
+        6006,
+        7007,
+        8008,
+        9009,
+        10010,
+    )
+    assert result[16] == 1001
+    assert 1 <= result[17] <= 12
+
+
+def test_generate_web_returns_from_sale_preserves_sale_keys():
+    ops = MaintenanceOperations()
+    ops.random_gen.seed(11)
+    ops._get_random_key = lambda _name: 24
+
+    sale_record = (1111, 2222, 3333, 4444, 5555, 6666, 7777, 9)
+
+    result = ops._generate_web_returns_from_sale(sale_record)
+
+    assert len(result) == 24
+    assert result[0] == 24
+    assert result[1] == 24
+    assert result[2:12] == (
+        2222,
+        3333,
+        4444,
+        5555,
+        6666,
+        3333,
+        4444,
+        5555,
+        6666,
+        7777,
+    )
+    assert result[13] == 1111
+    assert 1 <= result[14] <= 9

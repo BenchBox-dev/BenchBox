@@ -134,43 +134,78 @@ def aggregation_distinct_expression_impl(ctx: DataFrameContext) -> Any:
     return result
 
 
+def aggregation_groupby_impl(
+    ctx: DataFrameContext,
+    *,
+    table_name: str,
+    group_cols: tuple[str, ...],
+    agg_specs: tuple[tuple[str, str, str], ...],
+) -> Any:
+    """Run a grouped aggregation for either expression-family or pandas-family contexts."""
+    table = ctx.get_table(table_name)
+    group_columns = list(group_cols)
+
+    if hasattr(table, "group_by"):
+        col = ctx.col
+        expression_builders = {
+            "nunique": lambda column: column.n_unique(),
+            "sum": lambda column: column.sum(),
+            "mean": lambda column: column.mean(),
+            "count": lambda column: column.count(),
+            "max": lambda column: column.max(),
+        }
+        return table.group_by(*group_columns).agg(
+            *(
+                expression_builders[agg_func](col(column_name)).alias(alias)
+                for column_name, agg_func, alias in agg_specs
+            )
+        )
+
+    if hasattr(table, "groupby"):
+        return table.groupby(group_columns, as_index=False).agg(
+            **{alias: (column_name, agg_func) for column_name, agg_func, alias in agg_specs}
+        )
+
+    raise TypeError(f"Unsupported table type for grouped aggregation: {type(table)!r}")
+
+
 def aggregation_distinct_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     """Distinct count of high cardinality keys in low cardinality groups."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    result = lineitem.group_by("l_returnflag", "l_linestatus").agg(
-        col("l_orderkey").n_unique().alias("unique_orders"),
-        col("l_partkey").n_unique().alias("unique_parts"),
+    return aggregation_groupby_impl(
+        ctx,
+        table_name="lineitem",
+        group_cols=("l_returnflag", "l_linestatus"),
+        agg_specs=(
+            ("l_orderkey", "nunique", "unique_orders"),
+            ("l_partkey", "nunique", "unique_parts"),
+        ),
     )
-
-    return result
 
 
 def aggregation_groupby_large_expression_impl(ctx: DataFrameContext) -> Any:
     """Aggregates within high cardinality grouping."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    result = lineitem.group_by("l_orderkey", "l_partkey", "l_suppkey").agg(
-        col("l_quantity").sum().alias("total_qty"),
-        col("l_extendedprice").mean().alias("avg_price"),
+    return aggregation_groupby_impl(
+        ctx,
+        table_name="lineitem",
+        group_cols=("l_orderkey", "l_partkey", "l_suppkey"),
+        agg_specs=(
+            ("l_quantity", "sum", "total_qty"),
+            ("l_extendedprice", "mean", "avg_price"),
+        ),
     )
-
-    return result
 
 
 def aggregation_groupby_small_expression_impl(ctx: DataFrameContext) -> Any:
     """Aggregates within low cardinality grouping."""
-    nation = ctx.get_table("nation")
-    col = ctx.col
-
-    result = nation.group_by("n_regionkey").agg(
-        col("n_nationkey").count().alias("nation_count"),
-        col("n_name").max().alias("last_nation"),
+    return aggregation_groupby_impl(
+        ctx,
+        table_name="nation",
+        group_cols=("n_regionkey",),
+        agg_specs=(
+            ("n_nationkey", "count", "nation_count"),
+            ("n_name", "max", "last_nation"),
+        ),
     )
-
-    return result
 
 
 def aggregation_materialize_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1362,38 +1397,41 @@ def aggregation_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
 
 def aggregation_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     """Distinct count of high cardinality keys in low cardinality groups."""
-    lineitem = ctx.get_table("lineitem")
-
-    result = lineitem.groupby(["l_returnflag", "l_linestatus"], as_index=False).agg(
-        unique_orders=("l_orderkey", "nunique"),
-        unique_parts=("l_partkey", "nunique"),
+    return aggregation_groupby_impl(
+        ctx,
+        table_name="lineitem",
+        group_cols=("l_returnflag", "l_linestatus"),
+        agg_specs=(
+            ("l_orderkey", "nunique", "unique_orders"),
+            ("l_partkey", "nunique", "unique_parts"),
+        ),
     )
-
-    return result
 
 
 def aggregation_groupby_large_pandas_impl(ctx: DataFrameContext) -> Any:
     """Aggregates within high cardinality grouping."""
-    lineitem = ctx.get_table("lineitem")
-
-    result = lineitem.groupby(["l_orderkey", "l_partkey", "l_suppkey"], as_index=False).agg(
-        total_qty=("l_quantity", "sum"),
-        avg_price=("l_extendedprice", "mean"),
+    return aggregation_groupby_impl(
+        ctx,
+        table_name="lineitem",
+        group_cols=("l_orderkey", "l_partkey", "l_suppkey"),
+        agg_specs=(
+            ("l_quantity", "sum", "total_qty"),
+            ("l_extendedprice", "mean", "avg_price"),
+        ),
     )
-
-    return result
 
 
 def aggregation_groupby_small_pandas_impl(ctx: DataFrameContext) -> Any:
     """Aggregates within low cardinality grouping."""
-    nation = ctx.get_table("nation")
-
-    result = nation.groupby(["n_regionkey"], as_index=False).agg(
-        nation_count=("n_nationkey", "count"),
-        last_nation=("n_name", "max"),
+    return aggregation_groupby_impl(
+        ctx,
+        table_name="nation",
+        group_cols=("n_regionkey",),
+        agg_specs=(
+            ("n_nationkey", "count", "nation_count"),
+            ("n_name", "max", "last_nation"),
+        ),
     )
-
-    return result
 
 
 def aggregation_materialize_pandas_impl(ctx: DataFrameContext) -> Any:

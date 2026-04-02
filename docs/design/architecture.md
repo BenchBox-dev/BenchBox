@@ -1,558 +1,141 @@
 <!-- Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License. -->
 
-# BenchBox Architecture Design Document
+# BenchBox Architecture
 
 ```{tags} contributor, concept
 ```
 
-## 1. High-Level Architecture
+## Overview
 
-BenchBox is designed as a modular, extensible library for embedding benchmark datasets and queries for database evaluation. The architecture follows these key principles:
+BenchBox is a modular SQL and DataFrame benchmarking framework for OLAP databases. The architecture separates concerns into four layers:
 
-- **Modularity**: Clear separation between different components
-- **Extensibility**: Easy to add new benchmark types
-- **Self-contained**: with minimal external dependencies
-- **Cross-Database Compatibility**: Support for multiple database systems
+1. **Benchmarks** — dataset definitions, schemas, queries, and data generation
+2. **Platforms** — database adapters for SQL and DataFrame execution
+3. **Core** — shared infrastructure (runner, results, validation, visualization, etc.)
+4. **CLI** — user-facing commands and execution orchestration
 
-### 1.2 Component Responsibilities
+## Execution Model
 
-1. **Core Framework**: Provides base interfaces, abstract classes, and common utilities
-2. **Benchmarks**: Concrete implementations of specific benchmarks (TPC-H, TPC-DS, etc.)
-3. **Data Generator**: Generates benchmark data according to specifications
-4. **SQL Manager**: Stores and translates SQL queries for different database dialects
-
-## 2. Core Interfaces and Abstract Classes
-
-### 2.1 BaseBenchmark Abstract Class
-
-```python
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Union
-import pathlib
-
-class BaseBenchmark(ABC):
-    """Base abstract class for all benchmark implementations."""
-
-    def __init__(self, scale_factor: float = 1.0, output_dir: Optional[pathlib.Path] = None):
-        """
-        Initialize a benchmark instance.
-
-        Args:
-            scale_factor: Size of the generated dataset
-            output_dir: Directory to store generated data files
-        """
-        self.scale_factor = scale_factor
-        self.output_dir = output_dir or pathlib.Path("./data")
-        self._initialize()
-
-    @abstractmethod
-    def _initialize(self) -> None:
-        """Initialize benchmark-specific components."""
-        pass
-
-    @abstractmethod
-    def get_schema(self) -> Dict[str, Dict]:
-        """
-        Get the schema definition for this benchmark.
-
-        Returns:
-            Dictionary mapping table names to their schema definitions
-        """
-        pass
-
-    @abstractmethod
-    def generate_data(self) -> Dict[str, pathlib.Path]:
-        """
-        Generate benchmark data.
-
-        Returns:
-            Dictionary mapping table names to generated data file paths
-        """
-        pass
-
-    @abstractmethod
-    def get_query(self, query_id: Union[int, str]) -> str:
-        """
-        Get a specific query by ID.
-
-        Args:
-            query_id: Identifier for the query
-
-        Returns:
-            SQL query string
-        """
-        pass
-
-    @abstractmethod
-    def get_queries(self) -> Dict[Union[int, str], str]:
-        """
-        Get all queries for this benchmark.
-
-        Returns:
-            Dictionary mapping query IDs to SQL query strings
-        """
-        pass
-
-    def translate_query(self, query_id: Union[int, str], dialect: str) -> str:
-        """
-        Translate a query to a specific SQL dialect.
-
-        Args:
-            query_id: Identifier for the query
-            dialect: Target SQL dialect
-
-        Returns:
-            Translated SQL query string
-        """
-        query = self.get_query(query_id)
-        return self._translate_sql(query, dialect)
-
-    def _translate_sql(self, sql: str, dialect: str) -> str:
-        """
-        Translate SQL from the benchmark's native dialect to the target dialect.
-
-        Args:
-            sql: SQL query string
-            dialect: Target SQL dialect
-
-        Returns:
-            Translated SQL query string
-        """
-        # Use sqlglot for translation
-        import sqlglot
-        return sqlglot.transpile(sql, read="ansi", write=dialect)[0]
-```
-
-### 2.2 DataGenerator Interface
-
-```python
-from abc import ABC, abstractmethod
-from typing import Dict, Optional, List
-import pathlib
-
-class DataGenerator(ABC):
-    """Interface for benchmark data generators."""
-
-    @abstractmethod
-    def generate_table(self, table_name: str, schema: Dict, scale_factor: float,
-                       output_path: pathlib.Path) -> pathlib.Path:
-        """
-        Generate data for a specific table.
-
-        Args:
-            table_name: Name of the table
-            schema: Schema definition for the table
-            scale_factor: Size multiplier for the generated data
-            output_path: Path to write the generated data
-
-        Returns:
-            Path to the generated data file
-        """
-        pass
-
-    @abstractmethod
-    def generate_all(self, schemas: Dict[str, Dict], scale_factor: float,
-                    output_dir: pathlib.Path) -> Dict[str, pathlib.Path]:
-        """
-        Generate data for all tables in the benchmark.
-
-        Args:
-            schemas: Dictionary mapping table names to their schema definitions
-            scale_factor: Size multiplier for the generated data
-            output_dir: Directory to write the generated data files
-
-        Returns:
-            Dictionary mapping table names to generated data file paths
-        """
-        pass
-```
-
-### 2.3 QueryManager Interface
-
-```python
-from abc import ABC, abstractmethod
-from typing import Dict, Union
-
-class QueryManager(ABC):
-    """Interface for managing benchmark queries."""
-
-    @abstractmethod
-    def get_query(self, query_id: Union[int, str]) -> str:
-        """
-        Get a specific query by ID.
-
-        Args:
-            query_id: Identifier for the query
-
-        Returns:
-            SQL query string
-        """
-        pass
-
-    @abstractmethod
-    def get_all_queries(self) -> Dict[Union[int, str], str]:
-        """
-        Get all queries managed by this instance.
-
-        Returns:
-            Dictionary mapping query IDs to SQL query strings
-        """
-        pass
-
-    @abstractmethod
-    def translate_query(self, query_id: Union[int, str], dialect: str) -> str:
-        """
-        Translate a query to a specific SQL dialect.
-
-        Args:
-            query_id: Identifier for the query
-            dialect: Target SQL dialect
-
-        Returns:
-            Translated SQL query string
-        """
-        pass
-```
-
-## 3. Module Structure and Dependencies
-
-### 3.1 Module Organization
+BenchBox uses a **lifecycle-based** execution model (not Template Method). A benchmark run progresses through phases orchestrated by `run_benchmark_lifecycle()` in `benchbox.core.runner.runner`:
 
 ```
-benchbox/
-│
-├── __init__.py                  # Package exports
-├── core/                        # Core framework components
-│   ├── __init__.py
-│   ├── base.py                  # Base abstract classes
-│   ├── data/                    # Data generation framework
-│   │   ├── __init__.py
-│   │   ├── generator.py         # Data generator interfaces
-│   │   ├── schema.py            # Schema definition utilities
-│   │   └── random.py            # Random data generation utilities
-│   ├── sql/                     # SQL management framework
-│   │   ├── __init__.py
-│   │   ├── manager.py           # Query manager interfaces
-│   │   └── translator.py        # SQL translation utilities
-│   └── utils/                   # Common utilities
-│       ├── __init__.py
-│       ├── file.py              # File handling utilities
-│       └── validation.py        # Validation utilities
-│
-├── benchmarks/                  # Benchmark implementations
-│   ├── __init__.py
-│   ├── tpch/                    # TPC-H benchmark
-│   │   ├── __init__.py
-│   │   ├── benchmark.py         # TPC-H implementation
-│   │   ├── schema.py            # TPC-H schema definitions
-│   │   ├── generator.py         # TPC-H data generator
-│   │   └── queries/             # TPC-H query templates
-│   │       ├── __init__.py
-│   │       ├── q1.sql
-│   │       └── ...
-│   ├── tpcds/                   # TPC-DS benchmark
-│   │   ├── ...
-│   ├── ssb/                     # Star Schema Benchmark
-│   │   ├── ...
-│   └── ...                      # Other benchmarks
-│
-└── cli/                         # Command-line interface
-    ├── __init__.py
-    └── main.py                  # CLI entry point
+generate → load → warmup → power → throughput → maintenance
 ```
 
-### 3.2 Dependency Relationships
+### Key Types
+
+| Type | Location | Purpose |
+|------|----------|---------|
+| `LifecyclePhases` | `core.runner.runner` | Controls which phases to run |
+| `BenchmarkResults` | `core.results.models` | Complete run output with phase results |
+| `BenchmarkConfig` | `core.schemas` | Benchmark name, scale, query selection (Pydantic) |
+| `DatabaseConfig` | `core.schemas` | Connection and platform configuration (Pydantic) |
+| `PlatformAdapter` | `platforms.base.adapter` | Abstract base for all SQL platform adapters |
+
+### SQL Execution Path
 
 ```
-┌─────────────────┐     ┌───────────────┐     ┌─────────────────┐
-│                 │     │               │     │                 │
-│ Benchmark Impl  │────▶│ Core Framework│◀────│ CLI Application │
-│                 │     │               │     │                 │
-└─────────────────┘     └───────────────┘     └─────────────────┘
-        │                      │                       │
-        │                      │                       │
-        │                      ▼                       │
-        │              ┌───────────────┐               │
-        └────────────▶│  Data Generator│◀──────────────┘
-                      │               │
-                      └───────────────┘
-                            │
-                            │
-                            ▼
-                      ┌───────────────┐
-                      │               │
-                      │  SQL Manager  │
-                      │               │
-                      └───────────────┘
+CLI (run command)
+  → BenchmarkOrchestrator (cli/orchestrator.py)
+    → run_benchmark_lifecycle() (core/runner/runner.py)
+      → PlatformAdapter.execute_query() for each query
+        → BenchmarkResults
 ```
 
-## 4. Design Patterns and Extensibility
+The `PlatformAdapter` base class (`benchbox/platforms/base/adapter.py`) provides the interface that all 33 SQL platform adapters implement. Each adapter handles connection management, DDL generation, data loading, and query execution for its target database.
 
-### 4.1 Strategy Pattern for Data Generation
+### DataFrame Execution Path
 
-The architecture employs the Strategy pattern for data generation, allowing different generation algorithms to be plugged in based on the benchmark type.
-
-```python
-from abc import ABC, abstractmethod
-import pathlib
-from typing import Dict
-
-class GenerationStrategy(ABC):
-    """Strategy interface for data generation algorithms."""
-
-    @abstractmethod
-    def generate(self, schema: Dict, scale_factor: float, output_path: pathlib.Path) -> pathlib.Path:
-        """Generate data according to the strategy."""
-        pass
-
-class RandomDataStrategy(GenerationStrategy):
-    """Generate random data based on schema constraints."""
-
-    def generate(self, schema: Dict, scale_factor: float, output_path: pathlib.Path) -> pathlib.Path:
-        # Implementation for random data generation
-        pass
-
-class DeterministicDataStrategy(GenerationStrategy):
-    """Generate deterministic data based on benchmark specifications."""
-
-    def generate(self, schema: Dict, scale_factor: float, output_path: pathlib.Path) -> pathlib.Path:
-        # Implementation for deterministic data generation
-        pass
-```
-
-### 4.2 Factory Method for Benchmark Creation
-
-```python
-class BenchmarkFactory:
-    """Factory for creating benchmark instances."""
-
-    @staticmethod
-    def create_benchmark(benchmark_type: str, scale_factor: float = 1.0, **kwargs):
-        """
-        Create a benchmark instance of the specified type.
-
-        Args:
-            benchmark_type: Type of benchmark ('tpch', 'tpcds', 'ssb', etc.)
-            scale_factor: Size of the generated dataset
-            **kwargs: Additional benchmark-specific parameters
-
-        Returns:
-            BaseBenchmark instance
-        """
-        benchmark_type = benchmark_type.lower()
-
-        if benchmark_type == 'tpch':
-            from benchbox import TPCH
-            return TPCH(scale_factor=scale_factor, **kwargs)
-        elif benchmark_type == 'tpcds':
-            from benchbox import TPCDS
-            return TPCDS(scale_factor=scale_factor, **kwargs)
-        elif benchmark_type == 'ssb':
-            from benchbox import SSB
-            return SSB(scale_factor=scale_factor, **kwargs)
-        # Add more benchmark types as they are implemented
-        else:
-            raise ValueError(f"Unsupported benchmark type: {benchmark_type}")
-```
-
-### 4.3 Template Method for Benchmark Execution
-
-The BaseBenchmark class uses the Template Method pattern to define the skeleton of the benchmark execution process, with specific steps implemented by subclasses.
-
-```python
-class BaseBenchmark(ABC):
-    # ... other methods ...
-
-    def run(self, connection, query_ids=None):
-        """
-        Run benchmark queries against a database connection.
-
-        Args:
-            connection: Database connection object
-            query_ids: List of query IDs to run (runs all if None)
-
-        Returns:
-            Dictionary mapping query IDs to execution results
-        """
-        # 1. Prepare benchmark
-        self._prepare_benchmark(connection)
-
-        # 2. Determine which queries to run
-        if query_ids is None:
-            queries = self.get_queries()
-        else:
-            queries = {qid: self.get_query(qid) for qid in query_ids}
-
-        # 3. Execute queries and collect results
-        results = {}
-        for qid, query in queries.items():
-            results[qid] = self._execute_query(connection, query)
-
-        # 4. Post-process results
-        return self._post_process_results(results)
-
-    @abstractmethod
-    def _prepare_benchmark(self, connection):
-        """Prepare the database for benchmark execution."""
-        pass
-
-    @abstractmethod
-    def _execute_query(self, connection, query):
-        """Execute a query and return its result."""
-        pass
-
-    @abstractmethod
-    def _post_process_results(self, results):
-        """Post-process benchmark results."""
-        pass
-```
-
-## 5. Key Design Decisions
-
-### 5.1 Data Generation Strategy
-
-**Decision**: Use official TPC tools (dbgen for TPC-H, dsdgen for TPC-DS) for data generation.
-
-**Rationale**:
-- Official tools ensure specification compliance
-- Template-based query generation works independently of data generation
-
-**Implementation Strategy**:
-- Use external TPC tools for official compliance
-- Use pseudo-random number generators with fixed seeds for deterministic parameter generation
-- Support both full data generation and query-only usage patterns
-
-### 5.2 Embedded Query Storage
-
-**Decision**: Embed SQL queries directly in the library code rather than loading from external files.
-
-**Rationale**:
-- Simplifies distribution and packaging
-- Eliminates file system dependencies
-- Allows for programmatic query manipulation and introspection
-
-**Implementation Strategy**:
-- Store queries as string constants or templates in Python modules
-- Organize queries by benchmark and query ID
-- Provide interface for retrieving and customizing queries
-
-### 5.3 SQL Dialect Translation
-
-**Decision**: Use sqlglot for SQL translation between different database dialects.
-
-**Rationale**:
-- Leverages an established SQL parsing and translation library
-- Supports a wide range of SQL dialects
-- Provides a clean abstraction for SQL manipulation
-
-**Implementation Strategy**:
-- Wrap sqlglot functionality in a simple interface
-- Implement benchmark-specific SQL transformations when needed
-- Cache translated queries for performance
-
-### 5.4 Extensibility Model
-
-**Decision**: Use abstract base classes and interfaces to define extension points.
-
-**Rationale**:
-- Provides clear contracts for implementing new benchmarks
-- Ensures consistency across different benchmark implementations
-- Simplifies the process of adding new benchmark types
-
-**Implementation Strategy**:
-- Define core interfaces for key components
-- Implement concrete benchmark classes for each supported benchmark
-- Document extension patterns and provide examples
-
-## 6. Class/Interface Diagram
+DataFrame benchmarks use a parallel execution path:
 
 ```
-┌───────────────────┐     ┌───────────────────┐     ┌───────────────────┐
-│  BaseBenchmark    │     │  DataGenerator    │     │   QueryManager    │
-│  (Abstract)       │     │  (Interface)      │     │  (Interface)      │
-├───────────────────┤     ├───────────────────┤     ├───────────────────┤
-│ - scale_factor    │     │                   │     │                   │
-│ - output_dir      │     │                   │     │                   │
-├───────────────────┤     ├───────────────────┤     ├───────────────────┤
-│ + get_schema()    │     │ + generate_table()│     │ + get_query()     │
-│ + generate_data() │◄────┤ + generate_all()  │     │ + get_all_queries()│
-│ + get_query()     │     │                   │     │ + translate_query()│
-│ + get_queries()   │◄────┼───────────────────┘     │                   │
-│ + translate_query()│    │                         └───────────────────┘
-└───────────────────┘    │                                  ▲
-          ▲              │                                  │
-          │              │                                  │
-┌─────────┴──────────┐   │                        ┌─────────┴──────────┐
-│                    │   │                        │                    │
-│ TPCHBenchmark      │   │                        │ TPCHQueryManager   │
-│                    │   │                        │                    │
-├────────────────────┤   │                        ├────────────────────┤
-│ - tables           │   │                        │ - queries          │
-│ - data_generator   │───┘                        │                    │
-│ - query_manager    │─────────────────────────── │                    │
-├────────────────────┤                            ├────────────────────┤
-│ + _initialize()    │                            │ + get_query()      │
-│ + get_schema()     │                            │ + get_all_queries()│
-│ + generate_data()  │                            │ + translate_query()│
-│ + get_query()      │                            │                    │
-│ + get_queries()    │                            │                    │
-└────────────────────┘                            └────────────────────┘
+CLI (run command with --platform *-df)
+  → run_dataframe_benchmark() (core/runner/dataframe_runner.py)
+    → DataFrameContext (core/dataframe/context.py)
+      → ExpressionFamilyAdapter or PandasFamilyAdapter
+        → BenchmarkResults
 ```
 
-## 7. Implementation Considerations
+| Type | Location | Purpose |
+|------|----------|---------|
+| `DataFrameContext` | `core.dataframe.context` | Protocol for table access and column references |
+| `ExpressionFamilyAdapter` | `platforms.dataframe.expression_family` | Base for Polars, PySpark, DataFusion, LakeSail |
+| `PandasFamilyAdapter` | `platforms.dataframe.pandas_family` | Base for Pandas, Modin, cuDF, Dask |
 
-### 7.1 Performance Considerations
+The **family-based** adapter architecture means adding a new expression-style platform (e.g., Polars-like API) requires only implementing a thin adapter on top of `ExpressionFamilyAdapter`, inheriting query translation, tuning, and execution logic.
 
-- Use lazy loading for queries and other resources to minimize startup time
-- Implement incremental data generation for large datasets
-- Consider using Rust components for performance-critical data generation paths
-- Cache translated queries to avoid redundant translation
+## Benchmark Layer
 
-### 7.2 Memory Management
+Each benchmark (TPC-H, TPC-DS, SSB, ClickBench, etc.) lives under `benchbox/core/<benchmark_id>/` and provides:
 
-- Use generators and iterators for large data generation to minimize memory usage
-- Implement stream-based data writing for large tables
-- Consider chunked processing for very large benchmark datasets
+- **Schema** — table definitions and DDL generation via `get_create_tables_sql(dialect, tuning_config)`
+- **Queries** — SQL templates with dialect translation via sqlglot
+- **Data generation** — using official TPC tools (dbgen/dsdgen) or built-in generators
+- **Validation** — expected result counts and answer verification
 
-### 7.3 Testing Strategy
+All benchmarks inherit from `BaseBenchmark` (`benchbox/base.py`). Benchmarks are registered in `benchbox/core/benchmark_registry.py` which maps CLI names (e.g., `tpch`) to class names and metadata.
 
-- Unit test each component separately
-- Integration test benchmarks against small-scale data
-- Validate generated data against benchmark specifications
-- Test SQL translation across multiple dialects
+There are currently 20 benchmarks across TPC standards, academic, industry, and primitives categories.
 
-### 7.4 Documentation Standards
+## Platform Layer
 
-- Document public APIs with detailed docstrings
-- Provide examples for common use cases
-- Include benchmark-specific documentation (schema, query specifications, etc.)
-- Document extension points and patterns
+### SQL Platforms (33 adapters)
 
-## 8. Roadmap and Future Extensions
+All SQL adapters inherit from `PlatformAdapter` and implement:
+- `get_connection_from_pool()` / `close_connection()` — connection lifecycle
+- `execute_query()` — query execution with timing
+- `get_create_tables_sql()` — platform-specific DDL
+- `load_data()` — bulk data loading
 
-### 8.1 Phase 1: Core Framework and TPC-H
+Platforms span local engines (DuckDB, SQLite, DataFusion), cloud warehouses (Snowflake, BigQuery, Databricks, Redshift), and specialized systems (ClickHouse, StarRocks, QuestDB, TimescaleDB, etc.).
 
-1. Implement BaseBenchmark and core interfaces
-2. Develop data generation framework
-3. Implement TPC-H benchmark
-4. Add sqlglot integration for SQL translation
+### DataFrame Platforms (8 adapters)
 
-### 8.2 Phase 2: Additional Benchmarks
+DataFrame adapters are organized by API family:
+- **Expression family**: Polars, PySpark, DataFusion, LakeSail
+- **Pandas family**: Pandas, Modin, cuDF, Dask
 
-1. Implement TPC-DS benchmark
-2. Implement Star Schema Benchmark (SSB)
-3. Add H2O/db-benchmark
-4. Add ClickBench
+## Core Infrastructure
 
-### 8.3 Phase 3: Features
+The `benchbox/core/` directory contains 39 subsystems:
 
-1. Add support for custom benchmarks
-2. Implement benchmark execution framework
-3. Add result analysis and visualization tools
-4. Optimize performance for large-scale benchmarks
+| Subsystem | Purpose |
+|-----------|---------|
+| `runner/` | Benchmark lifecycle orchestration |
+| `results/` | Result models, serialization, aggregation |
+| `validation/` | Answer validation, data verification |
+| `visualization/` | ASCII chart generation and result rendering |
+| `dataframe/` | DataFrame execution context, profiling, tuning |
+| `query_plans/` | Query plan capture and analysis |
+| `tuning/` | Unified tuning configuration system |
+| `data_organization/` | Sorted ingestion, clustering strategies |
+| `comparison/` | Result comparison and regression detection |
+| `cost/` | Cloud cost estimation |
+| `analysis/` | Statistical analysis of benchmark results |
+| `contracts/` | Interface contracts and type validation |
 
-## 9. Conclusion
+## CLI Layer
 
-The proposed architecture provides a solid foundation for the BenchBox library, with clear separation of concerns, well-defined interfaces, and a modular structure. The design prioritizes extensibility, allowing new benchmarks to be added with minimal effort, while maintaining the hermetic nature of the library.
+The CLI (`benchbox/cli/`) uses Click and provides 25+ commands. The main `run` command orchestrates the full benchmark lifecycle through `BenchmarkOrchestrator` (`cli/orchestrator.py`) → `run_benchmark_lifecycle()`.
 
-The architecture balances flexibility and simplicity, providing powerful abstractions while keeping the implementation straightforward. By leveraging established design patterns and following best practices, the design ensures that BenchBox will be maintainable and extensible as it evolves.
+Key command groups: `run`, `compare`, `visualize`, `report`, `metrics`, `tuning`, `platforms`, `shell`, `datagen`, `setup`.
+
+## Visualization
+
+BenchBox provides ASCII chart visualization via `core/visualization/`:
+- **ASCII charts** (`core/visualization/ascii/`) — 15+ chart types rendered as terminal text (bar, box plot, heatmap, histogram, scatter, CDF, sparkline, etc.)
+- **ResultPlotter** (`core/visualization/result_plotter.py`) — normalizes JSON results and orchestrates chart rendering
+- **Templates** (`core/visualization/templates.py`) — named chart combinations (e.g., `flagship`, `comparison`, `executive_summary`)
+
+## MCP Integration
+
+The `benchbox/mcp/` package exposes BenchBox functionality as MCP (Model Context Protocol) tools, enabling AI assistants to discover, run, and analyze benchmarks.
+
+## Key Design Decisions
+
+1. **Lifecycle over Template Method** — execution phases are data-driven, not inheritance-driven
+2. **Family-based DataFrame adapters** — minimize code duplication across similar platforms
+3. **Official TPC tools** — use dbgen/dsdgen for specification-compliant data generation
+4. **sqlglot translation** — single query definition with automatic dialect translation
+5. **Lazy platform loading** — heavy SDK imports deferred until platform is actually used
+6. **ASCII visualization** — terminal-rendered charts for CI/CD and MCP integration

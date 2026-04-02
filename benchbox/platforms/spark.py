@@ -37,8 +37,6 @@ from .base.spark_execution_mixin import SparkDataLoadMixin, SparkQueryExecutionM
 try:
     from pyspark.sql import SparkSession
     from pyspark.sql.types import (
-        DateType,
-        DecimalType,
         DoubleType,
         IntegerType,
         LongType,
@@ -54,8 +52,6 @@ except ImportError:
     IntegerType = None
     LongType = None
     DoubleType = None
-    DecimalType = None
-    DateType = None
 
 
 class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter):
@@ -538,15 +534,9 @@ class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter
 
     def _extract_table_name(self, statement: str) -> str | None:
         """Extract table name from CREATE TABLE statement."""
-        try:
-            import re
+        from benchbox.core.sql_utils import extract_table_name
 
-            match = re.search(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)", statement, re.IGNORECASE)
-            if match:
-                return match.group(1).strip()
-        except Exception:
-            pass
-        return None
+        return extract_table_name(statement)
 
     def _normalize_table_name_in_sql(self, sql: str) -> str:
         """Normalize table names in SQL to lowercase for Spark."""

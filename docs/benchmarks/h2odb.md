@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, h2odb
 ```
 
+> **CLI name:** `h2odb` — use `benchbox run --benchmark h2odb`
+
 ## Overview
 
 The H2O DB Benchmark is designed to test analytical database performance using real-world taxi trip data patterns. Originally developed by H2O.ai for their database benchmarking initiative, this benchmark focuses on fundamental analytical operations that are common in data science and machine learning workflows: aggregations, grouping operations, and time-series analysis.
@@ -85,7 +87,7 @@ FROM trips;
 
 **Q2: Sum and Mean**
 ```sql
-SELECT 
+SELECT
     SUM(fare_amount) as sum_fare_amount,
     AVG(fare_amount) as mean_fare_amount
 FROM trips;
@@ -97,7 +99,7 @@ FROM trips;
 
 **Q3: Single-Column Grouping**
 ```sql
-SELECT 
+SELECT
     passenger_count,
     SUM(fare_amount) as sum_fare_amount
 FROM trips
@@ -109,7 +111,7 @@ ORDER BY passenger_count;
 
 **Q4: Multi-Aggregate Grouping**
 ```sql
-SELECT 
+SELECT
     passenger_count,
     SUM(fare_amount) as sum_fare_amount,
     AVG(fare_amount) as mean_fare_amount
@@ -122,7 +124,7 @@ ORDER BY passenger_count;
 
 **Q5: Two-Column Grouping**
 ```sql
-SELECT 
+SELECT
     passenger_count,
     vendor_id,
     SUM(fare_amount) as sum_fare_amount
@@ -137,7 +139,7 @@ ORDER BY passenger_count, vendor_id;
 
 **Q7: Time-Based Grouping**
 ```sql
-SELECT 
+SELECT
     EXTRACT(HOUR FROM pickup_datetime) as hour,
     SUM(fare_amount) as sum_fare_amount
 FROM trips
@@ -149,7 +151,7 @@ ORDER BY hour;
 
 **Q8: Complex Temporal Analysis**
 ```sql
-SELECT 
+SELECT
     DATE_TRUNC('day', pickup_datetime) as pickup_date,
     passenger_count,
     COUNT(*) as trip_count,
@@ -168,7 +170,7 @@ ORDER BY pickup_date, passenger_count;
 
 **Q9: Statistical Analysis**
 ```sql
-SELECT 
+SELECT
     vendor_id,
     COUNT(*) as trip_count,
     SUM(fare_amount) as total_revenue,
@@ -239,7 +241,7 @@ conn.execute(schema_sql)
 trips_file = h2odb.output_dir / "trips.csv"
 conn.execute(f"""
     INSERT INTO trips
-    SELECT * FROM read_csv('{trips_file}', 
+    SELECT * FROM read_csv('{trips_file}',
                           header=true,
                           auto_detect=true)
 """)
@@ -283,7 +285,7 @@ class H2ODBPerformanceTester:
     def __init__(self, h2odb: H2ODB, connection):
         self.h2odb = h2odb
         self.connection = connection
-        
+
     def benchmark_query_group(self, query_group: str, iterations: int = 3) -> Dict:
         """Benchmark specific H2O DB query groups."""
         query_groups = {
@@ -292,13 +294,13 @@ class H2ODBPerformanceTester:
             'temporal': ['Q7', 'Q8'],
             'advanced': ['Q9', 'Q10']
         }
-        
+
         if query_group not in query_groups:
             raise ValueError(f"Invalid query group: {query_group}")
-            
+
         query_ids = query_groups[query_group]
         results = {}
-        
+
         # Parameters for temporal queries
         params = {
             'start_date': '2020-01-01',
@@ -306,21 +308,21 @@ class H2ODBPerformanceTester:
             'min_fare': 5.0,
             'max_fare': 100.0
         }
-        
+
         for query_id in query_ids:
             print(f"Benchmarking {query_id} ({query_group})...")
-            
+
             times = []
             for iteration in range(iterations):
                 query_sql = self.h2odb.get_query(query_id, params=params)
-                
+
                 start_time = time.time()
                 result = self.connection.execute(query_sql).fetchall()
                 execution_time = time.time() - start_time
-                
+
                 times.append(execution_time)
                 print(f"  Iteration {iteration + 1}: {execution_time:.3f}s")
-            
+
             results[query_id] = {
                 'group': query_group,
                 'avg_time': mean(times),
@@ -330,13 +332,13 @@ class H2ODBPerformanceTester:
                 'rows_returned': len(result),
                 'times': times
             }
-        
+
         return results
-    
+
     def run_complete_benchmark(self) -> Dict:
         """Run all H2O DB query groups and return systematic results."""
         complete_results = {}
-        
+
         # Test each query group
         for group in ['basic', 'grouping', 'temporal', 'advanced']:
             print(f"\\nRunning {group.upper()} queries...")
@@ -346,7 +348,7 @@ class H2ODBPerformanceTester:
             except Exception as e:
                 print(f"Error in {group} queries: {e}")
                 complete_results[group] = {'error': str(e)}
-        
+
         # Calculate summary statistics
         all_times = []
         for group_data in complete_results.values():
@@ -354,7 +356,7 @@ class H2ODBPerformanceTester:
                 for query_data in group_data.values():
                     if isinstance(query_data, dict) and 'times' in query_data:
                         all_times.extend(query_data['times'])
-        
+
         if all_times:
             complete_results['summary'] = {
                 'total_queries': len(all_times) // 3,  # 3 iterations per query
@@ -363,9 +365,9 @@ class H2ODBPerformanceTester:
                 'total_min_time': min(all_times),
                 'total_max_time': max(all_times)
             }
-        
+
         return complete_results
-    
+
     def analyze_aggregation_performance(self) -> Dict:
         """Analyze aggregation performance across different group sizes."""
         aggregation_tests = [
@@ -374,25 +376,25 @@ class H2ODBPerformanceTester:
             ('two_col_group', 'SELECT passenger_count, vendor_id, SUM(fare_amount) FROM trips GROUP BY passenger_count, vendor_id'),
             ('complex_agg', 'SELECT vendor_id, COUNT(*), SUM(fare_amount), AVG(fare_amount), STDDEV(fare_amount) FROM trips GROUP BY vendor_id')
         ]
-        
+
         results = {}
-        
+
         for test_name, query_sql in aggregation_tests:
             print(f"Testing {test_name}...")
-            
+
             times = []
             for iteration in range(3):
                 start_time = time.time()
                 result = self.connection.execute(query_sql).fetchall()
                 execution_time = time.time() - start_time
                 times.append(execution_time)
-            
+
             results[test_name] = {
                 'avg_time': mean(times),
                 'rows_returned': len(result),
                 'times': times
             }
-        
+
         return results
 
 # Usage
@@ -435,7 +437,7 @@ print("Data Science Operations Performance Test:")
 start_time = time.time()
 trips_df['hour'] = pd.to_datetime(trips_df['pickup_datetime']).dt.hour
 trips_df['day_of_week'] = pd.to_datetime(trips_df['pickup_datetime']).dt.dayofweek
-trips_df['trip_duration'] = (pd.to_datetime(trips_df['dropoff_datetime']) - 
+trips_df['trip_duration'] = (pd.to_datetime(trips_df['dropoff_datetime']) -
                             pd.to_datetime(trips_df['pickup_datetime'])).dt.total_seconds()
 feature_eng_time = time.time() - start_time
 print(f"Feature engineering: {feature_eng_time:.3f}s")
@@ -551,11 +553,11 @@ h2odb = H2ODB(scale_factor=100, output_dir="/data/h2odb_sf100")
 data_files = h2odb.generate_data()
 
 # Load data into Spark DataFrame with optimizations
-trips_df = spark.read.csv("/data/h2odb_sf100/trips.csv", 
+trips_df = spark.read.csv("/data/h2odb_sf100/trips.csv",
                          header=True, inferSchema=True)
 
 # Partition by pickup date for temporal queries
-trips_df = trips_df.withColumn("pickup_date", 
+trips_df = trips_df.withColumn("pickup_date",
                                to_date("pickup_datetime"))
 trips_df = trips_df.repartition(100, "pickup_date")
 trips_df.cache()
@@ -570,7 +572,7 @@ q1_result.show()
 
 # Q3: Grouping by passenger count
 q3_result = spark.sql("""
-    SELECT 
+    SELECT
         passenger_count,
         SUM(fare_amount) as sum_fare_amount
     FROM trips
@@ -581,7 +583,7 @@ q3_result.show()
 
 # Q7: Temporal analysis
 q7_result = spark.sql("""
-    SELECT 
+    SELECT
         hour(pickup_datetime) as hour,
         SUM(fare_amount) as sum_fare_amount
     FROM trips
@@ -656,7 +658,7 @@ print(f"Q1 result: {q1_result.result_rows}")
 
 # Q3: Optimized grouping
 q3_configured = """
-SELECT 
+SELECT
     passenger_count,
     sum(fare_amount) as sum_fare_amount
 FROM trips
@@ -668,7 +670,7 @@ print(f"Q3 results: {len(q3_result.result_rows)} groups")
 
 # Q7: Optimized temporal analysis
 q7_configured = """
-SELECT 
+SELECT
     toHour(pickup_datetime) as hour,
     sum(fare_amount) as sum_fare_amount
 FROM trips
@@ -725,8 +727,8 @@ SET max_memory_usage = 8000000000;  -- ClickHouse
 
 -- Or break down large groups
 SELECT passenger_count, vendor_id, SUM(fare_amount)
-FROM trips 
-WHERE pickup_datetime >= '2020-01-01' 
+FROM trips
+WHERE pickup_datetime >= '2020-01-01'
   AND pickup_datetime < '2020-02-01'  -- Process monthly chunks
 GROUP BY passenger_count, vendor_id;
 ```
@@ -736,7 +738,7 @@ GROUP BY passenger_count, vendor_id;
 **Issue: Incorrect temporal analysis results**
 ```sql
 -- Solution: Ensure proper timezone handling and date parsing
-SELECT 
+SELECT
     EXTRACT(HOUR FROM pickup_datetime AT TIME ZONE 'UTC') as hour,
     SUM(fare_amount) as sum_fare_amount
 FROM trips
@@ -749,7 +751,7 @@ ORDER BY hour;
 **Issue: Unexpected aggregation results**
 ```sql
 -- Solution: Handle NULL values and outliers appropriately
-SELECT 
+SELECT
     passenger_count,
     COUNT(*) as trip_count,
     SUM(CASE WHEN fare_amount > 0 THEN fare_amount ELSE 0 END) as sum_fare_amount,

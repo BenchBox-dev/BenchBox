@@ -5,6 +5,8 @@
 ```{tags} intermediate, concept, tsbs-devops, custom-benchmark
 ```
 
+> **CLI name:** `tsbs_devops` — use `benchbox run --benchmark tsbs_devops`
+
 ## Overview
 
 The Time Series Benchmark Suite (TSBS) DevOps benchmark simulates infrastructure monitoring workloads typical of DevOps and observability platforms. Based on the [official TSBS implementation by Timescale](https://github.com/timescale/tsbs), this benchmark generates realistic time-series data representing CPU, memory, disk, and network metrics from a fleet of monitored hosts.
