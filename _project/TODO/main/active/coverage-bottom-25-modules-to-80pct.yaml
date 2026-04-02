@@ -491,7 +491,7 @@ work:
 
 - id: w11
   summary: "bigquery.py: GCS integration, auth, and query execution branches"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/bigquery.py (+321 lines → 80%)
