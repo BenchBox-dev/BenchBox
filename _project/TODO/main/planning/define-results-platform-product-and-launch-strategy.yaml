@@ -2,7 +2,8 @@ id: define-results-platform-product-and-launch-strategy
 title: "Define BenchBox results platform product boundary and launch strategy"
 worktree: main
 priority: Critical
-status: Not Started
+status: Done
+completed_note: "Strategy document exists at _project/analysis/benchbox-results-platform-strategy.md"
 category: Core Functionality
 description: |
   BenchBox currently blurs together three different concerns:
@@ -29,7 +30,7 @@ description: |
 work:
 - id: w1
   summary: "Audit current BenchBox result export, results CLI, and public-site constraints"
-  status: pending
+  status: done
   notes: |
     Capture the current canonical result path, static-site deployment model,
     and any pre-existing hints of hosted service design.
@@ -37,7 +38,7 @@ work:
 - id: w2
   summary: "Build a reference matrix from Geekbench, CloudSpecs, OpenBenchmarking, and ASV"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Classify what each reference teaches BenchBox about submission, browsing,
     comparison, static hosting, and trust labels.
@@ -45,14 +46,14 @@ work:
 - id: w3
   summary: "Define personas, workflows, trust levels, and phase-by-phase success metrics"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Cover at least maintainers/curators, result submitters, and result readers.
 
 - id: w4
   summary: "Choose the initial topology and command boundary for publish vs submit"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Confirm the launch topology: explorer at `/results/`, seed corpus stored
     under repo-local `results-data/`, and a single GitHub Pages workflow for
@@ -62,7 +63,7 @@ work:
 - id: w5
   summary: "Publish the strategy artifact and update companion TODO dependencies"
   needs: [w4]
-  status: pending
+  status: done
 
 metadata:
   tags:
