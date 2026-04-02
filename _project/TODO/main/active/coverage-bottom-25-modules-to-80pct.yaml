@@ -216,7 +216,7 @@ work:
 
 - id: w4
   summary: "Small cloud adapters: motherduck, starburst, clickhouse diagnostics"
-  status: pending
+  status: done
   needs: []
   description: |
     Three small adapters (<160 stmts each), each needing ~20-42 new covered lines.
@@ -255,7 +255,7 @@ work:
 
 - id: w5
   summary: "Credential modules: credentials/snowflake and credentials/redshift"
-  status: pending
+  status: done
   needs: []
   description: |
     Both credential modules use Rich Console/Prompt for interactive setup. Mock all
@@ -290,7 +290,7 @@ work:
 
 - id: w6
   summary: "Cloud staging URI parsing and write-primitives validation logic"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/base/cloud_spark/staging.py (+99 lines → 80%)
@@ -329,7 +329,7 @@ work:
 
 - id: w7
   summary: "spark.py: deployment modes, config validation, resource allocation"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/spark.py (+133 lines → 80%)
@@ -355,7 +355,7 @@ work:
 
 - id: w8
   summary: "databricks/adapter.py part 1: warehouse selection, clustering, SQL generation"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/databricks/adapter.py (first half — ~198 lines toward 80%)
@@ -417,7 +417,7 @@ work:
 
 - id: w9
   summary: "AWS Athena Spark + GCP Dataproc: state polling and job lifecycle"
-  status: pending
+  status: done
   needs: []
   description: |
     Both adapters follow the same "submit job → poll state → retrieve result" pattern.
@@ -452,7 +452,7 @@ work:
 
 - id: w10
   summary: "fabric_warehouse.py and snowflake.py: auth logic and connection config"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/fabric_warehouse.py (+109 lines → 80%)
