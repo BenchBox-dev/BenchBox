@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T20:42:31.983207'
-total_items: 37
+generated_at: '2026-04-02T08:48:55.671522'
+total_items: 38
 priorities:
   Critical:
     count: 1
@@ -10,8 +10,13 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 5
+    count: 6
     items:
+    - id: windows-ci-hardening
+      file: TODO/main/planning/windows-ci-hardening.yaml
+      title: Harden CI and static analysis to catch Windows-specific failures before merge
+      category: Testing & Quality
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -51,10 +56,10 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: coverage-bottom-25-modules-to-80pct
-      file: TODO/main/planning/coverage-bottom-25-modules-to-80pct.yaml
+      file: TODO/main/active/coverage-bottom-25-modules-to-80pct.yaml
       title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
       category: Testing & Quality
-      status: Not Started
+      status: In Progress
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
       title: Build a results explorer subsite on benchbox.dev

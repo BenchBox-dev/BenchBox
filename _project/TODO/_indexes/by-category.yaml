@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T20:42:31.983181'
+generated_at: '2026-04-02T08:48:55.671505'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -192,7 +192,7 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 2
+    count: 3
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -200,7 +200,12 @@ categories:
       priority: Medium
       status: Not Started
     - id: coverage-bottom-25-modules-to-80pct
-      file: TODO/main/planning/coverage-bottom-25-modules-to-80pct.yaml
+      file: TODO/main/active/coverage-bottom-25-modules-to-80pct.yaml
       title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
       priority: Medium-High
+      status: In Progress
+    - id: windows-ci-hardening
+      file: TODO/main/planning/windows-ci-hardening.yaml
+      title: Harden CI and static analysis to catch Windows-specific failures before merge
+      priority: High
       status: Not Started

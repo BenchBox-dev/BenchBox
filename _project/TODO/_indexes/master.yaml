@@ -1,5 +1,5 @@
-generated_at: '2026-04-01T20:42:31.983139'
-total_items: 37
+generated_at: '2026-04-02T08:48:55.671463'
+total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -18,6 +18,23 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 1
+- id: windows-ci-hardening
+  file: TODO/main/planning/windows-ci-hardening.yaml
+  title: Harden CI and static analysis to catch Windows-specific failures before merge
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Not Started
+  tags:
+  - ci
+  - windows
+  - cross-platform
+  - release-quality
+  estimated_effort: Medium
+  work_total: 7
+  work_done: 0
+  work_ready: 3
+  deferred_count: 2
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -478,20 +495,20 @@ items:
   work_done: 0
   work_ready: 3
 - id: coverage-bottom-25-modules-to-80pct
-  file: TODO/main/planning/coverage-bottom-25-modules-to-80pct.yaml
+  file: TODO/main/active/coverage-bottom-25-modules-to-80pct.yaml
   title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
   worktree: main
   category: Testing & Quality
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - testing
   - coverage
   - fast-lane
   estimated_effort: Large
   work_total: 14
-  work_done: 0
-  work_ready: 12
+  work_done: 13
+  work_ready: 1
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
   title: Build a results explorer subsite on benchbox.dev
