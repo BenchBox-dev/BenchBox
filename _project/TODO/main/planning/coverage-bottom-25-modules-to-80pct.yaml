@@ -354,15 +354,14 @@ work:
   - tests/unit/platforms/test_spark_adapter_coverage.py
 
 - id: w8
-  summary: "databricks/adapter.py: warehouse selection, clustering, SQL generation (large)"
+  summary: "databricks/adapter.py part 1: warehouse selection, clustering, SQL generation"
   status: pending
   needs: []
   description: |
-    benchbox/platforms/databricks/adapter.py (+396 lines → 80%)
+    benchbox/platforms/databricks/adapter.py (first half — ~198 lines toward 80%)
 
-    This is the largest single work unit. Mock databricks.sql and all credential
-    helpers. Focus on the business logic that does NOT require a live Databricks
-    workspace.
+    Mock databricks.sql and all credential helpers. Focus on the business logic
+    that does NOT require a live Databricks workspace.
 
     Warehouse selection (_select_databricks_warehouse):
     - Multiple warehouses: select by name match (case-insensitive partial match)
@@ -381,20 +380,38 @@ work:
     - LIQUID_CLUSTERING: verify "ALTER TABLE table CLUSTER BY (col1, col2)" template
     - No sort columns → returns None (no post-CTAS statement)
 
+    _build_copy_into_sql():
+    - Parquet vs CSV format: verify correct FORMAT clause per source type
+    - With credential options: CREDENTIAL block present in output
+    - Without credential options: CREDENTIAL block absent
+
+    File: tests/unit/platforms/test_databricks_adapter_coverage.py (new)
+  files:
+  - tests/unit/platforms/test_databricks_adapter_coverage.py
+
+- id: w13
+  summary: "databricks/adapter.py part 2: data loading, DBFS upload, error handling"
+  status: pending
+  needs: [w8]
+  description: |
+    benchbox/platforms/databricks/adapter.py (second half — remaining ~198 lines to 80%)
+
+    Extends tests/unit/platforms/test_databricks_adapter_coverage.py created in w8.
+
     Data loading flow:
-    - _build_copy_into_sql(): verify COPY INTO sql for Parquet vs CSV, with and
-      without credential options
     - _upload_to_dbfs(): mock dbfs_client.upload(); verify chunked upload with
-      correct block size
-    - External table creation: verify CREATE TABLE ... USING DELTA LOCATION
+      correct block size; verify OverflowError raised when file exceeds max DBFS size
+    - External table creation: verify CREATE TABLE ... USING DELTA LOCATION sql
     - UC Volumes path resolution: "dbfs:/mnt/..." vs "abfss://..." vs "s3://..."
+      each resolved to the correct staging path format
 
     Error handling:
-    - Connection retry: mock first connect raising OperationalError, second succeeding
+    - Connection retry: mock first connect raising OperationalError, second succeeding;
+      verify up to max_retries attempted then raises
     - Query timeout: mock execute_query raising TimeoutError; verify surfaced cleanly
+      without swallowing the original exception
 
-    File: tests/unit/platforms/test_databricks_adapter_coverage.py (new, to avoid
-    bloating existing files)
+    File: tests/unit/platforms/test_databricks_adapter_coverage.py (extend from w8)
   files:
   - tests/unit/platforms/test_databricks_adapter_coverage.py
 
@@ -518,11 +535,11 @@ work:
   - tests/unit/platforms/test_bigquery_adapter_coverage.py
 
 - id: w12
-  summary: "redshift.py: COPY command, IAM/S3 integration, connector selection (largest)"
+  summary: "redshift.py part 1: connector selection, connection setup, S3 URI parsing"
   status: pending
   needs: []
   description: |
-    benchbox/platforms/redshift.py (+435 lines → 80%)
+    benchbox/platforms/redshift.py (first half — ~218 lines toward 80%)
       Mock redshift_connector, psycopg2, and boto3 S3 client.
 
       Connector selection:
@@ -537,7 +554,7 @@ work:
       - SSL config: sslmode="verify-full" when ssl_verify=True
       - Connection retry on OperationalError: up to max_retries; then raises
 
-      S3 integration:
+      S3 URI parsing:
       - _parse_s3_staging_root(): "s3://bucket/prefix/" → (bucket, prefix);
         missing "s3://" raises ConfigurationError
       - _build_copy_command(): verify COPY schema.table FROM 's3://...' with
@@ -545,6 +562,18 @@ work:
       - CSV options: DELIMITER ',' IGNOREHEADER 1 REMOVEQUOTES EMPTYASNULL appended
       - Parquet options: FORMAT AS PARQUET appended; no DELIMITER
       - GZIP option: GZIP appended when compression=gzip
+
+      File: tests/unit/platforms/test_redshift_adapter_coverage.py (new)
+  files:
+  - tests/unit/platforms/test_redshift_adapter_coverage.py
+
+- id: w14
+  summary: "redshift.py part 2: data loading flow, SQL generation, WLM query group"
+  status: pending
+  needs: [w12]
+  description: |
+    benchbox/platforms/redshift.py (second half — remaining ~217 lines to 80%)
+      Extends tests/unit/platforms/test_redshift_adapter_coverage.py created in w12.
 
       Data loading flow:
       - upload_to_s3(): mock boto3.client.upload_file(); verify key = prefix + filename
@@ -562,7 +591,7 @@ work:
       - set_query_group(): mock execute("SET query_group TO ..."); verify called
         before each benchmark query when wlm_queue configured
 
-      File: tests/unit/platforms/test_redshift_adapter_coverage.py (new)
+      File: tests/unit/platforms/test_redshift_adapter_coverage.py (extend from w12)
   files:
   - tests/unit/platforms/test_redshift_adapter_coverage.py
 
@@ -577,8 +606,10 @@ approach: |
   Work units w1–w4 and w6–w9 are fully independent and can be executed in any order.
   w5 (credentials) has no dependencies but shares mock patterns with w10; do w5 first
   to establish the Rich Console mock helpers.
-  w10–w12 (large cloud adapters) should be done after w5 to leverage the established
+  w10–w11 (large cloud adapters) should be done after w5 to leverage the established
   mocking patterns.
+  w8 must complete before w13 (w13 extends the test file w8 creates).
+  w12 must complete before w14 (w14 extends the test file w12 creates).
 
   For each work unit:
   1. Run coverage on the target module first to identify the exact uncovered lines:
@@ -596,12 +627,12 @@ approach: |
   - pyodbc: patch "benchbox.platforms.fabric_warehouse.pyodbc.connect"
 
 anti_patterns:
-- "DO NOT add @pytest.mark.slow, @pytest.mark.live_integration, or @pytest.mark.resource_heavy markers — only @pytest.mark.fast"
-- "DO NOT import or instantiate real cloud SDK clients in tests — all external calls must be mocked"
+- "DO NOT add @pytest.mark.slow, @pytest.mark.live_integration, or @pytest.mark.resource_heavy markers — because those markers cause tests to be excluded from the fast lane and won't count toward the 80% coverage gate — use only @pytest.mark.fast"
+- "DO NOT import or instantiate real cloud SDK clients in tests — because CI has no cloud credentials and live calls cause flakiness and violate the fast-lane contract — mock all external SDK calls with unittest.mock.patch"
 - "DO NOT use -o 'addopts=' to override pytest.ini — this strips -n auto and makes tests 10x slower"
 - "DO NOT call list() on color_cycle() return values — color_cycle() returns an infinite itertools.cycle; use list(theme.palette or DEFAULT_PALETTE) instead"
-- "DO NOT modify production source files to make them more testable — only add/extend test files"
-- "DO NOT batch all 25 modules into a single test file — keep per-module or per-group test files aligned with existing test directory structure"
+- "DO NOT modify production source files to make them more testable — because changes to production code require their own review cycle and could introduce regressions that dwarf the coverage gain — only add/extend test files"
+- "DO NOT batch all 25 modules into a single test file — because monolithic test files make coverage diffs unreadable and slow down targeted reruns — keep per-module or per-group test files aligned with existing test directory structure"
 
 verification:
 - description: "All 25 target modules individually reach ≥80% coverage in the fast lane"
