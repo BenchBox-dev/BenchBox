@@ -125,7 +125,7 @@ work:
 
 - id: w2
   summary: "TPC generators and comparison suite: streaming, tpchavoc, comparison/suite"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/core/tpcds/generator/streaming.py (+57 lines → 80%)
