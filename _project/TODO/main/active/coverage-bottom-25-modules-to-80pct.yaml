@@ -779,7 +779,7 @@ work:
 
 - id: w18
   summary: "Core primitives part 2: transaction dataframe_ops + write_primitives benchmark"
-  status: pending
+  status: done
   needs: [w1, w6]
   description: |
     Two core modules with deep branching in ACID operations and benchmark setup.
@@ -829,7 +829,7 @@ work:
 
 - id: w19
   summary: "spark.py part 2 + credentials/redshift part 2"
-  status: pending
+  status: done
   needs: [w7, w5]
   description: |
     benchbox/platforms/spark.py (50% → 80%, +116 lines)
@@ -885,7 +885,7 @@ work:
 
 - id: w20
   summary: "snowflake.py part 2: connection, external tables, query execution, tuning"
-  status: pending
+  status: done
   needs: [w10]
   description: |
     benchbox/platforms/snowflake.py (54% → 80%, +186 lines)
@@ -937,7 +937,7 @@ work:
 
 - id: w21
   summary: "bigquery.py part 2: metadata, validation, loading, execution, tuning"
-  status: pending
+  status: done
   needs: [w11]
   description: |
     benchbox/platforms/bigquery.py (48% → 80%, +273 lines)
@@ -1001,7 +1001,7 @@ work:
 
 - id: w22
   summary: "databricks/adapter.py part 3: from_config, UC volumes, data loading, tuning"
-  status: pending
+  status: done
   needs: [w13]
   description: |
     benchbox/platforms/databricks/adapter.py (53% → 80%, +274 lines)
@@ -1065,7 +1065,7 @@ work:
 
 - id: w23
   summary: "redshift.py part 3: from_config, platform info, drop_database, S3 loading"
-  status: pending
+  status: done
   needs: [w14]
   description: |
     benchbox/platforms/redshift.py (48% → 65%, +186 lines — first half of gap)
@@ -1123,7 +1123,7 @@ work:
 
 - id: w24
   summary: "redshift.py part 4: external tables, query execution, statistics, tuning"
-  status: pending
+  status: done
   needs: [w23]
   description: |
     benchbox/platforms/redshift.py (65% → 80%, +186 lines — second half of gap)

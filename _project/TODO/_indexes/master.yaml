@@ -1,4 +1,4 @@
-generated_at: '2026-04-02T16:19:42.101539'
+generated_at: '2026-04-02T17:17:21.847814'
 total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -490,8 +490,8 @@ items:
   - fast-lane
   estimated_effort: Extra Large
   work_total: 24
-  work_done: 17
-  work_ready: 6
+  work_done: 24
+  work_ready: 0
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
   title: Build a results explorer subsite on benchbox.dev
