@@ -1,4 +1,4 @@
-generated_at: '2026-04-02T09:25:42.894883'
+generated_at: '2026-04-02T16:19:42.101594'
 total_items: 37
 statuses:
   In Progress:
@@ -10,7 +10,7 @@ statuses:
       priority: Medium-High
       category: Testing & Quality
   Not Started:
-    count: 36
+    count: 34
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -60,16 +60,6 @@ statuses:
     - id: build-static-pipeline-bundles-to-read-model
       file: TODO/main/planning/build-static-pipeline-bundles-to-read-model.yaml
       title: Build static pipeline that transforms result bundles into explorer read models
-      priority: Medium-High
-      category: Core Functionality
-    - id: define-results-platform-product-and-launch-strategy
-      file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
-      title: Define BenchBox results platform product boundary and launch strategy
-      priority: Critical
-      category: Core Functionality
-    - id: define-hosted-results-contract-and-governance-model
-      file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
-      title: Define hosted results contract, trust labels, and governance model
       priority: Medium-High
       category: Core Functionality
     - id: design-results-ingest-storage-and-derived-read-model

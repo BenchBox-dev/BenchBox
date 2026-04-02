@@ -1,4 +1,4 @@
-generated_at: '2026-04-02T09:25:42.894873'
+generated_at: '2026-04-02T16:19:42.101584'
 total_items: 37
 priorities:
   Critical:
@@ -8,7 +8,7 @@ priorities:
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
       category: Core Functionality
-      status: Not Started
+      status: Done
   High:
     count: 5
     items:
@@ -69,7 +69,7 @@ priorities:
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
       category: Core Functionality
-      status: Not Started
+      status: Done
     - id: generate-seed-corpus-for-results-explorer
       file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
       title: Generate seed corpus of benchmark results for the results explorer

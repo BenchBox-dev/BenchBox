@@ -638,7 +638,7 @@ work:
 
 - id: w15
   summary: "Small top-ups: motherduck, streaming, clickhouse/diagnostics, credentials/snowflake"
-  status: pending
+  status: done
   needs: [w4, w2, w5]
   description: |
     Four modules close to or within striking distance of 80%. Small, focused additions.
@@ -685,7 +685,7 @@ work:
 
 - id: w16
   summary: "Mid-tier adapters part 2: comparison/suite, dataproc, athena_spark"
-  status: pending
+  status: done
   needs: [w2, w9]
   description: |
     Three modules in the 63-66% range, each needing 37-47 more covered lines.
@@ -731,7 +731,7 @@ work:
 
 - id: w17
   summary: "Cloud infrastructure: staging.py providers + fabric_warehouse data loading"
-  status: pending
+  status: done
   needs: [w6, w10]
   description: |
     Two modules with heavy cloud SDK initialization and data loading paths.

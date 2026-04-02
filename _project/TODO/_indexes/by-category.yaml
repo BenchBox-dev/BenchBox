@@ -1,4 +1,4 @@
-generated_at: '2026-04-02T09:25:42.894858'
+generated_at: '2026-04-02T16:19:42.101569'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -59,12 +59,12 @@ categories:
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
       priority: Critical
-      status: Not Started
+      status: Done
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
       priority: Medium-High
-      status: Not Started
+      status: Done
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
