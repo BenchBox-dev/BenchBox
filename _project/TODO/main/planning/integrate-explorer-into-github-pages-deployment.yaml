@@ -1,7 +1,7 @@
 id: integrate-explorer-into-github-pages-deployment
 title: "Integrate results explorer into GitHub Pages deployment workflow"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 deps:

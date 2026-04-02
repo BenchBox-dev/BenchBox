@@ -1,7 +1,7 @@
 id: define-hosted-results-contract-and-governance-model
 title: "Define hosted results contract, trust labels, and governance model"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 deps:

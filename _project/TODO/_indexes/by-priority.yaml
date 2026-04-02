@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T20:41:13.991443'
+generated_at: '2026-04-01T20:42:31.983207'
 total_items: 37
 priorities:
   Critical:
@@ -12,6 +12,11 @@ priorities:
   High:
     count: 5
     items:
+    - id: integrate-benchbox-cli-submit-and-service-auth
+      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+      title: Integrate BenchBox CLI submission flow and service authentication
+      category: Core Functionality
+      status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
@@ -32,24 +37,9 @@ priorities:
       title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
       category: Core Functionality
       status: Not Started
-    - id: vector-search-benchmark-support
-      file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
-      title: Vector Search Benchmark Support
-      category: AI/ML Capabilities
-      status: Not Started
   Medium-High:
-    count: 11
+    count: 13
     items:
-    - id: add-hypothesis-property-tests
-      file: TODO/main/planning/add-hypothesis-property-tests.yaml
-      title: Add Hypothesis property-based tests for pure-function invariants
-      category: Testing & Quality
-      status: Not Started
-    - id: singlestore-adapter
-      file: TODO/platform-expansion/planning/singlestore-adapter.yaml
-      title: Add SingleStore Platform Adapter
-      category: Platform Expansion
-      status: Not Started
     - id: http-tls-certificate-validation
       file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
       title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
@@ -75,6 +65,11 @@ priorities:
       title: Build static pipeline that transforms result bundles into explorer read models
       category: Core Functionality
       status: Not Started
+    - id: define-hosted-results-contract-and-governance-model
+      file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
+      title: Define hosted results contract, trust labels, and governance model
+      category: Core Functionality
+      status: Not Started
     - id: generate-seed-corpus-for-results-explorer
       file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
       title: Generate seed corpus of benchmark results for the results explorer
@@ -90,23 +85,43 @@ priorities:
       title: Implement result detail page with query timings, metadata, and bundle download
       category: Core Functionality
       status: Not Started
+    - id: integrate-explorer-into-github-pages-deployment
+      file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
+      title: Integrate results explorer into GitHub Pages deployment workflow
+      category: Core Functionality
+      status: Not Started
+    - id: launch-results-explorer-acceptance-and-seed
+      file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
+      title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
+      category: Core Functionality
+      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
       status: Not Started
+    - id: vector-search-benchmark-support
+      file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
+      title: Vector Search Benchmark Support
+      category: AI/ML Capabilities
+      status: Not Started
   Medium:
-    count: 10
+    count: 9
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: define-hosted-results-contract-and-governance-model
-      file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
-      title: Define hosted results contract, trust labels, and governance model
-      category: Core Functionality
+    - id: add-hypothesis-property-tests
+      file: TODO/main/planning/add-hypothesis-property-tests.yaml
+      title: Add Hypothesis property-based tests for pure-function invariants
+      category: Testing & Quality
+      status: Not Started
+    - id: singlestore-adapter
+      file: TODO/platform-expansion/planning/singlestore-adapter.yaml
+      title: Add SingleStore Platform Adapter
+      category: Platform Expansion
       status: Not Started
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
@@ -128,19 +143,9 @@ priorities:
       title: Implement results compare view for side-by-side benchmark analysis
       category: Core Functionality
       status: Not Started
-    - id: integrate-benchbox-cli-submit-and-service-auth
-      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
-      title: Integrate BenchBox CLI submission flow and service authentication
-      category: Core Functionality
-      status: Not Started
-    - id: integrate-explorer-into-github-pages-deployment
-      file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
-      title: Integrate results explorer into GitHub Pages deployment workflow
-      category: Core Functionality
-      status: Not Started
-    - id: launch-results-explorer-acceptance-and-seed
-      file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
-      title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
+    - id: operate-results-platform-security-observability-and-abuse-controls
+      file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+      title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
       status: Not Started
     - id: stackoverflow-benchmark
@@ -149,7 +154,7 @@ priorities:
       category: Benchmark Development
       status: Not Started
   Low:
-    count: 10
+    count: 9
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -180,11 +185,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: operate-results-platform-security-observability-and-abuse-controls
-      file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
-      title: Operate results platform security, observability, and abuse controls
-      category: Core Functionality
       status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml

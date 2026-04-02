@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T20:41:13.991455'
+generated_at: '2026-04-01T20:42:31.983221'
 total_items: 37
 statuses:
   Not Started:
@@ -22,12 +22,12 @@ statuses:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
-      priority: Medium-High
+      priority: Medium
       category: Testing & Quality
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
-      priority: Medium-High
+      priority: Medium
       category: Platform Expansion
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
@@ -67,7 +67,7 @@ statuses:
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
-      priority: Medium
+      priority: Medium-High
       category: Core Functionality
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
@@ -122,17 +122,17 @@ statuses:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
-      priority: Medium
+      priority: High
       category: Core Functionality
     - id: integrate-explorer-into-github-pages-deployment
       file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
       title: Integrate results explorer into GitHub Pages deployment workflow
-      priority: Medium
+      priority: Medium-High
       category: Core Functionality
     - id: launch-results-explorer-acceptance-and-seed
       file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
       title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
-      priority: Medium
+      priority: Medium-High
       category: Core Functionality
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
@@ -147,7 +147,7 @@ statuses:
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
-      priority: Low
+      priority: Medium
       category: Core Functionality
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
@@ -182,7 +182,7 @@ statuses:
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
-      priority: High
+      priority: Medium-High
       category: AI/ML Capabilities
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml

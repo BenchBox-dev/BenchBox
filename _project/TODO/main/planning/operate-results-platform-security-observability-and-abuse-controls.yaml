@@ -1,7 +1,7 @@
 id: operate-results-platform-security-observability-and-abuse-controls
 title: "Operate results platform security, observability, and abuse controls"
 worktree: main
-priority: Low
+priority: Medium
 status: Not Started
 category: Core Functionality
 deps:

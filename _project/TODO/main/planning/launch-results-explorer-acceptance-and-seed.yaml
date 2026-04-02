@@ -1,7 +1,7 @@
 id: launch-results-explorer-acceptance-and-seed
 title: "Launch results explorer: acceptance testing, seed corpus verification, and go-live"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 deps:

@@ -1,7 +1,7 @@
 id: add-hypothesis-property-tests
 title: "Add Hypothesis property-based tests for pure-function invariants"
 worktree: main
-priority: Medium-High
+priority: Medium
 status: Not Started
 description: |
   Analysis of the full test suite (~16,800 test functions) identified ~20 tests

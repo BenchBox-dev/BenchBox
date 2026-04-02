@@ -1,4 +1,4 @@
-generated_at: '2026-04-01T20:41:13.991421'
+generated_at: '2026-04-01T20:42:31.983181'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -7,7 +7,7 @@ categories:
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
-      priority: High
+      priority: Medium-High
       status: Not Started
   Benchmark Development:
     count: 6
@@ -63,7 +63,7 @@ categories:
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
@@ -98,22 +98,22 @@ categories:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
-      priority: Medium
+      priority: High
       status: Not Started
     - id: integrate-explorer-into-github-pages-deployment
       file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
       title: Integrate results explorer into GitHub Pages deployment workflow
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: launch-results-explorer-acceptance-and-seed
       file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
       title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
-      priority: Low
+      priority: Medium
       status: Not Started
     - id: productize-result-publishing-and-artifact-sharing
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
@@ -151,7 +151,7 @@ categories:
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml
       title: Add SingleStore Platform Adapter
-      priority: Medium-High
+      priority: Medium
       status: Not Started
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
@@ -197,7 +197,7 @@ categories:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
-      priority: Medium-High
+      priority: Medium
       status: Not Started
     - id: coverage-bottom-25-modules-to-80pct
       file: TODO/main/planning/coverage-bottom-25-modules-to-80pct.yaml
