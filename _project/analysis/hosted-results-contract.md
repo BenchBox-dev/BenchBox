@@ -404,19 +404,32 @@ The submission manifest schema:
 
 ```json
 {
-  "bundle_hash": "<sha256 of bundle JSON bytes>",
-  "submitted_by": "<GitHub username or display name>",
-  "submission_notes": "<optional free-text, max 500 chars>",
-  "benchbox_version": "<semver string>",
-  "submitted_at": "<ISO 8601 timestamp>"
+  "bundle_hash": "<sha256 composite over all files in bundle directory>",
+  "submission_tool_version": "<'benchbox/' + semver string>",
+  "submitted_at": "<ISO 8601 UTC timestamp>",
+  "bundle_file": "<filename of primary result JSON>",
+  "benchmark": "<benchmark name from result>",
+  "platform": "<platform name from result>",
+  "scale_factor": "<scale factor from result>",
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "<GitHub username or display name — Phase 2: PR author; Phase 3: authenticated actor>",
+  "submission_notes": "<optional free-text, max 500 chars>"
 }
 ```
 
+**Field notes:**
+- `submitted_by`, `submission_notes`: Phase 2 — optional; Phase 3 — required.
+- `benchmark`, `platform`, `scale_factor`, `bundle_file`, `phase`, `submission_path`: All phases — required, extracted from result metadata.
+
 #### `bundle_hash` computation
 
-The CLI computes `bundle_hash` as `sha256(bundle_bytes)` where `bundle_bytes`
-are the raw bytes of the canonical JSON file as written to disk, before any
-encoding or compression. The hash must be recomputed at submission time (not
+The CLI computes `bundle_hash` as a composite SHA-256 over all files in the
+assembled bundle directory. Files are enumerated in sorted order by filename;
+for each file the filename bytes and file content bytes are fed into the hash.
+The manifest itself is excluded (hash is computed before manifest creation).
+This ensures companion files (query plans, tuning configs) are covered by
+the integrity check. The hash must be recomputed at submission time (not
 cached from a prior run) to detect any post-run modifications.
 
 #### Dry-run behavior
@@ -440,13 +453,18 @@ output directory contains:
 
 ```
 submission/
-  bundle.json
-  submission.json
-  README.md
+  bundle/
+    <result_filename>.json
+    <result_filename>.plans.json   (if present)
+    <result_filename>.tuning.json  (if present)
+  submission-manifest.json
+  CONTRIBUTING.md
 ```
 
-The contributor opens a PR against `results-data/` placing `bundle.json` and
-`submission.json` under `results-data/community/{bundle_hash[0:8]}/`.
+The contributor opens a PR against `results-data/` by copying the `bundle/`
+directory into `results-data/<benchmark>/<platform>/sf<scale>/` and placing
+`submission-manifest.json` alongside it. See `CONTRIBUTING.md` in the output
+directory for step-by-step instructions.
 
 #### Phase 3 API mode
 
@@ -613,6 +631,26 @@ The frontend enforces cohort rules before rendering:
 - Withdrawn results (tombstone) render a dedicated "Result Withdrawn" page at
   the stable URL with the tombstone data and a brief explanation. HTTP 410 is
   returned for API consumers; the frontend shows a human-readable message.
+
+### Open Questions (Phase 3)
+
+The following questions are explicitly deferred to Phase 3 design and are not
+resolved by this contract:
+
+- **`public_result_id` collision resolution:** Algorithm and concurrency strategy
+  when two submissions produce the same deterministic ID.
+- **Idempotency semantics:** Re-submitting a bundle that is already in
+  `pending` or `validated` state — return `200 OK` or `409 Conflict`?
+- **Cross-visibility cohort comparisons:** Whether results in different
+  visibility states (e.g., `private` and `public-curated`) may be included in
+  the same compare cohort.
+- **Withdrawn result URL behavior (Phases 1–2):** Return `404 Not Found` or a
+  dedicated "result withdrawn" page at the stable URL.
+- **Private result access control model:** Submitter-only access, or
+  organisation-based sharing (e.g., all members of the submitter's GitHub org)?
+- **Ranking eligibility rules for mixed-visibility cohorts:** Whether a cohort
+  containing both `public-self-reported` and `public-curated` results is
+  eligible for ranked display, and which rules govern it.
 
 ---
 
