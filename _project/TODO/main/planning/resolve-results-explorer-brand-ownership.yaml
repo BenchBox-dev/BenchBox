@@ -92,6 +92,14 @@ anti_patterns:
 - "DO NOT split the explorer across two brands without explicit intent -- because a benchbox.dev/results/ entry point that redirects to another domain confuses users and breaks search indexing -- pick one home"
 - "DO NOT treat this as a technical spike -- because it is a product/business decision -- gather context and make a call rather than prototyping both options"
 
+verification:
+- description: "Strategy memo contains a brand decision section"
+  command: "grep -c 'brand\\|Oxbow\\|BenchBox placement' _project/analysis/benchbox-results-platform-strategy.md"
+  expected_output: "≥1 (brand decision documented in strategy memo)"
+- description: "Decision ADR or memo section exists"
+  command: "grep -rn 'brand ownership\\|Oxbow Research\\|benchbox.dev/results' _project/analysis/ | grep -c 'decision\\|resolved\\|placement'"
+  expected_output: "≥1 (decision recorded)"
+
 scope_limit:
   only_modify:
   - "_project/analysis/"
