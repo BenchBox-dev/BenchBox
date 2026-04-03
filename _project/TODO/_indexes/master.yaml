@@ -1,4 +1,4 @@
-generated_at: '2026-04-03T04:10:37.030348'
+generated_at: '2026-04-03T08:16:06.744347'
 total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -491,8 +491,8 @@ items:
   - module-floor
   estimated_effort: Extra Large
   work_total: 19
-  work_done: 1
-  work_ready: 13
+  work_done: 2
+  work_ready: 14
   deferred_count: 2
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml

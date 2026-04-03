@@ -116,7 +116,7 @@ work:
 
 - id: w2
   summary: "DataFrame foundation: expression_family and iceberg_maintenance"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/dataframe/expression_family.py (+69 lines -> 80%)
