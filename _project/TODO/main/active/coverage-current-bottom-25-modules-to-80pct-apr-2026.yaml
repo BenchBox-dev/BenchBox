@@ -2,7 +2,7 @@ id: coverage-current-bottom-25-modules-to-80pct-apr-2026
 title: "Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 description: |
   Fresh baseline from `.coverage` rendered via `uv run -- python -m coverage json`
   at 2026-04-02 19:03:25 local time shows overall fast-lane coverage at 82.87%
@@ -93,7 +93,7 @@ justification: |
 work:
 - id: w1
   summary: "Low-cost helper top-ups: pg_mooncake DDL generator and ClickHouse diagnostics"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/core/tuning/generators/pg_mooncake.py (+5 lines -> 80%)
@@ -437,15 +437,18 @@ work:
 
 deferred:
 - summary: "Results-publishing coverage work"
-  reason: "Explicitly excluded from this item: `benchbox/core/publishing/**/*.py` and `benchbox/cli/commands/submit.py` are still in flight and should be planned against the publishing productization TODOs instead of this coverage wave."
+  reason: "Explicitly excluded from this item: `benchbox/core/publishing/**/*.py` and `benchbox/cli/commands/submit.py` are
+    still in flight and should be planned against the publishing productization TODOs instead of this coverage wave."
 - summary: "Coverage-ignored lines and omit-listed modules"
-  reason: "Anything already excluded by `[tool.coverage.run].omit`, `[tool.coverage.report].exclude_lines`, or `pragma: no cover` is intentionally out of scope; this item targets only measured statements."
+  reason: "Anything already excluded by `[tool.coverage.run].omit`, `[tool.coverage.report].exclude_lines`, or `pragma: no
+    cover` is intentionally out of scope; this item targets only measured statements."
 
 must_preserve:
 - "All new tests stay in the fast lane: mark them `@pytest.mark.fast` when appropriate and keep every scenario hermetic."
 - "No new coverage ignore rules, omit entries, or `pragma: no cover` annotations are added to hit the target."
 - "Results-publishing code stays untouched in this item."
-- "Assertions must verify actual SQL strings, config values, returned dataclasses, or error messages; import-only tests do not count."
+- "Assertions must verify actual SQL strings, config values, returned dataclasses, or error messages; import-only tests do
+  not count."
 - "Existing adapter behavior and public CLI/config contracts remain unchanged."
 
 approach: |
@@ -466,11 +469,16 @@ approach: |
   extended are named explicitly with `Extend ...`.
 
 anti_patterns:
-- "DO NOT add blanket import/smoke tests -- because they create coverage theater -- assert concrete outputs, SQL fragments, state transitions, and error text instead."
-- "DO NOT use live cloud accounts, real Spark clusters, or real sockets to raise unit coverage -- because the fast lane must remain hermetic -- patch SDK clients, Spark builders, subprocesses, file I/O, and network probes."
-- "DO NOT change coverage policy to make the denominator smaller -- because that hides risk rather than reducing it -- close the gap with executable tests."
-- "DO NOT touch `benchbox/core/publishing/**`, `benchbox/cli/commands/submit.py`, or `results-explorer/` in this item -- because that surface is still moving -- keep those changes in the publishing stream."
-- "DO NOT mix multiple heavyweight adapters into one implementation commit -- because diagnosis and rollback get harder -- land one work unit at a time with module-local verification."
+- "DO NOT add blanket import/smoke tests -- because they create coverage theater -- assert concrete outputs, SQL fragments,
+  state transitions, and error text instead."
+- "DO NOT use live cloud accounts, real Spark clusters, or real sockets to raise unit coverage -- because the fast lane must
+  remain hermetic -- patch SDK clients, Spark builders, subprocesses, file I/O, and network probes."
+- "DO NOT change coverage policy to make the denominator smaller -- because that hides risk rather than reducing it -- close
+  the gap with executable tests."
+- "DO NOT touch `benchbox/core/publishing/**`, `benchbox/cli/commands/submit.py`, or `results-explorer/` in this item -- because
+  that surface is still moving -- keep those changes in the publishing stream."
+- "DO NOT mix multiple heavyweight adapters into one implementation commit -- because diagnosis and rollback get harder --
+  land one work unit at a time with module-local verification."
 
 verification:
 - description: "w1 targeted coverage: pg_mooncake generator and ClickHouse diagnostics"
@@ -626,7 +634,8 @@ verification:
     'benchbox/platforms/clickhouse_cloud.py',
     'benchbox/core/amplab/dataframe_queries/queries.py']; data = json.load(open('/tmp/coverage_bottom25_verify.json'));
     missing = [t for t in targets if t not in data['files']];
-    below = [(t, round(data['files'][t]['summary']['percent_covered'], 2)) for t in targets if t in data['files'] and data['files'][t]['summary']['percent_covered'] < 80];
+    below = [(t, round(data['files'][t]['summary']['percent_covered'], 2)) for t in targets if t in data['files'] and data['files'][t]['summary']['percent_covered']
+    < 80];
     assert not missing, missing; assert not below, below; print('all 25 target modules >= 80%')"
   expected_output: "The command exits cleanly and prints `all 25 target modules >= 80%`."
 

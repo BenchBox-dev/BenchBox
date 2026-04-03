@@ -1,4 +1,4 @@
-generated_at: '2026-04-02T20:52:49.322170'
+generated_at: '2026-04-03T04:10:37.030348'
 total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -478,12 +478,12 @@ items:
   work_done: 0
   work_ready: 3
 - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
-  file: TODO/main/planning/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
+  file: TODO/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
   title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
   worktree: main
   category: Testing & Quality
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - testing
   - coverage
@@ -491,8 +491,8 @@ items:
   - module-floor
   estimated_effort: Extra Large
   work_total: 19
-  work_done: 0
-  work_ready: 14
+  work_done: 1
+  work_ready: 13
   deferred_count: 2
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml

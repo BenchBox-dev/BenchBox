@@ -1,4 +1,4 @@
-generated_at: '2026-04-02T20:52:49.322209'
+generated_at: '2026-04-03T04:10:37.030379'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -200,7 +200,7 @@ categories:
       priority: Medium
       status: Not Started
     - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
-      file: TODO/main/planning/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
+      file: TODO/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
       title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
       priority: Medium-High
-      status: Not Started
+      status: In Progress

@@ -1,4 +1,4 @@
-generated_at: '2026-04-02T20:52:49.322227'
+generated_at: '2026-04-03T04:10:37.030397'
 total_items: 37
 priorities:
   Critical:
@@ -51,10 +51,10 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
-      file: TODO/main/planning/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
+      file: TODO/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
       title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
       category: Testing & Quality
-      status: Not Started
+      status: In Progress
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
       title: Build a results explorer subsite on benchbox.dev
