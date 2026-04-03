@@ -1,4 +1,4 @@
-generated_at: '2026-04-03T08:16:06.744347'
+generated_at: '2026-04-03T08:46:03.491874'
 total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -15,6 +15,7 @@ items:
   - product-strategy
   - architecture
   estimated_effort: Medium
+  completed_date: '2026-03-29'
   work_total: 5
   work_done: 5
   work_ready: 0
@@ -60,7 +61,7 @@ items:
   worktree: main
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - publishing
   - results
@@ -491,8 +492,8 @@ items:
   - module-floor
   estimated_effort: Extra Large
   work_total: 19
-  work_done: 2
-  work_ready: 14
+  work_done: 5
+  work_ready: 12
   deferred_count: 2
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
@@ -547,6 +548,7 @@ items:
   - trust
   - privacy
   estimated_effort: Large
+  completed_date: '2026-03-29'
   work_total: 5
   work_done: 5
   work_ready: 0

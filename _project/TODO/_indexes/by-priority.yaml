@@ -1,4 +1,4 @@
-generated_at: '2026-04-03T08:16:06.744392'
+generated_at: '2026-04-03T08:46:03.491931'
 total_items: 37
 priorities:
   Critical:
@@ -26,7 +26,7 @@ priorities:
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: resolve-results-explorer-brand-ownership
       file: TODO/main/planning/resolve-results-explorer-brand-ownership.yaml
       title: Resolve whether the results explorer lives under BenchBox or Oxbow Research

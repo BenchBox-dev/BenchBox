@@ -1,16 +1,21 @@
-generated_at: '2026-04-03T08:16:06.744406'
+generated_at: '2026-04-03T08:46:03.491942'
 total_items: 37
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
       file: TODO/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
       title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
       priority: Medium-High
       category: Testing & Quality
+    - id: productize-result-publishing-and-artifact-sharing
+      file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
+      title: Productize result publishing and artifact sharing workflow
+      priority: High
+      category: Core Functionality
   Not Started:
-    count: 34
+    count: 33
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -141,11 +146,6 @@ statuses:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
-      category: Core Functionality
-    - id: productize-result-publishing-and-artifact-sharing
-      file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
-      title: Productize result publishing and artifact sharing workflow
-      priority: High
       category: Core Functionality
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml

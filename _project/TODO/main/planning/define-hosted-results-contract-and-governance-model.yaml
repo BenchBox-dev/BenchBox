@@ -3,6 +3,7 @@ title: "Define hosted results contract, trust labels, and governance model"
 worktree: main
 priority: Medium-High
 status: Done
+completed_date: "2026-03-29"
 completed_note: "Contract document exists at _project/analysis/hosted-results-contract.md"
 category: Core Functionality
 deps:

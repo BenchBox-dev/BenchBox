@@ -1,4 +1,4 @@
-generated_at: '2026-04-03T08:16:06.744374'
+generated_at: '2026-04-03T08:46:03.491914'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -119,7 +119,7 @@ categories:
       file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
       title: Productize result publishing and artifact sharing workflow
       priority: High
-      status: Not Started
+      status: In Progress
     - id: resolve-results-explorer-brand-ownership
       file: TODO/main/planning/resolve-results-explorer-brand-ownership.yaml
       title: Resolve whether the results explorer lives under BenchBox or Oxbow Research

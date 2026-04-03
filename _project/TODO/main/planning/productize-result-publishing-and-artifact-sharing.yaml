@@ -2,7 +2,7 @@ id: productize-result-publishing-and-artifact-sharing
 title: "Productize result publishing and artifact sharing workflow"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   The completed item `_project/DONE/infrastructure-publishing/planning/automated-data-publishing-pipeline.yaml`
