@@ -64,6 +64,72 @@ artifacts under `benchmark_runs/`.
 Exports result files to structured output formats for downstream analysis
 and reporting automation.
 
+### `benchbox publish`
+
+Publishes an already-exported schema-v2 result bundle to a named storage
+destination and records a durable, addressable reference in a persistent
+metadata store (`~/.benchbox/published.json`).
+
+Unlike `benchbox export` (which serialises live benchmark results to disk),
+`benchbox publish` operates on already-exported files and adds:
+- Addressability: a truthful backend-specific reference URI
+- Tracking: persistent publication history that survives process restart
+- Deduplication: publishing the same bundle twice updates the record
+
+**Supported backends and reference types:**
+
+| Destination | Reference format |
+|-------------|-----------------|
+| Local directory | `file:///abs/path/to/bundle.json` |
+| `s3://bucket/prefix` | `s3://bucket/prefix/bundle.json` |
+| `gs://bucket/prefix` | `gs://bucket/prefix/bundle.json` |
+| `abfss://...` | `abfss://.../bundle.json` |
+
+**No fake short-codes are generated.** For local and private cloud targets,
+BenchBox emits a storage path reference. Public short-link permalinks are
+only possible when a resolver service exists and is explicitly configured.
+
+**Persistence guarantees:**
+- Local JSON store (`~/.benchbox/published.json`) survives process restart
+- Cloud URI references are durable if the underlying cloud storage is
+- Records can be removed with `benchbox publish remove <id>` (files are NOT deleted)
+
+Common flags:
+
+- `--target <path-or-uri>` — destination directory or cloud URI prefix
+- `--label <maintainer-run|community-submission|ci|local>` — provenance label
+- `--dry-run` — preview without publishing
+- `--last` — publish the most recently exported result
+
+Examples:
+
+```
+# Publish a specific result to a local directory
+benchbox publish run results/tpch_sf1_duckdb.json
+
+# Publish to a custom local directory
+benchbox publish run results/tpch_sf1_duckdb.json --target /mnt/shared/benchbox
+
+# Publish to S3
+benchbox publish run results/tpch_sf1_duckdb.json --target s3://my-bucket/benchbox
+
+# Publish the most recent result
+benchbox publish run --last --benchmark tpch
+
+# Publish after a benchmark run (uses benchbox publish defaults)
+benchbox run --platform duckdb --benchmark tpch --publish
+benchbox run --platform duckdb --benchmark tpch --publish --publish-target s3://my-bucket/benchbox
+
+# List publication history
+benchbox publish list
+
+# Show a specific publication
+benchbox publish show abc123def456
+
+# Remove a publication record (does not delete artifact files)
+benchbox publish remove abc123def456
+```
+
 ### `benchbox check-deps`
 
 Checks optional platform dependencies and prints installation guidance.

@@ -548,6 +548,23 @@ from benchbox.cli.verbose_logging import setup_verbose_logging as setup_verbose_
     is_flag=True,
     help="Use ~/.benchbox/datagen/ as DataFrame cache (shared across projects). Default: project-local benchmark_runs/.",
 )
+@click.option(
+    "--publish",
+    is_flag=True,
+    help="Publish the exported result bundle after a successful run (uses benchbox publish defaults).",
+)
+@click.option(
+    "--publish-target",
+    default="benchmark_runs/published",
+    show_default=True,
+    help="Destination for --publish: local directory or cloud URI (s3://, gs://, abfss://).",
+)
+@click.option(
+    "--publish-label",
+    default="maintainer-run",
+    show_default=True,
+    help="Trust label for --publish (maintainer-run, community-submission, ci, local).",
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -580,6 +597,9 @@ def run(
     no_progress: bool,
     ignore_memory_warnings: bool,
     global_cache: bool,
+    publish: bool,
+    publish_target: str,
+    publish_label: str,
 ) -> None:
     """Run benchmarks.
 
@@ -1607,6 +1627,21 @@ def run(
 
             _render_post_run_charts(result, console, quiet)
 
+            # Optional post-run publish
+            if publish:
+                json_bundle = exported_files.get("json")
+                if json_bundle:
+                    from benchbox.cli.commands.publish import publish_bundle
+
+                    if not quiet:
+                        console.print("\n[bold]Publishing result bundle...[/bold]")
+                    publish_bundle(
+                        source_bundle=json_bundle,
+                        target=publish_target,
+                        label=publish_label,
+                        quiet=bool(quiet),
+                    )
+
             # Save configuration for quick restart
             from benchbox.cli.preferences import save_last_run_config
 
@@ -2435,6 +2470,21 @@ def run(
                 console.print(f"{format_name.upper()}: [dim]{filepath}[/dim]")
 
         _render_post_run_charts(result, console, quiet)
+
+        # Optional post-run publish
+        if publish:
+            json_bundle = exported_files.get("json")
+            if json_bundle:
+                from benchbox.cli.commands.publish import publish_bundle
+
+                if not quiet:
+                    console.print("\n[bold]Publishing result bundle...[/bold]")
+                publish_bundle(
+                    source_bundle=json_bundle,
+                    target=publish_target,
+                    label=publish_label,
+                    quiet=bool(quiet),
+                )
 
         # Save configuration for quick restart
         from benchbox.cli.preferences import save_last_run_config

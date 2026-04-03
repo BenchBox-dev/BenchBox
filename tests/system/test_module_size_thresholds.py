@@ -22,7 +22,7 @@ MAX_LINES_DEFAULT = 1_200
 ALLOWLIST = {
     Path(
         "benchbox/cli/commands/run.py"
-    ): 2_500,  # CLI tuning + query subset + validation + visualization + help + compression + interactive wizard + post-run charts + driver_version/auto_install options
+    ): 2_550,  # CLI tuning + query subset + validation + visualization + help + compression + interactive wizard + post-run charts + driver_version/auto_install options + --publish flag
     Path("benchbox/core/tpcds/benchmark/runner.py"): 2_120,  # orchestrates all benchmark phases
     Path("benchbox/core/tpcdi/generator/data.py"): 1_600,  # generator coordination remains complex
 }

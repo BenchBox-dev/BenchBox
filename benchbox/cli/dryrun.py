@@ -51,6 +51,9 @@ def generate_cli_command(
     sorted_ingestion_mode: str | None = None,
     sorted_ingestion_method: str | None = None,
     global_cache: bool = False,
+    publish: bool = False,
+    publish_target: str | None = None,
+    publish_label: str | None = None,
 ) -> str:
     """Generate equivalent CLI command from interactive wizard configuration.
 
@@ -78,6 +81,9 @@ def generate_cli_command(
         sorted_ingestion_mode: Cloud sorted-ingestion strategy (off, auto, force)
         sorted_ingestion_method: Cloud sorted-ingestion method override
         global_cache: Use global DataFrame cache
+        publish: Publish the exported result bundle after a successful run
+        publish_target: Destination for --publish (local dir or cloud URI)
+        publish_label: Trust label for --publish
 
     Returns:
         Complete CLI command string
@@ -128,10 +134,18 @@ def generate_cli_command(
         (official, "--official"),
         (capture_plans, "--capture-plans"),
         (global_cache, "--global-cache"),
+        (publish, "--publish"),
     ]
     for flag_value, flag in _BOOL_PARAMS:
         if flag_value:
             parts.append(flag)
+
+    # Publish target/label only meaningful when --publish is set
+    if publish:
+        if publish_target and publish_target != "benchmark_runs/published":
+            parts.append(f"--publish-target {publish_target}")
+        if publish_label and publish_label != "maintainer-run":
+            parts.append(f"--publish-label {publish_label}")
 
     # Verbose flags (-v, -vv)
     if verbose > 0:

@@ -22,6 +22,7 @@ from .export import export
 from .metrics import metrics_group
 from .plan_history import plan_history
 from .profile import profile
+from .publish import publish, publish_bundle
 from .report import report
 from .results import results
 from .run import PlatformOptionParamType, run, setup_verbose_logging
@@ -36,6 +37,7 @@ from .visualize import visualize
 COMMANDS = (
     run,
     run_official,
+    publish,
     compare,
     compare_dataframes,
     compare_plans,
@@ -74,6 +76,8 @@ __all__ = [
     "COMMANDS",
     "register_commands",
     "run",
+    "publish",
+    "publish_bundle",
     "run_official",
     "compare",
     "compare_dataframes",
