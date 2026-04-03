@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T08:16:08.120342'
-total_items: 620
+generated_at: '2026-04-03T09:45:41.591296'
+total_items: 627
 priorities:
   Critical:
     count: 36
@@ -185,7 +185,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 225
+    count: 227
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -1039,6 +1039,11 @@ priorities:
       title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
       category: Testing & Quality
       status: Completed
+    - id: resolve-results-explorer-brand-ownership
+      file: DONE/main/planning/resolve-results-explorer-brand-ownership.yaml
+      title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
+      category: Core Functionality
+      status: Completed
     - id: fix-datafusion-read-write-primitives-parity
       file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml
       title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
@@ -1068,6 +1073,11 @@ priorities:
       file: DONE/main/planning/docs-rewrite-architecture-and-structure.yaml
       title: Rewrite architecture.md and structure.md to match current codebase
       category: Documentation
+      status: Completed
+    - id: scaffold-results-explorer-frontend
+      file: DONE/main/planning/scaffold-results-explorer-frontend.yaml
+      title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
+      category: Core Functionality
       status: Completed
     - id: secure-credential-handling
       file: DONE/security-hardening/secure-credential-handling.yaml
@@ -1316,7 +1326,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 77
+    count: 81
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1438,6 +1448,11 @@ priorities:
       file: DONE/main/active/coverage-bottom-25-modules-to-80pct.yaml
       title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
       category: Testing & Quality
+      status: Completed
+    - id: build-static-pipeline-bundles-to-read-model
+      file: DONE/main/planning/build-static-pipeline-bundles-to-read-model.yaml
+      title: Build static pipeline that transforms result bundles into explorer read models
+      category: Core Functionality
       status: Completed
     - id: centralize-file-format-detection
       file: DONE/core-functionality/centralize-file-format-detection.yaml
@@ -1569,6 +1584,16 @@ priorities:
       title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
       category: Core Functionality
       status: Completed
+    - id: implement-explorer-home-and-browse-pages
+      file: DONE/main/planning/implement-explorer-home-and-browse-pages.yaml
+      title: Implement explorer home page and benchmark/platform browse pages
+      category: Core Functionality
+      status: Completed
+    - id: implement-result-detail-page
+      file: DONE/main/planning/implement-result-detail-page.yaml
+      title: Implement result detail page with query timings, metadata, and bundle download
+      category: Core Functionality
+      status: Completed
     - id: compare-interactive-file-selection
       file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
       title: Improve interactive file selection in compare command
@@ -1592,6 +1617,11 @@ priorities:
     - id: integrate-write-primitives-dataframe-mode
       file: DONE/dataframe-benchmarks/active/integrate-write-primitives-dataframe-mode.yaml
       title: Integrate Write Primitives DataFrame Mode with Runner and Registry
+      category: Core Functionality
+      status: Completed
+    - id: integrate-explorer-into-github-pages-deployment
+      file: DONE/main/planning/integrate-explorer-into-github-pages-deployment.yaml
+      title: Integrate results explorer into GitHub Pages deployment workflow
       category: Core Functionality
       status: Completed
     - id: explicit-tuning-file-resolution
@@ -1705,7 +1735,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 259
+    count: 260
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2393,6 +2423,11 @@ priorities:
       file: DONE/physical-tuning/active/ctas-sort-cloud-platforms.yaml
       title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,
         Azure Synapse)
+      category: Core Functionality
+      status: Completed
+    - id: implement-results-compare-view
+      file: DONE/main/planning/implement-results-compare-view.yaml
+      title: Implement results compare view for side-by-side benchmark analysis
       category: Core Functionality
       status: Completed
     - id: improve-benchmark-execution-reliability

@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T09:24:52.627736'
-total_items: 37
+generated_at: '2026-04-03T09:45:39.701059'
+total_items: 30
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Done
   High:
-    count: 5
+    count: 3
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -27,18 +27,8 @@ priorities:
       title: Productize result publishing and artifact sharing workflow
       category: Core Functionality
       status: In Progress
-    - id: resolve-results-explorer-brand-ownership
-      file: TODO/main/planning/resolve-results-explorer-brand-ownership.yaml
-      title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
-      category: Core Functionality
-      status: Not Started
-    - id: scaffold-results-explorer-frontend
-      file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
-      title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
-      category: Core Functionality
-      status: Not Started
   Medium-High:
-    count: 13
+    count: 9
     items:
     - id: http-tls-certificate-validation
       file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
@@ -60,11 +50,6 @@ priorities:
       title: Build a results explorer subsite on benchbox.dev
       category: Core Functionality
       status: Not Started
-    - id: build-static-pipeline-bundles-to-read-model
-      file: TODO/main/planning/build-static-pipeline-bundles-to-read-model.yaml
-      title: Build static pipeline that transforms result bundles into explorer read models
-      category: Core Functionality
-      status: Not Started
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
@@ -73,21 +58,6 @@ priorities:
     - id: generate-seed-corpus-for-results-explorer
       file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
       title: Generate seed corpus of benchmark results for the results explorer
-      category: Core Functionality
-      status: Not Started
-    - id: implement-explorer-home-and-browse-pages
-      file: TODO/main/planning/implement-explorer-home-and-browse-pages.yaml
-      title: Implement explorer home page and benchmark/platform browse pages
-      category: Core Functionality
-      status: Not Started
-    - id: implement-result-detail-page
-      file: TODO/main/planning/implement-result-detail-page.yaml
-      title: Implement result detail page with query timings, metadata, and bundle download
-      category: Core Functionality
-      status: Not Started
-    - id: integrate-explorer-into-github-pages-deployment
-      file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
-      title: Integrate results explorer into GitHub Pages deployment workflow
       category: Core Functionality
       status: Not Started
     - id: launch-results-explorer-acceptance-and-seed
@@ -106,7 +76,7 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium:
-    count: 9
+    count: 8
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -136,11 +106,6 @@ priorities:
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow
-      category: Core Functionality
-      status: Not Started
-    - id: implement-results-compare-view
-      file: TODO/main/planning/implement-results-compare-view.yaml
-      title: Implement results compare view for side-by-side benchmark analysis
       category: Core Functionality
       status: Not Started
     - id: operate-results-platform-security-observability-and-abuse-controls

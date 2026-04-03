@@ -1,4 +1,4 @@
-generated_at: '2026-04-03T09:24:52.627716'
+generated_at: '2026-04-03T09:45:39.701039'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -43,16 +43,11 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 17
+    count: 10
     items:
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
       title: Build a results explorer subsite on benchbox.dev
-      priority: Medium-High
-      status: Not Started
-    - id: build-static-pipeline-bundles-to-read-model
-      file: TODO/main/planning/build-static-pipeline-bundles-to-read-model.yaml
-      title: Build static pipeline that transforms result bundles into explorer read models
       priority: Medium-High
       status: Not Started
     - id: define-results-platform-product-and-launch-strategy
@@ -80,30 +75,10 @@ categories:
       title: Implement PR-based community result submission workflow
       priority: Medium
       status: Not Started
-    - id: implement-explorer-home-and-browse-pages
-      file: TODO/main/planning/implement-explorer-home-and-browse-pages.yaml
-      title: Implement explorer home page and benchmark/platform browse pages
-      priority: Medium-High
-      status: Not Started
-    - id: implement-result-detail-page
-      file: TODO/main/planning/implement-result-detail-page.yaml
-      title: Implement result detail page with query timings, metadata, and bundle download
-      priority: Medium-High
-      status: Not Started
-    - id: implement-results-compare-view
-      file: TODO/main/planning/implement-results-compare-view.yaml
-      title: Implement results compare view for side-by-side benchmark analysis
-      priority: Medium
-      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: High
-      status: Not Started
-    - id: integrate-explorer-into-github-pages-deployment
-      file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
-      title: Integrate results explorer into GitHub Pages deployment workflow
-      priority: Medium-High
       status: Not Started
     - id: launch-results-explorer-acceptance-and-seed
       file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
@@ -120,16 +95,6 @@ categories:
       title: Productize result publishing and artifact sharing workflow
       priority: High
       status: In Progress
-    - id: resolve-results-explorer-brand-ownership
-      file: TODO/main/planning/resolve-results-explorer-brand-ownership.yaml
-      title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
-      priority: High
-      status: Not Started
-    - id: scaffold-results-explorer-frontend
-      file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
-      title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
-      priority: High
-      status: Not Started
   Platform Expansion:
     count: 10
     items:

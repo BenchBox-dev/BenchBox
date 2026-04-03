@@ -2,7 +2,8 @@ id: integrate-explorer-into-github-pages-deployment
 title: "Integrate results explorer into GitHub Pages deployment workflow"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-03"
 category: Core Functionality
 deps:
   needs:
@@ -26,7 +27,7 @@ description: |
 work:
 - id: w1
   summary: "Add explorer build steps to the GitHub Pages workflow"
-  status: pending
+  status: done
   notes: |
     Modify `.github/workflows/docs.yml` so the workflow also triggers on
     `results-explorer/**` and `results-data/**`, then add build steps after the
@@ -47,7 +48,7 @@ work:
 - id: w2
   summary: "Add results-explorer npm dependencies to CI"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Ensure the workflow installs Node.js and npm dependencies. Add caching:
     - Cache `results-explorer/node_modules` keyed on `package-lock.json` hash
@@ -58,7 +59,7 @@ work:
 - id: w3
   summary: "Add 'Results' navigation link to the shared site header"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add a "Results" link to the benchbox.dev navigation that appears on:
     - Landing page header (in `landing/`)
@@ -73,7 +74,7 @@ work:
 - id: w4
   summary: "Add 404 fallback for client-side routing"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     GitHub Pages serves 404.html for unknown paths. For the explorer's
     client-side routes (especially compare view with query params), add a
@@ -88,7 +89,7 @@ work:
 - id: w5
   summary: "End-to-end deployment test on a staging branch"
   needs: [w1, w2, w3, w4]
-  status: pending
+  status: done
   notes: |
     Before merging to main:
     1. Push to a test branch with GitHub Pages enabled
@@ -114,6 +115,7 @@ metadata:
   - ci
   estimated_effort: "Medium"
   created_date: "2026-03-29"
+  completed_date: "2026-04-03"
 
 impact:
   business_value: |

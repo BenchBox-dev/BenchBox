@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T08:16:08.120470'
-total_items: 620
+generated_at: '2026-04-03T09:45:41.591447'
+total_items: 627
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 572
+    count: 579
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -729,6 +729,11 @@ statuses:
       title: Build automated pg_duckdb vs native DuckDB comparison report
       priority: Low
       category: Platform Expansion
+    - id: build-static-pipeline-bundles-to-read-model
+      file: DONE/main/planning/build-static-pipeline-bundles-to-read-model.yaml
+      title: Build static pipeline that transforms result bundles into explorer read models
+      priority: Medium-High
+      category: Core Functionality
     - id: bundle-tpc-query-templates-in-wheel
       file: DONE/release-readiness/bundle-tpc-query-templates-in-wheel.yaml
       title: Bundle TPC-H/TPC-DS query templates inside package for wheel distribution
@@ -1709,6 +1714,11 @@ statuses:
       title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
       priority: Medium-High
       category: Core Functionality
+    - id: implement-explorer-home-and-browse-pages
+      file: DONE/main/planning/implement-explorer-home-and-browse-pages.yaml
+      title: Implement explorer home page and benchmark/platform browse pages
+      priority: Medium-High
+      category: Core Functionality
     - id: on-demand-tpc-answer-download
       file: DONE/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
@@ -1718,6 +1728,16 @@ statuses:
       file: DONE/core-functionality/active/platform-driver-runtime-isolation.yaml
       title: Implement per-run platform driver runtime isolation (DuckDB first)
       priority: High
+      category: Core Functionality
+    - id: implement-result-detail-page
+      file: DONE/main/planning/implement-result-detail-page.yaml
+      title: Implement result detail page with query timings, metadata, and bundle download
+      priority: Medium-High
+      category: Core Functionality
+    - id: implement-results-compare-view
+      file: DONE/main/planning/implement-results-compare-view.yaml
+      title: Implement results compare view for side-by-side benchmark analysis
+      priority: Medium
       category: Core Functionality
     - id: improve-benchmark-execution-reliability
       file: DONE/unknown/planning/improve-benchmark-execution-reliability.yaml
@@ -1798,6 +1818,11 @@ statuses:
       file: DONE/main/active/follow-up-visualization-template-chart-integration.yaml
       title: Integrate additional ASCII chart types into template workflows
       priority: High
+      category: Core Functionality
+    - id: integrate-explorer-into-github-pages-deployment
+      file: DONE/main/planning/integrate-explorer-into-github-pages-deployment.yaml
+      title: Integrate results explorer into GitHub Pages deployment workflow
+      priority: Medium-High
       category: Core Functionality
     - id: tpcds-stdout-fix-integrate-stdout-datagen
       file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
@@ -2419,6 +2444,11 @@ statuses:
       title: Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight
       priority: High
       category: Testing & Quality
+    - id: resolve-results-explorer-brand-ownership
+      file: DONE/main/planning/resolve-results-explorer-brand-ownership.yaml
+      title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
+      priority: High
+      category: Core Functionality
     - id: resource-management
       file: DONE/runtime-ops/completed/resource-management.yaml
       title: Resource Management
@@ -2474,6 +2504,11 @@ statuses:
       title: SQL Cross-Platform Benchmark Suite
       priority: Low
       category: Performance and Efficiency
+    - id: scaffold-results-explorer-frontend
+      file: DONE/main/planning/scaffold-results-explorer-frontend.yaml
+      title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
+      priority: High
+      category: Core Functionality
     - id: schema-evolution-backward-compatibility-management
       file: DONE/infrastructure-schema/planning/schema-evolution-backward-compatibility-management.yaml
       title: Schema Evolution & Backward Compatibility Management

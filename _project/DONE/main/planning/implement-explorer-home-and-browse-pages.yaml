@@ -2,7 +2,8 @@ id: implement-explorer-home-and-browse-pages
 title: "Implement explorer home page and benchmark/platform browse pages"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-03"
 category: Core Functionality
 deps:
   needs:
@@ -21,7 +22,7 @@ description: |
 work:
 - id: w1
   summary: "Implement the explorer home page at /results/"
-  status: pending
+  status: done
   notes: |
     The home page should show:
     - Hero section: "BenchBox Results Explorer" with a brief description
@@ -35,7 +36,7 @@ work:
 - id: w2
   summary: "Implement the benchmark index page at /results/{benchmark}/"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     One page per benchmark (e.g., `/results/tpch/`, `/results/tpcds/`):
     - Benchmark name, description, and metadata (query count, official spec link)
@@ -51,7 +52,7 @@ work:
 - id: w3
   summary: "Implement the platform index page at /results/{platform}/"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     One page per platform (e.g., `/results/duckdb/`, `/results/datafusion/`):
     - Platform name, description, and metadata (supported benchmarks)
@@ -69,7 +70,7 @@ work:
 - id: w4
   summary: "Add interactive DuckDB-WASM filtering to browse pages"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Enhance browse pages with DuckDB-WASM powered filtering:
     - Filter by scale factor, date range, platform/benchmark
@@ -82,7 +83,7 @@ work:
 - id: w5
   summary: "Pre-render known browse pages at build time"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     During Vite build, read manifest.json and generate static HTML for:
     - Each benchmark: `/results/tpch/index.html`, `/results/tpcds/index.html`, etc.
@@ -100,6 +101,7 @@ metadata:
   - home
   estimated_effort: "Medium"
   created_date: "2026-03-29"
+  completed_date: "2026-04-03"
 
 impact:
   business_value: |

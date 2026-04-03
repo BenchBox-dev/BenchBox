@@ -2,7 +2,8 @@ id: implement-result-detail-page
 title: "Implement result detail page with query timings, metadata, and bundle download"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-03"
 category: Core Functionality
 deps:
   needs:
@@ -19,7 +20,7 @@ description: |
 work:
 - id: w1
   summary: "Implement the result detail page layout and metadata display"
-  status: pending
+  status: done
   notes: |
     The detail page for `/results/r/{result_id}` shows:
 
@@ -39,7 +40,7 @@ work:
 - id: w2
   summary: "Implement the query timing table and visualization"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Show per-query results in a sortable table:
     | Query | Time (ms) | Rows | Status |
@@ -58,7 +59,7 @@ work:
 - id: w3
   summary: "Add companion file display (query plans, tuning config)"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     If the result has companion files (.plans.json, .tuning.json):
     - Show a "Query Plans" expandable section with plan text per query
@@ -70,7 +71,7 @@ work:
 - id: w4
   summary: "Add compare action and navigation context"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     - "Compare with another result" button that navigates to compare view
       with this result pre-selected
@@ -81,7 +82,7 @@ work:
 - id: w5
   summary: "Pre-render detail pages at build time"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     During Vite build, read manifest.json and generate static HTML for every
     result: `/results/r/{result_id}/index.html`. Each page includes the full
@@ -97,6 +98,7 @@ metadata:
   - detail-page
   estimated_effort: "Medium"
   created_date: "2026-03-29"
+  completed_date: "2026-04-03"
 
 impact:
   business_value: |

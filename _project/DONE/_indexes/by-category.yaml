@@ -1,4 +1,4 @@
-generated_at: '2026-04-03T08:16:08.120205'
+generated_at: '2026-04-03T09:45:41.591129'
 total_categories: 74
 categories:
   '"Bug Fixes & Reliability"':
@@ -491,7 +491,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 194
+    count: 201
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -651,6 +651,11 @@ categories:
     - id: bidirectional-sync-and-true-up-releases
       file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
       title: Bidirectional Sync and True-Up Releases for Public/Private Repos
+      priority: Medium-High
+      status: Completed
+    - id: build-static-pipeline-bundles-to-read-model
+      file: DONE/main/planning/build-static-pipeline-bundles-to-read-model.yaml
+      title: Build static pipeline that transforms result bundles into explorer read models
       priority: Medium-High
       status: Completed
     - id: bundle-tpc-query-templates-in-wheel
@@ -1085,6 +1090,11 @@ categories:
       title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
       priority: Medium-High
       status: Completed
+    - id: implement-explorer-home-and-browse-pages
+      file: DONE/main/planning/implement-explorer-home-and-browse-pages.yaml
+      title: Implement explorer home page and benchmark/platform browse pages
+      priority: Medium-High
+      status: Completed
     - id: on-demand-tpc-answer-download
       file: DONE/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation
@@ -1094,6 +1104,16 @@ categories:
       file: DONE/core-functionality/active/platform-driver-runtime-isolation.yaml
       title: Implement per-run platform driver runtime isolation (DuckDB first)
       priority: High
+      status: Completed
+    - id: implement-result-detail-page
+      file: DONE/main/planning/implement-result-detail-page.yaml
+      title: Implement result detail page with query timings, metadata, and bundle download
+      priority: Medium-High
+      status: Completed
+    - id: implement-results-compare-view
+      file: DONE/main/planning/implement-results-compare-view.yaml
+      title: Implement results compare view for side-by-side benchmark analysis
+      priority: Medium
       status: Completed
     - id: compare-interactive-file-selection
       file: DONE/ux-improvements/active/compare-interactive-file-selection.yaml
@@ -1129,6 +1149,11 @@ categories:
       file: DONE/main/active/follow-up-visualization-template-chart-integration.yaml
       title: Integrate additional ASCII chart types into template workflows
       priority: High
+      status: Completed
+    - id: integrate-explorer-into-github-pages-deployment
+      file: DONE/main/planning/integrate-explorer-into-github-pages-deployment.yaml
+      title: Integrate results explorer into GitHub Pages deployment workflow
+      priority: Medium-High
       status: Completed
     - id: tpcds-stdout-fix-integrate-stdout-datagen
       file: DONE/tpcds-stdout-fix/integrate-stdout-datagen.yaml
@@ -1380,6 +1405,11 @@ categories:
       title: Replace per-shard INSERT loops with single bulk INSERT for DuckDB handlers
       priority: High
       status: Completed
+    - id: resolve-results-explorer-brand-ownership
+      file: DONE/main/planning/resolve-results-explorer-brand-ownership.yaml
+      title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
+      priority: High
+      status: Completed
     - id: fix-datafusion-read-write-primitives-parity
       file: DONE/main/active/fix-datafusion-read-write-primitives-parity.yaml
       title: Restore DataFusion behavioral parity for read/write primitives and harden working-dir reuse
@@ -1388,6 +1418,11 @@ categories:
     - id: result-schema-v2-redesign
       file: DONE/result-object-migration/active/result-schema-v2-redesign.yaml
       title: Result Output Schema v2.0 Complete Redesign
+      priority: High
+      status: Completed
+    - id: scaffold-results-explorer-frontend
+      file: DONE/main/planning/scaffold-results-explorer-frontend.yaml
+      title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
       priority: High
       status: Completed
     - id: surface-polars-driver-version-in-cli-output

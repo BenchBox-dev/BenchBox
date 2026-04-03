@@ -2,7 +2,8 @@ id: resolve-results-explorer-brand-ownership
 title: "Resolve whether the results explorer lives under BenchBox or Oxbow Research"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-03"
 category: Core Functionality
 deps:
   needs:
@@ -26,7 +27,14 @@ description: |
 work:
 - id: w1
   summary: "Define what Oxbow Research is and how it relates to BenchBox"
-  status: pending
+  status: done
+  completed_note: |
+    Oxbow Research is an earlier brand concept that was deliberately separated from
+    BenchBox. Git history shows content was moved to a dedicated repository
+    (refactor: move Oxbow Research content to dedicated repository), Oxbow references
+    were removed from the blog, 8 Oxbow blog TODOs were deleted, and GitHub org links
+    were corrected from Oxbow-Research to joeharris76. Oxbow Research has no
+    independent web presence, domain, or active product identity within this codebase.
   notes: |
     Clarify: is Oxbow Research a parent brand, a sibling product, a company
     entity, or something else? Research steps:
@@ -40,7 +48,13 @@ work:
 - id: w2
   summary: "Evaluate the tradeoffs of each brand placement"
   needs: [w1]
-  status: pending
+  status: done
+  completed_note: |
+    Full tradeoff analysis documented in _project/analysis/brand-ownership-decision.md.
+    BenchBox placement is strongly favored: single domain, integrated brand, no
+    infrastructure overhead, and the explorer's reproducibility value proposition is
+    inseparable from BenchBox. Oxbow Research placement is not viable — no domain,
+    no web presence, and git history shows it was intentionally decoupled from BenchBox.
   notes: |
     BenchBox placement:
     - Pro: explorer drives traffic to the tool, integrated brand, simpler deployment
@@ -53,7 +67,12 @@ work:
 - id: w3
   summary: "Make the decision and document rationale"
   needs: [w2]
-  status: pending
+  status: done
+  completed_note: |
+    Decision documented in _project/analysis/brand-ownership-decision.md (new file).
+    Strategy memo updated with a resolved Brand Decision section replacing the
+    Open Question section. Decision: BenchBox placement at benchbox.dev/results/
+    confirmed. No changes needed to existing scaffolding or CI/CD.
   notes: |
     Record the decision as an ADR or in the strategy memo. Update all downstream
     TODOs with the resolved domain, base URL, and design direction.

@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T09:24:52.627681'
-total_items: 37
+generated_at: '2026-04-03T09:45:39.700995'
+total_items: 30
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -74,45 +74,6 @@ items:
   work_done: 2
   work_ready: 2
   deferred_count: 3
-  needs:
-  - define-results-platform-product-and-launch-strategy
-- id: resolve-results-explorer-brand-ownership
-  file: TODO/main/planning/resolve-results-explorer-brand-ownership.yaml
-  title: Resolve whether the results explorer lives under BenchBox or Oxbow Research
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - phase-1
-  - brand
-  - decision
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 1
-  needs:
-  - define-results-platform-product-and-launch-strategy
-- id: scaffold-results-explorer-frontend
-  file: TODO/main/planning/scaffold-results-explorer-frontend.yaml
-  title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - phase-1
-  - frontend
-  - vite
-  - duckdb-wasm
-  estimated_effort: Medium
-  work_total: 5
-  work_done: 0
-  work_ready: 1
   needs:
   - define-results-platform-product-and-launch-strategy
 - id: bodo-jit-and-mpi-support
@@ -385,27 +346,6 @@ items:
   work_ready: 1
   needs:
   - launch-results-explorer-acceptance-and-seed
-- id: implement-results-compare-view
-  file: TODO/main/planning/implement-results-compare-view.yaml
-  title: Implement results compare view for side-by-side benchmark analysis
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - phase-1
-  - frontend
-  - compare
-  - analysis
-  estimated_effort: Large
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - scaffold-results-explorer-frontend
-  - build-static-pipeline-bundles-to-read-model
 - id: operate-results-platform-security-observability-and-abuse-controls
   file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
   title: Operate results platform security, observability, and abuse controls
@@ -492,8 +432,8 @@ items:
   - module-floor
   estimated_effort: Extra Large
   work_total: 19
-  work_done: 5
-  work_ready: 12
+  work_done: 6
+  work_ready: 11
   deferred_count: 2
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
@@ -514,26 +454,6 @@ items:
   work_ready: 1
   needs:
   - define-results-platform-product-and-launch-strategy
-- id: build-static-pipeline-bundles-to-read-model
-  file: TODO/main/planning/build-static-pipeline-bundles-to-read-model.yaml
-  title: Build static pipeline that transforms result bundles into explorer read models
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - phase-1
-  - build-pipeline
-  - read-model
-  estimated_effort: Medium
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - define-results-platform-product-and-launch-strategy
-  - generate-seed-corpus-for-results-explorer
 - id: define-hosted-results-contract-and-governance-model
   file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
   title: Define hosted results contract, trust labels, and governance model
@@ -573,70 +493,6 @@ items:
   work_ready: 1
   needs:
   - define-results-platform-product-and-launch-strategy
-- id: implement-explorer-home-and-browse-pages
-  file: TODO/main/planning/implement-explorer-home-and-browse-pages.yaml
-  title: Implement explorer home page and benchmark/platform browse pages
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - phase-1
-  - frontend
-  - browse
-  - home
-  estimated_effort: Medium
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - scaffold-results-explorer-frontend
-  - build-static-pipeline-bundles-to-read-model
-- id: implement-result-detail-page
-  file: TODO/main/planning/implement-result-detail-page.yaml
-  title: Implement result detail page with query timings, metadata, and bundle download
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - phase-1
-  - frontend
-  - detail-page
-  estimated_effort: Medium
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - scaffold-results-explorer-frontend
-- id: integrate-explorer-into-github-pages-deployment
-  file: TODO/main/planning/integrate-explorer-into-github-pages-deployment.yaml
-  title: Integrate results explorer into GitHub Pages deployment workflow
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - phase-1
-  - deployment
-  - github-pages
-  - ci
-  estimated_effort: Medium
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - build-static-pipeline-bundles-to-read-model
-  - scaffold-results-explorer-frontend
-  - implement-explorer-home-and-browse-pages
-  - implement-result-detail-page
-  - implement-results-compare-view
 - id: launch-results-explorer-acceptance-and-seed
   file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
   title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
