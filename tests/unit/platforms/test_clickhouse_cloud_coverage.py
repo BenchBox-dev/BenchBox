@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import logging
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -15,6 +17,25 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def _make_gcs_mocks():
+    """Build a (mock_blob, mock_gcs_bucket, mock_gcs_storage, mock_google_cloud, sys_modules_patch) tuple."""
+    mock_blob = MagicMock()
+    mock_gcs_bucket = MagicMock()
+    mock_gcs_bucket.blob.return_value = mock_blob
+    mock_gcs_client = MagicMock()
+    mock_gcs_client.bucket.return_value = mock_gcs_bucket
+    mock_gcs_storage = MagicMock()
+    mock_gcs_storage.Client.return_value = mock_gcs_client
+    mock_google_cloud = MagicMock()
+    mock_google_cloud.storage = mock_gcs_storage
+    sys_modules = {
+        "google": MagicMock(cloud=mock_google_cloud),
+        "google.cloud": mock_google_cloud,
+        "google.cloud.storage": mock_gcs_storage,
+    }
+    return mock_blob, mock_gcs_bucket, mock_gcs_storage, mock_google_cloud, sys_modules
 
 
 def test_from_config_maps_cloud_and_optional_fields() -> None:
@@ -619,8 +640,6 @@ def test_normalize_external_file_inputs_splits_cloud_and_local(tmp_path: Path) -
 
 def test_s3_external_credential_warning_logged(tmp_path: Path, caplog) -> None:
     """Credential embedding in VIEW SQL should produce a warning log."""
-    import logging
-    import os
     import sys
 
     adapter = ClickHouseCloudAdapter(
@@ -642,7 +661,6 @@ def test_s3_external_credential_warning_logged(tmp_path: Path, caplog) -> None:
         "AWS_SECRET_ACCESS_KEY": "secret123",
     }
 
-    # boto3 is imported inside the method, so we inject a mock into sys.modules
     mock_boto3 = MagicMock()
     mock_boto3.client.return_value = MagicMock()
 
@@ -654,3 +672,477 @@ def test_s3_external_credential_warning_logged(tmp_path: Path, caplog) -> None:
         adapter._create_external_tables_via_s3(benchmark, mock_conn, tmp_path)
 
     assert any("credentials will be embedded" in r.message.lower() for r in caplog.records)
+
+
+# ---- _build_ctas_sort_sql tests ----
+
+
+def test_build_ctas_sort_sql_returns_none_when_mode_off() -> None:
+    """_build_ctas_sort_sql should return None when sorted ingestion mode is off."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p")
+    with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("off", "auto")):
+        result = adapter._build_ctas_sort_sql("orders", [])
+    assert result is None
+
+
+def test_build_ctas_sort_sql_raises_when_mode_on() -> None:
+    """_build_ctas_sort_sql should raise ValueError when sorted ingestion is requested."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p")
+    with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("force", "ctas")):
+        with pytest.raises(ValueError, match="does not support post-load sorted ingestion"):
+            adapter._build_ctas_sort_sql("orders", [])
+
+
+def test_build_ctas_sort_sql_raises_on_resolve_error() -> None:
+    """_build_ctas_sort_sql should wrap ValueError from resolve_sorted_ingestion_strategy."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p")
+    with patch.object(adapter, "resolve_sorted_ingestion_strategy", side_effect=ValueError("unsupported")):
+        with pytest.raises(ValueError, match="does not support post-load sorted ingestion"):
+            adapter._build_ctas_sort_sql("orders", [])
+
+
+# ---- create_external_tables GCS dispatch ----
+
+
+def test_create_external_tables_dispatches_to_gcs() -> None:
+    """create_external_tables should dispatch to GCS helper when only gcs_staging_url is set."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://bucket/staging/")
+    mock_result = ({"orders": 50}, 0.5, {"loading_method": "gcs_external_views"})
+
+    benchmark, connection = MagicMock(), MagicMock()
+    with patch.object(adapter, "_create_external_tables_via_gcs", return_value=mock_result) as mock_gcs:
+        result = adapter.create_external_tables(benchmark, connection, Path("/tmp"))
+
+    mock_gcs.assert_called_once_with(benchmark, connection, Path("/tmp"))
+    assert result[2]["loading_method"] == "gcs_external_views"
+
+
+# ---- _create_external_tables_via_gcs tests ----
+
+
+def test_create_external_tables_via_gcs_import_error() -> None:
+    """_create_external_tables_via_gcs should raise ImportError when google-cloud-storage is missing."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://b/p/")
+
+    with patch.dict(
+        "sys.modules",
+        {"google": None, "google.cloud": None, "google.cloud.storage": None},
+    ):
+        with pytest.raises(ImportError, match="google-cloud-storage is required"):
+            adapter._create_external_tables_via_gcs(MagicMock(), MagicMock(), Path("/tmp"))
+
+
+def test_create_external_tables_via_gcs_parquet_locals(tmp_path: Path) -> None:
+    """GCS external mode should upload local Parquet and register gcs() VIEW."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
+
+    parquet_file = tmp_path / "lineitem.parquet"
+    parquet_file.write_bytes(b"PAR1")
+
+    benchmark = MagicMock()
+    benchmark.tables = {"lineitem": [str(parquet_file)]}
+
+    connection = MagicMock()
+
+    def _execute(sql: str):
+        if sql.startswith("SELECT COUNT(*)"):
+            return [(99,)]
+        return []
+
+    connection.execute.side_effect = _execute
+
+    _, _, _, _, sys_modules = _make_gcs_mocks()
+    with patch.dict("sys.modules", sys_modules):
+        stats, _, metadata = adapter._create_external_tables_via_gcs(benchmark, connection, tmp_path)
+
+    assert stats["lineitem"] == 99
+    assert metadata["loading_method"] == "gcs_external_views"
+    assert metadata["gcs_staging_url"] == "gs://gcs-bucket/staging/"
+
+    executed_sqls = [call.args[0] for call in connection.execute.call_args_list]
+    view_sql = next(s for s in executed_sqls if "CREATE OR REPLACE VIEW" in s)
+    assert "lineitem" in view_sql
+    assert "gcs(" in view_sql
+    assert "'Parquet'" in view_sql
+
+
+def test_create_external_tables_via_gcs_iceberg_local(tmp_path: Path) -> None:
+    """GCS external mode should upload Iceberg dirs and register iceberg() VIEWs."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
+
+    iceberg_dir = tmp_path / "orders"
+    (iceberg_dir / "metadata").mkdir(parents=True)
+    (iceberg_dir / "metadata" / "v1.metadata.json").write_text("{}")
+
+    benchmark = MagicMock()
+    benchmark.tables = {"orders": [str(iceberg_dir)]}
+
+    connection = MagicMock()
+    connection.execute.return_value = [(7,)]
+
+    _, _, _, _, sys_modules = _make_gcs_mocks()
+    with patch.dict("sys.modules", sys_modules):
+        stats, _, metadata = adapter._create_external_tables_via_gcs(benchmark, connection, tmp_path)
+
+    assert stats["orders"] == 7
+    executed_sqls = [call.args[0] for call in connection.execute.call_args_list]
+    view_sql = next(s for s in executed_sqls if "CREATE OR REPLACE VIEW" in s)
+    assert "iceberg(" in view_sql
+    assert "storage.googleapis.com" in view_sql
+
+
+def test_create_external_tables_via_gcs_parquet_cloud_uris(tmp_path: Path) -> None:
+    """GCS external mode should build gcs() VIEW from gs:// cloud URIs.
+
+    _resolve_cloud_data_files is mocked to supply raw URI strings because Path()
+    collapses gs:// to gs:/ which breaks the scheme check in _normalize_external_file_inputs.
+    """
+    adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
+
+    connection = MagicMock()
+    connection.execute.return_value = [(11,)]
+
+    _, _, _, _, sys_modules = _make_gcs_mocks()
+    with (
+        patch.object(
+            adapter,
+            "_resolve_cloud_data_files",
+            return_value={"orders": ["gs://gcs-bucket/data/orders.parquet"]},
+        ),
+        patch.dict("sys.modules", sys_modules),
+    ):
+        stats, _, metadata = adapter._create_external_tables_via_gcs(MagicMock(), connection, tmp_path)
+
+    assert stats["orders"] == 11
+    executed_sqls = [call.args[0] for call in connection.execute.call_args_list]
+    view_sql = next(s for s in executed_sqls if "CREATE OR REPLACE VIEW" in s)
+    assert "gcs(" in view_sql
+    assert "storage.googleapis.com" in view_sql
+
+
+def test_create_external_tables_via_gcs_iceberg_cloud_uris(tmp_path: Path) -> None:
+    """GCS external mode should build iceberg() VIEW from gs://…/metadata cloud URIs."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
+
+    connection = MagicMock()
+    connection.execute.return_value = [(3,)]
+
+    _, _, _, _, sys_modules = _make_gcs_mocks()
+    with (
+        patch.object(
+            adapter,
+            "_resolve_cloud_data_files",
+            return_value={"orders": ["gs://gcs-bucket/data/orders/metadata/v1.json"]},
+        ),
+        patch.dict("sys.modules", sys_modules),
+    ):
+        stats, _, metadata = adapter._create_external_tables_via_gcs(MagicMock(), connection, tmp_path)
+
+    assert stats["orders"] == 3
+    executed_sqls = [call.args[0] for call in connection.execute.call_args_list]
+    view_sql = next(s for s in executed_sqls if "CREATE OR REPLACE VIEW" in s)
+    assert "iceberg(" in view_sql
+
+
+def test_create_external_tables_via_gcs_no_sources_raises(tmp_path: Path) -> None:
+    """GCS external mode should raise ValueError when no supported file sources are found."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
+
+    connection = MagicMock()
+
+    _, _, _, _, sys_modules = _make_gcs_mocks()
+    # Provide an s3:// URI — wrong scheme, not valid for GCS mode
+    with (
+        patch.object(
+            adapter,
+            "_resolve_cloud_data_files",
+            return_value={"orders": ["s3://wrong-scheme/data.parquet"]},
+        ),
+        patch.dict("sys.modules", sys_modules),
+    ):
+        with pytest.raises(ValueError, match="requires Iceberg directories or Parquet files"):
+            adapter._create_external_tables_via_gcs(MagicMock(), connection, tmp_path)
+
+
+def test_create_external_tables_via_gcs_credential_warning(tmp_path: Path, caplog) -> None:
+    """GCS credential embedding should produce a warning log."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
+
+    parquet_file = tmp_path / "lineitem.parquet"
+    parquet_file.write_bytes(b"PAR1")
+
+    benchmark = MagicMock()
+    benchmark.tables = {"lineitem": [str(parquet_file)]}
+
+    connection = MagicMock()
+    connection.execute.return_value = [(5,)]
+
+    _, _, _, _, sys_modules = _make_gcs_mocks()
+    env_patch = {"GCS_HMAC_ACCESS_KEY": "hmackey", "GCS_HMAC_SECRET": "hmacsecret"}
+
+    with (
+        patch.dict(os.environ, env_patch),
+        patch.dict("sys.modules", sys_modules),
+        caplog.at_level(logging.WARNING),
+    ):
+        adapter._create_external_tables_via_gcs(benchmark, connection, tmp_path)
+
+    assert any("credentials will be embedded" in r.message.lower() for r in caplog.records)
+
+
+# ---- _load_data_via_gcs tests ----
+
+
+def test_load_data_via_gcs_uploads_and_ingests(tmp_path: Path) -> None:
+    """_load_data_via_gcs should upload CSV files to GCS and execute INSERT FROM gcs()."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
+
+    data_file = tmp_path / "orders.csv"
+    data_file.write_text("col1,col2\n1,a\n2,b\n")
+
+    benchmark = MagicMock()
+    benchmark.tables = {"orders": [str(data_file)]}
+
+    connection = MagicMock()
+    connection.execute.return_value = [(200,)]
+
+    mock_blob, _, _, _, sys_modules = _make_gcs_mocks()
+    with patch.dict("sys.modules", sys_modules):
+        table_stats, total_time, metadata = adapter._load_data_via_gcs(benchmark, connection, tmp_path)
+
+    assert "orders" in table_stats
+    assert table_stats["orders"] == 200
+    assert metadata["loading_method"] == "gcs_staging"
+    assert metadata["gcs_staging_url"] == "gs://gcs-bucket/staging/"
+
+    mock_blob.upload_from_filename.assert_called_once()
+    execute_calls = [call.args[0] for call in connection.execute.call_args_list]
+    assert any("gcs(" in s for s in execute_calls)
+    assert any("CSVWithNames" in s for s in execute_calls)
+
+
+def test_load_data_via_gcs_skips_empty_files(tmp_path: Path) -> None:
+    """_load_data_via_gcs should skip tables with no valid files."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
+
+    benchmark = MagicMock()
+    benchmark.tables = {"orders": [str(tmp_path / "nonexistent.csv")]}
+
+    connection = MagicMock()
+
+    _, _, _, _, sys_modules = _make_gcs_mocks()
+    with patch.dict("sys.modules", sys_modules):
+        table_stats, _, metadata = adapter._load_data_via_gcs(benchmark, connection, tmp_path)
+
+    assert table_stats["orders"] == 0
+    connection.execute.assert_not_called()
+
+
+# ---- _create_external_tables_via_s3 cloud URI branches ----
+
+
+def test_create_external_tables_via_s3_parquet_cloud_uris(tmp_path: Path) -> None:
+    """S3 external mode should build s3() VIEW from s3:// cloud URIs.
+
+    Note: _resolve_cloud_data_files returns Path objects, so cloud URIs must be provided
+    as strings via _normalize_external_file_inputs directly to avoid Path normalization
+    breaking the s3:// scheme. We mock _resolve_cloud_data_files to bypass this.
+    """
+    adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
+
+    connection = MagicMock()
+    connection.execute.return_value = [(55,)]
+
+    mock_s3_client = MagicMock()
+    mock_boto3 = MagicMock()
+    mock_boto3.client.return_value = mock_s3_client
+
+    with (
+        patch.object(
+            adapter,
+            "_resolve_cloud_data_files",
+            return_value={"orders": ["s3://bucket/data/orders.parquet"]},
+        ),
+        patch.dict("sys.modules", {"boto3": mock_boto3}),
+    ):
+        stats, _, metadata = adapter._create_external_tables_via_s3(MagicMock(), connection, tmp_path)
+
+    assert stats["orders"] == 55
+    executed_sqls = [call.args[0] for call in connection.execute.call_args_list]
+    view_sql = next(s for s in executed_sqls if "CREATE OR REPLACE VIEW" in s)
+    assert "s3(" in view_sql
+    assert "'Parquet'" in view_sql
+    # No upload should happen for cloud URIs
+    mock_s3_client.upload_file.assert_not_called()
+
+
+def test_create_external_tables_via_s3_parquet_cloud_uris_multiple_dirs(tmp_path: Path) -> None:
+    """S3 external mode with cloud URIs from multiple dirs should use common prefix glob."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
+
+    connection = MagicMock()
+    connection.execute.return_value = [(22,)]
+
+    mock_boto3 = MagicMock()
+    mock_boto3.client.return_value = MagicMock()
+
+    with (
+        patch.object(
+            adapter,
+            "_resolve_cloud_data_files",
+            return_value={
+                "orders": [
+                    "s3://bucket/data/2024/orders.parquet",
+                    "s3://bucket/data/2025/orders.parquet",
+                ]
+            },
+        ),
+        patch.dict("sys.modules", {"boto3": mock_boto3}),
+    ):
+        stats, _, _ = adapter._create_external_tables_via_s3(MagicMock(), connection, tmp_path)
+
+    assert stats["orders"] == 22
+    executed_sqls = [call.args[0] for call in connection.execute.call_args_list]
+    view_sql = next(s for s in executed_sqls if "CREATE OR REPLACE VIEW" in s)
+    assert "**" in view_sql or "*.parquet" in view_sql
+
+
+def test_create_external_tables_via_s3_iceberg_cloud_uris(tmp_path: Path) -> None:
+    """S3 external mode should build iceberg() VIEW from s3://…/metadata cloud URIs."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
+
+    connection = MagicMock()
+    connection.execute.return_value = [(9,)]
+
+    mock_boto3 = MagicMock()
+    mock_boto3.client.return_value = MagicMock()
+
+    with (
+        patch.object(
+            adapter,
+            "_resolve_cloud_data_files",
+            return_value={"orders": ["s3://bucket/data/orders/metadata/v1.json"]},
+        ),
+        patch.dict("sys.modules", {"boto3": mock_boto3}),
+    ):
+        stats, _, _ = adapter._create_external_tables_via_s3(MagicMock(), connection, tmp_path)
+
+    assert stats["orders"] == 9
+    executed_sqls = [call.args[0] for call in connection.execute.call_args_list]
+    view_sql = next(s for s in executed_sqls if "CREATE OR REPLACE VIEW" in s)
+    assert "iceberg(" in view_sql
+
+
+def test_create_external_tables_via_s3_no_sources_raises(tmp_path: Path) -> None:
+    """S3 external mode should raise ValueError when no supported sources are found."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
+
+    connection = MagicMock()
+    mock_boto3 = MagicMock()
+    mock_boto3.client.return_value = MagicMock()
+
+    # Mock to return a GCS URI — not valid for S3 mode
+    with (
+        patch.object(
+            adapter,
+            "_resolve_cloud_data_files",
+            return_value={"orders": ["gs://wrong-bucket/data.parquet"]},
+        ),
+        patch.dict("sys.modules", {"boto3": mock_boto3}),
+    ):
+        with pytest.raises(ValueError, match="requires Iceberg directories or Parquet files"):
+            adapter._create_external_tables_via_s3(MagicMock(), connection, tmp_path)
+
+
+# ---- _load_data_via_s3 no-valid-files and credential warning ----
+
+
+def test_load_data_via_s3_skips_empty_files(tmp_path: Path) -> None:
+    """_load_data_via_s3 should skip tables with no valid files."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
+
+    benchmark = MagicMock()
+    benchmark.tables = {"orders": [str(tmp_path / "nonexistent.csv")]}
+
+    connection = MagicMock()
+    mock_s3_client = MagicMock()
+    mock_boto3 = MagicMock()
+    mock_boto3.client.return_value = mock_s3_client
+
+    with patch.dict("sys.modules", {"boto3": mock_boto3}):
+        table_stats, _, metadata = adapter._load_data_via_s3(benchmark, connection, tmp_path)
+
+    assert table_stats["orders"] == 0
+    mock_s3_client.upload_file.assert_not_called()
+    connection.execute.assert_not_called()
+
+
+def test_load_data_via_s3_with_s3_region(tmp_path: Path) -> None:
+    """_load_data_via_s3 should pass region_name to boto3.client when s3_region is set."""
+    adapter = ClickHouseCloudAdapter(
+        host="h", password="p", s3_staging_url="s3://bucket/staging/", s3_region="eu-central-1"
+    )
+
+    data_file = tmp_path / "orders.csv"
+    data_file.write_text("id\n1\n")
+
+    benchmark = MagicMock()
+    benchmark.tables = {"orders": [str(data_file)]}
+
+    connection = MagicMock()
+    connection.execute.return_value = [(5,)]
+
+    mock_boto3 = MagicMock()
+    mock_s3_client = MagicMock()
+    mock_boto3.client.return_value = mock_s3_client
+
+    with patch.dict("sys.modules", {"boto3": mock_boto3}):
+        adapter._load_data_via_s3(benchmark, connection, tmp_path)
+
+    boto3_call_kwargs = mock_boto3.client.call_args[1]
+    assert boto3_call_kwargs.get("region_name") == "eu-central-1"
+
+
+# ---- platform_name property ----
+
+
+def test_platform_name_returns_clickhouse_cloud() -> None:
+    """platform_name property should return 'ClickHouse Cloud'."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p")
+    assert adapter.platform_name == "ClickHouse Cloud"
+
+
+# ---- _build_clickhouse_cloud_config edge cases ----
+
+
+def test_build_config_with_none_info() -> None:
+    """_build_clickhouse_cloud_config should handle None info gracefully."""
+    cred_manager = MagicMock()
+    cred_manager.get_platform_credentials.return_value = {}
+    with patch("benchbox.security.credentials.CredentialManager", return_value=cred_manager):
+        config = _build_clickhouse_cloud_config(
+            "clickhouse-cloud",
+            {"host": "h", "password": "p"},
+            {},
+            None,
+        )
+
+    assert config.type == "clickhouse-cloud"
+    assert config.name == "ClickHouse Cloud"
+    assert config.driver_package == "clickhouse-connect"
+
+
+def test_build_config_driver_version_from_overrides() -> None:
+    """_build_clickhouse_cloud_config should prefer driver_version from overrides."""
+    cred_manager = MagicMock()
+    cred_manager.get_platform_credentials.return_value = {}
+    info = type("Info", (), {"display_name": "CH Cloud", "driver_package": "clickhouse-connect"})
+    with patch("benchbox.security.credentials.CredentialManager", return_value=cred_manager):
+        config = _build_clickhouse_cloud_config(
+            "clickhouse-cloud",
+            {"driver_version": "0.7.0"},
+            {"driver_version": "0.8.0"},
+            info,
+        )
+
+    assert config.driver_version == "0.8.0"
