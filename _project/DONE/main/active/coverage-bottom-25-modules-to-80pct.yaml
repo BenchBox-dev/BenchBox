@@ -2,7 +2,8 @@ id: coverage-bottom-25-modules-to-80pct
 title: "Bring the 25 lowest-coverage modules to 80% fast-test coverage"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-04-02"
 description: |
   Current fast-test coverage sits at 80.04% (85,262 / 106,518 lines) — just 47
   covered lines above the 80% threshold. The buffer is dangerously thin: a single

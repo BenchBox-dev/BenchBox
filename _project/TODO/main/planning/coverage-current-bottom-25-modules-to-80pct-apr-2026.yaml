@@ -97,20 +97,22 @@ work:
   needs: []
   description: |
     benchbox/core/tuning/generators/pg_mooncake.py (+5 lines -> 80%)
-      - Extend `tests/unit/core/tuning/generators/test_pg_mooncake_ddl.py`.
+      - Add `tests/unit/core/tuning/generators/test_pg_mooncake_ddl.py`.
       - Cover `platform_name`, `generate_tuning_clauses()`, `generate_create_table_ddl()`,
         and `generate_partition_children()` for partitioned vs non-partitioned inputs.
       - Assert exact SQL fragments for Mooncake-specific clauses rather than
         mock-only expectations.
 
     benchbox/platforms/clickhouse/diagnostics.py (+21 lines -> 80%)
-      - Extend `tests/unit/platforms/test_clickhouse_cloud_coverage.py`.
+      - Add `tests/unit/platforms/test_clickhouse_diagnostics.py`.
       - Cover server vs local metadata collection, `check_server_database_exists()`,
         `drop_database()`, `get_table_info()`, and `optimize_table()`.
       - Mock both ClickHouse server query responses and local `chdb` metadata paths.
+      - Keep ClickHouse Cloud coverage in its own later work unit so this helper
+        top-up can land without shared-file ownership.
   files:
   - tests/unit/core/tuning/generators/test_pg_mooncake_ddl.py
-  - tests/unit/platforms/test_clickhouse_cloud_coverage.py
+  - tests/unit/platforms/test_clickhouse_diagnostics.py
 
 - id: w2
   summary: "DataFrame foundation: expression_family and iceberg_maintenance"
@@ -192,10 +194,10 @@ work:
         data organization.
 
     benchbox/core/ssb/generator.py (+55 lines -> 80%)
-      - Extend `tests/unit/generators/test_ssb_manifest.py` or add
-        `tests/unit/core/ssb/test_ssb_generator.py`.
-      - Cover date/customer/supplier/part generation helpers, file-format consistency
-        checks, manifest writing, and local generation error handling.
+      - Extend `tests/unit/generators/test_ssb_manifest.py` for manifest writing and
+        file-format consistency checks.
+      - Add `tests/unit/core/ssb/test_ssb_generator.py` for date/customer/supplier/part
+        generation helpers and local generation error handling.
 
     benchbox/core/datavault/benchmark.py (+32 lines -> 80%)
       - Extend `tests/unit/core/datavault/test_datavault_benchmark.py`.
@@ -226,7 +228,7 @@ work:
   - tests/unit/core/aiml_functions/test_aiml_functions_benchmark.py
 
 - id: w7
-  summary: "Databricks and cloud-Spark scaffolding: DF adapter, credentials, shared mixins"
+  summary: "Databricks DataFrame adapter branches"
   status: pending
   needs: []
   description: |
@@ -235,51 +237,76 @@ work:
         `tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py`.
       - Cover expression helpers, callable-vs-SQL dispatch in `execute_dataframe_query()`,
         `execute_query()` routing, and `_get_or_create_spark_session()` fallback behavior.
+      - Keep this adapter isolated so failures in Spark-session mocking do not block
+        unrelated credential or cloud-Spark work.
+  files:
+  - tests/unit/platforms/databricks/test_databricks_df_adapter.py
+  - tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py
 
+- id: w8
+  summary: "Databricks credential defaults and validation branches"
+  status: pending
+  needs: []
+  description: |
     benchbox/platforms/databricks/credentials.py (+37 lines -> 80%)
       - Extend `tests/unit/platforms/credentials/test_databricks_defaults.py`.
       - Cover env auto-detection, interactive defaults, save flow, and validation/error
         branches without touching a real workspace.
+      - Keep credential-path assertions separate from Spark session doubles so the
+        implementation commit stays easy to diagnose and roll back.
+  files:
+  - tests/unit/platforms/credentials/test_databricks_defaults.py
 
+- id: w9
+  summary: "Cloud-Spark DDL and config mixins"
+  status: pending
+  needs: []
+  description: |
     benchbox/platforms/base/cloud_spark/mixins.py (+61 lines -> 80%)
-      - Extend `tests/unit/platforms/cloud_spark/test_spark_ddl_mixin.py` and, if needed,
+      - Extend `tests/unit/platforms/cloud_spark/test_spark_ddl_mixin.py` and
         `tests/unit/platforms/base/cloud_spark/test_config.py`.
       - Cover constraint application, benchmark-driven config mutation, table-format
         selection, and tuning-clause generation for Delta, Iceberg, Hudi, Parquet, and Hive.
+      - Treat this as the reusable Spark-builder fixture layer that later Spark-family
+        adapter units depend on.
   files:
-  - tests/unit/platforms/databricks/test_databricks_df_adapter.py
-  - tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py
-  - tests/unit/platforms/credentials/test_databricks_defaults.py
   - tests/unit/platforms/cloud_spark/test_spark_ddl_mixin.py
   - tests/unit/platforms/base/cloud_spark/test_config.py
 
-- id: w8
-  summary: "Spark-family adapters: core Spark plus LakeSail"
+- id: w10
+  summary: "Core Spark adapter branches"
   status: pending
-  needs: [w7]
+  needs: [w9]
   description: |
     benchbox/platforms/spark.py (+133 lines -> 80%)
-      - Extend `tests/unit/platforms/test_spark_adapter.py` and add
-        `tests/unit/platforms/test_spark_adapter_coverage.py`.
+      - Extend `tests/unit/platforms/test_spark_adapter.py`.
+      - Add `tests/unit/platforms/test_spark_adapter_coverage.py`.
       - Cover CLI argument registration, SparkConf assembly, Spark session creation,
         database creation, platform-info reporting, external-table SQL generation,
         table-tuning SQL, connection testing, and adapter close/cleanup.
+      - Reuse the Spark builder doubles established in w9 rather than creating a
+        third independent mock stack.
+  files:
+  - tests/unit/platforms/test_spark_adapter.py
+  - tests/unit/platforms/test_spark_adapter_coverage.py
 
+- id: w11
+  summary: "LakeSail adapter branches"
+  status: pending
+  needs: [w9]
+  description: |
     benchbox/platforms/lakesail.py (+62 lines -> 80%)
       - Extend `tests/unit/platforms/test_lakesail_adapter.py`.
       - Cover config builder behavior, Spark Connect session creation, identifier
         validation, table-name normalization, existing-table detection, and
         create/drop/check database flows.
-
-    Shared rule:
-      - Reuse Spark builder doubles from w7 rather than creating a third mock stack.
+      - Reuse the Spark builder doubles established in w9 rather than creating a
+        third independent mock stack.
   files:
-  - tests/unit/platforms/test_spark_adapter.py
-  - tests/unit/platforms/test_spark_adapter_coverage.py
   - tests/unit/platforms/test_lakesail_adapter.py
 
-- id: w9
-  summary: "Cloud-loading adapters: Glue, Firebolt, and ClickHouse Cloud"
+- id: w12
+  summary: "Glue adapter orchestration branches"
   status: pending
   needs: []
   description: |
@@ -288,26 +315,44 @@ work:
       - Cover boto session/client setup, staging init, catalog table creation,
         job script upload, job existence checks, create/load/execute orchestration,
         and close behavior.
+      - Keep the unit isolated from Firebolt and ClickHouse Cloud so any cloud-specific
+        mocking failures stay module-local.
+  files:
+  - tests/unit/platforms/aws/test_glue_adapter.py
 
+- id: w13
+  summary: "Firebolt adapter loading and fallback branches"
+  status: pending
+  needs: []
+  description: |
     benchbox/platforms/firebolt.py (+121 lines -> 80%)
       - Extend `tests/unit/platforms/test_firebolt_adapter.py` and
         `tests/unit/platforms/test_firebolt_cloud.py`.
       - Cover deployment-mode resolution, mode validation, connection param assembly,
         data-file normalization, S3 load path, insert-based fallback path, and
         helper branches such as `_parse_s3_url()` and `_execute_batch_insert()`.
+      - Keep this adapter in its own work unit because the branch surface is wide
+        enough to justify dedicated review and rollback.
+  files:
+  - tests/unit/platforms/test_firebolt_adapter.py
+  - tests/unit/platforms/test_firebolt_cloud.py
 
+- id: w14
+  summary: "ClickHouse Cloud adapter external-table branches"
+  status: pending
+  needs: []
+  description: |
     benchbox/platforms/clickhouse_cloud.py (+75 lines -> 80%)
       - Extend `tests/unit/platforms/test_clickhouse_cloud_coverage.py`.
       - Cover cloud-default application, external file normalization, S3/GCS external
         table creation, CTAS sort SQL, data-file resolution, and validation failures
         when external-table requirements are not met.
+      - Keep ClickHouse diagnostics coverage in w1 so this work unit owns only the
+        cloud adapter paths.
   files:
-  - tests/unit/platforms/aws/test_glue_adapter.py
-  - tests/unit/platforms/test_firebolt_adapter.py
-  - tests/unit/platforms/test_firebolt_cloud.py
   - tests/unit/platforms/test_clickhouse_cloud_coverage.py
 
-- id: w10
+- id: w15
   summary: "Redshift credential and diagnostics branches"
   status: pending
   needs: []
@@ -324,7 +369,7 @@ work:
   - tests/unit/platforms/credentials/test_redshift_defaults.py
   - tests/unit/cli/test_cli_setup.py
 
-- id: w11
+- id: w16
   summary: "QuestDB adapter branches and ILP helpers"
   status: pending
   needs: []
@@ -339,17 +384,26 @@ work:
   - tests/unit/platforms/test_questdb_adapter.py
   - tests/unit/core/tuning/test_questdb_ddl_generator.py
 
-- id: w12
-  summary: "Primitives surface: metadata_primitives facade and write_primitives benchmark"
+- id: w17
+  summary: "Metadata primitives facade coverage"
   status: pending
-  needs: [w3]
+  needs: []
   description: |
     benchbox/metadata_primitives.py (+7 lines -> 80%)
       - Extend `tests/unit/core/metadata_primitives/test_metadata_primitives_core.py`.
       - Cover facade methods such as `generate_data()`, `get_schema()`,
         `get_create_tables_sql()`, `get_table_names()`, `run_benchmark()`,
         and complexity setup/teardown delegation.
+      - Keep this small facade separate from write-primitives execution flow so the
+        implementation commit remains narrowly scoped.
+  files:
+  - tests/unit/core/metadata_primitives/test_metadata_primitives_core.py
 
+- id: w18
+  summary: "Write-primitives benchmark execution paths"
+  status: pending
+  needs: [w3]
+  description: |
     benchbox/core/write_primitives/benchmark.py (+105 lines -> 80%)
       - Extend `tests/unit/core/write_primitives/test_benchmark_execution.py`,
         `tests/unit/core/write_primitives/test_benchmark_operations.py`, and, if needed,
@@ -362,12 +416,11 @@ work:
       - Keep assertions on emitted SQL, validation outcomes, and benchmark results.
         Do not count "adapter.execute was called" as sufficient coverage.
   files:
-  - tests/unit/core/metadata_primitives/test_metadata_primitives_core.py
   - tests/unit/core/write_primitives/test_benchmark_execution.py
   - tests/unit/core/write_primitives/test_benchmark_operations.py
   - tests/unit/benchmarks/test_write_primitives_validation.py
 
-- id: w13
+- id: w19
   summary: "TPC-DI error recovery engine"
   status: pending
   needs: []
@@ -399,12 +452,18 @@ approach: |
   Use the April 2, 2026 filtered ranking as the fixed baseline for this wave.
   Sequence the work so shared fixture layers are built once and reused:
   DataFrame foundation (w2) before DataFrame transaction/query work (w3-w4),
-  Databricks/cloud-Spark scaffolding (w7) before Spark/LakeSail (w8), and
-  transaction semantics (w3) before the write-primitives benchmark facade (w12).
+  cloud-Spark mixins (w9) before Spark/LakeSail (w10-w11), and transaction
+  semantics (w3) before the write-primitives benchmark paths (w18).
+
+  Heavyweight adapters are intentionally isolated one module per work unit
+  (w7-w16, w18-w19) so each implementation step can land as a single-purpose
+  commit with module-local rollback.
 
   Extend existing coverage-focused test files wherever the repo already has them.
   Only add new dedicated test files when current coverage is scattered across generic
   test modules and a focused file will make the missing branches easier to own.
+  Planned-new files are named explicitly with `Add ...`; existing files to be
+  extended are named explicitly with `Extend ...`.
 
 anti_patterns:
 - "DO NOT add blanket import/smoke tests -- because they create coverage theater -- assert concrete outputs, SQL fragments, state transitions, and error text instead."
@@ -414,15 +473,162 @@ anti_patterns:
 - "DO NOT mix multiple heavyweight adapters into one implementation commit -- because diagnosis and rollback get harder -- land one work unit at a time with module-local verification."
 
 verification:
-- description: "Each work unit ends with a focused pytest-cov run over the files touched in that unit."
-  command: "uv run -- python -m pytest <work-unit test files> -q -p pytest_cov --cov=<module paths> --cov-report=term-missing"
-  expected_output: "Every module touched in the active work unit reports at least 80% coverage."
+- description: "w1 targeted coverage: pg_mooncake generator and ClickHouse diagnostics"
+  command: >-
+    uv run -- python -m pytest tests/unit/core/tuning/generators/test_pg_mooncake_ddl.py
+    tests/unit/platforms/test_clickhouse_diagnostics.py -q -p pytest_cov
+    --cov=benchbox/core/tuning/generators/pg_mooncake.py
+    --cov=benchbox/platforms/clickhouse/diagnostics.py --cov-report=term-missing
+  expected_output: "Both named modules report at least 80% coverage."
+- description: "w2 targeted coverage: DataFrame foundation modules"
+  command: >-
+    uv run -- python -m pytest tests/unit/platforms/dataframe/test_expression_family.py
+    tests/unit/platforms/dataframe/test_expression_family_behavioral.py
+    tests/unit/platforms/dataframe/test_expression_family_coverage.py
+    tests/unit/platforms/dataframe/test_iceberg_maintenance.py
+    tests/unit/platforms/dataframe/test_iceberg_maintenance_coverage.py -q -p pytest_cov
+    --cov=benchbox/platforms/dataframe/expression_family.py
+    --cov=benchbox/platforms/dataframe/iceberg_maintenance.py --cov-report=term-missing
+  expected_output: "Both foundation modules report at least 80% coverage."
+- description: "w3 targeted coverage: transaction DataFrame operations"
+  command: >-
+    uv run -- python -m pytest tests/unit/core/transaction_primitives/test_dataframe_operations.py
+    tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py -q -p pytest_cov
+    --cov=benchbox/core/transaction_primitives/dataframe_operations.py --cov-report=term-missing
+  expected_output: "The transaction DataFrame operations module reports at least 80% coverage."
+- description: "w4 targeted coverage: CoffeeShop and AMPLab DataFrame query registries"
+  command: >-
+    uv run -- python -m pytest tests/unit/core/coffeeshop/test_coffeeshop_dataframe_queries.py
+    tests/unit/core/amplab/test_amplab_dataframe_queries.py -q -p pytest_cov
+    --cov=benchbox/core/coffeeshop/dataframe_queries/queries.py
+    --cov=benchbox/core/amplab/dataframe_queries/queries.py --cov-report=term-missing
+  expected_output: "Both registry modules report at least 80% coverage."
+- description: "w5 targeted coverage: TPC-DS manager, SSB generator, and DataVault benchmark"
+  command: >-
+    uv run -- python -m pytest tests/unit/core/tpcds/generator/test_manager.py
+    tests/unit/generators/test_ssb_manifest.py tests/unit/core/ssb/test_ssb_generator.py
+    tests/unit/core/datavault/test_datavault_benchmark.py -q -p pytest_cov
+    --cov=benchbox/core/tpcds/generator/manager.py --cov=benchbox/core/ssb/generator.py
+    --cov=benchbox/core/datavault/benchmark.py --cov-report=term-missing
+  expected_output: "All three generator or wrapper modules report at least 80% coverage."
+- description: "w6 targeted coverage: experimental benchmark wrappers"
+  command: >-
+    uv run -- python -m pytest tests/unit/core/gpu/test_gpu_benchmark.py
+    tests/unit/core/aiml_functions/test_aiml_functions_benchmark.py -q -p pytest_cov
+    --cov=benchbox/experimental/gpu/benchmark.py
+    --cov=benchbox/experimental/aiml_functions/benchmark.py --cov-report=term-missing
+  expected_output: "Both experimental benchmark wrappers report at least 80% coverage."
+- description: "w7 targeted coverage: Databricks DataFrame adapter"
+  command: >-
+    uv run -- python -m pytest tests/unit/platforms/databricks/test_databricks_df_adapter.py
+    tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py -q -p pytest_cov
+    --cov=benchbox/platforms/databricks/dataframe_adapter.py --cov-report=term-missing
+  expected_output: "The Databricks DataFrame adapter reports at least 80% coverage."
+- description: "w8 targeted coverage: Databricks credentials"
+  command: >-
+    uv run -- python -m pytest tests/unit/platforms/credentials/test_databricks_defaults.py
+    -q -p pytest_cov --cov=benchbox/platforms/databricks/credentials.py
+    --cov-report=term-missing
+  expected_output: "The Databricks credentials module reports at least 80% coverage."
+- description: "w9 targeted coverage: cloud-Spark mixins"
+  command: >-
+    uv run -- python -m pytest tests/unit/platforms/cloud_spark/test_spark_ddl_mixin.py
+    tests/unit/platforms/base/cloud_spark/test_config.py -q -p pytest_cov
+    --cov=benchbox/platforms/base/cloud_spark/mixins.py --cov-report=term-missing
+  expected_output: "The cloud-Spark mixins module reports at least 80% coverage."
+- description: "w10 targeted coverage: core Spark adapter"
+  command: >-
+    uv run -- python -m pytest tests/unit/platforms/test_spark_adapter.py
+    tests/unit/platforms/test_spark_adapter_coverage.py -q -p pytest_cov
+    --cov=benchbox/platforms/spark.py --cov-report=term-missing
+  expected_output: "The core Spark adapter reports at least 80% coverage."
+- description: "w11 targeted coverage: LakeSail adapter"
+  command: >-
+    uv run -- python -m pytest tests/unit/platforms/test_lakesail_adapter.py -q -p pytest_cov
+    --cov=benchbox/platforms/lakesail.py --cov-report=term-missing
+  expected_output: "The LakeSail adapter reports at least 80% coverage."
+- description: "w12 targeted coverage: Glue adapter"
+  command: >-
+    uv run -- python -m pytest tests/unit/platforms/aws/test_glue_adapter.py -q -p pytest_cov
+    --cov=benchbox/platforms/aws/glue_adapter.py --cov-report=term-missing
+  expected_output: "The Glue adapter reports at least 80% coverage."
+- description: "w13 targeted coverage: Firebolt adapter"
+  command: >-
+    uv run -- python -m pytest tests/unit/platforms/test_firebolt_adapter.py
+    tests/unit/platforms/test_firebolt_cloud.py -q -p pytest_cov
+    --cov=benchbox/platforms/firebolt.py --cov-report=term-missing
+  expected_output: "The Firebolt adapter reports at least 80% coverage."
+- description: "w14 targeted coverage: ClickHouse Cloud adapter"
+  command: >-
+    uv run -- python -m pytest tests/unit/platforms/test_clickhouse_cloud_coverage.py
+    -q -p pytest_cov --cov=benchbox/platforms/clickhouse_cloud.py --cov-report=term-missing
+  expected_output: "The ClickHouse Cloud adapter reports at least 80% coverage."
+- description: "w15 targeted coverage: Redshift credential and diagnostics branches"
+  command: >-
+    uv run -- python -m pytest tests/unit/platforms/credentials/test_redshift_defaults.py
+    tests/unit/cli/test_cli_setup.py -q -p pytest_cov
+    --cov=benchbox/platforms/credentials/redshift.py --cov-report=term-missing
+  expected_output: "The Redshift credentials module reports at least 80% coverage."
+- description: "w16 targeted coverage: QuestDB adapter"
+  command: >-
+    uv run -- python -m pytest tests/unit/platforms/test_questdb_adapter.py
+    tests/unit/core/tuning/test_questdb_ddl_generator.py -q -p pytest_cov
+    --cov=benchbox/platforms/questdb.py --cov-report=term-missing
+  expected_output: "The QuestDB adapter reports at least 80% coverage."
+- description: "w17 targeted coverage: metadata_primitives facade"
+  command: >-
+    uv run -- python -m pytest tests/unit/core/metadata_primitives/test_metadata_primitives_core.py
+    -q -p pytest_cov --cov=benchbox/metadata_primitives.py --cov-report=term-missing
+  expected_output: "The metadata_primitives facade reports at least 80% coverage."
+- description: "w18 targeted coverage: write_primitives benchmark"
+  command: >-
+    uv run -- python -m pytest tests/unit/core/write_primitives/test_benchmark_execution.py
+    tests/unit/core/write_primitives/test_benchmark_operations.py
+    tests/unit/benchmarks/test_write_primitives_validation.py -q -p pytest_cov
+    --cov=benchbox/core/write_primitives/benchmark.py --cov-report=term-missing
+  expected_output: "The write_primitives benchmark module reports at least 80% coverage."
+- description: "w19 targeted coverage: TPC-DI error recovery"
+  command: >-
+    uv run -- python -m pytest tests/unit/core/tpcdi/test_error_recovery.py
+    tests/unit/tpcdi/test_phase3_etl_enhanced.py -q -p pytest_cov
+    --cov=benchbox/core/tpcdi/etl/error_recovery.py --cov-report=term-missing
+  expected_output: "The TPC-DI error recovery module reports at least 80% coverage."
 - description: "The project fast lane still passes with coverage enabled."
   command: "make coverage-fast"
   expected_output: "Fast tests pass and total measured coverage remains >= 80%."
 - description: "Recompute the filtered module ranking from the coverage JSON after the final fast-lane run."
-  command: "uv run -- python -m coverage json -o /tmp/coverage_bottom25_verify.json"
-  expected_output: "A rerun of the April 2 filtered ranking shows zero of the 25 target modules below 80%."
+  command: >-
+    uv run -- python -m coverage json -o /tmp/coverage_bottom25_verify.json &&
+    uv run -- python -c "import json; targets = [
+    'benchbox/platforms/databricks/dataframe_adapter.py',
+    'benchbox/platforms/spark.py',
+    'benchbox/platforms/credentials/redshift.py',
+    'benchbox/core/transaction_primitives/dataframe_operations.py',
+    'benchbox/platforms/clickhouse/diagnostics.py',
+    'benchbox/core/write_primitives/benchmark.py',
+    'benchbox/core/tuning/generators/pg_mooncake.py',
+    'benchbox/metadata_primitives.py',
+    'benchbox/core/tpcds/generator/manager.py',
+    'benchbox/core/ssb/generator.py',
+    'benchbox/platforms/databricks/credentials.py',
+    'benchbox/core/tpcdi/etl/error_recovery.py',
+    'benchbox/core/datavault/benchmark.py',
+    'benchbox/experimental/gpu/benchmark.py',
+    'benchbox/platforms/base/cloud_spark/mixins.py',
+    'benchbox/platforms/aws/glue_adapter.py',
+    'benchbox/platforms/dataframe/iceberg_maintenance.py',
+    'benchbox/platforms/questdb.py',
+    'benchbox/experimental/aiml_functions/benchmark.py',
+    'benchbox/platforms/lakesail.py',
+    'benchbox/core/coffeeshop/dataframe_queries/queries.py',
+    'benchbox/platforms/firebolt.py',
+    'benchbox/platforms/dataframe/expression_family.py',
+    'benchbox/platforms/clickhouse_cloud.py',
+    'benchbox/core/amplab/dataframe_queries/queries.py']; data = json.load(open('/tmp/coverage_bottom25_verify.json'));
+    missing = [t for t in targets if t not in data['files']];
+    below = [(t, round(data['files'][t]['summary']['percent_covered'], 2)) for t in targets if t in data['files'] and data['files'][t]['summary']['percent_covered'] < 80];
+    assert not missing, missing; assert not below, below; print('all 25 target modules >= 80%')"
+  expected_output: "The command exits cleanly and prints `all 25 target modules >= 80%`."
 
 scope_limit:
   only_modify:
