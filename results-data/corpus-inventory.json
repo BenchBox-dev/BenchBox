@@ -1,0 +1,60 @@
+{
+  "generated": "2026-04-03",
+  "schema_version": "2.1",
+  "bundles": [
+    {
+      "file": "star_schema_sf001_datafusion_20260403_093817_adf0920e.json",
+      "benchmark": "star_schema",
+      "platform": "DataFusion",
+      "platform_version": "51.0.0",
+      "scale_factor": 0.01,
+      "trust_label": "maintainer-run",
+      "query_count": 52
+    },
+    {
+      "file": "star_schema_sf001_duckdb_20260403_093809_d4ec318a.json",
+      "benchmark": "star_schema",
+      "platform": "DuckDB",
+      "platform_version": "1.4.3",
+      "scale_factor": 0.01,
+      "trust_label": "maintainer-run",
+      "query_count": 52
+    },
+    {
+      "file": "star_schema_sf001_sqlite_20260403_093902_c4f99a62.json",
+      "benchmark": "star_schema",
+      "platform": "SQLite",
+      "platform_version": "3.50.4",
+      "scale_factor": 0.01,
+      "trust_label": "maintainer-run",
+      "query_count": 52
+    },
+    {
+      "file": "tpch_sf001_datafusion_20260403_093731_c235e698.json",
+      "benchmark": "tpch",
+      "platform": "DataFusion",
+      "platform_version": "51.0.0",
+      "scale_factor": 0.01,
+      "trust_label": "maintainer-run",
+      "query_count": 88
+    },
+    {
+      "file": "tpch_sf001_duckdb_20260403_093653_9c0925d1.json",
+      "benchmark": "tpch",
+      "platform": "DuckDB",
+      "platform_version": "1.4.3",
+      "scale_factor": 0.01,
+      "trust_label": "maintainer-run",
+      "query_count": 88
+    },
+    {
+      "file": "tpch_sf001_polars_20260403_093741_e744512d.json",
+      "benchmark": "tpch",
+      "platform": "Polars",
+      "platform_version": "1.37.1",
+      "scale_factor": 0.01,
+      "trust_label": "maintainer-run",
+      "query_count": 88
+    }
+  ]
+}

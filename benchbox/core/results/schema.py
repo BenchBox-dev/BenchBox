@@ -1147,9 +1147,9 @@ def _build_tables_block(table_statistics: dict[str, Any] | None) -> dict[str, An
                 entry["rows"] = stats["rows"]
             elif "rows_loaded" in stats:
                 entry["rows"] = stats["rows_loaded"]
-            if "load_time_ms" in stats:
+            if "load_time_ms" in stats and stats["load_time_ms"] is not None:
                 entry["load_ms"] = round(stats["load_time_ms"], 1)
-            elif "load_ms" in stats:
+            elif "load_ms" in stats and stats["load_ms"] is not None:
                 entry["load_ms"] = round(stats["load_ms"], 1)
             if entry:
                 tables[table_name] = entry
