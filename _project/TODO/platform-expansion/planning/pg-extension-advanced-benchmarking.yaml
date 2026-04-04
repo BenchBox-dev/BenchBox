@@ -104,13 +104,16 @@ work:
   summary: "Write pg_mooncake type compatibility matrix to pg_mooncake_type_compat.yaml
     — enumerate supported column types for the pinned version from release notes"
   status: pending
+  needs: []
 
 - id: w2
   summary: "Add optional migration phase to pg_mooncake adapter — ALTER TABLE heap→columnar,
     record wall time and storage delta, emit as a phase result in the result bundle"
   status: pending
+  needs: []
 
 - id: w3
   summary: "Add pg_duckdb vs native DuckDB comparison output — run identical TPC-H queries
     on both platforms, write per-query timing delta JSON into the result bundle"
   status: pending
+  needs: []
