@@ -109,7 +109,7 @@ work:
 - id: w2
   summary: "Add optional migration phase to pg_mooncake adapter — ALTER TABLE heap→columnar,
     record wall time and storage delta, emit as a phase result in the result bundle"
-  status: pending
+  status: done
   needs: []
 
 - id: w3
