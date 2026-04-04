@@ -115,5 +115,5 @@ work:
 - id: w3
   summary: "Add pg_duckdb vs native DuckDB comparison output — run identical TPC-H queries
     on both platforms, write per-query timing delta JSON into the result bundle"
-  status: pending
+  status: done
   needs: []
