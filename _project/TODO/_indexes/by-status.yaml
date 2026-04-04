@@ -1,6 +1,14 @@
-generated_at: '2026-04-03T21:07:33.907103'
-total_items: 28
+generated_at: '2026-04-03T21:09:37.791152'
+total_items: 29
 statuses:
+  In Progress:
+    count: 1
+    items:
+    - id: implement-pr-based-result-submission-workflow
+      file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
+      title: Implement PR-based community result submission workflow
+      priority: Medium
+      category: Core Functionality
   Not Started:
     count: 26
     items:
@@ -79,11 +87,6 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: implement-pr-based-result-submission-workflow
-      file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
-      title: Implement PR-based community result submission workflow
-      priority: Medium
-      category: Core Functionality
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -109,6 +112,11 @@ statuses:
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
       category: Core Functionality
+    - id: prune-legacy-publishing-prototype
+      file: TODO/main/planning/prune-legacy-publishing-prototype.yaml
+      title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
+      priority: Medium-High
+      category: Code Quality & Build
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

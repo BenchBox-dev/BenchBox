@@ -2,7 +2,7 @@ id: implement-pr-based-result-submission-workflow
 title: "Implement PR-based community result submission workflow"
 worktree: main
 priority: Medium
-status: Not Started
+status: In Progress
 category: Core Functionality
 deps:
   needs:
@@ -30,7 +30,8 @@ description: |
 work:
 - id: w1
   summary: "Design submission manifest schema and packaging format"
-  status: pending
+  status: done
+  completed_note: "Implemented as part of benchbox submit (PR #44). Manifest includes tool version, timestamp, bundle file/hash, benchmark/platform/scale metadata, contributor info, and optional context/platform_notes."
   notes: |
     Define the submission package format:
     - Canonical schema-v2 bundle (required)
@@ -45,7 +46,8 @@ work:
 - id: w2
   summary: "Implement `benchbox submit --output` CLI command"
   needs: [w1]
-  status: pending
+  status: done
+  completed_note: "Merged in PR #44. benchbox submit packages bundles with submission manifests, hash verification, contributor metadata, and PR instructions. See benchbox/cli/commands/submit.py"
   notes: |
     Add a CLI command that packages an existing exported result bundle into
     the submission format:

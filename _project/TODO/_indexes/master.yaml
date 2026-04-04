@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T21:07:33.907034'
-total_items: 28
+generated_at: '2026-04-03T21:09:37.791088'
+total_items: 29
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -311,7 +311,7 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Not Started
+  status: In Progress
   tags:
   - results
   - explorer
@@ -321,7 +321,7 @@ items:
   - pr-workflow
   estimated_effort: Large
   work_total: 5
-  work_done: 0
+  work_done: 2
   work_ready: 1
   needs:
   - launch-results-explorer-acceptance-and-seed
@@ -495,6 +495,23 @@ items:
   work_total: 12
   work_done: 0
   work_ready: 12
+- id: prune-legacy-publishing-prototype
+  file: TODO/main/planning/prune-legacy-publishing-prototype.yaml
+  title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
+  worktree: main
+  category: Code Quality & Build
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - publishing
+  - cleanup
+  - dead-code
+  estimated_effort: Half day
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - productize-result-publishing-and-artifact-sharing
 - id: vector-search-benchmark-support
   file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
   title: Vector Search Benchmark Support

@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T21:07:33.907091'
-total_items: 28
+generated_at: '2026-04-03T21:09:37.791140'
+total_items: 29
 priorities:
   Critical:
     count: 1
@@ -23,7 +23,7 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 8
+    count: 9
     items:
     - id: http-tls-certificate-validation
       file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
@@ -59,6 +59,11 @@ priorities:
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
+      status: Not Started
+    - id: prune-legacy-publishing-prototype
+      file: TODO/main/planning/prune-legacy-publishing-prototype.yaml
+      title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
+      category: Code Quality & Build
       status: Not Started
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
@@ -97,7 +102,7 @@ priorities:
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

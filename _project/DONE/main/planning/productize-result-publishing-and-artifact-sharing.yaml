@@ -316,14 +316,10 @@ success_metrics:
 - "The feature has at least one supported user-facing CLI path and is documented in CLI/help/docs"
 
 open_questions:
-- question: "Should local/cloud artifact publication standardize on a top-level `benchbox publish` command or an `artifacts`/`results` subcommand family?"
-  resolved: "Top-level `benchbox publish` command group with run/list/show/remove subcommands"
-- question: "Should durable publication metadata live beside result bundles, under `benchmark_runs/published/`, or in a separate indexed store?"
-  resolved: "Separate indexed store at ~/.benchbox/published.json — decoupled from bundle location"
-- question: "Should cloud publishing support launch only for directly addressable/public roots first, with private resolver workflows deferred?"
-  resolved: "Yes — file:// for local, native cloud URIs (s3/gs/abfss) for cloud. No fake short codes or resolver service."
-- question: "Which prototype-only surfaces should be deleted outright once the supported publishing flow lands?"
-  resolved: "Gap matrix recommends PRUNE all of Publisher/ArtifactManager/PermalinkRegistry. Tracked as separate TODO: prune-legacy-publishing-prototype"
+- "RESOLVED: CLI surface → top-level `benchbox publish` command group with run/list/show/remove subcommands"
+- "RESOLVED: Metadata location → separate indexed store at ~/.benchbox/published.json, decoupled from bundle location"
+- "RESOLVED: Cloud publishing → file:// for local, native cloud URIs (s3/gs/abfss) for cloud. No fake short codes or resolver service."
+- "RESOLVED: Prototype pruning → gap matrix recommends PRUNE all of Publisher/ArtifactManager/PermalinkRegistry. Tracked as prune-legacy-publishing-prototype TODO"
 
 commits:
 - "97138d3a5"
