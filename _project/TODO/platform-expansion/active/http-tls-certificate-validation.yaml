@@ -69,7 +69,7 @@ work:
 - id: w3
   summary: "Add unit tests for TLS options — verify cert path is passed through, verify_ssl=False disables validation"
   needs: [w2]
-  status: pending
+  status: done
 
 verification:
 - description: "Existing platform tests still pass"
