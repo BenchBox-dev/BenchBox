@@ -2,7 +2,7 @@ id: pg-extension-advanced-benchmarking
 title: "Advanced pg_mooncake and pg_duckdb Benchmarking Features"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Platform Expansion
 description: |
   Advanced benchmarking features for PostgreSQL extension adapters that go
@@ -103,7 +103,7 @@ work:
 - id: w1
   summary: "Write pg_mooncake type compatibility matrix to pg_mooncake_type_compat.yaml
     — enumerate supported column types for the pinned version from release notes"
-  status: pending
+  status: done
   needs: []
 
 - id: w2
