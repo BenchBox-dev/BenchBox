@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:30:54.926120'
-total_items: 26
+generated_at: '2026-04-04T08:37:58.553968'
+total_items: 23
 priorities:
   Critical:
     count: 1
@@ -33,28 +33,13 @@ priorities:
       category: AI/ML Capabilities
       status: Not Started
   Medium-High:
-    count: 4
+    count: 1
     items:
-    - id: build-results-explorer-subsite-on-benchbox-dev
-      file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
-      title: Build a results explorer subsite on benchbox.dev
-      category: Core Functionality
-      status: Not Started
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
       category: Core Functionality
       status: Completed
-    - id: generate-seed-corpus-for-results-explorer
-      file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
-      title: Generate seed corpus of benchmark results for the results explorer
-      category: Core Functionality
-      status: Not Started
-    - id: launch-results-explorer-acceptance-and-seed
-      file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
-      title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
-      category: Core Functionality
-      status: Not Started
   Medium:
     count: 8
     items:

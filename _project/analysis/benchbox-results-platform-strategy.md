@@ -24,6 +24,12 @@ Recommended split:
    A static-first public explorer for browsing, comparing, and analyzing
    curated public results.
 
+### Phase 1 Status: Launched (2026-04-04)
+
+Phase 1 is complete. The static explorer at benchbox.dev/results/ is deployed
+with a seed corpus of 6 bundles across 2 cohorts (TPC-H SF 0.01, SSB SF 0.01),
+each with ≥3 platforms. All launch criteria from the checklist below were met.
+
 ### Revised Launch Phases
 
 | Phase | Goal | Write Path | Infrastructure | Priority |

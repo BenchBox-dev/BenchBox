@@ -2,7 +2,7 @@ id: launch-results-explorer-acceptance-and-seed
 title: "Launch results explorer: acceptance testing, seed corpus verification, and go-live"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Core Functionality
 deps:
   needs:
@@ -29,7 +29,7 @@ description: |
 work:
 - id: w1
   summary: "Verify seed corpus completeness and quality"
-  status: pending
+  status: done
   notes: |
     Run the corpus inventory validation:
     - Each included benchmark has ≥3 comparable platforms at the same scale factor
@@ -44,7 +44,7 @@ work:
 - id: w2
   summary: "Run cross-browser acceptance testing"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Test the deployed explorer (or local preview) on:
     - Chrome (latest): all pages, DuckDB-WASM, compare view
@@ -63,7 +63,7 @@ work:
 - id: w3
   summary: "Verify production deployment end-to-end"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Push to main and verify the full GitHub Pages deployment:
     - Landing page still works at benchbox.dev
@@ -77,7 +77,7 @@ work:
 - id: w4
   summary: "Write changelog entry and update project documentation"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     - Add changelog entry for the results explorer launch
     - Update README if it references the project's web presence
@@ -87,7 +87,7 @@ work:
 - id: w5
   summary: "Mark Phase 1 complete and update TODO cluster status"
   needs: [w3, w4]
-  status: pending
+  status: done
   notes: |
     - Mark `build-results-explorer-subsite-on-benchbox-dev` as complete
     - Move all completed Phase 1 implementation TODOs to DONE
@@ -104,6 +104,7 @@ metadata:
   - acceptance
   estimated_effort: "Medium"
   created_date: "2026-03-29"
+  completed_date: "2026-04-04"
 
 impact:
   business_value: |

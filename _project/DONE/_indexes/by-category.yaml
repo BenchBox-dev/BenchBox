@@ -1,4 +1,4 @@
-generated_at: '2026-04-04T08:27:25.634814'
+generated_at: '2026-04-04T08:38:03.122907'
 total_categories: 75
 categories:
   '"Bug Fixes & Reliability"':
@@ -499,7 +499,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 202
+    count: 205
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -659,6 +659,11 @@ categories:
     - id: bidirectional-sync-and-true-up-releases
       file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
       title: Bidirectional Sync and True-Up Releases for Public/Private Repos
+      priority: Medium-High
+      status: Completed
+    - id: build-results-explorer-subsite-on-benchbox-dev
+      file: DONE/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
+      title: Build a results explorer subsite on benchbox.dev
       priority: Medium-High
       status: Completed
     - id: build-static-pipeline-bundles-to-read-model
@@ -987,6 +992,11 @@ categories:
       title: Fix sharded DataFrame Parquet bypass causing Polars date-string failures
       priority: High
       status: Completed
+    - id: generate-seed-corpus-for-results-explorer
+      file: DONE/main/planning/generate-seed-corpus-for-results-explorer.yaml
+      title: Generate seed corpus of benchmark results for the results explorer
+      priority: Medium-High
+      status: Completed
     - id: harden-operator-type-handling
       file: DONE/query-plan-remediation/planning/harden-operator-type-handling.yaml
       title: Harden plan comparison and visualization for unknown operator types
@@ -1172,6 +1182,11 @@ categories:
       file: DONE/main/active/manifest-table-name-collision-detection.yaml
       title: Invalidate manifest reuse when untracked directories collide with table names
       priority: High
+      status: Completed
+    - id: launch-results-explorer-acceptance-and-seed
+      file: DONE/main/planning/launch-results-explorer-acceptance-and-seed.yaml
+      title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
+      priority: Medium-High
       status: Completed
     - id: duckdb-text-plan-reliability
       file: DONE/query-plan-remediation/planning/duckdb-text-plan-reliability.yaml

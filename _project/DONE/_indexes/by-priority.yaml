@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:27:25.635045'
-total_items: 632
+generated_at: '2026-04-04T08:38:03.123448'
+total_items: 635
 priorities:
   Critical:
     count: 36
@@ -1331,7 +1331,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 85
+    count: 88
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1469,6 +1469,11 @@ priorities:
       title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
       category: Testing & Quality
       status: Completed
+    - id: build-results-explorer-subsite-on-benchbox-dev
+      file: DONE/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
+      title: Build a results explorer subsite on benchbox.dev
+      category: Core Functionality
+      status: Completed
     - id: build-static-pipeline-bundles-to-read-model
       file: DONE/main/planning/build-static-pipeline-bundles-to-read-model.yaml
       title: Build static pipeline that transforms result bundles into explorer read models
@@ -1579,6 +1584,11 @@ priorities:
       title: Fix type checking errors ignored in ty config
       category: Testing and Quality Assurance
       status: Completed
+    - id: generate-seed-corpus-for-results-explorer
+      file: DONE/main/planning/generate-seed-corpus-for-results-explorer.yaml
+      title: Generate seed corpus of benchmark results for the results explorer
+      category: Core Functionality
+      status: Completed
     - id: ctas-sorted-data-loading
       file: DONE/physical-tuning/active/ctas-sorted-data-loading.yaml
       title: Implement CTAS-based sorted data loading for DuckDB
@@ -1642,6 +1652,11 @@ priorities:
     - id: integrate-explorer-into-github-pages-deployment
       file: DONE/main/planning/integrate-explorer-into-github-pages-deployment.yaml
       title: Integrate results explorer into GitHub Pages deployment workflow
+      category: Core Functionality
+      status: Completed
+    - id: launch-results-explorer-acceptance-and-seed
+      file: DONE/main/planning/launch-results-explorer-acceptance-and-seed.yaml
+      title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
       category: Core Functionality
       status: Completed
     - id: explicit-tuning-file-resolution

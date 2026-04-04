@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:30:54.926057'
-total_items: 26
+generated_at: '2026-04-04T08:37:58.553921'
+total_items: 23
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -399,25 +399,6 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
-- id: build-results-explorer-subsite-on-benchbox-dev
-  file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
-  title: Build a results explorer subsite on benchbox.dev
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - website
-  - frontend
-  - explorer
-  - benchbox-dev
-  estimated_effort: Large
-  work_total: 3
-  work_done: 0
-  work_ready: 1
-  needs:
-  - define-results-platform-product-and-launch-strategy
 - id: define-hosted-results-contract-and-governance-model
   file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
   title: Define hosted results contract, trust labels, and governance model
@@ -438,43 +419,3 @@ items:
   work_ready: 0
   needs:
   - define-results-platform-product-and-launch-strategy
-- id: generate-seed-corpus-for-results-explorer
-  file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
-  title: Generate seed corpus of benchmark results for the results explorer
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - phase-1
-  - seed-corpus
-  - ci
-  estimated_effort: Medium
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - define-results-platform-product-and-launch-strategy
-- id: launch-results-explorer-acceptance-and-seed
-  file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
-  title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - phase-1
-  - launch
-  - acceptance
-  estimated_effort: Medium
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - generate-seed-corpus-for-results-explorer
-  - integrate-explorer-into-github-pages-deployment
-  - resolve-results-explorer-brand-ownership

@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:30:54.926131'
-total_items: 26
+generated_at: '2026-04-04T08:37:58.554016'
+total_items: 23
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Core Functionality
   Not Started:
-    count: 23
+    count: 20
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -42,11 +42,6 @@ statuses:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
       category: Platform Expansion
-    - id: build-results-explorer-subsite-on-benchbox-dev
-      file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
-      title: Build a results explorer subsite on benchbox.dev
-      priority: Medium-High
-      category: Core Functionality
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
@@ -62,11 +57,6 @@ statuses:
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
       priority: Low
       category: Supporting Infrastructure
-    - id: generate-seed-corpus-for-results-explorer
-      file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
-      title: Generate seed corpus of benchmark results for the results explorer
-      priority: Medium-High
-      category: Core Functionality
     - id: geospatial-primitives-benchmark
       file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
       title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
@@ -81,11 +71,6 @@ statuses:
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: High
-      category: Core Functionality
-    - id: launch-results-explorer-acceptance-and-seed
-      file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
-      title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
-      priority: Medium-High
       category: Core Functionality
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml

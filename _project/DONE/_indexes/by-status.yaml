@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:27:25.635207'
-total_items: 632
+generated_at: '2026-04-04T08:38:03.123838'
+total_items: 635
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 583
+    count: 586
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -744,6 +744,11 @@ statuses:
       title: Build Shared Infrastructure for Benchmarking PostgreSQL Extensions
       priority: Medium
       category: Platform Expansion
+    - id: build-results-explorer-subsite-on-benchbox-dev
+      file: DONE/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
+      title: Build a results explorer subsite on benchbox.dev
+      priority: Medium-High
+      category: Core Functionality
     - id: pg-duckdb-native-comparison
       file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml
       title: Build automated pg_duckdb vs native DuckDB comparison report
@@ -1618,6 +1623,11 @@ statuses:
       title: Gate monitoring behind a benchbox[monitoring] optional extra
       priority: High
       category: Packaging
+    - id: generate-seed-corpus-for-results-explorer
+      file: DONE/main/planning/generate-seed-corpus-for-results-explorer.yaml
+      title: Generate seed corpus of benchmark results for the results explorer
+      priority: Medium-High
+      category: Core Functionality
     - id: guard-tpc-ds-fractional-scale-defaults
       file: DONE/benchmark-expansion/planning/guard-tpc-ds-fractional-scale-defaults.yaml
       title: Guard TPC-DS Fractional Scale Defaults
@@ -1858,6 +1868,11 @@ statuses:
       file: DONE/main/active/manifest-table-name-collision-detection.yaml
       title: Invalidate manifest reuse when untracked directories collide with table names
       priority: High
+      category: Core Functionality
+    - id: launch-results-explorer-acceptance-and-seed
+      file: DONE/main/planning/launch-results-explorer-acceptance-and-seed.yaml
+      title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
+      priority: Medium-High
       category: Core Functionality
     - id: logging-standardization
       file: DONE/observability-quality/active/logging-standardization.yaml

@@ -2,7 +2,7 @@ id: build-results-explorer-subsite-on-benchbox-dev
 title: "Build a results explorer subsite on benchbox.dev"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Core Functionality
 deps:
   needs:
@@ -31,7 +31,7 @@ description: |
 work:
 - id: w1
   summary: "Milestone: seed corpus generated and build pipeline operational"
-  status: pending
+  status: done
   notes: |
     Tracked by: generate-seed-corpus-for-results-explorer,
     build-static-pipeline-bundles-to-read-model
@@ -39,7 +39,7 @@ work:
 - id: w2
   summary: "Milestone: frontend scaffold and all explorer pages implemented"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Tracked by: scaffold-results-explorer-frontend,
     implement-explorer-home-and-browse-pages,
@@ -49,7 +49,7 @@ work:
 - id: w3
   summary: "Milestone: explorer deployed to GitHub Pages and acceptance-tested"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Tracked by: integrate-explorer-into-github-pages-deployment,
     launch-results-explorer-acceptance-and-seed
@@ -63,6 +63,7 @@ metadata:
   - benchbox-dev
   estimated_effort: "Large"
   created_date: "2026-03-29"
+  completed_date: "2026-04-04"
 
 impact:
   business_value: |

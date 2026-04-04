@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:27:25.634504'
-total_items: 632
+generated_at: '2026-04-04T08:38:03.122283'
+total_items: 635
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7334,6 +7334,25 @@ items:
   work_done: 19
   work_ready: 0
   deferred_count: 2
+- id: build-results-explorer-subsite-on-benchbox-dev
+  file: DONE/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
+  title: Build a results explorer subsite on benchbox.dev
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - results
+  - website
+  - frontend
+  - explorer
+  - benchbox-dev
+  estimated_effort: Large
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+  needs:
+  - define-results-platform-product-and-launch-strategy
 - id: build-static-pipeline-bundles-to-read-model
   file: DONE/main/planning/build-static-pipeline-bundles-to-read-model.yaml
   title: Build static pipeline that transforms result bundles into explorer read models
@@ -7683,6 +7702,25 @@ items:
   - code-quality
   - ty
   estimated_effort: Large
+- id: generate-seed-corpus-for-results-explorer
+  file: DONE/main/planning/generate-seed-corpus-for-results-explorer.yaml
+  title: Generate seed corpus of benchmark results for the results explorer
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - seed-corpus
+  - ci
+  estimated_effort: Medium
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - define-results-platform-product-and-launch-strategy
 - id: ctas-sorted-data-loading
   file: DONE/physical-tuning/active/ctas-sorted-data-loading.yaml
   title: Implement CTAS-based sorted data loading for DuckDB
@@ -7914,6 +7952,27 @@ items:
   - implement-explorer-home-and-browse-pages
   - implement-result-detail-page
   - implement-results-compare-view
+- id: launch-results-explorer-acceptance-and-seed
+  file: DONE/main/planning/launch-results-explorer-acceptance-and-seed.yaml
+  title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - launch
+  - acceptance
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - generate-seed-corpus-for-results-explorer
+  - integrate-explorer-into-github-pages-deployment
+  - resolve-results-explorer-brand-ownership
 - id: explicit-tuning-file-resolution
   file: DONE/ux-improvements/active/explicit-tuning-file-resolution.yaml
   title: Make tuning file resolution explicit and transparent in CLI

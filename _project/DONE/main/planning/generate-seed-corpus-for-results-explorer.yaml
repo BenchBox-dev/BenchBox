@@ -2,7 +2,7 @@ id: generate-seed-corpus-for-results-explorer
 title: "Generate seed corpus of benchmark results for the results explorer"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Core Functionality
 deps:
   needs:
@@ -34,7 +34,7 @@ description: |
 work:
 - id: w1
   summary: "Define seed corpus spec: benchmarks, platforms, scale factors, and storage location"
-  status: pending
+  status: done
   notes: |
     Decide:
     - Which benchmark×platform×scale combinations to include (prioritize depth:
@@ -55,7 +55,7 @@ work:
 - id: w2
   summary: "Build a GitHub Actions workflow that generates seed corpus bundles"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Create `.github/workflows/seed-corpus.yml` (or extend an existing workflow)
     that runs the specified benchmark matrix using `benchbox run`. Each run should:
@@ -69,7 +69,7 @@ work:
 - id: w3
   summary: "Run initial seed corpus generation and commit bundles"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Execute the workflow, verify all bundles pass schema validation, and commit
     the initial corpus. Verify that each bundle has valid metadata, query timings,
@@ -78,7 +78,7 @@ work:
 - id: w4
   summary: "Add a corpus inventory manifest and validation script"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Create a simple `corpus-inventory.json` that lists all bundles with their
     benchmark, platform, scale factor, date, and file paths. Add a validation
@@ -95,6 +95,7 @@ metadata:
   - ci
   estimated_effort: "Medium"
   created_date: "2026-03-29"
+  completed_date: "2026-04-04"
 
 impact:
   business_value: |
