@@ -1,4 +1,4 @@
-generated_at: '2026-04-04T08:27:24.037626'
+generated_at: '2026-04-04T08:30:54.926102'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -7,7 +7,7 @@ categories:
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
-      priority: Medium-High
+      priority: High
       status: Not Started
   Benchmark Development:
     count: 6
@@ -30,12 +30,12 @@ categories:
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
-      priority: Medium-High
+      priority: High
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
-      priority: Medium
+      priority: Low
       status: Not Started
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
@@ -54,12 +54,12 @@ categories:
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
       priority: Critical
-      status: Done
+      status: Completed
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
       priority: Medium-High
-      status: Done
+      status: Completed
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
@@ -106,7 +106,7 @@ categories:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
-      priority: Low
+      priority: Medium
       status: Not Started
     - id: singlestore-adapter
       file: TODO/platform-expansion/planning/singlestore-adapter.yaml

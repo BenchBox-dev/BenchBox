@@ -1,4 +1,4 @@
-generated_at: '2026-04-04T08:27:24.037655'
+generated_at: '2026-04-04T08:30:54.926120'
 total_items: 26
 priorities:
   Critical:
@@ -8,9 +8,9 @@ priorities:
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
       category: Core Functionality
-      status: Done
+      status: Completed
   High:
-    count: 2
+    count: 4
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -22,29 +22,6 @@ priorities:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
       status: Not Started
-  Medium-High:
-    count: 6
-    items:
-    - id: build-results-explorer-subsite-on-benchbox-dev
-      file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
-      title: Build a results explorer subsite on benchbox.dev
-      category: Core Functionality
-      status: Not Started
-    - id: define-hosted-results-contract-and-governance-model
-      file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
-      title: Define hosted results contract, trust labels, and governance model
-      category: Core Functionality
-      status: Done
-    - id: generate-seed-corpus-for-results-explorer
-      file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
-      title: Generate seed corpus of benchmark results for the results explorer
-      category: Core Functionality
-      status: Not Started
-    - id: launch-results-explorer-acceptance-and-seed
-      file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
-      title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
-      category: Core Functionality
-      status: Not Started
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
@@ -55,12 +32,40 @@ priorities:
       title: Vector Search Benchmark Support
       category: AI/ML Capabilities
       status: Not Started
+  Medium-High:
+    count: 4
+    items:
+    - id: build-results-explorer-subsite-on-benchbox-dev
+      file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
+      title: Build a results explorer subsite on benchbox.dev
+      category: Core Functionality
+      status: Not Started
+    - id: define-hosted-results-contract-and-governance-model
+      file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
+      title: Define hosted results contract, trust labels, and governance model
+      category: Core Functionality
+      status: Completed
+    - id: generate-seed-corpus-for-results-explorer
+      file: TODO/main/planning/generate-seed-corpus-for-results-explorer.yaml
+      title: Generate seed corpus of benchmark results for the results explorer
+      category: Core Functionality
+      status: Not Started
+    - id: launch-results-explorer-acceptance-and-seed
+      file: TODO/main/planning/launch-results-explorer-acceptance-and-seed.yaml
+      title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
+      category: Core Functionality
+      status: Not Started
   Medium:
     count: 8
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
+      category: Platform Expansion
+      status: Not Started
+    - id: cedardb-adapter
+      file: TODO/platform-expansion/planning/cedardb-adapter.yaml
+      title: Add CedarDB Platform Adapter
       category: Platform Expansion
       status: Not Started
     - id: add-hypothesis-property-tests
@@ -93,22 +98,12 @@ priorities:
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
       status: Not Started
-    - id: stackoverflow-benchmark
-      file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
-      title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
-      category: Benchmark Development
-      status: Not Started
   Low:
     count: 9
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
       title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
-      category: Platform Expansion
-      status: Not Started
-    - id: cedardb-adapter
-      file: TODO/platform-expansion/planning/cedardb-adapter.yaml
-      title: Add CedarDB Platform Adapter
       category: Platform Expansion
       status: Not Started
     - id: siriusdb-adapter
@@ -135,6 +130,11 @@ priorities:
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
+      status: Not Started
+    - id: stackoverflow-benchmark
+      file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
+      title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
+      category: Benchmark Development
       status: Not Started
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml

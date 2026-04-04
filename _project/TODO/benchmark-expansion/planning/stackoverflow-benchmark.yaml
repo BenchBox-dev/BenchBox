@@ -2,7 +2,7 @@ id: stackoverflow-benchmark
 title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
 worktree: benchmark-expansion
 category: Benchmark Development
-priority: Medium
+priority: Low
 status: Not Started
 description: |
   Implement a Stack Overflow benchmark using the publicly available Stack Exchange

@@ -1,4 +1,4 @@
-generated_at: '2026-04-04T08:27:24.037747'
+generated_at: '2026-04-04T08:30:54.926131'
 total_items: 26
 statuses:
   In Progress:
@@ -25,7 +25,7 @@ statuses:
     - id: cedardb-adapter
       file: TODO/platform-expansion/planning/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
-      priority: Low
+      priority: Medium
       category: Platform Expansion
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -95,7 +95,7 @@ statuses:
     - id: nyc-taxi-benchmark-expansion
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
-      priority: Medium-High
+      priority: High
       category: Benchmark Development
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
@@ -110,7 +110,7 @@ statuses:
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
-      priority: Medium
+      priority: Low
       category: Benchmark Development
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
@@ -120,10 +120,23 @@ statuses:
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
       title: Vector Search Benchmark Support
-      priority: Medium-High
+      priority: High
       category: AI/ML Capabilities
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
+  Completed:
+    count: 2
+    items:
+    - id: define-results-platform-product-and-launch-strategy
+      file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
+      title: Define BenchBox results platform product boundary and launch strategy
+      priority: Critical
+      category: Core Functionality
+    - id: define-hosted-results-contract-and-governance-model
+      file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
+      title: Define hosted results contract, trust labels, and governance model
+      priority: Medium-High
+      category: Core Functionality

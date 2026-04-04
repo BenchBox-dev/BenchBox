@@ -1,7 +1,7 @@
 id: vector-search-benchmark-support
 title: "Vector Search Benchmark Support"
 worktree: ai-ml-vector-search
-priority: Medium-High
+priority: High
 status: Not Started
 category: AI/ML Capabilities
 description: |
