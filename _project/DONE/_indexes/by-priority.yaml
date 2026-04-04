@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:25:57.741960'
-total_items: 631
+generated_at: '2026-04-04T08:27:25.635045'
+total_items: 632
 priorities:
   Critical:
     count: 36
@@ -1331,7 +1331,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 84
+    count: 85
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1714,6 +1714,11 @@ priorities:
       title: Promote 3 internal MCP API references to public exports
       category: Packaging
       status: Completed
+    - id: prune-legacy-publishing-prototype
+      file: DONE/main/planning/prune-legacy-publishing-prototype.yaml
+      title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
+      category: Code Quality & Build
+      status: Not Started
     - id: remove-polars-sql-mode
       file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml
       title: Remove Polars SQL mode support - DataFrame only

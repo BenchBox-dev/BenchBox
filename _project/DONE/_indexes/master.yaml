@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:25:57.739530'
-total_items: 631
+generated_at: '2026-04-04T08:27:25.634504'
+total_items: 632
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -8139,6 +8139,23 @@ items:
   work_total: 2
   work_done: 2
   work_ready: 0
+- id: prune-legacy-publishing-prototype
+  file: DONE/main/planning/prune-legacy-publishing-prototype.yaml
+  title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
+  worktree: main
+  category: Code Quality & Build
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - publishing
+  - cleanup
+  - dead-code
+  estimated_effort: Half day
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - productize-result-publishing-and-artifact-sharing
 - id: remove-polars-sql-mode
   file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml
   title: Remove Polars SQL mode support - DataFrame only

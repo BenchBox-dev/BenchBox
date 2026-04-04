@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:25:53.575179'
-total_items: 27
+generated_at: '2026-04-04T08:27:24.037747'
+total_items: 26
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Core Functionality
   Not Started:
-    count: 24
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -102,11 +102,6 @@ statuses:
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
       category: Core Functionality
-    - id: prune-legacy-publishing-prototype
-      file: TODO/main/planning/prune-legacy-publishing-prototype.yaml
-      title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
-      priority: Medium-High
-      category: Code Quality & Build
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

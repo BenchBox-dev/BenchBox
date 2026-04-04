@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:25:57.743043'
-total_items: 631
+generated_at: '2026-04-04T08:27:25.635207'
+total_items: 632
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Usability
   Not Started:
-    count: 44
+    count: 45
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -232,6 +232,11 @@ statuses:
       title: 'PT-09: BigQuery Physical Tuning DDL Generator Enhancement'
       priority: Medium
       category: Platform Expansion
+    - id: prune-legacy-publishing-prototype
+      file: DONE/main/planning/prune-legacy-publishing-prototype.yaml
+      title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
+      priority: Medium-High
+      category: Code Quality & Build
     - id: pyspark-sql-registry-integration
       file: DONE/dataframe-expansion/planning/pyspark-sql-registry-integration.yaml
       title: Register PySpark SQL mode in platform registry

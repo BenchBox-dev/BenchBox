@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:25:57.740914'
-total_categories: 74
+generated_at: '2026-04-04T08:27:25.634814'
+total_categories: 75
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -233,6 +233,14 @@ categories:
       title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)
       priority: Medium
       status: Completed
+  Code Quality & Build:
+    count: 1
+    items:
+    - id: prune-legacy-publishing-prototype
+      file: DONE/main/planning/prune-legacy-publishing-prototype.yaml
+      title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
+      priority: Medium-High
+      status: Not Started
   Code Quality and Documentation:
     count: 4
     items:

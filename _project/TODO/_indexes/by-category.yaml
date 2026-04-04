@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:25:53.575151'
-total_categories: 7
+generated_at: '2026-04-04T08:27:24.037626'
+total_categories: 6
 categories:
   AI/ML Capabilities:
     count: 1
@@ -41,14 +41,6 @@ categories:
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
-      status: Not Started
-  Code Quality & Build:
-    count: 1
-    items:
-    - id: prune-legacy-publishing-prototype
-      file: TODO/main/planning/prune-legacy-publishing-prototype.yaml
-      title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
-      priority: Medium-High
       status: Not Started
   Core Functionality:
     count: 9

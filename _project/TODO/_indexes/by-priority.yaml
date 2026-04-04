@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:25:53.575168'
-total_items: 27
+generated_at: '2026-04-04T08:27:24.037655'
+total_items: 26
 priorities:
   Critical:
     count: 1
@@ -23,7 +23,7 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 7
+    count: 6
     items:
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
@@ -49,11 +49,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
       title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
       category: Benchmark Development
-      status: Not Started
-    - id: prune-legacy-publishing-prototype
-      file: TODO/main/planning/prune-legacy-publishing-prototype.yaml
-      title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
-      category: Code Quality & Build
       status: Not Started
     - id: vector-search-benchmark-support
       file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
