@@ -2,7 +2,7 @@ id: http-tls-certificate-validation
 title: "Add TLS Certificate Validation Options to HTTP-Based Data Loading"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Platform Expansion
 description: |
   Add verify_ssl and ca_cert_path options to HTTP-based data loading endpoints.
@@ -59,12 +59,12 @@ must_preserve:
 work:
 - id: w1
   summary: "Add verify_ssl and ca_cert_path TLS options to doris.py (_stream_load and _chunked_stream_load), starrocks/adapter.py, and influxdb/client.py — following trino.py:110-303 pattern"
-  status: pending
+  status: done
 
 - id: w2
   summary: "Wire options through Doris, StarRocks, and InfluxDB adapters"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Add unit tests for TLS options — verify cert path is passed through, verify_ssl=False disables validation"
