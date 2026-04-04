@@ -2,7 +2,8 @@ id: coverage-current-bottom-25-modules-to-80pct-apr-2026
 title: "Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-04-03"
 description: |
   Fresh baseline from `.coverage` rendered via `uv run -- python -m coverage json`
   at 2026-04-02 19:03:25 local time shows overall fast-lane coverage at 82.87%
@@ -143,7 +144,7 @@ work:
 
 - id: w3
   summary: "Transaction DataFrame operations: capabilities, format validation, atomic paths"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     benchbox/core/transaction_primitives/dataframe_operations.py (+88 lines -> 80%)
@@ -161,7 +162,7 @@ work:
 
 - id: w4
   summary: "DataFrame query registries: CoffeeShop and AMPLab expression/pandas parity"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     benchbox/core/coffeeshop/dataframe_queries/queries.py (+47 lines -> 80%)
@@ -184,7 +185,7 @@ work:
 
 - id: w5
   summary: "Generator and wrapper flow: TPC-DS manager, SSB generator, DataVault benchmark"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/core/tpcds/generator/manager.py (+45 lines -> 80%)
@@ -211,7 +212,7 @@ work:
 
 - id: w6
   summary: "Experimental benchmark wrappers: GPU and AIML functions"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/experimental/gpu/benchmark.py (+40 lines -> 80%)
@@ -229,7 +230,7 @@ work:
 
 - id: w7
   summary: "Databricks DataFrame adapter branches"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/databricks/dataframe_adapter.py (+89 lines -> 80%)
@@ -245,7 +246,7 @@ work:
 
 - id: w8
   summary: "Databricks credential defaults and validation branches"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/databricks/credentials.py (+37 lines -> 80%)
@@ -259,7 +260,7 @@ work:
 
 - id: w9
   summary: "Cloud-Spark DDL and config mixins"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/base/cloud_spark/mixins.py (+61 lines -> 80%)
@@ -275,7 +276,7 @@ work:
 
 - id: w10
   summary: "Core Spark adapter branches"
-  status: pending
+  status: done
   needs: [w9]
   description: |
     benchbox/platforms/spark.py (+133 lines -> 80%)
@@ -292,7 +293,7 @@ work:
 
 - id: w11
   summary: "LakeSail adapter branches"
-  status: pending
+  status: done
   needs: [w9]
   description: |
     benchbox/platforms/lakesail.py (+62 lines -> 80%)
@@ -307,7 +308,7 @@ work:
 
 - id: w12
   summary: "Glue adapter orchestration branches"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/aws/glue_adapter.py (+49 lines -> 80%)
@@ -322,7 +323,7 @@ work:
 
 - id: w13
   summary: "Firebolt adapter loading and fallback branches"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/firebolt.py (+121 lines -> 80%)
@@ -339,7 +340,7 @@ work:
 
 - id: w14
   summary: "ClickHouse Cloud adapter external-table branches"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/clickhouse_cloud.py (+75 lines -> 80%)
@@ -354,7 +355,7 @@ work:
 
 - id: w15
   summary: "Redshift credential and diagnostics branches"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/credentials/redshift.py (+118 lines -> 80%)
@@ -371,7 +372,7 @@ work:
 
 - id: w16
   summary: "QuestDB adapter branches and ILP helpers"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/platforms/questdb.py (+94 lines -> 80%)
@@ -386,7 +387,7 @@ work:
 
 - id: w17
   summary: "Metadata primitives facade coverage"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/metadata_primitives.py (+7 lines -> 80%)
@@ -401,7 +402,7 @@ work:
 
 - id: w18
   summary: "Write-primitives benchmark execution paths"
-  status: pending
+  status: done
   needs: [w3]
   description: |
     benchbox/core/write_primitives/benchmark.py (+105 lines -> 80%)
@@ -422,7 +423,7 @@ work:
 
 - id: w19
   summary: "TPC-DI error recovery engine"
-  status: pending
+  status: done
   needs: []
   description: |
     benchbox/core/tpcdi/etl/error_recovery.py (+58 lines -> 80%)

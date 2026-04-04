@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T09:45:41.591447'
-total_items: 627
+generated_at: '2026-04-03T21:07:35.386824'
+total_items: 629
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 579
+    count: 581
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -717,6 +717,11 @@ statuses:
     - id: coverage-bottom-25-modules-to-80pct
       file: DONE/main/active/coverage-bottom-25-modules-to-80pct.yaml
       title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
+      priority: Medium-High
+      category: Testing & Quality
+    - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
+      file: DONE/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
+      title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
       priority: Medium-High
       category: Testing & Quality
     - id: postgres-extension-benchmarking-infrastructure
@@ -2144,6 +2149,11 @@ statuses:
       title: Prevent concurrent parallel test runs via fcntl.flock mutex
       priority: Medium
       category: CI Infrastructure
+    - id: productize-result-publishing-and-artifact-sharing
+      file: DONE/main/planning/productize-result-publishing-and-artifact-sharing.yaml
+      title: Productize result publishing and artifact sharing workflow
+      priority: High
+      category: Core Functionality
     - id: formalize-mcp-internal-apis
       file: DONE/main/active/formalize-mcp-internal-apis.yaml
       title: Promote 3 internal MCP API references to public exports

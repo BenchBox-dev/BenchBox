@@ -1,4 +1,4 @@
-generated_at: '2026-04-03T09:45:39.701039'
+generated_at: '2026-04-03T21:07:33.907074'
 total_categories: 6
 categories:
   AI/ML Capabilities:
@@ -43,7 +43,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 10
+    count: 9
     items:
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
@@ -90,11 +90,6 @@ categories:
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
       status: Not Started
-    - id: productize-result-publishing-and-artifact-sharing
-      file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
-      title: Productize result publishing and artifact sharing workflow
-      priority: High
-      status: In Progress
   Platform Expansion:
     count: 10
     items:
@@ -157,15 +152,10 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 2
+    count: 1
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       priority: Medium
       status: Not Started
-    - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
-      file: TODO/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
-      title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
-      priority: Medium-High
-      status: In Progress

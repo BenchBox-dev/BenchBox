@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T09:45:39.701059'
-total_items: 30
+generated_at: '2026-04-03T21:07:33.907091'
+total_items: 28
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Done
   High:
-    count: 3
+    count: 2
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -22,13 +22,8 @@ priorities:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
       status: Not Started
-    - id: productize-result-publishing-and-artifact-sharing
-      file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
-      title: Productize result publishing and artifact sharing workflow
-      category: Core Functionality
-      status: In Progress
   Medium-High:
-    count: 9
+    count: 8
     items:
     - id: http-tls-certificate-validation
       file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
@@ -40,11 +35,6 @@ priorities:
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       category: Platform Expansion
       status: Not Started
-    - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
-      file: TODO/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
-      title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
-      category: Testing & Quality
-      status: In Progress
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
       title: Build a results explorer subsite on benchbox.dev

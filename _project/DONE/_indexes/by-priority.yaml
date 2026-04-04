@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T09:45:41.591296'
-total_items: 627
+generated_at: '2026-04-03T21:07:35.386692'
+total_items: 629
 priorities:
   Critical:
     count: 36
@@ -185,7 +185,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 227
+    count: 228
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -879,6 +879,11 @@ priorities:
       title: Presto and Trino Platform Documentation
       category: Documentation and User Experience
       status: Completed
+    - id: productize-result-publishing-and-artifact-sharing
+      file: DONE/main/planning/productize-result-publishing-and-artifact-sharing.yaml
+      title: Productize result publishing and artifact sharing workflow
+      category: Core Functionality
+      status: Completed
     - id: postgresql-first-class-platform
       file: DONE/platform-expansion/active/postgresql-first-class-platform.yaml
       title: Promote PostgreSQL to first-class platform status
@@ -1326,7 +1331,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 81
+    count: 82
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1447,6 +1452,11 @@ priorities:
     - id: coverage-bottom-25-modules-to-80pct
       file: DONE/main/active/coverage-bottom-25-modules-to-80pct.yaml
       title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
+      category: Testing & Quality
+      status: Completed
+    - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
+      file: DONE/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
+      title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
       category: Testing & Quality
       status: Completed
     - id: build-static-pipeline-bundles-to-read-model

@@ -1,19 +1,6 @@
-generated_at: '2026-04-03T09:45:39.701071'
-total_items: 30
+generated_at: '2026-04-03T21:07:33.907103'
+total_items: 28
 statuses:
-  In Progress:
-    count: 2
-    items:
-    - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
-      file: TODO/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
-      title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
-      priority: Medium-High
-      category: Testing & Quality
-    - id: productize-result-publishing-and-artifact-sharing
-      file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
-      title: Productize result publishing and artifact sharing workflow
-      priority: High
-      category: Core Functionality
   Not Started:
     count: 26
     items:

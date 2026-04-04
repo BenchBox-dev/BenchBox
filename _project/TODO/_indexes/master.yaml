@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T09:45:39.700995'
-total_items: 30
+generated_at: '2026-04-03T21:07:33.907034'
+total_items: 28
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -55,27 +55,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
-- id: productize-result-publishing-and-artifact-sharing
-  file: TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml
-  title: Productize result publishing and artifact sharing workflow
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - publishing
-  - results
-  - artifact-management
-  - sharing
-  - follow-up
-  - scope-review
-  estimated_effort: Large
-  work_total: 10
-  work_done: 2
-  work_ready: 2
-  deferred_count: 3
-  needs:
-  - define-results-platform-product-and-launch-strategy
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -418,23 +397,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 3
-- id: coverage-current-bottom-25-modules-to-80pct-apr-2026
-  file: TODO/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
-  title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
-  worktree: main
-  category: Testing & Quality
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - testing
-  - coverage
-  - fast-lane
-  - module-floor
-  estimated_effort: Extra Large
-  work_total: 19
-  work_done: 6
-  work_ready: 11
-  deferred_count: 2
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
   title: Build a results explorer subsite on benchbox.dev

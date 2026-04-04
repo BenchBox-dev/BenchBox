@@ -1,4 +1,4 @@
-generated_at: '2026-04-03T09:45:41.591129'
+generated_at: '2026-04-03T21:07:35.386546'
 total_categories: 74
 categories:
   '"Bug Fixes & Reliability"':
@@ -491,7 +491,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 201
+    count: 202
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1289,6 +1289,11 @@ categories:
       file: DONE/unknown/planning/pre-compile-tpc-binaries-for-multiple-platforms-completed.yaml
       title: Pre-Compile TPC Binaries for Multiple Platforms ✅ COMPLETED
       priority: Medium
+      status: Completed
+    - id: productize-result-publishing-and-artifact-sharing
+      file: DONE/main/planning/productize-result-publishing-and-artifact-sharing.yaml
+      title: Productize result publishing and artifact sharing workflow
+      priority: High
       status: Completed
     - id: propagate-duration-seconds-in-enhanced-results
       file: DONE/core-functionality/active/propagate-duration-seconds-in-enhanced-results.yaml
@@ -2932,11 +2937,16 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 17
+    count: 18
     items:
     - id: coverage-bottom-25-modules-to-80pct
       file: DONE/main/active/coverage-bottom-25-modules-to-80pct.yaml
       title: Bring the 25 lowest-coverage modules to 80% fast-test coverage
+      priority: Medium-High
+      status: Completed
+    - id: coverage-current-bottom-25-modules-to-80pct-apr-2026
+      file: DONE/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
+      title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
       priority: Medium-High
       status: Completed
     - id: enforce-no-conflicting-test-markers

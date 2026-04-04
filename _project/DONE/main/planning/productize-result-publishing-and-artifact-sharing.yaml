@@ -2,7 +2,8 @@ id: productize-result-publishing-and-artifact-sharing
 title: "Productize result publishing and artifact sharing workflow"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-03"
 category: Core Functionality
 description: |
   The completed item `_project/DONE/infrastructure-publishing/planning/automated-data-publishing-pipeline.yaml`
@@ -67,7 +68,8 @@ work:
 - id: w3
   summary: "Design and implement a persistent publication metadata model that survives process restart"
   needs: [w2]
-  status: pending
+  status: done
+  completed_note: "PublicationStore at ~/.benchbox/published.json — durable JSON-backed store with atomic writes via temp+rename. See benchbox/core/publishing/store.py"
   notes: |
     Replace the current process-local registry model with durable publication metadata. The store should
     persist published artifact identity, source result bundle, storage targets, retention state, and
@@ -77,7 +79,8 @@ work:
 - id: w4
   summary: "Refactor publishing to reuse canonical result bundles instead of duplicating result serialization"
   needs: [w2]
-  status: pending
+  status: done
+  completed_note: "BundlePublisher copies real schema-v2 bundles + companion files (.plans.json, .tuning.json). No re-serialization. See benchbox/core/publishing/bundle_publisher.py"
   notes: |
     The follow-up feature must publish the actual schema-v2 result bundle (`.json`, `.plans.json`,
     `.tuning.json`) produced by `benchbox.core.results.exporter`, not a second JSON shape from
@@ -87,7 +90,8 @@ work:
 - id: w5
   summary: "Implement a first-class CLI/API path for publishing existing result bundles"
   needs: [w3, w4]
-  status: pending
+  status: done
+  completed_note: "benchbox publish run/list/show/remove CLI command group. See benchbox/cli/commands/publish.py"
   notes: |
     Add the supported user entry point for publishing and inspecting published artifacts. The workflow
     should work on already-exported result files first, because that is the smallest broadly useful
@@ -96,7 +100,8 @@ work:
 - id: w6
   summary: "Add an optional post-run publish hook that composes with the existing run/export lifecycle"
   needs: [w5]
-  status: pending
+  status: done
+  completed_note: "benchbox run --publish / --publish-target / --publish-label flags. Reuses exported bundle, respects quiet mode. See benchbox/cli/commands/run.py"
   notes: |
     Once publishing an existing bundle is supported, wire an optional publish step into the canonical
     run lifecycle. The hook must reuse the already-exported bundle and preserve quiet-mode/output rules.
@@ -106,7 +111,8 @@ work:
 - id: w7
   summary: "Implement backend-specific addressability rules so share links are real, stable, and documented"
   needs: [w3, w5]
-  status: pending
+  status: done
+  completed_note: "build_reference() generates file:// URIs for local, s3:///gs:///abfss:// for cloud. No fake short codes. See benchbox/core/publishing/store.py"
   notes: |
     A short code or URL is only useful when it resolves to something durable. Define how BenchBox will
     represent published locations for:
@@ -119,7 +125,8 @@ work:
 - id: w8
   summary: "Add retention, republish, and idempotency semantics on top of the persistent publication store"
   needs: [w3, w5]
-  status: pending
+  status: done
+  completed_note: "Idempotent add() updates existing records for same source+destination. benchbox publish remove for metadata cleanup. See store.py and test_publish_store.py"
   notes: |
     The current prototype can mark items archived in memory, but a supported feature needs durable
     retention behavior, safe re-publication of existing bundles, and explicit idempotency rules for
@@ -128,7 +135,8 @@ work:
 - id: w9
   summary: "Document the workflow, configuration, and supported backends with user-facing examples"
   needs: [w5, w6, w7]
-  status: pending
+  status: done
+  completed_note: "docs/CLI_REFERENCE.md updated with usage examples, backend addressability notes, and persistence guarantees"
   notes: |
     Add CLI help, docs, and examples for both local and cloud publishing. The documentation must state
     exactly what kind of link/reference a user gets for each backend and what persistence guarantees
@@ -137,7 +145,8 @@ work:
 - id: w10
   summary: "Add end-to-end coverage and then retire or slim the remaining prototype-only surfaces"
   needs: [w6, w7, w8, w9]
-  status: pending
+  status: done
+  completed_note: "143 tests across test_publish_store.py and test_publish_cli.py. Prototype pruning deferred to separate TODO (prune-legacy-publishing-prototype)"
   notes: |
     Add unit and integration coverage for the supported flow, then remove or collapse the leftover
     prototype-only code paths that are no longer needed. If the feature still fails to earn real
@@ -307,10 +316,14 @@ success_metrics:
 - "The feature has at least one supported user-facing CLI path and is documented in CLI/help/docs"
 
 open_questions:
-- "Should local/cloud artifact publication standardize on a top-level `benchbox publish` command or an `artifacts`/`results` subcommand family?"
-- "Should durable publication metadata live beside result bundles, under `benchmark_runs/published/`, or in a separate indexed store?"
-- "Should cloud publishing support launch only for directly addressable/public roots first, with private resolver workflows deferred?"
-- "Which prototype-only surfaces should be deleted outright once the supported publishing flow lands?"
+- question: "Should local/cloud artifact publication standardize on a top-level `benchbox publish` command or an `artifacts`/`results` subcommand family?"
+  resolved: "Top-level `benchbox publish` command group with run/list/show/remove subcommands"
+- question: "Should durable publication metadata live beside result bundles, under `benchmark_runs/published/`, or in a separate indexed store?"
+  resolved: "Separate indexed store at ~/.benchbox/published.json — decoupled from bundle location"
+- question: "Should cloud publishing support launch only for directly addressable/public roots first, with private resolver workflows deferred?"
+  resolved: "Yes — file:// for local, native cloud URIs (s3/gs/abfss) for cloud. No fake short codes or resolver service."
+- question: "Which prototype-only surfaces should be deleted outright once the supported publishing flow lands?"
+  resolved: "Gap matrix recommends PRUNE all of Publisher/ArtifactManager/PermalinkRegistry. Tracked as separate TODO: prune-legacy-publishing-prototype"
 
 commits:
 - "97138d3a5"

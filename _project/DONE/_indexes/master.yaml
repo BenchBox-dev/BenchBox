@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T09:45:41.590820'
-total_items: 627
+generated_at: '2026-04-03T21:07:35.386276'
+total_items: 629
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2611,6 +2611,28 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 5-6 hours
+- id: productize-result-publishing-and-artifact-sharing
+  file: DONE/main/planning/productize-result-publishing-and-artifact-sharing.yaml
+  title: Productize result publishing and artifact sharing workflow
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - publishing
+  - results
+  - artifact-management
+  - sharing
+  - follow-up
+  - scope-review
+  estimated_effort: Large
+  completed_date: '2026-04-03'
+  work_total: 10
+  work_done: 10
+  work_ready: 0
+  deferred_count: 3
+  needs:
+  - define-results-platform-product-and-launch-strategy
 - id: postgresql-first-class-platform
   file: DONE/platform-expansion/active/postgresql-first-class-platform.yaml
   title: Promote PostgreSQL to first-class platform status
@@ -7259,6 +7281,24 @@ items:
   work_total: 24
   work_done: 24
   work_ready: 0
+- id: coverage-current-bottom-25-modules-to-80pct-apr-2026
+  file: DONE/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
+  title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
+  worktree: main
+  category: Testing & Quality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - testing
+  - coverage
+  - fast-lane
+  - module-floor
+  estimated_effort: Extra Large
+  completed_date: '2026-04-03'
+  work_total: 19
+  work_done: 19
+  work_ready: 0
+  deferred_count: 2
 - id: build-static-pipeline-bundles-to-read-model
   file: DONE/main/planning/build-static-pipeline-bundles-to-read-model.yaml
   title: Build static pipeline that transforms result bundles into explorer read models
