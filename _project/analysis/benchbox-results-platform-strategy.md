@@ -111,18 +111,19 @@ post-launch if organic traffic becomes a goal.
 
 No hard deadline or external event. Quality over speed.
 
-### Open Question: Brand Ownership
+### Brand Decision
 
-It is not yet decided whether the results explorer should live under the BenchBox
-brand (benchbox.dev/results/) or under the Oxbow Research brand. This decision
-affects hosting, curation authority, submission model, and long-term business
-positioning.
+**Resolved 2026-04-03**: The results explorer lives at `benchbox.dev/results/` under
+the BenchBox brand. See
+[`_project/analysis/brand-ownership-decision.md`](brand-ownership-decision.md) for
+the full decision rationale.
 
-**Working default:** BenchBox placement (benchbox.dev/results/). All implementation
-proceeds under this assumption. The brand ownership TODO
-(`resolve-results-explorer-brand-ownership`) validates or overrides this default.
-**It must be resolved before launch**, but it does not block scaffolding or
-implementation work that uses the default.
+**Summary**: Oxbow Research has no independent web presence, domain, or active product
+identity — it was an earlier brand concept that was deliberately separated from
+BenchBox in git history. The explorer's core value proposition (reproducible results,
+`benchbox run` re-execution) is inseparable from BenchBox, making BenchBox placement
+the coherent choice. The working default is confirmed; no changes to existing
+scaffolding or CI/CD are needed.
 
 ## Phase 1 MVP Definition
 
