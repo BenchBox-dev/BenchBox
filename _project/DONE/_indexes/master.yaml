@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:21:10.929746'
-total_items: 630
+generated_at: '2026-04-04T08:25:57.739530'
+total_items: 631
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7228,6 +7228,24 @@ items:
   - joe
   estimated_effort: 3-5 days
   completed_date: '2026-01-28'
+- id: pg-extension-advanced-benchmarking
+  file: DONE/platform-expansion/active/pg-extension-advanced-benchmarking.yaml
+  title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - pg-extensions
+  - pg-mooncake
+  - pg-duckdb
+  - benchmarking
+  - deferred-followup
+  estimated_effort: Small — 1-2 days
+  completed_date: '2026-04-04'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: align-benchbox-with-textcharts-de-benchboxing
   file: DONE/main/active/align-benchbox-with-textcharts-de-benchboxing.yaml
   title: Align BenchBox call sites with textcharts de-benchboxed API

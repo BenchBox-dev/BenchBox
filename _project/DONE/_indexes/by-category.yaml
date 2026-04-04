@@ -1,4 +1,4 @@
-generated_at: '2026-04-04T08:21:10.930062'
+generated_at: '2026-04-04T08:25:57.740914'
 total_categories: 74
 categories:
   '"Bug Fixes & Reliability"':
@@ -2084,7 +2084,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 72
+    count: 73
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2184,6 +2184,11 @@ categories:
     - id: pg-mooncake-platform-adapter
       file: DONE/platform-expansion/planning/pg-mooncake-platform-adapter.yaml
       title: Add pg_mooncake Platform Adapter for Columnstore Analytics in PostgreSQL
+      priority: Medium-High
+      status: Completed
+    - id: pg-extension-advanced-benchmarking
+      file: DONE/platform-expansion/active/pg-extension-advanced-benchmarking.yaml
+      title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Medium-High
       status: Completed
     - id: athena-spark-platform

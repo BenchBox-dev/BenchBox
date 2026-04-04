@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:21:09.352026'
-total_items: 28
+generated_at: '2026-04-04T08:25:53.575119'
+total_items: 27
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -364,23 +364,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: pg-extension-advanced-benchmarking
-  file: TODO/platform-expansion/active/pg-extension-advanced-benchmarking.yaml
-  title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - pg-extensions
-  - pg-mooncake
-  - pg-duckdb
-  - benchmarking
-  - deferred-followup
-  estimated_effort: Small — 1-2 days
-  work_total: 3
-  work_done: 2
-  work_ready: 1
 - id: build-results-explorer-subsite-on-benchbox-dev
   file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
   title: Build a results explorer subsite on benchbox.dev

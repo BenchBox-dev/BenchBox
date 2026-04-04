@@ -2,7 +2,8 @@ id: pg-extension-advanced-benchmarking
 title: "Advanced pg_mooncake and pg_duckdb Benchmarking Features"
 worktree: platform-expansion
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-04-04"
 category: Platform Expansion
 description: |
   Advanced benchmarking features for PostgreSQL extension adapters that go

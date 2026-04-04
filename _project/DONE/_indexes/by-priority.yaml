@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:21:10.930234'
-total_items: 630
+generated_at: '2026-04-04T08:25:57.741960'
+total_items: 631
 priorities:
   Critical:
     count: 36
@@ -1331,7 +1331,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 83
+    count: 84
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1433,6 +1433,11 @@ priorities:
       file: DONE/mcp-integration/mcp-visualization-tools.yaml
       title: Add visualization tools to MCP server
       category: Core Functionality
+      status: Completed
+    - id: pg-extension-advanced-benchmarking
+      file: DONE/platform-expansion/active/pg-extension-advanced-benchmarking.yaml
+      title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
+      category: Platform Expansion
       status: Completed
     - id: align-benchbox-with-textcharts-de-benchboxing
       file: DONE/main/active/align-benchbox-with-textcharts-de-benchboxing.yaml
