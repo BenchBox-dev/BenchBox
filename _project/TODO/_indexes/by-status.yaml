@@ -1,16 +1,21 @@
-generated_at: '2026-04-04T08:12:45.747489'
-total_items: 29
+generated_at: '2026-04-04T08:21:09.352087'
+total_items: 28
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
+    - id: pg-extension-advanced-benchmarking
+      file: TODO/platform-expansion/active/pg-extension-advanced-benchmarking.yaml
+      title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
+      priority: Medium-High
+      category: Platform Expansion
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow
       priority: Medium
       category: Core Functionality
   Not Started:
-    count: 26
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -41,16 +46,6 @@ statuses:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
-      category: Platform Expansion
-    - id: http-tls-certificate-validation
-      file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
-      title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
-      priority: Medium-High
-      category: Platform Expansion
-    - id: pg-extension-advanced-benchmarking
-      file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
-      title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
-      priority: Medium-High
       category: Platform Expansion
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml

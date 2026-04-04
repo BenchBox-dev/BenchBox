@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T21:09:39.219768'
-total_items: 629
+generated_at: '2026-04-04T08:21:10.929746'
+total_items: 630
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7042,6 +7042,23 @@ items:
   completed_date: '2026-02-16'
   work_total: 40
   work_done: 40
+  work_ready: 0
+- id: http-tls-certificate-validation
+  file: DONE/platform-expansion/active/http-tls-certificate-validation.yaml
+  title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - tls
+  - security
+  - http
+  - deferred-followup
+  estimated_effort: Small — 1 day
+  completed_date: '2026-04-04'
+  work_total: 3
+  work_done: 3
   work_ready: 0
 - id: release-automation-unit-tests
   file: DONE/core-functionality/active/release-automation-unit-tests.yaml

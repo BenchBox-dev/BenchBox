@@ -1,4 +1,4 @@
-generated_at: '2026-04-04T08:12:45.747415'
+generated_at: '2026-04-04T08:21:09.352061'
 total_categories: 7
 categories:
   AI/ML Capabilities:
@@ -99,7 +99,7 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 10
+    count: 9
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -126,16 +126,11 @@ categories:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
       status: Not Started
-    - id: http-tls-certificate-validation
-      file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
-      title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
-      priority: Medium-High
-      status: Not Started
     - id: pg-extension-advanced-benchmarking
-      file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
+      file: TODO/platform-expansion/active/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       priority: Medium-High
-      status: Not Started
+      status: In Progress
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control

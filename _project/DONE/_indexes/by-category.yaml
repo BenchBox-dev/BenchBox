@@ -1,4 +1,4 @@
-generated_at: '2026-04-03T21:09:39.220050'
+generated_at: '2026-04-04T08:21:10.930062'
 total_categories: 74
 categories:
   '"Bug Fixes & Reliability"':
@@ -2084,7 +2084,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 71
+    count: 72
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2150,6 +2150,11 @@ categories:
       file: DONE/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
       priority: Medium
+      status: Completed
+    - id: http-tls-certificate-validation
+      file: DONE/platform-expansion/active/http-tls-certificate-validation.yaml
+      title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
+      priority: Medium-High
       status: Completed
     - id: platform-adapter-http-tls-support
       file: DONE/platform-adapter-http-tls-support.yaml

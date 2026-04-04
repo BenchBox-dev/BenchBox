@@ -2,7 +2,8 @@ id: http-tls-certificate-validation
 title: "Add TLS Certificate Validation Options to HTTP-Based Data Loading"
 worktree: platform-expansion
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-04-04"
 category: Platform Expansion
 description: |
   Add verify_ssl and ca_cert_path options to HTTP-based data loading endpoints.

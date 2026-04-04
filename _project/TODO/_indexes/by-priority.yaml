@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:12:45.747453'
-total_items: 29
+generated_at: '2026-04-04T08:21:09.352076'
+total_items: 28
 priorities:
   Critical:
     count: 1
@@ -23,18 +23,13 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 9
+    count: 8
     items:
-    - id: http-tls-certificate-validation
-      file: TODO/platform-expansion/planning/http-tls-certificate-validation.yaml
-      title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
-      category: Platform Expansion
-      status: Not Started
     - id: pg-extension-advanced-benchmarking
-      file: TODO/platform-expansion/planning/pg-extension-advanced-benchmarking.yaml
+      file: TODO/platform-expansion/active/pg-extension-advanced-benchmarking.yaml
       title: Advanced pg_mooncake and pg_duckdb Benchmarking Features
       category: Platform Expansion
-      status: Not Started
+      status: In Progress
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: TODO/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
       title: Build a results explorer subsite on benchbox.dev

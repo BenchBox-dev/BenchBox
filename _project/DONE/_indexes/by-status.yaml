@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T21:09:39.220361'
-total_items: 629
+generated_at: '2026-04-04T08:21:10.930392'
+total_items: 630
 statuses:
   In Progress:
     count: 2
@@ -251,7 +251,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 581
+    count: 582
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -502,6 +502,11 @@ statuses:
       file: DONE/platform-expansion/planning/starrocks-olap-platform.yaml
       title: Add StarRocks MPP OLAP platform support
       priority: Medium
+      category: Platform Expansion
+    - id: http-tls-certificate-validation
+      file: DONE/platform-expansion/active/http-tls-certificate-validation.yaml
+      title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
+      priority: Medium-High
       category: Platform Expansion
     - id: tpcds-obt-benchmark-implementation
       file: DONE/benchmark-expansion/planning/tpcds-obt-benchmark-implementation.yaml

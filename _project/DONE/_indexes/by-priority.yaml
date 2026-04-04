@@ -1,5 +1,5 @@
-generated_at: '2026-04-03T21:09:39.220213'
-total_items: 629
+generated_at: '2026-04-04T08:21:10.930234'
+total_items: 630
 priorities:
   Critical:
     count: 36
@@ -1331,7 +1331,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 82
+    count: 83
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1376,6 +1376,11 @@ priorities:
     - id: questdb-timeseries-platform
       file: DONE/platform-expansion/active/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
+      category: Platform Expansion
+      status: Completed
+    - id: http-tls-certificate-validation
+      file: DONE/platform-expansion/active/http-tls-certificate-validation.yaml
+      title: Add TLS Certificate Validation Options to HTTP-Based Data Loading
       category: Platform Expansion
       status: Completed
     - id: release-automation-unit-tests
