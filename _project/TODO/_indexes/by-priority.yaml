@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:37:58.553968'
-total_items: 23
+generated_at: '2026-04-04T20:57:07.623353'
+total_items: 20
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 4
+    count: 2
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -22,16 +22,6 @@ priorities:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
       status: Not Started
-    - id: nyc-taxi-benchmark-expansion
-      file: TODO/benchmark-expansion/planning/nyc-taxi-benchmark-expansion.yaml
-      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
-      category: Benchmark Development
-      status: Not Started
-    - id: vector-search-benchmark-support
-      file: TODO/ai-ml-vector-search/planning/vector-search-benchmark-support.yaml
-      title: Vector Search Benchmark Support
-      category: AI/ML Capabilities
-      status: Not Started
   Medium-High:
     count: 1
     items:
@@ -41,43 +31,38 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 8
+    count: 7
     items:
+    - id: benchmark-option-cli-support
+      file: TODO/main/planning/benchmark-option-cli-support.yaml
+      title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
+      category: Core Functionality
+      status: Not Started
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       category: Platform Expansion
       status: Not Started
     - id: cedardb-adapter
-      file: TODO/platform-expansion/planning/cedardb-adapter.yaml
+      file: TODO/platform-expansion/active/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
       category: Platform Expansion
-      status: Not Started
+      status: In Progress
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       category: Testing & Quality
-      status: Not Started
-    - id: singlestore-adapter
-      file: TODO/platform-expansion/planning/singlestore-adapter.yaml
-      title: Add SingleStore Platform Adapter
-      category: Platform Expansion
       status: Not Started
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Not Started
-    - id: flight-data-benchmark
-      file: TODO/benchmark-expansion/planning/flight-data-benchmark.yaml
-      title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
-      category: Benchmark Development
-      status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow
       category: Core Functionality
-      status: In Progress
+      status: Completed
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

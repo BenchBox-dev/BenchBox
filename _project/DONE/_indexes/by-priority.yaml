@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:38:03.123448'
-total_items: 635
+generated_at: '2026-04-04T20:57:10.250251'
+total_items: 639
 priorities:
   Critical:
     count: 36
@@ -185,7 +185,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 228
+    count: 230
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -794,6 +794,11 @@ priorities:
       title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
       category: Architecture
       status: Completed
+    - id: nyc-taxi-benchmark-expansion
+      file: DONE/benchmark-expansion/active/nyc-taxi-benchmark-expansion.yaml
+      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+      category: Benchmark Development
+      status: Completed
     - id: nyc-taxi-olap-benchmark-core-implementation
       file: DONE/benchmark-expansion/active/nyc-taxi-olap-benchmark-core-implementation.yaml
       title: NYC Taxi OLAP Benchmark (Core Implementation)
@@ -1149,6 +1154,11 @@ priorities:
       file: DONE/core-functionality/active/validate-isolated-runtime-importability.yaml
       title: Validate isolated runtime importability before treating as cache hit
       category: Core Functionality
+      status: Completed
+    - id: vector-search-benchmark-support
+      file: DONE/ai-ml-vector-search/vector-search-benchmark-support.yaml
+      title: Vector Search Benchmark Support
+      category: AI/ML Capabilities
       status: Completed
     - id: adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage
       file: DONE/unknown/completed/adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage.yaml
@@ -1775,7 +1785,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 260
+    count: 262
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1940,6 +1950,11 @@ priorities:
     - id: add-prestodb-platform-adapter
       file: DONE/platform-expansion-presto/planning/add-prestodb-platform-adapter.yaml
       title: Add PrestoDB Platform Adapter
+      category: Platform Expansion
+      status: Completed
+    - id: singlestore-adapter
+      file: DONE/platform-expansion/planning/singlestore-adapter.yaml
+      title: Add SingleStore Platform Adapter
       category: Platform Expansion
       status: Completed
     - id: starrocks-olap-platform
@@ -2428,6 +2443,11 @@ priorities:
       file: DONE/main/active/fix-type-checking-quick-wins.yaml
       title: Fix type checking errors - Quick Wins (4 rules enabled)
       category: Testing and Quality Assurance
+      status: Completed
+    - id: flight-data-benchmark
+      file: DONE/benchmark-expansion/active/flight-data-benchmark.yaml
+      title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
+      category: Benchmark Development
       status: Completed
     - id: dataproc-serverless-platform
       file: DONE/platform-expansion/planning/dataproc-serverless-platform.yaml

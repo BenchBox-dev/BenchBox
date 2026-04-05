@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:38:03.122283'
-total_items: 635
+generated_at: '2026-04-04T20:57:10.249726'
+total_items: 639
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2400,6 +2400,27 @@ items:
   work_total: 4
   work_done: 4
   work_ready: 0
+- id: nyc-taxi-benchmark-expansion
+  file: DONE/benchmark-expansion/active/nyc-taxi-benchmark-expansion.yaml
+  title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: High
+  status: Completed
+  tags:
+  - benchmark
+  - real-world
+  - nyc-taxi
+  - enhancement
+  - multi-source
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 weeks
+  completed_date: '2026-04-04'
+  work_total: 12
+  work_done: 12
+  work_ready: 0
+  deferred_count: 1
 - id: nyc-taxi-olap-benchmark-core-implementation
   file: DONE/benchmark-expansion/active/nyc-taxi-olap-benchmark-core-implementation.yaml
   title: NYC Taxi OLAP Benchmark (Core Implementation)
@@ -3472,6 +3493,22 @@ items:
   work_done: 3
   work_ready: 0
   deferred_count: 2
+- id: vector-search-benchmark-support
+  file: DONE/ai-ml-vector-search/vector-search-benchmark-support.yaml
+  title: Vector Search Benchmark Support
+  worktree: ai-ml-vector-search
+  category: AI/ML Capabilities
+  priority: High
+  status: Completed
+  tags:
+  - benchmark
+  - vector-search
+  - ai-ml
+  - embeddings
+  estimated_effort: 3-4 weeks
+  work_total: 19
+  work_done: 19
+  work_ready: 0
 - id: adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage
   file: DONE/unknown/completed/adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage.yaml
   title: ✅ Adversarial Review - Cost Framework Enhancement (Warnings, Metadata, Timing, Storage)
@@ -4386,6 +4423,26 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 1 week (0.5 FTE)
   completed_date: '2025-11-29'
+- id: singlestore-adapter
+  file: DONE/platform-expansion/planning/singlestore-adapter.yaml
+  title: Add SingleStore Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  tags:
+  - platform
+  - sql
+  - mysql-compatible
+  - distributed
+  - olap
+  - cloud
+  - singlestore
+  estimated_effort: Medium
+  work_total: 11
+  work_done: 11
+  work_ready: 0
+  deferred_count: 2
 - id: starrocks-olap-platform
   file: DONE/platform-expansion/planning/starrocks-olap-platform.yaml
   title: Add StarRocks MPP OLAP platform support
@@ -5549,6 +5606,28 @@ items:
   - ty
   estimated_effort: Small
   completed_date: '2026-01-16'
+- id: flight-data-benchmark
+  file: DONE/benchmark-expansion/active/flight-data-benchmark.yaml
+  title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Medium
+  status: Completed
+  tags:
+  - benchmark
+  - real-world
+  - flight-data
+  - bts
+  - time-series
+  - transportation
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 weeks
+  completed_date: '2026-04-04'
+  work_total: 15
+  work_done: 15
+  work_ready: 0
+  deferred_count: 2
 - id: dataproc-serverless-platform
   file: DONE/platform-expansion/planning/dataproc-serverless-platform.yaml
   title: GCP Dataproc Serverless Platform

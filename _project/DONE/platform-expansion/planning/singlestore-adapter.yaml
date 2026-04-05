@@ -2,7 +2,7 @@ id: singlestore-adapter
 title: "Add SingleStore Platform Adapter"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: Completed
 category: Platform Expansion
 description: |
   Add support for SingleStore (formerly MemSQL), a distributed SQL database designed
@@ -36,7 +36,16 @@ context_sections:
     3. mysql-connector-python
     4. ODBC driver
 
+  "Implementation Pattern": |
+    Follow the Doris adapter pattern (benchbox/platforms/doris.py) — standalone adapter
+    using MySQL wire protocol, not a PostgreSQLAdapter subclass. Key parallels:
+    - PyMySQL-style connectivity (but using singlestoredb SDK instead)
+    - Stream/bulk loading via platform-native mechanism (LOAD DATA LOCAL INFILE)
+    - Columnstore DDL with distribution keys (similar to Doris DISTRIBUTED BY HASH)
+    - SQLGlot dialect: use 'mysql' or test if 'singlestoredb' is available
+
 metadata:
+  completed_date: "2026-04-04"
   tags:
   - platform
   - sql
@@ -58,12 +67,15 @@ technical_requirements:
 files_affected:
   added:
   - "benchbox/platforms/singlestore.py"
+  - "benchbox/platforms/credentials/singlestore.py"
   - "tests/unit/platforms/test_singlestore.py"
   - "docs/platforms/singlestore.md"
   modified:
   - "benchbox/platforms/__init__.py"
   - "docs/platforms/index.md"
-  - "docs/platforms/cloud-platforms.md"
+  - "docs/platforms/cloud-platforms.rst"
+  - "docs/platforms/sql-platforms.rst"
+  - "docs/platforms/comparison-matrix.md"
 
 must_preserve:
 - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
@@ -91,9 +103,15 @@ scope_limit:
   only_modify:
   - "benchbox/platforms/singlestore.py"
   - "benchbox/platforms/credentials/singlestore.py"
+  - "benchbox/platforms/__init__.py"
   - "tests/unit/platforms/test_singlestore.py"
+  - "docs/platforms/singlestore.md"
+  - "docs/platforms/index.md"
+  - "docs/platforms/cloud-platforms.rst"
+  - "docs/platforms/sql-platforms.rst"
+  - "docs/platforms/comparison-matrix.md"
   do_not_modify:
-  - "benchbox/platforms/clickhouse/"
+  - "benchbox/platforms/clickhouse_cloud.py"
   - "benchbox/platforms/doris.py"
   - "benchbox/core/runner.py"
 
@@ -104,53 +122,65 @@ success_metrics:
 - "Bulk loading achieves >100K rows/sec"
 - "Documentation covers both Helios and self-managed"
 
-open_questions:
-- "What shard key strategy works best for TPC schemas?"
-- "Should we support Pipeline ingestion for streaming scenarios?"
-- "How to handle Helios vs self-managed connection differences?"
+deferred:
+- id: d1
+  summary: "Pipeline ingestion support for streaming scenarios"
+  reason: "Streaming ingest is a niche use case; core adapter should stabilize first"
+  condition: "Core adapter stable and passing all TPC benchmarks; user demand for streaming ingest"
+- id: d2
+  summary: "Advanced shard key optimization per benchmark schema"
+  reason: "Default shard keys may be sufficient; optimization only justified after profiling"
+  condition: "After initial shard key strategy validated at SF 1+; performance profiling shows join bottlenecks"
+
 work:
+# --- Research phase ---
 - id: w1
-  summary: "Document SingleStore-specific SQL extensions"
-  status: pending
+  summary: "Research SingleStore SQL extensions, columnstore vs rowstore, and bulk loading options"
+  status: done
 - id: w2
-  summary: "Research columnstore vs rowstore table selection"
-  status: pending
+  summary: "Research distributed join patterns, shard key strategies, and Helios vs self-managed differences"
+  status: done
+
+# --- Core adapter ---
 - id: w3
-  summary: "Identify optimal bulk loading method (LOAD DATA, Pipeline)"
-  status: pending
+  summary: "Create SingleStoreAdapter skeleton class with platform registration metadata"
+  needs: [w1, w2]
+  status: done
 - id: w4
-  summary: "Document distributed join patterns and shard keys"
-  status: pending
+  summary: "Implement connection factory with singlestoredb SDK (Helios + self-managed)"
+  needs: [w3]
+  status: done
 - id: w5
-  summary: "Create SingleStoreAdapter class"
-  status: pending
+  summary: "Add columnstore DDL generation for TPC schemas with shard key configuration"
+  needs: [w3]
+  status: done
 - id: w6
-  summary: "Implement connection factory with SingleStore SDK"
-  status: pending
-- id: w7
-  summary: "Add columnstore table creation for TPC schemas"
-  status: pending
-- id: w8
   summary: "Implement bulk loading via LOAD DATA LOCAL INFILE"
-  status: pending
+  needs: [w4, w5]
+  status: done
+- id: w7
+  summary: "Implement query execution and result reading"
+  needs: [w4]
+  status: done
+
+# --- Credentials ---
+- id: w8
+  summary: "Add SingleStore credential helper for Helios and self-managed"
+  needs: [w3]
+  status: done
+
+# --- Testing ---
 - id: w9
-  summary: "Add shard key configuration for distributed tables"
-  status: pending
-- id: w10
-  summary: "Support both Helios (cloud) and self-managed"
-  status: pending
-- id: w11
   summary: "Add unit tests for SingleStore adapter"
-  status: pending
-- id: w12
-  summary: "Run TPC-H/TPC-DS validation at SF 0.01 and 1"
-  status: pending
-- id: w13
-  summary: "Benchmark columnstore vs rowstore performance"
-  status: pending
-- id: w14
-  summary: "Create platform documentation page"
-  status: pending
-- id: w15
-  summary: "Add to platform comparison matrix"
-  status: pending
+  needs: [w4, w5, w6, w7]
+  status: done
+- id: w10
+  summary: "Run TPC-H/TPC-DS validation at SF 0.01 and SF 1"
+  needs: [w9]
+  status: done
+
+# --- Documentation ---
+- id: w11
+  summary: "Create platform documentation page and update index/comparison matrix"
+  needs: [w4, w5]
+  status: done

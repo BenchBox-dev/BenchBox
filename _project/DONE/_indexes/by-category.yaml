@@ -1,4 +1,4 @@
-generated_at: '2026-04-04T08:38:03.122907'
+generated_at: '2026-04-04T20:57:10.250078'
 total_categories: 75
 categories:
   '"Bug Fixes & Reliability"':
@@ -96,7 +96,7 @@ categories:
       priority: High
       status: Completed
   AI/ML Capabilities:
-    count: 3
+    count: 4
     items:
     - id: ai-ml-sql-function-performance-testing
       file: DONE/ai-ml-functions/planning/ai-ml-sql-function-performance-testing.yaml
@@ -112,6 +112,11 @@ categories:
       file: DONE/ai-ml-nl2sql/completed/natural-language-to-sql-testing-framework.yaml
       title: Natural Language to SQL Testing Framework
       priority: Medium
+      status: Completed
+    - id: vector-search-benchmark-support
+      file: DONE/ai-ml-vector-search/vector-search-benchmark-support.yaml
+      title: Vector Search Benchmark Support
+      priority: High
       status: Completed
   Architecture:
     count: 1
@@ -130,13 +135,18 @@ categories:
       priority: High
       status: Completed
   Benchmark Development:
-    count: 3
+    count: 5
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
       title: AI/ML Primitives Benchmark - SQL-Based AI Functions
       priority: Medium-High
       status: Not Started
+    - id: flight-data-benchmark
+      file: DONE/benchmark-expansion/active/flight-data-benchmark.yaml
+      title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
+      priority: Medium
+      status: Completed
     - id: metadata-primitives-benchmark
       file: DONE/benchmark-expansion/planning/metadata-primitives-benchmark.yaml
       title: Metadata Primitives Benchmark - INFORMATION_SCHEMA, SHOW, DESCRIBE
@@ -147,6 +157,11 @@ categories:
       title: Metadata Primitives Complexity Enhancements
       priority: High
       status: Not Started
+    - id: nyc-taxi-benchmark-expansion
+      file: DONE/benchmark-expansion/active/nyc-taxi-benchmark-expansion.yaml
+      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+      priority: High
+      status: Completed
   Benchmark Expansion:
     count: 1
     items:
@@ -2107,7 +2122,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 73
+    count: 74
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2168,6 +2183,11 @@ categories:
       file: DONE/platform-expansion/active/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
       priority: Medium-High
+      status: Completed
+    - id: singlestore-adapter
+      file: DONE/platform-expansion/planning/singlestore-adapter.yaml
+      title: Add SingleStore Platform Adapter
+      priority: Medium
       status: Completed
     - id: starrocks-olap-platform
       file: DONE/platform-expansion/planning/starrocks-olap-platform.yaml

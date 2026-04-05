@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T08:38:03.123838'
-total_items: 635
+generated_at: '2026-04-04T20:57:10.250410'
+total_items: 639
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 586
+    count: 590
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -502,6 +502,11 @@ statuses:
       file: DONE/platform-expansion/active/questdb-timeseries-platform.yaml
       title: Add QuestDB time-series database platform support
       priority: Medium-High
+      category: Platform Expansion
+    - id: singlestore-adapter
+      file: DONE/platform-expansion/planning/singlestore-adapter.yaml
+      title: Add SingleStore Platform Adapter
+      priority: Medium
       category: Platform Expansion
     - id: starrocks-olap-platform
       file: DONE/platform-expansion/planning/starrocks-olap-platform.yaml
@@ -1598,6 +1603,11 @@ statuses:
       title: Fix type checking errors ignored in ty config
       priority: Medium-High
       category: Testing and Quality Assurance
+    - id: flight-data-benchmark
+      file: DONE/benchmark-expansion/active/flight-data-benchmark.yaml
+      title: Flight Data Benchmark - US Aviation On-Time Performance Analytics
+      priority: Medium
+      category: Benchmark Development
     - id: duplicate-code-followup-triage-centralization
       file: DONE/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
       title: Follow-up duplicate-code triage and consolidation from AST clone report
@@ -1969,6 +1979,11 @@ statuses:
       title: Multi-Region Performance Testing
       priority: Medium
       category: Enterprise Operations
+    - id: nyc-taxi-benchmark-expansion
+      file: DONE/benchmark-expansion/active/nyc-taxi-benchmark-expansion.yaml
+      title: NYC Taxi Benchmark Expansion - Green Taxi, FHV, and HVFHV Data Support
+      priority: High
+      category: Benchmark Development
     - id: nyc-taxi-olap-benchmark-advanced-geospatial-extension
       file: DONE/benchmark-expansion/completed/nyc-taxi-olap-benchmark-advanced-geospatial-extension.yaml
       title: NYC Taxi OLAP Benchmark (Advanced Geospatial Extension)
@@ -2785,6 +2800,11 @@ statuses:
       title: Validate isolated runtime importability before treating as cache hit
       priority: High
       category: Core Functionality
+    - id: vector-search-benchmark-support
+      file: DONE/ai-ml-vector-search/vector-search-benchmark-support.yaml
+      title: Vector Search Benchmark Support
+      priority: High
+      category: AI/ML Capabilities
     - id: visualization-framework-chart-generation-results-display
       file: DONE/content-enablement-viz/planning/visualization-framework-chart-generation-results-display.yaml
       title: Visualization Framework - Chart Generation & Results Display
