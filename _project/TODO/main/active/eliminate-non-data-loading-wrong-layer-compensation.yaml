@@ -198,7 +198,7 @@ work:
 - id: w10
   summary: "Add regression tests for benchmark identity propagation across runner, adapter, dry-run, and results"
   needs: [w3, w4, w5, w6, w7]
-  status: pending
+  status: done
   notes: |
     Add or extend tests for:
     - SQL runner propagates benchmark identity into adapter/results
@@ -222,7 +222,7 @@ work:
 - id: w11
   summary: "Add regression tests for Doris and SingleStore config-ownership cleanup"
   needs: [w8, w9]
-  status: pending
+  status: done
   notes: |
     Add or extend tests for:
     - Doris consumes builder-resolved config without env fallback duplication

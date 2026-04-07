@@ -116,12 +116,26 @@ verification:
 - description: Benchmark hook registry unit tests pass
   command: uv run -- python -m pytest tests/unit/cli/test_benchmark_hooks.py -v
   expected_output: all pass
+- description: Help-topic shows registered benchmark options
+  command: benchbox run --help-topic benchmarks
+  expected_output: output includes taxi_types, year, months for nyctaxi and skew_preset for tpch_skew
 
 scope_limit:
   only_modify:
-  - benchbox/cli/
-  - benchbox/core/*/benchmark.py
-  - tests/unit/cli/
+  - benchbox/cli/benchmark_hooks.py
+  - benchbox/cli/commands/run.py
+  - benchbox/cli/orchestrator.py
+  - benchbox/cli/help.py
+  - benchbox/core/nyctaxi/benchmark.py
+  - benchbox/core/flightdata/benchmark.py
+  - benchbox/core/tsbs_devops/benchmark.py
+  - benchbox/core/datavault/benchmark.py
+  - benchbox/core/tpcds_obt/benchmark.py
+  - benchbox/core/tpch_skew/benchmark.py
+  - benchbox/core/vector_search/benchmark.py
+  - benchbox/core/joinorder/benchmark.py
+  - benchbox/core/tpcdi/benchmark.py
+  - tests/unit/cli/test_benchmark_hooks.py
   do_not_modify:
   - benchbox/core/*/queries.py
   - benchbox/core/*/schema.py
@@ -181,9 +195,9 @@ work:
   - w1
   notes: >
     In benchbox/cli/commands/run.py:
-    - Add BenchmarkOptionParamType (same pattern as PlatformOptionParamType, lines 368-380)
+    - Add BenchmarkOptionParamType (same pattern as PlatformOptionParamType)
     - Add @click.option("--benchmark-option", ..., type=BenchmarkOptionParamType(),
-      multiple=True, hidden=True) — parallel to --platform-option at lines 518-534
+      multiple=True, hidden=True) — parallel to --platform-option
     - Parse benchmark options via BenchmarkHookRegistry.parse_options(benchmark, pairs)
     - Store parsed options in BenchmarkConfig.options under a namespaced key
       (e.g., options["benchmark_options"] = {...}) to avoid collision with existing options
@@ -194,27 +208,33 @@ work:
   needs:
   - w2
   notes: >
-    In benchbox/cli/orchestrator.py _get_benchmark_instance() (lines 65-103):
+    In benchbox/cli/orchestrator.py _get_benchmark_instance():
     - Extract benchmark_options from config.options.get("benchmark_options", {})
     - Merge into kwargs dict before calling benchmark_class(**kwargs)
-    - Also extract seed and force_regenerate from config.options if present
-      and the benchmark has registered specs for them
+    - seed and force_regenerate: these already live in BenchmarkConfig.options
+      but are NOT forwarded to constructors today. The orchestrator should check
+      if the current benchmark has registered BenchmarkOptionSpecs for "seed" or
+      "force_regenerate" (via BenchmarkHookRegistry.list_option_specs(benchmark)),
+      and if so, include them in kwargs from config.options. Benchmarks that don't
+      register these specs simply never receive them (no change). This avoids a
+      dual-path where seed flows through both config.options and --benchmark-option.
     - Preserve existing try/except TypeError fallback for parallel param
 
 - id: w4
-  summary: Register option specs for NYC Taxi, FlightData, and TSBS benchmarks
+  summary: Register option specs for high-complexity benchmarks (NYC Taxi, TSBS DevOps — enum lists, datetime, int lists)
   status: pending
   needs:
   - w1
   notes: >
+    These benchmarks require the custom parser functions built in w1 (parse_enum_list,
+    parse_int_list, parse_datetime). This is the highest-risk work unit — validate
+    parser edge cases (empty lists, single values, whitespace) here before w5.
+
     NYC Taxi (benchbox/core/nyctaxi/benchmark.py):
     - taxi_types: parse_enum_list(TaxiType), default=None, choices description
     - year: int parser, default=2019, choices=range(2019,2026)
     - months: parse_int_list, default=None
     - seed: int parser, default=None
-
-    FlightData (benchbox/core/flightdata/benchmark.py):
-    - end_year: int parser, default=LAST_AVAILABLE_YEAR
 
     TSBS DevOps (benchbox/core/tsbs_devops/benchmark.py):
     - num_hosts: int parser, default=None
@@ -226,11 +246,15 @@ work:
     (same pattern as platform option registration in benchbox/platforms/__init__.py).
 
 - id: w5
-  summary: Register option specs for remaining benchmarks (datavault, tpcds_obt, tpch_skew, vector_search, joinorder, tpcdi)
+  summary: Register option specs for simple-type benchmarks (FlightData, DataVault, TPC-DS OBT, TPC-H Skew, Vector Search, Join Order, TPC-DI)
   status: pending
   needs:
   - w1
   notes: >
+    These benchmarks use only str, int, parse_bool, parse_str_list, and
+    choices-constrained str parsers — all straightforward. Lower risk than w4.
+
+    FlightData: end_year (int, default=LAST_AVAILABLE_YEAR)
     DataVault: hash_algorithm (str, choices=["md5","sha256",...]), record_source (str)
     TPC-DS OBT: tpcds_source_dir (str), dimension_mode (str, choices), channels (parse_str_list), output_format (str, choices)
     TPC-H Skew: skew_preset (str, choices=["none","light","moderate","heavy","extreme","realistic"])
@@ -258,7 +282,8 @@ work:
   - w4
   - w5
   notes: >
-    Extend --help-topic system to show available benchmark options per benchmark.
+    Extend --help-topic system (benchbox/cli/help.py) to show available benchmark
+    options per benchmark.
     Example output for --help-topic benchmarks or --help-topic nyctaxi:
       nyctaxi:
         taxi_types  - Taxi data types to load (yellow,green,hvfhv) [default: yellow]
