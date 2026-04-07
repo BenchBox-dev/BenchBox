@@ -113,7 +113,7 @@ verification:
 - description: Each modified benchmark generates data at SF=0.01 without error
   command: >
     for bench in ssb joinorder coffeeshop tsbs_devops flightdata nyctaxi amplab h2odb clickbench; do
-      echo "=== $bench ===" && benchbox run --platform duckdb --benchmark $bench --scale 0.01 --phases generate --dry-run;
+      echo "=== $bench ===" && uv run -- benchbox run --platform duckdb --benchmark $bench --scale 0.01 --phases generate --dry-run;
     done
   expected_output: all dry runs complete without error
 - description: New datagen size tests validate SF=1 uncompressed output within 10% of 1GB
@@ -239,6 +239,10 @@ work:
 
     **Output for each**: "spec-locked" or "adjustable" determination with citation, plus the
     recommended new base constant value if adjustable.
+
+    **Note**: This gate bundles 4 benchmarks. If any single benchmark's research proves complex
+    (e.g., JOB paper analysis + join-plan validation), split it into a separate gate rather than
+    blocking CoffeeShop/AMPLab/H2O implementations that may be straightforward.
 
 - id: w3
   summary: "Research gate: real-data & time-series benchmarks (TSBS, FlightData, NYC Taxi) + compression"
@@ -473,9 +477,13 @@ work:
 - id: w13
   summary: "Create comprehensive datagen size validation test suite"
   status: pending
-  needs: [w4, w5, w6, w7, w8, w9, w10, w11, w12]
+  needs: [w1, w2, w3]
   notes: >
     Create tests/unit/generators/test_scale_factor_harmonization.py.
+
+    This work item should be built incrementally: create the test file and scaffold after
+    research gates complete, then add each benchmark's size assertion as its implementation
+    (w4-w12) finishes. Do not wait for all implementations — add tests as benchmarks land.
 
     For each benchmark that was modified, create a test that:
     1. Generates data at SF=0.01 (fast, suitable for CI)
@@ -498,7 +506,7 @@ work:
 - id: w14
   summary: "Cross-benchmark validation run and documentation update"
   status: pending
-  needs: [w13]
+  needs: [w4, w5, w6, w7, w8, w9, w10, w11, w12, w13]
   notes: >
     Final validation:
     1. Run all modified benchmarks at SF=0.01 with --phases generate
