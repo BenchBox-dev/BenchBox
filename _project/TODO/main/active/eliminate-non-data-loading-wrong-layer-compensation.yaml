@@ -141,7 +141,7 @@ work:
 - id: w7
   summary: "Refactor dry-run query extraction and estimation to use BenchmarkConfig.name instead of benchmark-object sniffing"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     DryRunExecutor already receives BenchmarkConfig and already uses it for
     platform-config injection. Extend that same explicit contract to query
