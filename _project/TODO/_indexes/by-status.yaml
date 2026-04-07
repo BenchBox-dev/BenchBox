@@ -1,16 +1,21 @@
-generated_at: '2026-04-07T12:20:25.281172'
+generated_at: '2026-04-07T12:48:25.187005'
 total_items: 21
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: cedardb-adapter
       file: TODO/platform-expansion/active/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
       priority: Medium
       category: Platform Expansion
+    - id: eliminate-non-data-loading-wrong-layer-compensation
+      file: TODO/main/active/eliminate-non-data-loading-wrong-layer-compensation.yaml
+      title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
+      priority: High
+      category: Core Functionality
   Not Started:
-    count: 17
+    count: 16
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -41,11 +46,6 @@ statuses:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
-      category: Core Functionality
-    - id: eliminate-non-data-loading-wrong-layer-compensation
-      file: TODO/main/planning/eliminate-non-data-loading-wrong-layer-compensation.yaml
-      title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
-      priority: High
       category: Core Functionality
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml

@@ -2,7 +2,7 @@ id: eliminate-non-data-loading-wrong-layer-compensation
 title: "Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   A targeted architectural review found 5 confirmed non-data-loading instances
@@ -32,17 +32,21 @@ deps:
 work:
 - id: w1
   summary: "Define the canonical benchmark identity contract for live execution paths"
-  status: pending
+  status: done
   notes: |
-    Decide and document which fields are authoritative at each boundary:
-    - benchmark_config.name: canonical benchmark slug from CLI/orchestrator
-    - benchmark_id: normalized execution/result identifier for persisted results
-    - display_name / wrapper class names: presentation only, never routing inputs
+    Contract documented in benchbox/core/schemas.py docstrings for both
+    RunConfig and BenchmarkConfig.
 
-    Output: a short architecture note in code comments and this TODO's notes
-    explaining where benchmark identity must be passed explicitly:
-    CLI -> BenchmarkConfig -> RunConfig/platform_config -> adapter execution
-    -> execution_metadata/result/export.
+    Ownership hierarchy (CLI -> persistence):
+    - BenchmarkConfig.name  -> authoritative slug from CLI/orchestrator (e.g. "tpch")
+    - RunConfig.benchmark   -> propagated copy; runner must populate from BenchmarkConfig.name
+    - execution_metadata["benchmark_id"] -> normalised form written to results/export
+    - display_name / wrapper class names -> presentation only, never routing inputs
+
+    Fix sequence: runner populates RunConfig.benchmark (w2), adapter uses
+    run_config["benchmark"] instead of sniffing (w3/w4), results/export consume
+    explicit benchmark_id from execution_metadata (w5/w6), dry-run uses
+    benchmark_config.name directly (w7).
 
 - id: w2
   summary: "Thread benchmark identity through the SQL runner instead of stripping it before adapter.run_benchmark()"

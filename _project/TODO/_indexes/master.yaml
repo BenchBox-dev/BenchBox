@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T12:20:25.281115'
+generated_at: '2026-04-07T12:48:25.186922'
 total_items: 21
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -20,12 +20,12 @@ items:
   work_done: 5
   work_ready: 0
 - id: eliminate-non-data-loading-wrong-layer-compensation
-  file: TODO/main/planning/eliminate-non-data-loading-wrong-layer-compensation.yaml
+  file: TODO/main/active/eliminate-non-data-loading-wrong-layer-compensation.yaml
   title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
   worktree: main
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - architecture
   - runner
@@ -36,8 +36,8 @@ items:
   - singlestore
   estimated_effort: 1-2 weeks
   work_total: 12
-  work_done: 0
-  work_ready: 1
+  work_done: 1
+  work_ready: 4
   deferred_count: 1
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml

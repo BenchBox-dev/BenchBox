@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T12:20:25.281148'
+generated_at: '2026-04-07T12:48:25.186965'
 total_categories: 5
 categories:
   Benchmark Development:
@@ -48,10 +48,10 @@ categories:
       priority: Medium
       status: Not Started
     - id: eliminate-non-data-loading-wrong-layer-compensation
-      file: TODO/main/planning/eliminate-non-data-loading-wrong-layer-compensation.yaml
+      file: TODO/main/active/eliminate-non-data-loading-wrong-layer-compensation.yaml
       title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
       priority: High
-      status: Not Started
+      status: In Progress
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow
