@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T19:06:28.687234'
-total_items: 19
+generated_at: '2026-04-07T19:49:46.336666'
+total_items: 20
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Core Functionality
   Not Started:
-    count: 15
+    count: 16
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -52,6 +52,11 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
+    - id: harmonize-large-scale-factor-behavior
+      file: TODO/main/planning/harmonize-large-scale-factor-behavior.yaml
+      title: Harmonize scale factor behavior at large scale factors (SF 10, 100, 1000)
+      priority: Medium
+      category: Core Functionality
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

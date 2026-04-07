@@ -1,0 +1,338 @@
+id: harmonize-large-scale-factor-behavior
+title: "Harmonize scale factor behavior at large scale factors (SF 10, 100, 1000)"
+worktree: main
+category: "Core Functionality"
+priority: Medium
+status: "Not Started"
+description: |
+  Follow-on to harmonize-scale-factor-baselines (completed 2026-04-07). That TODO established
+  SF=1 ≈ 1 GB baselines for all adjustable benchmarks. This TODO addresses three categories of
+  issue discovered when reviewing how those baselines scale at SF 10, 100, and 1000:
+
+  1. **Quadratic scaling (TSBS DevOps)** — both num_hosts and duration_days scale linearly with
+     SF, so total rows grow as SF². SF=10 produces ~93 GB instead of ~9.3 GB. SF=100 produces
+     ~9.2 TB instead of ~93 GB. This violates the "SF=N ≈ N GB" mental model.
+
+  2. **Saturation ceilings (FlightData, NYC Taxi)** — these real-data benchmarks hit hard data
+     ceilings and silently stop scaling. FlightData exhausts the BTS corpus (456 months) at
+     SF≈11.12, capping at ~10.7 GB. NYC Taxi saturates sample_rate at 1.0 when SF≥10, capping
+     at ~9.6 GB. Neither benchmark warns the user.
+
+  3. **Documentation errors** — scale factor tables in CoffeeShop, TSBS DevOps, and NYC Taxi
+     docs contain incorrect projections that don't match actual code behavior.
+
+  The four purely-linear benchmarks (CoffeeShop, H2O.db, JoinOrder, AMPLab) scale correctly —
+  no code changes needed for those, only the CoffeeShop doc fix.
+
+context_sections:
+  - name: "TSBS DevOps Quadratic Scaling"
+    summary: |
+      Code: benchbox/core/tsbs_devops/generator.py lines 94-95
+        num_hosts = max(10, int(100 * SF))
+        duration_days = max(1, int(2 * SF))
+      Both dimensions multiply by SF → total rows ∝ SF².
+
+      Projected sizes:
+        SF=1:    100 hosts × 2 days     = ~0.93 GB ✓
+        SF=10:   1,000 hosts × 20 days  = ~93 GB   (10× over expected)
+        SF=100:  10,000 hosts × 200 days = ~9.2 TB  (100× over expected)
+        SF=1000: 100,000 hosts × 2,000 days = ~916 TB
+
+      Fix options:
+        (a) Fix duration at 2 days, scale only hosts → linear in hosts
+        (b) Use sqrt(SF) for each dimension so product is linear
+        (c) Keep hosts primary with sub-linear days multiplier
+
+      Option (a) is simplest and matches canonical TSBS scaling model (host count, not duration).
+      The original harmonize TODO's w3 research gate asked "hosts, duration, or both?" — for
+      linear scaling the answer is: scale hosts only, keep duration fixed.
+
+      Additional low-SF note: max(10, ...) and max(1, ...) cause SF=0.01 and SF=0.1 to produce
+      identical output (10 hosts, 1 day). Not critical but should be documented.
+
+  - name: "FlightData Ceiling at SF≈11.12"
+    summary: |
+      Code: benchbox/core/flightdata/downloader.py lines 84-96
+        months = min(max(1, round(41 * SF)), 456)
+      BTS corpus spans Jan 1987 – Dec 2024 = 456 months. At SF≈11.12, all months are exhausted.
+
+      Projected sizes:
+        SF=1:    41 months  = ~1.0 GB  ✓
+        SF=10:   410 months = ~9.6 GB  ✓ (near-linear)
+        SF=100:  456 months = ~10.7 GB (saturated, 90% under expected)
+        SF=1000: 456 months = ~10.7 GB (saturated, 99% under expected)
+
+      No error or warning is raised. The min() silently caps.
+      Fix: add warning log at minimum. Accept the ceiling — real-data benchmarks naturally cap.
+
+  - name: "NYC Taxi Saturation at SF=10"
+    summary: |
+      Code: benchbox/core/nyctaxi/downloader.py (3 downloader classes)
+        sample_rate = min(1.0, SF / 10)
+      At SF≥10, sample_rate clamps to 1.0 — full available dataset.
+
+      Projected sizes:
+        SF=1:    sample_rate=0.1 → ~0.96 GB ✓
+        SF=10:   sample_rate=1.0 → ~9.6 GB  ✓ (at ceiling)
+        SF=100:  sample_rate=1.0 → ~9.6 GB  (saturated)
+        SF=1000: sample_rate=1.0 → ~9.6 GB  (saturated)
+
+      Same pattern as FlightData — silent saturation. Fix: warning log + documentation.
+
+  - name: "Documentation Errors"
+    summary: |
+      CoffeeShop (docs/benchmarks/coffeeshop.md:231-237):
+        Order Lines column shows ~25.5M at SF=1 (assumes 3 lines/order).
+        Actual: 13.26M (1.56 lines/order per benchmark_specs.py deterministic pattern).
+        All order_lines values ~2× overstated.
+
+      TSBS DevOps (docs/benchmarks/tsbs-devops.md:354-360):
+        SF=0.01/0.1: claims 2 days → actual is 1 day (max(1, ...) floor)
+        SF=100: claims 1,000 hosts → actual is 10,000 hosts
+        All data size projections assume linear scaling but actual is quadratic
+
+      NYC Taxi (docs/benchmarks/nyctaxi.md:254-260):
+        SF=100: claims ~960M trips / ~96 GB
+        Actual: saturates at SF=10 (~9.6 GB for any SF≥10)
+
+files_affected:
+  - path: benchbox/core/tsbs_devops/generator.py
+    change_type: modify
+  - path: benchbox/core/flightdata/downloader.py
+    change_type: modify
+  - path: benchbox/core/nyctaxi/downloader.py
+    change_type: modify
+  - path: benchbox/core/results/benchmark_specs.py
+    change_type: modify
+  - path: tests/unit/generators/test_scale_factor_harmonization.py
+    change_type: modify
+  - path: docs/benchmarks/coffeeshop.md
+    change_type: modify
+  - path: docs/benchmarks/tsbs-devops.md
+    change_type: modify
+  - path: docs/benchmarks/nyctaxi.md
+    change_type: modify
+
+must_preserve:
+  - "SF=1 baselines unchanged — the original harmonization is correct at SF=1"
+  - "All existing query sets, schemas, SQL files unchanged"
+  - "Benchmarks must still produce valid data at SF=0.01 (CI/testing scale)"
+  - "CompressionMixin behavior unchanged"
+  - "Linear benchmarks (CoffeeShop, H2O.db, JOB, AMPLab) need no code changes"
+
+anti_patterns:
+  - "DO NOT introduce a global calibration multiplier layer — because it adds indirection that makes per-benchmark tuning harder — scale each benchmark's own parameters directly"
+  - "DO NOT change row counts for spec-locked benchmarks (TPC-H, TPC-DS, SSB) — because their row counts are defined by the TPC/SSB specifications — only adjustable benchmarks are in scope"
+  - "DO NOT add backwards-compatibility shims — because BenchBox is still in beta (v0.2.0) — change formulas directly"
+  - "DO NOT synthesize fake data to extend real-data benchmarks (FlightData, NYC Taxi) beyond their natural corpus limits — because the value of these benchmarks is real historical data — warn and document ceilings instead"
+
+verification:
+  - description: "TSBS scaling is linear after fix"
+    command: "uv run -- python -c \"from benchbox.core.tsbs_devops.generator import TsbsDevopsGenerator; g1=TsbsDevopsGenerator(scale_factor=1); g10=TsbsDevopsGenerator(scale_factor=10); print(f'SF=1: {g1.num_hosts} hosts, {g1.duration_days} days'); print(f'SF=10: {g10.num_hosts} hosts, {g10.duration_days} days')\""
+    expected_output: "SF=10 should show ~1000 hosts with same duration as SF=1 (2 days)"
+  - description: "FlightData warns at ceiling"
+    command: "uv run -- python -c \"import logging; logging.basicConfig(level=logging.WARNING); from benchbox.core.flightdata.downloader import FlightDataDownloader; d=FlightDataDownloader(scale_factor=100)\" 2>&1 | grep -i warn"
+    expected_output: "Warning message about month ceiling being reached"
+  - description: "NYC Taxi warns at saturation"
+    command: "uv run -- python -c \"import logging; logging.basicConfig(level=logging.WARNING); from benchbox.core.nyctaxi.downloader import NycTaxiYellowDownloader; d=NycTaxiYellowDownloader(scale_factor=100)\" 2>&1 | grep -i warn"
+    expected_output: "Warning message about sample_rate saturation at 1.0"
+  - description: "Existing tests pass"
+    command: "uv run -- python -m pytest tests/unit/generators/test_scale_factor_harmonization.py -v"
+    expected_output: "All tests pass including new linearity tests"
+  - description: "Full test suite passes"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "All fast tests pass with no regressions"
+
+scope_limit:
+  only_modify:
+    - benchbox/core/tsbs_devops/generator.py
+    - benchbox/core/flightdata/downloader.py
+    - benchbox/core/nyctaxi/downloader.py
+    - benchbox/core/results/benchmark_specs.py
+    - tests/unit/generators/test_scale_factor_harmonization.py
+    - docs/benchmarks/coffeeshop.md
+    - docs/benchmarks/tsbs-devops.md
+    - docs/benchmarks/nyctaxi.md
+  do_not_modify:
+    - benchbox/core/tpch/
+    - benchbox/core/tpcds/
+    - benchbox/core/ssb/
+    - benchbox/core/clickbench/
+    - benchbox/utils/compression_mixin.py
+
+success_metrics:
+  - "TSBS DevOps scales linearly: SF=10 produces ~9.3 GB (not ~93 GB)"
+  - "FlightData and NYC Taxi log warnings when hitting their natural data ceilings"
+  - "All doc scale-factor tables match actual code behavior"
+  - "New test catches quadratic/non-linear scaling regressions"
+  - "No regressions in existing test suite"
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - datagen
+    - scale-factor
+    - benchmarks
+    - harmonization
+  estimated_effort: "Medium (2-3 days)"
+  created_date: "2026-04-07"
+  dependencies:
+    - id: harmonize-scale-factor-baselines
+      status: completed
+      relationship: "Direct follow-on — that TODO harmonized SF=1 baselines; this addresses large-SF behavior"
+  notes: |
+    Priority is Medium because SF=1 is the common case and works correctly. Large-SF issues
+    primarily affect power users running big benchmarks. The TSBS quadratic scaling is the most
+    impactful issue since it causes order-of-magnitude data size surprises.
+
+work:
+  - id: w1
+    summary: "Research TSBS quadratic scaling — evaluate options to achieve linear SF-to-size scaling"
+    status: pending
+    needs: []
+    notes: |
+      The TSBS DevOps generator currently scales both num_hosts and duration_days linearly with
+      SF, producing quadratic total data growth (SF² instead of SF). Research how to linearize.
+
+      Research questions:
+      1. What is the canonical TSBS scaling model? Check official tsbs_generate_data defaults
+         and published papers. Does the standard approach scale by host count, duration, or both?
+      2. Evaluate three fix options for achieving linear SF-to-size scaling:
+         (a) Fix duration at DEFAULT_DURATION_DAYS (2), scale only num_hosts → simplest,
+             matches canonical TSBS model where more hosts = more distinct time series
+         (b) Use sqrt(SF) for each dimension so hosts×days product grows linearly → preserves
+             both-dimension scaling but with non-intuitive per-dimension values
+         (c) Keep hosts as primary axis with sub-linear days multiplier → compromise
+      3. For each option, calculate projected sizes at SF=0.01, 0.1, 1, 10, 100, 1000.
+         Verify that SF=1 still produces ~0.93 GB (must not break baseline).
+      4. Consider the low-SF floor behavior: max(10, ...) and max(1, ...) cause SF=0.01 and
+         SF=0.1 to produce identical output (10 hosts, 1 day). Does the chosen fix affect this?
+      5. Review whether changing the formula requires updating benchmark_specs.py sf1_row_counts.
+
+      Output: recommend the best option with projected size table and implementation plan.
+
+  - id: w2
+    summary: "TSBS DevOps — linearize scaling formula to fix quadratic growth"
+    status: pending
+    needs: [w1]
+    notes: |
+      Apply w1 findings. Most likely: fix duration_days at DEFAULT_DURATION_DAYS (2), scale only
+      num_hosts. Update benchmark_specs.py sf1_row_counts if the formula changes affect SF=1
+      output (it shouldn't if duration stays at 2 days for SF=1).
+
+  - id: w3
+    summary: "FlightData — add warning log when month ceiling is hit"
+    status: pending
+    needs: []
+    notes: |
+      In benchbox/core/flightdata/downloader.py, add a logger.warning() when the computed months
+      value hits the 456 ceiling. Message should explain: the BTS corpus is exhausted, actual
+      data size will be capped at ~10.7 GB regardless of SF. Also update the generator docstring.
+
+  - id: w4
+    summary: "Research NYC Taxi expanded data — evaluate whether Green/HVFHV corpus extends the saturation ceiling"
+    status: pending
+    needs: []
+    notes: |
+      The NYC Taxi benchmark recently expanded to support three taxi types: Yellow (default),
+      Green (LPEP), and HVFHV (Uber/Lyft). Each type has its own downloader class with an
+      independent sample_rate = min(1.0, SF / SCALE_FACTOR_SAMPLE_DIVISOR) calculation.
+
+      Research questions:
+      1. What is the total data volume for each taxi type at sample_rate=1.0?
+         - Yellow: ~9.6 GB (known). Green and HVFHV: unknown — measure or estimate.
+      2. When all three types are enabled (taxi_types=yellow,green,hvfhv), what is the
+         combined corpus size? If Green adds ~2 GB and HVFHV adds ~25 GB (rough estimate
+         from fallback row counts in downloader), the combined ceiling could be ~37 GB.
+      3. Could the SCALE_FACTOR_SAMPLE_DIVISOR be adjusted per taxi type or globally to
+         account for the larger combined corpus? E.g., if combined corpus is ~37 GB, then
+         SF=1 should still target ~1 GB total across all types, but SF≥37 would saturate
+         instead of SF≥10.
+      4. Does the current SF=1 baseline (~1 GB) hold when multiple taxi types are enabled?
+         Each downloader independently samples at SF/10, so enabling all three at SF=1
+         would produce ~1 GB + ~0.2 GB + ~2.5 GB ≈ ~3.7 GB. Is this the intended behavior
+         or should the sample rate be divided across active types?
+      5. Review the --benchmark-option taxi_types=yellow,green,hvfhv interaction with SF.
+
+      Output: document findings and recommend whether to:
+      (a) Keep current behavior (each type has independent sample_rate, ceiling varies by config)
+      (b) Adjust SCALE_FACTOR_SAMPLE_DIVISOR to account for multi-type combined corpus
+      (c) Leave as-is but document the different ceilings per configuration
+
+  - id: w5
+    summary: "NYC Taxi — add warning log when sample_rate saturates at 1.0"
+    status: pending
+    needs: [w4]
+    notes: |
+      In benchbox/core/nyctaxi/downloader.py, add a logger.warning() in all 3 downloader classes
+      when sample_rate clamps to 1.0 (SF≥10). Message should explain: the full dataset is being
+      used, no additional scaling possible beyond SF=10.
+      Apply any findings from w4 — if the expanded corpus (Green/HVFHV) changes the saturation
+      ceiling or the SCALE_FACTOR_SAMPLE_DIVISOR, incorporate those changes here.
+
+  - id: w6
+    summary: "Fix CoffeeShop doc table — order_lines counts ~2× overstated"
+    status: pending
+    needs: []
+    notes: |
+      docs/benchmarks/coffeeshop.md lines 231-237. The table assumes 3 order lines per order but
+      the generator produces 1.56 lines/order (per benchmark_specs.py deterministic pattern).
+      Recalculate all order_lines values in the table.
+
+  - id: w7
+    summary: "Fix TSBS DevOps doc table — 3 errors in scale factor projections"
+    status: pending
+    needs: [w2]
+    notes: |
+      docs/benchmarks/tsbs-devops.md lines 354-360. Fix: (1) SF=0.01/0.1 duration should be
+      1 day not 2, (2) SF=100 hosts should be 10,000 not 1,000, (3) all data size projections
+      should reflect the post-w2 linear formula. Wait for w2 to know the final formula.
+
+  - id: w8
+    summary: "Fix NYC Taxi doc table — SF=100 projection impossible due to saturation"
+    status: pending
+    needs: [w5]
+    notes: |
+      docs/benchmarks/nyctaxi.md lines 254-260. SF=100 row claims ~960M trips / ~96 GB but
+      code saturates at SF=10. Update table to show ceiling and reference the saturation warning.
+      Apply w4 research findings — if expanded corpus changes the ceiling, reflect that here.
+
+  - id: w9
+    summary: "Add scaling behavior notes to each affected benchmark's docs"
+    status: pending
+    needs: [w2, w3, w5]
+    notes: |
+      Add a "Scaling Behavior" or "Large Scale Factors" section to docs for TSBS DevOps,
+      FlightData, and NYC Taxi explaining ceilings, saturation, or (post-fix) linear scaling.
+      FlightData does not currently have a docs/benchmarks/flightdata.md — either create one
+      or add notes to the most appropriate existing location.
+
+  - id: w10
+    summary: "Add scaling linearity tests to test_scale_factor_harmonization.py"
+    status: pending
+    needs: [w2]
+    notes: |
+      Extend tests/unit/generators/test_scale_factor_harmonization.py. For each adjustable
+      benchmark, generate at SF=0.01 and SF=0.02, verify the row count ratio is ~2× (not ~4×
+      as TSBS would currently produce). This catches quadratic scaling regressions. Also test
+      that FlightData/NYC Taxi ceiling warnings are emitted at high SF.
+
+  - id: w11
+    summary: "Cross-benchmark validation — verify projected sizes at SF=10"
+    status: pending
+    needs: [w2, w3, w5, w10]
+    notes: |
+      After all fixes, verify projected sizes at SF=10 are within 0.5×–2.0× of the expected
+      N×1GB for all adjustable benchmarks. This is a final integration check, not a unit test.
+
+deferred:
+  - id: d1
+    summary: "Extend FlightData beyond natural corpus via synthetic augmentation"
+    reason: "Real-data integrity is more valuable than arbitrary scaling. If needed in future, design a proper augmentation strategy as a separate TODO."
+  - id: d2
+    summary: "Extend NYC Taxi beyond natural corpus via synthetic augmentation"
+    reason: "Same rationale as d1. However, w4 research may reveal that the expanded Green/HVFHV corpus already raises the ceiling significantly. Revisit after w4 findings."
+  - id: d3
+    summary: "Fix TSBS low-SF floor behavior (SF=0.01 and SF=0.1 produce identical output)"
+    reason: "Not critical — low SFs are primarily for CI/testing where exact size doesn't matter. Document rather than fix."

@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T19:06:28.687201'
-total_items: 19
+generated_at: '2026-04-07T19:49:46.336619'
+total_items: 20
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -285,6 +285,25 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
+- id: harmonize-large-scale-factor-behavior
+  file: TODO/main/planning/harmonize-large-scale-factor-behavior.yaml
+  title: Harmonize scale factor behavior at large scale factors (SF 10, 100, 1000)
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - datagen
+  - scale-factor
+  - benchmarks
+  - harmonization
+  owners:
+  - joe
+  estimated_effort: Medium (2-3 days)
+  work_total: 11
+  work_done: 0
+  work_ready: 4
+  deferred_count: 3
 - id: implement-pr-based-result-submission-workflow
   file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
   title: Implement PR-based community result submission workflow
