@@ -109,7 +109,7 @@ work:
 - id: w5
   summary: "Make live result creation consume explicit benchmark_id instead of deriving it from names"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Ensure live-created BenchmarkResults receive benchmark_id from
     execution_metadata produced by the runner/adapter path.
@@ -127,7 +127,7 @@ work:
 - id: w6
   summary: "Make result export preserve explicit benchmark_id without name-derived drift"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Ensure export code consumes the explicit benchmark_id already present on
     live-created results instead of re-normalizing from names.
