@@ -1,0 +1,533 @@
+id: harmonize-scale-factor-baselines
+title: "Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed across all benchmarks"
+worktree: main
+category: Core Functionality
+priority: High
+status: Not Started
+description: >
+  BenchBox convention is SF=1 produces ~1GB of uncompressed data (TPC-H baseline: ~1GB at SF=1).
+  An audit of benchmark_runs/datagen/ found severe deviations once compression state is accounted
+  for. Key finding: generators with CompressionMixin (SSB, JoinOrder, CoffeeShop, ClickBench,
+  AMPLab, H2O) write zstd-compressed data by default (CLI compress_data=True), while generators
+  inheriting only VerbosityMixin (TSBS, FlightData, NYC Taxi) write uncompressed CSV. Comparing
+  on-disk sizes without accounting for this is misleading.
+
+  Corrected picture (estimated uncompressed sizes at SF=1):
+    - TPC-DS:    ~1.0GB  (on-target, official dsdgen binary)
+    - ClickBench: ~0.9GB (on-target, 1M wide rows)
+    - SSB:        ~720MB (0.72x under)
+    - TSBS:       466MB  (0.47x under, uncompressed on disk)
+    - FlightData: 416MB  (0.42x under, uncompressed on disk)
+    - AMPLab:     ~450MB (0.45x under)
+    - NYC Taxi:   96MB   (0.10x under, uncompressed on disk)
+    - H2O DB:     ~150MB (0.15x under)
+    - CoffeeShop: ~6GB   (6x OVER target)
+    - JoinOrder:  ~5GB   (5x OVER target)
+
+  TPC-H is the baseline and must not be changed. TPC-DI is out of scope.
+  We are in beta -- clean break, no fallback or versioning needed.
+
+  Each benchmark requires a research gate: review the original published specification to determine
+  if scale factor sizes are a hard requirement. If a published spec defines SF=1 row counts, we
+  must not deviate. If the benchmark is a BenchBox original or the spec is silent on sizing, we
+  can safely adjust. Where a published benchmark defines a standard sizing tier (e.g., H2O "small"
+  = 10M rows), matching that sizing is valuable and should be preferred.
+
+context_sections:
+- name: Compression Asymmetry Discovery
+  summary: >
+    Generators WITH CompressionMixin (write zstd-compressed data by default via CLI):
+      TPC-H, TPC-DS, SSB, JoinOrder, CoffeeShop, ClickBench, AMPLab, H2O DB
+    Generators WITHOUT CompressionMixin (always write uncompressed CSV):
+      TSBS DevOps, FlightData, NYC Taxi
+
+    CLI defaults: compress_data=True, compression_type="zstd" (benchbox/cli/preferences.py:89-90).
+    Generators without CompressionMixin ignore these settings silently.
+
+    Adding CompressionMixin to the three uncompressed generators is in scope for this TODO,
+    provided it does not violate the benchmark's published specification.
+
+- name: Scale Factor Storage & Migration Impact
+  summary: >
+    scale_factor is stored in:
+    - Result JSON: BenchmarkResults.scale_factor (float) in models.py:263
+    - Result filenames: {benchmark}_{sfX}_{platform}_{timestamp}_{exec_id}.json
+    - Datagen directories: {benchmark}_{sf}_data/
+    - Database names: {benchmark}_{sf}_{config}.duckdb
+
+    Changing base constants means old SF=1 data and new SF=1 data differ silently.
+    Since we are in beta, this is a clean break -- no versioning or fallback needed.
+    Users must regenerate data after this change. Expected results in
+    benchbox/core/expected_results/ must be updated where applicable.
+
+- name: Key Code Locations
+  summary: >
+    | Benchmark | Generator File | Scale Factor Line(s) |
+    |-----------|---------------|---------------------|
+    | SSB | core/ssb/generator.py | 67-71 (base_lineorders, base_customers, etc.) |
+    | JoinOrder | core/joinorder/generator.py | 82-109 (base_row_counts dict) |
+    | CoffeeShop | core/coffeeshop/generator.py | 338 (50_000_000 * scale_factor) |
+    | TSBS | core/tsbs_devops/generator.py | 35-36 (DEFAULT_HOSTS, DEFAULT_DURATION_DAYS), 89-90 |
+    | FlightData | core/flightdata/downloader.py | 93 (scale_factor * 17 months) |
+    | NYC Taxi | core/nyctaxi/downloader.py | 356 (scale_factor / 100.0) |
+    | AMPLab | core/amplab/generator.py | 72-74 (base_rankings, base_uservisits, base_documents) |
+    | H2O DB | core/h2odb/generator.py | 71 (base_trips = 1000000) |
+    | ClickBench | core/clickbench/generator.py | 57 (1_000_000 * scale_factor) |
+    | TPC-DS | core/tpcds/generator/manager.py | Uses official dsdgen binary |
+
+files_affected:
+- change_type: Modified
+  paths:
+  - benchbox/core/coffeeshop/generator.py
+  - benchbox/core/joinorder/generator.py
+  - benchbox/core/ssb/generator.py
+  - benchbox/core/tsbs_devops/generator.py
+  - benchbox/core/flightdata/downloader.py
+  - benchbox/core/nyctaxi/downloader.py
+  - benchbox/core/amplab/generator.py
+  - benchbox/core/h2odb/generator.py
+  - benchbox/core/clickbench/generator.py
+- change_type: New
+  paths:
+  - tests/unit/generators/test_scale_factor_harmonization.py
+
+must_preserve:
+- TPC-H generator unchanged -- it is the calibration baseline
+- TPC-DS uses official dsdgen binary -- do not override its internal scale logic
+- All existing query sets, schemas, and SQL files unchanged -- only row counts/volume change
+- Benchmarks must still produce valid data at SF=0.01 (CI/testing scale)
+- Generators with CompressionMixin continue compressing; adding compression to new generators must not break uncompressed-output mode (--compression none)
+- Scale factor validation in base_benchmark.py (SF > 0, SF >= 1 must be integer) unchanged
+
+anti_patterns:
+- DO NOT introduce a global calibration multiplier layer that adjusts SF before passing to generators -- because this hides the actual row count relationship and makes debugging scale issues harder -- instead change the base constants directly in each generator
+- DO NOT change row counts for benchmarks whose published specification defines SF=1 cardinalities -- because this makes BenchBox results incomparable to other implementations of the same benchmark -- instead document the deviation from 1GB as spec-compliant
+- DO NOT change TPC-DS scale factor handling -- because it uses the official dsdgen binary and the TPC Council defines SF semantics -- accept ~1GB as already on target
+- DO NOT add backwards-compatibility shims or legacy_scale_factor fields -- because we are in beta and a clean break is appropriate -- just change the constants and update tests
+- DO NOT estimate uncompressed sizes by guessing compression ratios -- because generators have different compression states -- instead calculate from row_count * bytes_per_row or run with --compression none to measure directly
+
+verification:
+- description: All fast tests pass after all changes
+  command: uv run -- python -m pytest -m fast -q
+  expected_output: all pass, 0 failures
+- description: Each modified benchmark generates data at SF=0.01 without error
+  command: >
+    for bench in ssb joinorder coffeeshop tsbs_devops flightdata nyctaxi amplab h2odb clickbench; do
+      echo "=== $bench ===" && benchbox run --platform duckdb --benchmark $bench --scale 0.01 --phases generate --dry-run;
+    done
+  expected_output: all dry runs complete without error
+- description: New datagen size tests validate SF=1 uncompressed output within 10% of 1GB
+  command: uv run -- python -m pytest tests/unit/generators/test_scale_factor_harmonization.py -v
+  expected_output: all pass
+
+scope_limit:
+  only_modify:
+  - benchbox/core/ssb/generator.py
+  - benchbox/core/joinorder/generator.py
+  - benchbox/core/coffeeshop/generator.py
+  - benchbox/core/tsbs_devops/generator.py
+  - benchbox/core/flightdata/downloader.py
+  - benchbox/core/nyctaxi/downloader.py
+  - benchbox/core/amplab/generator.py
+  - benchbox/core/h2odb/generator.py
+  - benchbox/core/clickbench/generator.py
+  - tests/unit/generators/
+  do_not_modify:
+  - benchbox/core/tpch/
+  - benchbox/core/tpcds/
+  - benchbox/core/tpcdi/
+  - benchbox/core/*/queries.py
+  - benchbox/core/*/schema.py
+  - benchbox/platforms/
+
+success_metrics:
+- All benchmarks produce 0.8-1.3GB uncompressed data at SF=1 (or are documented as spec-compliant exceptions)
+- TSBS, FlightData, NYC Taxi gain CompressionMixin support (if spec allows)
+- No regressions in existing test suite
+- Each benchmark has a datagen test validating SF=1 output size
+
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - datagen
+  - scale-factor
+  - benchmarks
+  - harmonization
+  estimated_effort: 2-3 weeks
+  created_date: '2026-04-07'
+  dependencies: []
+  notes: >
+    Originated from audit of benchmark_runs/datagen/ directory sizes. The initial audit
+    compared compressed and uncompressed on-disk sizes as equivalent, which was misleading.
+    CoffeeShop and JoinOrder are actually OVER target (not under), while TPC-DS and ClickBench
+    are already near target (not undersized). The corrected analysis drives this harmonization.
+
+work:
+# ============================================================================
+# RESEARCH GATES — Must complete before any implementation
+# ============================================================================
+- id: w1
+  summary: "Research gate: spec-governed benchmarks (TPC-DS, SSB, ClickBench)"
+  status: pending
+  notes: >
+    For each benchmark, find and read the original published specification or paper:
+
+    **TPC-DS** (likely already on target):
+    - Read the TPC-DS specification (check _sources/tpc-ds/specification/ if available)
+    - Confirm: SF=1 in TPC-DS produces ~1GB per the official spec
+    - Determine: the 379MB compressed / ~1GB uncompressed finding — is this confirmed?
+    - Decision: if confirmed on-target, mark TPC-DS as "no change needed, spec-compliant"
+
+    **SSB (Star Schema Benchmark)**:
+    - Find the original SSB paper (Pat O'Neil et al., 2007)
+    - Key question: does the SSB spec define SF=1 = 6M lineorder rows as a hard requirement?
+    - If yes: document SSB ~720MB as spec-compliant, mark as out-of-scope for harmonization
+    - If the paper only uses 6M as an example but doesn't mandate it: safe to increase
+
+    **ClickBench**:
+    - Find the original ClickBench benchmark definition (ClickHouse team, GitHub)
+    - The original uses 99,997,497 real records (a single fixed dataset, not scalable)
+    - BenchBox uses synthetic generation with 1M base records — this is already a deviation
+    - Since BenchBox's generator is custom and already ~0.9GB at SF=1: likely no change needed
+    - If the ClickBench spec defines a standard dataset size, document compliance status
+
+    **Output for each**: determination of "spec-locked" vs "adjustable" with citation.
+    Record whether spec mandates specific row counts at SF=1 or just uses them as defaults.
+    If adjustable, record the recommended target row counts for ~1GB uncompressed.
+
+- id: w2
+  summary: "Research gate: synthetic benchmarks (CoffeeShop, JoinOrder, AMPLab, H2O DB)"
+  status: pending
+  notes: >
+    For each benchmark, determine if there is a published specification that constrains SF sizing:
+
+    **CoffeeShop**:
+    - Reference: https://github.com/JosueBogran/coffeeshopdatageneratorv2
+    - This is a BenchBox-adapted benchmark inspired by a public generator, not a published spec
+    - Likely fully adjustable — confirm no published paper defines 50M orders as canonical
+    - Current: 50M orders → ~6GB uncompressed (6x over). Target: ~8M orders → ~1GB
+    - Decision: determine exact base order count for ~1GB uncompressed output
+
+    **JoinOrder (JOB)**:
+    - Reference: "How Good Are Query Optimizers, Really?" (Leis et al., VLDB 2015)
+    - The original JOB uses real IMDB data (~3.6GB). BenchBox uses synthetic IMDB-like data
+    - Key question: does the paper define specific table cardinalities as part of the benchmark?
+    - If yes (e.g., cast_info must be 36M rows for queries to be valid): cannot reduce
+    - If the paper only requires "IMDB-scale" data: can reduce proportionally
+    - Research whether reducing cardinality by 5x would change join order optimization behavior
+    - Current: ~72M total rows → ~5GB uncompressed. Target: ~14M rows → ~1GB
+    - Validate: at reduced cardinality, do JOB queries still exercise multi-way joins effectively?
+
+    **AMPLab (Big Data Benchmark)**:
+    - Reference: AMPLab Big Data Benchmark (UC Berkeley, 2013)
+    - The original defines specific "tiny" (rank ~160K, uv ~200K), "1node" (rank ~18M, uv ~155M),
+      "5nodes" tiers
+    - Key question: does BenchBox's base_rankings=100K, base_uservisits=1M match a published tier?
+    - If a published tier produces ~1GB: match that tier for SF=1
+    - If no tier matches 1GB: adjustable (the benchmark is a synthetic generator)
+    - Determine the recommended base counts to reach ~1GB uncompressed
+
+    **H2O DB (db-benchmark)**:
+    - Reference: https://github.com/h2oai/db-benchmark (H2O.ai, 2018)
+    - The original defines tiers: 0.5GB, 5GB, 50GB
+    - Key question: does the 0.5GB tier correspond to ~1M rows? What does 1GB correspond to?
+    - The standard "small" tier uses 10M rows — matching this is valuable and important
+    - If 10M rows produces ~1.5GB: use 10M anyway (matching a published sizing takes precedence)
+    - If there is a tier that naturally produces ~1GB: prefer that
+    - Determine the recommended base_trips value
+
+    **Output for each**: "spec-locked" or "adjustable" determination with citation, plus the
+    recommended new base constant value if adjustable.
+
+- id: w3
+  summary: "Research gate: real-data & time-series benchmarks (TSBS, FlightData, NYC Taxi) + compression"
+  status: pending
+  notes: >
+    For each benchmark, review the published specification AND determine:
+    (a) whether SF has a semantic meaning that should be preserved
+    (b) whether adding CompressionMixin violates the spec
+    (c) whether increasing data volume would change benchmark characteristics
+
+    **TSBS DevOps**:
+    - Reference: https://github.com/timescale/tsbs (TimescaleDB TSBS)
+    - The original tsbs_generate_data uses configurable hosts and duration
+    - Key question: does the TSBS spec define "100 hosts, 1 day" as canonical SF=1?
+    - Key question: should we increase hosts (100→N), duration (1→N days), or both?
+    - Increasing hosts changes cardinality (more distinct time series). Increasing days changes
+      temporal coverage. These have different benchmark characteristics — determine which is
+      preferred for join/aggregation query patterns used in BenchBox's TSBS query set
+    - CompressionMixin: TSBS currently outputs uncompressed CSV. Adding compression is likely
+      fine — the TSBS spec is about query patterns, not file format. Confirm.
+
+    **FlightData**:
+    - Reference: US Bureau of Transportation Statistics (BTS) dataset
+    - No formal benchmark specification — this is a real-data analytics benchmark
+    - Code comments claim SF=1 ≈ 1GB (downloader.py:91) but actual is 416MB uncompressed
+    - Key question: is the 416MB from synthetic fallback or real BTS download?
+    - If synthetic: the synthetic generator may undercount rows per month. Investigate.
+    - If real: 17 months of BTS data may produce less than the 600K flights/month estimate
+    - Determine: should multiplier change from 17 to ~41, or should bytes-per-flight increase?
+    - CompressionMixin: FlightData outputs uncompressed CSV. Adding compression is safe.
+
+    **NYC Taxi**:
+    - Reference: NYC TLC Trip Record Data (public dataset)
+    - No formal benchmark specification — this is a real-data analytics benchmark
+    - Current: sample_rate = SF/100, so SF=1 = 1% sample → 96MB uncompressed
+    - Key question: what sample rate produces ~1GB? Is SF=1 → 10% sample appropriate?
+    - Changing divisor from 100 to 10 makes SF=1 = 10% sample, SF=10 = full dataset
+    - Validate: this preserves reasonable SF semantics (SF=0.01 for CI still works)
+    - CompressionMixin: NYC Taxi outputs uncompressed CSV. Adding compression is safe.
+
+    **Output for each**: recommended constant change, compression decision, and any
+    semantic meaning to preserve in documentation/comments.
+
+# ============================================================================
+# IMPLEMENTATIONS — Oversized benchmarks (reduce to ~1GB)
+# ============================================================================
+- id: w4
+  summary: "CoffeeShop: reduce base order count to target ~1GB uncompressed at SF=1"
+  status: pending
+  needs: [w2]
+  notes: >
+    Apply the recommended base order count from w2 research gate.
+    Expected change: benchbox/core/coffeeshop/generator.py line 338.
+    Likely: 50_000_000 → value determined by research (~8M if no spec constraint).
+
+    Steps:
+    1. Apply constant change from w2 findings
+    2. Run datagen at SF=0.01 and verify output is proportionally smaller
+    3. Create/update unit test for CoffeeShop datagen size validation (see w14)
+    4. Update any docstrings claiming "SF=1 = 50M orders"
+    5. Run fast tests to verify no regressions
+
+- id: w5
+  summary: "JoinOrder: reduce all base_row_counts to target ~1GB uncompressed at SF=1"
+  status: pending
+  needs: [w2]
+  notes: >
+    Apply the recommended base row counts from w2 research gate.
+    Expected change: benchbox/core/joinorder/generator.py lines 82-109 (all 21 tables).
+
+    If w2 determines the JOB paper requires specific cardinalities, document as spec-locked
+    and skip implementation (mark this work item as "not applicable").
+
+    Steps:
+    1. Apply proportional reduction to all base_row_counts from w2 findings
+    2. Maintain relative proportions between tables (cast_info should still be ~50% of total)
+    3. Validate at SF=0.01: data generates correctly, all tables present
+    4. Create/update unit test for JoinOrder datagen size validation (see w14)
+    5. If JOB paper was found in w2, verify reduced cardinalities still produce meaningful
+       multi-way join plans (check that no table becomes so small it triggers nested-loop
+       instead of hash-join for the benchmark's key queries)
+    6. Run fast tests to verify no regressions
+
+# ============================================================================
+# IMPLEMENTATIONS — Undersized synthetic benchmarks (increase to ~1GB)
+# ============================================================================
+- id: w6
+  summary: "H2O DB: increase base_trips to match published tier targeting ~1GB at SF=1"
+  status: pending
+  needs: [w2]
+  notes: >
+    Apply the recommended base_trips from w2 research gate.
+    Expected change: benchbox/core/h2odb/generator.py line 71.
+
+    If w2 determines H2O's published 0.5GB tier = X rows and 1GB tier = Y rows, use Y.
+    If H2O's "small" tier (10M rows) is the closest standard sizing, use 10M even if it
+    produces ~1.5GB — matching a published sizing takes precedence over exact 1GB parity.
+
+    Steps:
+    1. Apply constant change from w2 findings
+    2. Run datagen at SF=0.01 and verify output
+    3. Create/update unit test for H2O DB datagen size validation (see w14)
+    4. Update docstring in generator ("SF=1 = ~1M trips" → new value)
+    5. Run fast tests
+
+- id: w7
+  summary: "AMPLab: increase base row counts to target ~1GB uncompressed at SF=1"
+  status: pending
+  needs: [w2]
+  notes: >
+    Apply the recommended base counts from w2 research gate.
+    Expected change: benchbox/core/amplab/generator.py lines 72-74.
+
+    If w2 identifies a published AMPLab tier that produces ~1GB, match that tier's row counts.
+    Otherwise, multiply all base counts proportionally to reach ~1GB uncompressed.
+
+    Steps:
+    1. Apply constant changes from w2 findings
+    2. Run datagen at SF=0.01 and verify all three tables generate correctly
+    3. Create/update unit test for AMPLab datagen size validation (see w14)
+    4. Update docstrings
+    5. Run fast tests
+
+- id: w8
+  summary: "SSB: increase base row counts per research gate findings (if spec allows)"
+  status: pending
+  needs: [w1]
+  notes: >
+    Apply w1 research gate determination.
+
+    IF w1 determines SSB spec defines SF=1 = 6M lineorders as mandatory:
+    - Document ~720MB as spec-compliant in generator docstring
+    - Mark this work item as "no change — spec-locked" and skip
+    - Still create a datagen test that validates the spec-compliant size
+
+    IF w1 determines SSB base counts are adjustable:
+    - Increase base_lineorders from 6_000_000 to ~8_400_000 (and dimension tables proportionally)
+    - Change in benchbox/core/ssb/generator.py lines 67-70
+    - Run datagen at SF=0.01, create size validation test
+    - Run fast tests
+
+# ============================================================================
+# IMPLEMENTATIONS — Real-data / time-series benchmarks (adjust + add compression)
+# ============================================================================
+- id: w9
+  summary: "NYC Taxi: change sample rate to target ~1GB at SF=1 + add CompressionMixin"
+  status: pending
+  needs: [w3]
+  notes: >
+    Apply w3 research gate findings.
+    Expected changes:
+    (a) benchbox/core/nyctaxi/downloader.py line 356: change divisor (likely 100.0 → 10.0)
+    (b) Add CompressionMixin to NYCTaxiDataDownloader, GreenTaxiDataDownloader, HVFHVDataDownloader
+        classes (currently only VerbosityMixin). Use open_output_file() for compressed writes.
+
+    Steps:
+    1. Apply sample rate constant change from w3 findings
+    2. Add CompressionMixin as parent class to all three downloader classes
+    3. Update file output to use self.open_output_file() / self.get_compressed_filename()
+    4. Ensure --compression none still produces uncompressed output
+    5. Update scale factor documentation in downloader.py and nyctaxi.py facades
+    6. Create/update datagen size validation test (see w14)
+    7. Run fast tests
+
+- id: w10
+  summary: "TSBS DevOps: increase data volume to target ~1GB at SF=1 + add CompressionMixin"
+  status: pending
+  needs: [w3]
+  notes: >
+    Apply w3 research gate findings.
+    Expected changes:
+    (a) benchbox/core/tsbs_devops/generator.py lines 35-36: increase DEFAULT_HOSTS and/or
+        DEFAULT_DURATION_DAYS per w3 determination of which dimension to scale
+    (b) Add CompressionMixin to TSBSDevOpsDataGenerator (currently only VerbosityMixin)
+
+    Steps:
+    1. Apply constant change from w3 findings (hosts vs duration vs both)
+    2. Add CompressionMixin as parent class
+    3. Update file output to use compression-aware methods
+    4. Ensure --compression none still works
+    5. Update scale factor documentation and semantic meaning comments
+    6. Create/update datagen size validation test (see w14)
+    7. Run fast tests
+
+- id: w11
+  summary: "FlightData: increase months multiplier to target ~1GB at SF=1 + add CompressionMixin"
+  status: pending
+  needs: [w3]
+  notes: >
+    Apply w3 research gate findings.
+    Expected changes:
+    (a) benchbox/core/flightdata/downloader.py line 93: increase multiplier (likely 17 → ~41)
+        OR fix synthetic fallback to produce correct bytes-per-flight if the real data is fine
+    (b) Add CompressionMixin to FlightDataDownloader (currently only VerbosityMixin)
+
+    Steps:
+    1. First verify: is the 416MB from synthetic fallback or real download? (w3 should answer)
+    2. Apply constant change from w3 findings
+    3. Add CompressionMixin as parent class
+    4. Update file output to use compression-aware methods
+    5. Update scale factor mapping documentation (SF=1 → N months → ~1GB)
+    6. Create/update datagen size validation test (see w14)
+    7. Run fast tests
+
+# ============================================================================
+# IMPLEMENTATIONS — Near-target benchmarks (minor adjustments if needed)
+# ============================================================================
+- id: w12
+  summary: "ClickBench: apply minor adjustment if research gate identifies need"
+  status: pending
+  needs: [w1]
+  notes: >
+    Apply w1 research gate determination.
+
+    ClickBench is currently ~0.9GB uncompressed at SF=1 (1M records × ~900 bytes/row).
+    This is within tolerance. However:
+
+    IF w1 determines the original ClickBench defines a standard dataset size (99.9M records)
+    and BenchBox's 1M is an arbitrary reduction:
+    - Consider whether bumping to 1.1M records would better align with a published reference
+    - Only change if there's a clear specification basis
+
+    IF no published sizing applies (likely — original ClickBench is a fixed dataset):
+    - Accept ~0.9GB as within tolerance, document, skip
+    - Still create a datagen test that validates current size
+
+    Expected: minimal or no change. Create size validation test regardless.
+
+# ============================================================================
+# TESTING & VALIDATION
+# ============================================================================
+- id: w13
+  summary: "Create comprehensive datagen size validation test suite"
+  status: pending
+  needs: [w4, w5, w6, w7, w8, w9, w10, w11, w12]
+  notes: >
+    Create tests/unit/generators/test_scale_factor_harmonization.py.
+
+    For each benchmark that was modified, create a test that:
+    1. Generates data at SF=0.01 (fast, suitable for CI)
+    2. Measures the uncompressed output size (use --compression none or measure before compression)
+    3. Calculates the projected SF=1 size via linear extrapolation (SF=0.01 * 100)
+    4. Asserts the projected SF=1 size is within 0.8-1.3GB (±30% tolerance for SF=0.01 extrapolation)
+
+    For spec-locked benchmarks (TPC-DS, and any marked as such by research gates):
+    1. Generate at SF=0.01 and verify data is valid
+    2. Document the expected size as spec-compliant (no assertion on 1GB target)
+
+    Mark all tests with @pytest.mark.slow (datagen even at SF=0.01 takes seconds per benchmark).
+    Do NOT use @pytest.mark.fast for these.
+
+    Also validate:
+    - Each benchmark still generates all expected tables at SF=0.01
+    - No empty tables
+    - Row counts scale linearly with SF (generate at SF=0.01 and SF=0.02, verify ~2x ratio)
+
+- id: w14
+  summary: "Cross-benchmark validation run and documentation update"
+  status: pending
+  needs: [w13]
+  notes: >
+    Final validation:
+    1. Run all modified benchmarks at SF=0.01 with --phases generate
+    2. Verify all fast tests pass: uv run -- python -m pytest -m fast -q
+    3. Run the new size validation tests: uv run -- python -m pytest tests/unit/generators/test_scale_factor_harmonization.py -v
+    4. Update AGENTS.md or benchmark documentation with the corrected SF-to-size mapping
+    5. For any benchmarks marked as spec-locked by research gates, update their generator
+       docstrings to explain why SF=1 ≠ 1GB (citing the specification)
+    6. Clean up any stale expected_results that reference old row counts
+
+deferred:
+- id: d1
+  summary: "Add data_generation_version field to BenchmarkResults for change tracking"
+  reason: >
+    Currently, changing base constants silently invalidates comparisons between old and new
+    SF=1 results. Adding a version field would allow detecting incompatible comparisons.
+    Not needed in beta, but important for GA.
+  undefer_when: BenchBox reaches GA or published-results branch accumulates comparison conflicts
+- id: d2
+  summary: "Add --force datagen auto-detection when base constants change"
+  reason: >
+    After changing base constants, users with cached datagen directories silently use stale
+    data. Could add a manifest hash of base constants to detect staleness. Beta users can
+    use --force datagen manually.
+  undefer_when: User reports confusing results due to stale datagen cache
+- id: d3
+  summary: "Measure actual uncompressed sizes at SF=1 for all benchmarks"
+  reason: >
+    Current uncompressed estimates are calculated from row_count * bytes_per_row. Running
+    each benchmark at SF=1 with --compression none would give exact measurements. Deferred
+    because SF=1 generation takes significant time and disk space.
+  undefer_when: Harmonization changes are complete and a precise audit is needed
