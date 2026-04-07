@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T13:01:07.877343'
-total_items: 640
+generated_at: '2026-04-07T13:04:34.528891'
+total_items: 641
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 591
+    count: 592
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -433,6 +433,11 @@ statuses:
       title: Add Azure Synapse Adapter
       priority: Medium
       category: Uncategorized
+    - id: cedardb-adapter
+      file: DONE/platform-expansion/active/cedardb-adapter.yaml
+      title: Add CedarDB Platform Adapter
+      priority: Medium
+      category: Platform Expansion
     - id: add-coffee-shop-benchmark-implementation
       file: DONE/unknown/planning/add-coffee-shop-benchmark-implementation.yaml
       title: Add Coffee Shop Benchmark Implementation

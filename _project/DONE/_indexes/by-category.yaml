@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T13:01:07.877038'
+generated_at: '2026-04-07T13:04:34.528576'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -2130,7 +2130,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 74
+    count: 75
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2146,6 +2146,11 @@ categories:
       file: DONE/platform-expansion/active/apache-doris-olap-platform.yaml
       title: Add Apache Doris MPP OLAP platform support
       priority: Medium-High
+      status: Completed
+    - id: cedardb-adapter
+      file: DONE/platform-expansion/active/cedardb-adapter.yaml
+      title: Add CedarDB Platform Adapter
+      priority: Medium
       status: Completed
     - id: ducklake-open-table-format
       file: DONE/platform-expansion/planning/ducklake-open-table-format.yaml

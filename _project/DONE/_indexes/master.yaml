@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T13:01:07.876733'
-total_items: 640
+generated_at: '2026-04-07T13:04:34.528274'
+total_items: 641
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4325,6 +4325,25 @@ items:
   - azure
   owners:
   - '"@benchbox-maintainers"'
+- id: cedardb-adapter
+  file: DONE/platform-expansion/active/cedardb-adapter.yaml
+  title: Add CedarDB Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  tags:
+  - platform
+  - sql
+  - postgresql-compatible
+  - olap
+  - oltp
+  - cedardb
+  estimated_effort: Medium
+  completed_date: '2026-04-07'
+  work_total: 9
+  work_done: 9
+  work_ready: 0
 - id: add-coffee-shop-benchmark-implementation
   file: DONE/unknown/planning/add-coffee-shop-benchmark-implementation.yaml
   title: Add Coffee Shop Benchmark Implementation

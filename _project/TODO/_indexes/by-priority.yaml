@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T13:01:06.363491'
-total_items: 21
+generated_at: '2026-04-07T13:04:32.922611'
+total_items: 20
 priorities:
   Critical:
     count: 1
@@ -36,7 +36,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 7
+    count: 6
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -48,11 +48,6 @@ priorities:
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: cedardb-adapter
-      file: TODO/platform-expansion/active/cedardb-adapter.yaml
-      title: Add CedarDB Platform Adapter
-      category: Platform Expansion
-      status: In Progress
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants

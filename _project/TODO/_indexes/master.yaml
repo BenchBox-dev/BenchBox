@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T13:01:06.363458'
-total_items: 21
+generated_at: '2026-04-07T13:04:32.922561'
+total_items: 20
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -268,24 +268,6 @@ items:
   estimated_effort: Medium-High
   work_total: 9
   work_done: 0
-  work_ready: 1
-- id: cedardb-adapter
-  file: TODO/platform-expansion/active/cedardb-adapter.yaml
-  title: Add CedarDB Platform Adapter
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium
-  status: In Progress
-  tags:
-  - platform
-  - sql
-  - postgresql-compatible
-  - olap
-  - oltp
-  - cedardb
-  estimated_effort: Medium
-  work_total: 9
-  work_done: 8
   work_ready: 1
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml

@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T13:01:06.363480'
+generated_at: '2026-04-07T13:04:32.922595'
 total_categories: 5
 categories:
   Benchmark Development:
@@ -68,7 +68,7 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 7
+    count: 6
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -80,11 +80,6 @@ categories:
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       priority: Medium
       status: Not Started
-    - id: cedardb-adapter
-      file: TODO/platform-expansion/active/cedardb-adapter.yaml
-      title: Add CedarDB Platform Adapter
-      priority: Medium
-      status: In Progress
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter

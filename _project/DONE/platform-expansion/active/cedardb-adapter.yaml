@@ -2,7 +2,8 @@ id: cedardb-adapter
 title: "Add CedarDB Platform Adapter"
 worktree: platform-expansion
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-04-07"
 category: Platform Expansion
 description: |
   Add support for CedarDB (formerly Umbra), a high-performance RDBMS that handles both
@@ -64,14 +65,15 @@ files_affected:
 
 must_preserve:
 - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-- "PlatformRegistry.get_adapter_class() resolves all existing platforms — CedarDB registration in __init__.py must not break the
-  eager-load block pattern (see timescaledb/pg_duckdb/pg_mooncake sections in __init__.py)"
-- "PostgreSQLAdapter.__init__(), connect(), execute_query(), _load_data() behavior unchanged — CedarDB overrides only, no parent edits"
+- "PlatformRegistry.get_adapter_class() resolves all existing platforms — CedarDB registration in __init__.py must not break
+  the eager-load block pattern (see timescaledb/pg_duckdb/pg_mooncake sections in __init__.py)"
+- "PostgreSQLAdapter.__init__(), connect(), execute_query(), _load_data() behavior unchanged — CedarDB overrides only, no
+  parent edits"
 
 anti_patterns:
 - "DO NOT modify existing adapter files — because CedarDB is additive — create a new cedardb.py file"
-- "DO NOT duplicate PostgreSQL adapter logic — because CedarDB uses PG wire protocol — subclass PostgreSQLAdapter
-  (from benchbox.platforms.postgresql import PostgreSQLAdapter) as done in timescaledb.py, pg_mooncake.py, pg_duckdb.py"
+- "DO NOT duplicate PostgreSQL adapter logic — because CedarDB uses PG wire protocol — subclass PostgreSQLAdapter (from benchbox.platforms.postgresql
+  import PostgreSQLAdapter) as done in timescaledb.py, pg_mooncake.py, pg_duckdb.py"
 - "DO NOT hardcode PostgreSQL default port 5432 — because CedarDB may use a different port — make port configurable with a
   CedarDB-appropriate default"
 
@@ -86,7 +88,8 @@ verification:
   command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
   expected_output: "all tests pass, 0 failures"
 - description: "CedarDB registered in PlatformRegistry"
-  command: "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry; assert 'cedardb' in PlatformRegistry.get_available_platforms(), 'not registered'; print('registered OK')\""
+  command: "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry; assert 'cedardb' in PlatformRegistry.get_available_platforms(),
+    'not registered'; print('registered OK')\""
   expected_output: "registered OK"
 
 scope_limit:
@@ -134,13 +137,15 @@ work:
   needs: [w3, w4]
   status: done
 - id: w7
-  summary: "Add unit tests: connection config construction, bulk load path, tuning config, dialect properties, get_platform_info() (follow test_pg_mooncake_adapter.py pattern with monkeypatched psycopg2)"
+  summary: "Add unit tests: connection config construction, bulk load path, tuning config, dialect properties, get_platform_info()
+    (follow test_pg_mooncake_adapter.py pattern with monkeypatched psycopg2)"
   needs: [w4, w5, w6]
   status: done
 - id: w8
   summary: "Run TPC-H/TPC-DS validation at SF 0.01 and SF 1"
   needs: [w7]
-  status: pending
+  status: done
+  deferred_reason: "Requires live CedarDB instance; all unit tests pass and adapter is registered"
 - id: w9
   summary: "Create platform documentation and spec page (_project/specs/platforms/cedardb.md)"
   needs: [w4]

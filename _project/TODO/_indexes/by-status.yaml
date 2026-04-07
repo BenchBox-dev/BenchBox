@@ -1,14 +1,9 @@
-generated_at: '2026-04-07T13:01:06.363502'
-total_items: 21
+generated_at: '2026-04-07T13:04:32.922621'
+total_items: 20
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: cedardb-adapter
-      file: TODO/platform-expansion/active/cedardb-adapter.yaml
-      title: Add CedarDB Platform Adapter
-      priority: Medium
-      category: Platform Expansion
     - id: eliminate-non-data-loading-wrong-layer-compensation
       file: TODO/main/active/eliminate-non-data-loading-wrong-layer-compensation.yaml
       title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
