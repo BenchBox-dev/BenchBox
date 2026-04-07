@@ -95,24 +95,26 @@ def main() -> int:
     if args.json:
         output = []
         for r in reports:
-            output.append({
-                "file": r.file,
-                "benchmark_id": r.benchmark_id,
-                "platform": r.platform,
-                "scale_factor": r.scale_factor,
-                "overall_status": r.overall_status.value,
-                "summary": r.summary,
-                "checks": [
-                    {
-                        "category": c.category.value,
-                        "name": c.name,
-                        "status": c.status.value,
-                        "message": c.message,
-                        "details": c.details,
-                    }
-                    for c in r.checks
-                ],
-            })
+            output.append(
+                {
+                    "file": r.file,
+                    "benchmark_id": r.benchmark_id,
+                    "platform": r.platform,
+                    "scale_factor": r.scale_factor,
+                    "overall_status": r.overall_status.value,
+                    "summary": r.summary,
+                    "checks": [
+                        {
+                            "category": c.category.value,
+                            "name": c.name,
+                            "status": c.status.value,
+                            "message": c.message,
+                            "details": c.details,
+                        }
+                        for c in r.checks
+                    ],
+                }
+            )
         print(json.dumps(output, indent=2))
     else:
         for report in reports:
