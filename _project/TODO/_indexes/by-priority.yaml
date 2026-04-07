@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T16:39:11.029383'
-total_items: 21
+generated_at: '2026-04-07T16:52:50.927336'
+total_items: 20
 priorities:
   Critical:
     count: 1
@@ -10,18 +10,13 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 4
+    count: 3
     items:
-    - id: result-integrity-validator
-      file: TODO/main/planning/result-integrity-validator.yaml
-      title: Build result integrity validator for benchmark JSON output
-      category: Testing & Quality
-      status: Not Started
     - id: harmonize-scale-factor-baselines
-      file: TODO/main/planning/harmonize-scale-factor-baselines.yaml
+      file: TODO/main/active/harmonize-scale-factor-baselines.yaml
       title: 'Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed across all benchmarks'
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

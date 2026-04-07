@@ -1,16 +1,21 @@
-generated_at: '2026-04-07T16:39:11.029392'
-total_items: 21
+generated_at: '2026-04-07T16:52:50.927345'
+total_items: 20
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
       title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
       priority: Medium
       category: Core Functionality
+    - id: harmonize-scale-factor-baselines
+      file: TODO/main/active/harmonize-scale-factor-baselines.yaml
+      title: 'Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed across all benchmarks'
+      priority: High
+      category: Core Functionality
   Not Started:
-    count: 17
+    count: 15
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -32,11 +37,6 @@ statuses:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
       category: Platform Expansion
-    - id: result-integrity-validator
-      file: TODO/main/planning/result-integrity-validator.yaml
-      title: Build result integrity validator for benchmark JSON output
-      priority: High
-      category: Testing & Quality
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
@@ -57,11 +57,6 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: harmonize-scale-factor-baselines
-      file: TODO/main/planning/harmonize-scale-factor-baselines.yaml
-      title: 'Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed across all benchmarks'
-      priority: High
-      category: Core Functionality
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

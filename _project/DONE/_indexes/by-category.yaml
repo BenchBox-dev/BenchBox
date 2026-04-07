@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T16:39:12.537762'
+generated_at: '2026-04-07T16:52:52.369115'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -3008,7 +3008,7 @@ categories:
       priority: High
       status: Completed
   Testing & Quality:
-    count: 18
+    count: 19
     items:
     - id: coverage-bottom-25-modules-to-80pct
       file: DONE/main/active/coverage-bottom-25-modules-to-80pct.yaml
@@ -3019,6 +3019,11 @@ categories:
       file: DONE/main/active/coverage-current-bottom-25-modules-to-80pct-apr-2026.yaml
       title: Bring the current 25 lowest-coverage non-publishing modules to 80% fast-test coverage
       priority: Medium-High
+      status: Completed
+    - id: result-integrity-validator
+      file: DONE/main/active/result-integrity-validator.yaml
+      title: Build result integrity validator for benchmark JSON output
+      priority: High
       status: Completed
     - id: enforce-no-conflicting-test-markers
       file: DONE/main/active/enforce-no-conflicting-test-markers.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T16:39:12.538060'
-total_items: 642
+generated_at: '2026-04-07T16:52:52.369418'
+total_items: 643
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 593
+    count: 594
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -764,6 +764,11 @@ statuses:
       title: Build automated pg_duckdb vs native DuckDB comparison report
       priority: Low
       category: Platform Expansion
+    - id: result-integrity-validator
+      file: DONE/main/active/result-integrity-validator.yaml
+      title: Build result integrity validator for benchmark JSON output
+      priority: High
+      category: Testing & Quality
     - id: build-static-pipeline-bundles-to-read-model
       file: DONE/main/planning/build-static-pipeline-bundles-to-read-model.yaml
       title: Build static pipeline that transforms result bundles into explorer read models

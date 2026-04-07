@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T16:39:11.029350'
-total_items: 21
+generated_at: '2026-04-07T16:52:50.927293'
+total_items: 20
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -19,30 +19,13 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
-- id: result-integrity-validator
-  file: TODO/main/planning/result-integrity-validator.yaml
-  title: Build result integrity validator for benchmark JSON output
-  worktree: main
-  category: Testing & Quality
-  priority: High
-  status: Not Started
-  tags:
-  - testing
-  - quality
-  - validation
-  - results
-  - integrity
-  estimated_effort: Large
-  work_total: 5
-  work_done: 0
-  work_ready: 1
 - id: harmonize-scale-factor-baselines
-  file: TODO/main/planning/harmonize-scale-factor-baselines.yaml
+  file: TODO/main/active/harmonize-scale-factor-baselines.yaml
   title: 'Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed across all benchmarks'
   worktree: main
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - datagen
   - scale-factor

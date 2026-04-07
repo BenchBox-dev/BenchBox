@@ -3,7 +3,7 @@ title: "Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed 
 worktree: main
 category: Core Functionality
 priority: High
-status: Not Started
+status: In Progress
 description: >
   BenchBox convention is SF=1 produces ~1GB of uncompressed data (TPC-H baseline: ~1GB at SF=1).
   An audit of benchmark_runs/datagen/ found severe deviations once compression state is accounted

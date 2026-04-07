@@ -2,7 +2,8 @@ id: result-integrity-validator
 title: "Build result integrity validator for benchmark JSON output"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-07"
 description: |
   The live integration test suite produces JSON result files after each benchmark
   run but there is no systematic way to evaluate whether those files are
@@ -67,7 +68,7 @@ justification: |
 work:
 - id: w1
   summary: "benchmark_specs.py — per-benchmark knowledge base"
-  status: pending
+  status: done
   needs: []
   description: |
     Create benchbox/core/results/benchmark_specs.py with a BenchmarkSpec
@@ -111,7 +112,7 @@ work:
 
 - id: w2
   summary: "integrity_validator.py — core three-tier validator"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     Create benchbox/core/results/integrity_validator.py with the following
@@ -172,7 +173,7 @@ work:
 
 - id: w3
   summary: "_project/scripts/validate_results.py — CLI entry point"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Create _project/scripts/validate_results.py as a standalone CLI script.
@@ -211,7 +212,7 @@ work:
 
 - id: w4
   summary: "analytics.py — add validate_results MCP tool"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Add a new validate_results MCP tool in benchbox/mcp/tools/analytics.py,
@@ -245,7 +246,7 @@ work:
 
 - id: w5
   summary: "test_integrity_validator.py — unit tests"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     Create tests/unit/core/results/test_integrity_validator.py with two

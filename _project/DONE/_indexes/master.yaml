@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T16:39:12.537492'
-total_items: 642
+generated_at: '2026-04-07T16:52:52.368842'
+total_items: 643
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -958,6 +958,24 @@ items:
   - joeharris76
   estimated_effort: 2-3 days
   completed_date: '2026-01-18'
+- id: result-integrity-validator
+  file: DONE/main/active/result-integrity-validator.yaml
+  title: Build result integrity validator for benchmark JSON output
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Completed
+  tags:
+  - testing
+  - quality
+  - validation
+  - results
+  - integrity
+  estimated_effort: Large
+  completed_date: '2026-04-07'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
 - id: cli-help-examples-missing-platforms
   file: DONE/docs-experience/planning/cli-help-examples-missing-platforms.yaml
   title: CLI Help Examples for Missing Platforms

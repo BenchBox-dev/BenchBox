@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T16:39:12.537910'
-total_items: 642
+generated_at: '2026-04-07T16:52:52.369263'
+total_items: 643
 priorities:
   Critical:
     count: 37
@@ -190,7 +190,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 231
+    count: 232
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -336,6 +336,11 @@ priorities:
       file: DONE/release-sync/active/bidirectional-repo-sync-v2.yaml
       title: Bidirectional Repository Sync (Redesigned)
       category: Core Functionality
+      status: Completed
+    - id: result-integrity-validator
+      file: DONE/main/active/result-integrity-validator.yaml
+      title: Build result integrity validator for benchmark JSON output
+      category: Testing & Quality
       status: Completed
     - id: cli-help-examples-missing-platforms
       file: DONE/docs-experience/planning/cli-help-examples-missing-platforms.yaml
