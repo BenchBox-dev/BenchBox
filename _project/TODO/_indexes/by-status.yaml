@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T12:03:29.739387'
-total_items: 21
+generated_at: '2026-04-07T12:09:16.261892'
+total_items: 22
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Platform Expansion
   Not Started:
-    count: 17
+    count: 18
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -41,6 +41,11 @@ statuses:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
+      category: Core Functionality
+    - id: eliminate-non-data-loading-wrong-layer-compensation
+      file: TODO/main/planning/eliminate-non-data-loading-wrong-layer-compensation.yaml
+      title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
+      priority: High
       category: Core Functionality
     - id: fix-platform-format-preference-defaults
       file: TODO/main/planning/fix-platform-format-preference-defaults.yaml

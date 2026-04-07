@@ -128,7 +128,7 @@ work:
   status: pending
   needs: [w3, w4]
   description: |
-    Update DataLoader.__init__() (data_loading.py line 2017) to pass
+    Update DataLoader.__init__() (data_loading.py line 1988) to pass
     requested_format=getattr(adapter, 'requested_table_format', None) to
     DataSourceResolver.
 

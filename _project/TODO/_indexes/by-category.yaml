@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T12:03:29.739343'
+generated_at: '2026-04-07T12:09:16.261862'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -33,7 +33,7 @@ categories:
       priority: Critical
       status: Not Started
   Core Functionality:
-    count: 7
+    count: 8
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -54,6 +54,11 @@ categories:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
+      status: Not Started
+    - id: eliminate-non-data-loading-wrong-layer-compensation
+      file: TODO/main/planning/eliminate-non-data-loading-wrong-layer-compensation.yaml
+      title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
+      priority: High
       status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
