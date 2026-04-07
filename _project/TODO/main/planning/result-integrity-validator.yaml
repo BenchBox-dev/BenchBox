@@ -25,8 +25,13 @@ description: |
                     benchmark floor, SF1 row counts within 1%, no duplicate
                     (id, iter, stream) combos
 
-  Reference DuckDB SF1 files (20 benchmarks) live in:
-    benchmark_runs/results/*_sf1_duckdb_sql_20260407_*.json
+  Reference DuckDB SF1 files live in benchmark_runs/results/ and match
+  the glob *_sf1_duckdb_*_2026*.json (55 files total). There are 20 current
+  benchmark IDs plus 8 legacy aliases (e.g., star_schema→ssb,
+  amplab_big_data→amplab, h2o_database→h2odb, tpc_di→tpcdi,
+  joinorderbenchmark→joinorder, nyc_taxi_olap→nyctaxi,
+  flight_data_olap→flightdata, data_vault→datavault).
+  The validator must handle both current and legacy benchmark IDs.
 
 category: Testing & Quality
 
@@ -83,15 +88,24 @@ work:
       tpch: 22 unique IDs "1"–"22", requires_tables=True, min_success_rate=1.0
             sf1_row_counts={customer:150000, lineitem:6001215, nation:25,
             orders:1500000, part:200000, partsupp:800000, region:5, supplier:10000}
-      tpcds: 101 unique IDs "1"–"99" + "14a"/"14b", requires_tables=True,
-             min_success_rate=0.95
+      tpcds: 103 unique IDs — "1"–"99" (excluding 14,23,24,39 which have
+             a/b variants) + "14a"/"14b"/"23a"/"23b"/"24a"/"24b"/"39a"/"39b",
+             requires_tables=True, min_success_rate=0.95
       transaction_primitives: high_failure_expected=True, min_success_rate=0.0
       read_primitives/write_primitives/metadata_primitives: open-ended
         (unique_query_ids=frozenset(), min_unique_queries=50/50/30)
       All others: fixed ID sets from reference run exploration
 
-    Export: BENCHMARK_SPECS: dict[str, BenchmarkSpec] and
+    Legacy alias mapping:
+      LEGACY_ALIASES: dict[str, str] mapping old→current benchmark IDs:
+        star_schema→ssb, amplab_big_data→amplab, h2o_database→h2odb,
+        tpc_di→tpcdi, joinorderbenchmark→joinorder, nyc_taxi_olap→nyctaxi,
+        flight_data_olap→flightdata, data_vault→datavault
+
+    Export: BENCHMARK_SPECS: dict[str, BenchmarkSpec],
+            LEGACY_ALIASES: dict[str, str], and
             get_spec(benchmark_id: str) -> BenchmarkSpec | None
+              (resolves legacy aliases automatically)
   files:
   - benchbox/core/results/benchmark_specs.py
 
@@ -118,6 +132,7 @@ work:
     Structural checks (FAIL on violation):
       - required_keys: all of version, run, benchmark, platform, config, summary,
         phases, queries, execution, environment, export present
+        (cost is NOT required — may be absent in external/older results)
       - query_count_math: summary.queries.passed + failed == total
       - timing_non_negative: all summary.timing values >= 0
       - percentile_ordering: p90 <= p95 <= p99
@@ -132,6 +147,8 @@ work:
         or iter > 0 (FAIL if none)
       - power_phase_completed: power_test.status in COMPLETED/SUCCESS/PASSED (WARN)
       - tables_object: present when spec.requires_tables_object=True (WARN)
+        Note: metadata_primitives has no tables key (tables=None in JSON);
+        other primitives do have tables. Only check when spec requires it.
       - tpc_metrics: summary.tpc_metrics present for tpch/tpcds/tpchavoc/tpch_skew
         (WARN if absent)
 
@@ -235,10 +252,16 @@ work:
     test classes:
 
     TestIntegrityValidatorReferenceFiles:
-      Parametrized over the 20 DuckDB SF1 reference files.
+      Parametrized over DuckDB SF1 reference files — one per current benchmark
+      ID (20 files, selected as the latest mtime per benchmark). Legacy-alias
+      files (e.g., star_schema, amplab_big_data) are excluded from
+      parametrization but covered by a separate test that verifies alias
+      resolution. Use a conftest fixture or helper that discovers files
+      dynamically via glob + grouping.
       Each file must produce overall_status != FAIL.
       Specifically check tpch passes sf1_row_counts believability check.
       Specifically check transaction_primitives passes despite high failure rate.
+      Specifically check a legacy-alias file resolves to the correct spec.
 
     TestIntegrityValidatorSyntheticData:
       Build a minimal valid TPC-H result dict fixture (helper function),
@@ -305,8 +328,8 @@ verification:
 - description: "All 20 DuckDB SF1 reference files pass validation"
   command: "uv run _project/scripts/validate_results.py benchmark_runs/results/ --benchmark duckdb"
   expected_output: "Exit code 0, all files PASS or WARN-only"
-- description: "Single file smoke test"
-  command: "uv run _project/scripts/validate_results.py benchmark_runs/results/tpch_sf1_duckdb_sql_20260407_152815_f0ea2061.json --verbose"
+- description: "Single file smoke test (latest TPC-H SF1 file)"
+  command: "uv run _project/scripts/validate_results.py \"$(ls -t benchmark_runs/results/tpch_sf1_duckdb_*.json | head -1)\" --verbose"
   expected_output: "Status: PASS, sf1_row_counts check passes"
 - description: "Fast test suite still passes"
   command: "uv run -- python -m pytest -m fast -q"
