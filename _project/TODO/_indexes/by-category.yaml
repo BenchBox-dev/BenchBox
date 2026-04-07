@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T20:57:07.623317'
-total_categories: 5
+generated_at: '2026-04-07T12:03:29.739343'
+total_categories: 6
 categories:
   Benchmark Development:
     count: 4
@@ -23,6 +23,14 @@ categories:
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
+      status: Not Started
+  Bug Fix:
+    count: 1
+    items:
+    - id: fix-platform-format-preference-defaults
+      file: TODO/main/planning/fix-platform-format-preference-defaults.yaml
+      title: Fix data format selection to always default to platform preferences
+      priority: Critical
       status: Not Started
   Core Functionality:
     count: 7

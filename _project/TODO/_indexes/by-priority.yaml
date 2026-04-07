@@ -1,14 +1,19 @@
-generated_at: '2026-04-04T20:57:07.623353'
-total_items: 20
+generated_at: '2026-04-07T12:03:29.739369'
+total_items: 21
 priorities:
   Critical:
-    count: 1
+    count: 2
     items:
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
       category: Core Functionality
       status: Completed
+    - id: fix-platform-format-preference-defaults
+      file: TODO/main/planning/fix-platform-format-preference-defaults.yaml
+      title: Fix data format selection to always default to platform preferences
+      category: Bug Fix
+      status: Not Started
   High:
     count: 2
     items:

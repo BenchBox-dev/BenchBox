@@ -1,5 +1,5 @@
-generated_at: '2026-04-04T20:57:07.623397'
-total_items: 20
+generated_at: '2026-04-07T12:03:29.739387'
+total_items: 21
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Platform Expansion
   Not Started:
-    count: 16
+    count: 17
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -42,6 +42,11 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
+    - id: fix-platform-format-preference-defaults
+      file: TODO/main/planning/fix-platform-format-preference-defaults.yaml
+      title: Fix data format selection to always default to platform preferences
+      priority: Critical
+      category: Bug Fix
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
