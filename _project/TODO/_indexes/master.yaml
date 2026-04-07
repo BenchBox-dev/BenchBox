@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T12:14:00.537864'
-total_items: 22
+generated_at: '2026-04-07T12:20:25.281115'
+total_items: 21
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -19,22 +19,6 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
-- id: fix-platform-format-preference-defaults
-  file: TODO/main/planning/fix-platform-format-preference-defaults.yaml
-  title: Fix data format selection to always default to platform preferences
-  worktree: main
-  category: Bug Fix
-  priority: Critical
-  status: Not Started
-  tags:
-  - data-loading
-  - format-selection
-  - regression
-  - duckdb
-  estimated_effort: Medium
-  work_total: 5
-  work_done: 0
-  work_ready: 2
 - id: eliminate-non-data-loading-wrong-layer-compensation
   file: TODO/main/planning/eliminate-non-data-loading-wrong-layer-compensation.yaml
   title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config

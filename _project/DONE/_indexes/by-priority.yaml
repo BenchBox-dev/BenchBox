@@ -1,8 +1,8 @@
-generated_at: '2026-04-07T12:14:01.976614'
-total_items: 639
+generated_at: '2026-04-07T12:20:26.794096'
+total_items: 640
 priorities:
   Critical:
-    count: 36
+    count: 37
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -93,6 +93,11 @@ priorities:
       file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml
       title: Fix critical CI issues for green builds
       category: Testing and Quality Assurance
+      status: Completed
+    - id: fix-platform-format-preference-defaults
+      file: DONE/main/planning/fix-platform-format-preference-defaults.yaml
+      title: Fix data format selection to always default to platform preferences
+      category: Bug Fix
       status: Completed
     - id: implement-expression-family-base-adapter-and-dialects
       file: DONE/dataframe-expression-family/completed/implement-expression-family-base-adapter-and-dialects.yaml

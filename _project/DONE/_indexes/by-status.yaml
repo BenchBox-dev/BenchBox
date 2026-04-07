@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T12:14:01.976776'
-total_items: 639
+generated_at: '2026-04-07T12:20:26.794253'
+total_items: 640
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 590
+    count: 591
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1563,6 +1563,11 @@ statuses:
       title: Fix cursor and connection resource leaks across new platform adapters
       priority: High
       category: Platform Expansion
+    - id: fix-platform-format-preference-defaults
+      file: DONE/main/planning/fix-platform-format-preference-defaults.yaml
+      title: Fix data format selection to always default to platform preferences
+      priority: Critical
+      category: Bug Fix
     - id: fix-datagen-layout-and-manifest-hygiene
       file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml
       title: Fix datagen layout, naming normalization, and manifest/cache hygiene

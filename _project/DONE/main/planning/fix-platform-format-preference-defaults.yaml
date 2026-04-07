@@ -2,7 +2,8 @@ id: fix-platform-format-preference-defaults
 title: "Fix data format selection to always default to platform preferences"
 worktree: main
 priority: Critical
-status: Not Started
+status: Completed
+completed_date: "2026-04-07"
 description: |
   The manifest's format_preference field (persisted by previous --table-format
   conversion runs) takes priority over platform default preferences. This means
@@ -63,7 +64,7 @@ deps:
 work:
 - id: w1
   summary: "Make _prefer_platform_defaults() return True for all native-mode platforms"
-  status: pending
+  status: done
   needs: []
   description: |
     Change ManifestFileSource._prefer_platform_defaults() in data_loading.py
@@ -85,7 +86,7 @@ work:
 
 - id: w2
   summary: "Add requested_table_format attribute to PlatformAdapter base class"
-  status: pending
+  status: done
   needs: []
   description: |
     Add self.requested_table_format: str | None = None to PlatformAdapter.__init__()
@@ -96,7 +97,7 @@ work:
 
 - id: w3
   summary: "Set requested_table_format on adapter in the runner"
-  status: pending
+  status: done
   needs: [w2]
   description: |
     In runner.py, after line 826 where table_format is extracted from options,
@@ -108,7 +109,7 @@ work:
 
 - id: w4
   summary: "Add requested_format parameter to ManifestFileSource and DataSourceResolver"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     In data_loading.py:
@@ -125,7 +126,7 @@ work:
 
 - id: w5
   summary: "Pass requested_format from DataLoader and all DataSourceResolver call sites"
-  status: pending
+  status: done
   needs: [w3, w4]
   description: |
     Update DataLoader.__init__() (data_loading.py line 1988) to pass
