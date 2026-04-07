@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T16:52:52.369115'
+generated_at: '2026-04-07T19:06:30.167022'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -522,7 +522,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 206
+    count: 207
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1039,6 +1039,11 @@ categories:
       file: DONE/main/active/harmonize-platform-display-names.yaml
       title: Harmonize platform display names and CLI keys for consistency
       priority: Medium
+      status: Completed
+    - id: harmonize-scale-factor-baselines
+      file: DONE/main/active/harmonize-scale-factor-baselines.yaml
+      title: 'Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed across all benchmarks'
+      priority: High
       status: Completed
     - id: ctas-sorted-data-loading
       file: DONE/physical-tuning/active/ctas-sorted-data-loading.yaml

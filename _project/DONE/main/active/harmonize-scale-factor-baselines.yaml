@@ -3,7 +3,8 @@ title: "Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed 
 worktree: main
 category: Core Functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-07"
 description: >
   BenchBox convention is SF=1 produces ~1GB of uncompressed data (TPC-H baseline: ~1GB at SF=1).
   An audit of benchmark_runs/datagen/ found severe deviations once compression state is accounted
@@ -169,7 +170,7 @@ work:
 # ============================================================================
 - id: w1
   summary: "Research gate: spec-governed benchmarks (TPC-DS, SSB, ClickBench)"
-  status: pending
+  status: done
   notes: >
     For each benchmark, find and read the original published specification or paper:
 
@@ -198,7 +199,7 @@ work:
 
 - id: w2
   summary: "Research gate: synthetic benchmarks (CoffeeShop, JoinOrder, AMPLab, H2O DB)"
-  status: pending
+  status: done
   notes: >
     For each benchmark, determine if there is a published specification that constrains SF sizing:
 
@@ -246,7 +247,7 @@ work:
 
 - id: w3
   summary: "Research gate: real-data & time-series benchmarks (TSBS, FlightData, NYC Taxi) + compression"
-  status: pending
+  status: done
   notes: >
     For each benchmark, review the published specification AND determine:
     (a) whether SF has a semantic meaning that should be preserved
@@ -291,7 +292,7 @@ work:
 # ============================================================================
 - id: w4
   summary: "CoffeeShop: reduce base order count to target ~1GB uncompressed at SF=1"
-  status: pending
+  status: done
   needs: [w2]
   notes: >
     Apply the recommended base order count from w2 research gate.
@@ -307,7 +308,7 @@ work:
 
 - id: w5
   summary: "JoinOrder: reduce all base_row_counts to target ~1GB uncompressed at SF=1"
-  status: pending
+  status: done
   needs: [w2]
   notes: >
     Apply the recommended base row counts from w2 research gate.
@@ -331,7 +332,7 @@ work:
 # ============================================================================
 - id: w6
   summary: "H2O DB: increase base_trips to match published tier targeting ~1GB at SF=1"
-  status: pending
+  status: done
   needs: [w2]
   notes: >
     Apply the recommended base_trips from w2 research gate.
@@ -350,7 +351,7 @@ work:
 
 - id: w7
   summary: "AMPLab: increase base row counts to target ~1GB uncompressed at SF=1"
-  status: pending
+  status: done
   needs: [w2]
   notes: >
     Apply the recommended base counts from w2 research gate.
@@ -368,7 +369,7 @@ work:
 
 - id: w8
   summary: "SSB: increase base row counts per research gate findings (if spec allows)"
-  status: pending
+  status: done
   needs: [w1]
   notes: >
     Apply w1 research gate determination.
@@ -389,7 +390,7 @@ work:
 # ============================================================================
 - id: w9
   summary: "NYC Taxi: change sample rate to target ~1GB at SF=1 + add CompressionMixin"
-  status: pending
+  status: done
   needs: [w3]
   notes: >
     Apply w3 research gate findings.
@@ -409,7 +410,7 @@ work:
 
 - id: w10
   summary: "TSBS DevOps: increase data volume to target ~1GB at SF=1 + add CompressionMixin"
-  status: pending
+  status: done
   needs: [w3]
   notes: >
     Apply w3 research gate findings.
@@ -429,7 +430,7 @@ work:
 
 - id: w11
   summary: "FlightData: increase months multiplier to target ~1GB at SF=1 + add CompressionMixin"
-  status: pending
+  status: done
   needs: [w3]
   notes: >
     Apply w3 research gate findings.
@@ -452,7 +453,7 @@ work:
 # ============================================================================
 - id: w12
   summary: "ClickBench: apply minor adjustment if research gate identifies need"
-  status: pending
+  status: done
   needs: [w1]
   notes: >
     Apply w1 research gate determination.
@@ -476,7 +477,7 @@ work:
 # ============================================================================
 - id: w13
   summary: "Create comprehensive datagen size validation test suite"
-  status: pending
+  status: done
   needs: [w1, w2, w3]
   notes: >
     Create tests/unit/generators/test_scale_factor_harmonization.py.
@@ -505,7 +506,7 @@ work:
 
 - id: w14
   summary: "Cross-benchmark validation run and documentation update"
-  status: pending
+  status: done
   needs: [w4, w5, w6, w7, w8, w9, w10, w11, w12, w13]
   notes: >
     Final validation:

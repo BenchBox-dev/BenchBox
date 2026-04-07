@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T16:52:52.369263'
-total_items: 643
+generated_at: '2026-04-07T19:06:30.167192'
+total_items: 644
 priorities:
   Critical:
     count: 37
@@ -190,7 +190,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 232
+    count: 233
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -652,6 +652,11 @@ priorities:
     - id: harmonize-benchmark-runtime-contract-and-base-classes
       file: DONE/core-functionality/active/harmonize-benchmark-runtime-contract-and-base-classes.yaml
       title: Harmonize benchmark runtime contract and base classes across all benchmarks
+      category: Core Functionality
+      status: Completed
+    - id: harmonize-scale-factor-baselines
+      file: DONE/main/active/harmonize-scale-factor-baselines.yaml
+      title: 'Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed across all benchmarks'
       category: Core Functionality
       status: Completed
     - id: implement-dataframe-result-validation-framework

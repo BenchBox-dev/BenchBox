@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T16:52:52.368842'
-total_items: 643
+generated_at: '2026-04-07T19:06:30.166677'
+total_items: 644
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1966,6 +1966,26 @@ items:
   work_done: 12
   work_ready: 0
   deferred_count: 1
+- id: harmonize-scale-factor-baselines
+  file: DONE/main/active/harmonize-scale-factor-baselines.yaml
+  title: 'Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed across all benchmarks'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - datagen
+  - scale-factor
+  - benchmarks
+  - harmonization
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 weeks
+  completed_date: '2026-04-07'
+  work_total: 14
+  work_done: 14
+  work_ready: 0
+  deferred_count: 3
 - id: implement-dataframe-result-validation-framework
   file: DONE/dataframe-validation/completed/implement-dataframe-result-validation-framework.yaml
   title: Implement DataFrame Result Validation Framework

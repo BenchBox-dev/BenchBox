@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T16:52:52.369418'
-total_items: 643
+generated_at: '2026-04-07T19:06:30.167347'
+total_items: 644
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 594
+    count: 595
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1677,6 +1677,11 @@ statuses:
       file: DONE/main/active/harmonize-platform-display-names.yaml
       title: Harmonize platform display names and CLI keys for consistency
       priority: Medium
+      category: Core Functionality
+    - id: harmonize-scale-factor-baselines
+      file: DONE/main/active/harmonize-scale-factor-baselines.yaml
+      title: 'Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed across all benchmarks'
+      priority: High
       category: Core Functionality
     - id: ctas-sorted-data-loading
       file: DONE/physical-tuning/active/ctas-sorted-data-loading.yaml

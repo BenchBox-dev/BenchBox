@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T16:52:50.927336'
-total_items: 20
+generated_at: '2026-04-07T19:06:28.687228'
+total_items: 19
 priorities:
   Critical:
     count: 1
@@ -10,13 +10,8 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 3
+    count: 2
     items:
-    - id: harmonize-scale-factor-baselines
-      file: TODO/main/active/harmonize-scale-factor-baselines.yaml
-      title: 'Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed across all benchmarks'
-      category: Core Functionality
-      status: In Progress
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
