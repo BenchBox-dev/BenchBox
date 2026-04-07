@@ -124,7 +124,7 @@ anti_patterns:
   - "DO NOT introduce a global calibration multiplier layer — because it adds indirection that makes per-benchmark tuning harder — scale each benchmark's own parameters directly"
   - "DO NOT change row counts for spec-locked benchmarks (TPC-H, TPC-DS, SSB) — because their row counts are defined by the TPC/SSB specifications — only adjustable benchmarks are in scope"
   - "DO NOT add backwards-compatibility shims — because BenchBox is still in beta (v0.2.0) — change formulas directly"
-  - "DO NOT synthesize fake data to extend real-data benchmarks (FlightData, NYC Taxi) beyond their natural corpus limits — because the value of these benchmarks is real historical data — warn and document ceilings instead"
+  - "DO NOT synthesize fake data without research gate approval — because the value of real-data benchmarks is historical authenticity — w3 (FlightData) and w5 (NYC Taxi) research gates must evaluate replication strategies before any synthetic data is added"
 
 verification:
   - description: "TSBS scaling is linear after fix"
@@ -222,15 +222,57 @@ work:
       output (it shouldn't if duration stays at 2 days for SF=1).
 
   - id: w3
-    summary: "FlightData — add warning log when month ceiling is hit"
+    summary: "Research FlightData ceiling — evaluate whether synthetic replication can extend scaling beyond SF≈11"
     status: pending
     needs: []
+    notes: |
+      The BTS flight corpus spans 456 months (Jan 1987 – Dec 2024), exhausted at SF≈11.12.
+      Beyond that, FlightData silently caps at ~10.7 GB. Evaluate whether controlled synthetic
+      replication of the source data could extend the ceiling to achieve linear scaling at
+      higher scale factors.
+
+      Research questions:
+      1. What replication strategies preserve benchmark validity?
+         (a) Duplicate entire months with perturbed dates (shift year/month forward) — preserves
+             seasonal patterns and carrier distributions but creates recognizable duplicates
+         (b) Row-level sampling with replacement and field perturbation (jitter delays, swap
+             carriers, randomize flight numbers) — more realistic but harder to implement
+         (c) Tile-based replication: at SF=20, use all 456 real months + 364 replicated months
+             with a synthetic "era" column to distinguish — simple, transparent, auditable
+         (d) Weighted oversampling of recent years (more representative of modern traffic
+             patterns) — produces more realistic large-scale data but introduces bias
+      2. Does replication compromise the benchmark's value proposition? FlightData's strength
+         is real historical data. If replicated data just duplicates query results (same carriers,
+         same routes, same delays), does it actually stress-test the engine differently than
+         the original corpus, or just multiply I/O?
+      3. What is the practical demand for FlightData at SF > 10? Is this a real use case or
+         theoretical? If no one needs SF=100 FlightData, a warning + documentation may suffice.
+      4. If replication is adopted, how should _scale_to_months() change? Currently:
+         months = min(max(1, round(SF * 41)), 456). Would need a two-phase approach:
+         Phase 1 (SF ≤ ~11): download real months as today
+         Phase 2 (SF > ~11): download all 456 months + generate replicated data to fill gap
+      5. What metadata should replicated rows carry? A flag column (is_synthetic=true)?
+         A replicated_from_month column? Or should replicas be indistinguishable?
+      6. Impact on query result validation — if result validators compare against expected
+         row counts, replication would change expected counts at high SF.
+
+      Output: recommend one of:
+      (a) Implement replication strategy (specify which) — with implementation sketch
+      (b) Accept the ceiling — warn and document only (current deferred item d1 approach)
+      (c) Hybrid — warn at ceiling but offer an opt-in --benchmark-option replicate=true flag
+
+  - id: w4
+    summary: "FlightData — add warning log when month ceiling is hit (and apply w3 findings)"
+    status: pending
+    needs: [w3]
     notes: |
       In benchbox/core/flightdata/downloader.py, add a logger.warning() when the computed months
       value hits the 456 ceiling. Message should explain: the BTS corpus is exhausted, actual
       data size will be capped at ~10.7 GB regardless of SF. Also update the generator docstring.
+      If w3 recommends a replication strategy, implement it here. If w3 recommends ceiling-only,
+      this is just the warning + docs.
 
-  - id: w4
+  - id: w5
     summary: "Research NYC Taxi expanded data — evaluate whether Green/HVFHV corpus extends the saturation ceiling"
     status: pending
     needs: []
@@ -260,18 +302,18 @@ work:
       (b) Adjust SCALE_FACTOR_SAMPLE_DIVISOR to account for multi-type combined corpus
       (c) Leave as-is but document the different ceilings per configuration
 
-  - id: w5
+  - id: w6
     summary: "NYC Taxi — add warning log when sample_rate saturates at 1.0"
     status: pending
-    needs: [w4]
+    needs: [w5]
     notes: |
       In benchbox/core/nyctaxi/downloader.py, add a logger.warning() in all 3 downloader classes
       when sample_rate clamps to 1.0 (SF≥10). Message should explain: the full dataset is being
       used, no additional scaling possible beyond SF=10.
-      Apply any findings from w4 — if the expanded corpus (Green/HVFHV) changes the saturation
+      Apply any findings from w5 — if the expanded corpus (Green/HVFHV) changes the saturation
       ceiling or the SCALE_FACTOR_SAMPLE_DIVISOR, incorporate those changes here.
 
-  - id: w6
+  - id: w7
     summary: "Fix CoffeeShop doc table — order_lines counts ~2× overstated"
     status: pending
     needs: []
@@ -280,7 +322,7 @@ work:
       the generator produces 1.56 lines/order (per benchmark_specs.py deterministic pattern).
       Recalculate all order_lines values in the table.
 
-  - id: w7
+  - id: w8
     summary: "Fix TSBS DevOps doc table — 3 errors in scale factor projections"
     status: pending
     needs: [w2]
@@ -289,26 +331,26 @@ work:
       1 day not 2, (2) SF=100 hosts should be 10,000 not 1,000, (3) all data size projections
       should reflect the post-w2 linear formula. Wait for w2 to know the final formula.
 
-  - id: w8
+  - id: w9
     summary: "Fix NYC Taxi doc table — SF=100 projection impossible due to saturation"
     status: pending
-    needs: [w5]
+    needs: [w6]
     notes: |
       docs/benchmarks/nyctaxi.md lines 254-260. SF=100 row claims ~960M trips / ~96 GB but
       code saturates at SF=10. Update table to show ceiling and reference the saturation warning.
-      Apply w4 research findings — if expanded corpus changes the ceiling, reflect that here.
+      Apply w5 research findings — if expanded corpus changes the ceiling, reflect that here.
 
-  - id: w9
+  - id: w10
     summary: "Add scaling behavior notes to each affected benchmark's docs"
     status: pending
-    needs: [w2, w3, w5]
+    needs: [w2, w4, w6]
     notes: |
       Add a "Scaling Behavior" or "Large Scale Factors" section to docs for TSBS DevOps,
       FlightData, and NYC Taxi explaining ceilings, saturation, or (post-fix) linear scaling.
       FlightData does not currently have a docs/benchmarks/flightdata.md — either create one
       or add notes to the most appropriate existing location.
 
-  - id: w10
+  - id: w11
     summary: "Add scaling linearity tests to test_scale_factor_harmonization.py"
     status: pending
     needs: [w2]
@@ -318,10 +360,10 @@ work:
       as TSBS would currently produce). This catches quadratic scaling regressions. Also test
       that FlightData/NYC Taxi ceiling warnings are emitted at high SF.
 
-  - id: w11
+  - id: w12
     summary: "Cross-benchmark validation — verify projected sizes at SF=10"
     status: pending
-    needs: [w2, w3, w5, w10]
+    needs: [w2, w4, w6, w11]
     notes: |
       After all fixes, verify projected sizes at SF=10 are within 0.5×–2.0× of the expected
       N×1GB for all adjustable benchmarks. This is a final integration check, not a unit test.
@@ -329,7 +371,7 @@ work:
 deferred:
   - id: d1
     summary: "Extend FlightData beyond natural corpus via synthetic augmentation"
-    reason: "Real-data integrity is more valuable than arbitrary scaling. If needed in future, design a proper augmentation strategy as a separate TODO."
+    reason: "Evaluated in w3 research gate. If w3 recommends replication, this is superseded by w4. If w3 recommends ceiling-only, this remains deferred — real-data integrity is more valuable than arbitrary scaling."
   - id: d2
     summary: "Extend NYC Taxi beyond natural corpus via synthetic augmentation"
     reason: "Same rationale as d1. However, w4 research may reveal that the expanded Green/HVFHV corpus already raises the ceiling significantly. Revisit after w4 findings."

@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T19:49:46.336619'
+generated_at: '2026-04-07T19:52:18.996753'
 total_items: 20
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -300,7 +300,7 @@ items:
   owners:
   - joe
   estimated_effort: Medium (2-3 days)
-  work_total: 11
+  work_total: 12
   work_done: 0
   work_ready: 4
   deferred_count: 3
