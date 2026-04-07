@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T13:13:17.443005'
+generated_at: '2026-04-07T13:30:47.250272'
 total_items: 19
 priorities:
   Critical:
@@ -37,7 +37,7 @@ priorities:
       file: TODO/main/planning/benchmark-option-cli-support.yaml
       title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter

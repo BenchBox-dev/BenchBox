@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T13:13:17.442971'
+generated_at: '2026-04-07T13:30:47.250229'
 total_items: 19
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -218,7 +218,7 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Not Started
+  status: In Progress
   tags:
   - cli
   - infrastructure
@@ -227,8 +227,8 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 1-2 weeks
   work_total: 7
-  work_done: 0
-  work_ready: 1
+  work_done: 7
+  work_ready: 0
   deferred_count: 2
 - id: ballista-distributed-adapter
   file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml

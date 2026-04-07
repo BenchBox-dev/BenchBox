@@ -3,7 +3,7 @@ title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
 worktree: main
 category: Core Functionality
 priority: Medium
-status: Not Started
+status: In Progress
 description: >
   Benchmark constructors accept parameters that are unreachable from the CLI.
   The orchestrator (_get_benchmark_instance) only forwards a fixed set of kwargs
@@ -178,7 +178,7 @@ metadata:
 work:
 - id: w1
   summary: Create BenchmarkHookRegistry and BenchmarkOptionSpec in benchbox/cli/benchmark_hooks.py
-  status: pending
+  status: done
   notes: >
     Mirror platform_hooks.py structure:
     - BenchmarkOptionError (ValueError subclass)
@@ -190,7 +190,7 @@ work:
 
 - id: w2
   summary: Add --benchmark-option Click option to run.py and wire parsing
-  status: pending
+  status: done
   needs:
   - w1
   notes: >
@@ -204,7 +204,7 @@ work:
 
 - id: w3
   summary: Wire orchestrator to forward benchmark options to constructor kwargs
-  status: pending
+  status: done
   needs:
   - w2
   notes: >
@@ -222,7 +222,7 @@ work:
 
 - id: w4
   summary: Register option specs for high-complexity benchmarks (NYC Taxi, TSBS DevOps — enum lists, datetime, int lists)
-  status: pending
+  status: done
   needs:
   - w1
   notes: >
@@ -247,7 +247,7 @@ work:
 
 - id: w5
   summary: Register option specs for simple-type benchmarks (FlightData, DataVault, TPC-DS OBT, TPC-H Skew, Vector Search, Join Order, TPC-DI)
-  status: pending
+  status: done
   needs:
   - w1
   notes: >
@@ -264,7 +264,7 @@ work:
 
 - id: w6
   summary: Add unit tests for BenchmarkHookRegistry, parsers, and end-to-end wiring
-  status: pending
+  status: done
   needs:
   - w3
   - w4
@@ -277,7 +277,7 @@ work:
 
 - id: w7
   summary: Add --help-topic documentation for benchmark options
-  status: pending
+  status: done
   needs:
   - w4
   - w5
