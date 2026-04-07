@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T13:30:47.250283'
-total_items: 19
+generated_at: '2026-04-07T16:30:12.379321'
+total_items: 20
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Core Functionality
   Not Started:
-    count: 15
+    count: 16
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -32,6 +32,11 @@ statuses:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
       category: Platform Expansion
+    - id: result-integrity-validator
+      file: TODO/main/planning/result-integrity-validator.yaml
+      title: Build result integrity validator for benchmark JSON output
+      priority: High
+      category: Testing & Quality
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture

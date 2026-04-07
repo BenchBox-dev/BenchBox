@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T13:30:47.250258'
+generated_at: '2026-04-07T16:30:12.379295'
 total_categories: 5
 categories:
   Benchmark Development:
@@ -104,10 +104,15 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 1
+    count: 2
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       priority: Medium
+      status: Not Started
+    - id: result-integrity-validator
+      file: TODO/main/planning/result-integrity-validator.yaml
+      title: Build result integrity validator for benchmark JSON output
+      priority: High
       status: Not Started

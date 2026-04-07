@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T13:30:47.250229'
-total_items: 19
+generated_at: '2026-04-07T16:30:12.379254'
+total_items: 20
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -19,6 +19,23 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
+- id: result-integrity-validator
+  file: TODO/main/planning/result-integrity-validator.yaml
+  title: Build result integrity validator for benchmark JSON output
+  worktree: main
+  category: Testing & Quality
+  priority: High
+  status: Not Started
+  tags:
+  - testing
+  - quality
+  - validation
+  - results
+  - integrity
+  estimated_effort: Large
+  work_total: 5
+  work_done: 0
+  work_ready: 1
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication

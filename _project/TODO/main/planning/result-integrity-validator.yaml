@@ -1,0 +1,327 @@
+id: result-integrity-validator
+title: "Build result integrity validator for benchmark JSON output"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  The live integration test suite produces JSON result files after each benchmark
+  run but there is no systematic way to evaluate whether those files are
+  structurally sound, complete, and believable. A silent failure — missing queries,
+  zero-time measurements, wrong row counts — can pass undetected.
+
+  This task implements a three-tier validator (structural → completeness →
+  believability) using the 20 DuckDB SF1 reference runs as ground-truth baselines.
+  The validator serves three consumers:
+    1. CI/post-run scripts: batch-validate a results directory, non-zero exit on failure
+    2. Live integration tests: importable function called after running a benchmark
+    3. Interactive analysis: MCP tool for Claude-assisted review
+
+  Three-tier check system:
+    STRUCTURAL  — schema version, required keys, cross-field math, non-negative
+                  timings, percentile ordering, valid phase enums
+    COMPLETENESS — expected query IDs for known benchmarks, measurement iterations
+                   present, power phase completed, tables object when required
+    BELIEVABILITY — avg between min/max, geomean plausible, success rate above
+                    benchmark floor, SF1 row counts within 1%, no duplicate
+                    (id, iter, stream) combos
+
+  Reference DuckDB SF1 files (20 benchmarks) live in:
+    benchmark_runs/results/*_sf1_duckdb_sql_20260407_*.json
+
+category: Testing & Quality
+
+metadata:
+  tags:
+  - testing
+  - quality
+  - validation
+  - results
+  - integrity
+  estimated_effort: "Large"
+  created_date: "2026-04-07"
+  source_review: "Live integration test review + local stress test at SF1"
+
+impact:
+  user_impact: |
+    CI and integration tests can automatically detect corrupt or incomplete
+    result files. Interactive MCP analysis gains a dedicated validation tool.
+  maintainer_impact: |
+    New module in benchbox/core/results/. New CLI script. Single new MCP tool
+    registered alongside existing analytics tools.
+  regression_risk: |
+    Low. All new files; no existing code modified except adding one tool
+    registration in analytics.py.
+
+justification: |
+  The 20 DuckDB SF1 runs completed successfully but there is no automated check
+  that the JSON output is internally consistent, complete, or has plausible values.
+  Platforms like Snowflake or Databricks may silently produce partial results
+  (timeouts, quota limits, skipped phases) that would otherwise look like a passing
+  run. The validator closes this gap.
+
+work:
+- id: w1
+  summary: "benchmark_specs.py — per-benchmark knowledge base"
+  status: pending
+  needs: []
+  description: |
+    Create benchbox/core/results/benchmark_specs.py with a BenchmarkSpec
+    dataclass and hardcoded specs for all 20 benchmarks derived from the
+    DuckDB SF1 reference runs.
+
+    BenchmarkSpec fields:
+      benchmark_id: str
+      unique_query_ids: frozenset[str]   # empty = open-ended primitive suite
+      min_unique_queries: int            # floor for open-ended benchmarks
+      min_success_rate: float            # 0.0–1.0
+      high_failure_expected: bool        # suppresses success-rate WARN
+      requires_tables_object: bool       # tables key expected in JSON
+      sf1_row_counts: dict[str, int] | None   # table→rows at SF=1
+      sf1_power_at_size_range: tuple[float, float] | None
+
+    Key specs to hardcode:
+      tpch: 22 unique IDs "1"–"22", requires_tables=True, min_success_rate=1.0
+            sf1_row_counts={customer:150000, lineitem:6001215, nation:25,
+            orders:1500000, part:200000, partsupp:800000, region:5, supplier:10000}
+      tpcds: 101 unique IDs "1"–"99" + "14a"/"14b", requires_tables=True,
+             min_success_rate=0.95
+      transaction_primitives: high_failure_expected=True, min_success_rate=0.0
+      read_primitives/write_primitives/metadata_primitives: open-ended
+        (unique_query_ids=frozenset(), min_unique_queries=50/50/30)
+      All others: fixed ID sets from reference run exploration
+
+    Export: BENCHMARK_SPECS: dict[str, BenchmarkSpec] and
+            get_spec(benchmark_id: str) -> BenchmarkSpec | None
+  files:
+  - benchbox/core/results/benchmark_specs.py
+
+- id: w2
+  summary: "integrity_validator.py — core three-tier validator"
+  status: pending
+  needs: [w1]
+  description: |
+    Create benchbox/core/results/integrity_validator.py with the following
+    public API:
+
+    Data models:
+      class CheckStatus(str, Enum): PASS, WARN, FAIL
+      class CheckCategory(str, Enum): STRUCTURAL, COMPLETENESS, BELIEVABILITY
+      @dataclass CheckResult: category, name, status, message, details
+      @dataclass IntegrityReport: file, benchmark_id, platform, scale_factor,
+          overall_status (worst of all checks), checks, summary (counts by status)
+          Methods: passed() -> bool, has_warnings() -> bool
+
+    Class ResultIntegrityValidator:
+      __init__(self, specs: dict | None = None)
+      validate(self, raw: dict[str, Any], filepath: str = "") -> IntegrityReport
+
+    Structural checks (FAIL on violation):
+      - required_keys: all of version, run, benchmark, platform, config, summary,
+        phases, queries, execution, environment, export present
+      - query_count_math: summary.queries.passed + failed == total
+      - timing_non_negative: all summary.timing values >= 0
+      - percentile_ordering: p90 <= p95 <= p99
+      - phase_status_values: each phase status in valid enum set
+      - query_entry_fields: each query entry has id, ms, status
+      - query_ms_non_negative: no query with ms < 0
+
+    Completeness checks:
+      - expected_query_ids: for known benchmarks, >80% of expected IDs present
+        (FAIL if <80%, WARN if 80-99%)
+      - measurement_queries_present: at least one query with run_type="measurement"
+        or iter > 0 (FAIL if none)
+      - power_phase_completed: power_test.status in COMPLETED/SUCCESS/PASSED (WARN)
+      - tables_object: present when spec.requires_tables_object=True (WARN)
+      - tpc_metrics: summary.tpc_metrics present for tpch/tpcds/tpchavoc/tpch_skew
+        (WARN if absent)
+
+    Believability checks:
+      - avg_between_min_max: avg_ms in [min_ms, max_ms] (FAIL if violated)
+      - geomean_plausible: if geometric_mean_ms present, must be in [min_ms, max_ms]
+        (FAIL if violated)
+      - success_rate: passed/total >= spec.min_success_rate unless
+        high_failure_expected (WARN if below floor)
+      - sf1_row_counts: for SF=1.0, each table rows within ±1% of spec value (WARN)
+      - timing_outliers: WARN if any single query ms > 1,800,000 (30 minutes)
+      - no_duplicate_executions: (id, iter, stream) tuples unique (WARN if dupes)
+      - load_time_nonzero: WARN if load_time_ms=0 for benchmarks that require loading
+
+    Module-level convenience functions:
+      validate_file(path: Path | str, specs=None) -> IntegrityReport
+      validate_directory(path, pattern="*.json", specs=None) -> list[IntegrityReport]
+        (excludes .plans.json and .tuning.json files)
+  files:
+  - benchbox/core/results/integrity_validator.py
+
+- id: w3
+  summary: "_project/scripts/validate_results.py — CLI entry point"
+  status: pending
+  needs: [w2]
+  description: |
+    Create _project/scripts/validate_results.py as a standalone CLI script.
+
+    Usage:
+      uv run _project/scripts/validate_results.py <path> [options]
+
+    Arguments:
+      path         Result file (.json) or directory
+
+    Options:
+      --json           Machine-readable JSON output
+      --verbose        Show all checks including PASSes (default: WARN+FAIL only)
+      --fail-on-warn   Exit 1 if any WARNs present (default: only FAILs cause exit 2)
+      --benchmark STR  Filter to benchmark (directory mode only)
+
+    Exit codes:
+      0 = all PASS
+      1 = warnings present, no failures (or --fail-on-warn)
+      2 = one or more FAILures
+
+    Default tabular output example:
+      File: tpch_sf1_duckdb_sql_20260407_152815_f0ea2061.json
+      Benchmark: tpch | Platform: DuckDB | SF: 1.0 | Status: PASS
+
+      CATEGORY        CHECK                     STATUS  MESSAGE
+      structural      required_keys             PASS    All 11 required keys present
+      structural      query_count_math          PASS    66 = 66 passed + 0 failed
+      completeness    expected_query_ids        PASS    22/22 expected query IDs found
+      believability   success_rate              PASS    100.0% >= 100.0% floor
+      believability   sf1_row_counts            PASS    8 tables within ±1% of SF1
+
+    In directory mode: print per-file summary, then an aggregate table.
+  files:
+  - _project/scripts/validate_results.py
+
+- id: w4
+  summary: "analytics.py — add validate_results MCP tool"
+  status: pending
+  needs: [w2]
+  description: |
+    Add a new validate_results MCP tool in benchbox/mcp/tools/analytics.py,
+    registered inside register_analytics_tools() alongside existing tools.
+
+    Tool signature:
+      @mcp.tool()
+      def validate_results(
+          result_file: str = "",
+          directory: str = "",
+          verbose: bool = False,
+      ) -> dict[str, Any]:
+          """Validate integrity, completeness, and believability of result JSON files.
+
+          Provide result_file (single file path) or directory (batch mode).
+          Returns structured check results with PASS/WARN/FAIL status per check.
+          """
+
+    Implementation:
+      - Resolve path relative to results_dir (captured in closure from
+        register_analytics_tools)
+      - Single file: call validate_file(), return dataclass as dict
+      - Directory: call validate_directory(), return list of summary dicts
+      - Return format matches IntegrityReport structure
+
+    Import: from benchbox.core.results.integrity_validator import (
+        validate_file, validate_directory
+    )
+  files:
+  - benchbox/mcp/tools/analytics.py
+
+- id: w5
+  summary: "test_integrity_validator.py — unit tests"
+  status: pending
+  needs: [w2]
+  description: |
+    Create tests/unit/core/results/test_integrity_validator.py with two
+    test classes:
+
+    TestIntegrityValidatorReferenceFiles:
+      Parametrized over the 20 DuckDB SF1 reference files.
+      Each file must produce overall_status != FAIL.
+      Specifically check tpch passes sf1_row_counts believability check.
+      Specifically check transaction_primitives passes despite high failure rate.
+
+    TestIntegrityValidatorSyntheticData:
+      Build a minimal valid TPC-H result dict fixture (helper function),
+      then mutate it per test case:
+
+      Structural:
+        test_missing_required_key — remove "queries" → FAIL
+        test_query_count_math_wrong — passed+failed != total → FAIL
+        test_negative_timing — avg_ms=-1 → FAIL
+        test_percentile_inversion — p95 < p90 → FAIL
+        test_invalid_phase_status — phase.status="INVALID" → FAIL
+
+      Completeness:
+        test_missing_query_ids — remove 50% of TPC-H query IDs → FAIL
+        test_no_measurement_queries — all entries iter=0 → FAIL
+        test_missing_tables_object — tpch spec requires tables → WARN
+
+      Believability:
+        test_avg_exceeds_max — avg_ms > max_ms → FAIL
+        test_geomean_outside_range — geometric_mean_ms < min_ms → FAIL
+        test_wrong_sf1_row_counts — lineitem rows=1000 → WARN
+        test_high_failure_exempt — transaction_primitives 95% fail → PASS
+        test_duplicate_execution — duplicate (id, iter, stream) → WARN
+
+    Mark all tests with @pytest.mark.fast so they run in the smoke suite.
+  files:
+  - tests/unit/core/results/test_integrity_validator.py
+
+must_preserve:
+- "load_result_file() and find_latest_result() in loader.py — no changes to these"
+- "SchemaV2Validator in schema.py — compose with it, do not modify or duplicate"
+- "register_analytics_tools() signature in analytics.py — only ADD a new @mcp.tool() inside it"
+- "All 20 DuckDB SF1 reference files produce overall_status != FAIL"
+
+approach: |
+  Compose with existing SchemaV2Validator (schema.py) as the first structural check.
+  If SchemaV2Validator raises, record FAIL and short-circuit structural checks.
+  Otherwise run all three tiers in sequence.
+
+  Benchmark specs are hardcoded from reference runs (not dynamically derived from
+  benchmark modules) — dynamic derivation creates transitive import issues and makes
+  the validator less self-contained.
+
+  Two-tier severity model:
+    FAIL = mathematical impossibility or known-bad value (corrupted result)
+    WARN = suspicious-but-plausible (degraded result, may still be valid)
+
+  The CLI script uses validate_file / validate_directory from the core module
+  directly — no duplication of logic.
+
+anti_patterns:
+- "DO NOT reimplement SchemaV2Validator logic — call schema_validator.validate(raw) as the first structural check"
+- "DO NOT import benchmark modules (tpch, tpcds, etc.) from benchmark_specs.py — hardcode the expected query ID sets to keep the validator self-contained and fast"
+- "DO NOT add a 'validate' action to the existing analyze_results tool — register a separate validate_results tool to keep tool responsibilities distinct"
+- "DO NOT raise exceptions on validation failures — return IntegrityReport with FAIL status so callers can decide how to handle"
+
+verification:
+- description: "Lint and type check all new files"
+  command: "uv run ruff check benchbox/core/results/benchmark_specs.py benchbox/core/results/integrity_validator.py _project/scripts/validate_results.py && uv run ty check"
+  expected_output: "No errors"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/results/test_integrity_validator.py -v"
+  expected_output: "All tests pass"
+- description: "All 20 DuckDB SF1 reference files pass validation"
+  command: "uv run _project/scripts/validate_results.py benchmark_runs/results/ --benchmark duckdb"
+  expected_output: "Exit code 0, all files PASS or WARN-only"
+- description: "Single file smoke test"
+  command: "uv run _project/scripts/validate_results.py benchmark_runs/results/tpch_sf1_duckdb_sql_20260407_152815_f0ea2061.json --verbose"
+  expected_output: "Status: PASS, sf1_row_counts check passes"
+- description: "Fast test suite still passes"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/results/benchmark_specs.py (new)"
+  - "benchbox/core/results/integrity_validator.py (new)"
+  - "_project/scripts/validate_results.py (new)"
+  - "benchbox/mcp/tools/analytics.py (add one tool registration)"
+  - "tests/unit/core/results/test_integrity_validator.py (new)"
+  do_not_touch:
+  - "benchbox/core/results/loader.py"
+  - "benchbox/core/results/schema.py"
+  - "benchbox/core/results/models.py"
+  - "benchbox/core/validation/ (existing data validation, unrelated)"
+  - "Any existing test files"
