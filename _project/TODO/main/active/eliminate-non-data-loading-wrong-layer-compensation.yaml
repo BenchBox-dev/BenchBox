@@ -68,7 +68,7 @@ work:
 - id: w3
   summary: "Remove base-adapter benchmark sniffing from live routing and validation"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Replace active-path uses of benchmark._name / display_name / class-name
     inference with explicit benchmark identity from run_config or a directly
@@ -91,7 +91,7 @@ work:
 - id: w4
   summary: "Remove base-adapter benchmark sniffing from dialect selection and single-query execution"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Clean up the remaining benchmark-identity inference in query selection and
     single-query execution paths.
