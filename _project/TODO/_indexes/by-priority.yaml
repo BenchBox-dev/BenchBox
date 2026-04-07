@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T13:08:44.336977'
-total_items: 20
+generated_at: '2026-04-07T13:12:59.300977'
+total_items: 19
 priorities:
   Critical:
     count: 1
@@ -10,13 +10,8 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 3
+    count: 2
     items:
-    - id: eliminate-non-data-loading-wrong-layer-compensation
-      file: TODO/main/active/eliminate-non-data-loading-wrong-layer-compensation.yaml
-      title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
-      category: Core Functionality
-      status: In Progress
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

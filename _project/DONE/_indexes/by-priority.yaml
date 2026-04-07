@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T13:08:45.806456'
-total_items: 641
+generated_at: '2026-04-07T13:13:00.847973'
+total_items: 642
 priorities:
   Critical:
     count: 37
@@ -190,7 +190,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 230
+    count: 231
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -442,6 +442,11 @@ priorities:
       file: DONE/docs-experience/active/mcp-landing-page-elevation.yaml
       title: Elevate MCP Feature on Landing Page and Documentation
       category: Documentation
+      status: Completed
+    - id: eliminate-non-data-loading-wrong-layer-compensation
+      file: DONE/main/eliminate-non-data-loading-wrong-layer-compensation.yaml
+      title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
+      category: Core Functionality
       status: Completed
     - id: emit-datagen-metrics-in-results-json
       file: DONE/core-functionality/active/emit-datagen-metrics-in-results-json.yaml

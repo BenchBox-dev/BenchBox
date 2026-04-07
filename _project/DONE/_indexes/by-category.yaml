@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T13:08:45.806307'
+generated_at: '2026-04-07T13:13:00.847793'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -522,7 +522,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 205
+    count: 206
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -807,6 +807,11 @@ categories:
     - id: drop-plotly-html-charts
       file: DONE/core-functionality/active/drop-plotly-html-charts.yaml
       title: Drop Plotly dependency and HTML chart rendering — go ASCII-only
+      priority: High
+      status: Completed
+    - id: eliminate-non-data-loading-wrong-layer-compensation
+      file: DONE/main/eliminate-non-data-loading-wrong-layer-compensation.yaml
+      title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
       priority: High
       status: Completed
     - id: embed-tuning-config-in-results

@@ -2,7 +2,8 @@ id: eliminate-non-data-loading-wrong-layer-compensation
 title: "Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-07"
 category: Core Functionality
 description: |
   A targeted architectural review found 5 confirmed non-data-loading instances
@@ -235,21 +236,30 @@ work:
 - id: w12
   summary: "Run focused verification and post-fix audits to ensure only legitimate compatibility boundaries still use fallbacks"
   needs: [w10, w11]
-  status: pending
+  status: done
   notes: |
-    After tests pass, rescan the touched subsystems for:
-    - active-path fallback logic around benchmark identity
-    - duplicated env/default resolution across config builders, from_config(),
-      and __init__() in Doris and SingleStore
+    643 tests pass across all touched surfaces.
 
-    Explicitly confirm that the remaining fallbacks are limited to:
-    - historical results compatibility / import boundaries
-    - legitimate owner-layer discovery for platforms not covered by these
-      confirmed findings
+    Surviving fallback sites (all confirmed valid):
 
-    Output:
-    - append a short audit note to this TODO or the implementation summary
-      naming any surviving allowed fallback sites and why they remain valid
+    Benchmark identity in adapter/dryrun:
+    - _get_benchmark_type() (adapter.py ~1717): the encapsulated fallback method;
+      only called when no explicit slug is available from run_config. Live path
+      never reaches it: run_config["benchmark_name"] is preferred in all
+      _execute_* routing methods.
+    - "or getattr(benchmark, '_name', ...)" patterns in _get_dialect_queries,
+      _execute_all_queries, _execute_single_query, _estimate_resources,
+      _estimate_memory_usage: all are documented as fallbacks for callers that
+      pre-date explicit slug propagation. Live path from runner always provides
+      the slug via run_config["benchmark_name"].
+
+    Doris/SingleStore env vars:
+    - _build_doris_config() and _build_singlestore_config(): single canonical
+      resolvers for the CLI path. All env vars are HERE.
+    - from_config() in both adapters: only DORIS_DATABASE / SINGLESTORE_DATABASE
+      env var remains, for benchmark-derived database naming. This is the
+      legitimate owner layer (from_config has benchmark+scale_factor context).
+    - __init__() in both adapters: no env vars, Python defaults only.
 
 deferred:
 - summary: "Re-audit Databend, Firebolt, Starburst, and ClickHouse Cloud for broader config-ownership standardization after the confirmed fixes land"

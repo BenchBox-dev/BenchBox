@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T13:08:45.806018'
-total_items: 641
+generated_at: '2026-04-07T13:13:00.847457'
+total_items: 642
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1286,6 +1286,27 @@ items:
   - marketing
   - visibility
   estimated_effort: Medium
+- id: eliminate-non-data-loading-wrong-layer-compensation
+  file: DONE/main/eliminate-non-data-loading-wrong-layer-compensation.yaml
+  title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - architecture
+  - runner
+  - dry-run
+  - results
+  - platform-config
+  - doris
+  - singlestore
+  estimated_effort: 1-2 weeks
+  completed_date: '2026-04-07'
+  work_total: 12
+  work_done: 12
+  work_ready: 0
+  deferred_count: 1
 - id: emit-datagen-metrics-in-results-json
   file: DONE/core-functionality/active/emit-datagen-metrics-in-results-json.yaml
   title: Emit meaningful datagen metrics in results JSON

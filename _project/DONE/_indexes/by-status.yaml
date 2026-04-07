@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T13:08:45.806595'
-total_items: 641
+generated_at: '2026-04-07T13:13:00.848137'
+total_items: 642
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 592
+    count: 593
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1227,6 +1227,11 @@ statuses:
       title: Elevate MCP Feature on Landing Page and Documentation
       priority: High
       category: Documentation
+    - id: eliminate-non-data-loading-wrong-layer-compensation
+      file: DONE/main/eliminate-non-data-loading-wrong-layer-compensation.yaml
+      title: Eliminate non-data-loading wrong-layer compensation across runner, dry-run, results, and platform config
+      priority: High
+      category: Core Functionality
     - id: embed-tuning-config-in-results
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output
