@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T13:04:32.922561'
+generated_at: '2026-04-07T13:05:46.349469'
 total_items: 20
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -36,8 +36,8 @@ items:
   - singlestore
   estimated_effort: 1-2 weeks
   work_total: 12
-  work_done: 7
-  work_ready: 3
+  work_done: 9
+  work_ready: 2
   deferred_count: 1
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml

@@ -158,7 +158,7 @@ work:
 - id: w8
   summary: "Make Doris config builder the single owner of standard CLI connection/env/default resolution"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Keep benchmark-aware database naming where benchmark/scale context first
     exists, but stop re-resolving host/port/http_port/username/password/database
@@ -179,7 +179,7 @@ work:
 - id: w9
   summary: "Make SingleStore config builder the single owner of standard CLI connection/env/default resolution"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Apply the same ownership cleanup as Doris to SingleStore.
 
