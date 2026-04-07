@@ -51,7 +51,7 @@ work:
 - id: w2
   summary: "Thread benchmark identity through the SQL runner instead of stripping it before adapter.run_benchmark()"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update the SQL lifecycle so RunConfig carries benchmark=benchmark_config.name
     and the SQL path does not drop that field before calling the adapter.
