@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T12:09:16.261829'
+generated_at: '2026-04-07T12:14:00.537864'
 total_items: 22
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -51,7 +51,7 @@ items:
   - doris
   - singlestore
   estimated_effort: 1-2 weeks
-  work_total: 9
+  work_total: 12
   work_done: 0
   work_ready: 1
   deferred_count: 1
