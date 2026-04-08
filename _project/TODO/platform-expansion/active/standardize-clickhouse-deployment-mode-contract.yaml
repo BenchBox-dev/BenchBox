@@ -59,7 +59,7 @@ work:
   summary: "Convert legacy config helpers and old argparse surfaces to emit and document `deployment_mode`, keeping `mode`
     only as a compatibility alias"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     This includes `benchbox/core/config_utils.py` and the legacy ClickHouse
     CLI config parser in `benchbox/cli/config.py`, which still advertises
