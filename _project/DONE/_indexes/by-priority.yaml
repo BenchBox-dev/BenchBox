@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:25:59.935836'
-total_items: 650
+generated_at: '2026-04-08T09:37:28.687432'
+total_items: 651
 priorities:
   Critical:
     count: 37
@@ -1830,7 +1830,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 264
+    count: 265
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1960,6 +1960,11 @@ priorities:
     - id: cedardb-adapter
       file: DONE/platform-expansion/active/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
+      category: Platform Expansion
+      status: Completed
+    - id: clickhouse-tpcdi-dialect-overrides
+      file: DONE/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml
+      title: Add ClickHouse dialect overrides for TPC-DI analytics queries (JULIANDAY, NULLIF, FILTER, subqueries)
       category: Platform Expansion
       status: Completed
     - id: add-coffee-shop-benchmark-implementation

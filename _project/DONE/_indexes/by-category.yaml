@@ -1,4 +1,4 @@
-generated_at: '2026-04-08T09:25:59.935599'
+generated_at: '2026-04-08T09:37:28.687280'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -2150,7 +2150,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 79
+    count: 80
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2176,6 +2176,11 @@ categories:
       file: DONE/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
       title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
       priority: Medium-High
+      status: Completed
+    - id: clickhouse-tpcdi-dialect-overrides
+      file: DONE/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml
+      title: Add ClickHouse dialect overrides for TPC-DI analytics queries (JULIANDAY, NULLIF, FILTER, subqueries)
+      priority: Medium
       status: Completed
     - id: clickhouse-coffeeshop-dialect-overrides
       file: DONE/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml

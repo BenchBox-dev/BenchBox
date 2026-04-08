@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:25:59.935125'
-total_items: 650
+generated_at: '2026-04-08T09:37:28.686967'
+total_items: 651
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4420,6 +4420,23 @@ items:
   completed_date: '2026-04-07'
   work_total: 9
   work_done: 9
+  work_ready: 0
+- id: clickhouse-tpcdi-dialect-overrides
+  file: DONE/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml
+  title: Add ClickHouse dialect overrides for TPC-DI analytics queries (JULIANDAY, NULLIF, FILTER, subqueries)
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  tags:
+  - clickhouse
+  - tpcdi
+  - dialect-override
+  - sf1-failures
+  estimated_effort: 1-2 days
+  completed_date: '2026-04-08'
+  work_total: 5
+  work_done: 5
   work_ready: 0
 - id: add-coffee-shop-benchmark-implementation
   file: DONE/unknown/planning/add-coffee-shop-benchmark-implementation.yaml

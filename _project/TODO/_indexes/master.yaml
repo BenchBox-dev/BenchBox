@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:25:57.781050'
-total_items: 23
+generated_at: '2026-04-08T09:37:27.103801'
+total_items: 22
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -265,22 +265,6 @@ items:
   work_total: 9
   work_done: 0
   work_ready: 1
-- id: clickhouse-tpcdi-dialect-overrides
-  file: TODO/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml
-  title: Add ClickHouse dialect overrides for TPC-DI analytics queries (JULIANDAY, NULLIF, FILTER, subqueries)
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  tags:
-  - clickhouse
-  - tpcdi
-  - dialect-override
-  - sf1-failures
-  estimated_effort: 1-2 days
-  work_total: 5
-  work_done: 0
-  work_ready: 4
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml
   title: Add Hypothesis property-based tests for pure-function invariants

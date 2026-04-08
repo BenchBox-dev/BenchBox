@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:25:59.936043'
-total_items: 650
+generated_at: '2026-04-08T09:37:28.687572'
+total_items: 651
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 601
+    count: 602
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -442,6 +442,11 @@ statuses:
       file: DONE/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
       title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
       priority: Medium-High
+      category: Platform Expansion
+    - id: clickhouse-tpcdi-dialect-overrides
+      file: DONE/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml
+      title: Add ClickHouse dialect overrides for TPC-DI analytics queries (JULIANDAY, NULLIF, FILTER, subqueries)
+      priority: Medium
       category: Platform Expansion
     - id: clickhouse-coffeeshop-dialect-overrides
       file: DONE/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:25:57.781104'
-total_items: 23
+generated_at: '2026-04-08T09:37:27.103843'
+total_items: 22
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Critical
       category: Core Functionality
   Not Started:
-    count: 18
+    count: 17
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -25,11 +25,6 @@ statuses:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
-      priority: Medium
-      category: Platform Expansion
-    - id: clickhouse-tpcdi-dialect-overrides
-      file: TODO/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml
-      title: Add ClickHouse dialect overrides for TPC-DI analytics queries (JULIANDAY, NULLIF, FILTER, subqueries)
       priority: Medium
       category: Platform Expansion
     - id: add-hypothesis-property-tests
