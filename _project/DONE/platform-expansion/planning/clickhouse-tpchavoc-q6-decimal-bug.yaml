@@ -3,38 +3,41 @@ title: "Fix ClickHouse QueryTransformer stripping leading zeros from decimal lit
 worktree: platform-expansion
 category: Core Functionality
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-08"
 description: |
   tpchavoc Q6 fails on ClickHouse with syntax error on ".06 - 0.01" — the source
   in benchbox/core/tpchavoc/variant_sets/q06.py contains "0.06" (with leading zero),
   but a query transformation step strips the leading zero, producing ".06" which is
   invalid ClickHouse syntax.
 
-  This is a bug in the SQL transformation pipeline, not the query file itself.
-  The ClickHouse QueryTransformer class needs investigation for numeric literal handling.
+  Root cause: fix_type_casts Patterns 2/3/4 use (0\.0*)\b which backtracks to
+  match "0." from "0.06" via a word boundary between "." (non-word) and the next
+  digit. This leaves the trailing digit(s) dangling after the CAST replacement,
+  e.g. "col + 0.06" → "col + CAST(0 AS Decimal(15,2))6".
 
-  Q5 and Q13 failures in tpchavoc are covered by other TODOs (join memory tuning
-  and timeout respectively).
+  Fix: replaced \b(?!\)) with (?![0-9\)]) in Pattern 2, and \b with (?![0-9]) in
+  Patterns 3/4, to prevent matching when the zero literal is followed by a digit.
 
 work:
   - id: w1
     summary: "Find the ClickHouse QueryTransformer code that handles numeric literals — grep for decimal/numeric transformation logic"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Fix the leading-zero stripping bug in the transformer"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Add unit test with decimal literals like 0.06 to prevent regression"
     needs: [w2]
-    status: pending
+    status: done
 
 files_affected:
   modified:
     - "benchbox/platforms/clickhouse/query_transformer.py"
-    - "benchbox/platforms/clickhouse/adapter.py"
+    - "tests/unit/platforms/test_clickhouse_adapter.py"
 
 must_preserve:
   - "Other numeric literal transformations continue to work correctly"
@@ -52,8 +55,8 @@ approach: |
 
 verification:
   - description: "Decimal literal 0.06 preserved through transformation"
-    command: "uv run -- python -m pytest tests/ -v -k 'clickhouse and (transform or decimal)'"
-    expected_output: "Tests pass confirming 0.06 is not stripped to .06"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py::TestClickHouseQueryTransformerDecimalLiterals -v"
+    expected_output: "6 passed"
 
 metadata:
   tags:

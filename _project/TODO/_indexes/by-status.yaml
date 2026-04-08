@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:13:03.926417'
-total_items: 24
+generated_at: '2026-04-08T09:25:57.781104'
+total_items: 23
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Critical
       category: Core Functionality
   Not Started:
-    count: 19
+    count: 18
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -46,11 +46,6 @@ statuses:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
-      category: Core Functionality
-    - id: clickhouse-tpchavoc-q6-decimal-bug
-      file: TODO/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
-      title: Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)
-      priority: Medium-High
       category: Core Functionality
     - id: clickhouse-error-message-capture
       file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml

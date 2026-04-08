@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:13:03.926408'
-total_items: 24
+generated_at: '2026-04-08T09:25:57.781095'
+total_items: 23
 priorities:
   Critical:
     count: 2
@@ -28,18 +28,13 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 2
+    count: 1
     items:
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
       category: Core Functionality
       status: Completed
-    - id: clickhouse-tpchavoc-q6-decimal-bug
-      file: TODO/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
-      title: Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)
-      category: Core Functionality
-      status: Not Started
   Medium:
     count: 9
     items:

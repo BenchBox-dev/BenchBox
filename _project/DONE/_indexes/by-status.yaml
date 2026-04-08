@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:13:05.414234'
-total_items: 649
+generated_at: '2026-04-08T09:25:59.936043'
+total_items: 650
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 600
+    count: 601
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1498,6 +1498,11 @@ statuses:
       title: Fix ClickHouse Platform Issues
       priority: Medium
       category: Project Lifecycle Management
+    - id: clickhouse-tpchavoc-q6-decimal-bug
+      file: DONE/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
+      title: Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)
+      priority: Medium-High
+      category: Core Functionality
     - id: dask-platform-compatibility
       file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml
       title: Fix Dask DataFrame Platform Compatibility

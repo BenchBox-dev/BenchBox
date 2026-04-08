@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:13:05.414095'
-total_items: 649
+generated_at: '2026-04-08T09:25:59.935836'
+total_items: 650
 priorities:
   Critical:
     count: 37
@@ -1366,7 +1366,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 91
+    count: 92
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1622,6 +1622,11 @@ priorities:
     - id: complexity-field-extraction-w14
       file: DONE/core-functionality/active/complexity-field-extraction-w14.yaml
       title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
+      category: Core Functionality
+      status: Completed
+    - id: clickhouse-tpchavoc-q6-decimal-bug
+      file: DONE/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
+      title: Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)
       category: Core Functionality
       status: Completed
     - id: platform-adapter-silent-error-handling

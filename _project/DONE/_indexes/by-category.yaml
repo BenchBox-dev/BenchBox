@@ -1,4 +1,4 @@
-generated_at: '2026-04-08T09:13:05.413936'
+generated_at: '2026-04-08T09:25:59.935599'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -522,7 +522,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 208
+    count: 209
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -934,6 +934,11 @@ categories:
       file: DONE/unknown/planning/fix-cli-power-throughput-test-execution-and-tuning-configuration-issues.yaml
       title: Fix CLI Power/Throughput Test Execution and Tuning Configuration Issues
       priority: Medium
+      status: Completed
+    - id: clickhouse-tpchavoc-q6-decimal-bug
+      file: DONE/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
+      title: Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)
+      priority: Medium-High
       status: Completed
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: DONE/core-functionality/active/fix-dataframe-parameter-parity-follow-up-findings.yaml

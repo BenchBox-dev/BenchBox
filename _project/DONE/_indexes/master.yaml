@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:13:05.413661'
-total_items: 649
+generated_at: '2026-04-08T09:25:59.935125'
+total_items: 650
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7931,6 +7931,23 @@ items:
   completed_date: '2026-02-22'
   work_total: 7
   work_done: 7
+  work_ready: 0
+- id: clickhouse-tpchavoc-q6-decimal-bug
+  file: DONE/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
+  title: Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - clickhouse
+  - tpchavoc
+  - bug
+  - sf1-failures
+  estimated_effort: Small
+  completed_date: '2026-04-08'
+  work_total: 3
+  work_done: 3
   work_ready: 0
 - id: platform-adapter-silent-error-handling
   file: DONE/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
