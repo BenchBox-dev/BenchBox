@@ -1,0 +1,105 @@
+id: clickhouse-tpcds-silent-empty-query-bug
+title: "Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries"
+worktree: platform-expansion
+category: Core Functionality
+priority: Critical
+status: Completed
+description: |
+  ClickHouse SF1 runs for tpcds and tpcds_obt show power_test status "COMPLETED" with
+  duration 0ms and an empty queries list. The phase silently swallows a query generation
+  failure, reporting success when zero queries actually executed.
+
+  Two candidate root causes:
+
+  Path A (most likely): dsqgen binary missing/failing silently. TPCDSQueryManager.get_all_queries()
+  in benchbox/core/tpcds/queries.py catches dsqgen exceptions per-query and skips them. If all 99
+  fail, it returns an empty dict. The power test runner iterates over zero queries and reports
+  COMPLETED.
+
+  Path B: _preflight_validate_generation() in power_test.py raises RuntimeError, caught at the
+  phase level, returning an empty result list.
+
+  Verification showed tpcds_obt did not share the same root cause. Base tpcds was fixed by
+  surfacing zero-query dsqgen failures, while tpcds_obt required adapter routing changes so it
+  runs through the generic OBT power-test path instead of the specialized TPC-DS stream runner.
+
+  This is the highest-priority fix because it blocks ~195 queries across both benchmarks and
+  masks the actual root cause (likely dsqgen binary availability on the ClickHouse Cloud host).
+
+work:
+- id: w1
+  summary: "Diagnose: run `benchbox run --platform duckdb --benchmark tpcds --scale 0.01 --phases power` to determine if dsqgen
+    works locally"
+  status: done
+
+- id: w2
+  summary: "In benchbox/core/tpcds/queries.py, add warning logging when dsqgen fails for individual queries, and raise error
+    when total success count is zero"
+  needs: [w1]
+  status: done
+
+- id: w3
+  summary: "In power_test.py, detect 0-query generation and set phase status to FAILED with descriptive error message. Also
+    fixed schema.py to derive power_test phase status from real executions."
+  needs: [w1]
+  status: done
+
+- id: w4
+  summary: "Add unit tests for zero-query detection in both queries.py and power_test.py"
+  needs: [w2, w3]
+  status: done
+
+- id: w5
+  summary: "Re-run ClickHouse tpcds and tpcds_obt at SF1 to verify fix surfaces the actual error"
+  needs: [w4]
+  status: done
+
+files_affected:
+  modified:
+  - "benchbox/core/tpcds/queries.py"
+  - "benchbox/core/tpcds/power_test.py"
+  - "benchbox/core/results/schema.py"
+
+must_preserve:
+- "TPCDSQueryManager.get_all_queries() continues to work when dsqgen succeeds for all queries"
+- "Power test phase still completes normally when queries are present"
+- "tpcds_obt executes its OBT query set via the generic adapter path instead of the base TPC-DS runner"
+
+approach: |
+  Start with diagnostic (w1) to understand whether dsqgen works locally on DuckDB.
+  If DuckDB succeeds, the issue is ClickHouse-adapter-specific query setup.
+  If DuckDB also fails, the dsqgen binary is the root cause.
+
+  For the code fix, add a guard in power_test.py's _run_power_test() method:
+  after query generation, check len(queries) == 0 and raise a descriptive error
+  rather than iterating over an empty list. In queries.py, track per-query failures
+  and raise when all queries fail.
+
+anti_patterns:
+- "DO NOT silently return empty results — because this masks dsqgen failures and produces misleading 'COMPLETED' status —
+  raise a clear error instead"
+- "DO NOT catch and swallow all exceptions in query generation — because individual query failures are acceptable but total
+  failure must be surfaced"
+
+verification:
+- description: "Zero-query generation raises error instead of silent completion"
+  command: "uv run -- python -m pytest tests/unit/core/tpcds/ -v -k 'zero_quer'"
+  expected_output: "Tests pass showing FAILED status when 0 queries generated"
+
+metadata:
+  tags:
+  - clickhouse
+  - tpcds
+  - bug
+  - sf1-failures
+  created_date: "2026-04-08"
+  estimated_effort: "1-2 days"
+
+completed_date: "2026-04-08"
+
+impact:
+  business_value: |
+    Unblocks ~195 queries across tpcds and tpcds_obt benchmarks on ClickHouse.
+    Currently these benchmarks report false success, misleading users.
+  technical_debt: |
+    Fixes a silent failure pattern that could affect other benchmarks using dsqgen.

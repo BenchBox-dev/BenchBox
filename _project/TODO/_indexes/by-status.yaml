@@ -1,18 +1,13 @@
-generated_at: '2026-04-08T10:05:55.378553'
-total_items: 23
+generated_at: '2026-04-08T10:11:40.014690'
+total_items: 22
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
       title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
       priority: Medium
-      category: Core Functionality
-    - id: clickhouse-tpcds-silent-empty-query-bug
-      file: TODO/platform-expansion/active/clickhouse-tpcds-silent-empty-query-bug.yaml
-      title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
-      priority: Critical
       category: Core Functionality
   Not Started:
     count: 18

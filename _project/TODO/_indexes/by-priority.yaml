@@ -1,19 +1,14 @@
-generated_at: '2026-04-08T10:05:55.378545'
-total_items: 23
+generated_at: '2026-04-08T10:11:40.014681'
+total_items: 22
 priorities:
   Critical:
-    count: 2
+    count: 1
     items:
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
       category: Core Functionality
       status: Completed
-    - id: clickhouse-tpcds-silent-empty-query-bug
-      file: TODO/platform-expansion/active/clickhouse-tpcds-silent-empty-query-bug.yaml
-      title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
-      category: Core Functionality
-      status: In Progress
   High:
     count: 3
     items:

@@ -1,4 +1,4 @@
-generated_at: '2026-04-08T10:05:56.991621'
+generated_at: '2026-04-08T10:11:41.656119'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -522,7 +522,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 209
+    count: 210
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -994,6 +994,11 @@ categories:
       file: DONE/unknown/planning/fix-tpc-ds-test-mode-cli-dry-run-output-to-show-actual-execution-plans.yaml
       title: Fix TPC-DS Test Mode CLI Dry Run Output to Show Actual Execution Plans ✅
       priority: Medium
+      status: Completed
+    - id: clickhouse-tpcds-silent-empty-query-bug
+      file: DONE/platform-expansion/active/clickhouse-tpcds-silent-empty-query-bug.yaml
+      title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
+      priority: Critical
       status: Completed
     - id: fix-tpch-reference-seed-and-parameter-parity
       file: DONE/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml

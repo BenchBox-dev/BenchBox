@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T10:05:56.991978'
-total_items: 651
+generated_at: '2026-04-08T10:11:41.656465'
+total_items: 652
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 602
+    count: 603
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1572,6 +1572,11 @@ statuses:
       file: DONE/unknown/planning/fix-tpc-ds-test-mode-cli-dry-run-output-to-show-actual-execution-plans.yaml
       title: Fix TPC-DS Test Mode CLI Dry Run Output to Show Actual Execution Plans ✅
       priority: Medium
+      category: Core Functionality
+    - id: clickhouse-tpcds-silent-empty-query-bug
+      file: DONE/platform-expansion/active/clickhouse-tpcds-silent-empty-query-bug.yaml
+      title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
+      priority: Critical
       category: Core Functionality
     - id: fix-tpch-reference-seed-and-parameter-parity
       file: DONE/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml

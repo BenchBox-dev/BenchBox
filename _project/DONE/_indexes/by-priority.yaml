@@ -1,8 +1,8 @@
-generated_at: '2026-04-08T10:05:56.991800'
-total_items: 651
+generated_at: '2026-04-08T10:11:41.656301'
+total_items: 652
 priorities:
   Critical:
-    count: 37
+    count: 38
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -83,6 +83,11 @@ priorities:
       file: DONE/security-hardening/active/timescaledb-sql-injection-remediation.yaml
       title: Fix SQL injection vulnerabilities in TimescaleDB adapter
       category: Security and Compliance
+      status: Completed
+    - id: clickhouse-tpcds-silent-empty-query-bug
+      file: DONE/platform-expansion/active/clickhouse-tpcds-silent-empty-query-bug.yaml
+      title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
+      category: Core Functionality
       status: Completed
     - id: platform-adapter-benchmark-correctness
       file: DONE/platform-expansion/active/platform-adapter-benchmark-correctness.yaml

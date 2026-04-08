@@ -1,4 +1,4 @@
-generated_at: '2026-04-08T10:05:55.378534'
+generated_at: '2026-04-08T10:11:40.014668'
 total_categories: 5
 categories:
   Benchmark Development:
@@ -25,7 +25,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 10
+    count: 9
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -52,11 +52,6 @@ categories:
       title: Fix ClickHouse adapter to capture error messages in query results
       priority: Medium
       status: Not Started
-    - id: clickhouse-tpcds-silent-empty-query-bug
-      file: TODO/platform-expansion/active/clickhouse-tpcds-silent-empty-query-bug.yaml
-      title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
-      priority: Critical
-      status: In Progress
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow
