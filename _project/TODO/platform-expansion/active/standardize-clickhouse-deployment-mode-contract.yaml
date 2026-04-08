@@ -49,7 +49,7 @@ work:
   summary: "Use the normalizer at the ClickHouse adapter and metadata boundary so legacy callers cannot silently default to
     local mode"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update `benchbox/platforms/clickhouse/adapter.py` and
     `benchbox/platforms/clickhouse/metadata.py` to read `deployment_mode`
