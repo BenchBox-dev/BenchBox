@@ -19,31 +19,33 @@ description: |
   Single fix resolves 9 failures across 3 benchmarks.
 
 work:
-  - id: w1
-    summary: "In tuning.py, change max_bytes_in_join multiplier from 0.25 to 0.5 of max_memory_usage"
-    status: pending
+- id: w1
+  summary: "In tuning.py, change max_bytes_in_join multiplier from 0.25 to 0.5 of max_memory_usage"
+  status: done
 
-  - id: w2
-    summary: "Verify join_algorithm = 'grace_hash' is being applied — check for overrides in adapter or session settings"
-    status: pending
+- id: w2
+  summary: "Verify join_algorithm = 'grace_hash' is being applied — check for overrides in adapter or session settings"
+  status: done
 
-  - id: w3
-    summary: "Add/update unit tests for tuning parameter values"
-    needs: [w1, w2]
-    status: pending
+- id: w3
+  summary: "Add/update unit tests for tuning parameter values"
+  needs: [w1, w2]
+  status: done
 
 files_affected:
   modified:
-    - "benchbox/platforms/clickhouse/tuning.py"
+  - "benchbox/platforms/clickhouse/tuning.py"
 
 must_preserve:
-  - "All other tuning parameters (max_memory_usage, max_threads, etc.) retain current values"
-  - "Tuning applies correctly for both SF0.01 and SF1 scales"
-  - "grace_hash join algorithm setting is not overridden by adapter session defaults"
+- "All other tuning parameters (max_memory_usage, max_threads, etc.) retain current values"
+- "Tuning applies correctly for both SF0.01 and SF1 scales"
+- "grace_hash join algorithm setting is not overridden by adapter session defaults"
 
 anti_patterns:
-  - "DO NOT lower max_bytes_in_join below 0.5 × max_memory_usage — because SF1 Q5 multi-table join needs 2.72 GiB and 25% cap caused OOM — keep at 50% minimum"
-  - "DO NOT remove grace_hash join_algorithm — because grace_hash spills to disk and is the safety net when memory limits are hit — verify it takes effect"
+- "DO NOT lower max_bytes_in_join below 0.5 × max_memory_usage — because SF1 Q5 multi-table join needs 2.72 GiB and 25% cap
+  caused OOM — keep at 50% minimum"
+- "DO NOT remove grace_hash join_algorithm — because grace_hash spills to disk and is the safety net when memory limits are
+  hit — verify it takes effect"
 
 approach: |
   Simple parameter change in tuning.py. Check the max_bytes_in_join calculation
@@ -51,18 +53,18 @@ approach: |
   adapter to verify grace_hash isn't overridden by session-level settings.
 
 verification:
-  - description: "Tuning tests pass with updated max_bytes_in_join multiplier"
-    command: "uv run -- python -m pytest tests/ -v -k 'clickhouse and tuning and (join or memory)'"
-    expected_output: "Tests pass confirming 0.5 multiplier and grace_hash settings"
+- description: "Tuning tests pass with updated max_bytes_in_join multiplier"
+  command: "uv run -- python -m pytest tests/ -v -k 'clickhouse and tuning and (join or memory)'"
+  expected_output: "Tests pass confirming 0.5 multiplier and grace_hash settings"
 
 metadata:
   tags:
-    - clickhouse
-    - tuning
-    - tpch
-    - tpchavoc
-    - tpch-skew
-    - sf1-failures
+  - clickhouse
+  - tuning
+  - tpch
+  - tpchavoc
+  - tpch-skew
+  - sf1-failures
   created_date: "2026-04-08"
   estimated_effort: "Small"
 
