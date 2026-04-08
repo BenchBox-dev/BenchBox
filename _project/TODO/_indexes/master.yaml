@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:37:27.103801'
-total_items: 22
+generated_at: '2026-04-08T10:05:55.378505'
+total_items: 23
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -71,6 +71,27 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
+- id: standardize-clickhouse-deployment-mode-contract
+  file: TODO/platform-expansion/planning/standardize-clickhouse-deployment-mode-contract.yaml
+  title: Standardize ClickHouse deployment naming around deployment_mode and remove legacy mode/embedded drift
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - clickhouse
+  - deployment-mode
+  - config
+  - cli
+  - docs
+  - compatibility
+  estimated_effort: 2-3 days
+  work_total: 7
+  work_done: 0
+  work_ready: 1
+  deferred_count: 1
+  needs:
+  - migrate-clickhouse-firebolt-deployment
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter

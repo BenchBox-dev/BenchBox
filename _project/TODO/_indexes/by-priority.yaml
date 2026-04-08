@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:37:27.103835'
-total_items: 22
+generated_at: '2026-04-08T10:05:55.378545'
+total_items: 23
 priorities:
   Critical:
     count: 2
@@ -15,7 +15,7 @@ priorities:
       category: Core Functionality
       status: In Progress
   High:
-    count: 2
+    count: 3
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -26,6 +26,11 @@ priorities:
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
+      status: Not Started
+    - id: standardize-clickhouse-deployment-mode-contract
+      file: TODO/platform-expansion/planning/standardize-clickhouse-deployment-mode-contract.yaml
+      title: Standardize ClickHouse deployment naming around deployment_mode and remove legacy mode/embedded drift
+      category: Core Functionality
       status: Not Started
   Medium-High:
     count: 1
