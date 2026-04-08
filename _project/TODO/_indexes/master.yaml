@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:04:20.137506'
-total_items: 27
+generated_at: '2026-04-08T09:07:53.269625'
+total_items: 26
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -390,22 +390,6 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
-- id: clickhouse-h2odb-percentile-override
-  file: TODO/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
-  title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - clickhouse
-  - h2odb
-  - dialect-override
-  - sf1-failures
-  estimated_effort: Small
-  work_total: 2
-  work_done: 0
-  work_ready: 1
 - id: clickhouse-coffeeshop-dialect-overrides
   file: TODO/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml
   title: Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)

@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:04:21.615441'
-total_items: 646
+generated_at: '2026-04-08T09:07:56.888964'
+total_items: 647
 priorities:
   Critical:
     count: 37
@@ -1366,7 +1366,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 88
+    count: 89
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1397,6 +1397,11 @@ priorities:
       file: DONE/table-format-parity/hudi-support-parity.yaml
       title: Add Apache Hudi Support on Par with Delta Lake and Iceberg
       category: Core Functionality
+      status: Completed
+    - id: clickhouse-h2odb-percentile-override
+      file: DONE/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
+      title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
+      category: Platform Expansion
       status: Completed
     - id: ducklake-open-table-format
       file: DONE/platform-expansion/planning/ducklake-open-table-format.yaml

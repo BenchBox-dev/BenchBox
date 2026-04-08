@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:04:21.614998'
-total_items: 646
+generated_at: '2026-04-08T09:07:56.885739'
+total_items: 647
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7204,6 +7204,23 @@ items:
   - maintenance-operations
   - format-converters
   estimated_effort: 3-4 weeks
+- id: clickhouse-h2odb-percentile-override
+  file: DONE/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
+  title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - clickhouse
+  - h2odb
+  - dialect-override
+  - sf1-failures
+  estimated_effort: Small
+  completed_date: '2026-04-08'
+  work_total: 2
+  work_done: 2
+  work_ready: 0
 - id: ducklake-open-table-format
   file: DONE/platform-expansion/planning/ducklake-open-table-format.yaml
   title: Add DuckLake Open Table Format Support

@@ -1,4 +1,4 @@
-generated_at: '2026-04-08T09:04:21.615281'
+generated_at: '2026-04-08T09:07:56.887485'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -2145,7 +2145,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 76
+    count: 77
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2166,6 +2166,11 @@ categories:
       file: DONE/platform-expansion/active/cedardb-adapter.yaml
       title: Add CedarDB Platform Adapter
       priority: Medium
+      status: Completed
+    - id: clickhouse-h2odb-percentile-override
+      file: DONE/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
+      title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
+      priority: Medium-High
       status: Completed
     - id: ducklake-open-table-format
       file: DONE/platform-expansion/planning/ducklake-open-table-format.yaml

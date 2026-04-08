@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:04:20.137563'
-total_items: 27
+generated_at: '2026-04-08T09:07:53.269730'
+total_items: 26
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Critical
       category: Core Functionality
   Not Started:
-    count: 22
+    count: 21
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -26,11 +26,6 @@ statuses:
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       priority: Medium
-      category: Platform Expansion
-    - id: clickhouse-h2odb-percentile-override
-      file: TODO/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
-      title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
-      priority: Medium-High
       category: Platform Expansion
     - id: clickhouse-tpcdi-dialect-overrides
       file: TODO/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml

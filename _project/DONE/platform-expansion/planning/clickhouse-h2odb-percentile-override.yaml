@@ -3,7 +3,8 @@ title: "Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantil
 worktree: platform-expansion
 category: Platform Expansion
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-08"
 description: |
   h2odb Q9 fails on ClickHouse with SYNTAX_ERROR because it uses standard SQL
   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY fare_amount). ClickHouse doesn't
@@ -17,12 +18,12 @@ description: |
 work:
   - id: w1
     summary: "Create ClickHouse-specific Q9 override file using quantile(0.5)(fare_amount) / quantile(0.9)(fare_amount)"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Add unit test that loads h2odb Q9 for ClickHouse and asserts SQL contains 'quantile(' not 'PERCENTILE_CONT'"
     needs: [w1]
-    status: pending
+    status: done
 
 files_affected:
   modified:
