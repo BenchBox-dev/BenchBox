@@ -3,7 +3,7 @@ title: "Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% an
 worktree: platform-expansion
 category: Platform Expansion
 priority: High
-status: Not Started
+status: Completed
 description: |
   ClickHouse SF1 Q5 fails across TPC-H, tpchavoc, and tpch_skew with:
   "Limit for JOIN exceeded, max bytes: 2.00 GiB, current bytes: 2.72 GiB"

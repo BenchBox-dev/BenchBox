@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T08:29:14.936421'
-total_items: 28
+generated_at: '2026-04-08T08:51:29.444313'
+total_items: 27
 priorities:
   Critical:
     count: 2
@@ -15,13 +15,8 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 3
+    count: 2
     items:
-    - id: clickhouse-join-memory-tuning
-      file: TODO/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
-      title: Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash
-      category: Platform Expansion
-      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

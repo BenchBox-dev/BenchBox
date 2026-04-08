@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T08:29:14.936433'
-total_items: 28
+generated_at: '2026-04-08T08:51:29.444323'
+total_items: 27
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Core Functionality
   Not Started:
-    count: 24
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -57,11 +57,6 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
-    - id: clickhouse-join-memory-tuning
-      file: TODO/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
-      title: Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash
-      priority: High
-      category: Platform Expansion
     - id: clickhouse-tpchavoc-q6-decimal-bug
       file: TODO/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
       title: Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)

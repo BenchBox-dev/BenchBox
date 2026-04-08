@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T08:29:14.936337'
-total_items: 28
+generated_at: '2026-04-08T08:51:29.444259'
+total_items: 27
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -35,24 +35,6 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 1
-- id: clickhouse-join-memory-tuning
-  file: TODO/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
-  title: Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: High
-  status: Not Started
-  tags:
-  - clickhouse
-  - tuning
-  - tpch
-  - tpchavoc
-  - tpch-skew
-  - sf1-failures
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 2
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication

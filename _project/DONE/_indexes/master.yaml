@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T08:29:16.349510'
-total_items: 645
+generated_at: '2026-04-08T08:51:30.920435'
+total_items: 646
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1574,6 +1574,24 @@ items:
   completed_date: '2026-02-17'
   work_total: 8
   work_done: 8
+  work_ready: 0
+- id: clickhouse-join-memory-tuning
+  file: DONE/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
+  title: Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Completed
+  tags:
+  - clickhouse
+  - tuning
+  - tpch
+  - tpchavoc
+  - tpch-skew
+  - sf1-failures
+  estimated_effort: Small
+  work_total: 3
+  work_done: 3
   work_ready: 0
 - id: dask-platform-compatibility
   file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml

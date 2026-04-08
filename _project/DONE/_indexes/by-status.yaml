@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T08:29:16.350104'
-total_items: 645
+generated_at: '2026-04-08T08:51:30.921016'
+total_items: 646
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 596
+    count: 597
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1473,6 +1473,11 @@ statuses:
       title: Fix CLI Power/Throughput Test Execution and Tuning Configuration Issues
       priority: Medium
       category: Core Functionality
+    - id: clickhouse-join-memory-tuning
+      file: DONE/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
+      title: Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash
+      priority: High
+      category: Platform Expansion
     - id: fix-clickhouse-platform-issues
       file: DONE/unknown/planning/fix-clickhouse-platform-issues.yaml
       title: Fix ClickHouse Platform Issues

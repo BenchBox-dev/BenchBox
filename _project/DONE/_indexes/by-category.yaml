@@ -1,4 +1,4 @@
-generated_at: '2026-04-08T08:29:16.349778'
+generated_at: '2026-04-08T08:51:30.920717'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -2145,7 +2145,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 75
+    count: 76
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2376,6 +2376,11 @@ categories:
       file: DONE/platform-expansion/planning/firebolt-cloud-deployment.yaml
       title: Firebolt Cloud Deployment Mode
       priority: Low
+      status: Completed
+    - id: clickhouse-join-memory-tuning
+      file: DONE/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
+      title: Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash
+      priority: High
       status: Completed
     - id: dask-platform-compatibility
       file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml

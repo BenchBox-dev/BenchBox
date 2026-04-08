@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T08:29:16.349938'
-total_items: 645
+generated_at: '2026-04-08T08:51:30.920873'
+total_items: 646
 priorities:
   Critical:
     count: 37
@@ -190,7 +190,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 233
+    count: 234
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -533,6 +533,11 @@ priorities:
       file: DONE/main/active/fix-ascii-visualization-regressions.yaml
       title: Fix ASCII visualization regressions in summary box, histogram semantics, box labels, and heatmap readability
       category: Core Functionality
+      status: Completed
+    - id: clickhouse-join-memory-tuning
+      file: DONE/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
+      title: Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash
+      category: Platform Expansion
       status: Completed
     - id: dask-platform-compatibility
       file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml
