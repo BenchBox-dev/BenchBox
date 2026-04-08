@@ -1,4 +1,4 @@
-generated_at: '2026-04-08T09:10:31.236225'
+generated_at: '2026-04-08T09:13:05.413936'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -2145,7 +2145,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 78
+    count: 79
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2170,6 +2170,11 @@ categories:
     - id: clickhouse-h2odb-percentile-override
       file: DONE/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
       title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
+      priority: Medium-High
+      status: Completed
+    - id: clickhouse-coffeeshop-dialect-overrides
+      file: DONE/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml
+      title: Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)
       priority: Medium-High
       status: Completed
     - id: clickhouse-nyctaxi-extract-overrides

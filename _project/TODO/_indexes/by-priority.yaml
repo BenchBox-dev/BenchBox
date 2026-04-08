@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:10:29.723494'
-total_items: 25
+generated_at: '2026-04-08T09:13:03.926408'
+total_items: 24
 priorities:
   Critical:
     count: 2
@@ -28,13 +28,8 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 3
+    count: 2
     items:
-    - id: clickhouse-coffeeshop-dialect-overrides
-      file: TODO/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml
-      title: Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)
-      category: Platform Expansion
-      status: Not Started
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model

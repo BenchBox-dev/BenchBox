@@ -3,7 +3,8 @@ title: "Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (T
 worktree: platform-expansion
 category: Platform Expansion
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-08"
 description: |
   6 query failures on ClickHouse in coffeeshop benchmark:
   - QSA4 × 3: SUM(x) FILTER (WHERE cond) → ClickHouse needs sumIf(x, cond)
@@ -14,17 +15,17 @@ description: |
 
 work:
   - id: w1
-    summary: "Create ClickHouse override for QSA4 replacing SUM(x) FILTER (WHERE cond) with sumIf(x, cond)"
-    status: pending
+    summary: "Create ClickHouse override for SA4 — actual issue is nested window aggregate SUM(SUM()) OVER (), replaced with CROSS JOIN subquery. TODO description was incorrect about FILTER clause."
+    status: done
 
   - id: w2
-    summary: "Create ClickHouse override for QTM1 using toHour(toDateTime(order_time)) for TIME-type column"
-    status: pending
+    summary: "Create ClickHouse override for TM1 using toHour(toDateTime(order_time)) for TIME-type column"
+    status: done
 
   - id: w3
-    summary: "Add unit tests: load QSA4/QTM1 for ClickHouse and assert SQL contains 'sumIf(' and 'toDateTime(' respectively"
+    summary: "Add unit tests: load SA4/TM1 for ClickHouse and assert SQL avoids nested window aggregate and uses toDateTime() respectively"
     needs: [w1, w2]
-    status: pending
+    status: done
 
 files_affected:
   added:

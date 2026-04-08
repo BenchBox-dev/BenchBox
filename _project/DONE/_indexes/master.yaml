@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:10:31.235928'
-total_items: 648
+generated_at: '2026-04-08T09:13:05.413661'
+total_items: 649
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7220,6 +7220,23 @@ items:
   completed_date: '2026-04-08'
   work_total: 2
   work_done: 2
+  work_ready: 0
+- id: clickhouse-coffeeshop-dialect-overrides
+  file: DONE/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml
+  title: Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - clickhouse
+  - coffeeshop
+  - dialect-override
+  - sf1-failures
+  estimated_effort: Small
+  completed_date: '2026-04-08'
+  work_total: 3
+  work_done: 3
   work_ready: 0
 - id: clickhouse-nyctaxi-extract-overrides
   file: DONE/platform-expansion/planning/clickhouse-nyctaxi-extract-overrides.yaml

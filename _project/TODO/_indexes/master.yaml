@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:10:29.723451'
-total_items: 25
+generated_at: '2026-04-08T09:13:03.926371'
+total_items: 24
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -390,22 +390,6 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
-- id: clickhouse-coffeeshop-dialect-overrides
-  file: TODO/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml
-  title: Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - clickhouse
-  - coffeeshop
-  - dialect-override
-  - sf1-failures
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 2
 - id: define-hosted-results-contract-and-governance-model
   file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
   title: Define hosted results contract, trust labels, and governance model
