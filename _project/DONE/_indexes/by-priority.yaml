@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:07:56.888964'
-total_items: 647
+generated_at: '2026-04-08T09:10:31.236378'
+total_items: 648
 priorities:
   Critical:
     count: 37
@@ -1366,7 +1366,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 89
+    count: 90
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1401,6 +1401,11 @@ priorities:
     - id: clickhouse-h2odb-percentile-override
       file: DONE/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
       title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
+      category: Platform Expansion
+      status: Completed
+    - id: clickhouse-nyctaxi-extract-overrides
+      file: DONE/platform-expansion/planning/clickhouse-nyctaxi-extract-overrides.yaml
+      title: Add ClickHouse dialect overrides for nyctaxi EXTRACT functions
       category: Platform Expansion
       status: Completed
     - id: ducklake-open-table-format

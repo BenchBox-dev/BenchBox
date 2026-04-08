@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:07:53.269625'
-total_items: 26
+generated_at: '2026-04-08T09:10:29.723451'
+total_items: 25
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -406,22 +406,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 2
-- id: clickhouse-nyctaxi-extract-overrides
-  file: TODO/platform-expansion/planning/clickhouse-nyctaxi-extract-overrides.yaml
-  title: Add ClickHouse dialect overrides for nyctaxi EXTRACT functions
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - clickhouse
-  - nyctaxi
-  - dialect-override
-  - sf1-failures
-  estimated_effort: Small
-  work_total: 4
-  work_done: 0
-  work_ready: 3
 - id: define-hosted-results-contract-and-governance-model
   file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
   title: Define hosted results contract, trust labels, and governance model

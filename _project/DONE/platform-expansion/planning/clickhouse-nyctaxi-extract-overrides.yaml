@@ -3,7 +3,8 @@ title: "Add ClickHouse dialect overrides for nyctaxi EXTRACT functions"
 worktree: platform-expansion
 category: Platform Expansion
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-08"
 description: |
   12 query failures across nyctaxi on ClickHouse due to unsupported EXTRACT variants:
   - rush-hour-analysis: EXTRACT(HOUR FROM ts) and EXTRACT(EPOCH FROM interval)
@@ -20,20 +21,20 @@ description: |
 work:
   - id: w1
     summary: "Create ClickHouse override for rush-hour-analysis query using toHour() and dateDiff('second', ...)"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Create ClickHouse override for weekday-weekend-comparison using toDayOfWeek() % 7"
-    status: pending
+    status: done
 
   - id: w3
     summary: "Create ClickHouse override for trips-by-day-of-week using toDayOfWeek() % 7"
-    status: pending
+    status: done
 
   - id: w4
     summary: "Verify all 3 overrides are loaded correctly by the query manager"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
 
 files_affected:
   added:

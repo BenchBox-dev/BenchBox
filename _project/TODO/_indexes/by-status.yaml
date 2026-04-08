@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T09:07:53.269730'
-total_items: 26
+generated_at: '2026-04-08T09:10:29.723505'
+total_items: 25
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Critical
       category: Core Functionality
   Not Started:
-    count: 21
+    count: 20
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -35,11 +35,6 @@ statuses:
     - id: clickhouse-coffeeshop-dialect-overrides
       file: TODO/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml
       title: Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)
-      priority: Medium-High
-      category: Platform Expansion
-    - id: clickhouse-nyctaxi-extract-overrides
-      file: TODO/platform-expansion/planning/clickhouse-nyctaxi-extract-overrides.yaml
-      title: Add ClickHouse dialect overrides for nyctaxi EXTRACT functions
       priority: Medium-High
       category: Platform Expansion
     - id: add-hypothesis-property-tests
