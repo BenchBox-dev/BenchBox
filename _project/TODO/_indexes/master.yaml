@@ -1,4 +1,4 @@
-generated_at: '2026-04-08T08:24:24.610021'
+generated_at: '2026-04-08T08:29:14.936337'
 total_items: 28
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -364,7 +364,7 @@ items:
   - dialect-override
   - sf1-failures
   estimated_effort: 2-3 days
-  work_total: 6
+  work_total: 8
   work_done: 0
   work_ready: 4
   deferred_count: 1

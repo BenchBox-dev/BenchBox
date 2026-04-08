@@ -33,21 +33,27 @@ work:
 
 files_affected:
   modified:
-    - "benchbox/platforms/clickhouse/"
+    - "benchbox/platforms/clickhouse/query_transformer.py"
+    - "benchbox/platforms/clickhouse/adapter.py"
 
 must_preserve:
   - "Other numeric literal transformations continue to work correctly"
   - "Queries that don't use small decimals remain unaffected"
 
+anti_patterns:
+  - "DO NOT strip leading zeros from decimal literals — because ClickHouse rejects bare '.06' as invalid syntax — preserve '0.06' form"
+  - "DO NOT apply numeric normalization that changes the string representation of valid SQL literals — because downstream engines may have strict parsing — only transform function names and syntax"
+
 approach: |
   Search the ClickHouse adapter for QueryTransformer or query rewriting logic.
   The bug likely involves a regex or string replacement that inadvertently strips
-  leading zeros from decimal numbers like 0.06 → .06.
+  leading zeros from decimal numbers like 0.06 → .06. Check query_transformer.py
+  first, then adapter.py for any pre-execution SQL munging.
 
 verification:
   - description: "Decimal literal 0.06 preserved through transformation"
-    command: "uv run -- python -m pytest tests/ -v -k 'clickhouse and (transform or query)'"
-    expected_output: "Tests pass, decimal literals preserved"
+    command: "uv run -- python -m pytest tests/ -v -k 'clickhouse and (transform or decimal)'"
+    expected_output: "Tests pass confirming 0.06 is not stripped to .06"
 
 metadata:
   tags:

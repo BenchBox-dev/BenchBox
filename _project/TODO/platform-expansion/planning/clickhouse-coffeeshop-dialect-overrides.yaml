@@ -22,7 +22,7 @@ work:
     status: pending
 
   - id: w3
-    summary: "Verify overrides load correctly"
+    summary: "Add unit tests: load QSA4/QTM1 for ClickHouse and assert SQL contains 'sumIf(' and 'toDateTime(' respectively"
     needs: [w1, w2]
     status: pending
 
@@ -31,15 +31,23 @@ files_affected:
     - "benchbox/core/coffeeshop/queries/clickhouse_sql/qsa4.sql"
     - "benchbox/core/coffeeshop/queries/clickhouse_sql/qtm1.sql"
 
+must_preserve:
+  - "Base coffeeshop QSA4/QTM1 queries unchanged — other platforms use standard FILTER and EXTRACT"
+  - "Override queries return identical column names and semantics"
+
+anti_patterns:
+  - "DO NOT modify base query files — because other platforms depend on standard SQL FILTER/EXTRACT — create clickhouse_sql/ overrides instead"
+  - "DO NOT use toHour() directly on TIME columns — because ClickHouse toHour() rejects bare TIME values — wrap in toDateTime() first"
+
 approach: |
   Follow existing override pattern. For QSA4, mechanically replace
   SUM(x) FILTER (WHERE cond) with sumIf(x, cond). For QTM1, wrap
   order_time in toDateTime() before passing to toHour().
 
 verification:
-  - description: "coffeeshop tests pass"
-    command: "uv run -- python -m pytest tests/ -v -k coffeeshop"
-    expected_output: "All coffeeshop tests pass"
+  - description: "ClickHouse coffeeshop overrides load with sumIf and toDateTime wrappers"
+    command: "uv run -- python -m pytest tests/ -v -k 'coffeeshop and clickhouse'"
+    expected_output: "Tests pass confirming sumIf/toDateTime overrides for QSA4/QTM1"
 
 metadata:
   tags:

@@ -29,11 +29,15 @@ work:
 
 files_affected:
   modified:
-    - "benchbox/platforms/clickhouse/"
+    - "benchbox/platforms/clickhouse/adapter.py"
 
 must_preserve:
   - "Query execution flow and retry logic unchanged"
   - "Successful queries unaffected"
+
+anti_patterns:
+  - "DO NOT catch exceptions without storing str(e) in the result error field — because swallowed errors force manual re-runs for diagnosis — always capture the message"
+  - "DO NOT change query execution flow or retry logic — because this is a diagnostics-only fix — only add error message capture to existing except blocks"
 
 approach: |
   Search the ClickHouse adapter for try/except blocks in query execution methods.
@@ -42,8 +46,8 @@ approach: |
 
 verification:
   - description: "Error messages appear in query results when queries fail"
-    command: "uv run -- python -m pytest tests/ -v -k 'clickhouse and error'"
-    expected_output: "Tests pass showing error messages captured"
+    command: "uv run -- python -m pytest tests/ -v -k 'clickhouse and (error_capture or error_message)'"
+    expected_output: "Tests pass confirming str(exception) is stored in result.error for failed queries"
 
 metadata:
   tags:

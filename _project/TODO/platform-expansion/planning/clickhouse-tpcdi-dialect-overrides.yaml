@@ -53,13 +53,18 @@ approach: |
   QAQ7/8/10 share the same JULIANDAY pattern so can be done together.
   QEQ3/QEQ7 need deeper investigation of the correlated subquery structure.
 
+must_preserve:
+  - "Base query_analytics.py queries unchanged — other platforms use standard SQL JULIANDAY/NULLIF/FILTER syntax"
+  - "Override queries return identical column names, types, and row semantics"
+
 anti_patterns:
   - "DO NOT modify the base query_analytics.py queries — because other platforms use them correctly — create ClickHouse overrides instead"
+  - "DO NOT use JULIANDAY() in ClickHouse overrides — because it is a SQLite-only function — use dateDiff('day', ...) instead"
 
 verification:
-  - description: "TPC-DI tests pass"
-    command: "uv run -- python -m pytest tests/ -v -k tpcdi"
-    expected_output: "All tpcdi tests pass"
+  - description: "ClickHouse TPC-DI overrides load and use native syntax"
+    command: "uv run -- python -m pytest tests/ -v -k 'tpcdi and clickhouse'"
+    expected_output: "Tests pass confirming dateDiff/today/sumIf/if() overrides for QAQ5-10 and QEQ3/7"
 
 metadata:
   tags:

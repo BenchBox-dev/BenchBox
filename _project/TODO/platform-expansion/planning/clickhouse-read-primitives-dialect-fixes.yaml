@@ -41,23 +41,68 @@ work:
     status: pending
 
   - id: w5
-    summary: "Investigate and fix remaining window function and QUALIFY failures (8+ queries)"
+    summary: "Fix window function syntax failures: timeseries_trend_analysis, window_moving_frame, window_multiple_orderings — adjust frame specs and ORDER BY for ClickHouse"
     needs: [w1, w2, w3]
     status: pending
 
   - id: w6
+    summary: "Fix QUALIFY clause failures: qualify_cume_dist — rewrite as subquery with WHERE on window result"
+    needs: [w1, w2, w3]
+    status: pending
+
+  - id: w7
+    summary: "Fix statistical function failures: statistical_correlation — investigate CORR() syntax differences"
+    needs: [w1, w2, w3]
+    status: pending
+
+  - id: w8
     summary: "Verify all overrides and expected_failure markers"
-    needs: [w4, w5]
+    needs: [w4, w5, w6, w7]
     status: pending
 
 deferred:
   - summary: "Fix ClickHouse adapter error message capture (Pattern G)"
     reason: "Tracked separately in clickhouse-error-message-capture TODO"
 
+files_affected:
+  added:
+    - "benchbox/core/read_primitives/queries/clickhouse_sql/any_value_simple.sql"
+    - "benchbox/core/read_primitives/queries/clickhouse_sql/any_value_with_filter.sql"
+    - "benchbox/core/read_primitives/queries/clickhouse_sql/array_length.sql"
+    - "benchbox/core/read_primitives/queries/clickhouse_sql/statistical_percentiles.sql"
+    - "benchbox/core/read_primitives/queries/clickhouse_sql/intrinsic_appx_median.sql"
+    - "benchbox/core/read_primitives/queries/clickhouse_sql/qualify_cume_dist.sql"
+  modified:
+    - "benchbox/core/read_primitives/queries.py"
+
+must_preserve:
+  - "Base read_primitives query files unchanged — other platforms use standard SQL"
+  - "Override queries return identical column names, types, and row semantics"
+  - "Existing ClickHouse read_primitives results for passing queries unaffected"
+
+anti_patterns:
+  - "DO NOT modify base query files — because other platforms depend on standard SQL — create clickhouse_sql/ overrides instead"
+  - "DO NOT mark fixable queries as expected_failure — because dialect overrides are preferred over skipping — only use expected_failure for genuine platform limitations (fulltext, timeout)"
+
+scope_limit:
+  include:
+    - "benchbox/core/read_primitives/queries/"
+  exclude:
+    - "benchbox/platforms/clickhouse/adapter.py — error capture tracked in clickhouse-error-message-capture"
+
 approach: |
   Categorize each of the 22 failing queries into: fixable (dialect override),
   expected_failure (platform limitation), or needs-investigation. Work through
-  fixable queries first using ClickHouse override patterns.
+  fixable queries first using ClickHouse override patterns. Window function and
+  QUALIFY fixes may require subquery rewrites rather than simple function substitutions.
+
+verification:
+  - description: "ClickHouse read_primitives overrides load and pass"
+    command: "uv run -- python -m pytest tests/ -v -k 'read_primitives and clickhouse'"
+    expected_output: "Tests pass confirming IN-subquery, length(), quantile(), window, and QUALIFY overrides"
+  - description: "Expected failures correctly marked"
+    command: "uv run -- python -m pytest tests/ -v -k 'read_primitives and clickhouse and expected'"
+    expected_output: "fulltext and aggregation_groupby_large marked as expected failures"
 
 metadata:
   tags:

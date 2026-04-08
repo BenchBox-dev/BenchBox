@@ -20,7 +20,7 @@ work:
     status: pending
 
   - id: w2
-    summary: "Verify override is picked up by the query loader for ClickHouse platform"
+    summary: "Add unit test that loads h2odb Q9 for ClickHouse and asserts SQL contains 'quantile(' not 'PERCENTILE_CONT'"
     needs: [w1]
     status: pending
 
@@ -30,6 +30,13 @@ files_affected:
   added:
     - "benchbox/core/h2odb/queries/clickhouse_sql/q9.sql"
 
+must_preserve:
+  - "Base h2odb Q9 query unchanged — other platforms use standard PERCENTILE_CONT syntax"
+  - "ClickHouse override returns identical column names and semantics as the base query"
+
+anti_patterns:
+  - "DO NOT modify base queries.py or default SQL files — because other platforms depend on standard SQL PERCENTILE_CONT — create clickhouse_sql/ override instead"
+
 approach: |
   Follow existing ClickHouse override patterns in other benchmarks. Check how
   query overrides are loaded (likely a clickhouse_sql/ subdirectory convention).
@@ -37,9 +44,9 @@ approach: |
   (ORDER BY col) with quantile(p)(col).
 
 verification:
-  - description: "h2odb tests pass"
-    command: "uv run -- python -m pytest tests/ -v -k h2odb"
-    expected_output: "All h2odb tests pass"
+  - description: "ClickHouse h2odb override loads and uses quantile() syntax"
+    command: "uv run -- python -m pytest tests/ -v -k 'h2odb and clickhouse'"
+    expected_output: "Tests pass confirming quantile() override for Q9"
 
 metadata:
   tags:

@@ -37,8 +37,13 @@ files_affected:
     - "benchbox/platforms/clickhouse/tuning.py"
 
 must_preserve:
-  - "Other tuning parameters remain unchanged"
+  - "All other tuning parameters (max_memory_usage, max_threads, etc.) retain current values"
   - "Tuning applies correctly for both SF0.01 and SF1 scales"
+  - "grace_hash join algorithm setting is not overridden by adapter session defaults"
+
+anti_patterns:
+  - "DO NOT lower max_bytes_in_join below 0.5 × max_memory_usage — because SF1 Q5 multi-table join needs 2.72 GiB and 25% cap caused OOM — keep at 50% minimum"
+  - "DO NOT remove grace_hash join_algorithm — because grace_hash spills to disk and is the safety net when memory limits are hit — verify it takes effect"
 
 approach: |
   Simple parameter change in tuning.py. Check the max_bytes_in_join calculation
@@ -46,9 +51,9 @@ approach: |
   adapter to verify grace_hash isn't overridden by session-level settings.
 
 verification:
-  - description: "Tuning tests pass with updated values"
-    command: "uv run -- python -m pytest tests/ -v -k 'clickhouse and tuning'"
-    expected_output: "All tuning tests pass"
+  - description: "Tuning tests pass with updated max_bytes_in_join multiplier"
+    command: "uv run -- python -m pytest tests/ -v -k 'clickhouse and tuning and (join or memory)'"
+    expected_output: "Tests pass confirming 0.5 multiplier and grace_hash settings"
 
 metadata:
   tags:
