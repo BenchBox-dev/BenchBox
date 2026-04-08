@@ -69,7 +69,7 @@ work:
   summary: "Normalize emitted ClickHouse diagnostics and platform metadata to `deployment_mode`, deciding whether `mode` is
     duplicated temporarily for compatibility"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Keep the compatibility question explicit instead of silently changing output
     shapes. Tests should make the transition behavior obvious.
