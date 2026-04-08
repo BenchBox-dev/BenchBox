@@ -3,7 +3,7 @@ title: "Standardize ClickHouse deployment naming around deployment_mode and remo
 worktree: platform-expansion
 category: Core Functionality
 priority: High
-status: Not Started
+status: In Progress
 deps:
   needs:
   - migrate-clickhouse-firebolt-deployment
@@ -37,15 +37,17 @@ description: |
 
 work:
 - id: w1
-  summary: "Add a shared ClickHouse deployment normalizer that accepts `deployment_mode`, legacy `mode`, and legacy `embedded`, and returns only canonical `local` or `server` values"
-  status: pending
+  summary: "Add a shared ClickHouse deployment normalizer that accepts `deployment_mode`, legacy `mode`, and legacy `embedded`,
+    and returns only canonical `local` or `server` values"
+  status: done
   notes: |
     Treat `cloud` as an error that points users to the dedicated
     `clickhouse-cloud` platform. Centralize the normalization logic so adapter,
     metadata, diagnostics, and config helpers cannot drift again.
 
 - id: w2
-  summary: "Use the normalizer at the ClickHouse adapter and metadata boundary so legacy callers cannot silently default to local mode"
+  summary: "Use the normalizer at the ClickHouse adapter and metadata boundary so legacy callers cannot silently default to
+    local mode"
   needs: [w1]
   status: pending
   notes: |
@@ -54,7 +56,8 @@ work:
     first, then legacy `mode`, then normalize before validation and branching.
 
 - id: w3
-  summary: "Convert legacy config helpers and old argparse surfaces to emit and document `deployment_mode`, keeping `mode` only as a compatibility alias"
+  summary: "Convert legacy config helpers and old argparse surfaces to emit and document `deployment_mode`, keeping `mode`
+    only as a compatibility alias"
   needs: [w1]
   status: pending
   notes: |
@@ -63,7 +66,8 @@ work:
     `embedded` terminology and stale flag help.
 
 - id: w4
-  summary: "Normalize emitted ClickHouse diagnostics and platform metadata to `deployment_mode`, deciding whether `mode` is duplicated temporarily for compatibility"
+  summary: "Normalize emitted ClickHouse diagnostics and platform metadata to `deployment_mode`, deciding whether `mode` is
+    duplicated temporarily for compatibility"
   needs: [w1, w2]
   status: pending
   notes: |
@@ -71,7 +75,8 @@ work:
     shapes. Tests should make the transition behavior obvious.
 
 - id: w5
-  summary: "Rewrite stale ClickHouse docs and examples so deployment selection no longer uses global `--mode`, `embedded` terminology, or base-platform `clickhouse:cloud` guidance"
+  summary: "Rewrite stale ClickHouse docs and examples so deployment selection no longer uses global `--mode`, `embedded`
+    terminology, or base-platform `clickhouse:cloud` guidance"
   needs: [w2, w3, w4]
   status: pending
   notes: |
@@ -80,7 +85,8 @@ work:
     help/example text in the CLI with the actual supported contract.
 
 - id: w6
-  summary: "Update unit tests to assert canonical `deployment_mode` behavior, legacy input compatibility, and separation of `clickhouse-cloud` from base ClickHouse deployment modes"
+  summary: "Update unit tests to assert canonical `deployment_mode` behavior, legacy input compatibility, and separation of
+    `clickhouse-cloud` from base ClickHouse deployment modes"
   needs: [w2, w3, w4]
   status: pending
   notes: |
@@ -88,7 +94,8 @@ work:
     config extraction, legacy CLI parsing, and platform help/examples.
 
 - id: w7
-  summary: "Run targeted regression checks and remove any remaining stale mode-naming references from the touched ClickHouse surfaces"
+  summary: "Run targeted regression checks and remove any remaining stale mode-naming references from the touched ClickHouse
+    surfaces"
   needs: [w5, w6]
   status: pending
   notes: |
@@ -98,7 +105,8 @@ work:
 
 deferred:
 - summary: "Remove the legacy `mode` alias and `embedded` synonym entirely after one deprecation window"
-  reason: "Current callers and old config files may still depend on these spellings; this TODO should normalize reads and canonicalize writes first"
+  reason: "Current callers and old config files may still depend on these spellings; this TODO should normalize reads and
+    canonicalize writes first"
 
 metadata:
   tags:
@@ -146,9 +154,12 @@ files_affected:
   - "tests/unit/platforms/test_platform_info.py"
 
 must_preserve:
-- "Canonical ClickHouse deployment selection via `deployment_mode=local|server` continues working through the modern adapter-factory and platform-defaults path"
-- "Legacy config inputs such as `mode=server` and `mode=embedded` remain readable during the transition, but are normalized to canonical values internally"
-- "ClickHouse Cloud remains a separate platform family entry via `clickhouse-cloud`; this cleanup must not reintroduce cloud as a base ClickHouse deployment mode"
+- "Canonical ClickHouse deployment selection via `deployment_mode=local|server` continues working through the modern adapter-factory
+  and platform-defaults path"
+- "Legacy config inputs such as `mode=server` and `mode=embedded` remain readable during the transition, but are normalized
+  to canonical values internally"
+- "ClickHouse Cloud remains a separate platform family entry via `clickhouse-cloud`; this cleanup must not reintroduce cloud
+  as a base ClickHouse deployment mode"
 
 approach: |
   Start from the already-correct canonical surface in
@@ -164,19 +175,27 @@ approach: |
   both the canonical path and the temporary compatibility shims.
 
 anti_patterns:
-- "DO NOT globally rename `DeploymentCapability.mode` in `benchbox/core/platform_registry.py` — because that field represents a generic deployment category, not the ClickHouse adapter config key — only fix ClickHouse-specific selectors, examples, and docs"
-- "DO NOT keep teaching `--mode=local` or `embedded mode` in ClickHouse docs/help text — because the global `--mode` flag now means execution mode and the old wording is actively misleading — use `deployment_mode` or `clickhouse:local/server` guidance instead"
-- "DO NOT reintroduce `cloud` as a deployment mode on the base ClickHouse adapter — because the dedicated `clickhouse-cloud` platform is already the canonical managed-service entry point — keep cloud guidance separate"
+- "DO NOT globally rename `DeploymentCapability.mode` in `benchbox/core/platform_registry.py` — because that field represents
+  a generic deployment category, not the ClickHouse adapter config key — only fix ClickHouse-specific selectors, examples,
+  and docs"
+- "DO NOT keep teaching `--mode=local` or `embedded mode` in ClickHouse docs/help text — because the global `--mode` flag
+  now means execution mode and the old wording is actively misleading — use `deployment_mode` or `clickhouse:local/server`
+  guidance instead"
+- "DO NOT reintroduce `cloud` as a deployment mode on the base ClickHouse adapter — because the dedicated `clickhouse-cloud`
+  platform is already the canonical managed-service entry point — keep cloud guidance separate"
 
 verification:
 - description: "Config and CLI tests cover canonical `deployment_mode` behavior plus legacy compatibility shims"
-  command: "uv run -- python -m pytest tests/unit/core/test_config_utils.py tests/unit/cli/test_example_argument_parser.py tests/unit/cli/test_platform.py tests/unit/platforms/test_adapter_factory_deployment.py -q"
+  command: "uv run -- python -m pytest tests/unit/core/test_config_utils.py tests/unit/cli/test_example_argument_parser.py
+    tests/unit/cli/test_platform.py tests/unit/platforms/test_adapter_factory_deployment.py -q"
   expected_output: "All targeted config and CLI tests pass"
 - description: "ClickHouse adapter, diagnostics, metadata, and local-mode tests pass with standardized deployment naming"
-  command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/test_clickhouse_diagnostics.py tests/unit/platforms/test_clickhouse_local.py tests/unit/platforms/test_platform_info.py -q"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/test_clickhouse_diagnostics.py
+    tests/unit/platforms/test_clickhouse_local.py tests/unit/platforms/test_platform_info.py -q"
   expected_output: "All targeted ClickHouse unit tests pass"
 - description: "Stale ClickHouse docs no longer teach deployment selection via the global `--mode` flag"
-  command: "rg -n -- '--mode=local|--mode=server' docs/platforms/clickhouse-local-mode.md docs/platforms/deployment-modes.md docs/platforms/index.md"
+  command: "rg -n -- '--mode=local|--mode=server' docs/platforms/clickhouse-local-mode.md docs/platforms/deployment-modes.md
+    docs/platforms/index.md"
   expected_output: "No matches"
 - description: "Base-platform examples no longer present `clickhouse:cloud` as the ClickHouse deployment selector"
   command: "rg -n -- 'clickhouse:cloud' benchbox/cli/commands/run.py benchbox/cli/platform.py benchbox/core/platform_registry.py"
@@ -197,4 +216,5 @@ scope_limit:
 
 open_questions:
 - "Should diagnostics emit both `deployment_mode` and `mode` for one release, or switch immediately once tests/docs are updated?"
-- "Should the legacy `--mode` alias in `benchbox/cli/config.py` emit a deprecation warning now, or remain silent until a broader CLI-compat cleanup?"
+- "Should the legacy `--mode` alias in `benchbox/cli/config.py` emit a deprecation warning now, or remain silent until a broader
+  CLI-compat cleanup?"
