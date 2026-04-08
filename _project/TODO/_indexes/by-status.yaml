@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T20:25:26.594396'
-total_items: 19
+generated_at: '2026-04-08T08:24:24.610112'
+total_items: 28
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Core Functionality
   Not Started:
-    count: 15
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -21,6 +21,26 @@ statuses:
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       priority: Medium
+      category: Platform Expansion
+    - id: clickhouse-h2odb-percentile-override
+      file: TODO/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
+      title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
+      priority: Medium-High
+      category: Platform Expansion
+    - id: clickhouse-tpcdi-dialect-overrides
+      file: TODO/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml
+      title: Add ClickHouse dialect overrides for TPC-DI analytics queries (JULIANDAY, NULLIF, FILTER, subqueries)
+      priority: Medium
+      category: Platform Expansion
+    - id: clickhouse-coffeeshop-dialect-overrides
+      file: TODO/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml
+      title: Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)
+      priority: Medium-High
+      category: Platform Expansion
+    - id: clickhouse-nyctaxi-extract-overrides
+      file: TODO/platform-expansion/planning/clickhouse-nyctaxi-extract-overrides.yaml
+      title: Add ClickHouse dialect overrides for nyctaxi EXTRACT functions
+      priority: Medium-High
       category: Platform Expansion
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -36,6 +56,31 @@ statuses:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
+      category: Core Functionality
+    - id: clickhouse-join-memory-tuning
+      file: TODO/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
+      title: Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash
+      priority: High
+      category: Platform Expansion
+    - id: clickhouse-tpchavoc-q6-decimal-bug
+      file: TODO/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
+      title: Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)
+      priority: Medium-High
+      category: Core Functionality
+    - id: clickhouse-error-message-capture
+      file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
+      title: Fix ClickHouse adapter to capture error messages in query results
+      priority: Medium
+      category: Core Functionality
+    - id: clickhouse-read-primitives-dialect-fixes
+      file: TODO/platform-expansion/planning/clickhouse-read-primitives-dialect-fixes.yaml
+      title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
+      priority: Medium
+      category: Platform Expansion
+    - id: clickhouse-tpcds-silent-empty-query-bug
+      file: TODO/platform-expansion/planning/clickhouse-tpcds-silent-empty-query-bug.yaml
+      title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
+      priority: Critical
       category: Core Functionality
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml

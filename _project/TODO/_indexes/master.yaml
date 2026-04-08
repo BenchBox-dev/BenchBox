@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T20:25:26.594347'
-total_items: 19
+generated_at: '2026-04-08T08:24:24.610021'
+total_items: 28
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -19,6 +19,40 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
+- id: clickhouse-tpcds-silent-empty-query-bug
+  file: TODO/platform-expansion/planning/clickhouse-tpcds-silent-empty-query-bug.yaml
+  title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: Critical
+  status: Not Started
+  tags:
+  - clickhouse
+  - tpcds
+  - bug
+  - sf1-failures
+  estimated_effort: 1-2 days
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+- id: clickhouse-join-memory-tuning
+  file: TODO/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
+  title: Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - clickhouse
+  - tuning
+  - tpch
+  - tpchavoc
+  - tpch-skew
+  - sf1-failures
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 2
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -249,6 +283,22 @@ items:
   work_total: 9
   work_done: 0
   work_ready: 1
+- id: clickhouse-tpcdi-dialect-overrides
+  file: TODO/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml
+  title: Add ClickHouse dialect overrides for TPC-DI analytics queries (JULIANDAY, NULLIF, FILTER, subqueries)
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - clickhouse
+  - tpcdi
+  - dialect-override
+  - sf1-failures
+  estimated_effort: 1-2 days
+  work_total: 5
+  work_done: 0
+  work_ready: 4
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml
   title: Add Hypothesis property-based tests for pure-function invariants
@@ -285,6 +335,39 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
+- id: clickhouse-error-message-capture
+  file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
+  title: Fix ClickHouse adapter to capture error messages in query results
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - clickhouse
+  - diagnostics
+  - bug
+  - sf1-failures
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+- id: clickhouse-read-primitives-dialect-fixes
+  file: TODO/platform-expansion/planning/clickhouse-read-primitives-dialect-fixes.yaml
+  title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - clickhouse
+  - read-primitives
+  - dialect-override
+  - sf1-failures
+  estimated_effort: 2-3 days
+  work_total: 6
+  work_done: 0
+  work_ready: 4
+  deferred_count: 1
 - id: implement-pr-based-result-submission-workflow
   file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
   title: Implement PR-based community result submission workflow
@@ -325,6 +408,54 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: clickhouse-h2odb-percentile-override
+  file: TODO/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
+  title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - clickhouse
+  - h2odb
+  - dialect-override
+  - sf1-failures
+  estimated_effort: Small
+  work_total: 2
+  work_done: 0
+  work_ready: 1
+- id: clickhouse-coffeeshop-dialect-overrides
+  file: TODO/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml
+  title: Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - clickhouse
+  - coffeeshop
+  - dialect-override
+  - sf1-failures
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 2
+- id: clickhouse-nyctaxi-extract-overrides
+  file: TODO/platform-expansion/planning/clickhouse-nyctaxi-extract-overrides.yaml
+  title: Add ClickHouse dialect overrides for nyctaxi EXTRACT functions
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - clickhouse
+  - nyctaxi
+  - dialect-override
+  - sf1-failures
+  estimated_effort: Small
+  work_total: 4
+  work_done: 0
+  work_ready: 3
 - id: define-hosted-results-contract-and-governance-model
   file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
   title: Define hosted results contract, trust labels, and governance model
@@ -345,3 +476,19 @@ items:
   work_ready: 0
   needs:
   - define-results-platform-product-and-launch-strategy
+- id: clickhouse-tpchavoc-q6-decimal-bug
+  file: TODO/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
+  title: Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - clickhouse
+  - tpchavoc
+  - bug
+  - sf1-failures
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1

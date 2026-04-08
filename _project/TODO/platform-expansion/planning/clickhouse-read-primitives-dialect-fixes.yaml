@@ -1,0 +1,74 @@
+id: clickhouse-read-primitives-dialect-fixes
+title: "Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture"
+worktree: platform-expansion
+category: Platform Expansion
+priority: Medium
+status: Not Started
+description: |
+  64/450 query failures across 22 unique queries in read_primitives on ClickHouse.
+  These break into several categories:
+
+  Dialect fixes needed:
+  - any_value_simple, any_value_with_filter: WHERE x = ANY(subquery) → WHERE x IN (subquery) (Pattern F)
+  - array_length: LENGTH(array_col) mistranslated to lengthUTF8() → should use length()
+  - statistical_percentiles, intrinsic_appx_median: PERCENTILE_CONT WITHIN GROUP → quantile() (Pattern C)
+  - statistical_correlation: likely CORR() function differences
+  - timeseries_trend_analysis, window_moving_frame, window_multiple_orderings: window function syntax differences
+  - qualify_cume_dist: QUALIFY clause not supported in ClickHouse
+
+  Expected failures (not fixable as dialect issues):
+  - aggregation_groupby_large: Timeout (907s vs 300s limit)
+  - fulltext_boolean_search, fulltext_phrase_search, fulltext_simple_search: full-text search syntax not portable
+
+  Secondary bug: The result JSON shows no error messages for most failures. The ClickHouse
+  adapter is capturing failure status but swallowing the exception message (Pattern G).
+
+work:
+  - id: w1
+    summary: "Fix ANY(subquery) → IN (subquery) for any_value_simple and any_value_with_filter queries"
+    status: pending
+
+  - id: w2
+    summary: "Fix array_length LENGTH() → length() (not lengthUTF8) for array columns"
+    status: pending
+
+  - id: w3
+    summary: "Add PERCENTILE_CONT → quantile() overrides for statistical_percentiles and intrinsic_appx_median"
+    status: pending
+
+  - id: w4
+    summary: "Mark fulltext_* and aggregation_groupby_large as expected_failure for ClickHouse with documented reasons"
+    status: pending
+
+  - id: w5
+    summary: "Investigate and fix remaining window function and QUALIFY failures (8+ queries)"
+    needs: [w1, w2, w3]
+    status: pending
+
+  - id: w6
+    summary: "Verify all overrides and expected_failure markers"
+    needs: [w4, w5]
+    status: pending
+
+deferred:
+  - summary: "Fix ClickHouse adapter error message capture (Pattern G)"
+    reason: "Tracked separately in clickhouse-error-message-capture TODO"
+
+approach: |
+  Categorize each of the 22 failing queries into: fixable (dialect override),
+  expected_failure (platform limitation), or needs-investigation. Work through
+  fixable queries first using ClickHouse override patterns.
+
+metadata:
+  tags:
+    - clickhouse
+    - read-primitives
+    - dialect-override
+    - sf1-failures
+  created_date: "2026-04-08"
+  estimated_effort: "2-3 days"
+
+impact:
+  business_value: |
+    Fixes majority of 64 query failures. read_primitives success rate improves
+    from 85.8% toward 95%+ after dialect fixes and expected_failure markers.

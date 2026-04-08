@@ -1,0 +1,55 @@
+id: clickhouse-coffeeshop-dialect-overrides
+title: "Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)"
+worktree: platform-expansion
+category: Platform Expansion
+priority: Medium-High
+status: Not Started
+description: |
+  6 query failures on ClickHouse in coffeeshop benchmark:
+  - QSA4 × 3: SUM(x) FILTER (WHERE cond) → ClickHouse needs sumIf(x, cond)
+  - QTM1 × 3: EXTRACT(HOUR FROM order_time) where order_time is TIME type →
+    toHour() doesn't accept bare TIME values, needs toHour(toDateTime(order_time))
+
+  Part of Pattern B (EXTRACT) and Pattern D (FILTER aggregate).
+
+work:
+  - id: w1
+    summary: "Create ClickHouse override for QSA4 replacing SUM(x) FILTER (WHERE cond) with sumIf(x, cond)"
+    status: pending
+
+  - id: w2
+    summary: "Create ClickHouse override for QTM1 using toHour(toDateTime(order_time)) for TIME-type column"
+    status: pending
+
+  - id: w3
+    summary: "Verify overrides load correctly"
+    needs: [w1, w2]
+    status: pending
+
+files_affected:
+  added:
+    - "benchbox/core/coffeeshop/queries/clickhouse_sql/qsa4.sql"
+    - "benchbox/core/coffeeshop/queries/clickhouse_sql/qtm1.sql"
+
+approach: |
+  Follow existing override pattern. For QSA4, mechanically replace
+  SUM(x) FILTER (WHERE cond) with sumIf(x, cond). For QTM1, wrap
+  order_time in toDateTime() before passing to toHour().
+
+verification:
+  - description: "coffeeshop tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k coffeeshop"
+    expected_output: "All coffeeshop tests pass"
+
+metadata:
+  tags:
+    - clickhouse
+    - coffeeshop
+    - dialect-override
+    - sf1-failures
+  created_date: "2026-04-08"
+  estimated_effort: "Small"
+
+impact:
+  business_value: |
+    Fixes 6 query failures (2 queries × 3 iterations).

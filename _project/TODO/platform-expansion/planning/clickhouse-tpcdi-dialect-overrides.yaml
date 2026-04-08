@@ -1,0 +1,76 @@
+id: clickhouse-tpcdi-dialect-overrides
+title: "Add ClickHouse dialect overrides for TPC-DI analytics queries (JULIANDAY, NULLIF, FILTER, subqueries)"
+worktree: platform-expansion
+category: Platform Expansion
+priority: Medium
+status: Not Started
+description: |
+  21/114 query failures on ClickHouse in TPC-DI benchmark across 7 unique queries:
+  - QAQ5: NULLIF() inside aggregate treated as nested aggregate
+  - QAQ6: SUM(x) FILTER (WHERE cond) not supported
+  - QAQ7, QAQ8, QAQ10: JULIANDAY() SQLite function not portable
+  - QEQ3, QEQ7: Deeply nested correlated subqueries with VALUES (0) as dummy patterns
+
+  Required substitutions:
+  - JULIANDAY(d1) - JULIANDAY(d2) → dateDiff('day', d2, d1)
+  - DATE('now') → today()
+  - NULLIF(x, 0) inside aggregate → if(x = 0, NULL, x)
+  - SUM(x) FILTER (WHERE cond) → sumIf(x, cond)
+
+  Patterns E (JULIANDAY), D (FILTER), and unique NULLIF/subquery rewrites.
+
+work:
+  - id: w1
+    summary: "Create ClickHouse overrides for QAQ7, QAQ8, QAQ10 — replace JULIANDAY/DATE('now') with dateDiff/today()"
+    status: pending
+
+  - id: w2
+    summary: "Create ClickHouse override for QAQ5 — rewrite NULLIF inside aggregates to if() expressions"
+    status: pending
+
+  - id: w3
+    summary: "Create ClickHouse override for QAQ6 — replace SUM FILTER with sumIf"
+    status: pending
+
+  - id: w4
+    summary: "Investigate and create ClickHouse overrides for QEQ3, QEQ7 — correlated subqueries with VALUES patterns"
+    status: pending
+
+  - id: w5
+    summary: "Verify all overrides load and pass syntax validation"
+    needs: [w1, w2, w3, w4]
+    status: pending
+
+files_affected:
+  modified:
+    - "benchbox/core/tpcdi/query_analytics.py"
+  added:
+    - "benchbox/core/tpcdi/queries/clickhouse_sql/"
+
+approach: |
+  Source queries are in benchbox/core/tpcdi/query_analytics.py lines ~260–490.
+  Create ClickHouse-specific SQL files in a clickhouse_sql/ subdirectory.
+  QAQ7/8/10 share the same JULIANDAY pattern so can be done together.
+  QEQ3/QEQ7 need deeper investigation of the correlated subquery structure.
+
+anti_patterns:
+  - "DO NOT modify the base query_analytics.py queries — because other platforms use them correctly — create ClickHouse overrides instead"
+
+verification:
+  - description: "TPC-DI tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k tpcdi"
+    expected_output: "All tpcdi tests pass"
+
+metadata:
+  tags:
+    - clickhouse
+    - tpcdi
+    - dialect-override
+    - sf1-failures
+  created_date: "2026-04-08"
+  estimated_effort: "1-2 days"
+
+impact:
+  business_value: |
+    Fixes 21 query failures across 7 unique queries. TPC-DI success rate improves
+    from 81.6% to ~100%.

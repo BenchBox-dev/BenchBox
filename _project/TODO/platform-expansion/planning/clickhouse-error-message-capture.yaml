@@ -1,0 +1,63 @@
+id: clickhouse-error-message-capture
+title: "Fix ClickHouse adapter to capture error messages in query results"
+worktree: platform-expansion
+category: Core Functionality
+priority: Medium
+status: Not Started
+description: |
+  The ClickHouse adapter captures failure status but swallows the exception message.
+  read_primitives and tpcdi result JSONs show "status": "FAILED" with no error string,
+  making diagnosis of query failures much harder.
+
+  The adapter's query execution error handler should always capture str(exception)
+  into the result object. This is Pattern G from the SF1 failure analysis.
+
+work:
+  - id: w1
+    summary: "Find the ClickHouse adapter's query execution error handler — locate where exceptions are caught but messages discarded"
+    status: pending
+
+  - id: w2
+    summary: "Ensure str(exception) is always written to the result error field"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Add unit test verifying error messages are captured in query results"
+    needs: [w2]
+    status: pending
+
+files_affected:
+  modified:
+    - "benchbox/platforms/clickhouse/"
+
+must_preserve:
+  - "Query execution flow and retry logic unchanged"
+  - "Successful queries unaffected"
+
+approach: |
+  Search the ClickHouse adapter for try/except blocks in query execution methods.
+  Look for patterns where the exception is caught to set status=FAILED but the
+  error message is not stored. Ensure the error field in QueryResult is populated.
+
+verification:
+  - description: "Error messages appear in query results when queries fail"
+    command: "uv run -- python -m pytest tests/ -v -k 'clickhouse and error'"
+    expected_output: "Tests pass showing error messages captured"
+
+metadata:
+  tags:
+    - clickhouse
+    - diagnostics
+    - bug
+    - sf1-failures
+  created_date: "2026-04-08"
+  estimated_effort: "Small"
+
+impact:
+  business_value: |
+    Improves diagnostics for all ClickHouse query failures. Without error messages,
+    debugging requires re-running queries manually against the database.
+  technical_debt: |
+    Silent error swallowing is an anti-pattern that makes all ClickHouse failure
+    analysis harder than it needs to be.

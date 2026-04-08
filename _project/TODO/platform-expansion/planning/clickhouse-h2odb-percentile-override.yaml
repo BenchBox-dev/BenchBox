@@ -1,0 +1,55 @@
+id: clickhouse-h2odb-percentile-override
+title: "Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()"
+worktree: platform-expansion
+category: Platform Expansion
+priority: Medium-High
+status: Not Started
+description: |
+  h2odb Q9 fails on ClickHouse with SYNTAX_ERROR because it uses standard SQL
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY fare_amount). ClickHouse doesn't
+  implement ordered-set aggregate syntax.
+
+  Fix: Add a ClickHouse-specific Q9 override using quantile(0.5)(fare_amount) and
+  quantile(0.9)(fare_amount). This is a 3-line SQL change.
+
+  Part of Pattern C (PERCENTILE_CONT rewrite) which also affects read_primitives.
+
+work:
+  - id: w1
+    summary: "Create ClickHouse-specific Q9 override file using quantile(0.5)(fare_amount) / quantile(0.9)(fare_amount)"
+    status: pending
+
+  - id: w2
+    summary: "Verify override is picked up by the query loader for ClickHouse platform"
+    needs: [w1]
+    status: pending
+
+files_affected:
+  modified:
+    - "benchbox/core/h2odb/queries.py"
+  added:
+    - "benchbox/core/h2odb/queries/clickhouse_sql/q9.sql"
+
+approach: |
+  Follow existing ClickHouse override patterns in other benchmarks. Check how
+  query overrides are loaded (likely a clickhouse_sql/ subdirectory convention).
+  The SQL change is straightforward: replace PERCENTILE_CONT(p) WITHIN GROUP
+  (ORDER BY col) with quantile(p)(col).
+
+verification:
+  - description: "h2odb tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k h2odb"
+    expected_output: "All h2odb tests pass"
+
+metadata:
+  tags:
+    - clickhouse
+    - h2odb
+    - dialect-override
+    - sf1-failures
+  created_date: "2026-04-08"
+  estimated_effort: "Small"
+
+impact:
+  business_value: |
+    Fixes 3 query failures (Q9 × 3 iterations). Quick win with minimal risk.

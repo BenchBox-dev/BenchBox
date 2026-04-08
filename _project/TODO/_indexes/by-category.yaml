@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T20:25:26.594373'
+generated_at: '2026-04-08T08:24:24.610054'
 total_categories: 5
 categories:
   Benchmark Development:
@@ -25,7 +25,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 7
+    count: 10
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -47,6 +47,21 @@ categories:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       status: Not Started
+    - id: clickhouse-tpchavoc-q6-decimal-bug
+      file: TODO/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
+      title: Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)
+      priority: Medium-High
+      status: Not Started
+    - id: clickhouse-error-message-capture
+      file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
+      title: Fix ClickHouse adapter to capture error messages in query results
+      priority: Medium
+      status: Not Started
+    - id: clickhouse-tpcds-silent-empty-query-bug
+      file: TODO/platform-expansion/planning/clickhouse-tpcds-silent-empty-query-bug.yaml
+      title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
+      priority: Critical
+      status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow
@@ -63,7 +78,7 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 6
+    count: 12
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -75,10 +90,40 @@ categories:
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       priority: Medium
       status: Not Started
+    - id: clickhouse-h2odb-percentile-override
+      file: TODO/platform-expansion/planning/clickhouse-h2odb-percentile-override.yaml
+      title: Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()
+      priority: Medium-High
+      status: Not Started
+    - id: clickhouse-tpcdi-dialect-overrides
+      file: TODO/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml
+      title: Add ClickHouse dialect overrides for TPC-DI analytics queries (JULIANDAY, NULLIF, FILTER, subqueries)
+      priority: Medium
+      status: Not Started
+    - id: clickhouse-coffeeshop-dialect-overrides
+      file: TODO/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml
+      title: Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)
+      priority: Medium-High
+      status: Not Started
+    - id: clickhouse-nyctaxi-extract-overrides
+      file: TODO/platform-expansion/planning/clickhouse-nyctaxi-extract-overrides.yaml
+      title: Add ClickHouse dialect overrides for nyctaxi EXTRACT functions
+      priority: Medium-High
+      status: Not Started
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
+      status: Not Started
+    - id: clickhouse-join-memory-tuning
+      file: TODO/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
+      title: Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash
+      priority: High
+      status: Not Started
+    - id: clickhouse-read-primitives-dialect-fixes
+      file: TODO/platform-expansion/planning/clickhouse-read-primitives-dialect-fixes.yaml
+      title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
+      priority: Medium
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
