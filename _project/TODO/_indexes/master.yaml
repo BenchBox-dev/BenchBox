@@ -1,4 +1,4 @@
-generated_at: '2026-04-08T08:51:29.444259'
+generated_at: '2026-04-08T09:04:20.137506'
 total_items: 27
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -20,12 +20,12 @@ items:
   work_done: 5
   work_ready: 0
 - id: clickhouse-tpcds-silent-empty-query-bug
-  file: TODO/platform-expansion/planning/clickhouse-tpcds-silent-empty-query-bug.yaml
+  file: TODO/platform-expansion/active/clickhouse-tpcds-silent-empty-query-bug.yaml
   title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
   worktree: platform-expansion
   category: Core Functionality
   priority: Critical
-  status: Not Started
+  status: In Progress
   tags:
   - clickhouse
   - tpcds
@@ -33,7 +33,7 @@ items:
   - sf1-failures
   estimated_effort: 1-2 days
   work_total: 5
-  work_done: 0
+  work_done: 4
   work_ready: 1
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml

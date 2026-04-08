@@ -1,16 +1,21 @@
-generated_at: '2026-04-08T08:51:29.444323'
+generated_at: '2026-04-08T09:04:20.137563'
 total_items: 27
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
       title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
       priority: Medium
       category: Core Functionality
+    - id: clickhouse-tpcds-silent-empty-query-bug
+      file: TODO/platform-expansion/active/clickhouse-tpcds-silent-empty-query-bug.yaml
+      title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
+      priority: Critical
+      category: Core Functionality
   Not Started:
-    count: 23
+    count: 22
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -72,11 +77,6 @@ statuses:
       title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
       priority: Medium
       category: Platform Expansion
-    - id: clickhouse-tpcds-silent-empty-query-bug
-      file: TODO/platform-expansion/planning/clickhouse-tpcds-silent-empty-query-bug.yaml
-      title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
-      priority: Critical
-      category: Core Functionality
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

@@ -1,4 +1,4 @@
-generated_at: '2026-04-08T08:51:29.444313'
+generated_at: '2026-04-08T09:04:20.137552'
 total_items: 27
 priorities:
   Critical:
@@ -10,10 +10,10 @@ priorities:
       category: Core Functionality
       status: Completed
     - id: clickhouse-tpcds-silent-empty-query-bug
-      file: TODO/platform-expansion/planning/clickhouse-tpcds-silent-empty-query-bug.yaml
+      file: TODO/platform-expansion/active/clickhouse-tpcds-silent-empty-query-bug.yaml
       title: Fix TPC-DS silent empty-query bug — surface FAILED when power test returns 0 queries
       category: Core Functionality
-      status: Not Started
+      status: In Progress
   High:
     count: 2
     items:
