@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T19:49:47.874471'
-total_items: 644
+generated_at: '2026-04-07T20:25:28.156182'
+total_items: 645
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5755,6 +5755,26 @@ items:
   work_total: 8
   work_done: 8
   work_ready: 0
+- id: harmonize-large-scale-factor-behavior
+  file: DONE/main/planning/harmonize-large-scale-factor-behavior.yaml
+  title: Harmonize scale factor behavior at large scale factors (SF 10, 100, 1000)
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - datagen
+  - scale-factor
+  - benchmarks
+  - harmonization
+  owners:
+  - joe
+  estimated_effort: Medium (2-3 days)
+  completed_date: '2026-04-07'
+  work_total: 12
+  work_done: 12
+  work_ready: 0
+  deferred_count: 3
 - id: dataframe-ai-primitives
   file: DONE/dataframe-benchmarks/completed/dataframe-ai-primitives.yaml
   title: Implement DataFrame Version of AI Primitives Benchmark

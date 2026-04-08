@@ -1,4 +1,4 @@
-generated_at: '2026-04-07T19:49:47.874791'
+generated_at: '2026-04-07T20:25:28.156488'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -522,7 +522,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 207
+    count: 208
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1044,6 +1044,11 @@ categories:
       file: DONE/main/active/harmonize-scale-factor-baselines.yaml
       title: 'Harmonize scale factor baselines: SF=1 should produce ~1GB uncompressed across all benchmarks'
       priority: High
+      status: Completed
+    - id: harmonize-large-scale-factor-behavior
+      file: DONE/main/planning/harmonize-large-scale-factor-behavior.yaml
+      title: Harmonize scale factor behavior at large scale factors (SF 10, 100, 1000)
+      priority: Medium
       status: Completed
     - id: ctas-sorted-data-loading
       file: DONE/physical-tuning/active/ctas-sorted-data-loading.yaml

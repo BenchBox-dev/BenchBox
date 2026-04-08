@@ -1,5 +1,5 @@
-generated_at: '2026-04-07T19:52:18.996800'
-total_items: 20
+generated_at: '2026-04-07T20:25:26.594387'
+total_items: 19
 priorities:
   Critical:
     count: 1
@@ -31,7 +31,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 7
+    count: 6
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -51,11 +51,6 @@ priorities:
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
-      category: Core Functionality
-      status: Not Started
-    - id: harmonize-large-scale-factor-behavior
-      file: TODO/main/planning/harmonize-large-scale-factor-behavior.yaml
-      title: Harmonize scale factor behavior at large scale factors (SF 10, 100, 1000)
       category: Core Functionality
       status: Not Started
     - id: implement-pr-based-result-submission-workflow

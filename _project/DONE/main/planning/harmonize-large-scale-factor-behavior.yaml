@@ -3,7 +3,8 @@ title: "Harmonize scale factor behavior at large scale factors (SF 10, 100, 1000
 worktree: main
 category: "Core Functionality"
 priority: Medium
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-04-07"
 description: |
   Follow-on to harmonize-scale-factor-baselines (completed 2026-04-07). That TODO established
   SF=1 ≈ 1 GB baselines for all adjustable benchmarks. This TODO addresses three categories of
@@ -189,7 +190,7 @@ metadata:
 work:
   - id: w1
     summary: "Research TSBS quadratic scaling — evaluate options to achieve linear SF-to-size scaling"
-    status: pending
+    status: done
     needs: []
     notes: |
       The TSBS DevOps generator currently scales both num_hosts and duration_days linearly with
@@ -214,7 +215,7 @@ work:
 
   - id: w2
     summary: "TSBS DevOps — linearize scaling formula to fix quadratic growth"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Apply w1 findings. Most likely: fix duration_days at DEFAULT_DURATION_DAYS (2), scale only
@@ -223,7 +224,7 @@ work:
 
   - id: w3
     summary: "Research FlightData ceiling — evaluate whether synthetic replication can extend scaling beyond SF≈11"
-    status: pending
+    status: done
     needs: []
     notes: |
       The BTS flight corpus spans 456 months (Jan 1987 – Dec 2024), exhausted at SF≈11.12.
@@ -263,7 +264,7 @@ work:
 
   - id: w4
     summary: "FlightData — add warning log when month ceiling is hit (and apply w3 findings)"
-    status: pending
+    status: done
     needs: [w3]
     notes: |
       In benchbox/core/flightdata/downloader.py, add a logger.warning() when the computed months
@@ -274,7 +275,7 @@ work:
 
   - id: w5
     summary: "Research NYC Taxi expanded data — evaluate whether Green/HVFHV corpus extends the saturation ceiling"
-    status: pending
+    status: done
     needs: []
     notes: |
       The NYC Taxi benchmark recently expanded to support three taxi types: Yellow (default),
@@ -304,7 +305,7 @@ work:
 
   - id: w6
     summary: "NYC Taxi — add warning log when sample_rate saturates at 1.0"
-    status: pending
+    status: done
     needs: [w5]
     notes: |
       In benchbox/core/nyctaxi/downloader.py, add a logger.warning() in all 3 downloader classes
@@ -315,7 +316,7 @@ work:
 
   - id: w7
     summary: "Fix CoffeeShop doc table — order_lines counts ~2× overstated"
-    status: pending
+    status: done
     needs: []
     notes: |
       docs/benchmarks/coffeeshop.md lines 231-237. The table assumes 3 order lines per order but
@@ -324,7 +325,7 @@ work:
 
   - id: w8
     summary: "Fix TSBS DevOps doc table — 3 errors in scale factor projections"
-    status: pending
+    status: done
     needs: [w2]
     notes: |
       docs/benchmarks/tsbs-devops.md lines 354-360. Fix: (1) SF=0.01/0.1 duration should be
@@ -333,7 +334,7 @@ work:
 
   - id: w9
     summary: "Fix NYC Taxi doc table — SF=100 projection impossible due to saturation"
-    status: pending
+    status: done
     needs: [w6]
     notes: |
       docs/benchmarks/nyctaxi.md lines 254-260. SF=100 row claims ~960M trips / ~96 GB but
@@ -342,7 +343,7 @@ work:
 
   - id: w10
     summary: "Add scaling behavior notes to each affected benchmark's docs"
-    status: pending
+    status: done
     needs: [w2, w4, w6]
     notes: |
       Add a "Scaling Behavior" or "Large Scale Factors" section to docs for TSBS DevOps,
@@ -352,7 +353,7 @@ work:
 
   - id: w11
     summary: "Add scaling linearity tests to test_scale_factor_harmonization.py"
-    status: pending
+    status: done
     needs: [w2]
     notes: |
       Extend tests/unit/generators/test_scale_factor_harmonization.py. For each adjustable
@@ -362,7 +363,7 @@ work:
 
   - id: w12
     summary: "Cross-benchmark validation — verify projected sizes at SF=10"
-    status: pending
+    status: done
     needs: [w2, w4, w6, w11]
     notes: |
       After all fixes, verify projected sizes at SF=10 are within 0.5×–2.0× of the expected
