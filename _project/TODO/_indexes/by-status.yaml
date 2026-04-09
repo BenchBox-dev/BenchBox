@@ -1,13 +1,18 @@
-generated_at: '2026-04-08T10:11:40.014690'
-total_items: 22
+generated_at: '2026-04-09T08:32:16.157088'
+total_items: 23
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
       title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
       priority: Medium
+      category: Core Functionality
+    - id: standardize-clickhouse-deployment-mode-contract
+      file: TODO/platform-expansion/active/standardize-clickhouse-deployment-mode-contract.yaml
+      title: Standardize ClickHouse deployment naming around deployment_mode and remove legacy mode/embedded drift
+      priority: High
       category: Core Functionality
   Not Started:
     count: 18
@@ -47,6 +52,11 @@ statuses:
       title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
       priority: Medium
       category: Platform Expansion
+    - id: fix-interactive-runner-defects
+      file: TODO/main/planning/fix-interactive-runner-defects.yaml
+      title: Fix five defects in the interactive benchmark wizard (benchbox run)
+      priority: High
+      category: Bug Fix
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -87,11 +97,6 @@ statuses:
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: standardize-clickhouse-deployment-mode-contract
-      file: TODO/platform-expansion/planning/standardize-clickhouse-deployment-mode-contract.yaml
-      title: Standardize ClickHouse deployment naming around deployment_mode and remove legacy mode/embedded drift
-      priority: High
-      category: Core Functionality
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements

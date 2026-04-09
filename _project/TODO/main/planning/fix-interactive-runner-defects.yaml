@@ -1,0 +1,224 @@
+id: fix-interactive-runner-defects
+title: "Fix five defects in the interactive benchmark wizard (benchbox run)"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  Running `benchbox run` without arguments triggers the interactive setup wizard.
+  A session identified five distinct defects, all confined to the interactive path
+  (non-interactive CLI usage is unaffected):
+
+  1. Phase input "37" parsed as single integer 37 (out of range), not digits 3 and 7.
+     Silent fallback to "power" with no useful error.
+  2. Query IDs collected as "Q37" format but adapter validates against bare "37" keys,
+     causing a hard runtime failure after Spark finishes loading data.
+  3. Scale factor recommendation returns 0.01 for benchmarks (e.g. TPC-DS) where the
+     minimum valid scale is 1.0 — recommendation is outside the available options list.
+  4. Tuning shown as "tuned" in the Configuration Preview and CLI command even when
+     the user declined tuning configuration.
+  5. "Test Execution Type" selection (standard/power/…) is dead input — it has no effect
+     on phase defaults and is overwritten by a subsequent re-derivation from phases.
+
+category: Bug Fix
+
+metadata:
+  tags:
+  - interactive
+  - wizard
+  - cli
+  - ux
+  estimated_effort: "Small"
+  created_date: "2026-04-09"
+  source_review: "Interactive session walkthrough exposing five defects"
+
+impact:
+  user_impact: |
+    Users running the interactive wizard get wrong results or hard failures:
+    - Phase input without commas silently selects the wrong phases.
+    - Any Q-prefixed query subset crashes after full data load (wasted time).
+    - Scale recommendation may guide users to an invalid scale factor.
+    - Configuration Preview misreports tuning state.
+    - Execution type selection creates false impression of control.
+  maintainer_impact: |
+    All fixes are small and isolated to the CLI layer. No platform or benchmark
+    logic is changed beyond query ID normalization in the adapter boundary.
+  regression_risk: |
+    Low. Changes are narrow: one helper function, one adapter validation method,
+    one one-liner default, and two variable assignments in the interactive flow.
+
+work:
+- id: w1
+  summary: "Fix scale factor recommendation returning value outside available options"
+  status: pending
+  needs: []
+  description: |
+    In `benchbox/cli/benchmarks.py:761`, `_get_recommended_scale()` has:
+      return max([s for s in scale_options if s <= 0.1], default=0.01)
+    For benchmarks where min scale > 0.1 (e.g. TPC-DS: [1.0, 10.0, 100.0]), the
+    comprehension is empty and the hardcoded 0.01 is returned — a value not in the
+    available options list.
+
+    Fix: replace the hardcoded default with scale_options[0]:
+      return max([s for s in scale_options if s <= 0.1], default=scale_options[0])
+  files:
+  - benchbox/cli/benchmarks.py
+
+- id: w2
+  summary: "Fix tuning state: decline branch must set tuning='notuning', not 'tuned'"
+  status: pending
+  needs: []
+  description: |
+    In `benchbox/cli/commands/run.py:2360-2362`, after the if/else block that
+    conditionally creates the tuning config, two lines execute unconditionally:
+      benchmark_config.options["tuning_enabled"] = True
+      tuning = "tuned"
+    This means the Configuration Preview and generated CLI command always show
+    `--tuning tuned`, even when the user answered "n" to tuning.
+
+    Fix: move both assignments into the branches:
+    - Acceptance branch: tuning = "tuned", tuning_enabled = True
+    - Decline branch: tuning = "notuning", tuning_enabled = False
+
+    The existing guard at line 2443 (`tuning if tuning != "notuning" else None`)
+    already handles "notuning" correctly, so the preview will suppress --tuning
+    automatically once the assignment is correct.
+  files:
+  - benchbox/cli/commands/run.py
+
+- id: w3
+  summary: "Fix phase parser: split multi-digit tokens into individual phase indices"
+  status: pending
+  needs: []
+  description: |
+    In `benchbox/cli/benchmarks.py:970-986`, `_parse_phase_input()` splits only on
+    commas. Input "37" stays as one token; `int("37") - 1 = 36` is out of range for
+    the 6-phase list, so nothing is selected and the code silently falls back to "power".
+
+    Fix: before the main loop, expand any multi-character all-digit token into its
+    individual digits:
+      tokens = []
+      for item in raw.split(","):
+          item = item.strip().lower()
+          if len(item) > 1 and item.isdigit():
+              tokens.extend(list(item))   # "37" → ["3", "7"]
+          else:
+              tokens.append(item)
+      # then iterate tokens with existing index/name lookup logic
+
+    Also improve the "No valid phases selected" message to show what was typed:
+      f"No valid phases selected from '{custom_input}', defaulting to 'power'"
+  files:
+  - benchbox/cli/benchmarks.py
+
+- id: w4
+  summary: "Fix query ID format mismatch: normalize Q-prefix in _apply_query_subset()"
+  status: pending
+  needs: []
+  description: |
+    `prompt_query_subset()` in `benchbox/cli/benchmarks.py:1564-1570` normalizes all
+    user input to Q-prefixed format (e.g. "Q37"). However, benchmark query dicts key
+    queries by bare integers/strings ("1", "37"). `_apply_query_subset()` in
+    `benchbox/platforms/base/adapter.py:3536-3539` checks `"Q37" in queries`, fails,
+    and raises a hard runtime error — after Spark has already spent time loading data.
+
+    Fix in `_apply_query_subset()` (the contract boundary): normalize the query_subset
+    before validation by stripping any leading Q/q prefix when followed by digits:
+      normalized = []
+      for qid in query_subset:
+          s = str(qid)
+          normalized.append(s[1:] if s.upper().startswith("Q") and s[1:].isdigit() else s)
+
+    Use `normalized` for both the invalid_queries check and the ordered_queries build.
+    This makes the adapter accept both "Q37" and "37" transparently without requiring
+    callers to agree on format.
+  files:
+  - benchbox/platforms/base/adapter.py
+
+- id: w5
+  summary: "Eliminate dead 'Test Execution Type' step from interactive wizard"
+  status: pending
+  needs: [w3]
+  description: |
+    The "Test Execution Type" menu (standard/power/throughput/maintenance/combined)
+    at ~`benchbox/cli/benchmarks.py:677` and `benchbox/cli/commands/run.py:~2235`
+    is dead input: it has no effect on phase defaults, and `test_execution_type` is
+    re-derived from the phases selected in the immediately following `prompt_phases()`
+    call (run.py lines 897-920), overwriting the user's choice.
+
+    Fix (Option A — remove the step):
+    - Remove the execution type prompt from the wizard flow.
+    - Remove the variable it populates (confirm it is only used in the re-derivation
+      that follows phase selection).
+    - Update the Configuration Preview to derive the display label purely from phases,
+      which is what the re-derivation already does.
+
+    This is the simpler fix: eliminates user confusion without new logic. Option B
+    (wiring execution type to pre-populate phase defaults) is also valid but adds
+    complexity for little benefit given the phase selector already covers all cases.
+  files:
+  - benchbox/cli/benchmarks.py
+  - benchbox/cli/commands/run.py
+
+must_preserve:
+- "_apply_query_subset() continues to work for CLI callers that already pass bare integer query IDs (e.g. '37', not 'Q37')"
+- "Phase selection still works correctly when user types comma-separated indices ('1,2,4') or names ('generate,load,power')"
+- "Non-interactive CLI flags --tuning tuned and --tuning notuning are unaffected"
+- "Configuration Preview correctly reflects the actual tuning state chosen"
+
+approach: |
+  Implement in order w1 → w2 → w3 → w4 → w5. Each work unit is independent except
+  w5 depends on w3 (both touch the same benchmarks.py prompt flow).
+
+  w1 and w2 are one-liners with zero risk. Do those first to build confidence.
+  w3 and w4 each need a focused test to verify the normalization is correct.
+  w5 requires tracing the execution type variable through the full interactive flow
+  to confirm it truly is dead input before removing it.
+
+anti_patterns:
+- "DO NOT change the normalization in prompt_query_subset() — fix it at the adapter boundary so all callers benefit"
+- "DO NOT add a 'Q' prefix everywhere else to match the prompt format — that couples all callers to one format"
+- "DO NOT add a noisy error message for the tuning decline case — it should just work silently with the correct state"
+- "DO NOT change scale_options lists in benchmark_registry.py — the fix is in the recommendation logic, not the options"
+
+verification:
+- description: "Scale recommendation returns a valid option for TPC-DS on 16-32 GB system"
+  command: |
+    uv run -- python -c "
+    from benchbox.cli.benchmarks import BenchmarkManager
+    m = BenchmarkManager.__new__(BenchmarkManager)
+    info = {'scale_options': [1.0, 10.0, 100.0]}
+    result = m._get_recommended_scale(info, {'memory_gb': 20})
+    assert result in info['scale_options'], f'{result} not in options'
+    print('PASS:', result)
+    "
+  expected_output: "PASS: 1.0"
+- description: "Phase parser handles undelimited digits ('37' → phases 3 and 7)"
+  command: |
+    uv run -- python -c "
+    from benchbox.cli.benchmarks import _parse_phase_input
+    phases = ['generate','load','warmup','power','throughput','maintenance']
+    result = _parse_phase_input('37', phases)
+    assert result == ['warmup', 'power'], f'Got {result}'
+    print('PASS:', result)
+    "
+  expected_output: "PASS: ['warmup', 'power']"
+- description: "Query subset accepts Q-prefixed IDs without error"
+  command: "uv run -- python -m pytest tests/unit/platforms/base/test_adapter.py -x -q -k query_subset"
+  expected_output: "passed"
+- description: "Smoke test: dry-run with Q-prefixed queries succeeds end-to-end"
+  command: "uv run benchbox run --platform duckdb --benchmark tpcds --scale 1.0 --queries Q1,Q6 --phases power --tuning notuning --dry-run"
+  expected_output: "Dry run complete"
+- description: "Full unit test pass for affected modules"
+  command: "uv run -- python -m pytest tests/unit/platforms/base/test_adapter.py tests/unit/cli/ -x -q"
+  expected_output: "passed"
+
+scope_limit:
+  only_modify:
+  - "benchbox/cli/benchmarks.py"
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/platforms/base/adapter.py"
+  do_not_touch:
+  - "benchbox/core/benchmark_registry.py (scale_options lists are correct)"
+  - "Platform adapter files other than base/adapter.py"
+  - "Any benchmark runner or data generation logic"
+  - "Tests (add new ones if needed, do not modify existing)"

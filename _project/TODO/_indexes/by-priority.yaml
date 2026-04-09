@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T10:11:40.014681'
-total_items: 22
+generated_at: '2026-04-09T08:32:16.157079'
+total_items: 23
 priorities:
   Critical:
     count: 1
@@ -10,8 +10,13 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 3
+    count: 4
     items:
+    - id: fix-interactive-runner-defects
+      file: TODO/main/planning/fix-interactive-runner-defects.yaml
+      title: Fix five defects in the interactive benchmark wizard (benchbox run)
+      category: Bug Fix
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -23,10 +28,10 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: standardize-clickhouse-deployment-mode-contract
-      file: TODO/platform-expansion/planning/standardize-clickhouse-deployment-mode-contract.yaml
+      file: TODO/platform-expansion/active/standardize-clickhouse-deployment-mode-contract.yaml
       title: Standardize ClickHouse deployment naming around deployment_mode and remove legacy mode/embedded drift
       category: Core Functionality
-      status: Not Started
+      status: In Progress
   Medium-High:
     count: 1
     items:

@@ -1,5 +1,5 @@
-generated_at: '2026-04-08T10:11:40.014668'
-total_categories: 5
+generated_at: '2026-04-09T08:32:16.157063'
+total_categories: 6
 categories:
   Benchmark Development:
     count: 4
@@ -23,6 +23,14 @@ categories:
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
+      status: Not Started
+  Bug Fix:
+    count: 1
+    items:
+    - id: fix-interactive-runner-defects
+      file: TODO/main/planning/fix-interactive-runner-defects.yaml
+      title: Fix five defects in the interactive benchmark wizard (benchbox run)
+      priority: High
       status: Not Started
   Core Functionality:
     count: 9
@@ -68,10 +76,10 @@ categories:
       priority: Medium
       status: Not Started
     - id: standardize-clickhouse-deployment-mode-contract
-      file: TODO/platform-expansion/planning/standardize-clickhouse-deployment-mode-contract.yaml
+      file: TODO/platform-expansion/active/standardize-clickhouse-deployment-mode-contract.yaml
       title: Standardize ClickHouse deployment naming around deployment_mode and remove legacy mode/embedded drift
       priority: High
-      status: Not Started
+      status: In Progress
   Platform Expansion:
     count: 7
     items:
