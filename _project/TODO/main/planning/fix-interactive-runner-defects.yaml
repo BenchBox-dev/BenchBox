@@ -30,6 +30,7 @@ metadata:
   - ux
   estimated_effort: "Small"
   created_date: "2026-04-09"
+  last_updated: "2026-04-09T09:15:00"
   source_review: "Interactive session walkthrough exposing five defects"
 
 impact:
@@ -65,6 +66,7 @@ work:
       return max([s for s in scale_options if s <= 0.1], default=scale_options[0])
   files:
   - benchbox/cli/benchmarks.py
+  - tests/unit/cli/test_benchmark_manager_behavioral.py
 
 - id: w2
   summary: "Fix tuning state: decline branch must set tuning='notuning', not 'tuned'"
@@ -87,6 +89,8 @@ work:
     automatically once the assignment is correct.
   files:
   - benchbox/cli/commands/run.py
+  - tests/unit/cli/test_run_command_interactive_paths.py
+  - tests/unit/cli/test_interactive_dry_run.py
 
 - id: w3
   summary: "Improve phase selection error messaging: explain out-of-range input and point to query step"
@@ -118,6 +122,7 @@ work:
     the messaging needs to be informative.
   files:
   - benchbox/cli/benchmarks.py
+  - tests/unit/cli/test_interactive_dry_run.py
 
 - id: w4
   summary: "Fix query ID format mismatch: normalize Q-prefix in _apply_query_subset()"
@@ -142,11 +147,12 @@ work:
     callers to agree on format.
   files:
   - benchbox/platforms/base/adapter.py
+  - tests/unit/platforms/test_base_adapter.py
 
 - id: w5
   summary: "Eliminate dead 'Test Execution Type' step from interactive wizard"
   status: pending
-  needs: []
+  needs: [w3]
   description: |
     The "Test Execution Type" menu (standard/power/throughput/maintenance/combined)
     at ~`benchbox/cli/benchmarks.py:677` and `benchbox/cli/commands/run.py:~2235`
@@ -167,22 +173,35 @@ work:
   files:
   - benchbox/cli/benchmarks.py
   - benchbox/cli/commands/run.py
+  - tests/unit/cli/test_benchmark_manager_behavioral.py
+  - tests/unit/cli/test_run_command_interactive_paths.py
 
 must_preserve:
 - "_apply_query_subset() continues to work for CLI callers that already pass bare integer query IDs (e.g. '37', not 'Q37')"
 - "Phase selection still works correctly when user types comma-separated indices ('1,2,4') or names ('generate,load,power')"
 - "Non-interactive CLI flags --tuning tuned and --tuning notuning are unaffected"
 - "Configuration Preview correctly reflects the actual tuning state chosen"
+- "Phase-derived execution mode mapping in benchbox/cli/commands/run.py remains the only source of truth for test_execution_type"
 
 approach: |
-  Implement in order w1 → w2 → w3 → w4 → w5. Each work unit is independent except
-  w5 depends on w3 (both touch the same benchmarks.py prompt flow).
+  Implement in order w1 → w2 → w3 → w4 → w5. Encode `w5 -> w3` in the work DAG
+  because both slices touch the same prompt flow in `benchbox/cli/benchmarks.py`.
 
-  w1 and w2 are one-liners with zero risk. Do those first to build confidence.
-  w3 is messaging-only (no logic changes) — easy to verify by inspection.
-  w4 needs a focused test to verify Q-prefix normalization is correct.
-  w5 requires tracing the execution type variable through the full interactive flow
-  to confirm it truly is dead input before removing it.
+  w1 and w2 are small logic fixes, but each must add or update focused unit coverage
+  in the adjacent CLI test files so the behavior is pinned by tests rather than
+  by one-off shell repros.
+
+  w3 must verify the user-facing fallback text by exercising `_prompt_custom_phases()`
+  and capturing console output; `_parse_phase_input()` alone is not sufficient because
+  it does not print the fallback guidance.
+
+  w4 must verify the adapter boundary directly. Do not rely on `benchbox run --dry-run`
+  for this defect because the dry-run query extraction path does not hit
+  `_apply_query_subset()` for TPC-H/TPC-DS.
+
+  w5 requires tracing `test_execution_type` through the full interactive flow,
+  deleting the dead prompt, and updating benchmark-manager tests that currently
+  exercise `_prompt_execution_type()` directly.
 
 anti_patterns:
 - "DO NOT change the normalization in prompt_query_subset() — fix it at the adapter boundary so all callers benefit"
@@ -191,37 +210,23 @@ anti_patterns:
 - "DO NOT change scale_options lists in benchmark_registry.py — the fix is in the recommendation logic, not the options"
 
 verification:
-- description: "Scale recommendation returns a valid option for TPC-DS on 16-32 GB system"
-  command: |
-    uv run -- python -c "
-    from benchbox.cli.benchmarks import BenchmarkManager
-    m = BenchmarkManager.__new__(BenchmarkManager)
-    info = {'scale_options': [1.0, 10.0, 100.0]}
-    result = m._get_recommended_scale(info, {'memory_gb': 20})
-    assert result in info['scale_options'], f'{result} not in options'
-    print('PASS:', result)
-    "
-  expected_output: "PASS: 1.0"
-- description: "Phase fallback message mentions the input typed and hints at the query step"
-  command: |
-    uv run -- python -c "
-    import io, sys
-    # Simulate entering '37' at the phase prompt and check the fallback message
-    from benchbox.cli.benchmarks import _parse_phase_input
-    phases = ['generate','load','warmup','power','throughput','maintenance']
-    result = _parse_phase_input('37', phases)
-    assert result == [], f'Expected empty list, got {result}'
-    print('PASS: invalid input correctly rejected, fallback message should mention query step')
-    "
-  expected_output: "PASS:"
-- description: "Query subset accepts Q-prefixed IDs without error"
-  command: "uv run -- python -m pytest tests/unit/platforms/base/test_adapter.py -x -q -k query_subset"
+- description: "Scale recommendation remains valid when the benchmark minimum scale is 1.0"
+  command: "uv run -- python -m pytest tests/unit/cli/test_benchmark_manager_behavioral.py -x -q -k recommended_scale"
   expected_output: "passed"
-- description: "Smoke test: dry-run with Q-prefixed queries succeeds end-to-end"
-  command: "uv run benchbox run --platform duckdb --benchmark tpcds --scale 1.0 --queries Q1,Q6 --phases power --tuning notuning --dry-run"
-  expected_output: "Dry run complete"
-- description: "Full unit test pass for affected modules"
-  command: "uv run -- python -m pytest tests/unit/platforms/base/test_adapter.py tests/unit/cli/ -x -q"
+- description: "Phase fallback guidance is verified at the prompt layer, including the typed input and query-step hint"
+  command: "uv run -- python -m pytest tests/unit/cli/test_interactive_dry_run.py -x -q -k phases"
+  expected_output: "passed"
+- description: "Adapter query subset filtering accepts both bare IDs and Q-prefixed IDs at the `_apply_query_subset()` boundary"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_base_adapter.py -x -q -k query_subset"
+  expected_output: "passed"
+- description: "Declining tuning in the interactive flow suppresses `--tuning` in the preview and leaves `tuning_enabled` false"
+  command: "uv run -- python -m pytest tests/unit/cli/test_run_command_interactive_paths.py tests/unit/cli/test_interactive_dry_run.py -x -q -k tuning"
+  expected_output: "passed"
+- description: "Removing the dead execution-type prompt preserves phase-derived execution mode behavior"
+  command: "uv run -- python -m pytest tests/unit/cli/test_benchmark_manager_behavioral.py tests/unit/cli/test_run_command_interactive_paths.py tests/unit/cli/test_cli_test_execution.py -x -q -k execution"
+  expected_output: "passed"
+- description: "Targeted interactive and adapter regression suite passes for all touched modules"
+  command: "uv run -- python -m pytest tests/unit/cli/test_benchmark_manager_behavioral.py tests/unit/cli/test_interactive_dry_run.py tests/unit/cli/test_run_command_interactive_paths.py tests/unit/platforms/test_base_adapter.py -x -q"
   expected_output: "passed"
 
 scope_limit:
@@ -229,8 +234,11 @@ scope_limit:
   - "benchbox/cli/benchmarks.py"
   - "benchbox/cli/commands/run.py"
   - "benchbox/platforms/base/adapter.py"
-  do_not_touch:
+  - "tests/unit/cli/test_benchmark_manager_behavioral.py"
+  - "tests/unit/cli/test_interactive_dry_run.py"
+  - "tests/unit/cli/test_run_command_interactive_paths.py"
+  - "tests/unit/platforms/test_base_adapter.py"
+  do_not_modify:
   - "benchbox/core/benchmark_registry.py (scale_options lists are correct)"
   - "Platform adapter files other than base/adapter.py"
   - "Any benchmark runner or data generation logic"
-  - "Tests (add new ones if needed, do not modify existing)"
