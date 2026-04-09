@@ -1,4 +1,4 @@
-generated_at: '2026-04-09T08:32:16.157038'
+generated_at: '2026-04-09T08:35:02.138740'
 total_items: 23
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -21,7 +21,7 @@ items:
   work_ready: 0
 - id: fix-interactive-runner-defects
   file: TODO/main/planning/fix-interactive-runner-defects.yaml
-  title: Fix five defects in the interactive benchmark wizard (benchbox run)
+  title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
   worktree: main
   category: Bug Fix
   priority: High
@@ -34,7 +34,7 @@ items:
   estimated_effort: Small
   work_total: 5
   work_done: 0
-  work_ready: 4
+  work_ready: 5
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication

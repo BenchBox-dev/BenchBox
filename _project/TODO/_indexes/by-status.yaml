@@ -1,4 +1,4 @@
-generated_at: '2026-04-09T08:32:16.157088'
+generated_at: '2026-04-09T08:35:02.138799'
 total_items: 23
 statuses:
   In Progress:
@@ -54,7 +54,7 @@ statuses:
       category: Platform Expansion
     - id: fix-interactive-runner-defects
       file: TODO/main/planning/fix-interactive-runner-defects.yaml
-      title: Fix five defects in the interactive benchmark wizard (benchbox run)
+      title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
       priority: High
       category: Bug Fix
     - id: future-ideas-backlog

@@ -1,4 +1,4 @@
-generated_at: '2026-04-09T08:32:16.157063'
+generated_at: '2026-04-09T08:35:02.138773'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -29,7 +29,7 @@ categories:
     items:
     - id: fix-interactive-runner-defects
       file: TODO/main/planning/fix-interactive-runner-defects.yaml
-      title: Fix five defects in the interactive benchmark wizard (benchbox run)
+      title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
       priority: High
       status: Not Started
   Core Functionality:
