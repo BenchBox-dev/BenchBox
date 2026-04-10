@@ -62,75 +62,138 @@ work:
       documenting the chosen approach before implementation.
 
   - id: w2
-    summary: "Implement expression-family variants for TPC-H queries Q1-Q6 (60 variants)"
+    summary: "Implement expression-family variants for Q1-Q3 (30 variants)"
     needs: [w1]
     status: pending
     notes: |
-      Create benchbox/core/tpchavoc/dataframe_queries/ directory with per-query modules.
+      Create benchbox/core/tpchavoc/dataframe_queries/ directory with per-query modules
+      (q01.py, q02.py, q03.py). For each query, create 10 expression_impl variants.
 
-      For each of Q1-Q6, create 10 expression_impl variants. Map SQL variant strategies
-      to DataFrame equivalents:
-
-      Example for Q1 (Pricing Summary Report — filter + groupby + aggregation):
-      - v1: Baseline (same as tpch dataframe Q1)
+      Q1 (Pricing Summary — filter + groupby + aggregation):
+      - v1: Baseline (import from tpch dataframe Q1)
       - v2: Pre-compute aggregation columns before groupby
-      - v3: Use window functions instead of groupby (partition + distinct)
-      - v4: Two-pass: first compute sums, then compute averages from sums
+      - v3: Window functions instead of groupby (partition + distinct)
+      - v4: Two-pass: compute sums first, then averages from sums
       - v5: Filter using .when().then() instead of boolean mask
       - v6: Explicit column selection before groupby (projection pushdown hint)
       - v7: Sort before groupby (tests sort-based aggregation)
-      - v8: Use intermediate DataFrame for filtered data (CTE equivalent)
+      - v8: Intermediate DataFrame for filtered data (CTE equivalent)
       - v9: Compute each aggregate separately then join results
       - v10: Reverse sort order then reverse at end
+
+      Q2 (Minimum Cost Supplier) and Q3 (Shipping Priority) follow similar variant
+      axes but emphasize join-reorder variants due to multi-table joins.
 
       Each variant must produce identical results to the base query.
 
   - id: w3
-    summary: "Implement expression-family variants for TPC-H queries Q7-Q14 (80 variants)"
+    summary: "Implement expression-family variants for Q4-Q6 (30 variants)"
     needs: [w1]
     status: pending
     notes: |
-      Continue with Q7-Q14. These queries involve multi-table joins and more complex
-      logic (shipping priority, market share, product type profit).
+      Continue with q04.py, q05.py, q06.py.
 
-      For join-heavy queries, the primary variant axis is join order:
+      Q4 (Order Priority Checking — EXISTS subquery):
+      - Variant axes: semi-join vs filter-join, pre-filter lineitem dates vs post-filter
+      Q5 (Local Supplier Volume — 6-table join + groupby):
+      - Variant axes: join order (6 permutations), pre-filter nation/region before join
+      Q6 (Forecasting Revenue Change — single-table filter + sum):
+      - Variant axes: filter order, compound vs chained filters, pre-select columns
+
+  - id: w4
+    summary: "Implement expression-family variants for Q7-Q10 (40 variants)"
+    needs: [w1]
+    status: pending
+    notes: |
+      q07.py through q10.py. These are join-heavy queries where the primary variant
+      axis is join order:
       - v1: Baseline join order from tpch/dataframe_queries.py
       - v2-v4: Alternative join orders (small-to-large, large-to-small, star-join)
       - v5-v7: Pre-filter variants (filter dimension tables before joining)
       - v8-v10: Aggregation strategy variants
 
-  - id: w4
-    summary: "Implement expression-family variants for TPC-H queries Q15-Q22 (80 variants)"
+      Q7 (Volume Shipping), Q8 (National Market Share), Q9 (Product Type Profit),
+      Q10 (Returned Item Reporting).
+
+  - id: w5
+    summary: "Implement expression-family variants for Q11-Q14 (40 variants)"
     needs: [w1]
     status: pending
     notes: |
-      Complete the expression-family variants for Q15-Q22. These include:
-      - Q15: Top supplier (subquery in SQL -> intermediate DF)
-      - Q16: Parts/supplier count (DISTINCT, NOT IN -> anti-join)
-      - Q17: Small quantity order revenue (correlated subquery -> join with avg)
-      - Q18: Large volume customer (HAVING -> filter after groupby)
-      - Q19: Discounted revenue (OR conditions -> union of filtered sets)
-      - Q20: Potential part promotion (multi-level subquery -> join chain)
-      - Q21: Suppliers who kept orders waiting (EXISTS/NOT EXISTS -> semi/anti join)
-      - Q22: Global sales opportunity (nested subqueries -> intermediate DFs)
+      q11.py through q14.py. Mix of subquery-heavy and aggregation-heavy queries.
 
-  - id: w5
-    summary: "Implement pandas-family variants for all 22 queries (220 variants)"
-    needs: [w2, w3, w4]
+      Q11 (Important Stock Identification — HAVING with subquery):
+      - Variant axes: subquery as intermediate DF vs inline, threshold pre-compute
+      Q12 (Shipping Modes and Order Priority — CASE + groupby):
+      - Variant axes: CASE as .when() chain vs boolean masks, filter-first vs agg-first
+      Q13 (Customer Distribution — LEFT JOIN + groupby + groupby):
+      - Variant axes: two-stage vs single-stage aggregation, NOT LIKE as anti-join
+      Q14 (Promotion Effect — CASE inside SUM):
+      - Variant axes: conditional sum vs filter+sum+join, pre-filter parts
+
+  - id: w6
+    summary: "Implement expression-family variants for Q15-Q18 (40 variants)"
+    needs: [w1]
     status: pending
     notes: |
-      Add pandas_impl variants paralleling the expression_impl variants.
+      q15.py through q18.py. Complex subquery patterns.
+
+      Q15 (Top Supplier — subquery for max revenue):
+      - Variant axes: intermediate DF vs chained, top-1 vs filter-to-max
+      Q16 (Parts/Supplier Count — DISTINCT, NOT IN):
+      - Variant axes: anti-join vs ~isin(), distinct before vs after join
+      Q17 (Small Quantity Order Revenue — correlated subquery):
+      - Variant axes: join-with-avg vs window function, filter timing
+      Q18 (Large Volume Customer — HAVING):
+      - Variant axes: filter-after-groupby vs pre-aggregate, join order
+
+  - id: w7
+    summary: "Implement expression-family variants for Q19-Q22 (40 variants)"
+    needs: [w1]
+    status: pending
+    notes: |
+      q19.py through q22.py. Most complex query patterns.
+
+      Q19 (Discounted Revenue — compound OR conditions):
+      - Variant axes: union of filtered sets vs single complex filter, per-brand subframes
+      Q20 (Potential Part Promotion — multi-level subquery):
+      - Variant axes: join chain vs nested intermediates, semi-join vs filter
+      Q21 (Suppliers Who Kept Orders Waiting — EXISTS/NOT EXISTS):
+      - Variant axes: semi-join + anti-join vs boolean masks, join order for 4 tables
+      Q22 (Global Sales Opportunity — nested subqueries):
+      - Variant axes: intermediate DFs vs chained, avg pre-compute vs inline
+
+  - id: w8
+    summary: "Implement pandas-family variants for Q1-Q11 (110 variants)"
+    needs: [w2, w3, w4, w5]
+    status: pending
+    notes: |
+      Add pandas_impl variants to q01.py through q11.py, paralleling expression_impl.
       Many variant strategies translate directly (join reorder, pre-filter, etc.).
-      Some expression-specific variants (lazy/eager, collect placement) don't apply
-      to pandas — replace with pandas-specific variants:
+
+      Replace expression-specific variants (lazy/eager, collect placement) with
+      pandas-specific alternatives:
       - .apply() vs vectorized operations
       - pd.merge() vs df.join() (index-based)
       - .groupby().agg() vs .pivot_table()
       - iterative merge chain vs reduce(merge, tables)
 
-  - id: w6
-    summary: "Wire up TPC-Havoc benchmark class, registry, dispatch, and add tests"
-    needs: [w5]
+  - id: w9
+    summary: "Implement pandas-family variants for Q12-Q22 (110 variants)"
+    needs: [w6, w7]
+    status: pending
+    notes: |
+      Add pandas_impl variants to q12.py through q22.py.
+
+      For the complex subquery patterns (Q15-Q22), pandas variants emphasize:
+      - Intermediate DataFrames vs chained operations
+      - .merge() join order permutations
+      - .pipe() chains vs sequential assignment
+      - Index-based operations vs column-based
+
+  - id: w10
+    summary: "Wire up TPC-Havoc benchmark class and registry for DataFrame dispatch"
+    needs: [w8, w9]
     status: pending
     notes: |
       Integration:
@@ -141,11 +204,17 @@ work:
       3. Add variant equivalence validation for DataFrame results
          (extend ResultValidator to handle DataFrame output comparison)
 
-      Tests (tests/unit/core/tpchavoc/test_dataframe_queries.py):
+  - id: w11
+    summary: "Add unit tests for TPC-Havoc DataFrame variants"
+    needs: [w10]
+    status: pending
+    notes: |
+      Create tests/unit/core/tpchavoc/test_dataframe_queries.py:
       - Test variant registration (220 total, 10 per query)
       - Test all variants for Q1 produce identical results on small TPC-H data
-      - Test expression_impl and pandas_impl for at least Q1 variants
+      - Test expression_impl and pandas_impl for at least Q1-Q3 variants
       - Test variant metadata (description, categories)
+      - Mark equivalence tests @pytest.mark.slow (they need TPC-H SF=0.01 data)
 
 deferred:
   - summary: "Automated variant equivalence testing across all 22 queries at SF=0.01"
@@ -213,6 +282,13 @@ approach: |
 
   Use the existing TPC-H parameter override system (set_parameter_overrides) for
   seed-based reproducibility.
+
+implementation_order: |
+  Implement LAST among the 5 DataFrame support TODOs. TPC-Havoc is the largest scope
+  (220 variants) and architecturally unique (variant concept). Implement after
+  df-support-flightdata and df-support-joinorder establish the QueryRegistry pattern,
+  since TPC-Havoc extends it with the variant registration design. All 5 TODOs modify
+  benchmark_registry.py — sequential implementation avoids merge conflicts.
 
 anti_patterns:
   - "DO NOT modify tpch/dataframe_queries.py — because TPC-Havoc extends TPC-H, not modifies it — import base implementations and build variants on top"

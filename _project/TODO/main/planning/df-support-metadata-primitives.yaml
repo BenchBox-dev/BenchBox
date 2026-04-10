@@ -197,6 +197,13 @@ approach: |
   many SQL metadata queries (INFORMATION_SCHEMA, ACL, views) are inherently SQL
   constructs with no DataFrame equivalent.
 
+implementation_order: |
+  Implement THIRD or FOURTH (interchangeable with transaction-primitives). Both use
+  the operations manager pattern (not QueryRegistry), so order between them doesn't
+  matter. Implement after df-support-flightdata establishes the QueryRegistry reference
+  pattern. All 5 DataFrame support TODOs modify benchmark_registry.py — sequential
+  implementation avoids merge conflicts.
+
 anti_patterns:
   - "DO NOT attempt to implement INFORMATION_SCHEMA queries in DataFrame mode — because DataFrames access metadata through native API (df.schema, spark.catalog), not SQL catalog tables — use platform-native introspection"
   - "DO NOT rewrite the existing 1821-line module from scratch — because significant work is already done — audit and complete what exists"

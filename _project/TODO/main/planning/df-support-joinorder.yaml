@@ -88,11 +88,12 @@ work:
       around the title table as the central fact table.
 
   - id: w4
-    summary: "Create pandas-family implementations for all 13 JoinOrder queries"
-    needs: [w1, w2, w3]
+    summary: "Create pandas-family implementations for queries 1a-6a (simpler joins)"
+    needs: [w1, w2]
     status: pending
     notes: |
-      Add pandas_impl functions for all 13 queries. Key differences from expression family:
+      Add pandas_impl functions for queries 1a, 1b, 2a, 3a, 4a, 5a, 6a (7 queries).
+      Key differences from expression family:
 
       - Joins: pd.merge(left, right, left_on=..., right_on=..., how="inner")
       - LIKE: df["col"].str.contains("pattern", na=False)
@@ -106,8 +107,23 @@ work:
       or sequential merge calls.
 
   - id: w5
-    summary: "Wire up JoinOrder benchmark class, registry, and add unit tests"
-    needs: [w4]
+    summary: "Create pandas-family implementations for queries 7a-12a (complex joins)"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Add pandas_impl functions for queries 7a, 8a, 9a, 10a, 11a, 12a (6 queries).
+      Same translation patterns as w4.
+
+      7a-9a have 7-8 table joins — the sequential pd.merge() chain will be long.
+      Use descriptive intermediate variable names for readability:
+        merged_title_mc = pd.merge(title, movie_companies, ...)
+        merged_with_cn = pd.merge(merged_title_mc, company_name, ...)
+
+      11a (9 tables) is the most complex — test this one carefully.
+
+  - id: w6
+    summary: "Wire up JoinOrder benchmark class and registry for DataFrame dispatch"
+    needs: [w4, w5]
     status: pending
     notes: |
       Integration:
@@ -116,13 +132,19 @@ work:
       3. Verify JoinOrderGenerator synthetic data works with DataFrame data loading
          (CSV/Parquet format compatibility)
 
-      Tests (tests/unit/core/joinorder/test_dataframe_queries.py):
+  - id: w7
+    summary: "Add unit tests for JoinOrder DataFrame queries"
+    needs: [w6]
+    status: pending
+    notes: |
+      Create tests/unit/core/joinorder/test_dataframe_queries.py:
       - Test all 13 queries registered with correct IDs
       - Test expression_impl on small synthetic IMDB-like data (build minimal
         fixtures with a few rows per table that satisfy join conditions)
       - Test pandas_impl on same fixtures
       - Test result shapes are non-empty (queries with valid data should return rows)
       - Test LIKE/IN/NOT LIKE predicates filter correctly
+      - Mark tests @pytest.mark.fast where possible
 
 deferred:
   - summary: "Benchmark join order sensitivity — measure if different .join() sequences change performance"
@@ -181,6 +203,11 @@ approach: |
          .select(col("title").min().alias("movie_title"))
 
   Use QueryCategory.JOIN for all queries, plus AGGREGATE and FILTER as appropriate.
+
+implementation_order: |
+  Implement SECOND, after df-support-flightdata establishes the reference pattern.
+  Reuse the same file structure and registration approach. All 5 DataFrame support
+  TODOs modify benchmark_registry.py — sequential implementation avoids merge conflicts.
 
 anti_patterns:
   - "DO NOT attempt to replicate SQL optimizer stress-testing in DataFrame mode — because DataFrame APIs define explicit join order, there is no optimizer to stress — focus on correct multi-join execution and performance measurement"

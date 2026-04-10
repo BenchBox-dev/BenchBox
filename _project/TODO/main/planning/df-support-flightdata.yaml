@@ -138,6 +138,12 @@ approach: |
   appropriate classification. Parameterize date ranges via a module-level defaults
   dict with set_parameter_overrides() pattern from tpch/dataframe_queries.py.
 
+implementation_order: |
+  Implement FIRST among the 5 DataFrame support TODOs. FlightData is the simplest
+  benchmark (3 tables, standard OLAP patterns) and establishes the reference pattern
+  for the others. All 5 TODOs modify benchmark_registry.py — sequential implementation
+  avoids merge conflicts.
+
 anti_patterns:
   - "DO NOT implement queries as SQL strings passed to DataFrame engines — because that defeats the purpose of DataFrame benchmarking — implement using native DataFrame API (col/lit/join/groupby)"
   - "DO NOT hardcode date ranges — because FlightData uses parameterized {start_date}/{end_date} based on available data — use the parameter override pattern from tpch/dataframe_queries.py"
