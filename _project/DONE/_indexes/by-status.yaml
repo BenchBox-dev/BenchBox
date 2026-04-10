@@ -1,5 +1,5 @@
-generated_at: '2026-04-09T08:32:17.610344'
-total_items: 652
+generated_at: '2026-04-10T08:46:26.463665'
+total_items: 653
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 603
+    count: 604
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -382,6 +382,11 @@ statuses:
       file: DONE/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
       title: Adapt BenchBox to textcharts neutralized defaults and new APIs
       priority: Medium-High
+      category: Core Functionality
+    - id: cli-iterations-parameter
+      file: DONE/main/planning/cli-iterations-parameter.yaml
+      title: Add --iterations CLI parameter for power test measurement count
+      priority: Medium
       category: Core Functionality
     - id: table-mode-external
       file: DONE/main/active/table-mode-external.yaml

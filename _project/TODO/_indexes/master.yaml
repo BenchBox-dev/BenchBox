@@ -1,4 +1,4 @@
-generated_at: '2026-04-09T08:35:02.138740'
+generated_at: '2026-04-10T08:46:24.918971'
 total_items: 23
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -34,7 +34,7 @@ items:
   estimated_effort: Small
   work_total: 5
   work_done: 0
-  work_ready: 5
+  work_ready: 4
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication

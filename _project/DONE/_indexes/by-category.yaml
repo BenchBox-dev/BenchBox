@@ -1,4 +1,4 @@
-generated_at: '2026-04-09T08:32:17.610047'
+generated_at: '2026-04-10T08:46:26.463320'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -522,7 +522,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 210
+    count: 211
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -543,6 +543,11 @@ categories:
       file: DONE/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
       title: Adapt BenchBox to textcharts neutralized defaults and new APIs
       priority: Medium-High
+      status: Completed
+    - id: cli-iterations-parameter
+      file: DONE/main/planning/cli-iterations-parameter.yaml
+      title: Add --iterations CLI parameter for power test measurement count
+      priority: Medium
       status: Completed
     - id: table-mode-external
       file: DONE/main/active/table-mode-external.yaml

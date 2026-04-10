@@ -1,5 +1,5 @@
-generated_at: '2026-04-09T08:32:17.610201'
-total_items: 652
+generated_at: '2026-04-10T08:46:26.463495'
+total_items: 653
 priorities:
   Critical:
     count: 38
@@ -1835,7 +1835,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 265
+    count: 266
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1937,6 +1937,11 @@ priorities:
       title: Add --capture-plans option to interactive wizard
       category: User Experience
       status: Not Started
+    - id: cli-iterations-parameter
+      file: DONE/main/planning/cli-iterations-parameter.yaml
+      title: Add --iterations CLI parameter for power test measurement count
+      category: Core Functionality
+      status: Completed
     - id: interactive-wizard-output-all-platforms
       file: DONE/ux-improvements/planning/interactive-wizard-output-all-platforms.yaml
       title: Add --output prompt for all platforms in interactive wizard

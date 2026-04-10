@@ -1,5 +1,5 @@
-generated_at: '2026-04-09T08:32:17.609763'
-total_items: 652
+generated_at: '2026-04-10T08:46:26.463005'
+total_items: 653
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4345,6 +4345,23 @@ items:
   - interactive
   - query-plans
   estimated_effort: Small
+- id: cli-iterations-parameter
+  file: DONE/main/planning/cli-iterations-parameter.yaml
+  title: Add --iterations CLI parameter for power test measurement count
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - cli
+  - power-test
+  - iterations
+  - usability
+  estimated_effort: Small (< 1 hour)
+  completed_date: '2026-04-10'
+  work_total: 2
+  work_done: 2
+  work_ready: 0
 - id: interactive-wizard-output-all-platforms
   file: DONE/ux-improvements/planning/interactive-wizard-output-all-platforms.yaml
   title: Add --output prompt for all platforms in interactive wizard
