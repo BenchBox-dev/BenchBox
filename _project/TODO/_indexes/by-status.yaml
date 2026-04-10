@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:32:38.884512'
-total_items: 25
+generated_at: '2026-04-10T10:35:05.030098'
+total_items: 24
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 20
+    count: 19
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -27,11 +27,6 @@ statuses:
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       priority: Medium
       category: Platform Expansion
-    - id: df-support-metadata-primitives
-      file: TODO/main/planning/df-support-metadata-primitives.yaml
-      title: Add DataFrame execution support to Metadata Primitives benchmark
-      priority: Medium
-      category: Core Functionality
     - id: df-support-tpchavoc
       file: TODO/main/planning/df-support-tpchavoc.yaml
       title: Add DataFrame execution support to TPC-Havoc benchmark

@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:32:38.884502'
-total_items: 25
+generated_at: '2026-04-10T10:35:05.030087'
+total_items: 24
 priorities:
   Critical:
     count: 1
@@ -41,7 +41,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 10
+    count: 9
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -52,11 +52,6 @@ priorities:
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: df-support-metadata-primitives
-      file: TODO/main/planning/df-support-metadata-primitives.yaml
-      title: Add DataFrame execution support to Metadata Primitives benchmark
-      category: Core Functionality
       status: Not Started
     - id: df-support-tpchavoc
       file: TODO/main/planning/df-support-tpchavoc.yaml

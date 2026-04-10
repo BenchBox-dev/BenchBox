@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:32:38.884456'
-total_items: 25
+generated_at: '2026-04-10T10:35:05.030032'
+total_items: 24
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -286,26 +286,6 @@ items:
   work_total: 9
   work_done: 0
   work_ready: 1
-- id: df-support-metadata-primitives
-  file: TODO/main/planning/df-support-metadata-primitives.yaml
-  title: Add DataFrame execution support to Metadata Primitives benchmark
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - dataframe
-  - metadata-primitives
-  - schema-introspection
-  - catalog
-  - expression-family
-  - pandas-family
-  - pyspark
-  estimated_effort: 2-3 days
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  deferred_count: 3
 - id: df-support-tpchavoc
   file: TODO/main/planning/df-support-tpchavoc.yaml
   title: Add DataFrame execution support to TPC-Havoc benchmark

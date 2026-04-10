@@ -1,4 +1,4 @@
-generated_at: '2026-04-10T10:32:40.507772'
+generated_at: '2026-04-10T10:35:06.666891'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -522,7 +522,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 214
+    count: 215
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -608,6 +608,11 @@ categories:
       file: DONE/main/planning/df-support-joinorder.yaml
       title: Add DataFrame execution support to JoinOrder benchmark
       priority: Medium-High
+      status: Completed
+    - id: df-support-metadata-primitives
+      file: DONE/main/planning/df-support-metadata-primitives.yaml
+      title: Add DataFrame execution support to Metadata Primitives benchmark
+      priority: Medium
       status: Completed
     - id: df-support-transaction-primitives
       file: DONE/main/planning/df-support-transaction-primitives.yaml

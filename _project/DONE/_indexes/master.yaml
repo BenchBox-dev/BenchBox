@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:32:40.507409'
-total_items: 656
+generated_at: '2026-04-10T10:35:06.666566'
+total_items: 657
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4487,6 +4487,27 @@ items:
   priority: Medium
   status: Completed
   completed_date: '2025-11-28'
+- id: df-support-metadata-primitives
+  file: DONE/main/planning/df-support-metadata-primitives.yaml
+  title: Add DataFrame execution support to Metadata Primitives benchmark
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - dataframe
+  - metadata-primitives
+  - schema-introspection
+  - catalog
+  - expression-family
+  - pandas-family
+  - pyspark
+  estimated_effort: 2-3 days
+  completed_date: '2026-04-10'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  deferred_count: 3
 - id: df-support-transaction-primitives
   file: DONE/main/planning/df-support-transaction-primitives.yaml
   title: Add DataFrame execution support to Transaction Primitives benchmark

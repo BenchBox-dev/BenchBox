@@ -1,4 +1,4 @@
-generated_at: '2026-04-10T10:32:38.884486'
+generated_at: '2026-04-10T10:35:05.030071'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -33,18 +33,13 @@ categories:
       priority: High
       status: Not Started
   Core Functionality:
-    count: 11
+    count: 10
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
       title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
       priority: Medium
       status: In Progress
-    - id: df-support-metadata-primitives
-      file: TODO/main/planning/df-support-metadata-primitives.yaml
-      title: Add DataFrame execution support to Metadata Primitives benchmark
-      priority: Medium
-      status: Not Started
     - id: df-support-tpchavoc
       file: TODO/main/planning/df-support-tpchavoc.yaml
       title: Add DataFrame execution support to TPC-Havoc benchmark
