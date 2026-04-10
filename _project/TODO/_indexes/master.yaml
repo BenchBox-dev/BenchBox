@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T08:46:24.918971'
-total_items: 23
+generated_at: '2026-04-10T09:41:18.276594'
+total_items: 28
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -286,6 +286,65 @@ items:
   work_total: 9
   work_done: 0
   work_ready: 1
+- id: df-support-metadata-primitives
+  file: TODO/main/planning/df-support-metadata-primitives.yaml
+  title: Add DataFrame execution support to Metadata Primitives benchmark
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - dataframe
+  - metadata-primitives
+  - schema-introspection
+  - catalog
+  - expression-family
+  - pandas-family
+  - pyspark
+  estimated_effort: 2-3 days
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  deferred_count: 3
+- id: df-support-tpchavoc
+  file: TODO/main/planning/df-support-tpchavoc.yaml
+  title: Add DataFrame execution support to TPC-Havoc benchmark
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - dataframe
+  - tpchavoc
+  - tpch
+  - query-variants
+  - optimizer
+  - expression-family
+  - pandas-family
+  estimated_effort: 5-8 days
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+  deferred_count: 2
+- id: df-support-transaction-primitives
+  file: TODO/main/planning/df-support-transaction-primitives.yaml
+  title: Add DataFrame execution support to Transaction Primitives benchmark
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - dataframe
+  - transaction-primitives
+  - pyspark
+  - delta-lake
+  - iceberg
+  - acid
+  estimated_effort: 2-3 days
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  deferred_count: 3
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml
   title: Add Hypothesis property-based tests for pure-function invariants
@@ -395,6 +454,43 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: df-support-flightdata
+  file: TODO/main/planning/df-support-flightdata.yaml
+  title: Add DataFrame execution support to FlightData benchmark
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - dataframe
+  - flightdata
+  - olap
+  - expression-family
+  - pandas-family
+  estimated_effort: 2-3 days
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  deferred_count: 1
+- id: df-support-joinorder
+  file: TODO/main/planning/df-support-joinorder.yaml
+  title: Add DataFrame execution support to JoinOrder benchmark
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - dataframe
+  - joinorder
+  - imdb
+  - multi-table-join
+  - expression-family
+  - pandas-family
+  estimated_effort: 3-5 days
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  deferred_count: 2
 - id: define-hosted-results-contract-and-governance-model
   file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
   title: Define hosted results contract, trust labels, and governance model

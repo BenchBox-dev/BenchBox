@@ -1,0 +1,224 @@
+id: df-support-metadata-primitives
+title: "Add DataFrame execution support to Metadata Primitives benchmark"
+worktree: main
+priority: Medium
+status: Not Started
+description: |
+  Complete and integrate the existing DataFrame operations module for the Metadata
+  Primitives benchmark, enabling schema introspection benchmarking on Polars, PySpark,
+  Pandas, and other DataFrame platforms.
+
+  Metadata Primitives tests database metadata introspection — INFORMATION_SCHEMA queries,
+  SHOW/DESCRIBE/PRAGMA commands, and catalog operations — using 62 SQL queries across
+  10 categories: schema (9), column (8), stats (6), query (4), wide table (5), view
+  hierarchy (4), complex type (5), large catalog (6), constraint (4), and ACL (11).
+
+  A substantial dataframe_operations.py already exists (1821 lines) with:
+  - MetadataOperationType enum (13+ operation types across 4 categories)
+  - MetadataOperationCategory enum (SCHEMA, CATALOG, LAKEHOUSE, COMPLEXITY)
+  - OPERATION_CATEGORIES mapping dict
+  - Platform-specific support levels (all platforms for schema, PySpark for catalog,
+    PySpark+Delta/Iceberg for lakehouse metadata)
+
+  Unlike SQL metadata introspection (which queries INFORMATION_SCHEMA), DataFrame
+  metadata operations use native DataFrame API: df.schema, df.dtypes, df.describe(),
+  df.columns, len(df), and platform-specific catalog APIs (spark.catalog.listTables()).
+
+  The benchmark has 3 tiers of DataFrame support:
+  1. Schema introspection: ALL platforms (Polars, Pandas, PySpark, DataFusion, etc.)
+  2. Catalog operations: PySpark with configured catalog only
+  3. Lakehouse metadata: PySpark + Delta Lake/Iceberg only
+
+category: Core Functionality
+
+work:
+  - id: w1
+    summary: "Audit existing dataframe_operations.py — map SQL queries to DataFrame operations, identify gaps"
+    status: pending
+    notes: |
+      Read benchbox/core/metadata_primitives/dataframe_operations.py (1821 lines) thoroughly.
+      Compare against the 62 SQL queries in catalog/queries.yaml.
+
+      Create a mapping table across 3 tiers:
+
+      Tier 1 — Schema introspection (ALL platforms):
+      - list_columns -> df.columns
+      - get_dtypes -> df.dtypes / df.schema
+      - describe_stats -> df.describe()
+      - row_count -> len(df) / df.count()
+      - column_count -> len(df.columns)
+      Map which of the 62 SQL queries correspond to these operations.
+
+      Tier 2 — Catalog operations (PySpark only):
+      - list_databases -> spark.catalog.listDatabases()
+      - list_tables -> spark.catalog.listTables()
+      - table_exists -> spark.catalog.tableExists()
+      Map SQL INFORMATION_SCHEMA queries to catalog API calls.
+
+      Tier 3 — Lakehouse metadata (PySpark + Delta/Iceberg):
+      - table_history -> DeltaTable.history()
+      - table_detail -> DeltaTable.detail()
+      Map SQL queries to format-specific metadata APIs.
+
+      Identify:
+      - Which operations are fully implemented?
+      - Which are stubs?
+      - Which SQL queries have no DataFrame equivalent (e.g., ACL queries)?
+
+  - id: w2
+    summary: "Complete schema introspection operations for all DataFrame platforms"
+    needs: [w1]
+    status: pending
+    notes: |
+      Ensure Tier 1 operations work across all platforms:
+
+      Expression family (Polars, DataFusion, PySpark):
+      - Schema access via ctx.get_table(name).schema
+      - Column listing via ctx.get_table(name).columns
+      - Statistics via describe() or platform-specific stats methods
+
+      Pandas family (Pandas, Modin, cuDF, Dask):
+      - df.dtypes, df.describe(), df.info(), df.columns, len(df)
+      - df.memory_usage() for size statistics
+      - df.nunique() for cardinality
+
+      These are the most broadly supported operations and should work on all 8
+      DataFrame platforms. Implement as DataFrameQuery objects with expression_impl
+      and pandas_impl, even though these are metadata operations — the QueryRegistry
+      pattern enables integration with the standard DataFrame runner.
+
+  - id: w3
+    summary: "Complete catalog and lakehouse operations for PySpark and define skip lists"
+    needs: [w1]
+    status: pending
+    notes: |
+      Tier 2 (PySpark catalog):
+      - Implement using spark.catalog.* API
+      - listDatabases(), listTables(), listColumns(), tableExists()
+      - These require a SparkSession with a configured catalog
+
+      Tier 3 (PySpark + Delta/Iceberg):
+      - DeltaTable.forPath(spark, path).history() / .detail()
+      - Iceberg snapshot listing via table properties
+
+      Define comprehensive skip lists:
+      - SKIP_FOR_DATAFRAME: ACL queries (GRANT/REVOKE timing), view hierarchy queries
+        (DataFrames don't have views), constraint queries (FK/PK are schema-level)
+      - SKIP_FOR_POLARS/PANDAS: Catalog and lakehouse operations
+      - SKIP_FOR_EXPRESSION_FAMILY: Catalog operations (except PySpark)
+
+      Many of the 62 SQL queries are SQL-specific (INFORMATION_SCHEMA, SHOW commands)
+      and will be skipped. Document the expected coverage: ~15-20 operations in
+      DataFrame mode vs 62 SQL queries.
+
+  - id: w4
+    summary: "Wire up MetadataPrimitivesBenchmark class, registry, and add unit tests"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Integration:
+      1. Add get_dataframe_queries() or get_dataframe_operations() to
+         MetadataPrimitivesBenchmark — decide which pattern based on w1 audit.
+         If operations are independent (stateless introspection), use QueryRegistry.
+         If operations are sequential/stateful, use operations manager.
+      2. Set supports_dataframe: True in benchmark_registry.py
+      3. Ensure TPC-H schema tables are loaded before metadata introspection runs
+         (metadata queries inspect the loaded tables)
+      4. Handle complexity testing (wide tables, large catalogs) — may need to
+         generate test structures in DataFrame mode too
+
+      Tests (tests/unit/core/metadata_primitives/test_dataframe_operations.py):
+      - Test MetadataOperationType enum values
+      - Test per-platform capability detection
+      - Test schema introspection operations on small synthetic DataFrames
+      - Test skip list correctness (Polars skips catalog ops, etc.)
+      - Test operation categories mapping
+      - Mark tests @pytest.mark.fast
+
+deferred:
+  - summary: "Integration tests with real PySpark + Delta Lake catalog"
+    reason: "Requires PySpark + Delta Lake runtime. Add to live_integration suite."
+  - summary: "Complexity stress testing (wide tables, large catalogs) in DataFrame mode"
+    reason: "DDL generation (CREATE TABLE with 1000 columns) is SQL-specific. DataFrame equivalent (constructing wide DataFrames) is a separate design problem."
+  - summary: "ACL/permission testing in DataFrame mode"
+    reason: "DataFrame APIs don't have GRANT/REVOKE equivalents. These 11 queries are permanently SQL-only."
+
+metadata:
+  tags:
+    - dataframe
+    - metadata-primitives
+    - schema-introspection
+    - catalog
+    - expression-family
+    - pandas-family
+    - pyspark
+  estimated_effort: "2-3 days"
+  created_date: "2026-04-10"
+
+impact:
+  business_value: |
+    Enables metadata introspection benchmarking on DataFrame platforms. Schema
+    discovery performance matters for data catalog integration, IDE autocomplete,
+    and BI tool connectivity — measuring this on DataFrame platforms fills a gap
+    in the current benchmark coverage.
+  user_impact: |
+    Users can run `benchbox run --platform polars-df --benchmark metadata_primitives`
+    to measure schema introspection performance. PySpark users get catalog + lakehouse
+    metadata benchmarking.
+
+files_affected:
+  modified:
+    - benchbox/core/metadata_primitives/dataframe_operations.py
+    - benchbox/core/metadata_primitives/benchmark.py
+    - benchbox/core/benchmark_registry.py
+  added:
+    - tests/unit/core/metadata_primitives/test_dataframe_operations.py
+
+must_preserve:
+  - "MetadataPrimitivesBenchmark SQL execution path unchanged — all 62 SQL queries still work"
+  - "Complexity testing DDL generation (wide tables, view hierarchies, large catalogs) still works for SQL mode"
+  - "Platform-specific SQL variants (ClickHouse, Snowflake, BigQuery, DataFusion) unchanged"
+
+approach: |
+  This benchmark has 1821 lines of existing DataFrame operations code. The work is
+  audit + integration + gap-filling, not greenfield.
+
+  Follow the write_primitives operations manager pattern for PySpark catalog/lakehouse
+  operations (stateful, sequential). For schema introspection operations that are
+  independent and stateless (df.schema, df.describe()), consider using the QueryRegistry
+  pattern instead — this enables the standard DataFrame runner to execute them.
+
+  A hybrid approach may be best: QueryRegistry for Tier 1 schema introspection
+  (works on all platforms), operations manager for Tier 2/3 catalog+lakehouse
+  (PySpark only). The benchmark class exposes both via get_dataframe_queries()
+  (returns Tier 1 registry) and get_dataframe_operations() (returns Tier 2/3 manager).
+
+  Expect ~25-30% coverage in DataFrame mode vs SQL mode. This is acceptable because
+  many SQL metadata queries (INFORMATION_SCHEMA, ACL, views) are inherently SQL
+  constructs with no DataFrame equivalent.
+
+anti_patterns:
+  - "DO NOT attempt to implement INFORMATION_SCHEMA queries in DataFrame mode — because DataFrames access metadata through native API (df.schema, spark.catalog), not SQL catalog tables — use platform-native introspection"
+  - "DO NOT rewrite the existing 1821-line module from scratch — because significant work is already done — audit and complete what exists"
+  - "DO NOT force 100% query parity with SQL mode — because ACL, view hierarchy, and constraint queries are inherently SQL-only — document the expected coverage gap clearly"
+
+verification:
+  - description: "Metadata Primitives reports supports_dataframe=True"
+    command: "uv run -- python -c \"from benchbox.core.benchmark_registry import BENCHMARK_REGISTRY; print(BENCHMARK_REGISTRY['metadata_primitives']['supports_dataframe'])\""
+    expected_output: "True"
+  - description: "Operations module loads without error"
+    command: "uv run -- python -c \"from benchbox.core.metadata_primitives.dataframe_operations import MetadataOperationType, MetadataOperationCategory; print(f'{len(MetadataOperationType)} ops, {len(MetadataOperationCategory)} categories')\""
+    expected_output: "13 ops, 4 categories"
+  - description: "Unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/metadata_primitives/ -v"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - benchbox/core/metadata_primitives/
+    - benchbox/core/benchmark_registry.py
+    - tests/unit/core/metadata_primitives/
+  do_not_modify:
+    - benchbox/core/runner/dataframe_runner.py
+    - benchbox/core/dataframe/
+    - benchbox/platforms/

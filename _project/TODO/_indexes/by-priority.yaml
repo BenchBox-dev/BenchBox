@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T08:46:24.919013'
-total_items: 23
+generated_at: '2026-04-10T09:41:18.276637'
+total_items: 28
 priorities:
   Critical:
     count: 1
@@ -33,15 +33,25 @@ priorities:
       category: Core Functionality
       status: In Progress
   Medium-High:
-    count: 1
+    count: 3
     items:
+    - id: df-support-flightdata
+      file: TODO/main/planning/df-support-flightdata.yaml
+      title: Add DataFrame execution support to FlightData benchmark
+      category: Core Functionality
+      status: Not Started
+    - id: df-support-joinorder
+      file: TODO/main/planning/df-support-joinorder.yaml
+      title: Add DataFrame execution support to JoinOrder benchmark
+      category: Core Functionality
+      status: Not Started
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
       category: Core Functionality
       status: Completed
   Medium:
-    count: 8
+    count: 11
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -52,6 +62,21 @@ priorities:
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: df-support-metadata-primitives
+      file: TODO/main/planning/df-support-metadata-primitives.yaml
+      title: Add DataFrame execution support to Metadata Primitives benchmark
+      category: Core Functionality
+      status: Not Started
+    - id: df-support-tpchavoc
+      file: TODO/main/planning/df-support-tpchavoc.yaml
+      title: Add DataFrame execution support to TPC-Havoc benchmark
+      category: Core Functionality
+      status: Not Started
+    - id: df-support-transaction-primitives
+      file: TODO/main/planning/df-support-transaction-primitives.yaml
+      title: Add DataFrame execution support to Transaction Primitives benchmark
+      category: Core Functionality
       status: Not Started
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml

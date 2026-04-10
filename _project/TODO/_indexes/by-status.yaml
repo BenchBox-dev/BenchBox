@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T08:46:24.919022'
-total_items: 23
+generated_at: '2026-04-10T09:41:18.276647'
+total_items: 28
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 18
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -27,6 +27,31 @@ statuses:
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       priority: Medium
       category: Platform Expansion
+    - id: df-support-flightdata
+      file: TODO/main/planning/df-support-flightdata.yaml
+      title: Add DataFrame execution support to FlightData benchmark
+      priority: Medium-High
+      category: Core Functionality
+    - id: df-support-joinorder
+      file: TODO/main/planning/df-support-joinorder.yaml
+      title: Add DataFrame execution support to JoinOrder benchmark
+      priority: Medium-High
+      category: Core Functionality
+    - id: df-support-metadata-primitives
+      file: TODO/main/planning/df-support-metadata-primitives.yaml
+      title: Add DataFrame execution support to Metadata Primitives benchmark
+      priority: Medium
+      category: Core Functionality
+    - id: df-support-tpchavoc
+      file: TODO/main/planning/df-support-tpchavoc.yaml
+      title: Add DataFrame execution support to TPC-Havoc benchmark
+      priority: Medium
+      category: Core Functionality
+    - id: df-support-transaction-primitives
+      file: TODO/main/planning/df-support-transaction-primitives.yaml
+      title: Add DataFrame execution support to Transaction Primitives benchmark
+      priority: Medium
+      category: Core Functionality
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
