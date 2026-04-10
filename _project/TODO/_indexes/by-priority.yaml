@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:35:05.030087'
-total_items: 24
+generated_at: '2026-04-10T11:31:08.414816'
+total_items: 25
 priorities:
   Critical:
     count: 1
@@ -10,11 +10,16 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 4
+    count: 5
     items:
     - id: fix-interactive-runner-defects
       file: TODO/main/planning/fix-interactive-runner-defects.yaml
       title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
+      category: Bug Fix
+      status: Not Started
+    - id: fix-read-primitives-query-skip-dispatch
+      file: TODO/main/planning/fix-read-primitives-query-skip-dispatch.yaml
+      title: Fix read-primitives SQL/DataFrame query skip dispatch boundaries
       category: Bug Fix
       status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth

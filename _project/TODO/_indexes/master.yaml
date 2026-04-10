@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:35:05.030032'
-total_items: 24
+generated_at: '2026-04-10T11:31:08.414776'
+total_items: 25
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -35,6 +35,23 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 4
+- id: fix-read-primitives-query-skip-dispatch
+  file: TODO/main/planning/fix-read-primitives-query-skip-dispatch.yaml
+  title: Fix read-primitives SQL/DataFrame query skip dispatch boundaries
+  worktree: main
+  category: Bug Fix
+  priority: High
+  status: Not Started
+  tags:
+  - read-primitives
+  - datafusion
+  - dataframe
+  - query-dispatch
+  - code-review-follow-up
+  estimated_effort: Small-Medium
+  work_total: 9
+  work_done: 0
+  work_ready: 1
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication

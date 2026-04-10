@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:35:05.030098'
-total_items: 24
+generated_at: '2026-04-10T11:31:08.414825'
+total_items: 25
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 19
+    count: 20
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -60,6 +60,11 @@ statuses:
     - id: fix-interactive-runner-defects
       file: TODO/main/planning/fix-interactive-runner-defects.yaml
       title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
+      priority: High
+      category: Bug Fix
+    - id: fix-read-primitives-query-skip-dispatch
+      file: TODO/main/planning/fix-read-primitives-query-skip-dispatch.yaml
+      title: Fix read-primitives SQL/DataFrame query skip dispatch boundaries
       priority: High
       category: Bug Fix
     - id: future-ideas-backlog
