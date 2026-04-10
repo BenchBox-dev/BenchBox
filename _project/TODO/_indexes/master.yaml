@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:18:58.990723'
-total_items: 27
+generated_at: '2026-04-10T10:28:07.461295'
+total_items: 26
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -454,25 +454,6 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
-- id: df-support-joinorder
-  file: TODO/main/planning/df-support-joinorder.yaml
-  title: Add DataFrame execution support to JoinOrder benchmark
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - dataframe
-  - joinorder
-  - imdb
-  - multi-table-join
-  - expression-family
-  - pandas-family
-  estimated_effort: 3-5 days
-  work_total: 7
-  work_done: 0
-  work_ready: 1
-  deferred_count: 2
 - id: define-hosted-results-contract-and-governance-model
   file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
   title: Define hosted results contract, trust labels, and governance model

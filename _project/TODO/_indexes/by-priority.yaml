@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:18:58.990924'
-total_items: 27
+generated_at: '2026-04-10T10:28:07.461347'
+total_items: 26
 priorities:
   Critical:
     count: 1
@@ -33,13 +33,8 @@ priorities:
       category: Core Functionality
       status: In Progress
   Medium-High:
-    count: 2
+    count: 1
     items:
-    - id: df-support-joinorder
-      file: TODO/main/planning/df-support-joinorder.yaml
-      title: Add DataFrame execution support to JoinOrder benchmark
-      category: Core Functionality
-      status: Not Started
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model

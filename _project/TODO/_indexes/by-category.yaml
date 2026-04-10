@@ -1,4 +1,4 @@
-generated_at: '2026-04-10T10:18:58.990905'
+generated_at: '2026-04-10T10:28:07.461330'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -33,18 +33,13 @@ categories:
       priority: High
       status: Not Started
   Core Functionality:
-    count: 13
+    count: 12
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
       title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
       priority: Medium
       status: In Progress
-    - id: df-support-joinorder
-      file: TODO/main/planning/df-support-joinorder.yaml
-      title: Add DataFrame execution support to JoinOrder benchmark
-      priority: Medium-High
-      status: Not Started
     - id: df-support-metadata-primitives
       file: TODO/main/planning/df-support-metadata-primitives.yaml
       title: Add DataFrame execution support to Metadata Primitives benchmark

@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:19:00.583594'
-total_items: 654
+generated_at: '2026-04-10T10:28:09.176816'
+total_items: 655
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 605
+    count: 606
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -476,6 +476,11 @@ statuses:
     - id: df-support-flightdata
       file: DONE/main/planning/df-support-flightdata.yaml
       title: Add DataFrame execution support to FlightData benchmark
+      priority: Medium-High
+      category: Core Functionality
+    - id: df-support-joinorder
+      file: DONE/main/planning/df-support-joinorder.yaml
+      title: Add DataFrame execution support to JoinOrder benchmark
       priority: Medium-High
       category: Core Functionality
     - id: datafusion-sql-query-transformer

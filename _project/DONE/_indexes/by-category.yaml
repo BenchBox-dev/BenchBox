@@ -1,4 +1,4 @@
-generated_at: '2026-04-10T10:19:00.583261'
+generated_at: '2026-04-10T10:28:09.176484'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -522,7 +522,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 212
+    count: 213
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -602,6 +602,11 @@ categories:
     - id: df-support-flightdata
       file: DONE/main/planning/df-support-flightdata.yaml
       title: Add DataFrame execution support to FlightData benchmark
+      priority: Medium-High
+      status: Completed
+    - id: df-support-joinorder
+      file: DONE/main/planning/df-support-joinorder.yaml
+      title: Add DataFrame execution support to JoinOrder benchmark
       priority: Medium-High
       status: Completed
     - id: datafusion-sql-query-transformer

@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:19:00.583433'
-total_items: 654
+generated_at: '2026-04-10T10:28:09.176658'
+total_items: 655
 priorities:
   Critical:
     count: 38
@@ -1371,7 +1371,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 93
+    count: 94
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1421,6 +1421,11 @@ priorities:
     - id: df-support-flightdata
       file: DONE/main/planning/df-support-flightdata.yaml
       title: Add DataFrame execution support to FlightData benchmark
+      category: Core Functionality
+      status: Completed
+    - id: df-support-joinorder
+      file: DONE/main/planning/df-support-joinorder.yaml
+      title: Add DataFrame execution support to JoinOrder benchmark
       category: Core Functionality
       status: Completed
     - id: ducklake-open-table-format

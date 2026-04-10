@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:19:00.582940'
-total_items: 654
+generated_at: '2026-04-10T10:28:09.176165'
+total_items: 655
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7325,6 +7325,26 @@ items:
   work_done: 4
   work_ready: 0
   deferred_count: 1
+- id: df-support-joinorder
+  file: DONE/main/planning/df-support-joinorder.yaml
+  title: Add DataFrame execution support to JoinOrder benchmark
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - dataframe
+  - joinorder
+  - imdb
+  - multi-table-join
+  - expression-family
+  - pandas-family
+  estimated_effort: 3-5 days
+  completed_date: '2026-04-10'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  deferred_count: 2
 - id: ducklake-open-table-format
   file: DONE/platform-expansion/planning/ducklake-open-table-format.yaml
   title: Add DuckLake Open Table Format Support
