@@ -1,4 +1,4 @@
-generated_at: '2026-04-10T11:31:08.414803'
+generated_at: '2026-04-10T11:43:25.370402'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -38,18 +38,13 @@ categories:
       priority: High
       status: Not Started
   Core Functionality:
-    count: 10
+    count: 9
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
       title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
       priority: Medium
       status: In Progress
-    - id: df-support-tpchavoc
-      file: TODO/main/planning/df-support-tpchavoc.yaml
-      title: Add DataFrame execution support to TPC-Havoc benchmark
-      priority: Medium
-      status: Not Started
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy

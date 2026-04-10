@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T11:31:08.414776'
-total_items: 25
+generated_at: '2026-04-10T11:43:25.370374'
+total_items: 24
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -303,26 +303,6 @@ items:
   work_total: 9
   work_done: 0
   work_ready: 1
-- id: df-support-tpchavoc
-  file: TODO/main/planning/df-support-tpchavoc.yaml
-  title: Add DataFrame execution support to TPC-Havoc benchmark
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - dataframe
-  - tpchavoc
-  - tpch
-  - query-variants
-  - optimizer
-  - expression-family
-  - pandas-family
-  estimated_effort: 5-8 days
-  work_total: 11
-  work_done: 0
-  work_ready: 1
-  deferred_count: 2
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml
   title: Add Hypothesis property-based tests for pure-function invariants

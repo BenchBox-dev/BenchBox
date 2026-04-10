@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:35:06.666566'
-total_items: 657
+generated_at: '2026-04-10T11:43:27.006537'
+total_items: 658
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4506,6 +4506,27 @@ items:
   completed_date: '2026-04-10'
   work_total: 4
   work_done: 4
+  work_ready: 0
+  deferred_count: 3
+- id: df-support-tpchavoc
+  file: DONE/main/planning/df-support-tpchavoc.yaml
+  title: Add DataFrame execution support to TPC-Havoc benchmark
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - dataframe
+  - tpchavoc
+  - tpch
+  - query-variants
+  - optimizer
+  - expression-family
+  - pandas-family
+  estimated_effort: 5-8 days
+  completed_date: '2026-04-10'
+  work_total: 11
+  work_done: 11
   work_ready: 0
   deferred_count: 3
 - id: df-support-transaction-primitives

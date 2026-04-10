@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T11:31:08.414816'
-total_items: 25
+generated_at: '2026-04-10T11:43:25.370414'
+total_items: 24
 priorities:
   Critical:
     count: 1
@@ -46,7 +46,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 9
+    count: 8
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -57,11 +57,6 @@ priorities:
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: df-support-tpchavoc
-      file: TODO/main/planning/df-support-tpchavoc.yaml
-      title: Add DataFrame execution support to TPC-Havoc benchmark
-      category: Core Functionality
       status: Not Started
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml

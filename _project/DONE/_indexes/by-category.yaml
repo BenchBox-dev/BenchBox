@@ -1,4 +1,4 @@
-generated_at: '2026-04-10T10:35:06.666891'
+generated_at: '2026-04-10T11:43:27.006839'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -522,7 +522,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 215
+    count: 216
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -612,6 +612,11 @@ categories:
     - id: df-support-metadata-primitives
       file: DONE/main/planning/df-support-metadata-primitives.yaml
       title: Add DataFrame execution support to Metadata Primitives benchmark
+      priority: Medium
+      status: Completed
+    - id: df-support-tpchavoc
+      file: DONE/main/planning/df-support-tpchavoc.yaml
+      title: Add DataFrame execution support to TPC-Havoc benchmark
       priority: Medium
       status: Completed
     - id: df-support-transaction-primitives

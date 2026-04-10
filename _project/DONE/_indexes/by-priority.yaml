@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:35:06.667062'
-total_items: 657
+generated_at: '2026-04-10T11:43:27.006996'
+total_items: 658
 priorities:
   Critical:
     count: 38
@@ -1845,7 +1845,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 268
+    count: 269
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2000,6 +2000,11 @@ priorities:
     - id: df-support-metadata-primitives
       file: DONE/main/planning/df-support-metadata-primitives.yaml
       title: Add DataFrame execution support to Metadata Primitives benchmark
+      category: Core Functionality
+      status: Completed
+    - id: df-support-tpchavoc
+      file: DONE/main/planning/df-support-tpchavoc.yaml
+      title: Add DataFrame execution support to TPC-Havoc benchmark
       category: Core Functionality
       status: Completed
     - id: df-support-transaction-primitives
