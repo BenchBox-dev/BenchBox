@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T09:48:25.434772'
-total_items: 28
+generated_at: '2026-04-10T10:18:58.990924'
+total_items: 27
 priorities:
   Critical:
     count: 1
@@ -33,13 +33,8 @@ priorities:
       category: Core Functionality
       status: In Progress
   Medium-High:
-    count: 3
+    count: 2
     items:
-    - id: df-support-flightdata
-      file: TODO/main/planning/df-support-flightdata.yaml
-      title: Add DataFrame execution support to FlightData benchmark
-      category: Core Functionality
-      status: Not Started
     - id: df-support-joinorder
       file: TODO/main/planning/df-support-joinorder.yaml
       title: Add DataFrame execution support to JoinOrder benchmark

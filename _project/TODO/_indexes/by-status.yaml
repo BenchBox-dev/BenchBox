@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T09:48:25.434783'
-total_items: 28
+generated_at: '2026-04-10T10:18:58.990935'
+total_items: 27
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 23
+    count: 22
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -27,11 +27,6 @@ statuses:
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       priority: Medium
       category: Platform Expansion
-    - id: df-support-flightdata
-      file: TODO/main/planning/df-support-flightdata.yaml
-      title: Add DataFrame execution support to FlightData benchmark
-      priority: Medium-High
-      category: Core Functionality
     - id: df-support-joinorder
       file: TODO/main/planning/df-support-joinorder.yaml
       title: Add DataFrame execution support to JoinOrder benchmark

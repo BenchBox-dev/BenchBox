@@ -1,4 +1,4 @@
-generated_at: '2026-04-10T09:41:19.771233'
+generated_at: '2026-04-10T10:19:00.583261'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -522,7 +522,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 211
+    count: 212
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -598,6 +598,11 @@ categories:
       file: DONE/benchmark-expansion/planning/datavault-benchmark-implementation.yaml
       title: Add Data Vault Benchmark Implementation
       priority: Medium
+      status: Completed
+    - id: df-support-flightdata
+      file: DONE/main/planning/df-support-flightdata.yaml
+      title: Add DataFrame execution support to FlightData benchmark
+      priority: Medium-High
       status: Completed
     - id: datafusion-sql-query-transformer
       file: DONE/core-functionality/active/datafusion-sql-query-transformer.yaml

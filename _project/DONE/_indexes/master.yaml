@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T09:41:19.770958'
-total_items: 653
+generated_at: '2026-04-10T10:19:00.582940'
+total_items: 654
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7306,6 +7306,25 @@ items:
   work_total: 4
   work_done: 4
   work_ready: 0
+- id: df-support-flightdata
+  file: DONE/main/planning/df-support-flightdata.yaml
+  title: Add DataFrame execution support to FlightData benchmark
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - dataframe
+  - flightdata
+  - olap
+  - expression-family
+  - pandas-family
+  estimated_effort: 2-3 days
+  completed_date: '2026-04-10'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  deferred_count: 1
 - id: ducklake-open-table-format
   file: DONE/platform-expansion/planning/ducklake-open-table-format.yaml
   title: Add DuckLake Open Table Format Support

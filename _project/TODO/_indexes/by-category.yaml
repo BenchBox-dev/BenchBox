@@ -1,4 +1,4 @@
-generated_at: '2026-04-10T09:48:25.434756'
+generated_at: '2026-04-10T10:18:58.990905'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -33,18 +33,13 @@ categories:
       priority: High
       status: Not Started
   Core Functionality:
-    count: 14
+    count: 13
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
       title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
       priority: Medium
       status: In Progress
-    - id: df-support-flightdata
-      file: TODO/main/planning/df-support-flightdata.yaml
-      title: Add DataFrame execution support to FlightData benchmark
-      priority: Medium-High
-      status: Not Started
     - id: df-support-joinorder
       file: TODO/main/planning/df-support-joinorder.yaml
       title: Add DataFrame execution support to JoinOrder benchmark

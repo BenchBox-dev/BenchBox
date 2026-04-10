@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T09:48:25.434727'
-total_items: 28
+generated_at: '2026-04-10T10:18:58.990723'
+total_items: 27
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -454,24 +454,6 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
-- id: df-support-flightdata
-  file: TODO/main/planning/df-support-flightdata.yaml
-  title: Add DataFrame execution support to FlightData benchmark
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - dataframe
-  - flightdata
-  - olap
-  - expression-family
-  - pandas-family
-  estimated_effort: 2-3 days
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  deferred_count: 1
 - id: df-support-joinorder
   file: TODO/main/planning/df-support-joinorder.yaml
   title: Add DataFrame execution support to JoinOrder benchmark
