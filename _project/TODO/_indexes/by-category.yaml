@@ -1,4 +1,4 @@
-generated_at: '2026-04-10T10:28:07.461330'
+generated_at: '2026-04-10T10:32:38.884486'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -33,7 +33,7 @@ categories:
       priority: High
       status: Not Started
   Core Functionality:
-    count: 12
+    count: 11
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -48,11 +48,6 @@ categories:
     - id: df-support-tpchavoc
       file: TODO/main/planning/df-support-tpchavoc.yaml
       title: Add DataFrame execution support to TPC-Havoc benchmark
-      priority: Medium
-      status: Not Started
-    - id: df-support-transaction-primitives
-      file: TODO/main/planning/df-support-transaction-primitives.yaml
-      title: Add DataFrame execution support to Transaction Primitives benchmark
       priority: Medium
       status: Not Started
     - id: define-results-platform-product-and-launch-strategy

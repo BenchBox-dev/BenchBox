@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:28:09.176165'
-total_items: 655
+generated_at: '2026-04-10T10:32:40.507409'
+total_items: 656
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4487,6 +4487,26 @@ items:
   priority: Medium
   status: Completed
   completed_date: '2025-11-28'
+- id: df-support-transaction-primitives
+  file: DONE/main/planning/df-support-transaction-primitives.yaml
+  title: Add DataFrame execution support to Transaction Primitives benchmark
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - dataframe
+  - transaction-primitives
+  - pyspark
+  - delta-lake
+  - iceberg
+  - acid
+  estimated_effort: 2-3 days
+  completed_date: '2026-04-10'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  deferred_count: 3
 - id: add-dry-run-support-to-all-example-scripts
   file: DONE/docs-experience/active/add-dry-run-support-to-all-example-scripts.yaml
   title: Add Dry Run Support to All Example Scripts

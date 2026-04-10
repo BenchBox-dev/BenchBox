@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:28:07.461357'
-total_items: 26
+generated_at: '2026-04-10T10:32:38.884512'
+total_items: 25
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 21
+    count: 20
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -35,11 +35,6 @@ statuses:
     - id: df-support-tpchavoc
       file: TODO/main/planning/df-support-tpchavoc.yaml
       title: Add DataFrame execution support to TPC-Havoc benchmark
-      priority: Medium
-      category: Core Functionality
-    - id: df-support-transaction-primitives
-      file: TODO/main/planning/df-support-transaction-primitives.yaml
-      title: Add DataFrame execution support to Transaction Primitives benchmark
       priority: Medium
       category: Core Functionality
     - id: add-hypothesis-property-tests

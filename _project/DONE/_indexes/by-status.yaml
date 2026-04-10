@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:28:09.176816'
-total_items: 655
+generated_at: '2026-04-10T10:32:40.508269'
+total_items: 656
 statuses:
   In Progress:
     count: 2
@@ -256,7 +256,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 606
+    count: 607
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -482,6 +482,11 @@ statuses:
       file: DONE/main/planning/df-support-joinorder.yaml
       title: Add DataFrame execution support to JoinOrder benchmark
       priority: Medium-High
+      category: Core Functionality
+    - id: df-support-transaction-primitives
+      file: DONE/main/planning/df-support-transaction-primitives.yaml
+      title: Add DataFrame execution support to Transaction Primitives benchmark
+      priority: Medium
       category: Core Functionality
     - id: datafusion-sql-query-transformer
       file: DONE/core-functionality/active/datafusion-sql-query-transformer.yaml

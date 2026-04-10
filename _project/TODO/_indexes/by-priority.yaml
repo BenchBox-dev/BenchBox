@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T10:28:07.461347'
-total_items: 26
+generated_at: '2026-04-10T10:32:38.884502'
+total_items: 25
 priorities:
   Critical:
     count: 1
@@ -41,7 +41,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 11
+    count: 10
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -61,11 +61,6 @@ priorities:
     - id: df-support-tpchavoc
       file: TODO/main/planning/df-support-tpchavoc.yaml
       title: Add DataFrame execution support to TPC-Havoc benchmark
-      category: Core Functionality
-      status: Not Started
-    - id: df-support-transaction-primitives
-      file: TODO/main/planning/df-support-transaction-primitives.yaml
-      title: Add DataFrame execution support to Transaction Primitives benchmark
       category: Core Functionality
       status: Not Started
     - id: add-hypothesis-property-tests
