@@ -1,4 +1,4 @@
-generated_at: '2026-04-10T11:43:27.006839'
+generated_at: '2026-04-10T11:56:47.871790'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -192,13 +192,18 @@ categories:
       priority: Medium
       status: Completed
   Bug Fix:
-    count: 1
+    count: 2
     items:
     - id: fix-platform-format-preference-defaults
       file: DONE/main/planning/fix-platform-format-preference-defaults.yaml
       title: Fix data format selection to always default to platform preferences
       priority: Critical
       status: Completed
+    - id: fix-read-primitives-query-skip-dispatch
+      file: DONE/main/planning/fix-read-primitives-query-skip-dispatch.yaml
+      title: Fix read-primitives SQL/DataFrame query skip dispatch boundaries
+      priority: High
+      status: Not Started
   Bug Fixes:
     count: 2
     items:

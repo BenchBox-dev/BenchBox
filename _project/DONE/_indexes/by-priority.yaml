@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T11:43:27.006996'
-total_items: 658
+generated_at: '2026-04-10T11:56:47.871947'
+total_items: 659
 priorities:
   Critical:
     count: 38
@@ -195,7 +195,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 234
+    count: 235
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -619,6 +619,11 @@ priorities:
       title: Fix manifest validation for directory-based table formats (Delta, Iceberg, DuckLake)
       category: Core Functionality
       status: Completed
+    - id: fix-read-primitives-query-skip-dispatch
+      file: DONE/main/planning/fix-read-primitives-query-skip-dispatch.yaml
+      title: Fix read-primitives SQL/DataFrame query skip dispatch boundaries
+      category: Bug Fix
+      status: Not Started
     - id: fix-sharded-dataframe-parquet-bypass
       file: DONE/main/active/fix-sharded-dataframe-parquet-bypass.yaml
       title: Fix sharded DataFrame Parquet bypass causing Polars date-string failures

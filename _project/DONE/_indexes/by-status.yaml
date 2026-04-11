@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T11:43:27.007164'
-total_items: 658
+generated_at: '2026-04-10T11:56:47.872086'
+total_items: 659
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Usability
   Not Started:
-    count: 45
+    count: 46
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -147,6 +147,11 @@ statuses:
       title: Extract SparkSessionManager for shared PySpark session management
       priority: High
       category: Platform Expansion
+    - id: fix-read-primitives-query-skip-dispatch
+      file: DONE/main/planning/fix-read-primitives-query-skip-dispatch.yaml
+      title: Fix read-primitives SQL/DataFrame query skip dispatch boundaries
+      priority: High
+      category: Bug Fix
     - id: gpu-acceleration-benchmarking-rapids-cudf-integration
       file: DONE/ai-ml-gpu/planning/gpu-acceleration-benchmarking-rapids-cudf-integration.yaml
       title: GPU Acceleration Benchmarking & RAPIDS cuDF Integration

@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T11:43:27.006537'
-total_items: 658
+generated_at: '2026-04-10T11:56:47.871436'
+total_items: 659
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1867,6 +1867,23 @@ items:
   work_done: 8
   work_ready: 0
   deferred_count: 2
+- id: fix-read-primitives-query-skip-dispatch
+  file: DONE/main/planning/fix-read-primitives-query-skip-dispatch.yaml
+  title: Fix read-primitives SQL/DataFrame query skip dispatch boundaries
+  worktree: main
+  category: Bug Fix
+  priority: High
+  status: Not Started
+  tags:
+  - read-primitives
+  - datafusion
+  - dataframe
+  - query-dispatch
+  - code-review-follow-up
+  estimated_effort: Small-Medium
+  work_total: 9
+  work_done: 9
+  work_ready: 0
 - id: fix-sharded-dataframe-parquet-bypass
   file: DONE/main/active/fix-sharded-dataframe-parquet-bypass.yaml
   title: Fix sharded DataFrame Parquet bypass causing Polars date-string failures
