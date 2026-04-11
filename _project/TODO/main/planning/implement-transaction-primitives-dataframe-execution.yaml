@@ -69,7 +69,10 @@ work:
        already exists at line 1060 and correctly validates the platform and returns
        a DataFrameTransactionOperationsManager
     5. Iterate TransactionOperationType values from the manager
-    6. For each supported operation, call the corresponding manager.execute_*() method
+    6. For each supported operation (manager.supports_operation(op_type)), dispatch to
+       the corresponding method via getattr(manager, f"execute_{op_type.value}").
+       All 12 enum values map 1:1 to manager methods by this convention
+       (e.g. ATOMIC_INSERT → execute_atomic_insert, TIME_TRAVEL_QUERY → execute_time_travel_query)
     7. Collect results in the standard format:
        {"query_id": op_type.value, "status": "SUCCESS"|"FAILED",
         "execution_time_seconds": <measured>, "rows_returned": <actual>,
@@ -80,19 +83,35 @@ work:
     CRITICAL: Every result row MUST have execution_time_seconds > 0 for SUCCESS operations.
     A 0.0 time with SUCCESS is the exact phantom-data pattern that caused the prior defect.
 
-    Also add skip_dataframe_data_loading() → True method. Transaction primitives creates
-    its own Delta/Iceberg tables — the generic Parquet loading path is wrong for this
-    benchmark.
+    Files: benchbox/core/transaction_primitives/benchmark.py
+
+- id: w4
+  summary: Add skip_dataframe_data_loading method to TransactionPrimitivesBenchmark
+  needs: []
+  status: pending
+  notes: |
+    Add a skip_dataframe_data_loading() → True method to TransactionPrimitivesBenchmark.
+    Transaction primitives creates its own Delta/Iceberg tables — the generic Parquet
+    loading path is wrong for this benchmark. Follow the write_primitives pattern
+    (benchmark.py:1189-1191).
 
     Files: benchbox/core/transaction_primitives/benchmark.py
 
 - id: w2
-  summary: Flip registry supports_dataframe to True
-  needs: [w1]
+  summary: Flip registry supports_dataframe to True and fix num_queries
+  needs: [w1, w4]
   status: pending
   notes: |
     In benchbox/core/benchmark_registry.py line 246, change:
       "supports_dataframe": False → "supports_dataframe": True
+
+    Also update "num_queries": 8 → 12. The current registry says 8 but the
+    TransactionOperationType enum has 12 values (ATOMIC_INSERT, ATOMIC_UPDATE,
+    ATOMIC_DELETE, ATOMIC_MERGE, ROLLBACK_TO_VERSION, ROLLBACK_TO_TIMESTAMP,
+    TIME_TRAVEL_QUERY, VERSION_COMPARE, CONCURRENT_WRITE, CONFLICT_RESOLUTION,
+    SNAPSHOT_ISOLATION, READ_YOUR_WRITES). If num_queries stays at 8 while the
+    benchmark runs 12 operations, progress reporting and result validation will
+    be inconsistent.
 
     This MUST happen AFTER w1, not before or simultaneously. The prior TODO flipped
     the flag while the implementation was hollow — making the system advertise a
@@ -102,12 +121,12 @@ work:
 
 - id: w3
   summary: Write behavioral tests that verify real execution, not just instantiation
-  needs: [w1]
+  needs: [w1, w4]
   status: pending
   notes: |
     This is the guardrail work unit. The prior TODO's tests (11 tests in
     test_dataframe_operations.py) verified:
-    - Enum has 10 values ✓ (instantiation, not behavior)
+    - Enum has N values ✓ (instantiation, not behavior)
     - Registry flag is True ✓ (configuration, not behavior)
     - Platform validation rejects Polars/Pandas ✓ (validation, not execution)
     - Operations manager instantiates ✓ (construction, not execution)
@@ -246,14 +265,16 @@ verification:
     print('OK: skip_dataframe_data_loading returns True')
     "
   expected_output: "OK: skip_dataframe_data_loading returns True"
-- description: Registry reports supports_dataframe True
+- description: Registry reports supports_dataframe True and num_queries 12
   command: >
     uv run -- python -c "
     from benchbox.core.benchmark_registry import BENCHMARK_REGISTRY;
-    assert BENCHMARK_REGISTRY['transaction_primitives']['supports_dataframe'] is True;
-    print('OK: supports_dataframe is True')
+    entry = BENCHMARK_REGISTRY['transaction_primitives'];
+    assert entry['supports_dataframe'] is True, f'supports_dataframe={entry[\"supports_dataframe\"]}';
+    assert entry['num_queries'] == 12, f'num_queries={entry[\"num_queries\"]}, expected 12';
+    print('OK: supports_dataframe is True, num_queries is 12')
     "
-  expected_output: "OK: supports_dataframe is True"
+  expected_output: "OK: supports_dataframe is True, num_queries is 12"
 - description: Behavioral tests pass (not just instantiation tests)
   command: uv run -- python -m pytest tests/unit/core/transaction_primitives/test_dataframe_workload.py -v
   expected_output: all tests pass, 0 failures

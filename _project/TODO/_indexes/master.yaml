@@ -1,4 +1,4 @@
-generated_at: '2026-04-11T08:19:12.181825'
+generated_at: '2026-04-11T08:32:54.750761'
 total_items: 24
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -429,7 +429,7 @@ items:
   - delta-lake
   - defect-remediation
   estimated_effort: 1-2 days
-  work_total: 3
+  work_total: 4
   work_done: 0
-  work_ready: 1
+  work_ready: 2
   deferred_count: 2
