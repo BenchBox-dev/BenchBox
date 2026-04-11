@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T09:31:56.165766'
-total_items: 660
+generated_at: '2026-04-11T09:45:00.495911'
+total_items: 661
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 610
+    count: 611
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2734,6 +2734,11 @@ statuses:
       title: Standardize Benchmark Constraint Parameter APIs
       priority: Medium
       category: Code Quality and Technical Debt
+    - id: standardize-clickhouse-deployment-mode-contract
+      file: DONE/platform-expansion/active/standardize-clickhouse-deployment-mode-contract.yaml
+      title: Standardize ClickHouse deployment naming around deployment_mode and remove legacy mode/embedded drift
+      priority: High
+      category: Core Functionality
     - id: standardize-connection-interfaces-across-all-benchmarks
       file: DONE/unknown/planning/standardize-connection-interfaces-across-all-benchmarks.yaml
       title: Standardize Connection Interfaces Across All Benchmarks

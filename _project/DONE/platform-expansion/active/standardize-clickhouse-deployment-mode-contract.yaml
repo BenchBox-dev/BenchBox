@@ -3,7 +3,8 @@ title: "Standardize ClickHouse deployment naming around deployment_mode and remo
 worktree: platform-expansion
 category: Core Functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-11"
 deps:
   needs:
   - migrate-clickhouse-firebolt-deployment
@@ -34,6 +35,12 @@ description: |
   selector, keeps `mode` and `embedded` as compatibility-only inputs during a
   transition window, and removes stale docs/examples that still present
   ClickHouse Cloud as a deployment mode of the base `clickhouse` platform.
+
+  This item is complete only as compatibility groundwork. Its remaining
+  docs/help/test cleanup is intentionally absorbed by
+  `first-class-clickhouse-local-server-cloud-platforms`, which replaces the
+  long-term public contract with first-class `clickhouse-local`,
+  `clickhouse-server`, and `clickhouse-cloud` platform names.
 
 work:
 - id: w1

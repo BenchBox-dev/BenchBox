@@ -7,6 +7,7 @@ status: Not Started
 deps:
   needs:
   - migrate-clickhouse-firebolt-deployment
+  - standardize-clickhouse-deployment-mode-contract
 description: |
   BenchBox currently treats ClickHouse as one base platform with mixed local/server
   behavior, while ClickHouse Cloud is already a separate first-class platform. That
@@ -35,6 +36,13 @@ description: |
   clear platform registration, dependency, packaging, testing, and documentation
   boundaries while preserving shared ClickHouse SQL/tuning/workload logic underneath.
 
+  This TODO builds on the compatibility groundwork from
+  `standardize-clickhouse-deployment-mode-contract`, but it supersedes that item's
+  remaining docs/help/test cleanup. The end-state is not "keep
+  `clickhouse:local/server` but make it cleaner"; the end-state is explicit
+  first-class platform names with legacy selectors handled only as migration
+  compatibility inputs.
+
 context_sections:
   "Research Findings": |
     Code review found three structural problems that argue for first-class platform
@@ -59,28 +67,53 @@ context_sections:
     names and make Docker-backed ClickHouse server validation part of the required
     acceptance criteria, not an optional follow-up.
 
+  "Relationship To Existing TODOs": |
+    Treat `standardize-clickhouse-deployment-mode-contract` as completed
+    compatibility groundwork, not the final public contract. Its completed work
+    units provide the deployment normalizer and adapter/config cleanup this item
+    can reuse, while its remaining docs/help/test work is superseded here because
+    it still assumes `clickhouse:local/server` remains the primary UX.
+
 work:
   - id: w1
-    summary: "Define the canonical naming and migration contract so `clickhouse-local`, `clickhouse-server`, and `clickhouse-cloud` are the only documented public platform names"
+    summary: "Publish the migration contract so `clickhouse-local`, `clickhouse-server`, and `clickhouse-cloud` are canonical and bare `clickhouse` is compatibility-only"
     status: pending
     notes: |
       Inventory every surface that currently exposes `clickhouse`, `clickhouse:local`,
-      `clickhouse:server`, `mode=local`, or `embedded`. Decide compatibility behavior
-      for bare `clickhouse` and encode that decision in one migration note before
-      touching code.
+      `clickhouse:server`, `mode=local`, or `embedded`. Encode one explicit
+      migration decision before touching code: bare `clickhouse` remains accepted
+      only as a deprecating compatibility alias, with documented scope and
+      removal follow-up.
 
   - id: w2
-    summary: "Register `clickhouse-local` and `clickhouse-server` as first-class platforms in registry, adapter-factory, lazy imports, platform hooks, and platform defaults"
+    summary: "Register `clickhouse-local` as a first-class platform in registry, lazy imports, and platform-listing surfaces"
     needs: [w1]
     status: pending
     notes: |
-      The registry should stop treating mixed `clickhouse` as the canonical public
-      platform. Installation commands, capability metadata, availability checks, and
-      driver package resolution must line up with the new names.
+      Local chDB needs its own public identity instead of leaking through mixed
+      `clickhouse` naming or internal `chdb` labels.
 
   - id: w3
-    summary: "Refactor the ClickHouse adapter boundary so local and server paths use explicit platform-specific wrappers over shared ClickHouse internals"
+    summary: "Register `clickhouse-server` as a first-class platform in registry, lazy imports, and platform-listing surfaces"
     needs: [w1]
+    status: pending
+    notes: |
+      Server ClickHouse must stop inheriting the canonical public name from the
+      mixed base platform. Capability metadata, availability checks, and family
+      relationships should make the server identity explicit.
+
+  - id: w4
+    summary: "Wire adapter factory, platform defaults, and CLI selector resolution so the new names are canonical and legacy selectors route through compatibility handling"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Registration alone is not enough. The runtime entry points must default to
+      `clickhouse-local` or `clickhouse-server` explicitly, while old selectors
+      either warn-and-map or fail with clear migration guidance.
+
+  - id: w5
+    summary: "Refactor the ClickHouse runtime boundary into explicit local/server wrappers over shared internals and fix mode-specific connection/metadata contracts"
+    needs: [w4]
     status: pending
     notes: |
       Shared SQL transformation, workload, and tuning code can stay shared, but the
@@ -88,45 +121,46 @@ work:
       are interchangeable. Fix metadata/version capture and connection handling as
       part of this split.
 
-  - id: w4
-    summary: "Align cross-cutting metadata and dependency surfaces that currently conflate `clickhouse` and chDB"
-    needs: [w2, w3]
+  - id: w6
+    summary: "Align dependency/install, cost, DDL, result-label, and database naming surfaces that still conflate `clickhouse` and chDB"
+    needs: [w4, w5]
     status: pending
     notes: |
       This includes dependency validation, install guidance, CLI database detection,
       cost categorization, DDL generator aliases, result/reporting labels, and any
       path or database naming helpers that assume one mixed ClickHouse identity.
 
-  - id: w5
-    summary: "Rewrite CLI help, docs, and README examples to teach `clickhouse-local`, `clickhouse-server`, and `clickhouse-cloud` as the canonical selectors"
-    needs: [w2, w4]
+  - id: w7
+    summary: "Rewrite CLI help, README, and platform docs to teach the explicit platform names and ship one migration note/deprecation table"
+    needs: [w1, w4, w6]
     status: pending
     notes: |
-      Product docs must stop teaching base `clickhouse`, auto-detect wording, or old
-      deployment-mode syntax as the primary path. Docker and self-hosted guidance
-      must explicitly point to `clickhouse-server`.
+      Product docs must stop teaching base `clickhouse`, auto-detect wording, or
+      old deployment-mode syntax as the primary path. The migration note should
+      define accepted legacy selectors, deprecation messaging, and the planned
+      alias-removal follow-up.
 
-  - id: w6
-    summary: "Add compatibility and migration coverage for legacy selectors while keeping the new names authoritative"
-    needs: [w2, w4]
+  - id: w8
+    summary: "Add compatibility coverage for legacy selectors, deprecation warnings, and historical config/result readability"
+    needs: [w1, w4, w6]
     status: pending
     notes: |
       If aliases are kept temporarily, test them explicitly and emit deprecation
       messaging. Historical result artifacts and config files should remain readable
       during the migration window.
 
-  - id: w7
-    summary: "Expand `clickhouse-server` validation from Docker smoke coverage to a real benchmark slice with schema creation, data loading, representative query execution, and platform-info assertions"
-    needs: [w3, w4]
+  - id: w9
+    summary: "Upgrade `clickhouse-server` Docker validation from connectivity smoke to a real benchmark slice with schema/load/query/platform-info assertions"
+    needs: [w5, w6]
     status: pending
     notes: |
       Existing Docker tests only prove connectivity. Acceptance for this item
       requires a real ClickHouse server path test that catches contract drift
       between `clickhouse-server` and `clickhouse-local`.
 
-  - id: w8
-    summary: "Run targeted verification, reconcile overlapping ClickHouse TODOs, and finish the migration with explicit follow-up decisions on alias removal"
-    needs: [w5, w6, w7]
+  - id: w10
+    summary: "Run targeted verification, retire overlapping ClickHouse naming TODOs, and leave only post-deprecation alias removal as follow-up"
+    needs: [w7, w8, w9]
     status: pending
     notes: |
       Close or supersede overlapping ClickHouse naming TODOs once the new platform
@@ -188,6 +222,8 @@ files_affected:
   - "tests/unit/core/test_platform_registry.py"
   - "tests/unit/core/test_platform_registration_alignment.py"
   - "tests/unit/cli/test_platform.py"
+  - "tests/unit/cli/test_example_argument_parser.py"
+  - "tests/unit/core/results/test_platform_info.py"
   - "tests/integration/platforms/test_clickhouse_live.py"
   - "tests/integration/test_clickhouse_local_cross_platform.py"
   - "tests/integration/test_ssb_clickhouse_integration.py"
@@ -196,6 +232,7 @@ files_affected:
   - "benchbox/platforms/clickhouse_local.py"
   - "benchbox/platforms/clickhouse_server.py"
   - "docs/platforms/clickhouse-server.md"
+  - "docs/platforms/clickhouse-migration.md"
   removed: []
 
 must_preserve:
@@ -204,8 +241,14 @@ must_preserve:
   - "Shared ClickHouse SQL transformation, workload loading, and tuning logic remain reusable across local, server, and cloud rather than forking benchmark semantics"
   - "Historical result files and configuration files using old ClickHouse labels remain readable during the migration window"
   - "The Docker testing harness for ClickHouse continues to use the existing compose stack and Makefile entrypoints rather than inventing a parallel ad-hoc test path"
+  - "The deployment normalization and legacy-read compatibility introduced by `standardize-clickhouse-deployment-mode-contract` remain reusable during the platform-name migration rather than being reimplemented from scratch"
 
 approach: |
+  Treat `standardize-clickhouse-deployment-mode-contract` as completed
+  compatibility groundwork: reuse its deployment normalizer and compatibility
+  shims where they help, but do not leave `clickhouse:local/server` as the
+  primary documented UX.
+
   Use the split-platform pattern already established by `motherduck` versus
   `duckdb` for public naming, while borrowing deployment and testing discipline
   from `timescaledb` and `firebolt` where that still makes sense.
@@ -238,12 +281,21 @@ verification:
   - description: "ClickHouse adapter and platform-info tests pass after the local/server split and connection-contract cleanup"
     command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/test_clickhouse_deployment_mode.py tests/unit/platforms/test_platform_info.py tests/unit/platforms/test_clickhouse_cloud_coverage.py -q"
     expected_output: "All targeted ClickHouse unit tests pass with no regressions in local, server, or cloud paths"
+  - description: "Legacy selectors, deprecation warnings, and compatibility guidance are explicit instead of silently preserving old naming drift"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_deployment_mode.py tests/unit/platforms/test_clickhouse_diagnostics.py tests/unit/cli/test_example_argument_parser.py tests/unit/cli/test_platform.py -q"
+    expected_output: "Legacy `clickhouse`, `clickhouse:local/server`, and old `mode`/`embedded` inputs are either supported via explicit deprecation behavior or fail with clear migration guidance"
+  - description: "Historical config payloads and result/platform labels remain readable during the migration window"
+    command: "uv run -- python -m pytest tests/unit/core/results/test_platform_info.py tests/unit/platforms/test_platform_info.py tests/unit/core/test_platform_registration_alignment.py -q"
+    expected_output: "Historical ClickHouse labels and config payloads remain readable while canonical writes and reporting use the new platform names"
   - description: "Embedded ClickHouse benchmark slices still pass under the new `clickhouse-local` identity"
     command: "uv run -- python -m pytest tests/integration/test_clickhouse_local_cross_platform.py tests/integration/test_ssb_clickhouse_integration.py -q"
     expected_output: "Local chDB integration tests pass when chdb is installed"
   - description: "Real ClickHouse server Docker tests validate schema creation, data loading, representative query execution, and platform-info capture via `clickhouse-server`"
     command: "make test-docker-clickhouse"
     expected_output: "Docker-backed ClickHouse tests pass against a real server with more than trivial connectivity checks"
+  - description: "A migration note documents the canonical names, accepted legacy selectors, deprecation messaging, and the alias-removal follow-up"
+    command: "rg -n -- 'clickhouse-local|clickhouse-server|clickhouse-cloud|deprecated|compatibility alias|legacy selector' README.md docs/platforms/"
+    expected_output: "README/docs contain one clear migration note or table covering canonical names, accepted legacy selectors, and the alias-removal follow-up"
   - description: "Product docs no longer teach bare `clickhouse` or `clickhouse:local/server` as the canonical public selectors"
     command: "rg -n -- 'clickhouse:local|clickhouse:server|--platform clickhouse\\b' README.md docs/ benchbox/cli/"
     expected_output: "No primary docs or CLI help examples present bare `clickhouse` or colon deployment syntax as the canonical selector; any remaining matches are migration notes only"
@@ -270,6 +322,7 @@ scope_limit:
   - "tests/unit/core/test_platform_registry.py"
   - "tests/unit/core/test_platform_registration_alignment.py"
   - "tests/unit/cli/"
+  - "tests/unit/core/results/test_platform_info.py"
   - "tests/integration/platforms/test_clickhouse_live.py"
   - "tests/integration/test_clickhouse_local_cross_platform.py"
   - "tests/integration/test_ssb_clickhouse_integration.py"
@@ -280,8 +333,9 @@ success_metrics:
   - "Installing local versus server ClickHouse support points users to the correct dependency path instead of a mixed driver story"
   - "Real Docker-backed `clickhouse-server` tests exercise a benchmark slice end-to-end rather than only connectivity smoke"
   - "User-facing docs and README examples consistently teach the three explicit ClickHouse platform names"
+  - "One migration note or deprecation table makes the legacy selector policy explicit instead of scattering it across docs and tests"
 
 open_questions:
-  - "Should bare `clickhouse` resolve to `clickhouse-server`, emit a hard error, or remain a deprecation alias only in specific CLI/config surfaces?"
+  - "How long should bare `clickhouse` remain accepted after deprecation messaging lands, and should that window be release-count-based or date-based?"
   - "Should the split introduce two thin top-level adapter modules (`clickhouse_local.py` and `clickhouse_server.py`) or keep registration pointed at wrapper classes inside the existing `benchbox/platforms/clickhouse/` package?"
-  - "Should product docs become three separate ClickHouse pages (`clickhouse-local`, `clickhouse-server`, `clickhouse-cloud`) or one family page plus dedicated local/server/cloud sub-guides?"
+  - "Should product docs become three separate ClickHouse pages (`clickhouse-local`, `clickhouse-server`, `clickhouse-cloud`) or one family page plus a dedicated migration note and local/server/cloud sub-guides?"

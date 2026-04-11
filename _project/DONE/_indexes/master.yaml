@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T09:31:56.165037'
-total_items: 660
+generated_at: '2026-04-11T09:45:00.495218'
+total_items: 661
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3471,6 +3471,28 @@ items:
   category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   priority: High
   status: Identified
+- id: standardize-clickhouse-deployment-mode-contract
+  file: DONE/platform-expansion/active/standardize-clickhouse-deployment-mode-contract.yaml
+  title: Standardize ClickHouse deployment naming around deployment_mode and remove legacy mode/embedded drift
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - clickhouse
+  - deployment-mode
+  - config
+  - cli
+  - docs
+  - compatibility
+  estimated_effort: 2-3 days
+  completed_date: '2026-04-11'
+  work_total: 7
+  work_done: 4
+  work_ready: 2
+  deferred_count: 1
+  needs:
+  - migrate-clickhouse-firebolt-deployment
 - id: presorted-open-table-format-datasets
   file: DONE/physical-tuning/active/presorted-open-table-format-datasets.yaml
   title: Support creation of pre-sorted / pre-clustered datasets in open table formats

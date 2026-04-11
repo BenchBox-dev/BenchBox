@@ -1,4 +1,4 @@
-generated_at: '2026-04-11T09:31:53.900311'
+generated_at: '2026-04-11T09:44:56.298825'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -33,7 +33,7 @@ categories:
       priority: High
       status: Not Started
   Core Functionality:
-    count: 10
+    count: 9
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -80,11 +80,6 @@ categories:
       title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms
       priority: High
       status: Not Started
-    - id: standardize-clickhouse-deployment-mode-contract
-      file: TODO/platform-expansion/active/standardize-clickhouse-deployment-mode-contract.yaml
-      title: Standardize ClickHouse deployment naming around deployment_mode and remove legacy mode/embedded drift
-      priority: High
-      status: In Progress
   Platform Expansion:
     count: 7
     items:
