@@ -36,7 +36,22 @@ description: |
   The correct call chain is:
     adapter._execute_queries_phase() → hasattr check → execute_dataframe_workload()
     → get_dataframe_operations(platform_name, spark_session) → manager
-    → iterate operations via manager.execute_*() methods → collect results
+    → set up Delta/Iceberg table → run operations in dependency order → collect results
+
+  IMPORTANT — Semantic equivalence, not operation-level parity:
+  The SQL path runs 23 operations (BEGIN/COMMIT overhead, savepoints, isolation levels,
+  mixed DML, advanced). The DataFrame path runs 12 operation types (atomic writes,
+  rollback-to-version, time travel, concurrent writes, snapshot isolation). These are
+  NOT the same operations — they test equivalent ACID concepts through platform-native
+  mechanisms. SQL uses BEGIN/COMMIT/ROLLBACK; Delta Lake uses atomic writes with RESTORE;
+  Iceberg uses snapshot-based isolation. The mapping is conceptual:
+    SQL commit overhead → atomic_insert/update/delete (implicit commit per write)
+    SQL rollback → rollback_to_version, rollback_to_timestamp (RESTORE)
+    SQL savepoints → No equivalent (correctly N/A for lakehouse)
+    SQL isolation levels → snapshot_isolation
+    SQL mixed DML → atomic_merge, concurrent_write, conflict_resolution
+    SQL read-your-writes → read_your_writes
+    SQL advanced → time_travel_query, version_compare
 
   Key constraints:
   - Transaction Primitives needs skip_dataframe_data_loading() → True because it
@@ -56,32 +71,103 @@ description: |
 category: Core Functionality
 work:
 - id: w1
-  summary: Implement execute_dataframe_workload body that delegates to DataFrameTransactionOperationsManager
+  summary: Implement execute_dataframe_workload with table lifecycle, operation dispatch, and result conversion
   status: pending
   notes: |
     Replace the NotImplementedError body in benchmark.py:1131-1149 with real execution.
+    This is more complex than the metadata_primitives pattern because the 12 execute_*
+    methods have HETEROGENEOUS SIGNATURES (2-5 params each, all different) and some
+    operations depend on state created by prior operations. Unlike metadata_primitives
+    where every method takes (dataframe) or (), you cannot use a uniform dispatch loop.
 
-    Follow the metadata_primitives pattern (benchmark.py:1282-1342):
-    1. Extract platform_name from adapter.platform_name
-    2. Extract spark_session from ctx (getattr(ctx, "spark_session", None))
-    3. Get config iterations from benchmark_config.options.get("power_iterations", 1)
-    4. Call self.get_dataframe_operations(platform_name, spark_session) — this method
-       already exists at line 1060 and correctly validates the platform and returns
-       a DataFrameTransactionOperationsManager
-    5. Iterate TransactionOperationType values from the manager
-    6. For each supported operation (manager.supports_operation(op_type)), dispatch to
-       the corresponding method via getattr(manager, f"execute_{op_type.value}").
-       All 12 enum values map 1:1 to manager methods by this convention
-       (e.g. ATOMIC_INSERT → execute_atomic_insert, TIME_TRAVEL_QUERY → execute_time_travel_query)
-    7. Collect results in the standard format:
-       {"query_id": op_type.value, "status": "SUCCESS"|"FAILED",
-        "execution_time_seconds": <measured>, "rows_returned": <actual>,
-        "iteration": N, "run_type": "measurement", "error": <if any>}
-    8. Honor query_filter to allow running subsets
-    9. Skip unsupported operations cleanly (status SKIPPED, not FAILED)
+    The implementation must handle four concerns:
 
-    CRITICAL: Every result row MUST have execution_time_seconds > 0 for SUCCESS operations.
-    A 0.0 time with SUCCESS is the exact phantom-data pattern that caused the prior defect.
+    --- CONCERN 1: Table lifecycle (setup/teardown) ---
+
+    The benchmark needs a Delta Lake table to operate on. Since
+    skip_dataframe_data_loading() returns True (w4), execute_dataframe_workload must
+    create and populate its own table:
+
+    1. Determine table_path: use a temp directory or adapter-provided path
+       (check ctx for a data_dir or output_dir attribute, or use tempfile)
+    2. Create initial Delta table from TPC-H source data:
+       - For PySpark: write a DataFrame (from ctx.tables or generated test data) as
+         Delta format to table_path
+       - The SQL path uses txn_orders (from TPC-H ORDERS) — use equivalent data
+    3. After all operations complete, clean up the table directory
+
+    --- CONCERN 2: Operation ordering and parameter sourcing ---
+
+    The 12 execute_* methods require operation-specific parameters that must come from
+    somewhere. They CANNOT be dispatched with a uniform getattr loop. Instead, build
+    an explicit dispatch function or dict mapping each TransactionOperationType to a
+    callable that provides the correct arguments:
+
+    Phase A — Write operations (create table state for later phases):
+      ATOMIC_INSERT: manager.execute_atomic_insert(table_path, test_dataframe)
+        → test_dataframe: small DF with TPC-H-like rows (e.g., 10 order rows)
+      ATOMIC_UPDATE: manager.execute_atomic_update(table_path, "o_orderkey > 8000000",
+        {"o_orderpriority": "1-URGENT"})
+      ATOMIC_DELETE: manager.execute_atomic_delete(table_path, "o_orderkey > 9000000")
+      ATOMIC_MERGE: manager.execute_atomic_merge(table_path, merge_source_df,
+        "target.o_orderkey = source.o_orderkey", when_matched={...}, when_not_matched={...})
+
+    Phase B — Version operations (depend on versions created in Phase A):
+      ROLLBACK_TO_VERSION: manager.execute_rollback_to_version(table_path, version=0)
+        → version 0 exists because Phase A writes created versions 1+
+      ROLLBACK_TO_TIMESTAMP: manager.execute_rollback_to_timestamp(table_path, timestamp)
+        → capture timestamp before Phase A, use it here
+      TIME_TRAVEL_QUERY: manager.execute_time_travel_query(table_path, version=0)
+      VERSION_COMPARE: manager.execute_version_compare(table_path, version1=0, version2=1)
+
+    Phase C — Concurrency/isolation operations:
+      CONCURRENT_WRITE: manager.execute_concurrent_write(table_path, [df1, df2, df3])
+        → provide 3 small DataFrames
+      CONFLICT_RESOLUTION: manager.execute_conflict_resolution(table_path, test_df,
+        resolution_strategy="retry")
+      SNAPSHOT_ISOLATION: manager.execute_snapshot_isolation(table_path)
+      READ_YOUR_WRITES: manager.execute_read_your_writes(table_path, test_df)
+
+    For each operation:
+    - Check manager.supports_operation(op_type) first — skip if unsupported
+    - Check query_filter — skip if not in filter
+    - Wrap in try/except — failed operations produce FAILED results, not exceptions
+
+    --- CONCERN 3: Result type conversion ---
+
+    Each execute_* returns DataFrameTransactionResult (dataclass with duration_ms,
+    rows_affected, success, error_message, validation_passed, metrics).
+    The adapter expects list[dict] with specific keys. Convert:
+      {
+        "query_id": op_type.value,               # e.g. "atomic_insert"
+        "status": "SUCCESS" if result.success else "FAILED",
+        "execution_time_seconds": result.duration_ms / 1000.0,
+        "rows_returned": result.rows_affected,
+        "iteration": iteration_number,
+        "run_type": "measurement",
+        **({"error": result.error_message} if result.error_message else {}),
+      }
+    For unsupported/filtered operations, emit SKIPPED (not FAILED, not omitted).
+
+    --- CONCERN 4: Iteration support ---
+
+    Get iterations from benchmark_config.options.get("power_iterations", 1).
+    For each iteration, re-run all operations. Between iterations, the table state
+    from the prior iteration may need resetting (re-create the initial table or
+    use rollback_to_version(0) to restore baseline).
+
+    CRITICAL: Every SUCCESS result row MUST have execution_time_seconds > 0.
+    A 0.0 time with SUCCESS is the exact phantom-data pattern from the prior defect.
+
+    --- Test data generation ---
+
+    The execute_dataframe_workload method needs to create small test DataFrames for
+    operations that require them (insert, merge, concurrent_write, etc.). Use
+    PySpark's createDataFrame() with TPC-H ORDERS schema columns:
+      o_orderkey, o_custkey, o_orderstatus, o_totalprice, o_orderdate,
+      o_orderpriority, o_clerk, o_shippriority, o_comment
+    Generate 10-50 synthetic rows with keys in the 8000000-9000000 range (matching
+    the SQL path's staging data range).
 
     Files: benchbox/core/transaction_primitives/benchmark.py
 
@@ -142,12 +228,26 @@ work:
     4. Assert that unsupported operations produce SKIPPED status, not SUCCESS
     5. Assert that query_filter correctly limits which operations run
     6. Verify skip_dataframe_data_loading() returns True
+    7. Assert result dict format matches adapter contract: every result dict MUST
+       have keys query_id, status, execution_time_seconds, rows_returned, iteration,
+       run_type. execution_time_seconds must be float (converted from ms), not ms.
+    8. Assert operation ordering: rollback/time-travel operations must not run
+       before write operations that create the versions they depend on
+    9. Assert table lifecycle: verify that setup (table creation) and teardown
+       (table cleanup) are called, not just the operations between them
 
     Test structure:
     - Mock the DataFrameTransactionOperationsManager to avoid needing real PySpark/Delta
+    - Configure mock execute_* methods to return DataFrameTransactionResult with
+      realistic timing (duration_ms > 0) — import the result type and use its
+      constructor or factory methods
+    - Mock supports_operation() to control which operations are "supported"
     - Patch get_dataframe_operations() to return the mock manager
     - Call execute_dataframe_workload() and inspect the returned result dicts
-    - Use mock.assert_called_once() to verify delegation happened
+    - Use mock.assert_called_once() / assert_called_with() to verify:
+      a) delegation happened
+      b) correct parameters were passed (table_path, dataframe, condition, etc.)
+      c) operations that depend on prior state ran AFTER their dependencies
 
     Tests go in tests/unit/core/transaction_primitives/test_dataframe_workload.py
     (separate file from the existing test_dataframe_operations.py which tests the
@@ -173,7 +273,7 @@ metadata:
   - pyspark
   - delta-lake
   - defect-remediation
-  estimated_effort: 1-2 days
+  estimated_effort: 2-3 days
   created_date: '2026-04-11'
   supersedes: df-support-transaction-primitives
 
@@ -201,27 +301,60 @@ must_preserve:
 - execute_dataframe_workload signature must match adapter call site (ctx, adapter, benchmark_config, query_filter, monitor, run_options) — keyword arguments, no underscore prefixes
 
 approach: |
-  Follow the metadata_primitives pattern (NOT write_primitives SQL parity pattern).
+  Follow the metadata_primitives pattern for scaffolding (NOT write_primitives SQL
+  parity), but with significant additional complexity for parameter sourcing and
+  operation ordering.
 
-  metadata_primitives.execute_dataframe_workload (benchmark.py:1282-1342):
-  - Extracts platform_name and spark_session from adapter/ctx
-  - Calls self.run_dataframe_benchmark() which uses the operations manager natively
-  - Converts operation results to the standard adapter dict format
-  - Handles iteration counting and query_filter
+  Why NOT metadata_primitives' uniform dispatch:
+  metadata_primitives works with a simple loop because every execute_* method takes
+  (dataframe) or (). Transaction primitives' 12 methods have heterogeneous signatures:
+  execute_atomic_insert(table_path, dataframe), execute_atomic_update(table_path,
+  condition, updates), execute_rollback_to_version(table_path, version), etc. A uniform
+  getattr loop cannot provide the correct arguments.
 
-  Transaction primitives should do the same:
-  - Call self.get_dataframe_operations(platform_name, spark_session) (already exists, line 1060)
-  - Iterate supported operations from the manager
-  - Time each operation via the manager's execute_*() methods
-  - Return results in adapter-compatible format
+  Recommended structure for execute_dataframe_workload:
+  1. Setup: create Delta table from synthetic TPC-H data, record table_path
+  2. Build an ordered list of (op_type, callable) pairs where each callable captures
+     the correct arguments for that operation (e.g., via a helper method per operation
+     or a dispatch dict with lambdas/partials)
+  3. Filter by query_filter and manager.supports_operation()
+  4. Execute in dependency order (writes before rollbacks/time-travel)
+  5. Convert DataFrameTransactionResult → adapter dict format
+  6. Teardown: clean up Delta table
 
-  The existing get_dataframe_operations() method validates the platform, creates the
-  manager, and returns it. The new code just needs to call it and iterate.
+  Why NOT SQL parity (DuckDB intermediary):
+  Transaction semantics are platform-specific. Delta Lake RESTORE, Iceberg snapshot
+  isolation, and PySpark conflict detection are the things being benchmarked. DuckDB
+  would test its own transactions, not the target platform's.
+
+  Semantic equivalence note:
+  The SQL path runs 23 operations; the DataFrame path runs 12. These test equivalent
+  ACID concepts through different mechanisms. Results are comparable at the category
+  level (commit overhead, rollback, isolation), not at the individual operation level.
+  This is by design — lakehouse transactions are fundamentally different from SQL
+  BEGIN/COMMIT/ROLLBACK.
+
+  The existing get_dataframe_operations() method (line 1060) validates the platform,
+  creates the manager, and returns it. Use it as the entry point.
 
 anti_patterns:
 - DO NOT emit result rows without calling an operation method — because this is exactly the
   phantom-data defect from the prior attempt. Every result row must come from a real
   manager.execute_*() call with measured timing.
+- DO NOT use a uniform getattr dispatch loop like getattr(manager, f"execute_{op.value}")()
+  — because the 12 execute_* methods have heterogeneous signatures (2-5 params each, all
+  different). execute_atomic_insert needs (table_path, dataframe), execute_atomic_update
+  needs (table_path, condition, updates), execute_rollback_to_version needs (table_path,
+  version). A uniform loop cannot provide correct arguments. Build an explicit dispatch
+  map or per-operation helper.
+- DO NOT call rollback/time-travel operations before write operations — because rollback
+  needs version numbers created by prior writes, time_travel_query needs historical
+  versions to exist, and version_compare needs two distinct versions. Operations must run
+  in dependency order (writes first, then version ops, then concurrency/isolation ops).
+- DO NOT skip table setup/teardown — because every execute_* method requires a table_path
+  pointing to a real Delta/Iceberg table. The SQL path has staging tables created by
+  setup(). The DataFrame path must create its own Delta table before operations and clean
+  it up after.
 - DO NOT use the SQL parity pattern (DuckDB intermediary) — because transaction semantics
   are platform-specific (Delta RESTORE, Iceberg snapshots). Routing through DuckDB tests
   DuckDB transactions, not the target platform's.
@@ -234,6 +367,11 @@ anti_patterns:
 - DO NOT write tests that only verify object construction or config flags — because
   the prior attempt had 11 such tests and none caught the hollow implementation. Every
   test must verify execution behavior (method calls, non-zero times, correct result format).
+- DO NOT assume 1:1 parity between SQL operations (23) and DataFrame operations (12) —
+  because they test equivalent ACID concepts through different mechanisms. The SQL path
+  tests BEGIN/COMMIT/ROLLBACK, savepoints, and isolation levels. The DataFrame path tests
+  atomic writes, RESTORE, time travel, and snapshot isolation. Results are comparable at
+  the category level, not the individual operation level.
 
 verification:
 - description: execute_dataframe_workload does not raise NotImplementedError

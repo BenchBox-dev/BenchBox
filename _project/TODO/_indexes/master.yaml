@@ -1,4 +1,4 @@
-generated_at: '2026-04-11T08:32:54.750761'
+generated_at: '2026-04-11T08:41:37.861254'
 total_items: 24
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -428,7 +428,7 @@ items:
   - pyspark
   - delta-lake
   - defect-remediation
-  estimated_effort: 1-2 days
+  estimated_effort: 2-3 days
   work_total: 4
   work_done: 0
   work_ready: 2
