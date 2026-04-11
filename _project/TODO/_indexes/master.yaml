@@ -1,5 +1,5 @@
-generated_at: '2026-04-10T11:56:46.264610'
-total_items: 23
+generated_at: '2026-04-11T08:19:12.181825'
+total_items: 24
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -415,3 +415,21 @@ items:
   work_ready: 0
   needs:
   - define-results-platform-product-and-launch-strategy
+- id: implement-transaction-primitives-dataframe-execution
+  file: TODO/main/planning/implement-transaction-primitives-dataframe-execution.yaml
+  title: Implement execute_dataframe_workload for Transaction Primitives (replaces hollow prior attempt)
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - dataframe
+  - transaction-primitives
+  - pyspark
+  - delta-lake
+  - defect-remediation
+  estimated_effort: 1-2 days
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  deferred_count: 2

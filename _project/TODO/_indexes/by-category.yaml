@@ -1,4 +1,4 @@
-generated_at: '2026-04-10T11:56:46.264638'
+generated_at: '2026-04-11T08:19:12.181854'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -33,7 +33,7 @@ categories:
       priority: High
       status: Not Started
   Core Functionality:
-    count: 9
+    count: 10
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -65,6 +65,11 @@ categories:
       title: Implement PR-based community result submission workflow
       priority: Medium
       status: Completed
+    - id: implement-transaction-primitives-dataframe-execution
+      file: TODO/main/planning/implement-transaction-primitives-dataframe-execution.yaml
+      title: Implement execute_dataframe_workload for Transaction Primitives (replaces hollow prior attempt)
+      priority: Medium-High
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

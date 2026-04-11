@@ -1,0 +1,274 @@
+id: implement-transaction-primitives-dataframe-execution
+title: Implement execute_dataframe_workload for Transaction Primitives (replaces hollow prior attempt)
+worktree: main
+priority: Medium-High
+status: Not Started
+description: |
+  The prior TODO df-support-transaction-primitives (commit b6dd3b91c) was marked complete
+  but delivered a functionally hollow implementation. The execute_dataframe_workload method
+  emitted phantom SUCCESS/0ms rows for all operations without calling the
+  DataFrameTransactionOperationsManager. It now raises NotImplementedError.
+
+  This TODO implements the REAL execution path. The infrastructure is solid — a fully
+  implemented DataFrameTransactionOperationsManager exists (1290 lines in
+  dataframe_operations.py) with 12 operation types, per-platform capability profiles,
+  and comprehensive unit tests at the operations-manager level. What's missing is
+  the bridge between the adapter dispatch and that manager.
+
+  There are TWO viable implementation patterns in the codebase:
+
+  Pattern A — SQL Parity (write_primitives): Spin up a temporary DuckDB, load data,
+  execute each operation through the SQL operation catalog. Ensures DataFrame-mode results
+  are semantically identical to SQL-mode results.
+  Reference: write_primitives/benchmark.py:1234-1345
+
+  Pattern B — Native DataFrame Execution (metadata_primitives): Call
+  run_dataframe_benchmark() which uses the operations manager directly on real
+  DataFrames/SparkSessions, producing results from actual platform execution.
+  Reference: metadata_primitives/benchmark.py:1282-1342
+
+  Transaction primitives MUST use Pattern B. Unlike write_primitives (where operations
+  map cleanly to SQL INSERT/UPDATE/DELETE), transaction operations test ACID semantics
+  that are fundamentally platform-specific: Delta Lake RESTORE for rollback, Iceberg
+  snapshot isolation, PySpark concurrent write conflict detection. Routing through DuckDB
+  would test DuckDB's transaction semantics, not the target platform's.
+
+  The correct call chain is:
+    adapter._execute_queries_phase() → hasattr check → execute_dataframe_workload()
+    → get_dataframe_operations(platform_name, spark_session) → manager
+    → iterate operations via manager.execute_*() methods → collect results
+
+  Key constraints:
+  - Transaction Primitives needs skip_dataframe_data_loading() → True because it
+    manages its own table lifecycle (Delta/Iceberg tables, not Parquet files)
+  - Only PySpark+Delta and PySpark+Iceberg support this benchmark in DataFrame mode
+  - Polars/Pandas have NO transaction support — must be rejected at supports_dataframe_mode()
+  - The benchmark registry currently shows supports_dataframe: False — must flip to True
+    only AFTER the implementation is verified functional
+
+  Root cause analysis of prior failure (prevents recurrence):
+  1. Agent wrote wiring code that compiled and passed tests but never executed operations
+  2. Tests only verified object instantiation, not execution behavior
+  3. The TODO's own approach section said "follow write_primitives pattern" but the agent
+     wrote an execute_dataframe_workload body that neither called get_dataframe_operations()
+     nor used the SQL parity approach — it just iterated the enum and returned fake rows
+  4. No test called execute_dataframe_workload or verified non-zero execution times
+category: Core Functionality
+work:
+- id: w1
+  summary: Implement execute_dataframe_workload body that delegates to DataFrameTransactionOperationsManager
+  status: pending
+  notes: |
+    Replace the NotImplementedError body in benchmark.py:1131-1149 with real execution.
+
+    Follow the metadata_primitives pattern (benchmark.py:1282-1342):
+    1. Extract platform_name from adapter.platform_name
+    2. Extract spark_session from ctx (getattr(ctx, "spark_session", None))
+    3. Get config iterations from benchmark_config.options.get("power_iterations", 1)
+    4. Call self.get_dataframe_operations(platform_name, spark_session) — this method
+       already exists at line 1060 and correctly validates the platform and returns
+       a DataFrameTransactionOperationsManager
+    5. Iterate TransactionOperationType values from the manager
+    6. For each supported operation, call the corresponding manager.execute_*() method
+    7. Collect results in the standard format:
+       {"query_id": op_type.value, "status": "SUCCESS"|"FAILED",
+        "execution_time_seconds": <measured>, "rows_returned": <actual>,
+        "iteration": N, "run_type": "measurement", "error": <if any>}
+    8. Honor query_filter to allow running subsets
+    9. Skip unsupported operations cleanly (status SKIPPED, not FAILED)
+
+    CRITICAL: Every result row MUST have execution_time_seconds > 0 for SUCCESS operations.
+    A 0.0 time with SUCCESS is the exact phantom-data pattern that caused the prior defect.
+
+    Also add skip_dataframe_data_loading() → True method. Transaction primitives creates
+    its own Delta/Iceberg tables — the generic Parquet loading path is wrong for this
+    benchmark.
+
+    Files: benchbox/core/transaction_primitives/benchmark.py
+
+- id: w2
+  summary: Flip registry supports_dataframe to True
+  needs: [w1]
+  status: pending
+  notes: |
+    In benchbox/core/benchmark_registry.py line 246, change:
+      "supports_dataframe": False → "supports_dataframe": True
+
+    This MUST happen AFTER w1, not before or simultaneously. The prior TODO flipped
+    the flag while the implementation was hollow — making the system advertise a
+    capability it couldn't deliver.
+
+    Files: benchbox/core/benchmark_registry.py
+
+- id: w3
+  summary: Write behavioral tests that verify real execution, not just instantiation
+  needs: [w1]
+  status: pending
+  notes: |
+    This is the guardrail work unit. The prior TODO's tests (11 tests in
+    test_dataframe_operations.py) verified:
+    - Enum has 10 values ✓ (instantiation, not behavior)
+    - Registry flag is True ✓ (configuration, not behavior)
+    - Platform validation rejects Polars/Pandas ✓ (validation, not execution)
+    - Operations manager instantiates ✓ (construction, not execution)
+
+    NONE of those tests would have caught the phantom-data defect. The new tests MUST:
+
+    1. Call execute_dataframe_workload() directly with a mock adapter/ctx that
+       provides a real-enough SparkSession mock (or stub the operations manager)
+    2. Assert that the returned result rows have execution_time_seconds > 0 for
+       SUCCESS operations — a zero-time SUCCESS is a test failure
+    3. Assert that the operations manager's execute_*() methods were actually called
+       (use unittest.mock to verify call counts)
+    4. Assert that unsupported operations produce SKIPPED status, not SUCCESS
+    5. Assert that query_filter correctly limits which operations run
+    6. Verify skip_dataframe_data_loading() returns True
+
+    Test structure:
+    - Mock the DataFrameTransactionOperationsManager to avoid needing real PySpark/Delta
+    - Patch get_dataframe_operations() to return the mock manager
+    - Call execute_dataframe_workload() and inspect the returned result dicts
+    - Use mock.assert_called_once() to verify delegation happened
+
+    Tests go in tests/unit/core/transaction_primitives/test_dataframe_workload.py
+    (separate file from the existing test_dataframe_operations.py which tests the
+    operations manager itself).
+
+    Files: tests/unit/core/transaction_primitives/test_dataframe_workload.py
+
+deferred:
+- summary: Integration tests with real PySpark + Delta Lake execution
+  reason: |
+    Requires PySpark + Delta Lake runtime. Add to live_integration test suite.
+    The unit tests in w3 verify delegation via mocks; integration tests verify
+    that the operations manager actually produces correct results on real tables.
+- summary: Iceberg table format support testing
+  reason: |
+    Iceberg support depends on PySpark + Iceberg catalog setup. Defer until
+    Delta Lake path is validated end-to-end.
+
+metadata:
+  tags:
+  - dataframe
+  - transaction-primitives
+  - pyspark
+  - delta-lake
+  - defect-remediation
+  estimated_effort: 1-2 days
+  created_date: '2026-04-11'
+  supersedes: df-support-transaction-primitives
+
+impact:
+  business_value: |
+    Enables transaction semantics benchmarking on lakehouse platforms (Delta Lake,
+    Iceberg) via PySpark DataFrames. Currently broken — the system either raises
+    NotImplementedError or (before the fix) emitted fabricated results.
+  user_impact: |
+    Users can run `benchbox run --platform pyspark-df --benchmark transaction_primitives`
+    to measure Delta Lake/Iceberg ACID transaction overhead and compare with SQL databases.
+
+files_affected:
+  modified:
+  - benchbox/core/transaction_primitives/benchmark.py
+  - benchbox/core/benchmark_registry.py
+  added:
+  - tests/unit/core/transaction_primitives/test_dataframe_workload.py
+
+must_preserve:
+- TransactionPrimitivesBenchmark SQL execution path — all 23 SQL operations still work via OperationExecutor
+- TPC-H staging table schema (txn_orders, txn_lineitem, txn_customer) unchanged
+- Existing get_dataframe_operations() method at benchmark.py:1060 — it works correctly, use it
+- Existing test_dataframe_operations.py tests — they test the operations manager and remain valid
+- execute_dataframe_workload signature must match adapter call site (ctx, adapter, benchmark_config, query_filter, monitor, run_options) — keyword arguments, no underscore prefixes
+
+approach: |
+  Follow the metadata_primitives pattern (NOT write_primitives SQL parity pattern).
+
+  metadata_primitives.execute_dataframe_workload (benchmark.py:1282-1342):
+  - Extracts platform_name and spark_session from adapter/ctx
+  - Calls self.run_dataframe_benchmark() which uses the operations manager natively
+  - Converts operation results to the standard adapter dict format
+  - Handles iteration counting and query_filter
+
+  Transaction primitives should do the same:
+  - Call self.get_dataframe_operations(platform_name, spark_session) (already exists, line 1060)
+  - Iterate supported operations from the manager
+  - Time each operation via the manager's execute_*() methods
+  - Return results in adapter-compatible format
+
+  The existing get_dataframe_operations() method validates the platform, creates the
+  manager, and returns it. The new code just needs to call it and iterate.
+
+anti_patterns:
+- DO NOT emit result rows without calling an operation method — because this is exactly the
+  phantom-data defect from the prior attempt. Every result row must come from a real
+  manager.execute_*() call with measured timing.
+- DO NOT use the SQL parity pattern (DuckDB intermediary) — because transaction semantics
+  are platform-specific (Delta RESTORE, Iceberg snapshots). Routing through DuckDB tests
+  DuckDB transactions, not the target platform's.
+- DO NOT rename keyword parameters with underscore prefixes (_monitor, _run_options) —
+  because the adapter passes them as keyword arguments by name. Renaming breaks the call
+  site with TypeError. Use # noqa: ARG002 if linter complains.
+- DO NOT flip supports_dataframe to True before execute_dataframe_workload is functional —
+  because this is what the prior attempt did, creating a system that advertised a broken
+  capability.
+- DO NOT write tests that only verify object construction or config flags — because
+  the prior attempt had 11 such tests and none caught the hollow implementation. Every
+  test must verify execution behavior (method calls, non-zero times, correct result format).
+
+verification:
+- description: execute_dataframe_workload does not raise NotImplementedError
+  command: >
+    uv run -- python -c "
+    from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark;
+    b = TransactionPrimitivesBenchmark();
+    assert hasattr(b, 'execute_dataframe_workload');
+    import inspect; src = inspect.getsource(b.execute_dataframe_workload);
+    assert 'NotImplementedError' not in src, 'Still raises NotImplementedError';
+    print('OK: execute_dataframe_workload has real implementation')
+    "
+  expected_output: "OK: execute_dataframe_workload has real implementation"
+- description: execute_dataframe_workload calls get_dataframe_operations (source check)
+  command: >
+    uv run -- python -c "
+    from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark;
+    import inspect; src = inspect.getsource(TransactionPrimitivesBenchmark.execute_dataframe_workload);
+    assert 'get_dataframe_operations' in src, 'Does not delegate to get_dataframe_operations';
+    print('OK: delegates to get_dataframe_operations')
+    "
+  expected_output: "OK: delegates to get_dataframe_operations"
+- description: skip_dataframe_data_loading returns True
+  command: >
+    uv run -- python -c "
+    from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark;
+    b = TransactionPrimitivesBenchmark();
+    assert b.skip_dataframe_data_loading() is True;
+    print('OK: skip_dataframe_data_loading returns True')
+    "
+  expected_output: "OK: skip_dataframe_data_loading returns True"
+- description: Registry reports supports_dataframe True
+  command: >
+    uv run -- python -c "
+    from benchbox.core.benchmark_registry import BENCHMARK_REGISTRY;
+    assert BENCHMARK_REGISTRY['transaction_primitives']['supports_dataframe'] is True;
+    print('OK: supports_dataframe is True')
+    "
+  expected_output: "OK: supports_dataframe is True"
+- description: Behavioral tests pass (not just instantiation tests)
+  command: uv run -- python -m pytest tests/unit/core/transaction_primitives/test_dataframe_workload.py -v
+  expected_output: all tests pass, 0 failures
+- description: Existing operations manager tests still pass
+  command: uv run -- python -m pytest tests/unit/core/transaction_primitives/ -v
+  expected_output: all tests pass, 0 failures
+
+scope_limit:
+  only_modify:
+  - benchbox/core/transaction_primitives/benchmark.py
+  - benchbox/core/benchmark_registry.py
+  - tests/unit/core/transaction_primitives/
+  do_not_modify:
+  - benchbox/platforms/dataframe/benchmark_mixin.py
+  - benchbox/core/runner/
+  - benchbox/core/dataframe/
+  - benchbox/platforms/
+  - benchbox/core/transaction_primitives/dataframe_operations.py  # already works, don't touch
