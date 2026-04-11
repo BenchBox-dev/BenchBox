@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T09:45:00.495744'
-total_items: 661
+generated_at: '2026-04-11T10:26:56.426656'
+total_items: 662
 priorities:
   Critical:
     count: 38
@@ -195,7 +195,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 236
+    count: 237
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -1128,6 +1128,11 @@ priorities:
       file: DONE/security-hardening/secure-credential-handling.yaml
       title: Secure Credential Handling
       category: Security and Reliability
+      status: Completed
+    - id: first-class-clickhouse-local-server-cloud-platforms
+      file: DONE/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
+      title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms
+      category: Core Functionality
       status: Completed
     - id: stabilize-full-test-suite-failures
       file: DONE/testing-improvements/completed/stabilize-full-test-suite-failures.yaml

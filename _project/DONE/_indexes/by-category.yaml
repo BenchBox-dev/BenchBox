@@ -1,4 +1,4 @@
-generated_at: '2026-04-11T09:45:00.495568'
+generated_at: '2026-04-11T10:26:56.426474'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -527,7 +527,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 218
+    count: 219
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1550,6 +1550,11 @@ categories:
       file: DONE/core-functionality/active/complexity-generators-pipelines-w14.yaml
       title: Simplify data generator and pipeline loading functions (complexity batch 5)
       priority: Medium
+      status: Completed
+    - id: first-class-clickhouse-local-server-cloud-platforms
+      file: DONE/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
+      title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms
+      priority: High
       status: Completed
     - id: standardize-clickhouse-deployment-mode-contract
       file: DONE/platform-expansion/active/standardize-clickhouse-deployment-mode-contract.yaml

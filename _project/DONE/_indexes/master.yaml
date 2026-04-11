@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T09:45:00.495218'
-total_items: 661
+generated_at: '2026-04-11T10:26:56.426161'
+total_items: 662
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3452,6 +3452,30 @@ items:
   priority: High
   status: Completed
   completed_date: '2025-11-27'
+- id: first-class-clickhouse-local-server-cloud-platforms
+  file: DONE/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
+  title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - clickhouse
+  - clickhouse-local
+  - clickhouse-server
+  - clickhouse-cloud
+  - platform-registration
+  - docker
+  - migration
+  estimated_effort: 4-6 days
+  completed_date: '2026-04-11'
+  work_total: 10
+  work_done: 9
+  work_ready: 1
+  deferred_count: 2
+  needs:
+  - migrate-clickhouse-firebolt-deployment
+  - standardize-clickhouse-deployment-mode-contract
 - id: stabilize-full-test-suite-failures
   file: DONE/testing-improvements/completed/stabilize-full-test-suite-failures.yaml
   title: Stabilize Full Test Suite Failures

@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T09:44:56.298838'
-total_items: 23
+generated_at: '2026-04-11T10:26:54.852693'
+total_items: 22
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 4
+    count: 3
     items:
     - id: fix-interactive-runner-defects
       file: TODO/main/planning/fix-interactive-runner-defects.yaml
@@ -26,11 +26,6 @@ priorities:
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
-      status: Not Started
-    - id: first-class-clickhouse-local-server-cloud-platforms
-      file: TODO/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
-      title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms
-      category: Core Functionality
       status: Not Started
   Medium-High:
     count: 1

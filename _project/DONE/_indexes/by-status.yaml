@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T09:45:00.495911'
-total_items: 661
+generated_at: '2026-04-11T10:26:56.426818'
+total_items: 662
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 611
+    count: 612
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2724,6 +2724,11 @@ statuses:
       title: Snowpark Connect for Spark Platform
       priority: Medium-High
       category: Platform Expansion
+    - id: first-class-clickhouse-local-server-cloud-platforms
+      file: DONE/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
+      title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms
+      priority: High
+      category: Core Functionality
     - id: stabilize-full-test-suite-failures
       file: DONE/testing-improvements/completed/stabilize-full-test-suite-failures.yaml
       title: Stabilize Full Test Suite Failures
