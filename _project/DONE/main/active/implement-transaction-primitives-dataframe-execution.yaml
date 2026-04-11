@@ -2,7 +2,8 @@ id: implement-transaction-primitives-dataframe-execution
 title: Implement execute_dataframe_workload for Transaction Primitives (replaces hollow prior attempt)
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: '2026-04-11'
 description: |
   The prior TODO df-support-transaction-primitives (commit b6dd3b91c) was marked complete
   but delivered a functionally hollow implementation. The execute_dataframe_workload method
@@ -72,7 +73,7 @@ category: Core Functionality
 work:
 - id: w1
   summary: Implement execute_dataframe_workload with table lifecycle, operation dispatch, and result conversion
-  status: pending
+  status: done
   notes: |
     Replace the NotImplementedError body in benchmark.py:1131-1149 with real execution.
     This is more complex than the metadata_primitives pattern because the 12 execute_*
@@ -174,7 +175,7 @@ work:
 - id: w4
   summary: Add skip_dataframe_data_loading method to TransactionPrimitivesBenchmark
   needs: []
-  status: pending
+  status: done
   notes: |
     Add a skip_dataframe_data_loading() → True method to TransactionPrimitivesBenchmark.
     Transaction primitives creates its own Delta/Iceberg tables — the generic Parquet
@@ -186,7 +187,7 @@ work:
 - id: w2
   summary: Flip registry supports_dataframe to True and fix num_queries
   needs: [w1, w4]
-  status: pending
+  status: done
   notes: |
     In benchbox/core/benchmark_registry.py line 246, change:
       "supports_dataframe": False → "supports_dataframe": True
@@ -208,7 +209,7 @@ work:
 - id: w3
   summary: Write behavioral tests that verify real execution, not just instantiation
   needs: [w1, w4]
-  status: pending
+  status: done
   notes: |
     This is the guardrail work unit. The prior TODO's tests (11 tests in
     test_dataframe_operations.py) verified:
@@ -298,7 +299,8 @@ must_preserve:
 - TPC-H staging table schema (txn_orders, txn_lineitem, txn_customer) unchanged
 - Existing get_dataframe_operations() method at benchmark.py:1060 — it works correctly, use it
 - Existing test_dataframe_operations.py tests — they test the operations manager and remain valid
-- execute_dataframe_workload signature must match adapter call site (ctx, adapter, benchmark_config, query_filter, monitor, run_options) — keyword arguments, no underscore prefixes
+- execute_dataframe_workload signature must match adapter call site (ctx, adapter, benchmark_config, query_filter,
+  monitor, run_options) — keyword arguments, no underscore prefixes
 
 approach: |
   Follow the metadata_primitives pattern for scaffolding (NOT write_primitives SQL
@@ -338,40 +340,32 @@ approach: |
   creates the manager, and returns it. Use it as the entry point.
 
 anti_patterns:
-- DO NOT emit result rows without calling an operation method — because this is exactly the
-  phantom-data defect from the prior attempt. Every result row must come from a real
-  manager.execute_*() call with measured timing.
-- DO NOT use a uniform getattr dispatch loop like getattr(manager, f"execute_{op.value}")()
-  — because the 12 execute_* methods have heterogeneous signatures (2-5 params each, all
-  different). execute_atomic_insert needs (table_path, dataframe), execute_atomic_update
-  needs (table_path, condition, updates), execute_rollback_to_version needs (table_path,
-  version). A uniform loop cannot provide correct arguments. Build an explicit dispatch
-  map or per-operation helper.
-- DO NOT call rollback/time-travel operations before write operations — because rollback
-  needs version numbers created by prior writes, time_travel_query needs historical
-  versions to exist, and version_compare needs two distinct versions. Operations must run
-  in dependency order (writes first, then version ops, then concurrency/isolation ops).
-- DO NOT skip table setup/teardown — because every execute_* method requires a table_path
-  pointing to a real Delta/Iceberg table. The SQL path has staging tables created by
-  setup(). The DataFrame path must create its own Delta table before operations and clean
-  it up after.
-- DO NOT use the SQL parity pattern (DuckDB intermediary) — because transaction semantics
-  are platform-specific (Delta RESTORE, Iceberg snapshots). Routing through DuckDB tests
-  DuckDB transactions, not the target platform's.
-- DO NOT rename keyword parameters with underscore prefixes (_monitor, _run_options) —
-  because the adapter passes them as keyword arguments by name. Renaming breaks the call
-  site with TypeError. Use # noqa: ARG002 if linter complains.
-- DO NOT flip supports_dataframe to True before execute_dataframe_workload is functional —
-  because this is what the prior attempt did, creating a system that advertised a broken
-  capability.
-- DO NOT write tests that only verify object construction or config flags — because
-  the prior attempt had 11 such tests and none caught the hollow implementation. Every
-  test must verify execution behavior (method calls, non-zero times, correct result format).
-- DO NOT assume 1:1 parity between SQL operations (23) and DataFrame operations (12) —
-  because they test equivalent ACID concepts through different mechanisms. The SQL path
-  tests BEGIN/COMMIT/ROLLBACK, savepoints, and isolation levels. The DataFrame path tests
-  atomic writes, RESTORE, time travel, and snapshot isolation. Results are comparable at
-  the category level, not the individual operation level.
+- DO NOT emit result rows without calling an operation method — because this is exactly the phantom-data defect from the
+  prior attempt. Every result row must come from a real manager.execute_*() call with measured timing.
+- DO NOT use a uniform getattr dispatch loop like getattr(manager, f"execute_{op.value}")() — because the 12 execute_*
+  methods have heterogeneous signatures (2-5 params each, all different). execute_atomic_insert needs (table_path,
+  dataframe), execute_atomic_update needs (table_path, condition, updates), execute_rollback_to_version needs
+  (table_path, version). A uniform loop cannot provide correct arguments. Build an explicit dispatch map or
+  per-operation helper.
+- DO NOT call rollback/time-travel operations before write operations — because rollback needs version numbers created
+  by prior writes, time_travel_query needs historical versions to exist, and version_compare needs two distinct
+  versions. Operations must run in dependency order (writes first, then version ops, then concurrency/isolation ops).
+- DO NOT skip table setup/teardown — because every execute_* method requires a table_path pointing to a real
+  Delta/Iceberg table. The SQL path has staging tables created by setup(). The DataFrame path must create its own Delta
+  table before operations and clean it up after.
+- DO NOT use the SQL parity pattern (DuckDB intermediary) — because transaction semantics are platform-specific (Delta
+  RESTORE, Iceberg snapshots). Routing through DuckDB tests DuckDB transactions, not the target platform's.
+- DO NOT rename keyword parameters with underscore prefixes (_monitor, _run_options) — because the adapter passes them
+  as keyword arguments by name. Renaming breaks the call site with TypeError. Use # noqa: ARG002 if linter complains.
+- DO NOT flip supports_dataframe to True before execute_dataframe_workload is functional — because this is what the
+  prior attempt did, creating a system that advertised a broken capability.
+- DO NOT write tests that only verify object construction or config flags — because the prior attempt had 11 such tests
+  and none caught the hollow implementation. Every test must verify execution behavior (method calls, non-zero times,
+  correct result format).
+- DO NOT assume 1:1 parity between SQL operations (23) and DataFrame operations (12) — because they test equivalent ACID
+  concepts through different mechanisms. The SQL path tests BEGIN/COMMIT/ROLLBACK, savepoints, and isolation levels. The
+  DataFrame path tests atomic writes, RESTORE, time travel, and snapshot isolation. Results are comparable at the
+  category level, not the individual operation level.
 
 verification:
 - description: execute_dataframe_workload does not raise NotImplementedError

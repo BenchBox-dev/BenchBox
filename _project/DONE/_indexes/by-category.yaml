@@ -1,4 +1,4 @@
-generated_at: '2026-04-11T08:19:13.714408'
+generated_at: '2026-04-11T09:03:59.077994'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -527,7 +527,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 216
+    count: 217
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1189,6 +1189,11 @@ categories:
     - id: ctas-sort-local-sql-platforms
       file: DONE/physical-tuning/active/ctas-sort-local-sql-platforms.yaml
       title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
+      priority: Medium-High
+      status: Completed
+    - id: implement-transaction-primitives-dataframe-execution
+      file: DONE/main/active/implement-transaction-primitives-dataframe-execution.yaml
+      title: Implement execute_dataframe_workload for Transaction Primitives (replaces hollow prior attempt)
       priority: Medium-High
       status: Completed
     - id: implement-explorer-home-and-browse-pages

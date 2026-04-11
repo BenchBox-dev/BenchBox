@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T08:19:13.714090'
-total_items: 659
+generated_at: '2026-04-11T09:03:59.077594'
+total_items: 660
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -8255,6 +8255,25 @@ items:
   work_ready: 0
   needs:
   - ctas-sort-dataloader-connectivity
+- id: implement-transaction-primitives-dataframe-execution
+  file: DONE/main/active/implement-transaction-primitives-dataframe-execution.yaml
+  title: Implement execute_dataframe_workload for Transaction Primitives (replaces hollow prior attempt)
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - dataframe
+  - transaction-primitives
+  - pyspark
+  - delta-lake
+  - defect-remediation
+  estimated_effort: 2-3 days
+  completed_date: '2026-04-11'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  deferred_count: 2
 - id: implement-explorer-home-and-browse-pages
   file: DONE/main/planning/implement-explorer-home-and-browse-pages.yaml
   title: Implement explorer home page and benchmark/platform browse pages

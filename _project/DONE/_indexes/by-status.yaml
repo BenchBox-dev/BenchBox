@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T08:19:13.714714'
-total_items: 659
+generated_at: '2026-04-11T09:03:59.078387'
+total_items: 660
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 609
+    count: 610
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1852,6 +1852,11 @@ statuses:
     - id: ctas-sort-local-sql-platforms
       file: DONE/physical-tuning/active/ctas-sort-local-sql-platforms.yaml
       title: Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)
+      priority: Medium-High
+      category: Core Functionality
+    - id: implement-transaction-primitives-dataframe-execution
+      file: DONE/main/active/implement-transaction-primitives-dataframe-execution.yaml
+      title: Implement execute_dataframe_workload for Transaction Primitives (replaces hollow prior attempt)
       priority: Medium-High
       category: Core Functionality
     - id: implement-explorer-home-and-browse-pages
