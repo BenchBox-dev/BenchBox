@@ -1,4 +1,4 @@
-generated_at: '2026-04-11T09:03:56.843017'
+generated_at: '2026-04-11T09:31:53.900311'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -33,7 +33,7 @@ categories:
       priority: High
       status: Not Started
   Core Functionality:
-    count: 9
+    count: 10
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -74,6 +74,11 @@ categories:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
+      status: Not Started
+    - id: first-class-clickhouse-local-server-cloud-platforms
+      file: TODO/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
+      title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms
+      priority: High
       status: Not Started
     - id: standardize-clickhouse-deployment-mode-contract
       file: TODO/platform-expansion/active/standardize-clickhouse-deployment-mode-contract.yaml

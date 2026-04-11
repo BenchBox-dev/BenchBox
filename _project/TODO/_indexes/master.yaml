@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T09:03:56.842987'
-total_items: 23
+generated_at: '2026-04-11T09:31:53.900286'
+total_items: 24
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -71,6 +71,28 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
+- id: first-class-clickhouse-local-server-cloud-platforms
+  file: TODO/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
+  title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - clickhouse
+  - clickhouse-local
+  - clickhouse-server
+  - clickhouse-cloud
+  - platform-registration
+  - docker
+  - migration
+  estimated_effort: 4-6 days
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+  deferred_count: 2
+  needs:
+  - migrate-clickhouse-firebolt-deployment
 - id: standardize-clickhouse-deployment-mode-contract
   file: TODO/platform-expansion/active/standardize-clickhouse-deployment-mode-contract.yaml
   title: Standardize ClickHouse deployment naming around deployment_mode and remove legacy mode/embedded drift

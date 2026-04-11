@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T09:03:56.843038'
-total_items: 23
+generated_at: '2026-04-11T09:31:53.900329'
+total_items: 24
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 18
+    count: 19
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -92,6 +92,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Low
       category: Platform Expansion
+    - id: first-class-clickhouse-local-server-cloud-platforms
+      file: TODO/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
+      title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms
+      priority: High
+      category: Core Functionality
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
