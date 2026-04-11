@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T08:41:37.861301'
-total_items: 24
+generated_at: '2026-04-11T09:03:56.843029'
+total_items: 23
 priorities:
   Critical:
     count: 1
@@ -33,18 +33,13 @@ priorities:
       category: Core Functionality
       status: In Progress
   Medium-High:
-    count: 2
+    count: 1
     items:
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
       category: Core Functionality
       status: Completed
-    - id: implement-transaction-primitives-dataframe-execution
-      file: TODO/main/planning/implement-transaction-primitives-dataframe-execution.yaml
-      title: Implement execute_dataframe_workload for Transaction Primitives (replaces hollow prior attempt)
-      category: Core Functionality
-      status: Not Started
   Medium:
     count: 8
     items:

@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T08:41:37.861312'
-total_items: 24
+generated_at: '2026-04-11T09:03:56.843038'
+total_items: 23
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 19
+    count: 18
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -72,11 +72,6 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: implement-transaction-primitives-dataframe-execution
-      file: TODO/main/planning/implement-transaction-primitives-dataframe-execution.yaml
-      title: Implement execute_dataframe_workload for Transaction Primitives (replaces hollow prior attempt)
-      priority: Medium-High
-      category: Core Functionality
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
