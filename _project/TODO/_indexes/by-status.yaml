@@ -1,8 +1,8 @@
-generated_at: '2026-04-12T08:12:31.985852'
-total_items: 38
+generated_at: '2026-04-12T08:13:16.192167'
+total_items: 40
 statuses:
   Not Started:
-    count: 35
+    count: 37
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -44,6 +44,11 @@ statuses:
       title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
       priority: Medium
       category: Testing and Quality Assurance
+    - id: quality-add-dependency-upper-bounds-policy
+      file: TODO/main/planning/quality-add-dependency-upper-bounds-policy.yaml
+      title: Add upper bounds on highest-risk dependencies and document policy
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: quality-audit-skip-xfail-markers-add-rationale
       file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
       title: Audit 276 skip/xfail test markers — add rationale or remove
@@ -74,6 +79,11 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
+    - id: quality-expand-agents-md-and-document-test-lock
+      file: TODO/main/planning/quality-expand-agents-md-and-document-test-lock.yaml
+      title: Expand AGENTS.md and document the test inter-process lock
+      priority: Low
+      category: Project Lifecycle Management
     - id: expand-seed-corpus-to-sf-0-1
       file: TODO/main/planning/expand-seed-corpus-to-sf-0-1.yaml
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
@@ -105,7 +115,7 @@ statuses:
       priority: High
       category: Core Functionality
     - id: make-parquet-default-for-tpcds-obt
-      file: TODO/main/planning/make-parquet-default-for-tpcds-obt.yaml
+      file: TODO/main/active/make-parquet-default-for-tpcds-obt.yaml
       title: Make Parquet the default output format for TPC-DS OBT
       priority: High
       category: Bug Fix

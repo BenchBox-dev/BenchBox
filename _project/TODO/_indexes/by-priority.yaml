@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:12:31.985842'
-total_items: 38
+generated_at: '2026-04-12T08:13:16.192157'
+total_items: 40
 priorities:
   Critical:
     count: 1
@@ -18,7 +18,7 @@ priorities:
       category: Core Functionality
       status: Not Started
     - id: make-parquet-default-for-tpcds-obt
-      file: TODO/main/planning/make-parquet-default-for-tpcds-obt.yaml
+      file: TODO/main/active/make-parquet-default-for-tpcds-obt.yaml
       title: Make Parquet the default output format for TPC-DS OBT
       category: Bug Fix
       status: Not Started
@@ -91,7 +91,7 @@ priorities:
       category: Documentation
       status: Not Started
   Medium:
-    count: 12
+    count: 13
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -107,6 +107,11 @@ priorities:
       file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
       title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
       category: Testing and Quality Assurance
+      status: Not Started
+    - id: quality-add-dependency-upper-bounds-policy
+      file: TODO/main/planning/quality-add-dependency-upper-bounds-policy.yaml
+      title: Add upper bounds on highest-risk dependencies and document policy
+      category: Code Quality and Technical Debt
       status: Not Started
     - id: quality-audit-skip-xfail-markers-add-rationale
       file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
@@ -154,7 +159,7 @@ priorities:
       category: Documentation
       status: Not Started
   Low:
-    count: 10
+    count: 11
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -165,6 +170,11 @@ priorities:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: quality-expand-agents-md-and-document-test-lock
+      file: TODO/main/planning/quality-expand-agents-md-and-document-test-lock.yaml
+      title: Expand AGENTS.md and document the test inter-process lock
+      category: Project Lifecycle Management
       status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml

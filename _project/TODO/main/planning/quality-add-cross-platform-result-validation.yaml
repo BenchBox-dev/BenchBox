@@ -1,0 +1,90 @@
+id: quality-add-cross-platform-result-validation
+title: "Add cross-platform query-result validation suite"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Testing and Quality Assurance
+description: |
+  Quality plan Phase 2b — anchor of the measurement-integrity workstream.
+  BenchBox's product is trustworthy benchmark results, but the audit found no
+  centralized correctness validation comparing query results across platforms.
+  Today, divergent results between (say) DuckDB and ClickHouse on the same
+  TPC-H query at SF=0.01 would not fail CI.
+
+  Build a `core/validation/cross_platform.py` module that runs a benchmark
+  on a reference platform (DuckDB) and a comparison platform, then asserts
+  result-set equality with per-benchmark tolerances (numeric precision,
+  ordering rules per TPC spec, NULL handling). Wire into a nightly CI matrix
+  covering DuckDB × {ClickHouse local, DataFusion, Polars-DF} at SF=0.01.
+
+  This TODO is also the safety net for the adapter-base refactor
+  (quality-refactor-adapter-base-into-cohesive-modules).
+
+work:
+  - id: w1
+    summary: "Design tolerance model: per-benchmark spec (TPC-H §2.6.3 ordering, decimal precision, NULL rules) — document in module docstring"
+    status: pending
+
+  - id: w2
+    summary: "Implement validation/cross_platform.py with compare(reference_results, comparison_results, benchmark, tolerance) returning structured diff"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Wire into pytest as parametrized tests over (benchmark, platform) pairs at SF=0.01; mark @pytest.mark.live_integration"
+    needs: [w2]
+    status: pending
+
+  - id: w4
+    summary: "Add nightly GitHub Actions workflow .github/workflows/cross-platform-validation.yml running the live_integration suite"
+    needs: [w3]
+    status: pending
+
+  - id: w5
+    summary: "Document the validation contract in docs/development/result-validation.md including how to add new platforms and tolerance overrides"
+    needs: [w2]
+    status: pending
+
+files_affected:
+  added:
+    - "benchbox/core/validation/cross_platform.py"
+    - "tests/integration/validation/test_cross_platform.py"
+    - ".github/workflows/cross-platform-validation.yml"
+    - "docs/development/result-validation.md"
+
+must_preserve:
+  - "Existing per-platform tests continue to run on PR; this is a new layer, not a replacement"
+  - "Fast test suite duration unchanged (this is live_integration, not fast)"
+
+approach: |
+  Use DuckDB as reference because (a) it's the project's lingua franca and
+  (b) TPC-H/TPC-DS expected answer sets exist for it. For each benchmark, run
+  the standard query set on reference + comparison platforms, normalize result
+  shape (column order per query spec, decimal scale), then diff. Surface
+  divergences with row/column locator + values.
+
+  For tolerances, start strict (exact match) and add per-query overrides only
+  when a real spec rule (e.g., TPC-H epsilon for floating-point aggregates)
+  justifies it.
+
+anti_patterns:
+  - "DO NOT hide divergences with loose tolerances — because that defeats the purpose — every loosened tolerance must cite a spec rule"
+  - "DO NOT run on every PR — because cross-platform suites are expensive and flaky in cloud — nightly only"
+
+verification:
+  - description: "Validation module unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/validation/ -v"
+    expected_output: "all tests pass"
+  - description: "Cross-platform suite runs end-to-end on at least one platform pair"
+    command: "uv run benchbox validate-results --reference duckdb --compare datafusion --benchmark tpch --scale 0.01"
+    expected_output: "PASS or structured diff report"
+
+metadata:
+  tags: ["quality-plan", "phase-2", "correctness", "validation"]
+  estimated_effort: "Medium (2-3 days)"
+  created_date: "2026-04-12"
+
+success_metrics:
+  - "At least 3 platform pairs (DuckDB×ClickHouse, DuckDB×DataFusion, DuckDB×Polars) validated nightly on TPC-H SF=0.01"
+  - "Any new adapter ships with a passing cross-platform validation row"
+  - "Zero silent divergences land on main"

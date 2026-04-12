@@ -1,0 +1,82 @@
+id: quality-add-perf-regression-smoke-ci
+title: "Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+description: |
+  Quality plan Phase 2d. The audit observed: "BenchBox does not benchmark
+  itself." For a benchmarking framework, this is a notable gap. A small
+  per-PR smoke run on a single fast platform/benchmark combo gives early
+  warning of orchestration overhead regressions (result builder, dialect
+  translation, validation passes, lazy-loading machinery).
+
+  Scope: DuckDB local + TPC-H SF=0.01 + power phase only. Compare wall-clock
+  to a stored baseline from main. Fail the PR check if regression exceeds 10%
+  (configurable). Store the JSON result as an artifact for trend visibility.
+
+deps:
+  needs:
+    - quality-make-timing-policy-ci-gate
+
+work:
+  - id: w1
+    summary: "Capture and commit a baseline result JSON from main (DuckDB TPC-H SF=0.01 power) at _project/baselines/perf_smoke_duckdb_tpch_001.json"
+    status: pending
+
+  - id: w2
+    summary: "Add a comparison script scripts/compare_perf_smoke.py that diffs current run vs baseline and emits PASS/FAIL with per-query deltas"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Add .github/workflows/perf-smoke.yml triggered on PR — runs the benchmark, calls the comparison script, sets PR check status"
+    needs: [w2]
+    status: pending
+
+  - id: w4
+    summary: "Add a maintainer-only label `skip-perf-smoke` and a documented baseline-refresh procedure in docs/development/perf-smoke.md"
+    needs: [w3]
+    status: pending
+
+files_affected:
+  added:
+    - "_project/baselines/perf_smoke_duckdb_tpch_001.json"
+    - "scripts/compare_perf_smoke.py"
+    - ".github/workflows/perf-smoke.yml"
+    - "docs/development/perf-smoke.md"
+
+must_preserve:
+  - "Existing CI workflows untouched"
+  - "Total CI time per PR increases by ≤2 minutes (DuckDB TPC-H SF=0.01 power runs in ~30 seconds on GH runners)"
+
+approach: |
+  Use the existing CLI: `benchbox run --platform duckdb --benchmark tpch
+  --scale 0.01 --phases power`. Read the resulting JSON, extract per-query
+  timings, compare against baseline. Use median across 3 runs to reduce
+  CI runner variance. The 10% threshold is generous because GH runners are
+  noisy; tighten over time if false-positive rate is acceptable.
+
+  For baseline refresh, document the procedure: maintainer runs the workflow
+  manually with a `--update-baseline` flag, commits the new JSON.
+
+anti_patterns:
+  - "DO NOT use mean instead of median — because GH runner outliers skew means — median over 3 runs"
+  - "DO NOT block PR on flake — because cloud CI is noisy — provide skip-perf-smoke label and document when to use it"
+  - "DO NOT expand to multi-platform initially — because flakiness compounds — start with DuckDB only"
+
+verification:
+  - description: "Baseline file exists and validates"
+    command: "uv run -- python -c 'import json; json.load(open(\"_project/baselines/perf_smoke_duckdb_tpch_001.json\"))'"
+    expected_output: "(no error)"
+  - description: "Comparison script runs against itself with 0% delta"
+    command: "uv run scripts/compare_perf_smoke.py _project/baselines/perf_smoke_duckdb_tpch_001.json _project/baselines/perf_smoke_duckdb_tpch_001.json"
+    expected_output: "PASS, max delta 0%"
+  - description: "Workflow file is valid YAML and parses with actionlint"
+    command: "actionlint .github/workflows/perf-smoke.yml"
+    expected_output: "(no errors)"
+
+metadata:
+  tags: ["quality-plan", "phase-2", "performance", "ci"]
+  estimated_effort: "Small-Medium (1-2 days)"
+  created_date: "2026-04-12"

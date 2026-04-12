@@ -1,0 +1,64 @@
+id: quality-expand-agents-md-and-document-test-lock
+title: "Expand AGENTS.md and document the test inter-process lock"
+worktree: main
+priority: Low
+status: Not Started
+category: Project Lifecycle Management
+description: |
+  Quality plan Phase 4f/4g. AGENTS.md is referenced as the canonical contributor
+  & agent guide but is only 98 lines — too thin to actually be canonical.
+  Promote frequently-needed patterns from /docs/development/ into AGENTS.md
+  so contributors and AI agents have one source of truth.
+
+  Separately, tests/conftest.py:52-209 implements a sophisticated file-based
+  inter-process test lock with a macOS-specific workaround at lines 109-122.
+  This is undocumented, fragile, and surprises new contributors. Add a
+  tests/README.md explaining what the lock does, why it exists, and when
+  the macOS branch fires.
+
+work:
+  - id: w1
+    summary: "Expand AGENTS.md sections: timing policy (1 paragraph), result validation (1 paragraph), adapter authoring guide pointer, dependency upper-bounds policy reference, common test markers cheat sheet"
+    status: pending
+
+  - id: w2
+    summary: "Write tests/README.md covering: (a) marker taxonomy, (b) the inter-process lock contract, (c) the macOS conftest branch, (d) how to add a new test category"
+    status: pending
+
+  - id: w3
+    summary: "Cross-link AGENTS.md ↔ tests/README.md ↔ docs/development/ so the entry points are obvious"
+    needs: [w1, w2]
+    status: pending
+
+files_affected:
+  modified:
+    - "AGENTS.md"
+  added:
+    - "tests/README.md"
+
+must_preserve:
+  - "AGENTS.md remains a quick reference, not a 1000-line tome — target ≤ 300 lines"
+  - "Existing /docs/development/ structure unchanged"
+  - "Test runtime/behavior unchanged (this is doc-only)"
+
+approach: |
+  AGENTS.md is the front door for contributors and AI agents. It should
+  link out to depth, not contain it. Each new section: 2-5 sentences + a
+  link to the deep-dive in /docs/development/.
+
+  For tests/README.md, treat it as onboarding doc for "I want to write a
+  new test in BenchBox" — explain the marker system, the lock, the macOS
+  quirk, and where to put fast vs slow tests.
+
+verification:
+  - description: "AGENTS.md is well-formed markdown"
+    command: "uv run --with markdownlint-cli2 markdownlint-cli2 AGENTS.md"
+    expected_output: "no errors"
+  - description: "All cross-links resolve"
+    command: "uv run --with linkchecker linkchecker --check-extern AGENTS.md tests/README.md"
+    expected_output: "no broken links"
+
+metadata:
+  tags: ["quality-plan", "phase-4", "documentation"]
+  estimated_effort: "Small (4-6 hours)"
+  created_date: "2026-04-12"

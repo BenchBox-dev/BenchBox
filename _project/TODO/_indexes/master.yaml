@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:12:31.985793'
-total_items: 38
+generated_at: '2026-04-12T08:13:16.192108'
+total_items: 40
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -41,7 +41,7 @@ items:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
 - id: make-parquet-default-for-tpcds-obt
-  file: TODO/main/planning/make-parquet-default-for-tpcds-obt.yaml
+  file: TODO/main/active/make-parquet-default-for-tpcds-obt.yaml
   title: Make Parquet the default output format for TPC-DS OBT
   worktree: main
   category: Bug Fix
@@ -145,6 +145,21 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: quality-expand-agents-md-and-document-test-lock
+  file: TODO/main/planning/quality-expand-agents-md-and-document-test-lock.yaml
+  title: Expand AGENTS.md and document the test inter-process lock
+  worktree: main
+  category: Project Lifecycle Management
+  priority: Low
+  status: Not Started
+  tags:
+  - quality-plan
+  - phase-4
+  - documentation
+  estimated_effort: Small (4-6 hours)
+  work_total: 3
+  work_done: 0
+  work_ready: 2
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -344,6 +359,22 @@ items:
   work_ready: 1
   needs:
   - quality-make-timing-policy-ci-gate
+- id: quality-add-dependency-upper-bounds-policy
+  file: TODO/main/planning/quality-add-dependency-upper-bounds-policy.yaml
+  title: Add upper bounds on highest-risk dependencies and document policy
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Not Started
+  tags:
+  - quality-plan
+  - phase-4
+  - supply-chain
+  - deps
+  estimated_effort: Small (4-6 hours)
+  work_total: 5
+  work_done: 0
+  work_ready: 1
 - id: quality-audit-skip-xfail-markers-add-rationale
   file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
   title: Audit 276 skip/xfail test markers — add rationale or remove

@@ -1,0 +1,88 @@
+id: quality-define-dataframe-protocol-and-remove-any
+title: "Define DataFrameProtocol and remove Any annotations from unified frame layer"
+worktree: main
+priority: Medium
+status: Not Started
+category: Code Quality and Technical Debt
+description: |
+  Quality plan Phase 4b. The audit found 6,059 `Any` annotations across
+  benchbox/, concentrated in the dataframe interop layer
+  (benchbox/platforms/dataframe/unified_frame.py: 4,138 lines). This is the
+  largest single source of typing evasion in the project. The 190 `# type: ignore`
+  directives cluster in the same area.
+
+  Define a DataFrameProtocol capturing the common surface across Polars,
+  Pandas, PyArrow, Modin, Dask, cudf — operations actually used by BenchBox
+  (read_parquet, filter, group_by/agg, join, collect, schema, len). Replace
+  Any annotations with the protocol where dispatch is generic, and with
+  concrete library types where dispatch is library-specific.
+
+work:
+  - id: w1
+    summary: "Survey unified_frame.py: enumerate every method, classify as (a) generic dispatch [→ protocol], (b) library-specific [→ concrete type], (c) escape hatch [keep Any with comment]"
+    status: pending
+
+  - id: w2
+    summary: "Define benchbox/platforms/dataframe/protocol.py with DataFrameProtocol covering the common surface (use typing.Protocol + runtime_checkable)"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Replace Any annotations in unified_frame.py per the survey classification"
+    needs: [w2]
+    status: pending
+
+  - id: w4
+    summary: "Run `uv run ty check benchbox/platforms/dataframe/` — fix any newly-surfaced errors (these are real bugs the prior Any was hiding)"
+    needs: [w3]
+    status: pending
+
+  - id: w5
+    summary: "Add a regression test that asserts DataFrameProtocol satisfies isinstance() check for each supported backend"
+    needs: [w2]
+    status: pending
+
+files_affected:
+  modified:
+    - "benchbox/platforms/dataframe/unified_frame.py"
+  added:
+    - "benchbox/platforms/dataframe/protocol.py"
+    - "tests/unit/platforms/dataframe/test_protocol_conformance.py"
+
+must_preserve:
+  - "Runtime behavior of unified_frame.py unchanged — this is type annotations only (plus protocol definition)"
+  - "All dataframe-platform tests pass on Polars, Pandas, PyArrow at minimum"
+  - "Lazy-loading semantics for optional dataframe backends preserved"
+
+approach: |
+  Use typing.Protocol (PEP 544) for structural typing — no inheritance changes
+  to existing dataframe libraries. Mark with @runtime_checkable so the
+  conformance test can use isinstance().
+
+  For methods that genuinely vary across backends (e.g., Polars lazy vs Pandas
+  eager), keep the library-specific type at the dispatch site and document why.
+
+  Be honest about Any: if a method genuinely takes "anything that has __array__",
+  keep Any with a one-line comment explaining why a more specific type is wrong.
+  The goal is not zero Any; it is meaningful Any.
+
+anti_patterns:
+  - "DO NOT inherit from a base class — because dataframe libraries don't share one and we can't modify them — use Protocol"
+  - "DO NOT add runtime type checks at every call site — because that's slow and noisy — type-check at boundaries only"
+  - "DO NOT touch unified_frame.py runtime behavior — because that's a separate concern — annotations only"
+
+verification:
+  - description: "Type checker is clean on dataframe layer"
+    command: "uv run ty check benchbox/platforms/dataframe/"
+    expected_output: "no errors"
+  - description: "All dataframe tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/ -q"
+    expected_output: "all tests pass"
+  - description: "Protocol conformance test passes for every backend"
+    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/test_protocol_conformance.py -v"
+    expected_output: "all tests pass"
+
+metadata:
+  tags: ["quality-plan", "phase-4", "typing", "dataframe"]
+  estimated_effort: "Medium (3-4 days)"
+  created_date: "2026-04-12"

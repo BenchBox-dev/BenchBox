@@ -1,0 +1,78 @@
+id: quality-audit-skip-xfail-markers-add-rationale
+title: "Audit 276 skip/xfail test markers — add rationale or remove"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+description: |
+  Quality plan Phase 4d. The audit found 276 skip/xfail markers across the
+  test suite. Many are legitimate (conditional on optional deps like PYSPARK,
+  CUDA, etc.) but there is no audit trail establishing that. Quietly-dead
+  tests can mask real failures and rot over time as the underlying conditions
+  change.
+
+  Triage every skip/xfail. Each must have either:
+    1. A `reason=` string referencing an issue/ticket, OR
+    2. A condition that's clearly self-explanatory (e.g., `not PYSPARK_AVAILABLE`)
+       AND a comment explaining why this test exists if PySpark is the only
+       way to validate it
+    3. Removal if no longer relevant
+
+work:
+  - id: w1
+    summary: "Generate inventory: scripts/audit_skip_xfail.py walks tests/, emits CSV with (file, line, marker_type, condition, current_reason)"
+    status: pending
+
+  - id: w2
+    summary: "Triage inventory in batches by directory: tests/unit/platforms/, tests/unit/core/, tests/integration/ — for each, decide keep/improve/remove"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Apply changes — improve reasons, remove dead skips, file follow-up TODOs for any xfail that should become passing"
+    needs: [w2]
+    status: pending
+
+  - id: w4
+    summary: "Add a pytest plugin or conftest hook that warns on skip/xfail without reason= (don't fail — would be too disruptive — warn only)"
+    needs: [w3]
+    status: pending
+
+files_affected:
+  modified:
+    - "tests/**/*.py"
+    - "tests/conftest.py"
+  added:
+    - "scripts/audit_skip_xfail.py"
+
+must_preserve:
+  - "Test count unchanged unless removal is explicitly justified"
+  - "Skip conditions for optional dependencies remain functional (don't break PYSPARK_AVAILABLE-style guards)"
+
+approach: |
+  Use ast module to find @pytest.mark.skip(if), @pytest.mark.xfail decorators
+  and inline pytest.skip()/pytest.xfail() calls. For each, capture the
+  condition expression and reason kwarg.
+
+  Triage rule of thumb: if you can't explain in one sentence why this test is
+  skipped, either improve the reason or remove the test.
+
+anti_patterns:
+  - "DO NOT bulk-remove without reading each test — because some are legitimately conditional — case-by-case"
+  - "DO NOT make the warning into an error — because too disruptive — warn-only initially"
+
+verification:
+  - description: "Audit script runs and produces inventory"
+    command: "uv run scripts/audit_skip_xfail.py --output /tmp/skip_audit.csv && wc -l /tmp/skip_audit.csv"
+    expected_output: "≥ 276 lines"
+  - description: "All tests still pass (no regressions from edits)"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass"
+  - description: "Conftest warning fires on a synthetic skip without reason"
+    command: "uv run -- python -m pytest tests/unit/conftest_warn_check.py -v"
+    expected_output: "warning emitted for unreasoned skip"
+
+metadata:
+  tags: ["quality-plan", "phase-4", "test-hygiene"]
+  estimated_effort: "Medium (2-3 days)"
+  created_date: "2026-04-12"

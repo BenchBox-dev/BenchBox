@@ -1,0 +1,76 @@
+id: quality-bulk-fix-encoding-lint-and-ratchet
+title: "Bulk-fix PLW1514 encoding violations and ratchet ruff/McCabe gates"
+worktree: main
+priority: Medium
+status: Not Started
+category: Code Quality and Technical Debt
+description: |
+  Quality plan Phase 1a/1b/1d. The repo currently has 238 ruff violations, 235 of
+  them PLW1514 (open() without explicit encoding=). All are auto-fixable with
+  --unsafe-fixes. Apply the bulk fix in reviewed chunks, then ratchet the gates
+  so the gain is locked:
+    - PLW1514 stays selected (currently selected — make sure CI fails on regression)
+    - B904 (raise-from) added to ruff select as error
+    - McCabe max-complexity lowered from 20 → 18, fix any new violations
+
+  This is a low-risk, high-signal cleanup that gives the rest of the quality plan
+  a clean baseline.
+
+work:
+  - id: w1
+    summary: "Run `uv run ruff check --fix --unsafe-fixes .` and review the diff in chunks (benchbox/, tests/, scripts/) — confirm encoding choices match file purpose (utf-8 for text, utf-8-sig only where needed)"
+    status: pending
+
+  - id: w2
+    summary: "Add B904 to [tool.ruff.lint.select] in pyproject.toml and fix any newly-surfaced raise-from violations"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Lower McCabe max-complexity from 20 → 18 in pyproject.toml; refactor or noqa any newly-violating functions (with rationale)"
+    needs: [w1]
+    status: pending
+
+  - id: w4
+    summary: "Run full fast test suite + verify CI is green; commit ratchet config in a separate commit from the bulk fix so review is easy"
+    needs: [w2, w3]
+    status: pending
+
+files_affected:
+  modified:
+    - "pyproject.toml"
+    - "benchbox/**/*.py"
+    - "tests/**/*.py"
+    - "scripts/**/*.py"
+
+must_preserve:
+  - "All currently-passing tests continue to pass"
+  - "No behavior changes — encoding=\"utf-8\" is the safe default; only deviate where existing files document a different encoding"
+  - "Existing per-file ruff ignores remain in place"
+
+approach: |
+  Run --unsafe-fixes once, then split the diff into directory-scoped commits for
+  reviewability. The Python default encoding is platform-dependent (locale on
+  Linux, utf-8 on macOS, mbcs on Windows) — adding explicit utf-8 is strictly
+  safer. For the few files that intentionally write CSV/TSV with platform
+  encoding, document and noqa per-line.
+
+anti_patterns:
+  - "DO NOT silence violations with broad `noqa` — because that defeats the gate — fix or per-line noqa with reason"
+  - "DO NOT bundle the ratchet config changes with the bulk fix — because it makes review impossible — separate commits per work unit"
+
+verification:
+  - description: "Ruff is clean"
+    command: "uv run ruff check ."
+    expected_output: "All checks passed"
+  - description: "Ruff format is clean"
+    command: "uv run ruff format --check ."
+    expected_output: "All files would be left unchanged"
+  - description: "Fast test suite passes"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass"
+
+metadata:
+  tags: ["quality-plan", "phase-1", "lint"]
+  estimated_effort: "Small (4 hours)"
+  created_date: "2026-04-12"
