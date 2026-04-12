@@ -1,4 +1,4 @@
-generated_at: '2026-04-11T10:26:54.852682'
+generated_at: '2026-04-12T07:49:17.441931'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -76,7 +76,7 @@ categories:
       priority: Medium
       status: Not Started
   Platform Expansion:
-    count: 7
+    count: 8
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -92,6 +92,11 @@ categories:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
+      status: Not Started
+    - id: velox-gluten-spark-adapter
+      file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
+      title: Add Velox + Gluten Spark Acceleration Platform Adapter
+      priority: Medium
       status: Not Started
     - id: clickhouse-read-primitives-dialect-fixes
       file: TODO/platform-expansion/planning/clickhouse-read-primitives-dialect-fixes.yaml

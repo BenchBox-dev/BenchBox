@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T10:26:54.852701'
-total_items: 22
+generated_at: '2026-04-12T07:49:17.441956'
+total_items: 23
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Core Functionality
   Not Started:
-    count: 18
+    count: 19
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -31,6 +31,11 @@ statuses:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
+      category: Platform Expansion
+    - id: velox-gluten-spark-adapter
+      file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
+      title: Add Velox + Gluten Spark Acceleration Platform Adapter
+      priority: Medium
       category: Platform Expansion
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T10:26:54.852658'
-total_items: 22
+generated_at: '2026-04-12T07:49:17.441905'
+total_items: 23
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -281,6 +281,26 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 1
+- id: velox-gluten-spark-adapter
+  file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
+  title: Add Velox + Gluten Spark Acceleration Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform
+  - spark
+  - velox
+  - gluten
+  - native-execution
+  - accelerated-spark
+  estimated_effort: Medium-Large — ~4-6 engineering days including jar provisioning, two deployment modes, CI strategy, and
+    docs
+  work_total: 17
+  work_done: 0
+  work_ready: 1
+  deferred_count: 5
 - id: design-results-ingest-storage-and-derived-read-model
   file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
   title: Design results ingest, storage, and derived read-model architecture

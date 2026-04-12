@@ -1,5 +1,5 @@
-generated_at: '2026-04-11T10:26:54.852693'
-total_items: 22
+generated_at: '2026-04-12T07:49:17.441947'
+total_items: 23
 priorities:
   Critical:
     count: 1
@@ -36,7 +36,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 8
+    count: 9
     items:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
@@ -52,6 +52,11 @@ priorities:
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       category: Testing & Quality
+      status: Not Started
+    - id: velox-gluten-spark-adapter
+      file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
+      title: Add Velox + Gluten Spark Acceleration Platform Adapter
+      category: Platform Expansion
       status: Not Started
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
