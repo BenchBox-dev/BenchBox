@@ -38,7 +38,7 @@ work:
     status: done
 
   - id: w4
-    summary: "Mark fulltext_* and aggregation_groupby_large as expected_failure for ClickHouse with documented reasons"
+    summary: "Keep working fulltext_* ClickHouse variants enabled and document aggregation_groupby_large as a timeout-risk query without hard-skipping it"
     status: done
 
   - id: w5
@@ -88,8 +88,11 @@ resolution_notes: |
   fulltext_* (LIKE fallback).
 
   Added: window_multiple_orderings clickhouse variant (subquery wrapper
-  to avoid alias + NULLS FIRST conflict), aggregation_groupby_large
-  skip_on [clickhouse] (300s timeout exceeded).
+  to avoid alias + NULLS FIRST conflict).
+
+  aggregation_groupby_large remains runnable on ClickHouse. The observed
+  ~900s runtime is a default-timeout issue, not a dialect incompatibility,
+  so it was not converted into skip_on or an expected failure marker.
 
   Fulltext queries were not marked expected_failure because working
   LIKE-based ClickHouse variants already exist — the anti_pattern guidance
@@ -104,7 +107,8 @@ must_preserve:
 
 anti_patterns:
   - "DO NOT modify base query files — because other platforms depend on standard SQL — create clickhouse_sql/ overrides instead"
-  - "DO NOT mark fixable queries as expected_failure — because dialect overrides are preferred over skipping — only use expected_failure for genuine platform limitations (fulltext, timeout)"
+  - "DO NOT mark fixable queries as expected_failure — because dialect overrides are preferred over skipping"
+  - "DO NOT use skip_on for runtime-only timeout risk — reserve skip_on for queries that are genuinely unsupported on that dialect"
 
 scope_limit:
   include:
@@ -122,9 +126,9 @@ verification:
   - description: "ClickHouse read_primitives overrides load and pass"
     command: "uv run -- python -m pytest tests/ -v -k 'read_primitives and clickhouse'"
     expected_output: "Tests pass confirming IN-subquery, length(), quantile(), window, and QUALIFY overrides"
-  - description: "Expected failures correctly marked"
-    command: "uv run -- python -m pytest tests/ -v -k 'read_primitives and clickhouse and expected'"
-    expected_output: "fulltext and aggregation_groupby_large marked as expected failures"
+  - description: "Timeout-only ClickHouse query remains selectable"
+    command: "uv run -- python -m pytest tests/unit/core/read_primitives/test_benchmark_variants.py -k aggregation_groupby_large"
+    expected_output: "aggregation_groupby_large still appears in clickhouse get_queries() output"
 
 metadata:
   tags:
