@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:03:42.576994'
-total_items: 664
+generated_at: '2026-04-12T08:06:37.605810'
+total_items: 665
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -8200,6 +8200,24 @@ items:
   work_total: 3
   work_done: 3
   work_ready: 0
+- id: clickhouse-read-primitives-dialect-fixes
+  file: DONE/platform-expansion/clickhouse-read-primitives-dialect-fixes.yaml
+  title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - clickhouse
+  - read-primitives
+  - dialect-override
+  - sf1-failures
+  estimated_effort: 2-3 days
+  completed_date: '2026-04-12'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  deferred_count: 1
 - id: platform-adapter-silent-error-handling
   file: DONE/platform-expansion/planning/platform-adapter-silent-error-handling.yaml
   title: Fix silent error swallowing in schema creation and connection setup across adapters

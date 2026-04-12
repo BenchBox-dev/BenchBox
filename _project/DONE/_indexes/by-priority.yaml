@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:03:42.577425'
-total_items: 664
+generated_at: '2026-04-12T08:06:37.606257'
+total_items: 665
 priorities:
   Critical:
     count: 38
@@ -1391,7 +1391,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 96
+    count: 97
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1668,6 +1668,11 @@ priorities:
       file: DONE/platform-expansion/planning/clickhouse-error-message-capture.yaml
       title: Fix ClickHouse adapter to capture error messages in query results
       category: Core Functionality
+      status: Completed
+    - id: clickhouse-read-primitives-dialect-fixes
+      file: DONE/platform-expansion/clickhouse-read-primitives-dialect-fixes.yaml
+      title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
+      category: Platform Expansion
       status: Completed
     - id: platform-adapter-silent-error-handling
       file: DONE/platform-expansion/planning/platform-adapter-silent-error-handling.yaml

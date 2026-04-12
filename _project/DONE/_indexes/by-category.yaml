@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T08:03:42.577273'
+generated_at: '2026-04-12T08:06:37.606098'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -2215,7 +2215,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 80
+    count: 81
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2471,6 +2471,11 @@ categories:
       file: DONE/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
       title: Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash
       priority: High
+      status: Completed
+    - id: clickhouse-read-primitives-dialect-fixes
+      file: DONE/platform-expansion/clickhouse-read-primitives-dialect-fixes.yaml
+      title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
+      priority: Medium-High
       status: Completed
     - id: dask-platform-compatibility
       file: DONE/dataframe-expansion/active/dask-platform-compatibility.yaml

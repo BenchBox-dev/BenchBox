@@ -3,7 +3,8 @@ title: "Fix ClickHouse read_primitives failures — dialect overrides, expected_
 worktree: platform-expansion
 category: Platform Expansion
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-12"
 description: |
   64/450 query failures across 22 unique queries in read_primitives on ClickHouse.
   These break into several categories:
@@ -26,54 +27,75 @@ description: |
 work:
   - id: w1
     summary: "Fix ANY(subquery) → IN (subquery) for any_value_simple and any_value_with_filter queries"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Fix array_length LENGTH() → length() (not lengthUTF8) for array columns"
-    status: pending
+    status: done
 
   - id: w3
     summary: "Add PERCENTILE_CONT → quantile() overrides for statistical_percentiles and intrinsic_appx_median"
-    status: pending
+    status: done
 
   - id: w4
     summary: "Mark fulltext_* and aggregation_groupby_large as expected_failure for ClickHouse with documented reasons"
-    status: pending
+    status: done
 
   - id: w5
     summary: "Fix window function syntax failures: timeseries_trend_analysis, window_moving_frame, window_multiple_orderings — adjust frame specs and ORDER BY for ClickHouse"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
 
   - id: w6
     summary: "Fix QUALIFY clause failures: qualify_cume_dist — rewrite as subquery with WHERE on window result"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
 
   - id: w7
     summary: "Fix statistical function failures: statistical_correlation — investigate CORR() syntax differences"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
 
   - id: w8
     summary: "Verify all overrides and expected_failure markers"
     needs: [w4, w5, w6, w7]
-    status: pending
+    status: done
 
 deferred:
   - summary: "Fix ClickHouse adapter error message capture (Pattern G)"
     reason: "Tracked separately in clickhouse-error-message-capture TODO"
 
 files_affected:
-  added:
-    - "benchbox/core/read_primitives/queries/clickhouse_sql/any_value_simple.sql"
-    - "benchbox/core/read_primitives/queries/clickhouse_sql/any_value_with_filter.sql"
-    - "benchbox/core/read_primitives/queries/clickhouse_sql/array_length.sql"
-    - "benchbox/core/read_primitives/queries/clickhouse_sql/statistical_percentiles.sql"
-    - "benchbox/core/read_primitives/queries/clickhouse_sql/intrinsic_appx_median.sql"
-    - "benchbox/core/read_primitives/queries/clickhouse_sql/qualify_cume_dist.sql"
   modified:
+    - "benchbox/core/read_primitives/benchmark.py"
     - "benchbox/core/read_primitives/queries.py"
+    - "benchbox/core/read_primitives/catalog/queries.yaml"
+
+resolution_notes: |
+  Root cause: get_queries(dialect=...) applied sqlglot postgres→clickhouse to
+  every query including ones that already had a clickhouse variant, so
+  native ClickHouse syntax in the variants (length(array), quantile(p)(col),
+  toDate(...), etc.) was mangled before execution. Fixed by adding
+  ReadPrimitivesQueryManager.has_variant and routing variants through
+  get_queries() without re-translation.
+
+  With the foundation fix, these variants — several already present in the
+  catalog — now survive to the adapter: any_value_simple/_with_filter (any()),
+  array_length (length()), intrinsic_appx_median/statistical_percentiles
+  (quantile()), statistical_correlation (corr/covarPop/covarSamp),
+  timeseries_trend_analysis (toStartOfMonth + manual slope),
+  window_moving_frame (ROWS frame), qualify_cume_dist (subquery+WHERE),
+  fulltext_* (LIKE fallback).
+
+  Added: window_multiple_orderings clickhouse variant (subquery wrapper
+  to avoid alias + NULLS FIRST conflict), aggregation_groupby_large
+  skip_on [clickhouse] (300s timeout exceeded).
+
+  Fulltext queries were not marked expected_failure because working
+  LIKE-based ClickHouse variants already exist — the anti_pattern guidance
+  prefers dialect overrides over skipping when the query is fixable.
+
+  Error-capture work deferred to clickhouse-error-message-capture TODO.
 
 must_preserve:
   - "Base read_primitives query files unchanged — other platforms use standard SQL"
