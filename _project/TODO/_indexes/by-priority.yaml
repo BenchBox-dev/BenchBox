@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T07:58:42.535656'
+generated_at: '2026-04-12T07:58:56.083526'
 total_items: 28
 priorities:
   Critical:
@@ -70,15 +70,15 @@ priorities:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Not Started
-    - id: clickhouse-error-message-capture
-      file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
-      title: Fix ClickHouse adapter to capture error messages in query results
-      category: Core Functionality
-      status: Not Started
     - id: clickhouse-read-primitives-dialect-fixes
       file: TODO/platform-expansion/active/clickhouse-read-primitives-dialect-fixes.yaml
       title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
       category: Platform Expansion
+      status: Not Started
+    - id: surface-contributor-onboarding-for-results
+      file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
+      title: Surface contributor onboarding for results submission
+      category: Documentation
       status: Not Started
   Medium:
     count: 5

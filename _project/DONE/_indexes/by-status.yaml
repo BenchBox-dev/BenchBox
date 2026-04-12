@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:58:44.074814'
-total_items: 663
+generated_at: '2026-04-12T07:58:59.132551'
+total_items: 664
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 613
+    count: 614
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1546,6 +1546,11 @@ statuses:
     - id: clickhouse-tpchavoc-q6-decimal-bug
       file: DONE/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
       title: Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)
+      priority: Medium-High
+      category: Core Functionality
+    - id: clickhouse-error-message-capture
+      file: DONE/platform-expansion/planning/clickhouse-error-message-capture.yaml
+      title: Fix ClickHouse adapter to capture error messages in query results
       priority: Medium-High
       category: Core Functionality
     - id: dask-platform-compatibility

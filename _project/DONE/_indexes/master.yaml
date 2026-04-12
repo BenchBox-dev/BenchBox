@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:58:44.074183'
-total_items: 663
+generated_at: '2026-04-12T07:58:59.131884'
+total_items: 664
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -8180,6 +8180,23 @@ items:
   - sf1-failures
   estimated_effort: Small
   completed_date: '2026-04-08'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+- id: clickhouse-error-message-capture
+  file: DONE/platform-expansion/planning/clickhouse-error-message-capture.yaml
+  title: Fix ClickHouse adapter to capture error messages in query results
+  worktree: platform-expansion
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - clickhouse
+  - diagnostics
+  - bug
+  - sf1-failures
+  estimated_effort: Small
+  completed_date: '2026-04-12'
   work_total: 3
   work_done: 3
   work_ready: 0

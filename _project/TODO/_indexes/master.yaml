@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T07:58:42.535606'
+generated_at: '2026-04-12T07:58:56.083471'
 total_items: 28
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -33,8 +33,8 @@ items:
   - ux
   estimated_effort: Small
   work_total: 5
-  work_done: 0
-  work_ready: 4
+  work_done: 1
+  work_ready: 3
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -477,22 +477,6 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
-- id: clickhouse-error-message-capture
-  file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
-  title: Fix ClickHouse adapter to capture error messages in query results
-  worktree: platform-expansion
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - clickhouse
-  - diagnostics
-  - bug
-  - sf1-failures
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 1
 - id: clickhouse-read-primitives-dialect-fixes
   file: TODO/platform-expansion/active/clickhouse-read-primitives-dialect-fixes.yaml
   title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
@@ -510,3 +494,21 @@ items:
   work_done: 0
   work_ready: 4
   deferred_count: 1
+- id: surface-contributor-onboarding-for-results
+  file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
+  title: Surface contributor onboarding for results submission
+  worktree: main
+  category: Documentation
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - documentation
+  - results
+  - contributor-experience
+  - phase-2
+  estimated_effort: Small
+  work_total: 5
+  work_done: 0
+  work_ready: 3
+  needs:
+  - implement-pr-based-result-submission-workflow

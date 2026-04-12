@@ -3,7 +3,8 @@ title: "Fix ClickHouse adapter to capture error messages in query results"
 worktree: platform-expansion
 category: Core Functionality
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-12"
 description: |
   The ClickHouse adapter captures failure status but swallows the exception message.
   read_primitives and tpcdi result JSONs show "status": "FAILED" with no error string,
@@ -15,17 +16,17 @@ description: |
 work:
   - id: w1
     summary: "Find the ClickHouse adapter's query execution error handler — locate where exceptions are caught but messages discarded"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Ensure str(exception) is always written to the result error field"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Add unit test verifying error messages are captured in query results"
     needs: [w2]
-    status: pending
+    status: done
 
 files_affected:
   modified:

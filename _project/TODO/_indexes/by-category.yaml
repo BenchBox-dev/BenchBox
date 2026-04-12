@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:58:42.535640'
-total_categories: 7
+generated_at: '2026-04-12T07:58:56.083509'
+total_categories: 8
 categories:
   Benchmark Development:
     count: 4
@@ -38,7 +38,7 @@ categories:
       priority: High
       status: Not Started
   Core Functionality:
-    count: 10
+    count: 9
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -70,11 +70,6 @@ categories:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       priority: Medium-High
       status: Not Started
-    - id: clickhouse-error-message-capture
-      file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
-      title: Fix ClickHouse adapter to capture error messages in query results
-      priority: Medium-High
-      status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow
@@ -89,6 +84,14 @@ categories:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
+      status: Not Started
+  Documentation:
+    count: 1
+    items:
+    - id: surface-contributor-onboarding-for-results
+      file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
+      title: Surface contributor onboarding for results submission
+      priority: Medium-High
       status: Not Started
   Platform Expansion:
     count: 8
