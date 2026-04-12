@@ -160,7 +160,8 @@ files_affected:
   - "docs/platforms/velox.md"
   - "docs/platforms/velox_jar_setup.md  # how to obtain/pin the bundle jar"
   modified:
-  - "benchbox/platforms/__init__.py             # register adapter + aliases"
+  - "benchbox/platforms/__init__.py             # lazy adapter entry + aliases + list_available_platforms constants"
+  - "benchbox/platforms/adapter_factory.py      # dispatch entry for 'velox' (mirror lakesail wiring)"
   - "benchbox/utils/dependencies.py             # add 'velox' DependencyInfo"
   - "pyproject.toml                              # add [project.optional-dependencies] velox extra"
   - "docs/platforms/index.md"
@@ -231,14 +232,23 @@ approach: |
        or Gluten metrics (SparkListener) to count JVM-fallback
        operators per query and attach to BenchmarkResults query metadata.
 
-    9. Dependency wiring:
+    9. Dependency + registry wiring (four touchpoints, mirroring LakeSail):
          - pyproject.toml extra "velox" pins pyspark==3.5.x (matching the
            bundle jar); the jar itself is NOT packaged.
          - utils/dependencies.py adds DependencyInfo("velox", ...) with
            packages=["pyspark"] and an extra `external_artifacts` note
            pointing to docs/platforms/velox_jar_setup.md.
-         - platforms/__init__.py registers "velox" (and optionally
-           "gluten-velox" alias) mapped to VeloxAdapter.
+         - platforms/__init__.py: register "VeloxAdapter" in the lazy
+           adapter map (mirroring the "LakeSailAdapter" entry at line 89),
+           add "velox" (and optional "gluten-velox") to the platform-name
+           lookup, add availability constant entry for
+           list_available_platforms().
+         - platforms/adapter_factory.py: register the Velox dispatch entry
+           so get_platform_adapter("velox", **config) resolves.
+         - At the bottom of velox.py, define `_build_velox_config` and
+           call PlatformHookRegistry.register_config_builder("velox", ...)
+           exactly as LakeSail does (credential loading, driver_package
+           = "pyspark", platform_fields listing Velox-specific knobs).
 
    10. Jar provisioning helper (small utility in benchbox/platforms/velox
        or a scripts/ helper): given gluten_version + spark_version + arch,
@@ -281,27 +291,30 @@ verification:
 - description: "Adapter module imports cleanly without Gluten jar present"
   command: "uv run -- python -c \"from benchbox.platforms.velox import VeloxAdapter; print('import OK')\""
   expected_output: "import OK"
-- description: "Platform registry exposes 'velox' alias"
-  command: "uv run -- python -c \"from benchbox.platforms import list_platforms; assert 'velox' in list_platforms(); print('registered')\""
+- description: "Platform registry exposes 'velox' via list_available_platforms()"
+  command: "uv run -- python -c \"from benchbox.platforms import list_available_platforms; assert 'velox' in list_available_platforms(); print('registered')\""
   expected_output: "registered"
+- description: "adapter_factory dispatches 'velox' to VeloxAdapter class"
+  command: "uv run -- python -c \"from benchbox.platforms.adapter_factory import get_adapter_class; cls = get_adapter_class('velox'); assert cls.__name__ == 'VeloxAdapter'; print('dispatch OK')\""
+  expected_output: "dispatch OK"
 - description: "Unit tests for new adapter pass (mocked SparkSession)"
-  command: "uv run -- python -m pytest tests/unit/platforms/test_velox_adapter.py -v --tb=short"
-  expected_output: "all tests pass, 0 failures"
-- description: "All existing platform unit tests still pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_velox_adapter.py -q"
+  expected_output: "exit code 0"
+- description: "All existing platform unit tests still pass (exit 0)"
   command: "uv run -- python -m pytest tests/unit/platforms/ -q"
-  expected_output: "no new failures vs main"
+  expected_output: "exit code 0"
 - description: "LakeSail and Spark adapter tests specifically unaffected"
   command: "uv run -- python -m pytest tests/unit/platforms/test_lakesail.py tests/unit/platforms/test_spark_adapter.py -q"
-  expected_output: "all tests pass"
+  expected_output: "exit code 0"
 - description: "Dependency introspection reports velox extra"
-  command: "uv run -- python -c \"from benchbox.utils.dependencies import DEPENDENCIES; print('velox' in DEPENDENCIES)\""
-  expected_output: "True"
-- description: "Lint + typecheck clean"
+  command: "uv run -- python -c \"from benchbox.utils.dependencies import DEPENDENCIES; assert 'velox' in DEPENDENCIES; print('dep OK')\""
+  expected_output: "dep OK"
+- description: "Lint + typecheck clean on new file"
   command: "uv run ruff check benchbox/platforms/velox.py && uv run ty check benchbox/platforms/velox.py"
-  expected_output: "no errors"
-- description: "Live smoke (Linux only, gated by live_integration marker): TPC-H Q1 at SF 0.01 reports Velox active"
-  command: "uv run -- python -m pytest tests/integration/platforms/test_velox_live.py -m live_integration -q"
-  expected_output: "velox_active=True in platform_info, Q1 returns expected rowcount"
+  expected_output: "exit code 0"
+- description: "Live smoke (Linux only, gated by live_integration marker): TPC-H Q1 at SF 0.01 reports velox_active=True"
+  command: "uv run -- python -m pytest tests/integration/platforms/test_velox_live.py::test_tpch_q1_velox_active -m live_integration -q"
+  expected_output: "exit code 0 (test asserts platform_info['velox_active'] is True and row count matches TPC-H Q1 expected)"
 
 scope_limit:
   only_modify:
@@ -355,23 +368,26 @@ work:
     with pyspark missing, same try/except shape as LakeSail.
 
 - id: w3
-  summary: "Register adapter in benchbox/platforms/__init__.py (alias 'velox', optional 'gluten-velox') and add DependencyInfo in utils/dependencies.py"
+  summary: "Register adapter across four wiring points — platforms/__init__.py lazy map + availability constants, adapter_factory.py dispatch, utils/dependencies.py DependencyInfo, pyproject.toml 'velox' extra pinning pyspark to a Gluten-supported version"
   needs: [w2]
   status: pending
+  notes: |
+    Single work unit because the four edits are trivial individually
+    and must land together for the adapter to be reachable. Commit
+    as one change.
 
 - id: w4
-  summary: "Add 'velox' optional-dependency group to pyproject.toml pinning pyspark to a Gluten-supported version"
+  summary: "Add _build_velox_config + PlatformHookRegistry.register_config_builder('velox', ...) at the bottom of velox.py, mirroring _build_lakesail_config"
   needs: [w3]
   status: pending
 
 - id: w5
-  summary: "Implement local-mode _create_spark_session — SparkSession.builder with required Gluten conf, jar classpath, off-heap, ColumnarShuffleManager"
+  summary: "Implement local-mode _create_spark_session — SparkSession.builder with required Gluten conf, jar classpath, off-heap, ColumnarShuffleManager; validate gluten_jar_path exists with clear error"
   needs: [w2]
   status: pending
   notes: |
     Mirror benchbox/platforms/spark.py for builder construction; add
-    Gluten-specific conf. Validate gluten_jar_path exists before session
-    creation with a clear error.
+    Gluten-specific conf.
 
 - id: w6
   summary: "Implement remote-mode _create_spark_session and _ensure_server_ready (endpoint parse, socket probe) — mirror LakeSail but do NOT auto-start a server"
@@ -403,17 +419,22 @@ work:
   needs: [w7]
   status: pending
 
-- id: w12
-  summary: "Write unit tests mocking SparkSession — covers config building, dependency check failure path, endpoint parsing, velox_active probe, local vs remote dispatch"
-  needs: [w5, w6, w8, w9, w10, w11]
+- id: w12a
+  summary: "Unit tests: config building, dependency check failure path, endpoint parsing, local vs remote dispatch (mocked SparkSession)"
+  needs: [w5, w6]
   status: pending
   notes: |
     Model on tests/unit/platforms/test_lakesail.py. Must run without
     pyspark installed (gated import, mock at module level).
 
+- id: w12b
+  summary: "Unit tests: velox_active probe parsing, get_query_plan fallback annotation, SparkTuningMixin behavior"
+  needs: [w8, w9, w11]
+  status: pending
+
 - id: w13
   summary: "Write live integration test (live_integration + requires-linux marker) running TPC-H Q1, Q6 at SF 0.01 and asserting velox_active=True"
-  needs: [w12]
+  needs: [w12a, w12b]
   status: pending
 
 - id: w14
@@ -428,19 +449,12 @@ work:
 
 - id: w16
   summary: "Run full smoke: uv run -- python -m pytest -m fast -q and the new unit tests; fix any drift"
-  needs: [w12, w14]
+  needs: [w12a, w12b, w14]
   status: pending
-
-- id: w17
-  summary: "Stretch: add SparkListener-based fallback-operator counter attached to per-query metadata in BenchmarkResults"
-  needs: [w13]
-  status: pending
-  notes: |
-    Optional in v1. If it turns out to require touching
-    SparkQueryExecutionMixin, defer to a follow-up item rather than
-    violating scope_limit.
 
 deferred:
+- summary: "SparkListener-based fallback-operator counter attached to per-query metadata in BenchmarkResults"
+  reason: "Would require editing SparkQueryExecutionMixin (violates scope_limit) or adding a new mixin; valuable for honest benchmarking but not blocking v1. Split into its own TODO after v1 lands and we see how often users hit fallback in practice."
 - summary: "GPU variant (Velox + NVIDIA cuDF) as separate 'velox-gpu' adapter"
   reason: "Track NVIDIA/Velox cuDF GA before committing to a GPU adapter; keep CPU Velox as baseline first."
 - summary: "Managed Spark integrations (EMR, Dataproc, Fabric native execution)"

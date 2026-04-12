@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:58:01.005105'
-total_items: 27
+generated_at: '2026-04-12T07:58:42.535667'
+total_items: 28
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Critical
       category: Bug Fix
   Not Started:
-    count: 23
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -37,6 +37,11 @@ statuses:
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       priority: Medium
       category: Platform Expansion
+    - id: add-third-benchmark-cohort-to-corpus
+      file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
+      title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
+      priority: Medium-High
+      category: Core Functionality
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
       title: Automate corpus-inventory.json generation from results-data/bundles/

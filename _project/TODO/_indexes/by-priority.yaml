@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:58:01.005094'
-total_items: 27
+generated_at: '2026-04-12T07:58:42.535656'
+total_items: 28
 priorities:
   Critical:
     count: 2
@@ -43,12 +43,17 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 6
+    count: 7
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       category: Testing & Quality
+      status: Not Started
+    - id: add-third-benchmark-cohort-to-corpus
+      file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
+      title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
+      category: Core Functionality
       status: Not Started
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml

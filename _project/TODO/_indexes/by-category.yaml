@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T07:58:01.005078'
+generated_at: '2026-04-12T07:58:42.535640'
 total_categories: 7
 categories:
   Benchmark Development:
@@ -38,8 +38,13 @@ categories:
       priority: High
       status: Not Started
   Core Functionality:
-    count: 9
+    count: 10
     items:
+    - id: add-third-benchmark-cohort-to-corpus
+      file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
+      title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
+      priority: Medium-High
+      status: Not Started
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
       title: Automate corpus-inventory.json generation from results-data/bundles/
