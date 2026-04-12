@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:16:44.794426'
-total_items: 39
+generated_at: '2026-04-12T08:31:27.963569'
+total_items: 40
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -462,6 +462,22 @@ items:
   work_ready: 0
   needs:
   - launch-results-explorer-acceptance-and-seed
+- id: quality-map-adapter-base-refactor-scope
+  file: TODO/main/planning/quality-map-adapter-base-refactor-scope.yaml
+  title: Map adapter.py public surface and extraction plan before the base refactor
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Not Started
+  tags:
+  - quality-plan
+  - phase-2
+  - phase-3-prep
+  - refactor-map
+  estimated_effort: Small-Medium (1-2 days)
+  work_total: 3
+  work_done: 0
+  work_ready: 1
 - id: operate-results-platform-security-observability-and-abuse-controls
   file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
   title: Operate results platform security, observability, and abuse controls
@@ -680,10 +696,11 @@ items:
   - refactor
   - high-blast-radius
   estimated_effort: Medium-Large (1 week)
-  work_total: 8
+  work_total: 7
   work_done: 0
   work_ready: 1
   needs:
+  - quality-map-adapter-base-refactor-scope
   - quality-add-cross-platform-result-validation
   - quality-make-timing-policy-ci-gate
 - id: surface-contributor-onboarding-for-results

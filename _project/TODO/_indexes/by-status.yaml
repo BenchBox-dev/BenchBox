@@ -1,8 +1,8 @@
-generated_at: '2026-04-12T08:16:44.794502'
-total_items: 39
+generated_at: '2026-04-12T08:31:27.963625'
+total_items: 40
 statuses:
   Not Started:
-    count: 36
+    count: 37
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -114,6 +114,11 @@ statuses:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: High
       category: Core Functionality
+    - id: quality-map-adapter-base-refactor-scope
+      file: TODO/main/planning/quality-map-adapter-base-refactor-scope.yaml
+      title: Map adapter.py public surface and extraction plan before the base refactor
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control

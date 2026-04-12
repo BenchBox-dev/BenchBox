@@ -52,10 +52,10 @@ approach: |
 
 verification:
   - description: "AGENTS.md is well-formed markdown"
-    command: "uv run --with markdownlint-cli2 markdownlint-cli2 AGENTS.md"
+    command: "uv run --with markdownlint-cli2 markdownlint-cli2 AGENTS.md tests/README.md"
     expected_output: "no errors"
-  - description: "All cross-links resolve"
-    command: "uv run --with linkchecker linkchecker --check-extern AGENTS.md tests/README.md"
+  - description: "Local cross-links resolve without requiring external network access"
+    command: "uv run --with linkchecker linkchecker AGENTS.md tests/README.md"
     expected_output: "no broken links"
 
 metadata:

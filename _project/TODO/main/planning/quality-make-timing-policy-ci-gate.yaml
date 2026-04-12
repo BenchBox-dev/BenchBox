@@ -20,7 +20,7 @@ description: |
 
 work:
   - id: w1
-    summary: "Run timing_audit.py and triage all 154 time.time() sites — categorize as: (a) event timestamp [keep], (b) execution timing [migrate to mono_time], (c) audit log [keep]"
+    summary: "Run `_project/scripts/timing_audit.py --report` and triage all 154 time.time() sites — categorize as: (a) event timestamp [keep], (b) execution timing [migrate to mono_time], (c) audit log [keep]"
     status: pending
 
   - id: w2
@@ -29,12 +29,12 @@ work:
     status: pending
 
   - id: w3
-    summary: "Add timing_policy_check.py invocation to .pre-commit-config.yaml as a local hook"
+    summary: "Add `_project/scripts/timing_policy_check.py --strict` to .pre-commit-config.yaml as a local hook with a stable id (timing-policy-check)"
     needs: [w2]
     status: pending
 
   - id: w4
-    summary: "Add a CI step in .github/workflows/lint.yml running `uv run scripts/timing_policy_check.py` — fail on unlisted wall-clock"
+    summary: "Add a CI step in .github/workflows/lint.yml running `uv run -- python _project/scripts/timing_policy_check.py --strict` — fail on unlisted wall-clock"
     needs: [w2]
     status: pending
 
@@ -70,11 +70,11 @@ anti_patterns:
 
 verification:
   - description: "Timing policy check passes"
-    command: "uv run scripts/timing_policy_check.py"
+    command: "uv run -- python _project/scripts/timing_policy_check.py --strict"
     expected_output: "All wall-clock usage either approved in allowlist or migrated"
-  - description: "Pre-commit hook fires on a synthetic violation"
-    command: "echo 'import time; time.time()' > /tmp/probe.py && pre-commit run --files /tmp/probe.py"
-    expected_output: "fails with timing policy violation"
+  - description: "Pre-commit timing hook is wired and passes on the repository"
+    command: "uv run -- pre-commit run timing-policy-check --all-files"
+    expected_output: "timing policy hook passes"
   - description: "Fast test suite passes after migrations"
     command: "uv run -- python -m pytest -m fast -q"
     expected_output: "all tests pass"

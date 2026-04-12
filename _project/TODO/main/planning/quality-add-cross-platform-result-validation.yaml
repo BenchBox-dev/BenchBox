@@ -11,11 +11,17 @@ description: |
   Today, divergent results between (say) DuckDB and ClickHouse on the same
   TPC-H query at SF=0.01 would not fail CI.
 
-  Build a `core/validation/cross_platform.py` module that runs a benchmark
-  on a reference platform (DuckDB) and a comparison platform, then asserts
-  result-set equality with per-benchmark tolerances (numeric precision,
-  ordering rules per TPC spec, NULL handling). Wire into a nightly CI matrix
+  Build a `core/validation/cross_platform.py` module plus a pytest-based
+  validation suite. The core comparator should run a benchmark on a reference
+  platform (DuckDB) and a comparison platform, then assert result-set equality
+  with per-benchmark tolerances (numeric precision, ordering rules per TPC
+  spec, NULL handling). Wire the integration suite into a nightly CI matrix
   covering DuckDB × {ClickHouse local, DataFusion, Polars-DF} at SF=0.01.
+
+  Keep v1 test-first rather than coupling it to a brand-new CLI surface. If
+  contributors still want a human-facing command after the pytest workflow
+  proves useful, create that as a follow-up TODO instead of baking it into the
+  first delivery.
 
   This TODO is also the safety net for the adapter-base refactor
   (quality-refactor-adapter-base-into-cohesive-modules).
@@ -26,28 +32,29 @@ work:
     status: pending
 
   - id: w2
-    summary: "Implement validation/cross_platform.py with compare(reference_results, comparison_results, benchmark, tolerance) returning structured diff"
+    summary: "Implement validation/cross_platform.py comparator plus focused unit coverage for normalization and tolerance rules"
     needs: [w1]
     status: pending
 
   - id: w3
-    summary: "Wire into pytest as parametrized tests over (benchmark, platform) pairs at SF=0.01; mark @pytest.mark.live_integration"
+    summary: "Wire into pytest integration tests over (benchmark, platform) pairs at SF=0.01; keep the first matrix local/no-credentials"
     needs: [w2]
     status: pending
 
   - id: w4
-    summary: "Add nightly GitHub Actions workflow .github/workflows/cross-platform-validation.yml running the live_integration suite"
+    summary: "Add nightly GitHub Actions workflow .github/workflows/cross-platform-validation.yml running the cross-platform pytest suite and publishing structured diff artifacts on failure"
     needs: [w3]
     status: pending
 
   - id: w5
-    summary: "Document the validation contract in docs/development/result-validation.md including how to add new platforms and tolerance overrides"
+    summary: "Document the validation contract in docs/development/result-validation.md including how to run the pytest suite locally, how to add new platforms, and how tolerance overrides are justified"
     needs: [w2]
     status: pending
 
 files_affected:
   added:
     - "benchbox/core/validation/cross_platform.py"
+    - "tests/unit/validation/test_cross_platform.py"
     - "tests/integration/validation/test_cross_platform.py"
     - ".github/workflows/cross-platform-validation.yml"
     - "docs/development/result-validation.md"
@@ -67,17 +74,26 @@ approach: |
   when a real spec rule (e.g., TPC-H epsilon for floating-point aggregates)
   justifies it.
 
+  Treat the pytest suite as the canonical execution surface for v1. If a
+  human-facing CLI becomes desirable later, add it after the comparison
+  semantics stabilize rather than inventing `benchbox validate-results` up
+  front.
+
 anti_patterns:
   - "DO NOT hide divergences with loose tolerances — because that defeats the purpose — every loosened tolerance must cite a spec rule"
   - "DO NOT run on every PR — because cross-platform suites are expensive and flaky in cloud — nightly only"
+  - "DO NOT invent a new top-level CLI in the first slice — because command design will distract from correctness semantics — stabilize the comparator in pytest first"
 
 verification:
-  - description: "Validation module unit tests pass"
-    command: "uv run -- python -m pytest tests/unit/validation/ -v"
+  - description: "Cross-platform comparator unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/validation/test_cross_platform.py -v"
     expected_output: "all tests pass"
-  - description: "Cross-platform suite runs end-to-end on at least one platform pair"
-    command: "uv run benchbox validate-results --reference duckdb --compare datafusion --benchmark tpch --scale 0.01"
-    expected_output: "PASS or structured diff report"
+  - description: "Cross-platform integration suite passes on the local matrix"
+    command: "uv run -- python -m pytest tests/integration/validation/test_cross_platform.py -v -m integration"
+    expected_output: "all tests pass"
+  - description: "Workflow file is valid"
+    command: "uv run --with actionlint actionlint .github/workflows/cross-platform-validation.yml"
+    expected_output: "(no errors)"
 
 metadata:
   tags: ["quality-plan", "phase-2", "correctness", "validation"]

@@ -36,7 +36,7 @@ work:
     status: pending
 
   - id: w5
-    summary: "Add a quarterly maintenance reminder TODO to revisit upper bounds"
+    summary: "Add `_project/TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml` as a quarterly maintenance reminder"
     needs: [w4]
     status: pending
 
@@ -45,6 +45,8 @@ files_affected:
     - "pyproject.toml"
     - "uv.lock"
     - "AGENTS.md"
+  added:
+    - "_project/TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml"
 
 must_preserve:
   - "All current tests pass after lock refresh"

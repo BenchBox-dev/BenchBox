@@ -16,6 +16,10 @@ description: |
   unchanged. Vertical slices: extract one submodule per slice, run full
   cross-platform validation between slices, commit per slice.
 
+  The read-only mapping work lives in a separate prep TODO
+  (quality-map-adapter-base-refactor-scope) so analysis can start early while
+  code-moving work remains blocked on the safety nets.
+
   Proposed split:
     base/adapter.py          (Protocol/ABC only — ~400 lines)
     base/connection.py       (Connection lifecycle, retries — ~600 lines)
@@ -27,47 +31,43 @@ description: |
 
 deps:
   needs:
+    - quality-map-adapter-base-refactor-scope
     - quality-add-cross-platform-result-validation
     - quality-make-timing-policy-ci-gate
 
 work:
   - id: w1
-    summary: "Map current adapter.py: list every public class/method with line ranges, callers, and proposed destination module — produce a refactor map at docs/development/adapter-refactor-map.md"
+    summary: "SLICE 1 — Extract connection.py (lifecycle + retries). Re-export from adapter.py. Run full test suite + cross-platform validation. Commit."
     status: pending
 
   - id: w2
-    summary: "SLICE 1 — Extract connection.py (lifecycle + retries). Re-export from adapter.py. Run full test suite + cross-platform validation. Commit."
+    summary: "SLICE 2 — Extract execution.py (query execution + timing). Same protocol as w2."
     needs: [w1]
     status: pending
 
   - id: w3
-    summary: "SLICE 2 — Extract execution.py (query execution + timing). Same protocol as w2."
+    summary: "SLICE 3 — Extract data_loading.py (native + external modes). Same protocol."
     needs: [w2]
     status: pending
 
   - id: w4
-    summary: "SLICE 3 — Extract data_loading.py (native + external modes). Same protocol."
+    summary: "SLICE 4 — Extract result_capture.py (status, errors, plans). Same protocol."
     needs: [w3]
     status: pending
 
   - id: w5
-    summary: "SLICE 4 — Extract result_capture.py (status, errors, plans). Same protocol."
+    summary: "SLICE 5 — Extract dialect_translation.py (sqlglot wrapping). Same protocol."
     needs: [w4]
     status: pending
 
   - id: w6
-    summary: "SLICE 5 — Extract dialect_translation.py (sqlglot wrapping). Same protocol."
+    summary: "SLICE 6 — Extract tuning.py (tuning resolver). Same protocol."
     needs: [w5]
     status: pending
 
   - id: w7
-    summary: "SLICE 6 — Extract tuning.py (tuning resolver). Same protocol."
-    needs: [w6]
-    status: pending
-
-  - id: w8
     summary: "Final cleanup — adapter.py contains only the Protocol/ABC. Verify ≤600 lines. Update docs/development/adapter-refactor-map.md as final state."
-    needs: [w7]
+    needs: [w6]
     status: pending
 
 files_affected:
@@ -125,14 +125,14 @@ verification:
     command: "uv run -- python -m pytest -m fast -q"
     expected_output: "all tests pass"
   - description: "Cross-platform validation passes"
-    command: "uv run benchbox validate-results --reference duckdb --compare datafusion --benchmark tpch --scale 0.01"
+    command: "uv run -- python -m pytest tests/integration/validation/test_cross_platform.py -v -m integration"
     expected_output: "PASS"
   - description: "adapter.py final size ≤ 600 lines"
     command: "wc -l benchbox/platforms/base/adapter.py"
     expected_output: "≤ 600"
-  - description: "All 73 adapters import successfully"
-    command: "uv run -- python -c 'from benchbox.platforms import discover_all; discover_all()'"
-    expected_output: "(no error)"
+  - description: "Platform registry still enumerates adapters after each slice"
+    command: "uv run -- python -c 'from benchbox.core.platform_registry import PlatformRegistry; print(len(PlatformRegistry.get_available_platforms()))'"
+    expected_output: "prints a positive platform count with no error"
 
 metadata:
   tags: ["quality-plan", "phase-3", "refactor", "high-blast-radius"]

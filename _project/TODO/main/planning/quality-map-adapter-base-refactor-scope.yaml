@@ -1,0 +1,62 @@
+id: quality-map-adapter-base-refactor-scope
+title: "Map adapter.py public surface and extraction plan before the base refactor"
+worktree: main
+priority: Medium
+status: Not Started
+category: Code Quality and Technical Debt
+description: |
+  Quality plan Phase 2c/Phase 3 prep. The adapter-base refactor is high blast
+  radius, but its first slice is read-only analysis: inventory the public
+  surface of benchbox/platforms/base/adapter.py, identify callers and cohesion
+  seams, and produce the extraction map that the real refactor will follow.
+
+  This TODO exists so safe analysis can begin immediately without weakening the
+  safety gates on quality-refactor-adapter-base-into-cohesive-modules. It
+  should not move code; it should make the later code-moving work smaller,
+  reviewable, and less likely to discover hidden coupling mid-refactor.
+
+work:
+  - id: w1
+    summary: "Inventory adapter.py public surface: every public class, method, attribute, and mixin-style helper with line ranges and rough responsibility grouping"
+    status: pending
+
+  - id: w2
+    summary: "Trace callers and coupling hotspots: identify which symbols are imported or overridden by platform adapters, tests, and CLI/orchestrator code"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Write docs/development/adapter-refactor-map.md with proposed module destinations, slice order, must-preserve contract, and explicit 'do not extract yet' exceptions"
+    needs: [w2]
+    status: pending
+
+files_affected:
+  added:
+    - "docs/development/adapter-refactor-map.md"
+
+must_preserve:
+  - "benchbox/platforms/base/adapter.py remains code-identical in this prep TODO"
+  - "No adapter implementation file is modified; this item is mapping only"
+
+approach: |
+  Read adapter.py and its direct callers/importers, then document the proposed
+  extraction by responsibility rather than by raw line count. The map should be
+  concrete enough that the downstream refactor can lift one cohesive slice at a
+  time and know what remains intentionally in adapter.py.
+
+  The output is a working refactor map, not a design essay. Prefer tables:
+  symbol, line range, current responsibility, proposed module, caller risk.
+
+anti_patterns:
+  - "DO NOT start moving code in this TODO — because that would bypass the safety-gated refactor item — keep this slice read-only"
+  - "DO NOT group methods by 'roughly same size' — because that creates arbitrary modules — cluster by responsibility and call graph"
+
+verification:
+  - description: "Refactor map covers the planned responsibility split"
+    command: "rg -n \"connection|execution|data_loading|result_capture|dialect_translation|tuning\" docs/development/adapter-refactor-map.md"
+    expected_output: "all planned modules referenced"
+
+metadata:
+  tags: ["quality-plan", "phase-2", "phase-3-prep", "refactor-map"]
+  estimated_effort: "Small-Medium (1-2 days)"
+  created_date: "2026-04-12"
