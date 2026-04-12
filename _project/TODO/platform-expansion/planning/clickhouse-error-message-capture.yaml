@@ -2,7 +2,7 @@ id: clickhouse-error-message-capture
 title: "Fix ClickHouse adapter to capture error messages in query results"
 worktree: platform-expansion
 category: Core Functionality
-priority: Medium
+priority: Medium-High
 status: Not Started
 description: |
   The ClickHouse adapter captures failure status but swallows the exception message.

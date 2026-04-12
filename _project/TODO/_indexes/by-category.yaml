@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T07:52:00.819727'
+generated_at: '2026-04-12T07:52:43.719102'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -30,7 +30,7 @@ categories:
     - id: fix-interactive-runner-defects
       file: TODO/main/planning/fix-interactive-runner-defects.yaml
       title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
-      priority: High
+      priority: Critical
       status: Not Started
     - id: make-parquet-default-for-tpcds-obt
       file: TODO/main/planning/make-parquet-default-for-tpcds-obt.yaml
@@ -43,7 +43,7 @@ categories:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
       title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
-      priority: Medium
+      priority: High
       status: In Progress
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -63,7 +63,7 @@ categories:
     - id: clickhouse-error-message-capture
       file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
       title: Fix ClickHouse adapter to capture error messages in query results
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
@@ -106,7 +106,7 @@ categories:
     - id: clickhouse-read-primitives-dialect-fixes
       file: TODO/platform-expansion/planning/clickhouse-read-primitives-dialect-fixes.yaml
       title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
@@ -137,5 +137,5 @@ categories:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
-      priority: Medium
+      priority: Medium-High
       status: Not Started

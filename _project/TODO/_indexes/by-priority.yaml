@@ -1,22 +1,27 @@
-generated_at: '2026-04-12T07:52:00.819741'
+generated_at: '2026-04-12T07:52:43.719117'
 total_items: 24
 priorities:
   Critical:
-    count: 1
+    count: 2
     items:
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
       category: Core Functionality
       status: Completed
-  High:
-    count: 4
-    items:
     - id: fix-interactive-runner-defects
       file: TODO/main/planning/fix-interactive-runner-defects.yaml
       title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
       category: Bug Fix
       status: Not Started
+  High:
+    count: 4
+    items:
+    - id: benchmark-option-cli-support
+      file: TODO/main/planning/benchmark-option-cli-support.yaml
+      title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
+      category: Core Functionality
+      status: In Progress
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -33,30 +38,35 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium-High:
-    count: 1
+    count: 4
     items:
+    - id: add-hypothesis-property-tests
+      file: TODO/main/planning/add-hypothesis-property-tests.yaml
+      title: Add Hypothesis property-based tests for pure-function invariants
+      category: Testing & Quality
+      status: Not Started
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
       category: Core Functionality
       status: Completed
-  Medium:
-    count: 9
-    items:
-    - id: benchmark-option-cli-support
-      file: TODO/main/planning/benchmark-option-cli-support.yaml
-      title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
+    - id: clickhouse-error-message-capture
+      file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
+      title: Fix ClickHouse adapter to capture error messages in query results
       category: Core Functionality
-      status: In Progress
+      status: Not Started
+    - id: clickhouse-read-primitives-dialect-fixes
+      file: TODO/platform-expansion/planning/clickhouse-read-primitives-dialect-fixes.yaml
+      title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
+      category: Platform Expansion
+      status: Not Started
+  Medium:
+    count: 5
+    items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: add-hypothesis-property-tests
-      file: TODO/main/planning/add-hypothesis-property-tests.yaml
-      title: Add Hypothesis property-based tests for pure-function invariants
-      category: Testing & Quality
       status: Not Started
     - id: velox-gluten-spark-adapter
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
@@ -67,16 +77,6 @@ priorities:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
-      status: Not Started
-    - id: clickhouse-error-message-capture
-      file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
-      title: Fix ClickHouse adapter to capture error messages in query results
-      category: Core Functionality
-      status: Not Started
-    - id: clickhouse-read-primitives-dialect-fixes
-      file: TODO/platform-expansion/planning/clickhouse-read-primitives-dialect-fixes.yaml
-      title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
-      category: Platform Expansion
       status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml

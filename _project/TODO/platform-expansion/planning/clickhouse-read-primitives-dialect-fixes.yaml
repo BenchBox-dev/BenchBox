@@ -2,7 +2,7 @@ id: clickhouse-read-primitives-dialect-fixes
 title: "Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture"
 worktree: platform-expansion
 category: Platform Expansion
-priority: Medium
+priority: Medium-High
 status: Not Started
 description: |
   64/450 query failures across 22 unique queries in read_primitives on ClickHouse.

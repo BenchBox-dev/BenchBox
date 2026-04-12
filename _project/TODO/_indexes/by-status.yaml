@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T07:52:00.819750'
+generated_at: '2026-04-12T07:52:43.719127'
 total_items: 24
 statuses:
   In Progress:
@@ -7,7 +7,7 @@ statuses:
     - id: benchmark-option-cli-support
       file: TODO/main/planning/benchmark-option-cli-support.yaml
       title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
-      priority: Medium
+      priority: High
       category: Core Functionality
   Not Started:
     count: 20
@@ -25,7 +25,7 @@ statuses:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
-      priority: Medium
+      priority: Medium-High
       category: Testing & Quality
     - id: siriusdb-adapter
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
@@ -45,17 +45,17 @@ statuses:
     - id: clickhouse-error-message-capture
       file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
       title: Fix ClickHouse adapter to capture error messages in query results
-      priority: Medium
+      priority: Medium-High
       category: Core Functionality
     - id: clickhouse-read-primitives-dialect-fixes
       file: TODO/platform-expansion/planning/clickhouse-read-primitives-dialect-fixes.yaml
       title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
-      priority: Medium
+      priority: Medium-High
       category: Platform Expansion
     - id: fix-interactive-runner-defects
       file: TODO/main/planning/fix-interactive-runner-defects.yaml
       title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
-      priority: High
+      priority: Critical
       category: Bug Fix
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml

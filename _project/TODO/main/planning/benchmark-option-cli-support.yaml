@@ -2,7 +2,7 @@ id: benchmark-option-cli-support
 title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
 worktree: main
 category: Core Functionality
-priority: Medium
+priority: High
 status: In Progress
 description: >
   Benchmark constructors accept parameters that are unreachable from the CLI.

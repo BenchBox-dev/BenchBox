@@ -1,7 +1,7 @@
 id: fix-interactive-runner-defects
 title: "Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)"
 worktree: main
-priority: High
+priority: Critical
 status: Not Started
 description: |
   Running `benchbox run` without arguments triggers the interactive setup wizard.
