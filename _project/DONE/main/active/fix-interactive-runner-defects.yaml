@@ -2,7 +2,8 @@ id: fix-interactive-runner-defects
 title: "Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)"
 worktree: main
 priority: Critical
-status: Not Started
+status: Completed
+completed_date: "2026-04-12"
 description: |
   Running `benchbox run` without arguments triggers the interactive setup wizard.
   A session identified five distinct defects, all confined to the interactive path
@@ -53,7 +54,7 @@ impact:
 work:
 - id: w1
   summary: "Fix scale factor recommendation returning value outside available options"
-  status: pending
+  status: done
   needs: []
   description: |
     In `benchbox/cli/benchmarks.py:761`, `_get_recommended_scale()` has:
@@ -70,7 +71,7 @@ work:
 
 - id: w2
   summary: "Fix tuning state: decline branch must set tuning='notuning', not 'tuned'"
-  status: pending
+  status: done
   needs: []
   description: |
     In `benchbox/cli/commands/run.py:2360-2362`, after the if/else block that
@@ -94,7 +95,7 @@ work:
 
 - id: w3
   summary: "Improve phase selection error messaging: explain out-of-range input and point to query step"
-  status: pending
+  status: done
   needs: []
   description: |
     In `benchbox/cli/benchmarks.py:946-986`, `_prompt_custom_phases()` and
@@ -126,7 +127,7 @@ work:
 
 - id: w4
   summary: "Fix query ID format mismatch: normalize Q-prefix in _apply_query_subset()"
-  status: pending
+  status: done
   needs: []
   description: |
     `prompt_query_subset()` in `benchbox/cli/benchmarks.py:1564-1570` normalizes all
@@ -151,7 +152,7 @@ work:
 
 - id: w5
   summary: "Eliminate dead 'Test Execution Type' step from interactive wizard"
-  status: pending
+  status: done
   needs: [w3]
   description: |
     The "Test Execution Type" menu (standard/power/throughput/maintenance/combined)
