@@ -3,7 +3,8 @@ title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
 worktree: main
 category: Core Functionality
 priority: High
-status: In Progress
+status: Completed
+completed_date: '2026-04-12'
 description: >
   Benchmark constructors accept parameters that are unreachable from the CLI.
   The orchestrator (_get_benchmark_instance) only forwards a fixed set of kwargs

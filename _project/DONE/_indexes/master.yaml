@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:52:45.183510'
-total_items: 662
+generated_at: '2026-04-12T07:58:02.516231'
+total_items: 663
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -590,6 +590,25 @@ items:
   work_total: 16
   work_done: 16
   work_ready: 0
+- id: benchmark-option-cli-support
+  file: DONE/main/planning/benchmark-option-cli-support.yaml
+  title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - cli
+  - infrastructure
+  - developer-experience
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 1-2 weeks
+  completed_date: '2026-04-12'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  deferred_count: 2
 - id: interactive-wizard-force-regeneration
   file: DONE/ux-improvements/planning/interactive-wizard-force-regeneration.yaml
   title: Add --force option to interactive wizard

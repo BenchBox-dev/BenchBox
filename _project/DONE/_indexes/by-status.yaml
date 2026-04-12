@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:52:45.184092'
-total_items: 662
+generated_at: '2026-04-12T07:58:02.516865'
+total_items: 663
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 612
+    count: 613
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -387,6 +387,11 @@ statuses:
       file: DONE/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
       title: Adapt BenchBox to textcharts neutralized defaults and new APIs
       priority: Medium-High
+      category: Core Functionality
+    - id: benchmark-option-cli-support
+      file: DONE/main/planning/benchmark-option-cli-support.yaml
+      title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
+      priority: High
       category: Core Functionality
     - id: cli-iterations-parameter
       file: DONE/main/planning/cli-iterations-parameter.yaml

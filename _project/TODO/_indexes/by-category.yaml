@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:52:43.719102'
-total_categories: 6
+generated_at: '2026-04-12T07:58:01.005078'
+total_categories: 7
 categories:
   Benchmark Development:
     count: 4
@@ -28,23 +28,23 @@ categories:
     count: 2
     items:
     - id: fix-interactive-runner-defects
-      file: TODO/main/planning/fix-interactive-runner-defects.yaml
+      file: TODO/main/active/fix-interactive-runner-defects.yaml
       title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
       priority: Critical
-      status: Not Started
+      status: In Progress
     - id: make-parquet-default-for-tpcds-obt
       file: TODO/main/planning/make-parquet-default-for-tpcds-obt.yaml
       title: Make Parquet the default output format for TPC-DS OBT
       priority: High
       status: Not Started
   Core Functionality:
-    count: 8
+    count: 9
     items:
-    - id: benchmark-option-cli-support
-      file: TODO/main/planning/benchmark-option-cli-support.yaml
-      title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
-      priority: High
-      status: In Progress
+    - id: automate-corpus-inventory-generation
+      file: TODO/main/planning/automate-corpus-inventory-generation.yaml
+      title: Automate corpus-inventory.json generation from results-data/bundles/
+      priority: Medium-High
+      status: Not Started
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
@@ -59,6 +59,11 @@ categories:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
+      status: Not Started
+    - id: expand-seed-corpus-to-sf-0-1
+      file: TODO/main/planning/expand-seed-corpus-to-sf-0-1.yaml
+      title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
+      priority: Medium-High
       status: Not Started
     - id: clickhouse-error-message-capture
       file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
@@ -104,7 +109,7 @@ categories:
       priority: Medium
       status: Not Started
     - id: clickhouse-read-primitives-dialect-fixes
-      file: TODO/platform-expansion/planning/clickhouse-read-primitives-dialect-fixes.yaml
+      file: TODO/platform-expansion/active/clickhouse-read-primitives-dialect-fixes.yaml
       title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
       priority: Medium-High
       status: Not Started
@@ -138,4 +143,17 @@ categories:
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       priority: Medium-High
+      status: Not Started
+  Testing and Quality Assurance:
+    count: 2
+    items:
+    - id: verify-ci-validation-workflow-end-to-end
+      file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+      title: Verify the validate-submission CI workflow end-to-end with a real PR
+      priority: High
+      status: Not Started
+    - id: verify-trust-badge-rendering-in-explorer
+      file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
+      title: Visually verify TrustBadge rendering across all 4 explorer pages
+      priority: High
       status: Not Started

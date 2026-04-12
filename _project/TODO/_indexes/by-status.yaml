@@ -1,16 +1,16 @@
-generated_at: '2026-04-12T07:52:43.719127'
-total_items: 24
+generated_at: '2026-04-12T07:58:01.005105'
+total_items: 27
 statuses:
   In Progress:
     count: 1
     items:
-    - id: benchmark-option-cli-support
-      file: TODO/main/planning/benchmark-option-cli-support.yaml
-      title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
-      priority: High
-      category: Core Functionality
+    - id: fix-interactive-runner-defects
+      file: TODO/main/active/fix-interactive-runner-defects.yaml
+      title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
+      priority: Critical
+      category: Bug Fix
   Not Started:
-    count: 20
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -37,10 +37,20 @@ statuses:
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       priority: Medium
       category: Platform Expansion
+    - id: automate-corpus-inventory-generation
+      file: TODO/main/planning/automate-corpus-inventory-generation.yaml
+      title: Automate corpus-inventory.json generation from results-data/bundles/
+      priority: Medium-High
+      category: Core Functionality
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
+      category: Core Functionality
+    - id: expand-seed-corpus-to-sf-0-1
+      file: TODO/main/planning/expand-seed-corpus-to-sf-0-1.yaml
+      title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
+      priority: Medium-High
       category: Core Functionality
     - id: clickhouse-error-message-capture
       file: TODO/platform-expansion/planning/clickhouse-error-message-capture.yaml
@@ -48,15 +58,10 @@ statuses:
       priority: Medium-High
       category: Core Functionality
     - id: clickhouse-read-primitives-dialect-fixes
-      file: TODO/platform-expansion/planning/clickhouse-read-primitives-dialect-fixes.yaml
+      file: TODO/platform-expansion/active/clickhouse-read-primitives-dialect-fixes.yaml
       title: Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture
       priority: Medium-High
       category: Platform Expansion
-    - id: fix-interactive-runner-defects
-      file: TODO/main/planning/fix-interactive-runner-defects.yaml
-      title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
-      priority: Critical
-      category: Bug Fix
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -107,6 +112,16 @@ statuses:
       title: TigerData Cloud Enhancements
       priority: Low
       category: Platform Expansion
+    - id: verify-ci-validation-workflow-end-to-end
+      file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+      title: Verify the validate-submission CI workflow end-to-end with a real PR
+      priority: High
+      category: Testing and Quality Assurance
+    - id: verify-trust-badge-rendering-in-explorer
+      file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
+      title: Visually verify TrustBadge rendering across all 4 explorer pages
+      priority: High
+      category: Testing and Quality Assurance
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload

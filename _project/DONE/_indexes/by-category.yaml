@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T07:52:45.183790'
+generated_at: '2026-04-12T07:58:02.516537'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -527,7 +527,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 219
+    count: 220
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -548,6 +548,11 @@ categories:
       file: DONE/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
       title: Adapt BenchBox to textcharts neutralized defaults and new APIs
       priority: Medium-High
+      status: Completed
+    - id: benchmark-option-cli-support
+      file: DONE/main/planning/benchmark-option-cli-support.yaml
+      title: Add --benchmark-option K=V CLI support for benchmark-specific parameters
+      priority: High
       status: Completed
     - id: cli-iterations-parameter
       file: DONE/main/planning/cli-iterations-parameter.yaml
