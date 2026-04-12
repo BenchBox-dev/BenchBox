@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T08:13:17.668470'
+generated_at: '2026-04-12T08:16:46.302231'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -192,7 +192,7 @@ categories:
       priority: Medium
       status: Completed
   Bug Fix:
-    count: 3
+    count: 4
     items:
     - id: fix-platform-format-preference-defaults
       file: DONE/main/planning/fix-platform-format-preference-defaults.yaml
@@ -209,6 +209,11 @@ categories:
       title: Fix read-primitives SQL/DataFrame query skip dispatch boundaries
       priority: High
       status: Not Started
+    - id: make-parquet-default-for-tpcds-obt
+      file: DONE/main/make-parquet-default-for-tpcds-obt.yaml
+      title: Make Parquet the default output format for TPC-DS OBT
+      priority: High
+      status: Completed
   Bug Fixes:
     count: 2
     items:

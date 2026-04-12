@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:13:16.192157'
-total_items: 40
+generated_at: '2026-04-12T08:16:44.794491'
+total_items: 39
 priorities:
   Critical:
     count: 1
@@ -10,17 +10,12 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 5
+    count: 4
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
       category: Core Functionality
-      status: Not Started
-    - id: make-parquet-default-for-tpcds-obt
-      file: TODO/main/active/make-parquet-default-for-tpcds-obt.yaml
-      title: Make Parquet the default output format for TPC-DS OBT
-      category: Bug Fix
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml

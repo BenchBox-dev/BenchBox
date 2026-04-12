@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:13:17.668181'
-total_items: 666
+generated_at: '2026-04-12T08:16:46.301888'
+total_items: 667
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2450,6 +2450,24 @@ items:
   - observability
   estimated_effort: 2-3 weeks (phased implementation)
   completed_date: '2026-01-16'
+- id: make-parquet-default-for-tpcds-obt
+  file: DONE/main/make-parquet-default-for-tpcds-obt.yaml
+  title: Make Parquet the default output format for TPC-DS OBT
+  worktree: main
+  category: Bug Fix
+  priority: High
+  status: Completed
+  tags:
+  - tpcds-obt
+  - dataframe
+  - data-format
+  - performance
+  - parquet
+  estimated_effort: Small
+  completed_date: '2026-04-12'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
 - id: provable-cli-command-generation
   file: DONE/core-functionality/planning/provable-cli-command-generation.yaml
   title: Make generate_cli_command provably complete — all behavior-affecting CLI params round-trip

@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:13:16.192108'
-total_items: 40
+generated_at: '2026-04-12T08:16:44.794426'
+total_items: 39
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -40,23 +40,6 @@ items:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
-- id: make-parquet-default-for-tpcds-obt
-  file: TODO/main/active/make-parquet-default-for-tpcds-obt.yaml
-  title: Make Parquet the default output format for TPC-DS OBT
-  worktree: main
-  category: Bug Fix
-  priority: High
-  status: Not Started
-  tags:
-  - tpcds-obt
-  - dataframe
-  - data-format
-  - performance
-  - parquet
-  estimated_effort: Small
-  work_total: 5
-  work_done: 0
-  work_ready: 1
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control

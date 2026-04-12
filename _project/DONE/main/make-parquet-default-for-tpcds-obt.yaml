@@ -2,7 +2,8 @@ id: make-parquet-default-for-tpcds-obt
 title: "Make Parquet the default output format for TPC-DS OBT"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-12"
 description: |
   TPC-DS OBT currently defaults to pipe-delimited `.dat` output. At SF1 this
   produces an 11GB uncompressed file (5,041,336 rows × 518 columns). The
@@ -107,7 +108,7 @@ cost_benefit_analysis:
 work:
 - id: w1
   summary: "Flip output_format default to 'parquet' in benchmark + transformer"
-  status: pending
+  status: done
   needs: []
   description: |
     Flip the default format from `"dat"` to `"parquet"` in four locations.
@@ -139,7 +140,7 @@ work:
 
 - id: w2
   summary: "Update _existing_obt() to prefer parquet and detect stale .dat"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     `_existing_obt()` at `benchbox/core/tpcds_obt/benchmark.py:187-195` looks
@@ -175,7 +176,7 @@ work:
 
 - id: w3
   summary: "Update tests for new parquet default + keep explicit-dat coverage"
-  status: pending
+  status: done
   needs: [w1, w2]
   description: |
     Two unit tests currently pass `output_format="dat"` explicitly:
@@ -226,7 +227,7 @@ work:
 
 - id: w4
   summary: "Update documentation to reflect new parquet default"
-  status: pending
+  status: done
   needs: [w1]
   description: |
     Only one doc page references the default explicitly:
@@ -262,7 +263,7 @@ work:
 
 - id: w5
   summary: "Verify end-to-end: DuckDB SQL path + DataFusion DataFrame path"
-  status: pending
+  status: done
   needs: [w1, w2, w3]
   description: |
     Functional verification that the default flip works for both the SQL
@@ -304,7 +305,8 @@ must_preserve:
 - "`.dat` format remains available when user explicitly passes `--benchmark-option output_format=dat`"
 - "TPC-DS OBT query semantics unchanged — queries still reference the same column names and types"
 - "DuckDB SQL platform still runs tpcds_obt to completion"
-- "Manifest JSON schema unchanged (same keys: table, mode, channels, column_count, rows_total, rows_by_channel, rows_with_returns, output_file, output_format, file_size_bytes, scale_factor)"
+- "Manifest JSON schema unchanged (same keys: table, mode, channels, column_count, rows_total, rows_by_channel, rows_with_returns,
+  output_file, output_format, file_size_bytes, scale_factor)"
 - "`choices=('dat', 'parquet')` on the BenchmarkOptionSpec remains — don't narrow the allowed set"
 
 approach: |
@@ -322,30 +324,41 @@ approach: |
   logic itself.
 
 anti_patterns:
-- "DO NOT remove `.dat` support — because users reproducing older results need it, do keep the format as an explicit opt-in via `--benchmark-option output_format=dat`"
-- "DO NOT auto-delete stale `.dat` files — because the user may still want them for tuning comparisons, do log an INFO message pointing at the path and let the user decide"
-- "DO NOT narrow `choices=('dat', 'parquet')` on the BenchmarkOptionSpec — because it's a valid explicit override, do leave the choices tuple unchanged"
-- "DO NOT refactor the transformer or schema in this TODO — because the file size is a default-flip problem, not a schema problem, do keep scope_limit to the files listed per work unit"
-- "DO NOT change the default for other benchmarks — because each benchmark has its own generator pipeline and compliance expectations, do limit this change to `tpcds_obt` only"
+- "DO NOT remove `.dat` support — because users reproducing older results need it, do keep the format as an explicit opt-in
+  via `--benchmark-option output_format=dat`"
+- "DO NOT auto-delete stale `.dat` files — because the user may still want them for tuning comparisons, do log an INFO message
+  pointing at the path and let the user decide"
+- "DO NOT narrow `choices=('dat', 'parquet')` on the BenchmarkOptionSpec — because it's a valid explicit override, do leave
+  the choices tuple unchanged"
+- "DO NOT refactor the transformer or schema in this TODO — because the file size is a default-flip problem, not a schema
+  problem, do keep scope_limit to the files listed per work unit"
+- "DO NOT change the default for other benchmarks — because each benchmark has its own generator pipeline and compliance expectations,
+  do limit this change to `tpcds_obt` only"
 
 verification:
 - description: "All tpcds_obt unit tests pass after the default flip (pytest exits 0)"
   command: "uv run -- python -m pytest tests/unit/core/tpcds_obt/ -q && echo OK"
   expected_output: "OK"
 - description: "Default path (no format arg) produces parquet"
-  command: "uv run -- python -c 'from benchbox.core.tpcds_obt.benchmark import TPCDSOBTBenchmark; b = TPCDSOBTBenchmark(); print(b.output_format)'"
+  command: "uv run -- python -c 'from benchbox.core.tpcds_obt.benchmark import TPCDSOBTBenchmark; b = TPCDSOBTBenchmark();
+    print(b.output_format)'"
   expected_output: "parquet"
 - description: "Explicit dat override still works"
-  command: "uv run -- python -c 'from benchbox.core.tpcds_obt.benchmark import TPCDSOBTBenchmark; b = TPCDSOBTBenchmark(output_format=\"dat\"); print(b.output_format)'"
+  command: "uv run -- python -c 'from benchbox.core.tpcds_obt.benchmark import TPCDSOBTBenchmark; b = TPCDSOBTBenchmark(output_format=\"\
+    dat\"); print(b.output_format)'"
   expected_output: "dat"
 - description: "BenchmarkOptionSpec default is parquet"
   command: "grep -n 'name=\"output_format\"' benchbox/core/tpcds_obt/benchmark.py -A 2 | grep default="
   expected_output: 'default="parquet"'
 - description: "DuckDB SQL path at SF 0.01 produces a .parquet artifact (not .dat)"
-  command: "rm -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.* && uv run benchbox run --platform duckdb --benchmark tpcds_obt --scale 0.01 --queries Q1 >/dev/null 2>&1 && test -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.parquet && ! test -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.dat && echo OK"
+  command: "rm -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.* && uv run benchbox run --platform duckdb
+    --benchmark tpcds_obt --scale 0.01 --queries Q1 >/dev/null 2>&1 && test -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.parquet
+    && ! test -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.dat && echo OK"
   expected_output: "OK"
 - description: "DataFusion DataFrame path at SF 1 produces .parquet and run exits 0 (originally-failing case)"
-  command: "rm -f benchmark_runs/datagen/tpcds_obt_sf1/tpcds_sales_returns_obt.parquet && uv run benchbox run --platform datafusion-df --benchmark tpcds_obt --scale 1 --queries Q1 >/dev/null 2>&1 && test -f benchmark_runs/datagen/tpcds_obt_sf1/tpcds_sales_returns_obt.parquet && echo OK"
+  command: "rm -f benchmark_runs/datagen/tpcds_obt_sf1/tpcds_sales_returns_obt.parquet && uv run benchbox run --platform datafusion-df
+    --benchmark tpcds_obt --scale 1 --queries Q1 >/dev/null 2>&1 && test -f benchmark_runs/datagen/tpcds_obt_sf1/tpcds_sales_returns_obt.parquet
+    && echo OK"
   expected_output: "OK"
 
 scope_limit:

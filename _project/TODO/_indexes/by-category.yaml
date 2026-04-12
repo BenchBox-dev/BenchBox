@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:13:16.192138'
-total_categories: 10
+generated_at: '2026-04-12T08:16:44.794467'
+total_categories: 9
 categories:
   Benchmark Development:
     count: 4
@@ -23,14 +23,6 @@ categories:
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
-      status: Not Started
-  Bug Fix:
-    count: 1
-    items:
-    - id: make-parquet-default-for-tpcds-obt
-      file: TODO/main/active/make-parquet-default-for-tpcds-obt.yaml
-      title: Make Parquet the default output format for TPC-DS OBT
-      priority: High
       status: Not Started
   Code Quality and Technical Debt:
     count: 4
