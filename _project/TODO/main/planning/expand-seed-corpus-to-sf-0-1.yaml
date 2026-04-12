@@ -1,0 +1,131 @@
+id: expand-seed-corpus-to-sf-0-1
+title: "Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+deps:
+  needs:
+  - automate-corpus-inventory-generation
+  - verify-ci-validation-workflow-end-to-end
+
+description: |
+  The Phase 1 launch corpus is 6 bundles, all at scale factor 0.01. This is
+  enough to prove the explorer renders, but too small to look credible to a
+  visitor evaluating real-world performance. The strategy doc commits to
+  "depth per benchmark" — ≥3 comparable platforms per cohort — and SF 0.1
+  is the next rung that exercises the platforms beyond toy timings while
+  staying within reasonable runtime + storage budgets for CI / local runs.
+
+  This item generates SF 0.1 cohorts for TPC-H and SSB on the same three
+  platforms each cohort already covers at SF 0.01 (TPC-H: DuckDB, DataFusion,
+  Polars; SSB: DuckDB, DataFusion, SQLite), uses the production submit→PR
+  flow to land them on `published-results`, and confirms the explorer
+  renders the new cohort selectors.
+
+work:
+- id: w1
+  summary: "Generate TPC-H SF 0.1 results on DuckDB, DataFusion, Polars"
+  status: pending
+  notes: |
+    For each platform run a clean tuned run, using full TPC-H query set:
+      benchbox run --platform duckdb     --benchmark tpch --scale 0.1 --tuning tuned
+      benchbox run --platform datafusion --benchmark tpch --scale 0.1 --tuning tuned
+      benchbox run --platform polars-df  --benchmark tpch --scale 0.1 --tuning tuned
+    Capture environment metadata (uname, CPU, RAM) in the bundle. If a
+    query fails on a given platform, document the failure in
+    `_project/notes/` and leave the bundle out (don't ship a partial
+    cohort that misleads the compare view).
+
+- id: w2
+  summary: "Generate SSB SF 0.1 results on DuckDB, DataFusion, SQLite"
+  status: pending
+  notes: |
+    Same pattern as w1. SQLite at SF 0.1 may be slow; allow extended
+    timeouts but do not silently shorten the query set:
+      benchbox run --platform duckdb     --benchmark ssb --scale 0.1 --tuning tuned
+      benchbox run --platform datafusion --benchmark ssb --scale 0.1 --tuning tuned
+      benchbox run --platform sqlite     --benchmark ssb --scale 0.1 --tuning tuned
+
+- id: w3
+  summary: "Package each bundle with `benchbox submit` and stage the PR"
+  needs: [w1, w2]
+  status: pending
+  notes: |
+    For each bundle:
+      benchbox submit --last --output ./submission-<platform>-<benchmark>-sf0.1/
+    Verify the manifest hash and the labelled trust label is `maintainer-run`
+    (these are not community submissions).
+
+- id: w4
+  summary: "Open a single submission PR against published-results with all 6 bundles"
+  needs: [w3]
+  status: pending
+  notes: |
+    Single PR is preferable to 6 PRs because:
+      - the cohort is meaningful only when complete,
+      - the explorer rebuild only fires once per merge,
+      - reviewers see all SF 0.1 results together.
+    Confirm validate-submission CI passes; address any failures.
+    Confirm corpus-inventory.json regenerates cleanly (depends on
+    automate-corpus-inventory-generation). Merge after review.
+
+- id: w5
+  summary: "Verify the explorer surfaces the new SF 0.1 cohort"
+  needs: [w4]
+  status: pending
+  notes: |
+    After explorer redeploy:
+      - TPC-H scale-factor selector lists 0.01 and 0.1
+      - SSB scale-factor selector lists 0.01 and 0.1
+      - Compare view at /results/compare?ids=<3 SF 0.1 ids> renders
+      - Cohort validation does NOT block within-SF comparisons
+      - Cohort validation DOES block mixed-SF comparisons
+    Capture one screenshot per benchmark of the SF 0.1 compare view.
+
+verification:
+- description: "Inventory contains 12 bundles total (6 SF 0.01 + 6 SF 0.1)"
+  command: "uv run python -c \"import json; d=json.load(open('results-data/corpus-inventory.json')); print(len(d['bundles']))\""
+  expected_output: "12"
+- description: "Each new bundle validates against schema-v2"
+  command: "uv run python results-data/validate_corpus.py"
+  expected_output: "all bundles valid"
+
+must_preserve:
+- Existing 6 SF 0.01 bundles untouched.
+- "Cohort isolation — SF 0.01 and SF 0.1 must remain separate cohorts in the explorer."
+- Maintainer-run trust label on all generated bundles (no fake community labels).
+
+anti_patterns:
+- DO NOT skip platforms where a few queries fail and ship partial-coverage bundles — because the cohort's value is in apples-to-apples comparison; partial coverage misleads.
+- DO NOT bypass `benchbox submit` and copy bundles directly into `results-data/bundles/` — because the production flow (submit + manifest + CI) needs to be exercised on every cohort, not just community ones.
+- DO NOT hand-edit `corpus-inventory.json` — because the generator from `automate-corpus-inventory-generation` is now authoritative.
+
+scope_limit:
+  only_modify:
+  - results-data/bundles/  # add new bundle directories
+  - results-data/corpus-inventory.json  # via generator only
+  - _project/notes/  # failure documentation if any platform skips queries
+  do_not_touch:
+  - benchbox/  # no platform changes during corpus generation
+  - results-explorer/
+
+metadata:
+  tags:
+  - results
+  - corpus
+  - tpch
+  - ssb
+  - sf-0.1
+  estimated_effort: "Medium"
+  created_date: "2026-04-12"
+
+impact:
+  business_value: |
+    Doubles the corpus and moves it to a scale factor where platform
+    differences are visible in real timing terms, not noise. Strengthens
+    the credibility argument for the explorer to outside visitors.
+  user_impact: |
+    Visitors comparing platforms see meaningful timing differences instead
+    of single-digit-millisecond results that are dominated by overhead.

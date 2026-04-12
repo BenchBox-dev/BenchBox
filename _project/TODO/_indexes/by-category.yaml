@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T07:59:53.713131'
+generated_at: '2026-04-12T08:03:41.090265'
 total_categories: 8
 categories:
   Benchmark Development:
@@ -31,14 +31,14 @@ categories:
       file: TODO/main/active/fix-interactive-runner-defects.yaml
       title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
       priority: Critical
-      status: In Progress
+      status: Not Started
     - id: make-parquet-default-for-tpcds-obt
       file: TODO/main/planning/make-parquet-default-for-tpcds-obt.yaml
       title: Make Parquet the default output format for TPC-DS OBT
       priority: High
       status: Not Started
   Core Functionality:
-    count: 9
+    count: 11
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -55,6 +55,11 @@ categories:
       title: Define BenchBox results platform product boundary and launch strategy
       priority: Critical
       status: Completed
+    - id: define-phase-3-promotion-metrics
+      file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
+      title: Define Phase 3 promotion metrics, dashboard, and review cadence
+      priority: Medium
+      status: Not Started
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
@@ -85,13 +90,23 @@ categories:
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
       status: Not Started
+    - id: evaluate-results-data-repo-extraction-checkpoint
+      file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
+      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
+      priority: Low
+      status: Not Started
   Documentation:
-    count: 1
+    count: 2
     items:
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
       priority: Medium-High
+      status: Not Started
+    - id: write-results-platform-phase-2-operations-runbook
+      file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
+      title: Write the Phase 2 results-platform operations runbook
+      priority: Medium
       status: Not Started
   Platform Expansion:
     count: 8

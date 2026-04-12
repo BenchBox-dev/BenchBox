@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:59:53.713175'
-total_items: 29
+generated_at: '2026-04-12T08:03:41.090278'
+total_items: 32
 priorities:
   Critical:
     count: 2
@@ -13,7 +13,7 @@ priorities:
       file: TODO/main/active/fix-interactive-runner-defects.yaml
       title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
       category: Bug Fix
-      status: In Progress
+      status: Not Started
   High:
     count: 5
     items:
@@ -81,7 +81,7 @@ priorities:
       category: Documentation
       status: Not Started
   Medium:
-    count: 6
+    count: 8
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -92,6 +92,11 @@ priorities:
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: define-phase-3-promotion-metrics
+      file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
+      title: Define Phase 3 promotion metrics, dashboard, and review cadence
+      category: Core Functionality
       status: Not Started
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
@@ -113,8 +118,13 @@ priorities:
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
       status: Not Started
+    - id: write-results-platform-phase-2-operations-runbook
+      file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
+      title: Write the Phase 2 results-platform operations runbook
+      category: Documentation
+      status: Not Started
   Low:
-    count: 9
+    count: 10
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -145,6 +155,11 @@ priorities:
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
+      status: Not Started
+    - id: evaluate-results-data-repo-extraction-checkpoint
+      file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
+      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
+      category: Core Functionality
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml

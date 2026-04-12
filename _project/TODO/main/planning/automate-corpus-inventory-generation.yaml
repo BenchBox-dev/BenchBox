@@ -1,0 +1,178 @@
+id: automate-corpus-inventory-generation
+title: "Automate corpus-inventory.json generation from results-data/bundles/"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+deps:
+  needs:
+  - implement-pr-based-result-submission-workflow
+
+description: |
+  `results-data/corpus-inventory.json` is currently maintained by hand. It
+  enumerates every bundle in the seed corpus with metadata (benchmark,
+  platform, scale, trust label, hash). Once Phase 2 community PRs start
+  landing, hand-maintenance will drift: contributors will forget to update
+  the inventory, maintainers will forget to nudge them, and the explorer
+  static-build pipeline will silently see a stale view of the corpus.
+
+  This item replaces the hand-maintained file with a generated one. The
+  generator scans `results-data/bundles/` recursively, extracts metadata
+  from each bundle's schema-v2 header (and sidecar manifest where present),
+  and writes a deterministic, sorted `corpus-inventory.json`. A pre-commit
+  hook and a CI step prevent drift.
+
+work:
+- id: w1
+  summary: "Write `scripts/generate_corpus_inventory.py`"
+  status: pending
+  notes: |
+    Inputs: scan `results-data/bundles/` for `*.json` (excluding sidecar
+    files matching `submission-manifest.json` and any `.plans.json` /
+    `.tuning.json` companions).
+
+    For each bundle:
+      - Parse schema-v2 header: benchmark, platform, scale_factor,
+        timestamp, query_count, query_set
+      - Detect sibling `submission-manifest.json` → trust_label =
+        community-submission, else default maintainer-run
+      - Compute SHA256 of the bundle file
+      - Capture relative path
+
+    Output: `results-data/corpus-inventory.json` with
+      - `generated_at` (UTC ISO timestamp, omit if --check)
+      - `bundles[]` sorted by (benchmark, platform, scale_factor, timestamp)
+      - `cohorts` summary: per-(benchmark, scale) lists of platforms
+      - `summary`: total_bundles, by_benchmark, by_platform, by_trust_label
+
+    Flags:
+      - `--check` → exit 1 if generated content differs from on-disk file
+        (no write, deterministic — no `generated_at`)
+      - `--write` → overwrite `corpus-inventory.json`
+    Default: `--write`.
+
+- id: w2
+  summary: "Add unit tests for the generator"
+  needs: [w1]
+  status: pending
+  notes: |
+    `tests/unit/scripts/test_generate_corpus_inventory.py`:
+      - Empty bundles dir → empty inventory with consistent shape
+      - Single bundle without sidecar → maintainer-run trust label
+      - Single bundle with sidecar → community-submission
+      - Multiple bundles → sorted deterministically
+      - Cohort summary: 3 platforms at same (benchmark, scale) groups
+        correctly
+      - Hash matches sha256 of bundle file
+      - `--check` returns 0 on match, 1 on drift, prints diff
+      - Companion files (.plans.json, .tuning.json) excluded from bundle
+        enumeration
+      - Malformed bundle JSON → fail with clear message naming the file
+
+- id: w3
+  summary: "Wire the generator into validate-submission CI workflow"
+  needs: [w2]
+  status: pending
+  notes: |
+    Update `.github/workflows/validate-submission.yml` to add a step after
+    bundle validation:
+      `uv run python scripts/generate_corpus_inventory.py --check`
+    A failing check posts a PR comment instructing the contributor to run
+    `uv run python scripts/generate_corpus_inventory.py --write` locally
+    and amend the PR. Keep the message friendly — most contributors will
+    not have read the contributor guide before this point.
+
+- id: w4
+  summary: "Add pre-commit hook entry for the generator"
+  needs: [w2]
+  status: pending
+  notes: |
+    Add to `.pre-commit-config.yaml` (or create one if absent):
+      - id: corpus-inventory
+        name: corpus-inventory drift check
+        entry: uv run python scripts/generate_corpus_inventory.py --check
+        files: ^results-data/bundles/
+        language: system
+        pass_filenames: false
+    Document hook installation in `docs/contributing-results.md`.
+
+- id: w5
+  summary: "Regenerate corpus-inventory.json and reconcile differences"
+  needs: [w1]
+  status: pending
+  notes: |
+    1. Run `--write` against the current corpus.
+    2. Diff against the existing hand-maintained file. Any diff is suspect:
+       investigate whether the hand-maintained file is right (then fix the
+       generator) or the generator is right (then commit the regenerated
+       file with a chore commit).
+    3. The pipeline at `benchbox/core/explorer_pipeline/` already derives
+       its own manifest, so confirm no consumer depends on the
+       hand-curated shape.
+
+- id: w6
+  summary: "Document the generator in contributor guide and ops runbook"
+  needs: [w3, w5]
+  status: pending
+  notes: |
+    Update `docs/contributing-results.md`:
+      - Replace any "edit corpus-inventory.json" instruction with
+        "run `uv run python scripts/generate_corpus_inventory.py --write`".
+      - Note that CI will reject PRs whose inventory drifts.
+    Add a one-liner to the Phase 2 ops runbook (TODO
+    `write-results-platform-phase-2-operations-runbook`) referencing the
+    same.
+
+verification:
+- description: "Generator runs cleanly against current corpus, --check passes after --write"
+  command: "uv run python scripts/generate_corpus_inventory.py --write && uv run python scripts/generate_corpus_inventory.py --check"
+  expected_output: "exit 0 from both runs"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/scripts/test_generate_corpus_inventory.py -q"
+  expected_output: "all tests pass"
+- description: "Generated file is byte-identical when run twice (deterministic)"
+  command: "uv run python scripts/generate_corpus_inventory.py --write && cp results-data/corpus-inventory.json /tmp/inv1.json && uv run python scripts/generate_corpus_inventory.py --write && diff /tmp/inv1.json results-data/corpus-inventory.json"
+  expected_output: "no diff (modulo generated_at if not stripped)"
+
+must_preserve:
+- The schema-v2 bundle format and the trust-label sidecar contract — generator reads, never mutates.
+- Existing pipeline at `benchbox/core/explorer_pipeline/` — it builds its own manifest; the inventory is a separate, lighter index.
+- Existing fields/shape consumed by any downstream tool referencing `corpus-inventory.json`. Audit consumers in w5 before changing the shape.
+
+anti_patterns:
+- DO NOT parse the submission-manifest.json contents for trust resolution — because the established contract (PR #53) is presence-only; only check `is_file()`. Hash verification belongs to the CI validator.
+- DO NOT include `generated_at` in `--check` mode — because timestamp drift would defeat the purpose; the deterministic comparison must be byte-stable.
+- DO NOT auto-regenerate during the pipeline build — because PRs need to fail loudly with "run the script" guidance, not silently regenerate and hide drift.
+
+scope_limit:
+  only_modify:
+  - scripts/generate_corpus_inventory.py
+  - tests/unit/scripts/test_generate_corpus_inventory.py
+  - .github/workflows/validate-submission.yml
+  - .pre-commit-config.yaml
+  - docs/contributing-results.md
+  - results-data/corpus-inventory.json
+  do_not_touch:
+  - benchbox/core/explorer_pipeline/  # separate manifest pipeline
+  - results-data/bundles/  # data, not code
+
+metadata:
+  tags:
+  - results
+  - corpus
+  - automation
+  - ci
+  - phase-2
+  estimated_effort: "Medium"
+  created_date: "2026-04-12"
+
+impact:
+  business_value: |
+    Eliminates a foreseeable source of corpus drift before Phase 2 traffic
+    arrives. Cheaper to build the guard now than to debug stale-inventory
+    explorer renders later.
+  user_impact: |
+    Contributors don't have to learn an arcane file format; they run one
+    script. Maintainers don't have to remember to update the inventory on
+    every merge.
