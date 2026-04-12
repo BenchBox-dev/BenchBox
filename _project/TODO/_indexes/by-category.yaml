@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:06:36.067403'
-total_categories: 8
+generated_at: '2026-04-12T08:11:04.740775'
+total_categories: 9
 categories:
   Benchmark Development:
     count: 4
@@ -37,8 +37,16 @@ categories:
       title: Make Parquet the default output format for TPC-DS OBT
       priority: High
       status: Not Started
+  Code Quality and Technical Debt:
+    count: 1
+    items:
+    - id: quality-bulk-fix-encoding-lint-and-ratchet
+      file: TODO/main/planning/quality-bulk-fix-encoding-lint-and-ratchet.yaml
+      title: Bulk-fix PLW1514 encoding violations and ratchet ruff/McCabe gates
+      priority: Medium
+      status: Not Started
   Core Functionality:
-    count: 11
+    count: 12
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -73,6 +81,11 @@ categories:
     - id: expand-seed-corpus-to-sf-0-1
       file: TODO/main/planning/expand-seed-corpus-to-sf-0-1.yaml
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
+      priority: Medium-High
+      status: Not Started
+    - id: quality-extend-error-capture-to-cloud-adapters
+      file: TODO/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
+      title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
       priority: Medium-High
       status: Not Started
     - id: implement-pr-based-result-submission-workflow
@@ -163,8 +176,18 @@ categories:
       priority: Medium-High
       status: Not Started
   Testing and Quality Assurance:
-    count: 3
+    count: 5
     items:
+    - id: quality-add-cross-platform-result-validation
+      file: TODO/main/planning/quality-add-cross-platform-result-validation.yaml
+      title: Add cross-platform query-result validation suite
+      priority: Medium-High
+      status: Not Started
+    - id: quality-make-timing-policy-ci-gate
+      file: TODO/main/planning/quality-make-timing-policy-ci-gate.yaml
+      title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
+      priority: Medium-High
+      status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

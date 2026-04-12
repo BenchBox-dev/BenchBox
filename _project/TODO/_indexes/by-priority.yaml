@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:06:36.067432'
-total_items: 31
+generated_at: '2026-04-12T08:11:04.740801'
+total_items: 35
 priorities:
   Critical:
     count: 2
@@ -43,7 +43,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 6
+    count: 9
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -54,6 +54,11 @@ priorities:
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       category: Core Functionality
+      status: Not Started
+    - id: quality-add-cross-platform-result-validation
+      file: TODO/main/planning/quality-add-cross-platform-result-validation.yaml
+      title: Add cross-platform query-result validation suite
+      category: Testing and Quality Assurance
       status: Not Started
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
@@ -70,13 +75,23 @@ priorities:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Not Started
+    - id: quality-extend-error-capture-to-cloud-adapters
+      file: TODO/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
+      title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
+      category: Core Functionality
+      status: Not Started
+    - id: quality-make-timing-policy-ci-gate
+      file: TODO/main/planning/quality-make-timing-policy-ci-gate.yaml
+      title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
+      category: Testing and Quality Assurance
+      status: Not Started
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
       category: Documentation
       status: Not Started
   Medium:
-    count: 8
+    count: 9
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -87,6 +102,11 @@ priorities:
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: quality-bulk-fix-encoding-lint-and-ratchet
+      file: TODO/main/planning/quality-bulk-fix-encoding-lint-and-ratchet.yaml
+      title: Bulk-fix PLW1514 encoding violations and ratchet ruff/McCabe gates
+      category: Code Quality and Technical Debt
       status: Not Started
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
