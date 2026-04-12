@@ -44,6 +44,7 @@ files_affected:
     - "tests/conftest.py"
   added:
     - "scripts/audit_skip_xfail.py"
+    - "tests/unit/conftest_warn_check.py"
 
 must_preserve:
   - "Test count unchanged unless removal is explicitly justified"

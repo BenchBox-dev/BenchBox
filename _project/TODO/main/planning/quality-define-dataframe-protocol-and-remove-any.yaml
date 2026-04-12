@@ -19,7 +19,7 @@ description: |
 
 work:
   - id: w1
-    summary: "Survey unified_frame.py: enumerate every method, classify as (a) generic dispatch [→ protocol], (b) library-specific [→ concrete type], (c) escape hatch [keep Any with comment]"
+    summary: "Capture ty-check baseline to /tmp/ty_baseline.txt, then classify unified_frame.py methods: generic dispatch → protocol, library-specific → concrete type, escape hatch → keep Any"
     status: pending
 
   - id: w2
@@ -72,9 +72,9 @@ anti_patterns:
   - "DO NOT touch unified_frame.py runtime behavior — because that's a separate concern — annotations only"
 
 verification:
-  - description: "Type checker is clean on dataframe layer"
-    command: "uv run ty check benchbox/platforms/dataframe/"
-    expected_output: "no errors"
+  - description: "Type checker shows no new errors on dataframe layer vs pre-refactor baseline captured in w1"
+    command: "uv run ty check benchbox/platforms/dataframe/ > /tmp/ty_after.txt; diff /tmp/ty_baseline.txt /tmp/ty_after.txt"
+    expected_output: "no new error lines (removals from fixing real bugs are acceptable)"
   - description: "All dataframe tests pass"
     command: "uv run -- python -m pytest tests/unit/platforms/dataframe/ -q"
     expected_output: "all tests pass"

@@ -17,16 +17,16 @@ description: |
 
 work:
   - id: w1
-    summary: "Inventory adapter.py public surface: every public class, method, attribute, and mixin-style helper with line ranges and rough responsibility grouping"
+    summary: "Inventory adapter.py public surface: every public class, method, attribute, and mixin-style helper with line ranges and rough responsibility grouping (~3-4 hours)"
     status: pending
 
   - id: w2
-    summary: "Trace callers and coupling hotspots: identify which symbols are imported or overridden by platform adapters, tests, and CLI/orchestrator code"
+    summary: "Trace callers and coupling hotspots: identify which symbols are imported or overridden by platform adapters, tests, and CLI/orchestrator code (~3-4 hours)"
     needs: [w1]
     status: pending
 
   - id: w3
-    summary: "Write docs/development/adapter-refactor-map.md with proposed module destinations, slice order, must-preserve contract, and explicit 'do not extract yet' exceptions"
+    summary: "Write docs/development/adapter-refactor-map.md with proposed module destinations, slice order, must-preserve contract, and explicit 'do not extract yet' exceptions (~2-3 hours)"
     needs: [w2]
     status: pending
 
@@ -52,9 +52,15 @@ anti_patterns:
   - "DO NOT group methods by 'roughly same size' — because that creates arbitrary modules — cluster by responsibility and call graph"
 
 verification:
-  - description: "Refactor map covers the planned responsibility split"
+  - description: "Refactor map enumerates every public symbol in adapter.py"
+    command: "uv run -- python -c 'import ast, pathlib; src = pathlib.Path(\"benchbox/platforms/base/adapter.py\").read_text(); tree = ast.parse(src); symbols = [n.name for n in ast.walk(tree) if isinstance(n, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and not n.name.startswith(\"_\")]; doc = pathlib.Path(\"docs/development/adapter-refactor-map.md\").read_text(); missing = [s for s in symbols if s not in doc]; print(\"MISSING:\", missing) if missing else print(\"OK: all\", len(symbols), \"public symbols mapped\")'"
+    expected_output: "OK: all N public symbols mapped"
+  - description: "Map references every proposed target module"
     command: "rg -n \"connection|execution|data_loading|result_capture|dialect_translation|tuning\" docs/development/adapter-refactor-map.md"
-    expected_output: "all planned modules referenced"
+    expected_output: "all six module names present"
+  - description: "adapter.py is unchanged (this TODO is read-only)"
+    command: "git diff --stat benchbox/platforms/base/adapter.py"
+    expected_output: "(empty — no changes)"
 
 metadata:
   tags: ["quality-plan", "phase-2", "phase-3-prep", "refactor-map"]

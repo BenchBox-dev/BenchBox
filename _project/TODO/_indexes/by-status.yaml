@@ -1,8 +1,8 @@
-generated_at: '2026-04-12T08:35:46.510460'
+generated_at: '2026-04-12T19:52:03.326612'
 total_items: 40
 statuses:
   Not Started:
-    count: 33
+    count: 32
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -159,18 +159,13 @@ statuses:
       title: Verify the validate-submission CI workflow end-to-end with a real PR
       priority: High
       category: Testing and Quality Assurance
-    - id: verify-trust-badge-rendering-in-explorer
-      file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
-      title: Visually verify TrustBadge rendering across all 4 explorer pages
-      priority: High
-      category: Testing and Quality Assurance
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
   Completed:
-    count: 7
+    count: 8
     items:
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
@@ -202,6 +197,11 @@ statuses:
       title: Surface contributor onboarding for results submission
       priority: Medium-High
       category: Documentation
+    - id: verify-trust-badge-rendering-in-explorer
+      file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
+      title: Visually verify TrustBadge rendering across all 4 explorer pages
+      priority: High
+      category: Testing and Quality Assurance
     - id: write-results-platform-phase-2-operations-runbook
       file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
       title: Write the Phase 2 results-platform operations runbook

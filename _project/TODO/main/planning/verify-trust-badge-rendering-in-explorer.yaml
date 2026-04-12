@@ -2,7 +2,7 @@ id: verify-trust-badge-rendering-in-explorer
 title: "Visually verify TrustBadge rendering across all 4 explorer pages"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 deps:

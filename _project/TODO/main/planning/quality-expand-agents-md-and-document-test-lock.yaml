@@ -18,15 +18,15 @@ description: |
 
 work:
   - id: w1
-    summary: "Expand AGENTS.md sections: timing policy (1 paragraph), result validation (1 paragraph), adapter authoring guide pointer, dependency upper-bounds policy reference, common test markers cheat sheet"
+    summary: "Expand AGENTS.md with 5 sections (+80-120 lines, ≤300 total, ~2h): timing policy, result validation, adapter authoring pointer, dep upper-bounds reference, test markers cheat sheet"
     status: pending
 
   - id: w2
-    summary: "Write tests/README.md covering: (a) marker taxonomy, (b) the inter-process lock contract, (c) the macOS conftest branch, (d) how to add a new test category"
+    summary: "Write tests/README.md (~100-150 lines) covering: (a) marker taxonomy, (b) the inter-process lock contract, (c) the macOS conftest branch, (d) how to add a new test category (~2 hours)"
     status: pending
 
   - id: w3
-    summary: "Cross-link AGENTS.md ↔ tests/README.md ↔ docs/development/ so the entry points are obvious"
+    summary: "Cross-link AGENTS.md ↔ tests/README.md ↔ docs/development/ so the entry points are obvious (~30 min)"
     needs: [w1, w2]
     status: pending
 
@@ -49,6 +49,11 @@ approach: |
   For tests/README.md, treat it as onboarding doc for "I want to write a
   new test in BenchBox" — explain the marker system, the lock, the macOS
   quirk, and where to put fast vs slow tests.
+
+anti_patterns:
+  - "DO NOT duplicate content from /docs/development/ into AGENTS.md — because the two will drift out of sync — summarize in 2-5 sentences and link"
+  - "DO NOT let AGENTS.md exceed 300 lines — because it stops being a quick reference — move depth to /docs/development/"
+  - "DO NOT document the macOS conftest branch by paraphrasing the code — because rewrites rot — quote the exact lines (109-122) and explain why"
 
 verification:
   - description: "AGENTS.md is well-formed markdown"
