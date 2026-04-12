@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T08:11:04.740715'
-total_items: 35
+generated_at: '2026-04-12T08:12:31.985793'
+total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -19,22 +19,6 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
-- id: fix-interactive-runner-defects
-  file: TODO/main/active/fix-interactive-runner-defects.yaml
-  title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
-  worktree: main
-  category: Bug Fix
-  priority: Critical
-  status: In Progress
-  tags:
-  - interactive
-  - wizard
-  - cli
-  - ux
-  estimated_effort: Small
-  work_total: 5
-  work_done: 1
-  work_ready: 3
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -342,6 +326,39 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 6
+- id: quality-add-perf-regression-smoke-ci
+  file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
+  title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Not Started
+  tags:
+  - quality-plan
+  - phase-2
+  - performance
+  - ci
+  estimated_effort: Small-Medium (1-2 days)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - quality-make-timing-policy-ci-gate
+- id: quality-audit-skip-xfail-markers-add-rationale
+  file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
+  title: Audit 276 skip/xfail test markers — add rationale or remove
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Not Started
+  tags:
+  - quality-plan
+  - phase-4
+  - test-hygiene
+  estimated_effort: Medium (2-3 days)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
 - id: quality-bulk-fix-encoding-lint-and-ratchet
   file: TODO/main/planning/quality-bulk-fix-encoding-lint-and-ratchet.yaml
   title: Bulk-fix PLW1514 encoding violations and ratchet ruff/McCabe gates
@@ -355,6 +372,22 @@ items:
   - lint
   estimated_effort: Small (4 hours)
   work_total: 4
+  work_done: 0
+  work_ready: 1
+- id: quality-define-dataframe-protocol-and-remove-any
+  file: TODO/main/planning/quality-define-dataframe-protocol-and-remove-any.yaml
+  title: Define DataFrameProtocol and remove Any annotations from unified frame layer
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Not Started
+  tags:
+  - quality-plan
+  - phase-4
+  - typing
+  - dataframe
+  estimated_effort: Medium (3-4 days)
+  work_total: 5
   work_done: 0
   work_ready: 1
 - id: define-phase-3-promotion-metrics
@@ -620,6 +653,25 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 1
+- id: quality-refactor-adapter-base-into-cohesive-modules
+  file: TODO/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
+  title: Refactor 5,158-line adapter base into cohesive sub-modules
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - quality-plan
+  - phase-3
+  - refactor
+  - high-blast-radius
+  estimated_effort: Medium-Large (1 week)
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+  needs:
+  - quality-add-cross-platform-result-validation
+  - quality-make-timing-policy-ci-gate
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

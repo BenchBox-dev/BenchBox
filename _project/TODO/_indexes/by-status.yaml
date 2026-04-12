@@ -1,16 +1,8 @@
-generated_at: '2026-04-12T08:11:04.740812'
-total_items: 35
+generated_at: '2026-04-12T08:12:31.985852'
+total_items: 38
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: fix-interactive-runner-defects
-      file: TODO/main/active/fix-interactive-runner-defects.yaml
-      title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
-      priority: Critical
-      category: Bug Fix
   Not Started:
-    count: 31
+    count: 35
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -47,6 +39,16 @@ statuses:
       title: Add cross-platform query-result validation suite
       priority: Medium-High
       category: Testing and Quality Assurance
+    - id: quality-add-perf-regression-smoke-ci
+      file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
+      title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
+      priority: Medium
+      category: Testing and Quality Assurance
+    - id: quality-audit-skip-xfail-markers-add-rationale
+      file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
+      title: Audit 276 skip/xfail test markers — add rationale or remove
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
       title: Automate corpus-inventory.json generation from results-data/bundles/
@@ -55,6 +57,11 @@ statuses:
     - id: quality-bulk-fix-encoding-lint-and-ratchet
       file: TODO/main/planning/quality-bulk-fix-encoding-lint-and-ratchet.yaml
       title: Bulk-fix PLW1514 encoding violations and ratchet ruff/McCabe gates
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: quality-define-dataframe-protocol-and-remove-any
+      file: TODO/main/planning/quality-define-dataframe-protocol-and-remove-any.yaml
+      title: Define DataFrameProtocol and remove Any annotations from unified frame layer
       priority: Medium
       category: Code Quality and Technical Debt
     - id: define-phase-3-promotion-metrics
@@ -122,6 +129,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Low
       category: Platform Expansion
+    - id: quality-refactor-adapter-base-into-cohesive-modules
+      file: TODO/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
+      title: Refactor 5,158-line adapter base into cohesive sub-modules
+      priority: Medium-High
+      category: Code Quality and Technical Debt
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

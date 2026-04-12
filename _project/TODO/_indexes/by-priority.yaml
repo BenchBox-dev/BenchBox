@@ -1,19 +1,14 @@
-generated_at: '2026-04-12T08:11:04.740801'
-total_items: 35
+generated_at: '2026-04-12T08:12:31.985842'
+total_items: 38
 priorities:
   Critical:
-    count: 2
+    count: 1
     items:
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
       category: Core Functionality
       status: Completed
-    - id: fix-interactive-runner-defects
-      file: TODO/main/active/fix-interactive-runner-defects.yaml
-      title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
-      category: Bug Fix
-      status: In Progress
   High:
     count: 5
     items:
@@ -43,7 +38,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 9
+    count: 10
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -85,13 +80,18 @@ priorities:
       title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
       category: Testing and Quality Assurance
       status: Not Started
+    - id: quality-refactor-adapter-base-into-cohesive-modules
+      file: TODO/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
+      title: Refactor 5,158-line adapter base into cohesive sub-modules
+      category: Code Quality and Technical Debt
+      status: Not Started
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
       category: Documentation
       status: Not Started
   Medium:
-    count: 9
+    count: 12
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -103,9 +103,24 @@ priorities:
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
       status: Not Started
+    - id: quality-add-perf-regression-smoke-ci
+      file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
+      title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
+      category: Testing and Quality Assurance
+      status: Not Started
+    - id: quality-audit-skip-xfail-markers-add-rationale
+      file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
+      title: Audit 276 skip/xfail test markers — add rationale or remove
+      category: Testing and Quality Assurance
+      status: Not Started
     - id: quality-bulk-fix-encoding-lint-and-ratchet
       file: TODO/main/planning/quality-bulk-fix-encoding-lint-and-ratchet.yaml
       title: Bulk-fix PLW1514 encoding violations and ratchet ruff/McCabe gates
+      category: Code Quality and Technical Debt
+      status: Not Started
+    - id: quality-define-dataframe-protocol-and-remove-any
+      file: TODO/main/planning/quality-define-dataframe-protocol-and-remove-any.yaml
+      title: Define DataFrameProtocol and remove Any annotations from unified frame layer
       category: Code Quality and Technical Debt
       status: Not Started
     - id: define-phase-3-promotion-metrics

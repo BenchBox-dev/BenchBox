@@ -1,8 +1,8 @@
-generated_at: '2026-04-12T08:11:06.223094'
-total_items: 665
+generated_at: '2026-04-12T08:12:33.448020'
+total_items: 666
 priorities:
   Critical:
-    count: 38
+    count: 39
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -102,6 +102,11 @@ priorities:
     - id: fix-platform-format-preference-defaults
       file: DONE/main/planning/fix-platform-format-preference-defaults.yaml
       title: Fix data format selection to always default to platform preferences
+      category: Bug Fix
+      status: Completed
+    - id: fix-interactive-runner-defects
+      file: DONE/main/active/fix-interactive-runner-defects.yaml
+      title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
       category: Bug Fix
       status: Completed
     - id: implement-expression-family-base-adapter-and-dialects
