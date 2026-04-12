@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:58:56.083526'
-total_items: 28
+generated_at: '2026-04-12T07:59:53.713175'
+total_items: 29
 priorities:
   Critical:
     count: 2
@@ -81,7 +81,7 @@ priorities:
       category: Documentation
       status: Not Started
   Medium:
-    count: 5
+    count: 6
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -107,6 +107,11 @@ priorities:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
+      status: Not Started
+    - id: external-contributor-submission-dry-run
+      file: TODO/main/planning/external-contributor-submission-dry-run.yaml
+      title: Run a Phase 2 dry-run with one external trusted contributor
+      category: Testing and Quality Assurance
       status: Not Started
   Low:
     count: 9

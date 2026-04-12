@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T07:58:56.083509'
+generated_at: '2026-04-12T07:59:53.713131'
 total_categories: 8
 categories:
   Benchmark Development:
@@ -153,8 +153,13 @@ categories:
       priority: Medium-High
       status: Not Started
   Testing and Quality Assurance:
-    count: 2
+    count: 3
     items:
+    - id: external-contributor-submission-dry-run
+      file: TODO/main/planning/external-contributor-submission-dry-run.yaml
+      title: Run a Phase 2 dry-run with one external trusted contributor
+      priority: Medium
+      status: Not Started
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR

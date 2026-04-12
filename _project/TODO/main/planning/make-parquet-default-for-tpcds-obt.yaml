@@ -18,8 +18,10 @@ description: |
     load 11GB of pipe-delimited text into memory at SF1
 
   Parquet's columnar encoding with null suppression and per-column
-  compression is expected to reduce the file to ~300-700MB at SF1 (10-20x
-  smaller). The transformer already supports parquet output — the export
+  compression is expected to reduce the file materially — an order-of-
+  magnitude shrink is plausible given the null density and text repetition,
+  but the actual ratio is validated in w5. The transformer already
+  supports parquet output — the export
   branch at `etl/transformer.py:730` emits parquet when
   `output_format="parquet"` is passed. What is missing is making parquet
   the default so DataFrame platforms work out of the box and SQL platforms
@@ -58,8 +60,9 @@ metadata:
 
 impact:
   user_impact: |
-    Users running TPC-DS OBT at SF1+ get a ~10-20x smaller data artifact by
-    default (~300-700MB vs 11GB at SF1). DataFrame platforms (DataFusion,
+    Users running TPC-DS OBT at SF1+ get a materially smaller data artifact
+    by default (expected order-of-magnitude shrink vs the 11GB `.dat` at
+    SF1 — exact ratio captured in w5). DataFrame platforms (DataFusion,
     Polars, Pandas) become viable for TPC-DS OBT. Users with existing `.dat`
     files will see a one-time regeneration the next time they run the
     benchmark unless they explicitly pass `--benchmark-option output_format=dat`.
@@ -86,7 +89,7 @@ justification: |
 cost_benefit_analysis:
   expected_benefits: |
     - DataFusion, Polars, Pandas can actually run TPC-DS OBT
-    - SF1 artifact shrinks ~10-20x (11GB → ~300-700MB est.)
+    - SF1 artifact shrinks materially from 11GB (exact ratio captured in w5)
     - Load time shrinks proportionally (Parquet parallel reads + column projection)
     - SQL platforms also benefit from the smaller artifact
     - Aligns with `DataFrameRunOptions.prefer_parquet=True` which is already
@@ -151,12 +154,19 @@ work:
     `.dat` if they want the disk space back.
 
     Implementation:
-    1. In `_existing_obt()`, after the existing check fails, check whether
-       `self.output_dir / "tpcds_sales_returns_obt.dat"` exists and
-       `output_format != "dat"`. If so, log INFO:
-       `"Found stale .dat output at <path>. Regenerating as <format>. Delete the .dat manually to reclaim disk space."`
-    2. Do NOT auto-delete the stale file — the user may still want it for
-       SQL platforms that were tuned against that specific artifact.
+    1. In `_existing_obt()`, after the existing check fails, detect an
+       alternate-format artifact on disk and log an INFO message pointing at
+       it. Handle both directions symmetrically:
+       - If requested format is `parquet` and
+         `self.output_dir / "tpcds_sales_returns_obt.dat"` exists, log:
+         `"Found stale .dat output at <path>. Regenerating as parquet. Delete the .dat manually to reclaim disk space."`
+       - If requested format is `dat` and
+         `self.output_dir / "tpcds_sales_returns_obt.parquet"` exists, log:
+         `"Found existing .parquet output at <path>. Regenerating as dat because output_format=dat was requested."`
+       A helper that iterates over the other candidate extensions keeps the
+       logic short.
+    2. Do NOT auto-delete the alternate-format file — the user may still
+       want it for platforms tuned against that specific artifact.
 
     Keep the return-value contract (True when a matching artifact exists,
     False otherwise) unchanged.
@@ -193,10 +203,18 @@ work:
          argument produces a `.parquet` file and manifest `output_format` field
          equals `"parquet"`.
 
-    3. `tests/integration/test_tpcds_obt_etl.py`:
+    3. `tests/unit/core/tpcds_obt/test_etl.py` — add a size-ratio unit test:
+       `test_parquet_output_materially_smaller_than_dat`. Use a tiny
+       synthetic OBT fixture (≤1000 rows, ~20 columns is enough — mock
+       `TABLE_COLUMNS` if needed). Call `transform()` twice: once with
+       `output_format="dat"`, once with `output_format="parquet"`.
+       Assert `os.path.getsize(parquet_path) * 5 < os.path.getsize(dat_path)`
+       (parquet must be under one-fifth of .dat). This guards against a
+       future regression where parquet encoding gets accidentally
+       disabled or falls back to row format.
+
+    4. `tests/integration/test_tpcds_obt_etl.py`:
        - The line-171 test may remain as the explicit-`.dat` integration case.
-       - Consider (not required) adding an integration test that verifies
-         file size ratio: parquet < 10% of `.dat` at SF 0.01. Skip if too slow.
 
     Run: `uv run -- python -m pytest tests/unit/core/tpcds_obt/ -q` — all
     green. Integration tests optional in this work unit but should pass:
@@ -230,11 +248,17 @@ work:
        want `.dat` (reproducing older runs, feeding a tool that only reads
        pipe-delimited text). Keep it under 10 lines.
 
-    3. If AGENTS.md, CLAUDE.md, or any README mentions the default output
-       format for tpcds_obt, update there too. Run a repo-wide grep:
-       `grep -rn 'tpcds_obt.*dat\|output_format.*dat' docs/ AGENTS.md CLAUDE.md README.md 2>/dev/null`.
+    3. `docs/reference/cli/run.md` — line 127:
+       `| \`tpcds_obt\` | \`output_format\` | \`dat\` | Output format: \`dat\`, \`parquet\` |`
+       Change the default column from `dat` to `parquet`.
+
+    Grep already confirmed during planning that only these two files
+    reference the default explicitly. AGENTS.md, CLAUDE.md, and
+    docs/development/result-integrity-validation.md mention `tpcds_obt`
+    but not the default format — no change needed there.
   files:
   - docs/benchmarks/tpc-ds-obt.md
+  - docs/reference/cli/run.md
 
 - id: w5
   summary: "Verify end-to-end: DuckDB SQL path + DataFusion DataFrame path"
@@ -305,9 +329,9 @@ anti_patterns:
 - "DO NOT change the default for other benchmarks — because each benchmark has its own generator pipeline and compliance expectations, do limit this change to `tpcds_obt` only"
 
 verification:
-- description: "All tpcds_obt unit tests pass after the default flip"
-  command: "uv run -- python -m pytest tests/unit/core/tpcds_obt/ -q"
-  expected_output: "All tests pass"
+- description: "All tpcds_obt unit tests pass after the default flip (pytest exits 0)"
+  command: "uv run -- python -m pytest tests/unit/core/tpcds_obt/ -q && echo OK"
+  expected_output: "OK"
 - description: "Default path (no format arg) produces parquet"
   command: "uv run -- python -c 'from benchbox.core.tpcds_obt.benchmark import TPCDSOBTBenchmark; b = TPCDSOBTBenchmark(); print(b.output_format)'"
   expected_output: "parquet"
@@ -317,12 +341,12 @@ verification:
 - description: "BenchmarkOptionSpec default is parquet"
   command: "grep -n 'name=\"output_format\"' benchbox/core/tpcds_obt/benchmark.py -A 2 | grep default="
   expected_output: 'default="parquet"'
-- description: "DuckDB SQL path runs tpcds_obt at SF 0.01 (smoke)"
-  command: "rm -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.* && uv run benchbox run --platform duckdb --benchmark tpcds_obt --scale 0.01 --queries Q1 2>&1 | tail -20"
-  expected_output: "Q1 completes; .parquet file created"
-- description: "DataFusion DataFrame path runs tpcds_obt at SF 1 (originally-failing case)"
-  command: "rm -f benchmark_runs/datagen/tpcds_obt_sf1/tpcds_sales_returns_obt.parquet && uv run benchbox run --platform datafusion-df --benchmark tpcds_obt --scale 1 --queries Q1 2>&1 | tail -20"
-  expected_output: "Q1 completes within 60s; .parquet file created"
+- description: "DuckDB SQL path at SF 0.01 produces a .parquet artifact (not .dat)"
+  command: "rm -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.* && uv run benchbox run --platform duckdb --benchmark tpcds_obt --scale 0.01 --queries Q1 >/dev/null 2>&1 && test -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.parquet && ! test -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.dat && echo OK"
+  expected_output: "OK"
+- description: "DataFusion DataFrame path at SF 1 produces .parquet and run exits 0 (originally-failing case)"
+  command: "rm -f benchmark_runs/datagen/tpcds_obt_sf1/tpcds_sales_returns_obt.parquet && uv run benchbox run --platform datafusion-df --benchmark tpcds_obt --scale 1 --queries Q1 >/dev/null 2>&1 && test -f benchmark_runs/datagen/tpcds_obt_sf1/tpcds_sales_returns_obt.parquet && echo OK"
+  expected_output: "OK"
 
 scope_limit:
   only_modify:
@@ -332,6 +356,7 @@ scope_limit:
   - "tests/unit/core/tpcds_obt/test_etl.py"
   - "tests/integration/test_tpcds_obt_etl.py"
   - "docs/benchmarks/tpc-ds-obt.md"
+  - "docs/reference/cli/run.md"
   do_not_touch:
   - "benchbox/core/tpcds_obt/schema.py — the 518-column schema is intentional OBT design"
   - "benchbox/core/tpcds_obt/queries/ — query adaptations are unaffected by format"

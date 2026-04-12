@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:58:56.083537'
-total_items: 28
+generated_at: '2026-04-12T07:59:53.713202'
+total_items: 29
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Critical
       category: Bug Fix
   Not Started:
-    count: 24
+    count: 25
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -102,6 +102,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Low
       category: Platform Expansion
+    - id: external-contributor-submission-dry-run
+      file: TODO/main/planning/external-contributor-submission-dry-run.yaml
+      title: Run a Phase 2 dry-run with one external trusted contributor
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

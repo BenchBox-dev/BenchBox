@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:58:56.083471'
-total_items: 28
+generated_at: '2026-04-12T07:59:53.713030'
+total_items: 29
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -382,6 +382,27 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: external-contributor-submission-dry-run
+  file: TODO/main/planning/external-contributor-submission-dry-run.yaml
+  title: Run a Phase 2 dry-run with one external trusted contributor
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - contributor-experience
+  - phase-2
+  - dry-run
+  - user-research
+  estimated_effort: Small
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - verify-ci-validation-workflow-end-to-end
+  - verify-trust-badge-rendering-in-explorer
+  - surface-contributor-onboarding-for-results
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml
   title: Add Hypothesis property-based tests for pure-function invariants
