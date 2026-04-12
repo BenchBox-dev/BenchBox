@@ -2,7 +2,8 @@ id: surface-contributor-onboarding-for-results
 title: "Surface contributor onboarding for results submission"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_note: "Contributor path is now linked from the explorer header, explorer home CTA, docs navigation, and README. Completed 2026-04-12."
 category: Documentation
 
 deps:
@@ -24,7 +25,7 @@ description: |
 work:
 - id: w1
   summary: "Add 'Submit a result' link to the explorer site header"
-  status: pending
+  status: done
   notes: |
     Edit `results-explorer/src/components/Header.tsx` (or equivalent —
     confirm the actual file). Add a nav link "Submit a result" pointing
@@ -34,7 +35,7 @@ work:
 - id: w2
   summary: "Add a homepage CTA card on the explorer landing page"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add a small card to the explorer landing page (after the summary
     cards) inviting visitors to contribute their own results. Card title:
@@ -45,7 +46,7 @@ work:
 
 - id: w3
   summary: "Add 'Contributing Results' to the docs nav"
-  status: pending
+  status: done
   notes: |
     Edit `docs/index.rst` (or the appropriate Sphinx toctree) to include
     `contributing-results` under a "Contributing" section. If a
@@ -56,7 +57,7 @@ work:
 
 - id: w4
   summary: "Add a 'Contributing Results' section to README.md"
-  status: pending
+  status: done
   notes: |
     Add a short section after the existing "Quick Start" / installation
     section. Two paragraphs maximum:
@@ -68,7 +69,7 @@ work:
 - id: w5
   summary: "Verify all four entry points render and resolve correctly"
   needs: [w1, w2, w3, w4]
-  status: pending
+  status: done
   notes: |
     - Build the explorer locally; click the new header link and CTA card.
     - Build sphinx docs locally; navigate to the new entry from the docs

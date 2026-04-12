@@ -43,7 +43,7 @@ class TodoCLI:
             print("   Run 'uv run scripts/generate_indexes.py' to create indexes", file=sys.stderr)
             return {"items": []}
 
-        with open(index_path) as f:
+        with open(index_path, encoding="utf-8") as f:
             return yaml.safe_load(f)
 
     def list_items(
@@ -139,7 +139,7 @@ class TodoCLI:
             sys.exit(1)
 
         try:
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 item = yaml.safe_load(f)
 
             print(f"\n{'=' * 100}")
@@ -355,7 +355,7 @@ class TodoCLI:
             if "_indexes" in str(yaml_file):
                 continue
             try:
-                with open(yaml_file) as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
                 if data and isinstance(data, dict):
                     slug = data.get("id", yaml_file.stem)
@@ -381,7 +381,7 @@ class TodoCLI:
             if "_indexes" in str(yaml_file):
                 continue
             try:
-                with open(yaml_file) as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
                 if data and isinstance(data, dict):
                     slug = data.get("id", yaml_file.stem)
@@ -406,6 +406,10 @@ class TodoCLI:
             raise ValueError(
                 f"Duplicate id across TODO and DONE: '{sample}'. IDs must be globally unique across both trees."
             )
+        todo_completed = {
+            slug for slug, (_path, data) in items.items() if data.get("status", "Not Started") == "Completed"
+        }
+        done_slugs |= todo_completed
         return items, done_slugs
 
     def _get_work_ready_units(self, work: list) -> tuple[list[dict], list[dict], list[dict]]:
@@ -668,7 +672,7 @@ class TodoCLI:
         ryaml.preserve_quotes = True
         ryaml.width = 120
 
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             doc = ryaml.load(f)
 
         doc_work = doc.get("work")
@@ -687,7 +691,7 @@ class TodoCLI:
             print(f"Failed to update {work_id} status in {path} (work id not found during YAML edit).", file=sys.stderr)
             sys.exit(1)
 
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             ryaml.dump(doc, f)
 
         print(f"Marked {slug}/{work_id} as done.")

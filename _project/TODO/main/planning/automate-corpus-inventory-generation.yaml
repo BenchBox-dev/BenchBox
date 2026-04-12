@@ -2,7 +2,8 @@ id: automate-corpus-inventory-generation
 title: "Automate corpus-inventory.json generation from results-data/bundles/"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_note: "Implemented `scripts/generate_corpus_inventory.py` with sidecar-aware trust labels, test coverage, CI/pre-commit wiring, and contributor-doc guidance. Inventory regenerated and verified on 2026-04-12."
 category: Core Functionality
 
 deps:
@@ -26,7 +27,7 @@ description: |
 work:
 - id: w1
   summary: "Write `scripts/generate_corpus_inventory.py`"
-  status: pending
+  status: done
   notes: |
     Inputs: scan `results-data/bundles/` for `*.json` (excluding sidecar
     files matching `submission-manifest.json` and any `.plans.json` /
@@ -55,7 +56,7 @@ work:
 - id: w2
   summary: "Add unit tests for the generator"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     `tests/unit/scripts/test_generate_corpus_inventory.py`:
       - Empty bundles dir → empty inventory with consistent shape
@@ -73,7 +74,7 @@ work:
 - id: w3
   summary: "Wire the generator into validate-submission CI workflow"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Update `.github/workflows/validate-submission.yml` to add a step after
     bundle validation:
@@ -86,7 +87,7 @@ work:
 - id: w4
   summary: "Add pre-commit hook entry for the generator"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Add to `.pre-commit-config.yaml` (or create one if absent):
       - id: corpus-inventory
@@ -100,7 +101,7 @@ work:
 - id: w5
   summary: "Regenerate corpus-inventory.json and reconcile differences"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     1. Run `--write` against the current corpus.
     2. Diff against the existing hand-maintained file. Any diff is suspect:
@@ -114,7 +115,7 @@ work:
 - id: w6
   summary: "Document the generator in contributor guide and ops runbook"
   needs: [w3, w5]
-  status: pending
+  status: done
   notes: |
     Update `docs/contributing-results.md`:
       - Replace any "edit corpus-inventory.json" instruction with
@@ -126,13 +127,13 @@ work:
 
 verification:
 - description: "Generator runs cleanly against current corpus, --check passes after --write"
-  command: "uv run python scripts/generate_corpus_inventory.py --write && uv run python scripts/generate_corpus_inventory.py --check"
+  command: "uv run -- python scripts/generate_corpus_inventory.py --write && uv run -- python scripts/generate_corpus_inventory.py --check"
   expected_output: "exit 0 from both runs"
 - description: "Unit tests pass"
   command: "uv run -- python -m pytest tests/unit/scripts/test_generate_corpus_inventory.py -q"
   expected_output: "all tests pass"
 - description: "Generated file is byte-identical when run twice (deterministic)"
-  command: "uv run python scripts/generate_corpus_inventory.py --write && cp results-data/corpus-inventory.json /tmp/inv1.json && uv run python scripts/generate_corpus_inventory.py --write && diff /tmp/inv1.json results-data/corpus-inventory.json"
+  command: "uv run -- python scripts/generate_corpus_inventory.py --write && cp results-data/corpus-inventory.json /tmp/inv1.json && uv run -- python scripts/generate_corpus_inventory.py --write && diff /tmp/inv1.json results-data/corpus-inventory.json"
   expected_output: "no diff (modulo generated_at if not stripped)"
 
 must_preserve:

@@ -26,9 +26,11 @@ Recommended split:
 
 ### Phase 1 Status: Launched (2026-04-04)
 
-Phase 1 is complete. The static explorer at benchbox.dev/results/ is deployed
-with a seed corpus of 6 bundles across 2 cohorts (TPC-H SF 0.01, SSB SF 0.01),
-each with ≥3 platforms. All launch criteria from the checklist below were met.
+Phase 1 launched on 2026-04-04. The launch corpus had 6 maintainer-run bundles
+across 2 cohorts (TPC-H SF 0.01 and SSB/`star_schema` SF 0.01), each with ≥3
+platforms. As of 2026-04-12, the repository corpus has expanded to 12 bundles
+across 4 cohorts by adding SF 0.1 for both benchmark families. All launch
+criteria from the checklist below were met.
 
 ### Revised Launch Phases
 

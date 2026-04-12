@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T08:31:27.963598'
+generated_at: '2026-04-12T08:35:46.510435'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -64,7 +64,7 @@ categories:
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
       title: Automate corpus-inventory.json generation from results-data/bundles/
       priority: Medium-High
-      status: Not Started
+      status: Completed
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
@@ -89,7 +89,7 @@ categories:
       file: TODO/main/planning/expand-seed-corpus-to-sf-0-1.yaml
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       priority: Medium-High
-      status: Not Started
+      status: Completed
     - id: quality-extend-error-capture-to-cloud-adapters
       file: TODO/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
       title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
@@ -122,12 +122,12 @@ categories:
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
       priority: Medium-High
-      status: Not Started
+      status: Completed
     - id: write-results-platform-phase-2-operations-runbook
       file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
       title: Write the Phase 2 results-platform operations runbook
       priority: Medium
-      status: Not Started
+      status: Completed
   Platform Expansion:
     count: 7
     items:

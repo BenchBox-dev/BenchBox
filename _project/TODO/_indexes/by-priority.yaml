@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T08:31:27.963613'
+generated_at: '2026-04-12T08:35:46.510449'
 total_items: 40
 priorities:
   Critical:
@@ -54,7 +54,7 @@ priorities:
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
       title: Automate corpus-inventory.json generation from results-data/bundles/
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
@@ -64,7 +64,7 @@ priorities:
       file: TODO/main/planning/expand-seed-corpus-to-sf-0-1.yaml
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: quality-extend-error-capture-to-cloud-adapters
       file: TODO/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
       title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
@@ -84,7 +84,7 @@ priorities:
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
       category: Documentation
-      status: Not Started
+      status: Completed
   Medium:
     count: 14
     items:
@@ -157,7 +157,7 @@ priorities:
       file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
       title: Write the Phase 2 results-platform operations runbook
       category: Documentation
-      status: Not Started
+      status: Completed
   Low:
     count: 11
     items:

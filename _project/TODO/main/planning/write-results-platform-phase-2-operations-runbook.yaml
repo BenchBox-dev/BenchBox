@@ -2,7 +2,8 @@ id: write-results-platform-phase-2-operations-runbook
 title: "Write the Phase 2 results-platform operations runbook"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_note: "Created docs/operations/results-phase-2-runbook.md and linked it from contributor docs plus the results-publishing handoff on 2026-04-12."
 category: Documentation
 
 deps:
@@ -25,7 +26,7 @@ description: |
 work:
 - id: w1
   summary: "Outline the runbook based on the actual Phase 2 surface"
-  status: pending
+  status: done
   notes: |
     Headings (in order):
       1. What Phase 2 is (one paragraph + link to strategy doc)
@@ -44,7 +45,7 @@ work:
 - id: w2
   summary: "Document the maintainer review checklist with concrete reject criteria"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Pull from `docs/contributing-results.md` quality expectations and
     extend with reject criteria the contributor docs intentionally don't
@@ -61,7 +62,7 @@ work:
 - id: w3
   summary: "Document CI failure triage with sample messages"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     For each error class produced by `scripts/validate_submission.py`:
       - What it means
@@ -74,7 +75,7 @@ work:
 - id: w4
   summary: "Document the rollback path with explicit commands"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Step-by-step:
       1. Identify the offending merge commit on `published-results`.
@@ -89,7 +90,7 @@ work:
 - id: w5
   summary: "Publish runbook and link from key entry points"
   needs: [w2, w3, w4]
-  status: pending
+  status: done
   notes: |
     Save as `docs/operations/results-phase-2-runbook.md`. Link from:
       - `docs/contributing-results.md` (one line: "Maintainers: see ops

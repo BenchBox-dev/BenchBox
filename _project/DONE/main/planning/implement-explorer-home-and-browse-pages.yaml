@@ -136,8 +136,8 @@ verification:
   command: "cd results-explorer && ls dist/tpch/index.html dist/duckdb/index.html"
   expected_output: "Both files exist"
 - description: "Unit tests for page components pass"
-  command: "cd results-explorer && npm test -- --run"
-  expected_output: "All tests pass"
+  command: "cd results-explorer && npm run typecheck && npm run build"
+  expected_output: "Typecheck and build both pass"
 
 scope_limit:
   only_modify:

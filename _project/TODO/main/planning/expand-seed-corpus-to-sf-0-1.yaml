@@ -2,7 +2,8 @@ id: expand-seed-corpus-to-sf-0-1
 title: "Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_note: "Current corpus contains 12 bundles total: TPC-H and SSB/`star_schema` each have SF 0.01 and 0.1 cohorts with 3 platforms per cohort. Explorer data was regenerated from the 12-bundle corpus on 2026-04-12."
 category: Core Functionality
 
 deps:
@@ -27,7 +28,7 @@ description: |
 work:
 - id: w1
   summary: "Generate TPC-H SF 0.1 results on DuckDB, DataFusion, Polars"
-  status: pending
+  status: done
   notes: |
     For each platform run a clean tuned run, using full TPC-H query set:
       benchbox run --platform duckdb     --benchmark tpch --scale 0.1 --tuning tuned
@@ -40,7 +41,7 @@ work:
 
 - id: w2
   summary: "Generate SSB SF 0.1 results on DuckDB, DataFusion, SQLite"
-  status: pending
+  status: done
   notes: |
     Same pattern as w1. SQLite at SF 0.1 may be slow; allow extended
     timeouts but do not silently shorten the query set:
@@ -51,7 +52,7 @@ work:
 - id: w3
   summary: "Package each bundle with `benchbox submit` and stage the PR"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     For each bundle:
       benchbox submit --last --output ./submission-<platform>-<benchmark>-sf0.1/
@@ -61,7 +62,7 @@ work:
 - id: w4
   summary: "Open a single submission PR against published-results with all 6 bundles"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Single PR is preferable to 6 PRs because:
       - the cohort is meaningful only when complete,
@@ -74,7 +75,7 @@ work:
 - id: w5
   summary: "Verify the explorer surfaces the new SF 0.1 cohort"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     After explorer redeploy:
       - TPC-H scale-factor selector lists 0.01 and 0.1
@@ -86,10 +87,10 @@ work:
 
 verification:
 - description: "Inventory contains 12 bundles total (6 SF 0.01 + 6 SF 0.1)"
-  command: "uv run python -c \"import json; d=json.load(open('results-data/corpus-inventory.json')); print(len(d['bundles']))\""
+  command: "uv run -- python -c \"import json; d=json.load(open('results-data/corpus-inventory.json')); print(len(d['bundles']))\""
   expected_output: "12"
 - description: "Each new bundle validates against schema-v2"
-  command: "uv run python results-data/validate_corpus.py"
+  command: "uv run -- python results-data/validate_corpus.py"
   expected_output: "all bundles valid"
 
 must_preserve:

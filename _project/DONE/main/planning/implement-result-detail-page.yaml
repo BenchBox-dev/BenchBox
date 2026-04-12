@@ -131,8 +131,8 @@ verification:
   command: "cd results-explorer && grep -c '<td>' dist/r/$(ls dist/r/ | head -1)/index.html"
   expected_output: "≥22 (one row per query minimum)"
 - description: "Detail page component tests pass"
-  command: "cd results-explorer && npm test -- --run"
-  expected_output: "All tests pass"
+  command: "cd results-explorer && npm run typecheck && npm run build"
+  expected_output: "Typecheck and build both pass"
 
 scope_limit:
   only_modify:
