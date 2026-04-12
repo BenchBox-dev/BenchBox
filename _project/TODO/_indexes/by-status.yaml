@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T07:49:17.441956'
-total_items: 23
+generated_at: '2026-04-12T07:52:00.819750'
+total_items: 24
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Core Functionality
   Not Started:
-    count: 19
+    count: 20
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -77,6 +77,11 @@ statuses:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: High
       category: Core Functionality
+    - id: make-parquet-default-for-tpcds-obt
+      file: TODO/main/planning/make-parquet-default-for-tpcds-obt.yaml
+      title: Make Parquet the default output format for TPC-DS OBT
+      priority: High
+      category: Bug Fix
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control

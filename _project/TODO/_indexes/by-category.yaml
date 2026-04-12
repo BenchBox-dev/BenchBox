@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T07:49:17.441931'
+generated_at: '2026-04-12T07:52:00.819727'
 total_categories: 6
 categories:
   Benchmark Development:
@@ -25,11 +25,16 @@ categories:
       priority: Low
       status: Not Started
   Bug Fix:
-    count: 1
+    count: 2
     items:
     - id: fix-interactive-runner-defects
       file: TODO/main/planning/fix-interactive-runner-defects.yaml
       title: Fix four defects and one UX clarity issue in the interactive benchmark wizard (benchbox run)
+      priority: High
+      status: Not Started
+    - id: make-parquet-default-for-tpcds-obt
+      file: TODO/main/planning/make-parquet-default-for-tpcds-obt.yaml
+      title: Make Parquet the default output format for TPC-DS OBT
       priority: High
       status: Not Started
   Core Functionality:
