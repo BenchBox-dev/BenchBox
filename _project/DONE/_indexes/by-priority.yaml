@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:14:55.776412'
-total_items: 671
+generated_at: '2026-04-13T08:21:15.343363'
+total_items: 672
 priorities:
   Critical:
     count: 39
@@ -1890,7 +1890,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 272
+    count: 273
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2171,6 +2171,11 @@ priorities:
       file: DONE/platform-expansion/planning/athena-configuration-validation.yaml
       title: Athena Configuration Validation
       category: Platform Polish
+      status: Completed
+    - id: quality-audit-skip-xfail-markers-add-rationale
+      file: DONE/main/quality/quality-audit-skip-xfail-markers-add-rationale.yaml
+      title: Audit 276 skip/xfail test markers — add rationale or remove
+      category: Testing and Quality Assurance
       status: Completed
     - id: auto-compile-tpc-binary-tools-completed
       file: DONE/unknown/planning/auto-compile-tpc-binary-tools-completed.yaml

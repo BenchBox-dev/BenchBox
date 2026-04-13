@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:14:54.213349'
+generated_at: '2026-04-13T08:21:13.676880'
 total_categories: 8
 categories:
   Benchmark Development:
@@ -188,7 +188,7 @@ categories:
       priority: Medium-High
       status: Not Started
   Testing and Quality Assurance:
-    count: 7
+    count: 6
     items:
     - id: quality-add-cross-platform-result-validation
       file: TODO/main/planning/quality-add-cross-platform-result-validation.yaml
@@ -198,11 +198,6 @@ categories:
     - id: quality-add-perf-regression-smoke-ci
       file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
       title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
-      priority: Medium
-      status: Not Started
-    - id: quality-audit-skip-xfail-markers-add-rationale
-      file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
-      title: Audit 276 skip/xfail test markers — add rationale or remove
       priority: Medium
       status: Not Started
     - id: quality-make-timing-policy-ci-gate

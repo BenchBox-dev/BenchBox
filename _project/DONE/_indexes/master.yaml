@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:14:55.775883'
-total_items: 671
+generated_at: '2026-04-13T08:21:15.342917'
+total_items: 672
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5030,6 +5030,22 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 3-4 hours
+- id: quality-audit-skip-xfail-markers-add-rationale
+  file: DONE/main/quality/quality-audit-skip-xfail-markers-add-rationale.yaml
+  title: Audit 276 skip/xfail test markers — add rationale or remove
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-4
+  - test-hygiene
+  estimated_effort: Medium (2-3 days)
+  completed_date: '2026-04-13'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: auto-compile-tpc-binary-tools-completed
   file: DONE/unknown/planning/auto-compile-tpc-binary-tools-completed.yaml
   title: Auto-Compile TPC Binary Tools ✅ COMPLETED

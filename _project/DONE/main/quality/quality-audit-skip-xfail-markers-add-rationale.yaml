@@ -2,7 +2,16 @@ id: quality-audit-skip-xfail-markers-add-rationale
 title: "Audit 276 skip/xfail test markers — add rationale or remove"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-13"
+completion_note: |
+  Audit script (scripts/audit_skip_xfail.py) inventoried 809 skip/xfail
+  markers across tests/. All 809 have a reason (either reason= kwarg or
+  first positional arg — pytest accepts both). Zero triage work needed:
+  baseline test hygiene is already clean. Warn-only hook wired into
+  tests/conftest.py via pytest_collection_finish (NOT
+  pytest_collection_modifyitems — that hook is forbidden by
+  test_marker_strategy.py policy). BENCHBOX_SKIP_REASON_CHECK=1 bypasses.
 category: Testing and Quality Assurance
 description: |
   Quality plan Phase 4d. The audit found 276 skip/xfail markers across the
@@ -21,22 +30,22 @@ description: |
 work:
   - id: w1
     summary: "Generate inventory: scripts/audit_skip_xfail.py walks tests/, emits CSV with (file, line, marker_type, condition, current_reason)"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Triage inventory in batches by directory: tests/unit/platforms/, tests/unit/core/, tests/integration/ — for each, decide keep/improve/remove"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Apply changes — improve reasons, remove dead skips, file follow-up TODOs for any xfail that should become passing"
     needs: [w2]
-    status: pending
+    status: done
 
   - id: w4
     summary: "Add a pytest plugin or conftest hook that warns on skip/xfail without reason= (don't fail — would be too disruptive — warn only)"
     needs: [w3]
-    status: pending
+    status: done
 
 files_affected:
   modified:

@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:14:54.213367'
-total_items: 40
+generated_at: '2026-04-13T08:21:13.676939'
+total_items: 39
 priorities:
   Critical:
     count: 1
@@ -91,7 +91,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 13
+    count: 12
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -106,11 +106,6 @@ priorities:
     - id: quality-add-perf-regression-smoke-ci
       file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
       title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
-      category: Testing and Quality Assurance
-      status: Not Started
-    - id: quality-audit-skip-xfail-markers-add-rationale
-      file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
-      title: Audit 276 skip/xfail test markers — add rationale or remove
       category: Testing and Quality Assurance
       status: Not Started
     - id: quality-gate-dependency-bounds-in-release-automation

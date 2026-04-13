@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:14:55.776238'
+generated_at: '2026-04-13T08:21:15.343208'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -3247,7 +3247,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 32
+    count: 33
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3279,6 +3279,11 @@ categories:
       file: DONE/tpch-stdout-fix/planning/test-stdout-datagen.yaml
       title: Add regression tests for TPC-H stdout data generation
       priority: High
+      status: Completed
+    - id: quality-audit-skip-xfail-markers-add-rationale
+      file: DONE/main/quality/quality-audit-skip-xfail-markers-add-rationale.yaml
+      title: Audit 276 skip/xfail test markers — add rationale or remove
+      priority: Medium
       status: Completed
     - id: comprehensive-platform-adapter-testing-completed
       file: DONE/unknown/planning/comprehensive-platform-adapter-testing-completed.yaml

@@ -1,8 +1,8 @@
-generated_at: '2026-04-13T08:14:54.213378'
-total_items: 40
+generated_at: '2026-04-13T08:21:13.676955'
+total_items: 39
 statuses:
   Not Started:
-    count: 32
+    count: 31
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -42,11 +42,6 @@ statuses:
     - id: quality-add-perf-regression-smoke-ci
       file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
       title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
-      priority: Medium
-      category: Testing and Quality Assurance
-    - id: quality-audit-skip-xfail-markers-add-rationale
-      file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
-      title: Audit 276 skip/xfail test markers — add rationale or remove
       priority: Medium
       category: Testing and Quality Assurance
     - id: quality-gate-dependency-bounds-in-release-automation
