@@ -42,39 +42,44 @@ work:
   status: done
 
 - id: w2
-  summary: "SLICE 2 — Extract tuning.py (apply_* / sorted-ingestion / constraint / CTAS-sort; exclude _create_schema_with_tuning
-    per map §6). Same protocol."
+  summary: "SLICE 2a — Extract sorted_ingestion.py (sorted-ingestion capability/resolve/metadata + CTAS-sort helpers + state)."
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
-  summary: "SLICE 3 — Extract connection.py (lifecycle, DriverIsolationCapability, PlatformAdapterConnection, _NoCloseProxy).
-    Same protocol."
+  summary: "SLICE 2b — Extract tuning_config.py (effective config, validate_tuning_*, apply_unified_tuning, configure_for_benchmark)."
   needs: [w2]
   status: pending
 
 - id: w4
-  summary: "SLICE 4 — Extract data_loading.py (create_schema, load_data, external tables, _create_enhanced_* phase helpers).
-    Same protocol."
+  summary: "SLICE 2c — Consolidate per-table tuning hooks into tuning.py (apply_table_tunings, supports_tuning_type, generate_tuning_clause)."
   needs: [w3]
   status: pending
 
 - id: w5
-  summary: "SLICE 5 — Extract result_capture.py (plan capture, validate_loaded_data/row_counts, _collect_resource_utilization).
-    Same protocol."
+  summary: "SLICE 3 — Extract connection.py (lifecycle, DriverIsolationCapability, PlatformAdapterConnection, _NoCloseProxy)."
   needs: [w4]
   status: pending
 
 - id: w6
-  summary: "SLICE 6 — Extract execution.py (execute_query, power/throughput/maintenance drivers; keep run_enhanced_benchmark
-    on facade). Same protocol."
+  summary: "SLICE 4 — Extract data_loading.py (create_schema, load_data, external tables, _create_enhanced_* phase helpers)."
   needs: [w5]
   status: pending
 
 - id: w7
-  summary: "Final cleanup — adapter.py contains only the facade + required re-exports. Verify ≤600 lines. Update docs/development/adapter-refactor-map.md
-    with final state."
+  summary: "SLICE 5 — Extract result_capture.py (plan capture, validate_loaded_data/row_counts, _collect_resource_utilization)."
   needs: [w6]
+  status: pending
+
+- id: w8
+  summary: "SLICE 6 — Extract execution.py (execute_query, power/throughput/maintenance drivers; keep run_enhanced_benchmark
+    on facade)."
+  needs: [w7]
+  status: pending
+
+- id: w9
+  summary: "Final cleanup — adapter.py contains only facade + re-exports. Verify ≤600 lines. Update docs/development/adapter-refactor-map.md."
+  needs: [w8]
   status: pending
 
 files_affected:
