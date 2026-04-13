@@ -30,7 +30,7 @@ work:
 - id: w2
   summary: "Apply same pattern to firebolt.py"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Apply same pattern to experimental/gpu/metrics.py and capabilities.py"
