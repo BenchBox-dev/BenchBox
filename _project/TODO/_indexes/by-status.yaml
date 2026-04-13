@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T13:51:47.812987'
-total_items: 37
+generated_at: '2026-04-13T14:00:28.355094'
+total_items: 38
 statuses:
   Blocked:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 27
+    count: 28
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -42,6 +42,11 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
+    - id: quality-add-tests-for-extracted-dedup-helpers
+      file: TODO/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
+      title: Add unit tests for 5 helpers extracted by the dedup consolidation
+      priority: Low
+      category: Code Quality and Technical Debt
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence

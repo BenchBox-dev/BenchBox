@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T13:51:47.812953'
+generated_at: '2026-04-13T14:00:28.355062'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -25,8 +25,13 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 5
+    count: 6
     items:
+    - id: quality-add-tests-for-extracted-dedup-helpers
+      file: TODO/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
+      title: Add unit tests for 5 helpers extracted by the dedup consolidation
+      priority: Low
+      status: Not Started
     - id: quality-extract-transactional-benchmark-base
       file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
       title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
