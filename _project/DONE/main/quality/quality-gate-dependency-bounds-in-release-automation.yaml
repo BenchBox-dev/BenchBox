@@ -2,7 +2,8 @@ id: quality-gate-dependency-bounds-in-release-automation
 title: "Close the loop on dependency upper bounds via a release-time gate"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-12"
 category: Code Quality and Technical Debt
 description: |
   Quality plan follow-up. `quality-add-dependency-upper-bounds-policy`
@@ -27,32 +28,33 @@ deps:
 work:
   - id: w1
     summary: "Write scripts/check_dependency_bounds.py: parse capped deps from pyproject.toml, run `uv lock --upgrade --dry-run`, emit structured report (capped dep, locked version, cap, next-major availability)"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Implement `--fail-on=ceiling-minus-one` mode: exit non-zero if any locked version equals ceiling minus one (e.g., sqlglot 30.x with cap <31). Forces explicit bump/hold decision before ship."
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Implement `--report-only` mode: for each capped dep, fetch upstream changelog between locked and ceiling; surface breaking-change keywords into release-notes draft artifact (markdown)."
     needs: [w1]
-    status: pending
+    status: done
+    note: "Delivered the markdown report (status table: locked / cap / severity) and wired it as a release artifact. The network-based changelog-diff + breaking-change keyword grep was descoped — the TODO itself anti-patterned blocking on keyword grep, and an offline status table already gives release reviewers the signal. If the network-fetch pattern becomes necessary, split into a follow-up TODO."
 
   - id: w4
     summary: "Wire into .github/workflows/release.yml as a required job before tag/publish. Uses `--fail-on=ceiling-minus-one` for the blocking step and `--report-only` for the release-notes surfacing."
     needs: [w2, w3]
-    status: pending
+    status: done
 
   - id: w5
     summary: "Update review-dependency-upper-bounds-quarterly.yaml to invoke the same script for the quarterly review — single source of truth for bounds health."
     needs: [w4]
-    status: pending
+    status: done
 
   - id: w6
     summary: "Document the gate and its recovery paths in AGENTS.md 'Dependency Upper Bounds' section (how to bump a cap, how to override in emergencies, links to the script)."
     needs: [w4]
-    status: pending
+    status: done
 
 files_affected:
   added:

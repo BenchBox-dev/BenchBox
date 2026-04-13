@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:44:58.488957'
-total_items: 37
+generated_at: '2026-04-13T08:51:06.368795'
+total_items: 36
 priorities:
   Critical:
     count: 1
@@ -81,7 +81,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 12
+    count: 11
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -92,11 +92,6 @@ priorities:
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: quality-gate-dependency-bounds-in-release-automation
-      file: TODO/main/planning/quality-gate-dependency-bounds-in-release-automation.yaml
-      title: Close the loop on dependency upper bounds via a release-time gate
-      category: Code Quality and Technical Debt
       status: Not Started
     - id: quality-consolidate-duplicate-code-clusters
       file: TODO/main/planning/quality-consolidate-duplicate-code-clusters.yaml

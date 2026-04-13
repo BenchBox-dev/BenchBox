@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:45:00.122505'
+generated_at: '2026-04-13T08:51:08.155126'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 45
+    count: 46
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -348,6 +348,11 @@ categories:
     - id: circular-import-issues-completed
       file: DONE/unknown/planning/circular-import-issues-completed.yaml
       title: Circular Import Issues ✅ COMPLETED
+      priority: Medium
+      status: Completed
+    - id: quality-gate-dependency-bounds-in-release-automation
+      file: DONE/main/quality/quality-gate-dependency-bounds-in-release-automation.yaml
+      title: Close the loop on dependency upper bounds via a release-time gate
       priority: Medium
       status: Completed
     - id: complexity-check-triage-and-remediation

@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:45:00.122204'
-total_items: 676
+generated_at: '2026-04-13T08:51:08.154825'
+total_items: 677
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5224,6 +5224,26 @@ items:
   work_total: 24
   work_done: 24
   work_ready: 0
+- id: quality-gate-dependency-bounds-in-release-automation
+  file: DONE/main/quality/quality-gate-dependency-bounds-in-release-automation.yaml
+  title: Close the loop on dependency upper bounds via a release-time gate
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-4
+  - supply-chain
+  - release-gate
+  - ci
+  estimated_effort: Small-Medium (1-2 days)
+  completed_date: '2026-04-12'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  needs:
+  - quality-add-dependency-upper-bounds-policy
 - id: cloud-platform-error-context
   file: DONE/observability-quality/planning/cloud-platform-error-context.yaml
   title: Cloud Platform Error Message Context

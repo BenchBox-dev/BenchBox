@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:45:00.122666'
-total_items: 676
+generated_at: '2026-04-13T08:51:08.155284'
+total_items: 677
 priorities:
   Critical:
     count: 39
@@ -1900,7 +1900,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 275
+    count: 276
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2256,6 +2256,11 @@ priorities:
       file: DONE/platform-expansion/active/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode
       category: Platform Expansion
+      status: Completed
+    - id: quality-gate-dependency-bounds-in-release-automation
+      file: DONE/main/quality/quality-gate-dependency-bounds-in-release-automation.yaml
+      title: Close the loop on dependency upper bounds via a release-time gate
+      category: Code Quality and Technical Debt
       status: Completed
     - id: cloud-platform-error-context
       file: DONE/observability-quality/planning/cloud-platform-error-context.yaml

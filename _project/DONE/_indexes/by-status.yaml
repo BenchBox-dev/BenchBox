@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:45:00.122818'
-total_items: 676
+generated_at: '2026-04-13T08:51:08.155432'
+total_items: 677
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 626
+    count: 627
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -949,6 +949,11 @@ statuses:
       title: Close pre-Beta release blockers in status messaging, install docs, packaging policy, and typecheck gating
       priority: Critical
       category: Release Readiness
+    - id: quality-gate-dependency-bounds-in-release-automation
+      file: DONE/main/quality/quality-gate-dependency-bounds-in-release-automation.yaml
+      title: Close the loop on dependency upper bounds via a release-time gate
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: cloud-integration-test-gaps
       file: DONE/platform-expansion/planning/cloud-integration-test-gaps.yaml
       title: Cloud Integration Test Infrastructure — Address Review Gaps
