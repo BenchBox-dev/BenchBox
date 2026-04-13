@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T10:37:33.777424'
+generated_at: '2026-04-13T10:49:11.138567'
 total_categories: 8
 categories:
   Benchmark Development:
@@ -48,7 +48,7 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 13
+    count: 12
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -85,11 +85,6 @@ categories:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       priority: Medium-High
       status: Completed
-    - id: quality-extend-error-capture-to-cloud-adapters
-      file: TODO/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
-      title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
-      priority: Medium-High
-      status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow

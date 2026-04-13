@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T10:37:35.251594'
-total_items: 678
+generated_at: '2026-04-13T10:49:12.722493'
+total_items: 679
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 628
+    count: 629
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1473,6 +1473,11 @@ statuses:
       title: Expose interactive table mode selection and include it in equivalent CLI command
       priority: High
       category: User Experience
+    - id: quality-extend-error-capture-to-cloud-adapters
+      file: DONE/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
+      title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
+      priority: Medium-High
+      category: Core Functionality
     - id: dedup-query-catalog-base
       file: DONE/core-functionality/active/dedup-query-catalog-base.yaml
       title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin

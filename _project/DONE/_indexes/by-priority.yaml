@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T10:37:35.251434'
-total_items: 678
+generated_at: '2026-04-13T10:49:12.722323'
+total_items: 679
 priorities:
   Critical:
     count: 39
@@ -1401,7 +1401,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 99
+    count: 100
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1667,6 +1667,11 @@ priorities:
     - id: enhance-ascii-charting
       file: DONE/core-functionality/planning/enhance-ascii-charting.yaml
       title: Enhance and extend ASCII charting with new chart types and comparison visualizations
+      category: Core Functionality
+      status: Completed
+    - id: quality-extend-error-capture-to-cloud-adapters
+      file: DONE/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
+      title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
       category: Core Functionality
       status: Completed
     - id: complexity-field-extraction-w14

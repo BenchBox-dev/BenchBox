@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T10:37:33.777391'
-total_items: 36
+generated_at: '2026-04-13T10:49:11.138540'
+total_items: 35
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -594,24 +594,6 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
-- id: quality-extend-error-capture-to-cloud-adapters
-  file: TODO/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
-  title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
-  worktree: platform-expansion
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - quality-plan
-  - phase-1
-  - error-handling
-  - cloud-adapters
-  estimated_effort: Small-Medium (1 day)
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - clickhouse-error-message-capture
 - id: quality-reduce-complexity-hotspots-to-mccabe-20
   file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
   title: Reduce 44 McCabe complexity hotspots and gate C901 permanently

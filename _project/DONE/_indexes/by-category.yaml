@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T10:37:35.251271'
+generated_at: '2026-04-13T10:49:12.722134'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -567,7 +567,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 221
+    count: 222
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -950,6 +950,11 @@ categories:
       title: Expand query plan fingerprint coverage and verification
       priority: High
       status: Not Started
+    - id: quality-extend-error-capture-to-cloud-adapters
+      file: DONE/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
+      title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
+      priority: Medium-High
+      status: Completed
     - id: dedup-query-catalog-base
       file: DONE/core-functionality/active/dedup-query-catalog-base.yaml
       title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin

@@ -2,7 +2,8 @@ id: quality-extend-error-capture-to-cloud-adapters
 title: "Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters"
 worktree: platform-expansion
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-04-12"
 category: Core Functionality
 description: |
   Quality plan Phase 1c. The just-completed clickhouse-error-message-capture
