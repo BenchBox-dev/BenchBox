@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:21:13.676880'
+generated_at: '2026-04-13T08:26:24.969995'
 total_categories: 8
 categories:
   Benchmark Development:
@@ -188,7 +188,7 @@ categories:
       priority: Medium-High
       status: Not Started
   Testing and Quality Assurance:
-    count: 6
+    count: 5
     items:
     - id: quality-add-cross-platform-result-validation
       file: TODO/main/planning/quality-add-cross-platform-result-validation.yaml
@@ -199,11 +199,6 @@ categories:
       file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
       title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
       priority: Medium
-      status: Not Started
-    - id: quality-make-timing-policy-ci-gate
-      file: TODO/main/planning/quality-make-timing-policy-ci-gate.yaml
-      title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
-      priority: Medium-High
       status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml

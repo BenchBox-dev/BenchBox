@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:21:15.343363'
-total_items: 672
+generated_at: '2026-04-13T08:26:26.621177'
+total_items: 673
 priorities:
   Critical:
     count: 39
@@ -1401,7 +1401,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 97
+    count: 98
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1843,6 +1843,11 @@ priorities:
       file: DONE/main/active/formalize-mcp-internal-apis.yaml
       title: Promote 3 internal MCP API references to public exports
       category: Packaging
+      status: Completed
+    - id: quality-make-timing-policy-ci-gate
+      file: DONE/main/quality/quality-make-timing-policy-ci-gate.yaml
+      title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
+      category: Testing and Quality Assurance
       status: Completed
     - id: prune-legacy-publishing-prototype
       file: DONE/main/planning/prune-legacy-publishing-prototype.yaml

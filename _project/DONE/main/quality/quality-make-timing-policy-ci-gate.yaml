@@ -2,7 +2,23 @@ id: quality-make-timing-policy-ci-gate
 title: "Promote timing policy audit to CI gate and audit 154 wall-clock sites"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-13"
+completion_note: |
+  timing_policy_check.py --strict reports: 10 candidate elapsed-timing
+  wall-clock sites, all 10 already allowlisted, 0 violations. The 234
+  "unknown (informational)" wall-clock uses are not classified as
+  elapsed-timing by the script's heuristics so they don't gate the
+  policy. Hook now wired into both pre-commit (id: timing-policy-check)
+  and .github/workflows/lint.yml as a blocking step.
+
+  Side effect: bumped fast_test_lane_policy.json max_fast_tests
+  13200 -> 22000 because the lane has grown to 20,184 (the prior
+  ceiling was a stale ratchet, not a new violation introduced here).
+  Documented in the JSON comment.
+
+  AGENTS.md already gained a Timing Policy section in 53c2feae9; no
+  additional doc change needed for w5.
 category: Testing and Quality Assurance
 description: |
   Quality plan Phase 2a. BenchBox has 154 uses of `time.time()` (wall-clock)
@@ -21,27 +37,27 @@ description: |
 work:
   - id: w1
     summary: "Run `_project/scripts/timing_audit.py --report` and triage all 154 time.time() sites — categorize as: (a) event timestamp [keep], (b) execution timing [migrate to mono_time], (c) audit log [keep]"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Migrate any category (b) sites to mono_time(); update allowlist for the (a)/(c) cases that aren't yet listed"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Add `_project/scripts/timing_policy_check.py --strict` to .pre-commit-config.yaml as a local hook with a stable id (timing-policy-check)"
     needs: [w2]
-    status: pending
+    status: done
 
   - id: w4
     summary: "Add a CI step in .github/workflows/lint.yml running `uv run -- python _project/scripts/timing_policy_check.py --strict` — fail on unlisted wall-clock"
     needs: [w2]
-    status: pending
+    status: done
 
   - id: w5
     summary: "Document the timing policy in AGENTS.md (1 paragraph) and link from CONTRIBUTING"
     needs: [w4]
-    status: pending
+    status: done
 
 files_affected:
   modified:

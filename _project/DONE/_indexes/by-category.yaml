@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:21:15.343208'
+generated_at: '2026-04-13T08:26:26.620983'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -3247,7 +3247,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 33
+    count: 34
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3374,6 +3374,11 @@ categories:
       file: DONE/physical-tuning/planning/pt-11-integration-testing-dryrun.yaml
       title: 'PT-11: Physical Tuning Integration, Testing & Dry-Run Enhancement'
       priority: Medium
+      status: Completed
+    - id: quality-make-timing-policy-ci-gate
+      file: DONE/main/quality/quality-make-timing-policy-ci-gate.yaml
+      title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
+      priority: Medium-High
       status: Completed
     - id: coverage-per-module-50-temporary-split
       file: DONE/main/active/coverage-per-module-50-temporary-split.yaml

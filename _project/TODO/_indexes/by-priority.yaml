@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:21:13.676939'
-total_items: 39
+generated_at: '2026-04-13T08:26:24.970014'
+total_items: 38
 priorities:
   Critical:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 11
+    count: 10
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -69,11 +69,6 @@ priorities:
       file: TODO/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
       title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
       category: Core Functionality
-      status: Not Started
-    - id: quality-make-timing-policy-ci-gate
-      file: TODO/main/planning/quality-make-timing-policy-ci-gate.yaml
-      title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
-      category: Testing and Quality Assurance
       status: Not Started
     - id: quality-reduce-complexity-hotspots-to-mccabe-20
       file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml

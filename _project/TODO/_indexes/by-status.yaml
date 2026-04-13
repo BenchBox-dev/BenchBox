@@ -1,8 +1,8 @@
-generated_at: '2026-04-13T08:21:13.676955'
-total_items: 39
+generated_at: '2026-04-13T08:26:24.970026'
+total_items: 38
 statuses:
   Not Started:
-    count: 31
+    count: 30
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -104,11 +104,6 @@ statuses:
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
       category: Core Functionality
-    - id: quality-make-timing-policy-ci-gate
-      file: TODO/main/planning/quality-make-timing-policy-ci-gate.yaml
-      title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
-      priority: Medium-High
-      category: Testing and Quality Assurance
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds

@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:21:15.343522'
-total_items: 672
+generated_at: '2026-04-13T08:26:26.621351'
+total_items: 673
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 622
+    count: 623
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2364,6 +2364,11 @@ statuses:
       title: Promote PostgreSQL to first-class platform status
       priority: High
       category: Platform Expansion
+    - id: quality-make-timing-policy-ci-gate
+      file: DONE/main/quality/quality-make-timing-policy-ci-gate.yaml
+      title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
+      priority: Medium-High
+      category: Testing and Quality Assurance
     - id: propagate-duration-seconds-in-enhanced-results
       file: DONE/core-functionality/active/propagate-duration-seconds-in-enhanced-results.yaml
       title: Propagate explicit duration_seconds through enhanced result builders

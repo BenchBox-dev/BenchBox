@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:21:13.676839'
-total_items: 39
+generated_at: '2026-04-13T08:26:24.969957'
+total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -643,22 +643,6 @@ items:
   work_ready: 1
   needs:
   - clickhouse-error-message-capture
-- id: quality-make-timing-policy-ci-gate
-  file: TODO/main/planning/quality-make-timing-policy-ci-gate.yaml
-  title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - quality-plan
-  - phase-2
-  - timing
-  - ci-gate
-  estimated_effort: Small-Medium (1-2 days)
-  work_total: 5
-  work_done: 0
-  work_ready: 1
 - id: quality-reduce-complexity-hotspots-to-mccabe-20
   file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
   title: Reduce 44 McCabe complexity hotspots and gate C901 permanently

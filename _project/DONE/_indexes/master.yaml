@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:21:15.342917'
-total_items: 672
+generated_at: '2026-04-13T08:26:26.620619'
+total_items: 673
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -8882,6 +8882,23 @@ items:
   completed_date: '2026-03-23'
   work_total: 2
   work_done: 2
+  work_ready: 0
+- id: quality-make-timing-policy-ci-gate
+  file: DONE/main/quality/quality-make-timing-policy-ci-gate.yaml
+  title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium-High
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-2
+  - timing
+  - ci-gate
+  estimated_effort: Small-Medium (1-2 days)
+  completed_date: '2026-04-13'
+  work_total: 5
+  work_done: 5
   work_ready: 0
 - id: prune-legacy-publishing-prototype
   file: DONE/main/planning/prune-legacy-publishing-prototype.yaml
