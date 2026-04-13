@@ -71,7 +71,7 @@ work:
 - id: w6
   summary: "SLICE 4 — Extract data_loading.py (create_schema, load_data, external tables, _create_enhanced_* phase helpers)."
   needs: [w5]
-  status: pending
+  status: done
 
 - id: w7
   summary: "SLICE 5 — Extract result_capture.py (plan capture, validate_loaded_data/row_counts, _collect_resource_utilization)."
