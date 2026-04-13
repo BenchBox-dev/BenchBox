@@ -44,7 +44,7 @@ work:
   - id: w3
     summary: "Consolidate GCP Dataproc GCS-path cluster: extract helper in benchbox/platforms/gcp/_gcs_path.py; migrate dataproc_adapter + dataproc_serverless_adapter"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w4
     summary: "Consolidate apply_platform_optimizations/apply_table_tunings: decide base template-method vs mixin (coordinate with adapter-base map TODO); implement for Databend + Databricks"
