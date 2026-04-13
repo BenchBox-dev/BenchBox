@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T23:15:51.232958'
+generated_at: '2026-04-13T08:13:32.038711'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 43
+    count: 44
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -334,6 +334,11 @@ categories:
       file: DONE/core-functionality/active/dedup-wave3-ignore-rules.yaml
       title: Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage
       priority: Medium-High
+      status: Completed
+    - id: quality-add-dependency-upper-bounds-policy
+      file: DONE/main/quality/quality-add-dependency-upper-bounds-policy.yaml
+      title: Add upper bounds on highest-risk dependencies and document policy
+      priority: Medium
       status: Completed
     - id: quality-bulk-fix-encoding-lint-and-ratchet
       file: DONE/main/quality/quality-bulk-fix-encoding-lint-and-ratchet.yaml

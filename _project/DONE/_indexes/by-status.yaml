@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T23:15:51.233255'
-total_items: 670
+generated_at: '2026-04-13T08:13:32.039066'
+total_items: 671
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 620
+    count: 621
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -709,6 +709,11 @@ statuses:
       title: Add system environment details to the right side of the run summary box
       priority: Medium
       category: Visualization
+    - id: quality-add-dependency-upper-bounds-policy
+      file: DONE/main/quality/quality-add-dependency-upper-bounds-policy.yaml
+      title: Add upper bounds on highest-risk dependencies and document policy
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: mcp-visualization-tools
       file: DONE/mcp-integration/mcp-visualization-tools.yaml
       title: Add visualization tools to MCP server

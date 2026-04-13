@@ -2,7 +2,8 @@ id: quality-add-dependency-upper-bounds-policy
 title: "Add upper bounds on highest-risk dependencies and document policy"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-13"
 category: Code Quality and Technical Debt
 description: |
   Quality plan Phase 4e. The audit found pyproject.toml uses minimum-version
@@ -18,27 +19,27 @@ description: |
 work:
   - id: w1
     summary: "Identify 5-8 highest-risk deps (breaking minor releases, deep API integration, no semver guarantee). Candidates: sqlglot, pydantic, click, duckdb, pyarrow."
-    status: pending
+    status: done
 
   - id: w2
     summary: "Add upper bounds to those deps in pyproject.toml: e.g., `sqlglot>=20.0.0,<30.0.0`. Pick bounds wide enough not to constrain users but narrow enough to catch breaking jumps."
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Run `uv lock --upgrade` and `uv run -- python -m pytest -m fast -q` to confirm no regression"
     needs: [w2]
-    status: pending
+    status: done
 
   - id: w4
     summary: "Document the dependency-bounds policy in AGENTS.md: when to add an upper bound, when to bump it, the review process for major bumps"
     needs: [w3]
-    status: pending
+    status: done
 
   - id: w5
     summary: "Add `_project/TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml` as a quarterly maintenance reminder"
     needs: [w4]
-    status: pending
+    status: done
 
 files_affected:
   modified:

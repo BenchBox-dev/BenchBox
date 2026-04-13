@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T23:15:51.232682'
-total_items: 670
+generated_at: '2026-04-13T08:13:32.038382'
+total_items: 671
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4952,6 +4952,23 @@ items:
   completed_date: '2026-02-10'
   work_total: 3
   work_done: 3
+  work_ready: 0
+- id: quality-add-dependency-upper-bounds-policy
+  file: DONE/main/quality/quality-add-dependency-upper-bounds-policy.yaml
+  title: Add upper bounds on highest-risk dependencies and document policy
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-4
+  - supply-chain
+  - deps
+  estimated_effort: Small (4-6 hours)
+  completed_date: '2026-04-13'
+  work_total: 5
+  work_done: 5
   work_ready: 0
 - id: preexisting-complexity-review-findings
   file: DONE/core-functionality/active/preexisting-complexity-review-findings.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T23:15:51.233110'
-total_items: 670
+generated_at: '2026-04-13T08:13:32.038898'
+total_items: 671
 priorities:
   Critical:
     count: 39
@@ -1890,7 +1890,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 271
+    count: 272
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2146,6 +2146,11 @@ priorities:
       file: DONE/main/active/summary-box-system-environment-info.yaml
       title: Add system environment details to the right side of the run summary box
       category: Visualization
+      status: Completed
+    - id: quality-add-dependency-upper-bounds-policy
+      file: DONE/main/quality/quality-add-dependency-upper-bounds-policy.yaml
+      title: Add upper bounds on highest-risk dependencies and document policy
+      category: Code Quality and Technical Debt
       status: Completed
     - id: preexisting-complexity-review-findings
       file: DONE/core-functionality/active/preexisting-complexity-review-findings.yaml

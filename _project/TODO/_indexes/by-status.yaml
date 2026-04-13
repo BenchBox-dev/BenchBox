@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T23:15:49.680791'
+generated_at: '2026-04-13T08:13:30.363276'
 total_items: 39
 statuses:
   Not Started:
@@ -44,11 +44,6 @@ statuses:
       title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
       priority: Medium
       category: Testing and Quality Assurance
-    - id: quality-add-dependency-upper-bounds-policy
-      file: TODO/main/planning/quality-add-dependency-upper-bounds-policy.yaml
-      title: Add upper bounds on highest-risk dependencies and document policy
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: quality-audit-skip-xfail-markers-add-rationale
       file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
       title: Audit 276 skip/xfail test markers — add rationale or remove
@@ -114,6 +109,11 @@ statuses:
       title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
       priority: Medium-High
       category: Testing and Quality Assurance
+    - id: review-dependency-upper-bounds-quarterly
+      file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
+      title: Quarterly review of dependency upper bounds
+      priority: Low
+      category: Code Quality and Technical Debt
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes

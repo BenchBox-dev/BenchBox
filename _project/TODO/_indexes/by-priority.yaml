@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T23:15:49.680780'
+generated_at: '2026-04-13T08:13:30.363264'
 total_items: 39
 priorities:
   Critical:
@@ -91,7 +91,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 13
+    count: 12
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -107,11 +107,6 @@ priorities:
       file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
       title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
       category: Testing and Quality Assurance
-      status: Not Started
-    - id: quality-add-dependency-upper-bounds-policy
-      file: TODO/main/planning/quality-add-dependency-upper-bounds-policy.yaml
-      title: Add upper bounds on highest-risk dependencies and document policy
-      category: Code Quality and Technical Debt
       status: Not Started
     - id: quality-audit-skip-xfail-markers-add-rationale
       file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
@@ -159,7 +154,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 10
+    count: 11
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -185,6 +180,11 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
+      status: Not Started
+    - id: review-dependency-upper-bounds-quarterly
+      file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
+      title: Quarterly review of dependency upper bounds
+      category: Code Quality and Technical Debt
       status: Not Started
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
