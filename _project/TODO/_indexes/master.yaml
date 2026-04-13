@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T10:22:36.224509'
+generated_at: '2026-04-13T10:25:33.736828'
 total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -358,7 +358,7 @@ items:
   - DRY
   estimated_effort: Medium (3-4 days)
   work_total: 7
-  work_done: 4
+  work_done: 5
   work_ready: 1
   needs:
   - quality-bulk-fix-encoding-lint-and-ratchet
