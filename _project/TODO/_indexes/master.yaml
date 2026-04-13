@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T13:37:30.027579'
-total_items: 38
+generated_at: '2026-04-13T13:51:47.812916'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -477,24 +477,6 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
-- id: quality-migrate-unified-frame-any-to-protocol
-  file: TODO/main/active/quality-migrate-unified-frame-any-to-protocol.yaml
-  title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: Not Started
-  tags:
-  - quality-plan
-  - phase-4
-  - typing
-  - dataframe
-  estimated_effort: Medium (2-3 days)
-  work_total: 5
-  work_done: 1
-  work_ready: 2
-  needs:
-  - quality-define-dataframe-protocol-and-remove-any
 - id: external-contributor-submission-dry-run
   file: TODO/main/planning/external-contributor-submission-dry-run.yaml
   title: Run a Phase 2 dry-run with one external trusted contributor

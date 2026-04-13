@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T13:37:30.027629'
-total_items: 38
+generated_at: '2026-04-13T13:51:47.812975'
+total_items: 37
 priorities:
   Critical:
     count: 1
@@ -86,7 +86,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 12
+    count: 11
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -127,11 +127,6 @@ priorities:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
-      status: Not Started
-    - id: quality-migrate-unified-frame-any-to-protocol
-      file: TODO/main/active/quality-migrate-unified-frame-any-to-protocol.yaml
-      title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
-      category: Code Quality and Technical Debt
       status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T13:37:31.497926'
-total_items: 679
+generated_at: '2026-04-13T13:51:49.394059'
+total_items: 680
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 629
+    count: 630
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2664,6 +2664,11 @@ statuses:
       title: Rename --convert to --table-format and --data-format to --presort
       priority: High
       category: CLI UX
+    - id: quality-migrate-unified-frame-any-to-protocol
+      file: DONE/main/quality/quality-migrate-unified-frame-any-to-protocol.yaml
+      title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: complexity-dict-dispatch-w14
       file: DONE/core-functionality/active/complexity-dict-dispatch-w14.yaml
       title: Replace if/elif lookup chains with dict-based dispatch (complexity batch 1)

@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T13:37:31.497608'
+generated_at: '2026-04-13T13:51:49.393752'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 47
+    count: 48
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -481,6 +481,11 @@ categories:
     - id: remove-tpc-h-parallel-file-merging-anti-pattern
       file: DONE/unknown/planning/remove-tpc-h-parallel-file-merging-anti-pattern.yaml
       title: Remove TPC-H Parallel File Merging Anti-Pattern
+      priority: Medium
+      status: Completed
+    - id: quality-migrate-unified-frame-any-to-protocol
+      file: DONE/main/quality/quality-migrate-unified-frame-any-to-protocol.yaml
+      title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
       priority: Medium
       status: Completed
     - id: runtime-module-refactor-batch-two

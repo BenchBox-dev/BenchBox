@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T13:37:30.027611'
+generated_at: '2026-04-13T13:51:47.812953'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -25,7 +25,7 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 6
+    count: 5
     items:
     - id: quality-extract-transactional-benchmark-base
       file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
@@ -51,11 +51,6 @@ categories:
       file: TODO/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
       title: Refactor 5,158-line adapter base into cohesive sub-modules
       priority: Medium-High
-      status: Not Started
-    - id: quality-migrate-unified-frame-any-to-protocol
-      file: TODO/main/active/quality-migrate-unified-frame-any-to-protocol.yaml
-      title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
-      priority: Medium
       status: Not Started
   Core Functionality:
     count: 12

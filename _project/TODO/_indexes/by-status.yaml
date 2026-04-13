@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T13:37:30.027639'
-total_items: 38
+generated_at: '2026-04-13T13:51:47.812987'
+total_items: 37
 statuses:
   Blocked:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 28
+    count: 27
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -111,11 +111,6 @@ statuses:
       file: TODO/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
       title: Refactor 5,158-line adapter base into cohesive sub-modules
       priority: Medium-High
-      category: Code Quality and Technical Debt
-    - id: quality-migrate-unified-frame-any-to-protocol
-      file: TODO/main/active/quality-migrate-unified-frame-any-to-protocol.yaml
-      title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
-      priority: Medium
       category: Code Quality and Technical Debt
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml

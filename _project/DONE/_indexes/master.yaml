@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T13:37:31.497326'
-total_items: 679
+generated_at: '2026-04-13T13:51:49.393452'
+total_items: 680
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6900,6 +6900,25 @@ items:
   category: Code Quality and Technical Debt
   priority: Medium
   status: Completed
+- id: quality-migrate-unified-frame-any-to-protocol
+  file: DONE/main/quality/quality-migrate-unified-frame-any-to-protocol.yaml
+  title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-4
+  - typing
+  - dataframe
+  estimated_effort: Medium (2-3 days)
+  completed_date: '2026-04-13'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - quality-define-dataframe-protocol-and-remove-any
 - id: reduce-cyclomatic-complexity-violations
   file: DONE/main/active/reduce-cyclomatic-complexity-violations.yaml
   title: Resolve all 10 cyclomatic complexity violations (5 ignore, 5 refactor)

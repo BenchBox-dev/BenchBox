@@ -2,7 +2,8 @@ id: quality-migrate-unified-frame-any-to-protocol
 title: "Replace Any annotations in unified_frame.py with LazyFrameLike protocol"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-13"
 category: Code Quality and Technical Debt
 description: |
   Follow-up to quality-define-dataframe-protocol-and-remove-any.
@@ -35,31 +36,43 @@ work:
 - id: w2
   summary: "Migrate category (a) — generic-dispatch sites — to LazyFrameLike. One commit per ~20 sites for review bounding."
   needs: [w1]
-  status: in-progress
-  notes: "First slice landed in commit 486c21640: wrap_dataframe + UnifiedLazyFrame.join.
-    Hand-verification revealed the w1 heuristic over-assigned category (a) — UnifiedExpr dunder
-    operators (16 sites), .native/.collect/.scalar returns (3 sites), and Polars-specific helpers
-    are NOT generic-dispatch. See heuristic-limitations table in
-    docs/development/unified_frame_any_survey.md. Remaining (a) candidates need per-site review;
-    real (a) count is ~4-6, not 25."
+  status: done
+  notes: "Verified (a) count after hand-walking: only 2 genuine generic-dispatch sites
+    (wrap_dataframe + UnifiedLazyFrame.join). Both migrated in commit 486c21640. The other
+    23 heuristic-flagged (a) sites were re-classified as (b) library-specific or (c)
+    escape-hatch — see Heuristic limitations + Re-classification log in
+    docs/development/unified_frame_any_survey.md."
 
 - id: w3
   summary: "Migrate category (b) — library-specific sites — to concrete types (e.g., polars.LazyFrame, pyspark.sql.DataFrame).
     Use TYPE_CHECKING imports to preserve lazy-load semantics."
   needs: [w1]
-  status: pending
+  status: done
+  notes: "21 (b) sites migrated to concrete types under TYPE_CHECKING imports across commits
+    3b8fa0e57 (1 polars helper), 6a191d677 (8 pyspark join methods), 4b11df2f8 (10 datafusion
+    expr/df sites), 4baac9f50 (3 datafusion ast/agg helpers). 11 sites originally heuristic-
+    flagged (b) were re-classified to (c) (runtime probes + Unified*Expr.__init__ family) and
+    documented per re-classification log."
 
 - id: w4
   summary: "For category (c) escape-hatch Any, add inline comment explaining why a more specific type would be wrong. The
     goal is meaningful Any, not zero Any."
   needs: [w1]
-  status: pending
+  status: done
+  notes: "Used class-level rationale blocks instead of one-comment-per-method to avoid noise.
+    Coverage: UnifiedExpr class docstring (covers ~17 method-param sites), arithmetic dunder
+    section comment (16 sites), UnifiedWhen/UnifiedWhenThen class docstrings (5 sites),
+    UnifiedExpr.native + .collect + .scalar docstrings (3 return sites), _is_* predicate
+    section comment (4 sites). Commits: 7226876a3, 3b8fa0e57, 3398d9457, f137b20dc."
 
 - id: w5
   summary: "Run `uv run ty check benchbox/platforms/dataframe/` against /tmp/ty_baseline.txt (93 diagnostics). Confirm no
     new errors; fix any that appear (those are real bugs the prior Any was hiding)."
   needs: [w2, w3, w4]
-  status: pending
+  status: done
+  notes: "ty diagnostic count steady at 93 (= baseline) after every w2/w3/w4 commit. No new
+    errors surfaced — the prior Any annotations were not masking type errors in the migrated
+    sites. Verified after final commit f137b20dc."
 
 files_affected:
   modified:
