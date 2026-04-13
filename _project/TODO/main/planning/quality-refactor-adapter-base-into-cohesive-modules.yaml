@@ -54,7 +54,7 @@ work:
 - id: w4
   summary: "SLICE 2c — Consolidate per-table tuning hooks into tuning.py (apply_table_tunings, supports_tuning_type, generate_tuning_clause)."
   needs: [w3]
-  status: pending
+  status: done
 
 - id: w5
   summary: "SLICE 3 — Extract connection.py (lifecycle, DriverIsolationCapability, PlatformAdapterConnection, _NoCloseProxy)."
