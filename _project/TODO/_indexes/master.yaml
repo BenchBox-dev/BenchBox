@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T14:23:37.670085'
+generated_at: '2026-04-13T14:47:38.519685'
 total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -70,7 +70,7 @@ items:
   - licensing
   estimated_effort: Medium
   work_total: 5
-  work_done: 0
+  work_done: 1
   work_ready: 1
 - id: support-unofficial-tpcds-scales-with-methodology-guardrails
   file: TODO/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
@@ -681,7 +681,7 @@ items:
   - high-blast-radius
   estimated_effort: Medium-Large (1 week)
   work_total: 10
-  work_done: 4
+  work_done: 6
   work_ready: 1
   needs:
   - quality-map-adapter-base-refactor-scope

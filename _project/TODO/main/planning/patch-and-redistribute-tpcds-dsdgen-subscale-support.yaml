@@ -23,7 +23,18 @@ description: |
 work:
 - id: w1
   summary: "Root-cause the subscale crash in `_sources/tpc-ds/tools` with a minimal reproducer tied to `call_center`, `store`, `warehouse`, and `web_site`."
-  status: pending
+  status: done
+  notes: |
+    Completed during Gate Zero investigation on 2026-04-13. All four target tables
+    (call_center, store, warehouse, web_site) exhibit exit 139 with no output file
+    at sf=0.01, 0.1, and 0.5 on both bundled macOS binaries (darwin-arm64,
+    darwin-x86_64). A fresh source build from _sources/tpc-ds/tools reproduced the
+    same failure for call_center sf=0.01. lldb on the source-built binary pinned the
+    fault to a null dereference in dist_weight at dist.c:512: weight_sets[wset - 1]
+    with wset=0, reached via scaling.c:124 (LogScale), scaling.c:319 (get_rowcount),
+    parallel.c:64 (split_work), and driver.c:549 (main). lldb was run only on
+    call_center; the identical exit-139 pattern across all four tables implies the
+    same root cause. See _sources/tpcds-subscale-probe.md for the full evidence record.
 
 - id: w2
   summary: "Audit TPC licensing and BenchBox release constraints for shipping patched `dsdgen` binaries rather than upstream artifacts."

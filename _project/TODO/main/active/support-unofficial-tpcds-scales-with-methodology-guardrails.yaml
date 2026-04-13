@@ -312,7 +312,7 @@ files_affected:
   added:
   - "_sources/tpcds-subscale-probe.md"
   - "_sources/adr/"
-  - "_project/TODO/main/planning/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml"
+  - "_project/TODO/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml"
 
 scope_limit:
   only_modify:
@@ -382,8 +382,6 @@ success_metrics:
 - "Validation behavior for unofficial subscale runs matches the documented table contract derived from Gate Zero."
 
 open_questions:
-- "Do all bundled `dsdgen` binaries actually complete successfully at 0.01, 0.1, and 0.5, or do some platforms require a separate
-  fallback project?"
 - "For unofficial subscale runs, which TPC-DS tables are mandatory, optional-empty, or expected to be absent according to
   actual generator output?"
 - "Should plain non-official `sf>=1` TPC-DS runs remain allowed by default outside `--official`, or should the new opt-in
