@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T22:08:17.765976'
-total_categories: 9
+generated_at: '2026-04-12T23:15:49.680759'
+total_categories: 8
 categories:
   Benchmark Development:
     count: 4
@@ -164,14 +164,6 @@ categories:
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
-      priority: Low
-      status: Not Started
-  Project Lifecycle Management:
-    count: 1
-    items:
-    - id: quality-expand-agents-md-and-document-test-lock
-      file: TODO/main/planning/quality-expand-agents-md-and-document-test-lock.yaml
-      title: Expand AGENTS.md and document the test inter-process lock
       priority: Low
       status: Not Started
   Supporting Infrastructure:

@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T22:08:17.765995'
-total_items: 40
+generated_at: '2026-04-12T23:15:49.680780'
+total_items: 39
 priorities:
   Critical:
     count: 1
@@ -159,7 +159,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 11
+    count: 10
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -170,11 +170,6 @@ priorities:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: quality-expand-agents-md-and-document-test-lock
-      file: TODO/main/planning/quality-expand-agents-md-and-document-test-lock.yaml
-      title: Expand AGENTS.md and document the test inter-process lock
-      category: Project Lifecycle Management
       status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml

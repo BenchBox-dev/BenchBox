@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T22:08:19.392888'
+generated_at: '2026-04-12T23:15:51.232958'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -2896,7 +2896,7 @@ categories:
       priority: Medium
       status: Completed
   Project Lifecycle Management:
-    count: 27
+    count: 28
     items:
     - id: add-global-quiet-mode-quiet-q-to-suppress-all-output
       file: DONE/unknown/planning/add-global-quiet-mode-quiet-q-to-suppress-all-output.yaml
@@ -2947,6 +2947,11 @@ categories:
       file: DONE/unknown/planning/distinct-database-naming-based-on-configuration-characteristics.yaml
       title: Distinct Database Naming Based on Configuration Characteristics
       priority: Medium
+      status: Completed
+    - id: quality-expand-agents-md-and-document-test-lock
+      file: DONE/main/quality/quality-expand-agents-md-and-document-test-lock.yaml
+      title: Expand AGENTS.md and document the test inter-process lock
+      priority: Low
       status: Completed
     - id: fix-clickhouse-platform-issues
       file: DONE/unknown/planning/fix-clickhouse-platform-issues.yaml

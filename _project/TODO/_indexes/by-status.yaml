@@ -1,8 +1,8 @@
-generated_at: '2026-04-12T22:08:17.766007'
-total_items: 40
+generated_at: '2026-04-12T23:15:49.680791'
+total_items: 39
 statuses:
   Not Started:
-    count: 32
+    count: 31
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -74,11 +74,6 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
-    - id: quality-expand-agents-md-and-document-test-lock
-      file: TODO/main/planning/quality-expand-agents-md-and-document-test-lock.yaml
-      title: Expand AGENTS.md and document the test inter-process lock
-      priority: Low
-      category: Project Lifecycle Management
     - id: quality-extend-error-capture-to-cloud-adapters
       file: TODO/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
       title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters

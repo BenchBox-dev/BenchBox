@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T22:08:19.392580'
-total_items: 669
+generated_at: '2026-04-12T23:15:51.232682'
+total_items: 670
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4147,6 +4147,22 @@ items:
   work_done: 2
   work_ready: 0
   deferred_count: 1
+- id: quality-expand-agents-md-and-document-test-lock
+  file: DONE/main/quality/quality-expand-agents-md-and-document-test-lock.yaml
+  title: Expand AGENTS.md and document the test inter-process lock
+  worktree: main
+  category: Project Lifecycle Management
+  priority: Low
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-4
+  - documentation
+  estimated_effort: Small (4-6 hours)
+  completed_date: '2026-04-12'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: dedup-tpcds-constants-empty-results
   file: DONE/core-functionality/active/dedup-tpcds-constants-empty-results.yaml
   title: Extract TPC-DS canonical table list and shared _empty_results to constants

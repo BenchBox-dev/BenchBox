@@ -2,7 +2,8 @@ id: quality-expand-agents-md-and-document-test-lock
 title: "Expand AGENTS.md and document the test inter-process lock"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-04-12"
 category: Project Lifecycle Management
 description: |
   Quality plan Phase 4f/4g. AGENTS.md is referenced as the canonical contributor
@@ -19,16 +20,16 @@ description: |
 work:
   - id: w1
     summary: "Expand AGENTS.md with 5 sections (+80-120 lines, ≤300 total, ~2h): timing policy, result validation, adapter authoring pointer, dep upper-bounds reference, test markers cheat sheet"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Write tests/README.md (~100-150 lines) covering: (a) marker taxonomy, (b) the inter-process lock contract, (c) the macOS conftest branch, (d) how to add a new test category (~2 hours)"
-    status: pending
+    status: done
 
   - id: w3
     summary: "Cross-link AGENTS.md ↔ tests/README.md ↔ docs/development/ so the entry points are obvious (~30 min)"
     needs: [w1, w2]
-    status: pending
+    status: done
 
 files_affected:
   modified:
