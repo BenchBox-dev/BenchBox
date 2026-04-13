@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T21:47:56.768359'
-total_items: 42
+generated_at: '2026-04-12T22:00:56.490993'
+total_items: 41
 priorities:
   Critical:
     count: 1
@@ -91,7 +91,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 15
+    count: 14
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -117,11 +117,6 @@ priorities:
       file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
       title: Audit 276 skip/xfail test markers — add rationale or remove
       category: Testing and Quality Assurance
-      status: Not Started
-    - id: quality-bulk-fix-encoding-lint-and-ratchet
-      file: TODO/main/planning/quality-bulk-fix-encoding-lint-and-ratchet.yaml
-      title: Bulk-fix PLW1514 encoding violations and ratchet ruff/McCabe gates
-      category: Code Quality and Technical Debt
       status: Not Started
     - id: quality-consolidate-duplicate-code-clusters
       file: TODO/main/planning/quality-consolidate-duplicate-code-clusters.yaml

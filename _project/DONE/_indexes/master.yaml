@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T21:47:58.276812'
-total_items: 667
+generated_at: '2026-04-12T22:00:58.141038'
+total_items: 668
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5081,6 +5081,22 @@ items:
   work_done: 5
   work_ready: 0
   deferred_count: 3
+- id: quality-bulk-fix-encoding-lint-and-ratchet
+  file: DONE/main/quality/quality-bulk-fix-encoding-lint-and-ratchet.yaml
+  title: Bulk-fix PLW1514 encoding violations and ratchet ruff/McCabe gates
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-1
+  - lint
+  estimated_effort: Small (4 hours)
+  completed_date: '2026-04-12'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: cli-data-only-and-load-only-execution-options
   file: DONE/unknown/planning/cli-data-only-and-load-only-execution-options.yaml
   title: CLI Data-Only and Load-Only Execution Options

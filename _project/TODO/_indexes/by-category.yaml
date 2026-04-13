@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T21:47:56.768342'
+generated_at: '2026-04-12T22:00:56.490971'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -25,16 +25,11 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 7
+    count: 6
     items:
     - id: quality-add-dependency-upper-bounds-policy
       file: TODO/main/planning/quality-add-dependency-upper-bounds-policy.yaml
       title: Add upper bounds on highest-risk dependencies and document policy
-      priority: Medium
-      status: Not Started
-    - id: quality-bulk-fix-encoding-lint-and-ratchet
-      file: TODO/main/planning/quality-bulk-fix-encoding-lint-and-ratchet.yaml
-      title: Bulk-fix PLW1514 encoding violations and ratchet ruff/McCabe gates
       priority: Medium
       status: Not Started
     - id: quality-consolidate-duplicate-code-clusters
