@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:26:26.621351'
-total_items: 673
+generated_at: '2026-04-13T08:30:19.649578'
+total_items: 674
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 623
+    count: 624
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1232,6 +1232,11 @@ statuses:
       title: Define DataFrame Execution Model for Write Primitives
       priority: Medium-High
       category: Core Functionality
+    - id: quality-define-dataframe-protocol-and-remove-any
+      file: DONE/main/quality/quality-define-dataframe-protocol-and-remove-any.yaml
+      title: Define DataFrameProtocol and remove Any annotations from unified frame layer
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: dataframe-tpcdi-architecture
       file: DONE/dataframe-benchmarks/active/dataframe-tpcdi-architecture.yaml
       title: Design DataFrame Architecture for TPC-DI ETL Workload

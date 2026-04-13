@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:26:24.969995'
+generated_at: '2026-04-13T08:30:18.049858'
 total_categories: 8
 categories:
   Benchmark Development:
@@ -37,11 +37,6 @@ categories:
       title: Consolidate duplicate-code clusters across platforms and core
       priority: Medium
       status: Not Started
-    - id: quality-define-dataframe-protocol-and-remove-any
-      file: TODO/main/planning/quality-define-dataframe-protocol-and-remove-any.yaml
-      title: Define DataFrameProtocol and remove Any annotations from unified frame layer
-      priority: Medium
-      status: Not Started
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
@@ -56,6 +51,11 @@ categories:
       file: TODO/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
       title: Refactor 5,158-line adapter base into cohesive sub-modules
       priority: Medium-High
+      status: Not Started
+    - id: quality-migrate-unified-frame-any-to-protocol
+      file: TODO/main/planning/quality-migrate-unified-frame-any-to-protocol.yaml
+      title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
+      priority: Medium
       status: Not Started
   Core Functionality:
     count: 12

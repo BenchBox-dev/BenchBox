@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:26:24.970014'
+generated_at: '2026-04-13T08:30:18.049879'
 total_items: 38
 priorities:
   Critical:
@@ -113,11 +113,6 @@ priorities:
       title: Consolidate duplicate-code clusters across platforms and core
       category: Code Quality and Technical Debt
       status: Not Started
-    - id: quality-define-dataframe-protocol-and-remove-any
-      file: TODO/main/planning/quality-define-dataframe-protocol-and-remove-any.yaml
-      title: Define DataFrameProtocol and remove Any annotations from unified frame layer
-      category: Code Quality and Technical Debt
-      status: Not Started
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence
@@ -137,6 +132,11 @@ priorities:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
+      status: Not Started
+    - id: quality-migrate-unified-frame-any-to-protocol
+      file: TODO/main/planning/quality-migrate-unified-frame-any-to-protocol.yaml
+      title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
+      category: Code Quality and Technical Debt
       status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml

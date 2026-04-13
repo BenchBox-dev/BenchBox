@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:26:26.620619'
-total_items: 673
+generated_at: '2026-04-13T08:30:19.648781'
+total_items: 674
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5584,6 +5584,23 @@ items:
   completed_date: '2026-02-18'
   work_total: 3
   work_done: 3
+  work_ready: 0
+- id: quality-define-dataframe-protocol-and-remove-any
+  file: DONE/main/quality/quality-define-dataframe-protocol-and-remove-any.yaml
+  title: Define DataFrameProtocol and remove Any annotations from unified frame layer
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-4
+  - typing
+  - dataframe
+  estimated_effort: Medium (3-4 days)
+  completed_date: '2026-04-13'
+  work_total: 5
+  work_done: 5
   work_ready: 0
 - id: interactive-wizard-cli-command-preview
   file: DONE/ux-improvements/active/interactive-wizard-cli-command-preview.yaml

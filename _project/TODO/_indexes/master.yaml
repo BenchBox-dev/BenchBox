@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:26:24.969957'
+generated_at: '2026-04-13T08:30:18.049822'
 total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -380,22 +380,6 @@ items:
   work_ready: 1
   needs:
   - quality-bulk-fix-encoding-lint-and-ratchet
-- id: quality-define-dataframe-protocol-and-remove-any
-  file: TODO/main/planning/quality-define-dataframe-protocol-and-remove-any.yaml
-  title: Define DataFrameProtocol and remove Any annotations from unified frame layer
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: Not Started
-  tags:
-  - quality-plan
-  - phase-4
-  - typing
-  - dataframe
-  estimated_effort: Medium (3-4 days)
-  work_total: 5
-  work_done: 0
-  work_ready: 1
 - id: define-phase-3-promotion-metrics
   file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
   title: Define Phase 3 promotion metrics, dashboard, and review cadence
@@ -474,6 +458,24 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: quality-migrate-unified-frame-any-to-protocol
+  file: TODO/main/planning/quality-migrate-unified-frame-any-to-protocol.yaml
+  title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Not Started
+  tags:
+  - quality-plan
+  - phase-4
+  - typing
+  - dataframe
+  estimated_effort: Medium (2-3 days)
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - quality-define-dataframe-protocol-and-remove-any
 - id: external-contributor-submission-dry-run
   file: TODO/main/planning/external-contributor-submission-dry-run.yaml
   title: Run a Phase 2 dry-run with one external trusted contributor

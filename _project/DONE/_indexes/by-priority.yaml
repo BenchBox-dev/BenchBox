@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:26:26.621177'
-total_items: 673
+generated_at: '2026-04-13T08:30:19.649400'
+total_items: 674
 priorities:
   Critical:
     count: 39
@@ -1895,7 +1895,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 273
+    count: 274
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2403,6 +2403,11 @@ priorities:
       file: DONE/core-functionality/active/deferred-storage-and-cache-unification.yaml
       title: Deferred Storage Location and Cache Unification Enhancements
       category: Core Functionality
+      status: Completed
+    - id: quality-define-dataframe-protocol-and-remove-any
+      file: DONE/main/quality/quality-define-dataframe-protocol-and-remove-any.yaml
+      title: Define DataFrameProtocol and remove Any annotations from unified frame layer
+      category: Code Quality and Technical Debt
       status: Completed
     - id: interactive-wizard-cli-command-preview
       file: DONE/ux-improvements/active/interactive-wizard-cli-command-preview.yaml
