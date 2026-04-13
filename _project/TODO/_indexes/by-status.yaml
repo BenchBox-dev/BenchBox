@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T11:53:26.007082'
-total_items: 36
+generated_at: '2026-04-13T13:37:30.027639'
+total_items: 38
 statuses:
   Blocked:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 26
+    count: 28
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -52,6 +52,16 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
+    - id: quality-extract-transactional-benchmark-base
+      file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
+      title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: quality-extract-throughput-runner
+      file: TODO/main/planning/quality-extract-throughput-runner.yaml
+      title: Extract shared core.throughput.runner with aligned ThroughputResult model
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

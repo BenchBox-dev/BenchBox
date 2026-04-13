@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T11:53:26.007053'
+generated_at: '2026-04-13T13:37:30.027611'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -25,8 +25,18 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 4
+    count: 6
     items:
+    - id: quality-extract-transactional-benchmark-base
+      file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
+      title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
+      priority: Medium
+      status: Not Started
+    - id: quality-extract-throughput-runner
+      file: TODO/main/planning/quality-extract-throughput-runner.yaml
+      title: Extract shared core.throughput.runner with aligned ThroughputResult model
+      priority: Medium
+      status: Not Started
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
