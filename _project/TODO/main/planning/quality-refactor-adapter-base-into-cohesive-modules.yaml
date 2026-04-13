@@ -57,12 +57,14 @@ work:
   status: done
 
 - id: w5
-  summary: "SLICE 3a — Extract connection_lifecycle.py (test_connection, validate/require_dependencies, get_connection_from_pool, drop_database, handle_existing_database, check_database_exists*)."
+  summary: "SLICE 3a — Extract connection_lifecycle.py (test_connection, validate/require_dependencies, get_connection_from_pool,
+    drop_database, handle_existing_database, check_database_exists*)."
   needs: [w4]
-  status: pending
+  status: done
 
 - id: w10
-  summary: "SLICE 3b — Extract connection_wrappers.py (DriverIsolationCapability, check_isolation_capability, PlatformAdapterConnection, _NoCloseProxy). Re-export from adapter.py."
+  summary: "SLICE 3b — Extract connection_wrappers.py (DriverIsolationCapability, check_isolation_capability, PlatformAdapterConnection,
+    _NoCloseProxy). Re-export from adapter.py."
   needs: [w5]
   status: pending
 
