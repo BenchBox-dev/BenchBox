@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T14:47:40.936261'
-total_items: 680
+generated_at: '2026-04-13T15:31:36.347419'
+total_items: 681
 priorities:
   Critical:
     count: 39
@@ -1401,7 +1401,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 100
+    count: 101
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1864,6 +1864,11 @@ priorities:
       title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
       category: Code Quality & Build
       status: Not Started
+    - id: quality-refactor-adapter-base-into-cohesive-modules
+      file: DONE/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
+      title: Refactor 5,158-line adapter base into cohesive sub-modules
+      category: Code Quality and Technical Debt
+      status: Completed
     - id: remove-polars-sql-mode
       file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml
       title: Remove Polars SQL mode support - DataFrame only

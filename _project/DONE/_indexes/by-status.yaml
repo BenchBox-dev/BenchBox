@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T14:47:40.936419'
-total_items: 680
+generated_at: '2026-04-13T15:31:36.347584'
+total_items: 681
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 630
+    count: 631
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2584,6 +2584,11 @@ statuses:
       title: Reduce complexity in validation, analysis, and remaining scattered functions (complexity batch 7)
       priority: Medium
       category: Core Functionality
+    - id: quality-refactor-adapter-base-into-cohesive-modules
+      file: DONE/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
+      title: Refactor 5,158-line adapter base into cohesive sub-modules
+      priority: Medium-High
+      category: Code Quality and Technical Debt
     - id: refactor-mcp-use-public-api
       file: DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml
       title: Refactor MCP to use public BaseBenchmark API instead of CLI internals

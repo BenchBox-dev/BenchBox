@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T14:47:38.519733'
-total_items: 38
+generated_at: '2026-04-13T15:31:34.687436'
+total_items: 37
 priorities:
   Critical:
     count: 1
@@ -43,7 +43,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 8
+    count: 7
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -73,11 +73,6 @@ priorities:
     - id: quality-reduce-complexity-hotspots-to-mccabe-20
       file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
       title: Reduce 44 McCabe complexity hotspots and gate C901 permanently
-      category: Code Quality and Technical Debt
-      status: Not Started
-    - id: quality-refactor-adapter-base-into-cohesive-modules
-      file: TODO/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
-      title: Refactor 5,158-line adapter base into cohesive sub-modules
       category: Code Quality and Technical Debt
       status: Not Started
     - id: surface-contributor-onboarding-for-results

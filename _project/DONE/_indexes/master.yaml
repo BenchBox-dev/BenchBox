@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T14:47:40.935783'
-total_items: 680
+generated_at: '2026-04-13T15:31:36.346940'
+total_items: 681
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -9047,6 +9047,27 @@ items:
   work_ready: 1
   needs:
   - productize-result-publishing-and-artifact-sharing
+- id: quality-refactor-adapter-base-into-cohesive-modules
+  file: DONE/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
+  title: Refactor 5,158-line adapter base into cohesive sub-modules
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-3
+  - refactor
+  - high-blast-radius
+  estimated_effort: Medium-Large (1 week)
+  completed_date: '2026-04-13'
+  work_total: 10
+  work_done: 10
+  work_ready: 0
+  needs:
+  - quality-map-adapter-base-refactor-scope
+  - quality-add-cross-platform-result-validation
+  - quality-make-timing-policy-ci-gate
 - id: remove-polars-sql-mode
   file: DONE/dataframe-expansion/completed/remove-polars-sql-mode.yaml
   title: Remove Polars SQL mode support - DataFrame only

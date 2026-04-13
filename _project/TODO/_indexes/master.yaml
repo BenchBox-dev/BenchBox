@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T14:47:38.519685'
-total_items: 38
+generated_at: '2026-04-13T15:31:34.687383'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -667,26 +667,6 @@ items:
   work_ready: 1
   needs:
   - quality-bulk-fix-encoding-lint-and-ratchet
-- id: quality-refactor-adapter-base-into-cohesive-modules
-  file: TODO/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
-  title: Refactor 5,158-line adapter base into cohesive sub-modules
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - quality-plan
-  - phase-3
-  - refactor
-  - high-blast-radius
-  estimated_effort: Medium-Large (1 week)
-  work_total: 10
-  work_done: 6
-  work_ready: 1
-  needs:
-  - quality-map-adapter-base-refactor-scope
-  - quality-add-cross-platform-result-validation
-  - quality-make-timing-policy-ci-gate
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

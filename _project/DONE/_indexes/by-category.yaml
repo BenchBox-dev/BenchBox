@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T14:47:40.936092'
+generated_at: '2026-04-13T15:31:36.347245'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 48
+    count: 49
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -472,6 +472,11 @@ categories:
       file: DONE/main/active/reduce-cc13-complexity-ceiling.yaml
       title: Reduce CC=13 complexity ceiling and lower warn threshold to 13
       priority: Medium
+      status: Completed
+    - id: quality-refactor-adapter-base-into-cohesive-modules
+      file: DONE/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
+      title: Refactor 5,158-line adapter base into cohesive sub-modules
+      priority: Medium-High
       status: Completed
     - id: remove-tpc-di-streaming-code-and-delegate-to-databases-completed
       file: DONE/unknown/planning/remove-tpc-di-streaming-code-and-delegate-to-databases-completed.yaml

@@ -2,7 +2,8 @@ id: quality-refactor-adapter-base-into-cohesive-modules
 title: "Refactor 5,158-line adapter base into cohesive sub-modules"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-13"
 category: Code Quality and Technical Debt
 description: |
   Quality plan Phase 3. benchbox/platforms/base/adapter.py is 5,158 lines —
@@ -82,12 +83,12 @@ work:
   summary: "SLICE 6 — Extract execution.py (execute_query, power/throughput/maintenance drivers; keep run_enhanced_benchmark
     on facade)."
   needs: [w7]
-  status: pending
+  status: done
 
 - id: w9
   summary: "Final cleanup — adapter.py contains only facade + re-exports. Verify ≤600 lines. Update docs/development/adapter-refactor-map.md."
   needs: [w8]
-  status: pending
+  status: done
 
 files_affected:
   modified:
