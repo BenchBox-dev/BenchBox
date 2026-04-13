@@ -39,7 +39,7 @@ work:
   - id: w2
     summary: "Consolidate Azure Spark credential/token cluster into benchbox/platforms/azure/_credentials.py; migrate fabric_spark + synapse_spark adapters"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Consolidate GCP Dataproc GCS-path cluster: extract helper in benchbox/platforms/gcp/_gcs_path.py; migrate dataproc_adapter + dataproc_serverless_adapter"
