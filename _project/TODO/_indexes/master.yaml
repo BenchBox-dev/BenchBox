@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:30:18.049822'
+generated_at: '2026-04-13T08:37:26.382507'
 total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -497,6 +497,25 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
+- id: quality-cross-platform-validation-integration-matrix
+  file: TODO/main/planning/quality-cross-platform-validation-integration-matrix.yaml
+  title: Wire cross-platform validation comparator into a nightly integration matrix
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Not Started
+  tags:
+  - quality-plan
+  - phase-2
+  - correctness
+  - validation
+  - ci
+  estimated_effort: Medium (2-3 days)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - quality-add-cross-platform-result-validation
 - id: write-results-platform-phase-2-operations-runbook
   file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
   title: Write the Phase 2 results-platform operations runbook
@@ -552,22 +571,6 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
-- id: quality-add-cross-platform-result-validation
-  file: TODO/main/planning/quality-add-cross-platform-result-validation.yaml
-  title: Add cross-platform query-result validation suite
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - quality-plan
-  - phase-2
-  - correctness
-  - validation
-  estimated_effort: Medium (2-3 days)
-  work_total: 5
-  work_done: 0
-  work_ready: 1
 - id: automate-corpus-inventory-generation
   file: TODO/main/planning/automate-corpus-inventory-generation.yaml
   title: Automate corpus-inventory.json generation from results-data/bundles/

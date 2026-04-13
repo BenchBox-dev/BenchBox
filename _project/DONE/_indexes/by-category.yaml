@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:30:19.649210'
+generated_at: '2026-04-13T08:37:27.988432'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -3252,7 +3252,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 34
+    count: 35
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3273,6 +3273,11 @@ categories:
       file: DONE/core-functionality/active/release-automation-unit-tests.yaml
       title: Add comprehensive unit tests for release automation (fingerprinting, timestamps, content validation, size checks,
         scripts)
+      priority: Medium-High
+      status: Completed
+    - id: quality-add-cross-platform-result-validation
+      file: DONE/main/quality/quality-add-cross-platform-result-validation.yaml
+      title: Add cross-platform query-result validation suite
       priority: Medium-High
       status: Completed
     - id: tpcds-stdout-fix-test-stdout-datagen

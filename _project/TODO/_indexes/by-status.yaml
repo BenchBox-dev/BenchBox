@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:30:18.049889'
+generated_at: '2026-04-13T08:37:26.382582'
 total_items: 38
 statuses:
   Not Started:
@@ -34,11 +34,6 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
-    - id: quality-add-cross-platform-result-validation
-      file: TODO/main/planning/quality-add-cross-platform-result-validation.yaml
-      title: Add cross-platform query-result validation suite
-      priority: Medium-High
-      category: Testing and Quality Assurance
     - id: quality-add-perf-regression-smoke-ci
       file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
       title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
@@ -154,6 +149,11 @@ statuses:
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
+    - id: quality-cross-platform-validation-integration-matrix
+      file: TODO/main/planning/quality-cross-platform-validation-integration-matrix.yaml
+      title: Wire cross-platform validation comparator into a nightly integration matrix
+      priority: Medium
+      category: Testing and Quality Assurance
   Completed:
     count: 8
     items:

@@ -2,7 +2,8 @@ id: quality-add-cross-platform-result-validation
 title: "Add cross-platform query-result validation suite"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-12"
 category: Testing and Quality Assurance
 description: |
   Quality plan Phase 2b — anchor of the measurement-integrity workstream.
@@ -29,35 +30,38 @@ description: |
 work:
   - id: w1
     summary: "Design tolerance model: per-benchmark spec (TPC-H §2.6.3 ordering, decimal precision, NULL rules) — document in module docstring"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Implement validation/cross_platform.py comparator plus focused unit coverage for normalization and tolerance rules"
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Wire into pytest integration tests over (benchmark, platform) pairs at SF=0.01; keep the first matrix local/no-credentials"
     needs: [w2]
-    status: pending
+    status: deferred
+    note: "Split to follow-up quality-cross-platform-validation-integration-matrix — live matrix + nightly workflow bundled there to keep this TODO's review surface bounded."
 
   - id: w4
     summary: "Add nightly GitHub Actions workflow .github/workflows/cross-platform-validation.yml running the cross-platform pytest suite and publishing structured diff artifacts on failure"
     needs: [w3]
-    status: pending
+    status: deferred
+    note: "Split to follow-up quality-cross-platform-validation-integration-matrix."
 
   - id: w5
     summary: "Document the validation contract in docs/development/result-validation.md including how to run the pytest suite locally, how to add new platforms, and how tolerance overrides are justified"
     needs: [w2]
-    status: pending
+    status: done
 
 files_affected:
   added:
     - "benchbox/core/validation/cross_platform.py"
-    - "tests/unit/validation/test_cross_platform.py"
+    - "tests/unit/core/test_cross_platform_validation.py"
+    - "docs/development/result-validation.md"
+  deferred_to_follow_up:
     - "tests/integration/validation/test_cross_platform.py"
     - ".github/workflows/cross-platform-validation.yml"
-    - "docs/development/result-validation.md"
 
 must_preserve:
   - "Existing per-platform tests continue to run on PR; this is a new layer, not a replacement"
