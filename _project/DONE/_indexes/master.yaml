@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T10:25:35.261064'
-total_items: 677
+generated_at: '2026-04-13T10:37:35.250988'
+total_items: 678
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5407,6 +5407,25 @@ items:
   work_ready: 0
   needs:
   - dedup-wave3-ignore-rules
+- id: quality-consolidate-duplicate-code-clusters
+  file: DONE/main/planning/quality-consolidate-duplicate-code-clusters.yaml
+  title: Consolidate duplicate-code clusters across platforms and core
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-3-prep
+  - duplication
+  - DRY
+  estimated_effort: Medium (3-4 days)
+  completed_date: '2026-04-12'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  needs:
+  - quality-bulk-fix-encoding-lint-and-ratchet
 - id: dedup-wave2-generator-schema-utils
   file: DONE/core-functionality/active/dedup-wave2-generator-schema-utils.yaml
   title: Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators

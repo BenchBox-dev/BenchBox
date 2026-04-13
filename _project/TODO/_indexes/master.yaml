@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T10:25:33.736828'
-total_items: 37
+generated_at: '2026-04-13T10:37:33.777391'
+total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -344,24 +344,6 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 6
-- id: quality-consolidate-duplicate-code-clusters
-  file: TODO/main/planning/quality-consolidate-duplicate-code-clusters.yaml
-  title: Consolidate duplicate-code clusters across platforms and core
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: Not Started
-  tags:
-  - quality-plan
-  - phase-3-prep
-  - duplication
-  - DRY
-  estimated_effort: Medium (3-4 days)
-  work_total: 7
-  work_done: 5
-  work_ready: 1
-  needs:
-  - quality-bulk-fix-encoding-lint-and-ratchet
 - id: define-phase-3-promotion-metrics
   file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
   title: Define Phase 3 promotion metrics, dashboard, and review cadence

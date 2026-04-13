@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T10:25:35.261681'
-total_items: 677
+generated_at: '2026-04-13T10:37:35.251594'
+total_items: 678
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 627
+    count: 628
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1091,6 +1091,11 @@ statuses:
       file: DONE/core-functionality/active/consolidate-duplicate-code.yaml
       title: Consolidate duplicate code identified by AST structural clone detection
       priority: Medium-High
+      category: Code Quality and Technical Debt
+    - id: quality-consolidate-duplicate-code-clusters
+      file: DONE/main/planning/quality-consolidate-duplicate-code-clusters.yaml
+      title: Consolidate duplicate-code clusters across platforms and core
+      priority: Medium
       category: Code Quality and Technical Debt
     - id: consolidate-file-format-detection
       file: DONE/core-functionality/consolidate-file-format-detection.yaml
