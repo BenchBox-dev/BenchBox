@@ -1,0 +1,103 @@
+id: patch-and-redistribute-tpcds-dsdgen-subscale-support
+title: "Patch and redistribute TPC-DS dsdgen binaries for subscale support"
+worktree: main
+priority: High
+status: Identified
+category: Tooling and Distribution
+
+description: |
+  `_sources/tpcds-subscale-probe.md` shows that the currently bundled
+  `darwin-arm64` and `darwin-x86_64` `dsdgen` binaries segfault with exit code
+  139 before emitting required small-dimension tables at `sf=0.01`, `0.1`, and
+  `0.5`. The repo's only bundled `tpcds_sf001` asset is
+  `examples/data/tpcds_sf001/README.txt`, so there is no real sample-data
+  fallback to unblock the higher-level unofficial-scale work.
+
+  This item isolates the generator/distribution problem from the broader
+  methodology and result-pipeline feature. The desired outcome is either:
+  1. a legally shippable patched binary set that passes Gate Zero across every
+     bundle target BenchBox distributes, or
+  2. an explicit decision that patched redistribution is not viable, which then
+     unblocks a separate user-supplied/pre-generated-data track.
+
+work:
+- id: w1
+  summary: "Root-cause the subscale crash in `_sources/tpc-ds/tools` with a minimal reproducer tied to `call_center`, `store`, `warehouse`, and `web_site`."
+  status: pending
+
+- id: w2
+  summary: "Audit TPC licensing and BenchBox release constraints for shipping patched `dsdgen` binaries rather than upstream artifacts."
+  needs: [w1]
+  status: pending
+
+- id: w3
+  summary: "Prototype the source patch on the native Darwin toolchain and rerun Gate Zero at 0.01, 0.1, and 0.5 with row counts and checksums."
+  needs: [w1, w2]
+  status: pending
+
+- id: w4
+  summary: "Build and verify the patched bundle set for every distributed target (`darwin-*`, `linux-*`, `windows-*`) or document exactly which targets remain unsupported."
+  needs: [w3]
+  status: pending
+
+- id: w5
+  summary: "Publish the updated probe artifact and either unblock `support-unofficial-tpcds-scales-with-methodology-guardrails` or open the user-supplied-data fallback item with concrete evidence."
+  needs: [w4]
+  status: pending
+
+files_affected:
+  modified:
+    - "_sources/tpc-ds/tools/"
+    - "_binaries/tpc-ds/"
+    - "_sources/tpcds-subscale-probe.md"
+    - "docs/development/tpc-compilation-guide.md"
+
+must_preserve:
+  - "Official `sf>=1` TPC-DS generation remains stable while the patch track is in flight."
+  - "Do not claim generic subscale support until every shipped bundle target has empirical Gate Zero evidence."
+  - "Do not replace real benchmark data with placeholder sample bundles."
+
+approach: |
+  Treat this as a standalone toolchain project. Reproduce the crash at the
+  native `dsdgen` layer, patch the source if feasible, validate the patch on
+  the host toolchain first, then rebuild and rerun Gate Zero across all
+  distributed bundle targets before reopening the higher-level unofficial-scale
+  feature.
+
+anti_patterns:
+  - "DO NOT remove BenchBox's `scale_factor >= 1.0` guard first -- because the current shipped binaries crash and there is no real `sf001` sample dataset."
+  - "DO NOT treat a single-platform patch as sufficient evidence -- because BenchBox ships multiple bundled binaries and the original feature depends on cross-bundle behavior."
+  - "DO NOT bury licensing or redistribution work inside the higher-level methodology TODO -- because binary shipping is a separate release decision."
+
+verification:
+  - description: "New TODO validates against the project TODO schema"
+    command: "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml"
+    expected_output: "validation passes with no schema errors"
+  - description: "TODO dependency graph remains valid after adding the follow-up"
+    command: "uv run _project/scripts/todo_cli.py check-graph"
+    expected_output: "graph validation passes with no cycles or dangling references"
+  - description: "Indexes regenerate cleanly after adding the follow-up"
+    command: "uv run _project/scripts/generate_indexes.py"
+    expected_output: "TODO indexes regenerate successfully"
+
+metadata:
+  tags:
+    - tpcds
+    - dsdgen
+    - binaries
+    - subscale
+    - licensing
+  estimated_effort: "Medium"
+  created_date: "2026-04-13"
+
+impact:
+  business_value: |
+    Separates the binary/toolchain blocker from the higher-level methodology
+    feature so the team can make a hard go/no-go decision on native unofficial
+    TPC-DS support.
+  user_impact: |
+    Prevents contributors from spending time on a feature path that the shipped
+    generator assets cannot currently support.
+  technical_debt: |
+    Converts an implicit generator assumption into an explicit toolchain project
+    with testable exit criteria.

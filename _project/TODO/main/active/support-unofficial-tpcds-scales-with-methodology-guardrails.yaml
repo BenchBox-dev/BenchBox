@@ -2,7 +2,7 @@ id: support-unofficial-tpcds-scales-with-methodology-guardrails
 title: "Support unofficial TPC-DS scales with explicit methodology guardrails"
 worktree: main
 priority: High
-status: Identified
+status: Blocked
 category: Core Functionality
 
 description: |
@@ -26,15 +26,35 @@ description: |
   pre-generated datasets rather than forcing the current validation and
   reporting pipeline into an incoherent state.
 
+  Gate Zero on 2026-04-13 failed on the locally executable bundled macOS
+  binaries (`darwin-arm64`, `darwin-x86_64`): required small-dimension tables
+  segfault at `sf=0.01`, `0.1`, and `0.5`, and the repo's bundled
+  `examples/data/tpcds_sf001` asset is still only a placeholder. See
+  `_sources/tpcds-subscale-probe.md`. This item is blocked until the bundled
+  generator problem is solved in a separate track.
+
+deps:
+  needs:
+    - patch-and-redistribute-tpcds-dsdgen-subscale-support
+
 work:
 - id: w1
   summary: "Run Gate Zero: probe every bundled TPC-DS dsdgen binary at 0.01, 0.1, and 0.5 and document actual behavior"
-  status: pending
+  status: done
   notes: |
     Required research gate. For each bundled binary, record exit status, stderr,
     produced tables, row counts, and checksums, with special attention to small
     dimension tables such as call_center, store, warehouse, and web_site.
     Output: `_sources/tpcds-subscale-probe.md`.
+
+    Result on 2026-04-13: both locally executable bundled macOS binaries
+    (`darwin-arm64`, `darwin-x86_64`) exited 139 with no output files for
+    `call_center`, `store`, `warehouse`, and `web_site` at `sf=0.01`, `0.1`,
+    and `0.5`; `sf=1.0` controls succeeded with expected row counts and stable
+    checksums. Linux and Windows bundles are present but were not executable on
+    this Darwin host. The bundled `examples/data/tpcds_sf001` directory
+    contains only a placeholder README, so there is no real sample-data escape
+    hatch today.
 
     If some platforms pass and some fail, continue implementation with an
     explicit per-platform capability split (`native_subscale` vs
@@ -46,7 +66,8 @@ work:
     behavior changes based on assumption alone.
 
 - id: w2
-  summary: "Define the subscale data contract from probe results: missing-vs-empty tables, manifest expectations, and validation rules"
+  summary: "Define the subscale data contract from probe results: missing-vs-empty tables, manifest expectations, and validation
+    rules"
   needs: [w1]
   status: pending
   notes: |
@@ -83,7 +104,8 @@ work:
     publish/submit restrictions.
 
 - id: w5
-  summary: "Make compliance durable across result objects, schema export/import, loader, normalizer, database, and publication metadata"
+  summary: "Make compliance durable across result objects, schema export/import, loader, normalizer, database, and publication
+    metadata"
   needs: [w2, w3]
   status: pending
   notes: |
@@ -177,9 +199,12 @@ impact:
     dataset completeness.
 
 must_preserve:
-- "Official TPC-DS workflows remain unchanged for comparable runs, including `benchbox run --official` behavior and official-scale artifact semantics."
-- "Shared `format_scale_factor()` tokens and existing path conventions remain stable for official runs and for other benchmarks that already use fractional scales."
-- "Historical reporting, publication, and rankings must not silently mix unofficial TPC-DS artifacts into official comparable cohorts."
+- "Official TPC-DS workflows remain unchanged for comparable runs, including `benchbox run --official` behavior and official-scale
+  artifact semantics."
+- "Shared `format_scale_factor()` tokens and existing path conventions remain stable for official runs and for other benchmarks
+  that already use fractional scales."
+- "Historical reporting, publication, and rankings must not silently mix unofficial TPC-DS artifacts into official comparable
+  cohorts."
 
 approach: |
   Start with the empirical Gate Zero probe and write down the table-level data
@@ -195,14 +220,18 @@ approach: |
   only in legacy TPC-DS reporting code.
 
 anti_patterns:
-- "DO NOT enable unofficial TPC-DS scales by only removing the current min-scale checks -- because generation, validation, storage, and reporting remain inconsistent -- prove binary behavior and data contract first."
-- "DO NOT store compliance only under `execution_metadata` and assume it will round-trip -- because schema export/import and database rankings ignore arbitrary metadata today -- add explicit result/schema/storage support."
-- "DO NOT replace `sf001` token formatting with a new scheme -- because the existing formatter already drives filenames, paths, database names, and sample lookup -- preserve the token and add an adjacent unofficial marker."
-- "DO NOT relax TPC-DS missing-table validation generically -- because current generation/loading behavior already diverges from validators -- derive methodology-specific rules from Gate Zero evidence and enforce those."
+- "DO NOT enable unofficial TPC-DS scales by only removing the current min-scale checks -- because generation, validation,
+  storage, and reporting remain inconsistent -- prove binary behavior and data contract first."
+- "DO NOT store compliance only under `execution_metadata` and assume it will round-trip -- because schema export/import and
+  database rankings ignore arbitrary metadata today -- add explicit result/schema/storage support."
+- "DO NOT replace `sf001` token formatting with a new scheme -- because the existing formatter already drives filenames, paths,
+  database names, and sample lookup -- preserve the token and add an adjacent unofficial marker."
+- "DO NOT relax TPC-DS missing-table validation generically -- because current generation/loading behavior already diverges
+  from validators -- derive methodology-specific rules from Gate Zero evidence and enforce those."
 
 verification:
 - description: "New TODO validates against the project TODO schema"
-  command: "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml"
+  command: "uv run _project/scripts/validate_todo.py _project/TODO/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml"
   expected_output: "validation passes with no schema errors"
 - description: "TODO dependency graph remains valid after adding the new item"
   command: "uv run _project/scripts/todo_cli.py check-graph"
@@ -211,7 +240,9 @@ verification:
   command: "uv run _project/scripts/generate_indexes.py"
   expected_output: "TODO indexes regenerate successfully"
 - description: "Implementation verification covers both general fast tests and targeted TPC-DS/result-pipeline regressions"
-  command: "uv run -- python -m pytest -m fast -q && uv run -- python -m pytest tests/unit/generators/test_tpcds_generator.py tests/unit/test_fractional_scale_factors.py tests/unit/core/test_tpcds_resource_resolution.py tests/unit/core/visualization/test_post_run_summary.py tests/unit/mcp/test_visualization_tools.py tests/e2e/test_error_handling.py -q"
+  command: "uv run -- python -m pytest -m fast -q && uv run -- python -m pytest tests/unit/generators/test_tpcds_generator.py
+    tests/unit/test_fractional_scale_factors.py tests/unit/core/test_tpcds_resource_resolution.py tests/unit/core/visualization/test_post_run_summary.py
+    tests/unit/mcp/test_visualization_tools.py tests/e2e/test_error_handling.py -q"
   expected_output: "fast suite and targeted TPC-DS, result-pipeline, visualization, and MCP tests pass"
 
 files_affected:
@@ -301,15 +332,21 @@ technical_requirements:
   - "Preserve existing scale token formatting; add an unofficial marker instead of a new token scheme."
 
 success_metrics:
-- "BenchBox can only produce unofficial TPC-DS scale artifacts after explicit user opt-in and after the native-generation path is empirically validated."
-- "Unofficial TPC-DS runs are durably marked and isolated across JSON export, import, database storage, publication metadata, and historical rankings."
-- "Official TPC metrics are suppressed or rendered non-comparable for unofficial TPC-DS runs, while official TPC-DS workflows remain unchanged."
+- "BenchBox can only produce unofficial TPC-DS scale artifacts after explicit user opt-in and after the native-generation
+  path is empirically validated."
+- "Unofficial TPC-DS runs are durably marked and isolated across JSON export, import, database storage, publication metadata,
+  and historical rankings."
+- "Official TPC metrics are suppressed or rendered non-comparable for unofficial TPC-DS runs, while official TPC-DS workflows
+  remain unchanged."
 - "Validation behavior for unofficial subscale runs matches the documented table contract derived from Gate Zero."
 
 open_questions:
-- "Do all bundled `dsdgen` binaries actually complete successfully at 0.01, 0.1, and 0.5, or do some platforms require a separate fallback project?"
-- "For unofficial subscale runs, which TPC-DS tables are mandatory, optional-empty, or expected to be absent according to actual generator output?"
-- "Should plain non-official `sf>=1` TPC-DS runs remain allowed by default outside `--official`, or should the new opt-in cover all non-official scales?"
+- "Do all bundled `dsdgen` binaries actually complete successfully at 0.01, 0.1, and 0.5, or do some platforms require a separate
+  fallback project?"
+- "For unofficial subscale runs, which TPC-DS tables are mandatory, optional-empty, or expected to be absent according to
+  actual generator output?"
+- "Should plain non-official `sf>=1` TPC-DS runs remain allowed by default outside `--official`, or should the new opt-in
+  cover all non-official scales?"
 
 research_value:
   hypothesis: |
