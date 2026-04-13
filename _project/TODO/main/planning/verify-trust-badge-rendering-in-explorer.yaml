@@ -3,6 +3,7 @@ title: "Visually verify TrustBadge rendering across all 4 explorer pages"
 worktree: main
 priority: High
 status: Completed
+completed_note: "Visual verification performed 2026-04-12 via Playwright-driven local explorer build. Captured 20 screenshots (5 trust-label variants × 4 pages) under `_project/handoffs/trust-badge-screenshots-2026-04-12/`. No visual defects found; fixture branch discarded per scope_limit."
 category: Testing and Quality Assurance
 
 deps:
@@ -26,7 +27,7 @@ description: |
 work:
 - id: w1
   summary: "Seed local corpus with one bundle per trust label"
-  status: pending
+  status: done
   notes: |
     The current seed corpus is all `maintainer-run`. To verify all variants,
     temporarily add 4 fixture bundles in a local-only branch (do NOT commit
@@ -42,7 +43,7 @@ work:
 - id: w2
   summary: "Build and serve the explorer locally"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     cd results-explorer
     npm install
@@ -53,7 +54,7 @@ work:
 - id: w3
   summary: "Verify badge rendering on all 4 pages and capture screenshots"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     For each page, confirm: badge renders, color matches spec
     (Maintainer=blue, Community=yellow, CI=gray, Local=gray, Unknown=neutral
@@ -74,7 +75,7 @@ work:
 - id: w4
   summary: "Cross-browser sanity check (Chrome, Firefox, Safari)"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Re-open one ResultDetail page per browser. Confirm color, font, and
     layout match Chrome. Document any browser-specific issues
@@ -84,7 +85,7 @@ work:
 - id: w5
   summary: "File defects and update handoff status"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     - For each visual issue, create a focused bug TODO referencing the
       offending screenshot and the source file/line.

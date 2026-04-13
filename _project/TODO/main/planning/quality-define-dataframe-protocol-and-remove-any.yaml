@@ -73,8 +73,8 @@ anti_patterns:
 
 verification:
   - description: "Type checker shows no new errors on dataframe layer vs pre-refactor baseline captured in w1"
-    command: "uv run ty check benchbox/platforms/dataframe/ > /tmp/ty_after.txt; diff /tmp/ty_baseline.txt /tmp/ty_after.txt"
-    expected_output: "no new error lines (removals from fixing real bugs are acceptable)"
+    command: "uv run ty check benchbox/platforms/dataframe/ > /tmp/ty_after.txt; diff /tmp/ty_baseline.txt /tmp/ty_after.txt | grep '^>' || true"
+    expected_output: "no lines emitted (additions to baseline = new errors; removals are tolerated and filtered out)"
   - description: "All dataframe tests pass"
     command: "uv run -- python -m pytest tests/unit/platforms/dataframe/ -q"
     expected_output: "all tests pass"
