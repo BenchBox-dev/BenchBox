@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T09:20:27.072946'
-total_items: 36
+generated_at: '2026-04-13T10:22:36.224574'
+total_items: 37
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 4
+    count: 5
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -22,6 +22,11 @@ priorities:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
       status: Not Started
+    - id: support-unofficial-tpcds-scales-with-methodology-guardrails
+      file: TODO/main/planning/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
+      title: Support unofficial TPC-DS scales with explicit methodology guardrails
+      category: Core Functionality
+      status: Identified
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR

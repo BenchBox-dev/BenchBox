@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T09:20:27.072925'
+generated_at: '2026-04-13T10:22:36.224558'
 total_categories: 8
 categories:
   Benchmark Development:
@@ -53,7 +53,7 @@ categories:
       priority: Medium
       status: Not Started
   Core Functionality:
-    count: 12
+    count: 13
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -115,6 +115,11 @@ categories:
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
       status: Not Started
+    - id: support-unofficial-tpcds-scales-with-methodology-guardrails
+      file: TODO/main/planning/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
+      title: Support unofficial TPC-DS scales with explicit methodology guardrails
+      priority: High
+      status: Identified
   Documentation:
     count: 2
     items:

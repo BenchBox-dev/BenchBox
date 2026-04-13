@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T09:20:27.072885'
-total_items: 36
+generated_at: '2026-04-13T10:22:36.224509'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -55,6 +55,25 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
+- id: support-unofficial-tpcds-scales-with-methodology-guardrails
+  file: TODO/main/planning/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
+  title: Support unofficial TPC-DS scales with explicit methodology guardrails
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Identified
+  tags:
+  - tpcds
+  - unofficial
+  - scale-factor
+  - results
+  - validation
+  - publishing
+  estimated_effort: Large
+  work_total: 9
+  work_done: 0
+  work_ready: 1
+  deferred_count: 3
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
   title: Verify the validate-submission CI workflow end-to-end with a real PR
