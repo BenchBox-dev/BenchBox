@@ -1,8 +1,8 @@
-generated_at: '2026-04-13T08:13:30.363276'
-total_items: 39
+generated_at: '2026-04-13T08:14:54.213378'
+total_items: 40
 statuses:
   Not Started:
-    count: 31
+    count: 32
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -49,6 +49,11 @@ statuses:
       title: Audit 276 skip/xfail test markers — add rationale or remove
       priority: Medium
       category: Testing and Quality Assurance
+    - id: quality-gate-dependency-bounds-in-release-automation
+      file: TODO/main/planning/quality-gate-dependency-bounds-in-release-automation.yaml
+      title: Close the loop on dependency upper bounds via a release-time gate
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: quality-consolidate-duplicate-code-clusters
       file: TODO/main/planning/quality-consolidate-duplicate-code-clusters.yaml
       title: Consolidate duplicate-code clusters across platforms and core

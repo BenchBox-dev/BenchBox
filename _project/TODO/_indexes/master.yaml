@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:13:30.363202'
-total_items: 39
+generated_at: '2026-04-13T08:14:54.213311'
+total_items: 40
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -358,6 +358,25 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
+- id: quality-gate-dependency-bounds-in-release-automation
+  file: TODO/main/planning/quality-gate-dependency-bounds-in-release-automation.yaml
+  title: Close the loop on dependency upper bounds via a release-time gate
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Not Started
+  tags:
+  - quality-plan
+  - phase-4
+  - supply-chain
+  - release-gate
+  - ci
+  estimated_effort: Small-Medium (1-2 days)
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+  needs:
+  - quality-add-dependency-upper-bounds-policy
 - id: quality-consolidate-duplicate-code-clusters
   file: TODO/main/planning/quality-consolidate-duplicate-code-clusters.yaml
   title: Consolidate duplicate-code clusters across platforms and core

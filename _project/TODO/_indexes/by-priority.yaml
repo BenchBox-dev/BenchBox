@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:13:30.363264'
-total_items: 39
+generated_at: '2026-04-13T08:14:54.213367'
+total_items: 40
 priorities:
   Critical:
     count: 1
@@ -91,7 +91,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 12
+    count: 13
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -112,6 +112,11 @@ priorities:
       file: TODO/main/planning/quality-audit-skip-xfail-markers-add-rationale.yaml
       title: Audit 276 skip/xfail test markers — add rationale or remove
       category: Testing and Quality Assurance
+      status: Not Started
+    - id: quality-gate-dependency-bounds-in-release-automation
+      file: TODO/main/planning/quality-gate-dependency-bounds-in-release-automation.yaml
+      title: Close the loop on dependency upper bounds via a release-time gate
+      category: Code Quality and Technical Debt
       status: Not Started
     - id: quality-consolidate-duplicate-code-clusters
       file: TODO/main/planning/quality-consolidate-duplicate-code-clusters.yaml
