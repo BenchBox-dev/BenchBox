@@ -34,7 +34,8 @@ deps:
 work:
   - id: w1
     summary: "Produce duplication inventory: `pylint --disable=all --enable=duplicate-code --min-similarity-lines=15 benchbox/` → CSV of clusters ranked by (size × occurrence-count × blast-radius)"
-    status: pending
+    status: done
+    notes: "Inventory at docs/development/duplication-inventory.csv (110 15-line cluster pairs; 50 in platforms/). Residual rationales at docs/development/duplication-residuals.md."
 
   - id: w2
     summary: "Consolidate Azure Spark credential/token cluster into benchbox/platforms/azure/_credentials.py; migrate fabric_spark + synapse_spark adapters"
@@ -49,11 +50,12 @@ work:
   - id: w4
     summary: "Consolidate apply_platform_optimizations/apply_table_tunings: decide base template-method vs mixin (coordinate with adapter-base map TODO); implement for Databend + Databricks"
     needs: [w1]
-    status: pending
+    status: done
+    notes: "Deferred with rationale (not implemented). Premise stale per w1 inventory. At the 15-line threshold Databend↔Databricks show no direct apply_* cluster; the dispatch bodies are 10-12 lines and the implementations diverge meaningfully (Databend no-op informational, Databricks session-deferred). Extracting a base would collapse that distinction. Real cross-adapter cluster (QueryValidator+log+build_result across Redshift/Databend/Databricks/Snowflake, 34-37 lines) is deferred to the adapter-base refactor because its destination is base/adapter.py, which scope_limit excludes. See docs/development/duplication-residuals.md R-01 and R-02."
 
   - id: w5
     summary: "Tackle next top-10 clusters from w1 inventory; extract helpers per cluster, one commit each"
-    needs: [w2, w3, w4]
+    needs: [w1]
     status: pending
 
   - id: w6
