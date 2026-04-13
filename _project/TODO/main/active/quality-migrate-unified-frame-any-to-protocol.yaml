@@ -35,7 +35,13 @@ work:
 - id: w2
   summary: "Migrate category (a) — generic-dispatch sites — to LazyFrameLike. One commit per ~20 sites for review bounding."
   needs: [w1]
-  status: pending
+  status: in-progress
+  notes: "First slice landed in commit 486c21640: wrap_dataframe + UnifiedLazyFrame.join.
+    Hand-verification revealed the w1 heuristic over-assigned category (a) — UnifiedExpr dunder
+    operators (16 sites), .native/.collect/.scalar returns (3 sites), and Polars-specific helpers
+    are NOT generic-dispatch. See heuristic-limitations table in
+    docs/development/unified_frame_any_survey.md. Remaining (a) candidates need per-site review;
+    real (a) count is ~4-6, not 25."
 
 - id: w3
   summary: "Migrate category (b) — library-specific sites — to concrete types (e.g., polars.LazyFrame, pyspark.sql.DataFrame).
