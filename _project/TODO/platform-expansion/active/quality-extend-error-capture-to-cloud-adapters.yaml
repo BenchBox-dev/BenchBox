@@ -35,7 +35,7 @@ work:
 - id: w3
   summary: "Apply same pattern to experimental/gpu/metrics.py and capabilities.py"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w4
   summary: "Apply same pattern to experimental/concurrency/pool_tester.py"
