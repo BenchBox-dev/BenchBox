@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:37:26.382570'
-total_items: 38
+generated_at: '2026-04-13T08:44:58.488957'
+total_items: 37
 priorities:
   Critical:
     count: 1
@@ -81,7 +81,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 13
+    count: 12
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -92,11 +92,6 @@ priorities:
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: quality-add-perf-regression-smoke-ci
-      file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
-      title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
-      category: Testing and Quality Assurance
       status: Not Started
     - id: quality-gate-dependency-bounds-in-release-automation
       file: TODO/main/planning/quality-gate-dependency-bounds-in-release-automation.yaml

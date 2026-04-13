@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:37:27.988753'
-total_items: 675
+generated_at: '2026-04-13T08:45:00.122818'
+total_items: 676
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 625
+    count: 626
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -679,6 +679,11 @@ statuses:
       title: Add numbered list selection to platform setup wizard
       priority: Medium-High
       category: User Experience
+    - id: quality-add-perf-regression-smoke-ci
+      file: DONE/main/quality/quality-add-perf-regression-smoke-ci.yaml
+      title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: pg-duckdb-platform-adapter
       file: DONE/platform-expansion/planning/pg-duckdb-platform-adapter.yaml
       title: Add pg_duckdb Platform Adapter for DuckDB-Accelerated PostgreSQL Analytics

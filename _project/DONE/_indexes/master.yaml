@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:37:27.988082'
-total_items: 675
+generated_at: '2026-04-13T08:45:00.122204'
+total_items: 676
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4921,6 +4921,25 @@ items:
   - iceberg
   - parquet
   estimated_effort: Medium
+- id: quality-add-perf-regression-smoke-ci
+  file: DONE/main/quality/quality-add-perf-regression-smoke-ci.yaml
+  title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-2
+  - performance
+  - ci
+  estimated_effort: Small-Medium (1-2 days)
+  completed_date: '2026-04-12'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - quality-make-timing-policy-ci-gate
 - id: add-sphinx-tags
   file: DONE/docs-experience/active/add-sphinx-tags.yaml
   title: Add sphinx-tags to BenchBox Documentation

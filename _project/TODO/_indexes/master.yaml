@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:37:26.382507'
-total_items: 38
+generated_at: '2026-04-13T08:44:58.488898'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -325,24 +325,6 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 6
-- id: quality-add-perf-regression-smoke-ci
-  file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
-  title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: Medium
-  status: Not Started
-  tags:
-  - quality-plan
-  - phase-2
-  - performance
-  - ci
-  estimated_effort: Small-Medium (1-2 days)
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - quality-make-timing-policy-ci-gate
 - id: quality-gate-dependency-bounds-in-release-automation
   file: TODO/main/planning/quality-gate-dependency-bounds-in-release-automation.yaml
   title: Close the loop on dependency upper bounds via a release-time gate

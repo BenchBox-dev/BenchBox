@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T08:37:27.988598'
-total_items: 675
+generated_at: '2026-04-13T08:45:00.122666'
+total_items: 676
 priorities:
   Critical:
     count: 39
@@ -1900,7 +1900,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 274
+    count: 275
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2147,6 +2147,11 @@ priorities:
       title: Add open table format selection to CLI interactive mode
       category: User Experience
       status: Not Started
+    - id: quality-add-perf-regression-smoke-ci
+      file: DONE/main/quality/quality-add-perf-regression-smoke-ci.yaml
+      title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
+      category: Testing and Quality Assurance
+      status: Completed
     - id: add-sphinx-tags
       file: DONE/docs-experience/active/add-sphinx-tags.yaml
       title: Add sphinx-tags to BenchBox Documentation

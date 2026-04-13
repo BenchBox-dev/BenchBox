@@ -1,8 +1,8 @@
-generated_at: '2026-04-13T08:37:26.382582'
-total_items: 38
+generated_at: '2026-04-13T08:44:58.488969'
+total_items: 37
 statuses:
   Not Started:
-    count: 30
+    count: 29
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -34,11 +34,6 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
-    - id: quality-add-perf-regression-smoke-ci
-      file: TODO/main/planning/quality-add-perf-regression-smoke-ci.yaml
-      title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
-      priority: Medium
-      category: Testing and Quality Assurance
     - id: quality-gate-dependency-bounds-in-release-automation
       file: TODO/main/planning/quality-gate-dependency-bounds-in-release-automation.yaml
       title: Close the loop on dependency upper bounds via a release-time gate

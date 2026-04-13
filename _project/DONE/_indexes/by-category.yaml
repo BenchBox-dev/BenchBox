@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T08:37:27.988432'
+generated_at: '2026-04-13T08:45:00.122505'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -3252,7 +3252,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 35
+    count: 36
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3279,6 +3279,11 @@ categories:
       file: DONE/main/quality/quality-add-cross-platform-result-validation.yaml
       title: Add cross-platform query-result validation suite
       priority: Medium-High
+      status: Completed
+    - id: quality-add-perf-regression-smoke-ci
+      file: DONE/main/quality/quality-add-perf-regression-smoke-ci.yaml
+      title: Add per-PR performance regression smoke (DuckDB TPC-H SF=0.01)
+      priority: Medium
       status: Completed
     - id: tpcds-stdout-fix-test-stdout-datagen
       file: DONE/tpcds-stdout-fix/test-stdout-datagen.yaml
