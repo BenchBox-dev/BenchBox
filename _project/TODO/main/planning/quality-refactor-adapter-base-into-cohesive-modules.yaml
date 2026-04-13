@@ -31,63 +31,70 @@ description: |
 
 deps:
   needs:
-    - quality-map-adapter-base-refactor-scope
-    - quality-add-cross-platform-result-validation
-    - quality-make-timing-policy-ci-gate
+  - quality-map-adapter-base-refactor-scope
+  - quality-add-cross-platform-result-validation
+  - quality-make-timing-policy-ci-gate
 
 work:
-  - id: w1
-    summary: "SLICE 1 — Extract connection.py (lifecycle + retries). Re-export from adapter.py. Run full test suite + cross-platform validation. Commit."
-    status: pending
+- id: w1
+  summary: "SLICE 1 — Extract dialect_translation.py (dialect/translate_sql/get_tpc_base_dialect). Smallest cluster per refactor
+    map §4. Re-export from adapter.py. Run full fast suite."
+  status: done
 
-  - id: w2
-    summary: "SLICE 2 — Extract execution.py (query execution + timing). Same protocol as w2."
-    needs: [w1]
-    status: pending
+- id: w2
+  summary: "SLICE 2 — Extract tuning.py (apply_* / sorted-ingestion / constraint / CTAS-sort; exclude _create_schema_with_tuning
+    per map §6). Same protocol."
+  needs: [w1]
+  status: pending
 
-  - id: w3
-    summary: "SLICE 3 — Extract data_loading.py (native + external modes). Same protocol."
-    needs: [w2]
-    status: pending
+- id: w3
+  summary: "SLICE 3 — Extract connection.py (lifecycle, DriverIsolationCapability, PlatformAdapterConnection, _NoCloseProxy).
+    Same protocol."
+  needs: [w2]
+  status: pending
 
-  - id: w4
-    summary: "SLICE 4 — Extract result_capture.py (status, errors, plans). Same protocol."
-    needs: [w3]
-    status: pending
+- id: w4
+  summary: "SLICE 4 — Extract data_loading.py (create_schema, load_data, external tables, _create_enhanced_* phase helpers).
+    Same protocol."
+  needs: [w3]
+  status: pending
 
-  - id: w5
-    summary: "SLICE 5 — Extract dialect_translation.py (sqlglot wrapping). Same protocol."
-    needs: [w4]
-    status: pending
+- id: w5
+  summary: "SLICE 5 — Extract result_capture.py (plan capture, validate_loaded_data/row_counts, _collect_resource_utilization).
+    Same protocol."
+  needs: [w4]
+  status: pending
 
-  - id: w6
-    summary: "SLICE 6 — Extract tuning.py (tuning resolver). Same protocol."
-    needs: [w5]
-    status: pending
+- id: w6
+  summary: "SLICE 6 — Extract execution.py (execute_query, power/throughput/maintenance drivers; keep run_enhanced_benchmark
+    on facade). Same protocol."
+  needs: [w5]
+  status: pending
 
-  - id: w7
-    summary: "Final cleanup — adapter.py contains only the Protocol/ABC. Verify ≤600 lines. Update docs/development/adapter-refactor-map.md as final state."
-    needs: [w6]
-    status: pending
+- id: w7
+  summary: "Final cleanup — adapter.py contains only the facade + required re-exports. Verify ≤600 lines. Update docs/development/adapter-refactor-map.md
+    with final state."
+  needs: [w6]
+  status: pending
 
 files_affected:
   modified:
-    - "benchbox/platforms/base/adapter.py"
+  - "benchbox/platforms/base/adapter.py"
   added:
-    - "benchbox/platforms/base/connection.py"
-    - "benchbox/platforms/base/execution.py"
-    - "benchbox/platforms/base/data_loading.py"
-    - "benchbox/platforms/base/result_capture.py"
-    - "benchbox/platforms/base/dialect_translation.py"
-    - "benchbox/platforms/base/tuning.py"
-    - "docs/development/adapter-refactor-map.md"
+  - "benchbox/platforms/base/connection.py"
+  - "benchbox/platforms/base/execution.py"
+  - "benchbox/platforms/base/data_loading.py"
+  - "benchbox/platforms/base/result_capture.py"
+  - "benchbox/platforms/base/dialect_translation.py"
+  - "benchbox/platforms/base/tuning.py"
+  - "docs/development/adapter-refactor-map.md"
 
 must_preserve:
-  - "ALL 73 adapter implementations import from `benchbox.platforms.base.adapter` unchanged"
-  - "Public protocol surface of PlatformAdapter (every @abstractmethod, every public attribute) is byte-identical"
-  - "Cross-platform validation suite (from quality-add-cross-platform-result-validation) passes after every slice"
-  - "Timing semantics (mono_time vs wall-clock) preserved exactly per timing policy"
-  - "All existing platform-specific tests pass after every slice (≥21,000 tests)"
+- "ALL 73 adapter implementations import from `benchbox.platforms.base.adapter` unchanged"
+- "Public protocol surface of PlatformAdapter (every @abstractmethod, every public attribute) is byte-identical"
+- "Cross-platform validation suite (from quality-add-cross-platform-result-validation) passes after every slice"
+- "Timing semantics (mono_time vs wall-clock) preserved exactly per timing policy"
+- "All existing platform-specific tests pass after every slice (≥21,000 tests)"
 
 approach: |
   This is a textbook vertical-slice refactor (SHARED/slicing-framework.md).
@@ -103,36 +110,38 @@ approach: |
   only if absolutely required, which it shouldn't be given re-exports).
 
 anti_patterns:
-  - "DO NOT rename any public symbol — because 73 adapters depend on them — preserve names exactly even if they're imperfect"
-  - "DO NOT collapse multiple slices into one commit — because review and rollback need slice-level granularity — one commit per slice"
-  - "DO NOT modify adapter implementation files — because that's a different refactor — limit scope to base/"
-  - "DO NOT extract while adapters or tests are in flight on other branches — because merge conflicts will be brutal — coordinate timing"
+- "DO NOT rename any public symbol — because 73 adapters depend on them — preserve names exactly even if they're imperfect"
+- "DO NOT collapse multiple slices into one commit — because review and rollback need slice-level granularity — one commit
+  per slice"
+- "DO NOT modify adapter implementation files — because that's a different refactor — limit scope to base/"
+- "DO NOT extract while adapters or tests are in flight on other branches — because merge conflicts will be brutal — coordinate
+  timing"
 
 scope_limit:
   only_modify:
-    - "benchbox/platforms/base/"
-    - "docs/development/adapter-refactor-map.md"
+  - "benchbox/platforms/base/"
+  - "docs/development/adapter-refactor-map.md"
   do_not_modify:
-    - "benchbox/platforms/clickhouse/"
-    - "benchbox/platforms/duckdb/"
-    - "benchbox/platforms/databricks/"
-    - "benchbox/platforms/snowflake/"
-    - "benchbox/platforms/redshift.py"
-    - "(any other adapter implementation)"
+  - "benchbox/platforms/clickhouse/"
+  - "benchbox/platforms/duckdb/"
+  - "benchbox/platforms/databricks/"
+  - "benchbox/platforms/snowflake/"
+  - "benchbox/platforms/redshift.py"
+  - "(any other adapter implementation)"
 
 verification:
-  - description: "Full fast test suite passes after every slice"
-    command: "uv run -- python -m pytest -m fast -q"
-    expected_output: "all tests pass"
-  - description: "Cross-platform validation passes"
-    command: "uv run -- python -m pytest tests/integration/validation/test_cross_platform.py -v -m integration"
-    expected_output: "PASS"
-  - description: "adapter.py final size ≤ 600 lines"
-    command: "wc -l benchbox/platforms/base/adapter.py"
-    expected_output: "≤ 600"
-  - description: "Platform registry still enumerates adapters after each slice"
-    command: "uv run -- python -c 'from benchbox.core.platform_registry import PlatformRegistry; print(len(PlatformRegistry.get_available_platforms()))'"
-    expected_output: "prints a positive platform count with no error"
+- description: "Full fast test suite passes after every slice"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all tests pass"
+- description: "Cross-platform validation passes"
+  command: "uv run -- python -m pytest tests/integration/validation/test_cross_platform.py -v -m integration"
+  expected_output: "PASS"
+- description: "adapter.py final size ≤ 600 lines"
+  command: "wc -l benchbox/platforms/base/adapter.py"
+  expected_output: "≤ 600"
+- description: "Platform registry still enumerates adapters after each slice"
+  command: "uv run -- python -c 'from benchbox.core.platform_registry import PlatformRegistry; print(len(PlatformRegistry.get_available_platforms()))'"
+  expected_output: "prints a positive platform count with no error"
 
 metadata:
   tags: ["quality-plan", "phase-3", "refactor", "high-blast-radius"]
