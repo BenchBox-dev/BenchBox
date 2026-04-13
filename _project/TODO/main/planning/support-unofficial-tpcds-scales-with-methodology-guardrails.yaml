@@ -19,9 +19,12 @@ description: |
   comparable results. The first gate is empirical: prove what the bundled
   `dsdgen` binaries actually do at subscale and document the resulting table
   contract before any product behavior changes merge. If native generation is
-  not viable, the item must stop and spawn a narrower follow-up for patched
-  binaries or user-supplied/pre-generated datasets rather than forcing the
-  current validation and reporting pipeline into an incoherent state.
+  only partially viable, continue with per-platform capability gating
+  (`native_subscale` vs `user_supplied_only`) rather than collapsing to an
+  all-or-nothing outcome. If all bundled binaries fail, stop implementation and
+  spawn a narrower follow-up for patched binaries or user-supplied/
+  pre-generated datasets rather than forcing the current validation and
+  reporting pipeline into an incoherent state.
 
 work:
 - id: w1
@@ -32,6 +35,11 @@ work:
     produced tables, row counts, and checksums, with special attention to small
     dimension tables such as call_center, store, warehouse, and web_site.
     Output: `_sources/tpcds-subscale-probe.md`.
+
+    If some platforms pass and some fail, continue implementation with an
+    explicit per-platform capability split (`native_subscale` vs
+    `user_supplied_only`) and keep subscale generation gated on the current
+    platform capability. Do not flatten a mixed outcome into a global yes/no.
 
     If all platforms fail, stop implementation and create a follow-up TODO for
     patched binaries or user-supplied/pre-generated data. Do not merge any
@@ -95,6 +103,10 @@ work:
     visualization surfaces, and ranking/report logic so unofficial TPC-DS runs
     render clearly as non-comparable and do not contaminate official cohorts.
 
+    This explicitly includes `benchbox/core/visualization/` and
+    `benchbox/mcp/tools/visualization.py` plus associated visualization/MCP
+    tests, not just CLI tables or legacy TPC-DS reporting templates.
+
 - id: w7
   summary: "Align generation, manifest writing, loading, and validation with the measured unofficial subscale contract"
   needs: [w2, w3]
@@ -106,14 +118,20 @@ work:
     it with broad best-effort behavior.
 
 - id: w8
-  summary: "Add filename/publication markers plus submit, publish, and report-import guardrails"
+  summary: "Add filename/publication markers plus exact submit, publish, and report-import guardrails"
   needs: [w5, w6]
   status: pending
   notes: |
     Preserve existing `sf001` naming. Mark unofficial artifacts with an adjacent
     unofficial token and carry the same distinction into publication metadata.
-    `submit`, `publish`, and `report import` must refuse or clearly segregate
-    unofficial TPC-DS artifacts by default.
+    `submit` must refuse any non-official result with no override. `publish`
+    must refuse non-official results unless the user opts in with
+    `--label unofficial-research`, and that label plus the compliance fields
+    must persist in the published manifest.
+
+    `report import` and comparative reporting surfaces must exclude unofficial
+    TPC-DS artifacts by default and include them only via explicit opt-in with
+    clear non-comparable markers.
 
 - id: w9
   summary: "Update contributor docs and run the full verification matrix after implementation"
@@ -193,8 +211,8 @@ verification:
   command: "uv run _project/scripts/generate_indexes.py"
   expected_output: "TODO indexes regenerate successfully"
 - description: "Implementation verification covers both general fast tests and targeted TPC-DS/result-pipeline regressions"
-  command: "uv run -- python -m pytest -m fast -q && uv run -- python -m pytest tests/unit/generators/test_tpcds_generator.py tests/unit/test_fractional_scale_factors.py tests/unit/core/test_tpcds_resource_resolution.py tests/e2e/test_error_handling.py -q"
-  expected_output: "fast suite and targeted TPC-DS/result-pipeline tests pass"
+  command: "uv run -- python -m pytest -m fast -q && uv run -- python -m pytest tests/unit/generators/test_tpcds_generator.py tests/unit/test_fractional_scale_factors.py tests/unit/core/test_tpcds_resource_resolution.py tests/unit/core/visualization/test_post_run_summary.py tests/unit/mcp/test_visualization_tools.py tests/e2e/test_error_handling.py -q"
+  expected_output: "fast suite and targeted TPC-DS, result-pipeline, visualization, and MCP tests pass"
 
 files_affected:
   modified:
@@ -202,6 +220,7 @@ files_affected:
   - "benchbox/core/tpcds/"
   - "benchbox/core/results/"
   - "benchbox/core/validation/"
+  - "benchbox/core/visualization/"
   - "benchbox/cli/commands/run.py"
   - "benchbox/cli/commands/datagen.py"
   - "benchbox/cli/commands/submit.py"
@@ -209,7 +228,10 @@ files_affected:
   - "benchbox/cli/commands/report.py"
   - "benchbox/cli/display.py"
   - "benchbox/cli/output.py"
+  - "benchbox/mcp/tools/"
   - "tests/unit/"
+  - "tests/unit/core/visualization/"
+  - "tests/unit/mcp/"
   - "tests/e2e/"
   - "_sources/"
   - "CLAUDE.md"
@@ -226,6 +248,7 @@ scope_limit:
   - "benchbox/core/tpcds/"
   - "benchbox/core/results/"
   - "benchbox/core/validation/"
+  - "benchbox/core/visualization/"
   - "benchbox/cli/commands/run.py"
   - "benchbox/cli/commands/datagen.py"
   - "benchbox/cli/commands/submit.py"
@@ -233,7 +256,10 @@ scope_limit:
   - "benchbox/cli/commands/report.py"
   - "benchbox/cli/display.py"
   - "benchbox/cli/output.py"
+  - "benchbox/mcp/tools/"
   - "tests/unit/"
+  - "tests/unit/core/visualization/"
+  - "tests/unit/mcp/"
   - "tests/e2e/"
   - "_sources/"
   - "CLAUDE.md"
@@ -261,12 +287,15 @@ context_sections:
   "Decision Boundaries": |
     This item is not approved to merge until Gate Zero documents whether native
     subscale generation is real and what the resulting table contract is. If the
-    probe disproves the premise, implementation stops and the follow-up path is
-    handled as separate work.
+    probe shows a mixed-platform outcome, continue with per-platform capability
+    gating and a user-supplied-only fallback on failing platforms. If the probe
+    disproves the premise on all bundled binaries, implementation stops and the
+    follow-up path is handled as separate work.
 
 technical_requirements:
   constraints:
   - "Do not merge behavior changes before Gate Zero is documented."
+  - "Treat mixed-platform Gate Zero results as a per-platform capability decision, not as an all-or-nothing enable/disable."
   - "Keep official comparable TPC-DS behavior unchanged for existing workflows."
   - "Carry methodology/comparability through export, import, storage, ranking, and publication."
   - "Preserve existing scale token formatting; add an unofficial marker instead of a new token scheme."
