@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T10:49:11.138567'
-total_categories: 8
+generated_at: '2026-04-13T11:53:26.007053'
+total_categories: 9
 categories:
   Benchmark Development:
     count: 4
@@ -43,7 +43,7 @@ categories:
       priority: Medium-High
       status: Not Started
     - id: quality-migrate-unified-frame-any-to-protocol
-      file: TODO/main/planning/quality-migrate-unified-frame-any-to-protocol.yaml
+      file: TODO/main/active/quality-migrate-unified-frame-any-to-protocol.yaml
       title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
       priority: Medium
       status: Not Started
@@ -106,10 +106,10 @@ categories:
       priority: Low
       status: Not Started
     - id: support-unofficial-tpcds-scales-with-methodology-guardrails
-      file: TODO/main/planning/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
+      file: TODO/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
       title: Support unofficial TPC-DS scales with explicit methodology guardrails
       priority: High
-      status: Identified
+      status: Blocked
   Documentation:
     count: 2
     items:
@@ -200,3 +200,11 @@ categories:
       title: Wire cross-platform validation comparator into a nightly integration matrix
       priority: Medium
       status: Not Started
+  Tooling and Distribution:
+    count: 1
+    items:
+    - id: patch-and-redistribute-tpcds-dsdgen-subscale-support
+      file: TODO/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml
+      title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
+      priority: High
+      status: Identified

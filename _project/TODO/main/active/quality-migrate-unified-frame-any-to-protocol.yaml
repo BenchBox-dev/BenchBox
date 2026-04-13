@@ -24,42 +24,46 @@ description: |
 
 deps:
   needs:
-    - quality-define-dataframe-protocol-and-remove-any
+  - quality-define-dataframe-protocol-and-remove-any
 
 work:
-  - id: w1
-    summary: "Survey unified_frame.py: classify each `Any` annotation as (a) generic dispatch -> LazyFrameLike, (b) library-specific -> concrete type, (c) genuine escape hatch -> keep with comment. Output CSV."
-    status: pending
+- id: w1
+  summary: "Survey unified_frame.py: classify each `Any` annotation as (a) generic dispatch -> LazyFrameLike, (b) library-specific
+    -> concrete type, (c) genuine escape hatch -> keep with comment. Output CSV."
+  status: done
 
-  - id: w2
-    summary: "Migrate category (a) — generic-dispatch sites — to LazyFrameLike. One commit per ~20 sites for review bounding."
-    needs: [w1]
-    status: pending
+- id: w2
+  summary: "Migrate category (a) — generic-dispatch sites — to LazyFrameLike. One commit per ~20 sites for review bounding."
+  needs: [w1]
+  status: pending
 
-  - id: w3
-    summary: "Migrate category (b) — library-specific sites — to concrete types (e.g., polars.LazyFrame, pyspark.sql.DataFrame). Use TYPE_CHECKING imports to preserve lazy-load semantics."
-    needs: [w1]
-    status: pending
+- id: w3
+  summary: "Migrate category (b) — library-specific sites — to concrete types (e.g., polars.LazyFrame, pyspark.sql.DataFrame).
+    Use TYPE_CHECKING imports to preserve lazy-load semantics."
+  needs: [w1]
+  status: pending
 
-  - id: w4
-    summary: "For category (c) escape-hatch Any, add inline comment explaining why a more specific type would be wrong. The goal is meaningful Any, not zero Any."
-    needs: [w1]
-    status: pending
+- id: w4
+  summary: "For category (c) escape-hatch Any, add inline comment explaining why a more specific type would be wrong. The
+    goal is meaningful Any, not zero Any."
+  needs: [w1]
+  status: pending
 
-  - id: w5
-    summary: "Run `uv run ty check benchbox/platforms/dataframe/` against /tmp/ty_baseline.txt (93 diagnostics). Confirm no new errors; fix any that appear (those are real bugs the prior Any was hiding)."
-    needs: [w2, w3, w4]
-    status: pending
+- id: w5
+  summary: "Run `uv run ty check benchbox/platforms/dataframe/` against /tmp/ty_baseline.txt (93 diagnostics). Confirm no
+    new errors; fix any that appear (those are real bugs the prior Any was hiding)."
+  needs: [w2, w3, w4]
+  status: pending
 
 files_affected:
   modified:
-    - "benchbox/platforms/dataframe/unified_frame.py"
+  - "benchbox/platforms/dataframe/unified_frame.py"
 
 must_preserve:
-  - "Runtime behavior of unified_frame.py unchanged — annotations only"
-  - "All dataframe-platform tests pass on Polars, Pandas, PyArrow at minimum"
-  - "Lazy-loading of optional backends preserved (TYPE_CHECKING imports for library-specific types)"
-  - "ty diagnostic count does not increase from baseline 93"
+- "Runtime behavior of unified_frame.py unchanged — annotations only"
+- "All dataframe-platform tests pass on Polars, Pandas, PyArrow at minimum"
+- "Lazy-loading of optional backends preserved (TYPE_CHECKING imports for library-specific types)"
+- "ty diagnostic count does not increase from baseline 93"
 
 approach: |
   Sweep one method group at a time (join operations, group_by, expression
@@ -69,18 +73,19 @@ approach: |
   generic args.
 
 anti_patterns:
-  - "DO NOT migrate everything to LazyFrameLike — because not every Any is a generic-dispatch site — classify first"
-  - "DO NOT add runtime isinstance() checks at every call — because that's slow and noisy — type-only at boundaries"
-  - "DO NOT touch unified_frame.py runtime behavior — because that's a separate concern — annotations only"
-  - "DO NOT bundle the survey + migration into one commit — because it loses the ability to revert just the migration — survey first, then migrate per category"
+- "DO NOT migrate everything to LazyFrameLike — because not every Any is a generic-dispatch site — classify first"
+- "DO NOT add runtime isinstance() checks at every call — because that's slow and noisy — type-only at boundaries"
+- "DO NOT touch unified_frame.py runtime behavior — because that's a separate concern — annotations only"
+- "DO NOT bundle the survey + migration into one commit — because it loses the ability to revert just the migration — survey
+  first, then migrate per category"
 
 verification:
-  - description: "ty diagnostic count unchanged or reduced"
-    command: "uv run ty check benchbox/platforms/dataframe/ 2>&1 | tail -1"
-    expected_output: "Found ≤93 diagnostics"
-  - description: "Dataframe tests pass"
-    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/ -q"
-    expected_output: "all tests pass"
+- description: "ty diagnostic count unchanged or reduced"
+  command: "uv run ty check benchbox/platforms/dataframe/ 2>&1 | tail -1"
+  expected_output: "Found ≤93 diagnostics"
+- description: "Dataframe tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/dataframe/ -q"
+  expected_output: "all tests pass"
 
 metadata:
   tags: ["quality-plan", "phase-4", "typing", "dataframe"]

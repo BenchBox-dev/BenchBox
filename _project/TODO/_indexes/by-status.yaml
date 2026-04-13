@@ -1,6 +1,14 @@
-generated_at: '2026-04-13T10:49:11.138593'
-total_items: 35
+generated_at: '2026-04-13T11:53:26.007082'
+total_items: 36
 statuses:
+  Blocked:
+    count: 1
+    items:
+    - id: support-unofficial-tpcds-scales-with-methodology-guardrails
+      file: TODO/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
+      title: Support unofficial TPC-DS scales with explicit methodology guardrails
+      priority: High
+      category: Core Functionality
   Not Started:
     count: 26
     items:
@@ -95,7 +103,7 @@ statuses:
       priority: Medium-High
       category: Code Quality and Technical Debt
     - id: quality-migrate-unified-frame-any-to-protocol
-      file: TODO/main/planning/quality-migrate-unified-frame-any-to-protocol.yaml
+      file: TODO/main/active/quality-migrate-unified-frame-any-to-protocol.yaml
       title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
       priority: Medium
       category: Code Quality and Technical Debt
@@ -137,11 +145,11 @@ statuses:
   Identified:
     count: 1
     items:
-    - id: support-unofficial-tpcds-scales-with-methodology-guardrails
-      file: TODO/main/planning/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
-      title: Support unofficial TPC-DS scales with explicit methodology guardrails
+    - id: patch-and-redistribute-tpcds-dsdgen-subscale-support
+      file: TODO/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml
+      title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
       priority: High
-      category: Core Functionality
+      category: Tooling and Distribution
   Completed:
     count: 8
     items:

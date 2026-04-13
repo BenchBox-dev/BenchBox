@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T10:49:11.138540'
-total_items: 35
+generated_at: '2026-04-13T11:53:26.007016'
+total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -55,13 +55,30 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
+- id: patch-and-redistribute-tpcds-dsdgen-subscale-support
+  file: TODO/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml
+  title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
+  worktree: main
+  category: Tooling and Distribution
+  priority: High
+  status: Identified
+  tags:
+  - tpcds
+  - dsdgen
+  - binaries
+  - subscale
+  - licensing
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
 - id: support-unofficial-tpcds-scales-with-methodology-guardrails
-  file: TODO/main/planning/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
+  file: TODO/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
   title: Support unofficial TPC-DS scales with explicit methodology guardrails
   worktree: main
   category: Core Functionality
   priority: High
-  status: Identified
+  status: Blocked
   tags:
   - tpcds
   - unofficial
@@ -71,9 +88,11 @@ items:
   - publishing
   estimated_effort: Large
   work_total: 9
-  work_done: 0
-  work_ready: 1
+  work_done: 1
+  work_ready: 2
   deferred_count: 3
+  needs:
+  - patch-and-redistribute-tpcds-dsdgen-subscale-support
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
   title: Verify the validate-submission CI workflow end-to-end with a real PR
@@ -423,7 +442,7 @@ items:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
 - id: quality-migrate-unified-frame-any-to-protocol
-  file: TODO/main/planning/quality-migrate-unified-frame-any-to-protocol.yaml
+  file: TODO/main/active/quality-migrate-unified-frame-any-to-protocol.yaml
   title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
   worktree: main
   category: Code Quality and Technical Debt

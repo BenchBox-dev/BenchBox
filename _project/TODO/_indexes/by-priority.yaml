@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T10:49:11.138583'
-total_items: 35
+generated_at: '2026-04-13T11:53:26.007070'
+total_items: 36
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 5
+    count: 6
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -22,11 +22,16 @@ priorities:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
       status: Not Started
+    - id: patch-and-redistribute-tpcds-dsdgen-subscale-support
+      file: TODO/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml
+      title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
+      category: Tooling and Distribution
+      status: Identified
     - id: support-unofficial-tpcds-scales-with-methodology-guardrails
-      file: TODO/main/planning/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
+      file: TODO/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
       title: Support unofficial TPC-DS scales with explicit methodology guardrails
       category: Core Functionality
-      status: Identified
+      status: Blocked
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR
@@ -114,7 +119,7 @@ priorities:
       category: Core Functionality
       status: Not Started
     - id: quality-migrate-unified-frame-any-to-protocol
-      file: TODO/main/planning/quality-migrate-unified-frame-any-to-protocol.yaml
+      file: TODO/main/active/quality-migrate-unified-frame-any-to-protocol.yaml
       title: Replace Any annotations in unified_frame.py with LazyFrameLike protocol
       category: Code Quality and Technical Debt
       status: Not Started
