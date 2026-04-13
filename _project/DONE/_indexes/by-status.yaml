@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T22:00:58.141674'
-total_items: 668
+generated_at: '2026-04-12T22:08:19.393198'
+total_items: 669
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 618
+    count: 619
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2039,6 +2039,11 @@ statuses:
       title: Make tuning file resolution explicit and transparent in CLI
       priority: Medium-High
       category: Core Functionality
+    - id: quality-map-adapter-base-refactor-scope
+      file: DONE/main/quality/quality-map-adapter-base-refactor-scope.yaml
+      title: Map adapter.py public surface and extraction plan before the base refactor
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: complexity-ignores-w14
       file: DONE/core-functionality/active/complexity-ignores-w14.yaml
       title: Mark required-complexity functions as approved ignores in pyproject.toml

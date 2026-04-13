@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T22:00:56.490993'
-total_items: 41
+generated_at: '2026-04-12T22:08:17.765995'
+total_items: 40
 priorities:
   Critical:
     count: 1
@@ -91,7 +91,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 14
+    count: 13
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -143,11 +143,6 @@ priorities:
       title: Implement PR-based community result submission workflow
       category: Core Functionality
       status: Completed
-    - id: quality-map-adapter-base-refactor-scope
-      file: TODO/main/planning/quality-map-adapter-base-refactor-scope.yaml
-      title: Map adapter.py public surface and extraction plan before the base refactor
-      category: Code Quality and Technical Debt
-      status: Not Started
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

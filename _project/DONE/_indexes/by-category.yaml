@@ -1,4 +1,4 @@
-generated_at: '2026-04-12T22:00:58.141346'
+generated_at: '2026-04-12T22:08:19.392888'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 42
+    count: 43
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -407,6 +407,11 @@ categories:
       file: DONE/core-functionality/active/duplicate-code-followup-triage-centralization.yaml
       title: Follow-up duplicate-code triage and consolidation from AST clone report
       priority: High
+      status: Completed
+    - id: quality-map-adapter-base-refactor-scope
+      file: DONE/main/quality/quality-map-adapter-base-refactor-scope.yaml
+      title: Map adapter.py public surface and extraction plan before the base refactor
+      priority: Medium
       status: Completed
     - id: timing-runtime-wide-monotonic-migration
       file: DONE/main/active/timing-runtime-wide-monotonic-migration.yaml

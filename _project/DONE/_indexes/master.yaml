@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T22:00:58.141038'
-total_items: 668
+generated_at: '2026-04-12T22:08:19.392580'
+total_items: 669
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6188,6 +6188,23 @@ items:
   owners:
   - joe
   estimated_effort: Medium
+- id: quality-map-adapter-base-refactor-scope
+  file: DONE/main/quality/quality-map-adapter-base-refactor-scope.yaml
+  title: Map adapter.py public surface and extraction plan before the base refactor
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-2
+  - phase-3-prep
+  - refactor-map
+  estimated_effort: Small-Medium (1-2 days)
+  completed_date: '2026-04-12'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: metadata-primitives-benchmark
   file: DONE/benchmark-expansion/planning/metadata-primitives-benchmark.yaml
   title: Metadata Primitives Benchmark - INFORMATION_SCHEMA, SHOW, DESCRIBE

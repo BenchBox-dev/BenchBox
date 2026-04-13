@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T22:00:58.141517'
-total_items: 668
+generated_at: '2026-04-12T22:08:19.393048'
+total_items: 669
 priorities:
   Critical:
     count: 39
@@ -1890,7 +1890,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 270
+    count: 271
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2660,6 +2660,11 @@ priorities:
       title: Make DuckDB text plan parsing reliable or fail fast
       category: Core Functionality
       status: Not Started
+    - id: quality-map-adapter-base-refactor-scope
+      file: DONE/main/quality/quality-map-adapter-base-refactor-scope.yaml
+      title: Map adapter.py public surface and extraction plan before the base refactor
+      category: Code Quality and Technical Debt
+      status: Completed
     - id: metadata-primitives-benchmark
       file: DONE/benchmark-expansion/planning/metadata-primitives-benchmark.yaml
       title: Metadata Primitives Benchmark - INFORMATION_SCHEMA, SHOW, DESCRIBE
