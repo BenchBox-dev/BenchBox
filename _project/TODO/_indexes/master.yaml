@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T14:00:28.355029'
+generated_at: '2026-04-13T14:23:37.670085'
 total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -87,9 +87,9 @@ items:
   - validation
   - publishing
   estimated_effort: Large
-  work_total: 9
+  work_total: 10
   work_done: 1
-  work_ready: 2
+  work_ready: 1
   deferred_count: 3
   needs:
   - patch-and-redistribute-tpcds-dsdgen-subscale-support
@@ -680,8 +680,8 @@ items:
   - refactor
   - high-blast-radius
   estimated_effort: Medium-Large (1 week)
-  work_total: 7
-  work_done: 0
+  work_total: 10
+  work_done: 4
   work_ready: 1
   needs:
   - quality-map-adapter-base-refactor-scope

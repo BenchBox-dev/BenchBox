@@ -30,8 +30,18 @@ description: |
   binaries (`darwin-arm64`, `darwin-x86_64`): required small-dimension tables
   segfault at `sf=0.01`, `0.1`, and `0.5`, and the repo's bundled
   `examples/data/tpcds_sf001` asset is still only a placeholder. See
-  `_sources/tpcds-subscale-probe.md`. This item is blocked until the bundled
-  generator problem is solved in a separate track.
+  `_sources/tpcds-subscale-probe.md`. A follow-up minimal repro removed
+  BenchBox wrapper logic from the boundary: direct invocation of the packaged
+  host-native binary crashed in the same way, and a fresh local build from
+  `_sources/tpc-ds/tools` reproduced the same `call_center sf=0.01` failure on
+  macOS arm64. `lldb` pinned the fault to upstream generator code at
+  `_sources/tpc-ds/tools/dist.c:512` (`dist_weight`, null dereference of
+  `weight_sets[wset - 1]` with `wset=0`), reached via
+  `_sources/tpc-ds/tools/scaling.c:124` (`LogScale`),
+  `_sources/tpc-ds/tools/scaling.c:319` (`get_rowcount`),
+  `_sources/tpc-ds/tools/parallel.c:64` (`split_work`), and
+  `_sources/tpc-ds/tools/driver.c:549` (`main`). This item is blocked until the
+  bundled/upstream generator problem is solved in a separate track.
 
 deps:
   needs:
@@ -54,7 +64,15 @@ work:
     checksums. Linux and Windows bundles are present but were not executable on
     this Darwin host. The bundled `examples/data/tpcds_sf001` directory
     contains only a placeholder README, so there is no real sample-data escape
-    hatch today.
+    hatch today. A direct-binary repro on the same host proved the crash
+    occurs before any BenchBox wrapper logic runs, and a fresh source build
+    from `_sources/tpc-ds/tools` reproduced the same failure. `lldb` on the
+    source-built binary stopped in `dist_weight` at
+    `_sources/tpc-ds/tools/dist.c:512`, called from
+    `_sources/tpc-ds/tools/scaling.c:124`,
+    `_sources/tpc-ds/tools/scaling.c:319`,
+    `_sources/tpc-ds/tools/parallel.c:64`, and
+    `_sources/tpc-ds/tools/driver.c:549`.
 
     If some platforms pass and some fail, continue implementation with an
     explicit per-platform capability split (`native_subscale` vs
@@ -65,10 +83,30 @@ work:
     patched binaries or user-supplied/pre-generated data. Do not merge any
     behavior changes based on assumption alone.
 
+- id: w10
+  summary: "Use DuckDB's TPC-DS tooling as a diagnostic cross-check for schema and downstream assumptions"
+  needs: [w1]
+  status: pending
+  notes: |
+    DuckDB's TPC-DS extension demonstrates that nonstandard scale handling
+    exists in real tooling (`CALL dsdgen(sf = 1)` and `sf = 0` for schema-only
+    generation), so "anything other than official scale factors is impossible"
+    is too strong a claim. That does not prove DuckDB supports arbitrary
+    fractional scales the way BenchBox needs.
+
+    Use DuckDB only as a diagnostic cross-check:
+    - quick schema sanity checks
+    - comparing expected table presence and naming
+    - validating that downstream BenchBox load/execution code does not
+      inherently require official scale points
+
+    Do not use DuckDB generation as the final product path unless product
+    requirements explicitly change to allow it.
+
 - id: w2
   summary: "Define the subscale data contract from probe results: missing-vs-empty tables, manifest expectations, and validation
     rules"
-  needs: [w1]
+  needs: [w1, w10]
   status: pending
   notes: |
     Translate probe evidence into a precise methodology contract. Decide which
@@ -80,7 +118,7 @@ work:
 
 - id: w3
   summary: "Add a single TPC-DS compliance classifier and remove contradictory scale handling"
-  needs: [w1]
+  needs: [w1, w10]
   status: pending
   notes: |
     Replace duplicated benchmark-registry / runner / generator-manager logic
@@ -228,6 +266,9 @@ anti_patterns:
   database names, and sample lookup -- preserve the token and add an adjacent unofficial marker."
 - "DO NOT relax TPC-DS missing-table validation generically -- because current generation/loading behavior already diverges
   from validators -- derive methodology-specific rules from Gate Zero evidence and enforce those."
+- "DO NOT switch the product path to DuckDB-generated TPC-DS data just because DuckDB exposes nonstandard scale handling --
+  because that changes generator provenance and methodology semantics -- use DuckDB only as a diagnostic cross-check unless
+  product requirements explicitly change."
 
 verification:
 - description: "New TODO validates against the project TODO schema"
