@@ -1,0 +1,136 @@
+id: quality-reduce-complexity-hotspots-to-mccabe-20
+title: "Reduce 44 McCabe complexity hotspots and gate C901 permanently"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Code Quality and Technical Debt
+description: |
+  Quality plan supplement — complexity workstream. `ruff --select=C901` finds
+  44 functions over McCabe 20 (threshold=20 today, gate not enforced).
+  `quality-bulk-fix-encoding-lint-and-ratchet` ratchets the threshold 20→18
+  for NEW code but does not acknowledge the 44 pre-existing violations. Those
+  functions remain unmanaged dispatch trees — the worst, cli/commands/run.py
+  `run`, is at McCabe 285.
+
+  Bring every function under 20, then add C901 to the permanent ruff `select`
+  so regression is impossible. Sequence big-blast-radius offenders into their
+  own slices; bulk the long tail by module. This is a prerequisite for the
+  ratchet to 18 to have meaning.
+
+  Top offenders (by McCabe score):
+    cli/commands/run.py::run                                     285
+    core/runner/runner.py::run_benchmark_lifecycle                47
+    core/platform_registry.py::auto_register_platforms            46
+    examples/unified_runner.py::main                              43
+    scripts/validate_submission.py::_validate_bundle              36
+    platforms/base/adapter.py::_summarize_performance_characteristics  35
+    core/tpcds/power_test.py::run                                 34
+    platforms/dataframe/unified_frame.py::join                    33
+    core/tpcds_obt/query_conversion.py::_post_process             32
+
+deps:
+  needs:
+    - quality-bulk-fix-encoding-lint-and-ratchet
+
+work:
+  - id: w1
+    summary: "Refactor cli/commands/run.py::run (285→<20): extract option-resolution, phase-selection, platform-dispatch, and result-reporting helpers. Own commit. Validate CLI help/behavior unchanged."
+    status: pending
+
+  - id: w2
+    summary: "Refactor top-5 next hotspots (runner lifecycle, platform_registry auto-register, examples main, validate_submission bundle, adapter perf-summary) — one commit each"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Bring remaining ~38 offenders under McCabe 20 in batches by module (cli/*, core/tpcds/*, platforms/*). One commit per batch; no semantics changes."
+    needs: [w2]
+    status: pending
+
+  - id: w4
+    summary: "Add `C901` to [tool.ruff.lint.select] in pyproject.toml with mccabe max-complexity=20. Confirm `uv run ruff check .` returns 0 C901 errors."
+    needs: [w3]
+    status: pending
+
+  - id: w5
+    summary: "Update .github/workflows/lint.yml to surface C901 failures explicitly (so review knows complexity gate fired, not a random lint)."
+    needs: [w4]
+    status: pending
+
+files_affected:
+  modified:
+    - "pyproject.toml"
+    - "benchbox/cli/commands/run.py"
+    - "benchbox/core/runner/runner.py"
+    - "benchbox/core/platform_registry.py"
+    - "examples/unified_runner.py"
+    - "scripts/validate_submission.py"
+    - "benchbox/platforms/base/adapter.py"
+    - "benchbox/core/tpcds/power_test.py"
+    - "benchbox/platforms/dataframe/unified_frame.py"
+    - "benchbox/core/tpcds_obt/query_conversion.py"
+    - "(various — 38 additional modules)"
+    - ".github/workflows/lint.yml"
+
+must_preserve:
+  - "Runtime behavior of every refactored function — this is structural extraction, not behavior change"
+  - "Public CLI surface of `benchbox run` unchanged (same options, same exit codes, same help text)"
+  - "All existing tests pass after every slice (≥21,000 tests)"
+  - "No new `# noqa: C901` suppressions — refactor, don't silence (exception: generated code or vendored shims with inline rationale)"
+
+approach: |
+  Extract-method is the primary tool. For each hotspot:
+    1. Read the function; identify cohesive branches (often one per phase,
+       subcommand, or resource category).
+    2. Extract each branch to a private helper with a clear single
+       responsibility.
+    3. Re-run the full fast test suite per commit.
+    4. Confirm `ruff check --select=C901 <file>` is clean for that file
+       before moving on.
+
+  For cli/commands/run.py::run specifically, the 285 score indicates it is
+  effectively a dispatcher. Extract by phase (generate/load/power/throughput/
+  maintenance), by platform-option parsing, and by result finalization; the
+  click decorator surface stays on the outer `run` shell.
+
+  Prefer small, reviewable PRs — one commit per hotspot at minimum. Do not
+  bundle refactors across modules.
+
+anti_patterns:
+  - "DO NOT add `# noqa: C901` to silence violations — because that defeats the gate — extract helpers instead"
+  - "DO NOT change public API surface during extraction — because callers depend on it — keep helpers private"
+  - "DO NOT bundle multiple hotspot refactors into one commit — because review needs to be bounded — one commit per function"
+  - "DO NOT introduce new abstractions just to hit the number — because YAGNI — extract only cohesive helpers that tell a story"
+
+scope_limit:
+  only_modify:
+    - "functions listed in the C901 inventory"
+    - "pyproject.toml (add C901 to select)"
+    - ".github/workflows/lint.yml (surface gate)"
+  do_not_modify:
+    - "(any function not flagged by C901)"
+    - "adapter implementation files not in the inventory"
+
+verification:
+  - description: "Zero C901 violations at threshold 20"
+    command: "uv run ruff check --select=C901 ."
+    expected_output: "All checks passed"
+  - description: "Full fast suite passes"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass"
+  - description: "`benchbox run --help` output is unchanged"
+    command: "uv run benchbox run --help | sha256sum"
+    expected_output: "matches pre-refactor hash captured at start of w1"
+  - description: "pyproject.toml gates C901 permanently"
+    command: "uv run -- python -c \"import tomllib; cfg = tomllib.load(open('pyproject.toml','rb')); assert 'C901' in cfg['tool']['ruff']['lint']['select']\""
+    expected_output: "(no error)"
+
+metadata:
+  tags: ["quality-plan", "phase-1", "lint", "complexity", "ci-gate"]
+  estimated_effort: "Medium (3-5 days, parallelizable after w1)"
+  created_date: "2026-04-12"
+
+success_metrics:
+  - "C901 count drops from 44 → 0 at threshold 20"
+  - "C901 becomes a permanent ruff gate (pyproject + CI)"
+  - "No function above McCabe 20 lands on main after merge"

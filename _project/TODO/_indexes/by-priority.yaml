@@ -1,5 +1,5 @@
-generated_at: '2026-04-12T19:52:03.326600'
-total_items: 40
+generated_at: '2026-04-12T20:03:09.824009'
+total_items: 42
 priorities:
   Critical:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 10
+    count: 11
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -75,6 +75,11 @@ priorities:
       title: Promote timing policy audit to CI gate and audit 154 wall-clock sites
       category: Testing and Quality Assurance
       status: Not Started
+    - id: quality-reduce-complexity-hotspots-to-mccabe-20
+      file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
+      title: Reduce 44 McCabe complexity hotspots and gate C901 permanently
+      category: Code Quality and Technical Debt
+      status: Not Started
     - id: quality-refactor-adapter-base-into-cohesive-modules
       file: TODO/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
       title: Refactor 5,158-line adapter base into cohesive sub-modules
@@ -86,7 +91,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 14
+    count: 15
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -116,6 +121,11 @@ priorities:
     - id: quality-bulk-fix-encoding-lint-and-ratchet
       file: TODO/main/planning/quality-bulk-fix-encoding-lint-and-ratchet.yaml
       title: Bulk-fix PLW1514 encoding violations and ratchet ruff/McCabe gates
+      category: Code Quality and Technical Debt
+      status: Not Started
+    - id: quality-consolidate-duplicate-code-clusters
+      file: TODO/main/planning/quality-consolidate-duplicate-code-clusters.yaml
+      title: Consolidate duplicate-code clusters across platforms and core
       category: Code Quality and Technical Debt
       status: Not Started
     - id: quality-define-dataframe-protocol-and-remove-any
