@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T23:37:04.710295'
+generated_at: '2026-04-14T01:53:37.811480'
 total_items: 38
 priorities:
   Critical:
@@ -77,7 +77,7 @@ priorities:
       status: Completed
     - id: quality-reduce-complexity-hotspots-to-mccabe-20
       file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
-      title: Reduce 44 McCabe complexity hotspots and gate C901 permanently
+      title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently
       category: Code Quality and Technical Debt
       status: Not Started
     - id: surface-contributor-onboarding-for-results

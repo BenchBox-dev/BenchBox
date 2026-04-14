@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T23:37:04.710306'
+generated_at: '2026-04-14T01:53:37.811491'
 total_items: 38
 statuses:
   Blocked:
@@ -114,7 +114,7 @@ statuses:
       category: Platform Expansion
     - id: quality-reduce-complexity-hotspots-to-mccabe-20
       file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
-      title: Reduce 44 McCabe complexity hotspots and gate C901 permanently
+      title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently
       priority: Medium-High
       category: Code Quality and Technical Debt
     - id: external-contributor-submission-dry-run

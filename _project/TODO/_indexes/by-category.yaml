@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T23:37:04.710277'
+generated_at: '2026-04-14T01:53:37.811464'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -54,7 +54,7 @@ categories:
       status: Not Started
     - id: quality-reduce-complexity-hotspots-to-mccabe-20
       file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
-      title: Reduce 44 McCabe complexity hotspots and gate C901 permanently
+      title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently
       priority: Medium-High
       status: Not Started
   Core Functionality:

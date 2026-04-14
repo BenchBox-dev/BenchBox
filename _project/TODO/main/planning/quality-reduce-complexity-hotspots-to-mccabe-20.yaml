@@ -1,32 +1,29 @@
 id: quality-reduce-complexity-hotspots-to-mccabe-20
-title: "Reduce 44 McCabe complexity hotspots and gate C901 permanently"
+title: "Reduce McCabe complexity hotspots under 18 and gate C901 permanently"
 worktree: main
 priority: Medium-High
 status: Not Started
 category: Code Quality and Technical Debt
 description: |
-  Quality plan supplement — complexity workstream. `ruff --select=C901` finds
-  44 functions over McCabe 20 (threshold=20 today, gate not enforced).
-  `quality-bulk-fix-encoding-lint-and-ratchet` ratchets the threshold 20→18
-  for NEW code but does not acknowledge the 44 pre-existing violations. Those
-  functions remain unmanaged dispatch trees — the worst, cli/commands/run.py
-  `run`, is at McCabe 285.
+  Quality plan supplement — complexity workstream. The ratchet target is
+  McCabe **18** (aligning with `quality-bulk-fix-encoding-lint-and-ratchet`).
+  As of 2026-04-13, 7 C901 violations remain above threshold 18 after an
+  ongoing refactor campaign brought the count down from 44+. The worst
+  remaining offender — `cli/commands/run.py::run` at McCabe 285 — is an
+  unmanaged dispatcher that must be split into phase/option/result helpers.
 
-  Bring every function under 20, then add C901 to the permanent ruff `select`
-  so regression is impossible. Sequence big-blast-radius offenders into their
-  own slices; bulk the long tail by module. This is a prerequisite for the
-  ratchet to 18 to have meaning.
+  Bring every function under 18, then add C901 to the permanent ruff `select`
+  with `max-complexity=18` so regression is impossible. Sequence big-blast-
+  radius offenders into their own slices; bulk the long tail by module.
 
-  Top offenders (by McCabe score):
+  Remaining offenders above threshold 18 (as of 2026-04-13):
     cli/commands/run.py::run                                     285
-    core/runner/runner.py::run_benchmark_lifecycle                47
-    core/platform_registry.py::auto_register_platforms            46
-    examples/unified_runner.py::main                              43
-    scripts/validate_submission.py::_validate_bundle              36
-    platforms/base/adapter.py::_summarize_performance_characteristics  35
-    core/tpcds/power_test.py::run                                 34
-    platforms/dataframe/unified_frame.py::join                    33
-    core/tpcds_obt/query_conversion.py::_post_process             32
+    platforms/dataframe/unified_frame.py::_datafusion_join_with_exprs  23
+    core/tpcds/benchmark/runner.py::run_throughput_test           22
+    core/tpcds/benchmark/runner.py::run_power_test                22
+    platforms/databricks/adapter.py::_upload_to_uc_volume         21
+    platforms/databricks/adapter.py::apply_table_tunings          21
+    platforms/dataframe/unified_frame.py::_extract_multi_agg_arithmetic  21
 
 deps:
   needs:
@@ -34,27 +31,21 @@ deps:
 
 work:
   - id: w1
-    summary: "Refactor cli/commands/run.py::run (285→<20): extract option-resolution, phase-selection, platform-dispatch, and result-reporting helpers. Own commit. Validate CLI help/behavior unchanged."
+    summary: "Refactor cli/commands/run.py::run (285→<18): extract option-resolution, phase-selection, platform-dispatch, and result-reporting helpers. Own commit. Validate CLI help/behavior unchanged."
     status: pending
 
   - id: w2
-    summary: "Refactor top-5 next hotspots (runner lifecycle, platform_registry auto-register, examples main, validate_submission bundle, adapter perf-summary) — one commit each"
-    needs: [w1]
+    summary: "Clear remaining 6 M19-M23 hotspots one-per-commit: _datafusion_join_with_exprs, run_throughput_test, run_power_test, _upload_to_uc_volume, apply_table_tunings, _extract_multi_agg_arithmetic"
     status: pending
 
   - id: w3
-    summary: "Bring remaining ~38 offenders under McCabe 20 in batches by module (cli/*, core/tpcds/*, platforms/*). One commit per batch; no semantics changes."
-    needs: [w2]
+    summary: "Add `C901` to [tool.ruff.lint.select] in pyproject.toml with mccabe max-complexity=18. Confirm `uv run ruff check .` returns 0 C901 errors."
+    needs: [w1, w2]
     status: pending
 
   - id: w4
-    summary: "Add `C901` to [tool.ruff.lint.select] in pyproject.toml with mccabe max-complexity=20. Confirm `uv run ruff check .` returns 0 C901 errors."
-    needs: [w3]
-    status: pending
-
-  - id: w5
     summary: "Update .github/workflows/lint.yml to surface C901 failures explicitly (so review knows complexity gate fired, not a random lint)."
-    needs: [w4]
+    needs: [w3]
     status: pending
 
 files_affected:
@@ -112,7 +103,7 @@ scope_limit:
     - "adapter implementation files not in the inventory"
 
 verification:
-  - description: "Zero C901 violations at threshold 20"
+  - description: "Zero C901 violations at threshold 18"
     command: "uv run ruff check --select=C901 ."
     expected_output: "All checks passed"
   - description: "Full fast suite passes"
@@ -131,6 +122,6 @@ metadata:
   created_date: "2026-04-12"
 
 success_metrics:
-  - "C901 count drops from 44 → 0 at threshold 20"
+  - "C901 count drops to 0 at threshold 18"
   - "C901 becomes a permanent ruff gate (pyproject + CI)"
-  - "No function above McCabe 20 lands on main after merge"
+  - "No function above McCabe 18 lands on main after merge"

@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T23:37:04.710247'
+generated_at: '2026-04-14T01:53:37.811433'
 total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -669,7 +669,7 @@ items:
   - verify-ci-validation-workflow-end-to-end
 - id: quality-reduce-complexity-hotspots-to-mccabe-20
   file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
-  title: Reduce 44 McCabe complexity hotspots and gate C901 permanently
+  title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently
   worktree: main
   category: Code Quality and Technical Debt
   priority: Medium-High
@@ -681,9 +681,9 @@ items:
   - complexity
   - ci-gate
   estimated_effort: Medium (3-5 days, parallelizable after w1)
-  work_total: 5
+  work_total: 4
   work_done: 0
-  work_ready: 1
+  work_ready: 2
   needs:
   - quality-bulk-fix-encoding-lint-and-ratchet
 - id: surface-contributor-onboarding-for-results
