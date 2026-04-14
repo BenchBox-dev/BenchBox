@@ -86,22 +86,34 @@ work:
 - id: w10
   summary: "Use DuckDB's TPC-DS tooling as a diagnostic cross-check for schema and downstream assumptions"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
-    DuckDB's TPC-DS extension demonstrates that nonstandard scale handling
-    exists in real tooling (`CALL dsdgen(sf = 1)` and `sf = 0` for schema-only
-    generation), so "anything other than official scale factors is impossible"
-    is too strong a claim. That does not prove DuckDB supports arbitrary
-    fractional scales the way BenchBox needs.
+    Completed 2026-04-14. Output: `_sources/tpcds-duckdb-diagnostic.md`.
 
-    Use DuckDB only as a diagnostic cross-check:
-    - quick schema sanity checks
-    - comparing expected table presence and naming
-    - validating that downstream BenchBox load/execution code does not
-      inherently require official scale points
+    DuckDB v1.2.2 with the tpcds extension generates all 24 BenchBox-canonical
+    tables at sf=0.01, sf=0.1, and sf=1.0 without crashes. Column counts match
+    dsdgen sf=1.0 for all four Gate Zero tables (call_center=31, store=29,
+    warehouse=14, web_site=26). 22/24 sf=1.0 row counts match BenchBox
+    expectations exactly; store_returns and web_returns differ by <0.2% (well
+    within the 5% tolerance). The `dbgen_version` table is absent from DuckDB
+    output — manifest expected_table_count (25) would need adjustment for any
+    non-dsdgen source.
 
-    Do not use DuckDB generation as the final product path unless product
-    requirements explicitly change to allow it.
+    Critical finding for w2 (data contract): BenchBox's FIXED_TABLES set
+    assumes call_center, store, warehouse, web_site, and reason always hold
+    their sf=1.0 row counts. DuckDB shows these tables actually scale down at
+    sf<1.0 (e.g., call_center=1 at sf=0.01). A subscale data contract must not
+    assume fixed-table row counts hold below sf=1.0.
+
+    Load compatibility confirmed: BenchBox's has_trailing_delimiter detection
+    handles both dsdgen pipe-terminated and DuckDB pipe-separated formats.
+    The scale_factor >= 1.0 guard lives only in the generator and runner
+    layers (benchmark_registry.py:546 and runner.py:162); the data loading path
+    does not check scale_factor at all. Downstream load and execution code does
+    not inherently require official scale points.
+
+    DuckDB remains diagnostic only. It is not a substitute for dsdgen output
+    in BenchBox's methodology context.
 
 - id: w2
   summary: "Define the subscale data contract from probe results: missing-vs-empty tables, manifest expectations, and validation

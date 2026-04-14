@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:32:48.381369'
+generated_at: '2026-04-14T09:39:57.667801'
 total_items: 684
 items:
 - id: interactive-wizard-dry-run-support
@@ -1567,7 +1567,7 @@ items:
   worktree: main
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: Completed
   tags:
   - results
   - explorer
@@ -1576,6 +1576,7 @@ items:
   - duckdb
   - fidelity
   estimated_effort: Medium (2-3 days)
+  completed_date: '2026-04-14'
   work_total: 7
   work_done: 0
   work_ready: 1

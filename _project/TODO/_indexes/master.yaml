@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:32:46.442892'
+generated_at: '2026-04-14T09:39:55.794089'
 total_items: 41
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -108,8 +108,8 @@ items:
   - publishing
   estimated_effort: Large
   work_total: 10
-  work_done: 1
-  work_ready: 3
+  work_done: 2
+  work_ready: 2
   deferred_count: 3
   needs:
   - patch-and-redistribute-tpcds-dsdgen-subscale-support
@@ -199,8 +199,8 @@ items:
   - duplication-followup
   estimated_effort: Small (1 day, ~5 small test modules)
   work_total: 5
-  work_done: 3
-  work_ready: 2
+  work_done: 4
+  work_ready: 1
   needs:
   - quality-consolidate-duplicate-code-clusters
 - id: future-ideas-backlog

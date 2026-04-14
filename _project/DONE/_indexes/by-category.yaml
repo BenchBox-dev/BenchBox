@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:32:48.381720'
+generated_at: '2026-04-14T09:39:57.668272'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -979,7 +979,7 @@ categories:
       file: DONE/main/planning/explorer-extend-manifest-and-pipeline.yaml
       title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
       priority: High
-      status: Not Started
+      status: Completed
     - id: dedup-query-catalog-base
       file: DONE/core-functionality/active/dedup-query-catalog-base.yaml
       title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin

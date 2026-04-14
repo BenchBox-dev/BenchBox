@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:32:48.382072'
+generated_at: '2026-04-14T09:39:57.668623'
 total_items: 684
 statuses:
   In Progress:
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Usability
   Not Started:
-    count: 47
+    count: 46
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -142,11 +142,6 @@ statuses:
       title: Expand query plan fingerprint coverage and verification
       priority: High
       category: Core Functionality
-    - id: explorer-extend-manifest-and-pipeline
-      file: DONE/main/planning/explorer-extend-manifest-and-pipeline.yaml
-      title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
-      priority: High
-      category: Core Functionality
     - id: pyspark-sql-session-manager
       file: DONE/dataframe-expansion/planning/pyspark-sql-session-manager.yaml
       title: Extract SparkSessionManager for shared PySpark session management
@@ -266,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 633
+    count: 634
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1487,6 +1482,11 @@ statuses:
       file: DONE/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
       title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
       priority: Medium-High
+      category: Core Functionality
+    - id: explorer-extend-manifest-and-pipeline
+      file: DONE/main/planning/explorer-extend-manifest-and-pipeline.yaml
+      title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
+      priority: High
       category: Core Functionality
     - id: dedup-query-catalog-base
       file: DONE/core-functionality/active/dedup-query-catalog-base.yaml

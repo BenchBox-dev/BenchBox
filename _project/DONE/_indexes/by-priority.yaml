@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:32:48.381901'
+generated_at: '2026-04-14T09:39:57.668457'
 total_items: 684
 priorities:
   Critical:
@@ -533,7 +533,7 @@ priorities:
       file: DONE/main/planning/explorer-extend-manifest-and-pipeline.yaml
       title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: extract-ascii-charting-into-standalone-library
       file: DONE/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout
