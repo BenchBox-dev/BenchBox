@@ -51,7 +51,7 @@ work:
   summary: "Migrate TPC-H throughput_test.py to use core.throughput.runner.StreamRunner; preserve config.min_success_rate
     behavior. One commit."
   needs: [w3]
-  status: pending
+  status: done
 
 - id: w5
   summary: "Migrate TPC-DS throughput_test.py to use core.throughput.runner.StreamRunner; preserve hard-coded 70% gate as
