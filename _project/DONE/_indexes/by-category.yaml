@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T16:43:35.873382'
+generated_at: '2026-04-14T16:46:08.894712'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -597,7 +597,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 226
+    count: 227
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -758,6 +758,11 @@ categories:
       file: DONE/core-functionality/active/dedup-ignore-rules-boilerplate.yaml
       title: Add ignore rules for 17 boilerplate duplicate groups identified by duplicate-check
       priority: Medium-High
+      status: Completed
+    - id: explorer-add-comparison-charts
+      file: DONE/main/planning/explorer-add-comparison-charts.yaml
+      title: Add normalized speedup and diverging bar charts to explorer compare view
+      priority: Medium
       status: Completed
     - id: cloud-dw-sorted-data-ingestion
       file: DONE/physical-tuning/active/cloud-dw-sorted-data-ingestion.yaml

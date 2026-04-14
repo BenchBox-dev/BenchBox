@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T16:43:34.146525'
-total_items: 37
+generated_at: '2026-04-14T16:46:07.187483'
+total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -383,27 +383,6 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 6
-- id: explorer-add-comparison-charts
-  file: TODO/main/planning/explorer-add-comparison-charts.yaml
-  title: Add normalized speedup and diverging bar charts to explorer compare view
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - charts
-  - compare
-  - visualization
-  - fidelity
-  estimated_effort: Medium (2-3 days)
-  work_total: 4
-  work_done: 0
-  work_ready: 2
-  needs:
-  - explorer-extend-manifest-and-pipeline
-  - explorer-align-duration-metric
 - id: define-phase-3-promotion-metrics
   file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
   title: Define Phase 3 promotion metrics, dashboard, and review cadence
@@ -448,7 +427,7 @@ items:
   worktree: main
   category: Code Quality and Technical Debt
   priority: Medium
-  status: Not Started
+  status: In Progress
   tags:
   - quality-plan
   - phase-2
@@ -456,8 +435,8 @@ items:
   - transactional
   estimated_effort: Medium (2-3 days)
   work_total: 5
-  work_done: 0
-  work_ready: 1
+  work_done: 1
+  work_ready: 2
   needs:
   - quality-consolidate-duplicate-code-clusters
 - id: implement-pr-based-result-submission-workflow

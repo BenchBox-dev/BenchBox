@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T16:43:35.873567'
-total_items: 689
+generated_at: '2026-04-14T16:46:08.894894'
+total_items: 690
 priorities:
   Critical:
     count: 39
@@ -1935,7 +1935,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 280
+    count: 281
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2181,6 +2181,11 @@ priorities:
       file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
       title: Add dedicated tags for all platforms and benchmarks
       category: Documentation
+      status: Completed
+    - id: explorer-add-comparison-charts
+      file: DONE/main/planning/explorer-add-comparison-charts.yaml
+      title: Add normalized speedup and diverging bar charts to explorer compare view
+      category: Core Functionality
       status: Completed
     - id: interactive-mode-open-table-format-selection
       file: DONE/ux-improvements/planning/interactive-mode-open-table-format-selection.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T16:43:34.146597'
-total_items: 37
+generated_at: '2026-04-14T16:46:07.187543'
+total_items: 36
 statuses:
   Blocked:
     count: 1
@@ -9,8 +9,16 @@ statuses:
       title: Support unofficial TPC-DS scales with explicit methodology guardrails
       priority: High
       category: Core Functionality
+  In Progress:
+    count: 1
+    items:
+    - id: quality-extract-transactional-benchmark-base
+      file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
+      title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
+      priority: Medium
+      category: Code Quality and Technical Debt
   Not Started:
-    count: 27
+    count: 25
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -47,11 +55,6 @@ statuses:
       title: Add methodology disclosure panel to result detail pages
       priority: Medium-High
       category: Core Functionality
-    - id: explorer-add-comparison-charts
-      file: TODO/main/planning/explorer-add-comparison-charts.yaml
-      title: Add normalized speedup and diverging bar charts to explorer compare view
-      priority: Medium
-      category: Core Functionality
     - id: explorer-align-duration-metric
       file: TODO/main/planning/explorer-align-duration-metric.yaml
       title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
@@ -67,11 +70,6 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
-    - id: quality-extract-transactional-benchmark-base
-      file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
-      title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T16:43:34.146585'
-total_items: 37
+generated_at: '2026-04-14T16:46:07.187532'
+total_items: 36
 priorities:
   Critical:
     count: 1
@@ -86,7 +86,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 11
+    count: 10
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -97,11 +97,6 @@ priorities:
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: explorer-add-comparison-charts
-      file: TODO/main/planning/explorer-add-comparison-charts.yaml
-      title: Add normalized speedup and diverging bar charts to explorer compare view
-      category: Core Functionality
       status: Not Started
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
@@ -117,7 +112,7 @@ priorities:
       file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
       title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
       category: Code Quality and Technical Debt
-      status: Not Started
+      status: In Progress
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow

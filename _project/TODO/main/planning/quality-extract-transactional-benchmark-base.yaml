@@ -2,7 +2,7 @@ id: quality-extract-transactional-benchmark-base
 title: "Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives"
 worktree: main
 priority: Medium
-status: Not Started
+status: In Progress
 category: Code Quality and Technical Debt
 description: |
   Quality plan supplement — duplication workstream follow-up. Tracks
@@ -33,26 +33,31 @@ deps:
 
 work:
 - id: w1
-  summary: "Survey both Benchmark + Operations classes side-by-side: produce diff table of (shared method, divergent method, divergent type signature). Identify the minimal generic surface."
-  status: pending
+  summary: "Survey both Benchmark + Operations classes side-by-side: produce diff table of (shared method, divergent method,
+    divergent type signature). Identify the minimal generic surface."
+  status: done
 
 - id: w2
-  summary: "Introduce TransactionalBenchmarkBase[ResultT, OperationT] under benchbox/core/transactional/. Migrate transaction_primitives.Benchmark to inherit; one commit."
+  summary: "Introduce TransactionalBenchmarkBase[ResultT, OperationT] under benchbox/core/transactional/. Migrate transaction_primitives.Benchmark
+    to inherit; one commit."
   needs: [w1]
   status: pending
 
 - id: w3
-  summary: "Migrate write_primitives.Benchmark onto TransactionalBenchmarkBase[ResultT, OperationT]; verify type params bind cleanly. One commit."
+  summary: "Migrate write_primitives.Benchmark onto TransactionalBenchmarkBase[ResultT, OperationT]; verify type params bind
+    cleanly. One commit."
   needs: [w2]
   status: pending
 
 - id: w4
-  summary: "Introduce OperationsRegistryBase[OperationT]; migrate transaction_primitives.Operations and write_primitives.Operations one at a time."
+  summary: "Introduce OperationsRegistryBase[OperationT]; migrate transaction_primitives.Operations and write_primitives.Operations
+    one at a time."
   needs: [w1]
   status: pending
 
 - id: w5
-  summary: "Re-run pylint duplicate-code at 15-line threshold over both modules; confirm the three R-08 clusters drop out. Update docs/development/duplication-residuals.md."
+  summary: "Re-run pylint duplicate-code at 15-line threshold over both modules; confirm the three R-08 clusters drop out.
+    Update docs/development/duplication-residuals.md."
   needs: [w3, w4]
   status: pending
 
@@ -83,14 +88,19 @@ approach: |
   parent dedup TODO refused to touch this was bundle risk.
 
 anti_patterns:
-- "DO NOT collapse ResultT / OperationT into a single concrete type — because that loses type safety the existing classes provide — keep generics"
+- "DO NOT collapse ResultT / OperationT into a single concrete type — because that loses type safety the existing classes
+  provide — keep generics"
 - "DO NOT migrate both families in one commit — because review needs to see each migration in isolation — one commit per family"
 - "DO NOT change benchmark semantics during extraction — because that's a separate concern — structural moves only"
-- "DO NOT extract methods that genuinely differ between the two families — because the diff exists for a reason — the survey in w1 must classify each method as shared vs divergent"
+- "DO NOT extract methods that genuinely differ between the two families — because the diff exists for a reason — the survey
+  in w1 must classify each method as shared vs divergent"
 
 verification:
-- description: "Pylint R0801 count drops to 0 — full extraction of the three R-08 clusters eliminates all duplicate-code hits in these two modules"
-  command: "uv run --with pylint --with pandas --with polars pylint --disable=all --enable=duplicate-code --min-similarity-lines=15 benchbox/core/transaction_primitives/ benchbox/core/write_primitives/ 2>&1 | grep -c 'R0801'"
+- description: "Pylint R0801 count drops to 0 in the four target files (catalog/schema/dataframe_ops files are out-of-scope and retain pre-existing clusters)"
+  command: "uv run --with pylint --with pandas --with polars pylint --disable=all --enable=duplicate-code --min-similarity-lines=15
+    benchbox/core/transaction_primitives/benchmark.py benchbox/core/transaction_primitives/operations.py
+    benchbox/core/write_primitives/benchmark.py benchbox/core/write_primitives/operations.py
+    2>&1 | grep -c 'R0801'"
   expected_output: "0"
 - description: "Transaction primitives tests pass"
   command: "uv run -- python -m pytest tests/unit/core/transaction_primitives/ tests/unit/core/write_primitives/ -q"

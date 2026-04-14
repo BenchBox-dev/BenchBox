@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T16:43:35.873739'
-total_items: 689
+generated_at: '2026-04-14T16:46:08.895061'
+total_items: 690
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 638
+    count: 639
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -683,6 +683,11 @@ statuses:
       file: DONE/core-functionality/active/dedup-ignore-rules-boilerplate.yaml
       title: Add ignore rules for 17 boilerplate duplicate groups identified by duplicate-check
       priority: Medium-High
+      category: Core Functionality
+    - id: explorer-add-comparison-charts
+      file: DONE/main/planning/explorer-add-comparison-charts.yaml
+      title: Add normalized speedup and diverging bar charts to explorer compare view
+      priority: Medium
       category: Core Functionality
     - id: platform-setup-numbered-list-selection
       file: DONE/ux-improvements/active/platform-setup-numbered-list-selection.yaml

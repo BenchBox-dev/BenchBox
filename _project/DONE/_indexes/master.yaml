@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T16:43:35.873009'
-total_items: 689
+generated_at: '2026-04-14T16:46:08.894350'
+total_items: 690
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4985,6 +4985,28 @@ items:
   - sphinx-tags
   - discoverability
   estimated_effort: 2-3 hours
+- id: explorer-add-comparison-charts
+  file: DONE/main/planning/explorer-add-comparison-charts.yaml
+  title: Add normalized speedup and diverging bar charts to explorer compare view
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - charts
+  - compare
+  - visualization
+  - fidelity
+  estimated_effort: Medium (2-3 days)
+  completed_date: '2026-04-14'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - explorer-extend-manifest-and-pipeline
+  - explorer-align-duration-metric
 - id: interactive-mode-open-table-format-selection
   file: DONE/ux-improvements/planning/interactive-mode-open-table-format-selection.yaml
   title: Add open table format selection to CLI interactive mode
