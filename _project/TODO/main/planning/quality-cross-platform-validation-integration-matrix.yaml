@@ -30,7 +30,7 @@ deps:
 
 work:
   - id: w1
-    summary: "Write tests/integration/validation/test_cross_platform.py covering DuckDB × DataFusion on TPC-H SF=0.01; use the comparator with STRICT by default and register per-query tolerances only with spec citations"
+    summary: "Write tests/integration/validation/test_cross_platform.py: DuckDB × DataFusion, TPC-H SF=0.01; comparator STRICT by default; Tolerance overrides must cite spec rules"
     status: pending
 
   - id: w2
@@ -84,9 +84,9 @@ verification:
   - description: "Nightly workflow file is valid"
     command: "uv run --with actionlint actionlint .github/workflows/cross-platform-validation.yml"
     expected_output: "(no errors)"
-  - description: "Fast lane unaffected"
-    command: "uv run -- python -m pytest -m fast -q --collect-only | tail -5"
-    expected_output: "fast-lane collection count unchanged vs baseline"
+  - description: "New integration test file carries no mark.fast markers — fast lane unaffected"
+    command: "grep -c 'mark.fast' tests/integration/validation/test_cross_platform.py || echo 0"
+    expected_output: "0"
 
 metadata:
   tags: ["quality-plan", "phase-2", "correctness", "validation", "ci"]

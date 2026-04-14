@@ -89,9 +89,9 @@ anti_patterns:
 - "DO NOT extract methods that genuinely differ between the two families — because the diff exists for a reason — the survey in w1 must classify each method as shared vs divergent"
 
 verification:
-- description: "Pylint duplicate-code count drops by the three R-08 clusters"
+- description: "Pylint R0801 count drops to 0 — full extraction of the three R-08 clusters eliminates all duplicate-code hits in these two modules"
   command: "uv run --with pylint --with pandas --with polars pylint --disable=all --enable=duplicate-code --min-similarity-lines=15 benchbox/core/transaction_primitives/ benchbox/core/write_primitives/ 2>&1 | grep -c 'R0801'"
-  expected_output: "≤ baseline minus 3"
+  expected_output: "0"
 - description: "Transaction primitives tests pass"
   command: "uv run -- python -m pytest tests/unit/core/transaction_primitives/ tests/unit/core/write_primitives/ -q"
   expected_output: "all tests pass"

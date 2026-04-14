@@ -78,9 +78,9 @@ verification:
 - description: "All new test files pass"
   command: "uv run -- python -m pytest tests/unit/platforms/azure/test_livy_mixin.py tests/unit/platforms/test_spark_helpers.py tests/unit/platforms/dataframe/test_result_helpers.py tests/unit/platforms/test_presto_trino_utils.py tests/unit/core/test_schema_primitives_base.py -q"
   expected_output: "all tests pass"
-- description: "Coverage of the 5 helper modules climbs from current baseline"
-  command: "uv run -- python -m pytest --cov=benchbox/platforms/azure/_livy_mixin --cov=benchbox/platforms/_spark_helpers --cov=benchbox/platforms/dataframe/_result_helpers --cov=benchbox/platforms/presto_trino_utils --cov=benchbox/core/schema_primitives tests/unit/ -q"
-  expected_output: "each module ≥80% line coverage"
+- description: "Coverage of the 5 helper modules reaches ≥80%"
+  command: "uv run -- python -m pytest --cov=benchbox/platforms/azure/_livy_mixin --cov=benchbox/platforms/_spark_helpers --cov=benchbox/platforms/dataframe/_result_helpers --cov=benchbox/platforms/presto_trino_utils --cov=benchbox/core/schema_primitives --cov-fail-under=80 tests/unit/ -q"
+  expected_output: "passed (no 'FAIL Required test coverage of 80%' line in output)"
 
 metadata:
   tags: ["quality-plan", "tests", "duplication-followup"]
