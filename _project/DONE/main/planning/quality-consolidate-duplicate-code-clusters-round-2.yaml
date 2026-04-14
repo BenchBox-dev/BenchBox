@@ -105,9 +105,11 @@ work:
     notes: "No aws_cost_limits.py file exists in the codebase. The AWS platform adapters (athena_spark, emr_serverless, glue) each set billing_model as a static string — no collect/describe/aggregate loop to unify. Skipping."
 
 files_affected:
-  added:
-    - "benchbox/platforms/_platform_info_utils.py"
-    - "benchbox/platforms/credentials/_flow.py"
+  # NOTE: _platform_info_utils.py and credentials/_flow.py were planned but not created.
+  # All w1-w5 work units were marked done with explicit rationale for skipping each extraction
+  # (fewer than 3 call sites, or platform-specific differences outweigh the dedup benefit).
+  # The added: list below reflects the original plan; no files were actually added.
+  added: []
   modified:
     - "benchbox/platforms/bigquery.py"
     - "benchbox/platforms/snowflake.py"
