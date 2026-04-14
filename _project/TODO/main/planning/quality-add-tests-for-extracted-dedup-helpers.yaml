@@ -46,7 +46,7 @@ work:
 - id: w4
   summary: "Add tests for presto_trino_utils helpers: escape_insert_value (quote/escape edges), is_date_value (date detection),
     normalize_existing_files, load_file_batches, resolve_data_files."
-  status: pending
+  status: done
 
 - id: w5
   summary: "Add tests for BaseSchemaTable: schema parsing, primary-key + partitioning passthrough, CREATE TABLE statement
