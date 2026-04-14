@@ -1,0 +1,44 @@
+id: generalize-database-table-reuse-detection
+title: "Generalize benchmark table reuse detection for managed databases"
+worktree: main
+priority: Normal
+status: Not Started
+description: |
+  Both QuestDB and InfluxDB adapters override handle_existing_database() to work
+  around a base class limitation: when skip_database_management=True (used for
+  external managed databases), the base class immediately returns with
+  database_was_reused=True without validating whether the expected benchmark
+  tables actually exist.
+
+  This causes silent schema-creation skips when tables are stale or from a
+  different benchmark, leading to validation failures with empty tables.
+
+  Refactor the base class (benchbox/platforms/base/connection_lifecycle.py)
+  to provide a check_benchmark_tables_exist() hook that managed-database
+  adapters can use without duplicating table-existence logic.
+
+  Then migrate both QuestDB and InfluxDB to use the hook and remove their
+  near-duplicate overrides.
+
+category: Architecture & Refactoring
+
+metadata:
+  tags:
+  - architecture
+  - database-adapters
+  - managed-databases
+  - refactoring
+  estimated_effort: "Small"
+  created_date: "2026-04-14"
+  source_review: "Review findings on commit dbc84af27"
+  related_commits:
+  - dbc84af27
+
+impact:
+  user_impact: |
+    None — this is internal refactoring. Behavior is already correct after
+    dbc84af27; this eliminates duplication.
+  maintainer_impact: |
+    Reduces duplication between QuestDB and InfluxDB adapters. Makes it
+    easier for future managed-database adapters to get reuse detection right
+    from the start.
