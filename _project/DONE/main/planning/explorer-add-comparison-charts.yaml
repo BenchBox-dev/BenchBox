@@ -2,7 +2,8 @@ id: explorer-add-comparison-charts
 title: "Add normalized speedup and diverging bar charts to explorer compare view"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-14"
 category: Core Functionality
 
 description: |
@@ -37,7 +38,7 @@ deps:
 work:
   - id: w1
     summary: "Implement NormalizedSpeedupChart: speedup = baseline_ms / this_ms per query, log-scale horizontal bars, green/red for faster/slower. Baseline = first selected result."
-    status: pending
+    status: done
     notes: |
       Log scale is important because OLAP query deltas span orders of
       magnitude. A linear scale makes small queries illegible when one
@@ -48,7 +49,7 @@ work:
 
   - id: w2
     summary: "Implement DivergingBarChart: delta_ms = this_ms - baseline_ms per query, horizontal diverging bars centered at 0, % change labels, sorted by abs(delta)."
-    status: pending
+    status: done
     notes: |
       Convention: red bars = regression (slower than baseline), green bars =
       improvement (faster). Magnitude-sorted by abs(delta) so the biggest
@@ -57,12 +58,12 @@ work:
   - id: w3
     summary: "Add chart selector to Compare.tsx: toggle between Grouped Bar, Normalized Speedup, Diverging Bar. Default Normalized Speedup for 2-result; Grouped Bar for 3+."
     needs: [w1, w2]
-    status: pending
+    status: done
 
   - id: w4
     summary: "Add baseline selector for normalized speedup chart: when comparing 3+ results, a dropdown lets the user pick which result is the baseline. Default to the fastest (lowest geomean_ms) result."
     needs: [w3]
-    status: pending
+    status: done
 
 files_affected:
   added:
