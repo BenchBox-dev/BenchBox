@@ -39,7 +39,7 @@ work:
   summary: "Introduce benchbox/core/throughput/result.py with the unified ThroughputResult dataclass. TPC-H and TPC-DS specific
     fields land on a thin per-spec subclass. No callers migrated yet."
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Introduce benchbox/core/throughput/runner.py with StreamRunner protocol, concurrent-stream executor, metrics calc.

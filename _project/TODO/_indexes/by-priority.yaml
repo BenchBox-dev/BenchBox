@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:49:53.102353'
+generated_at: '2026-04-14T09:53:21.575517'
 total_items: 39
 priorities:
   Critical:
@@ -127,7 +127,7 @@ priorities:
       file: TODO/main/planning/quality-extract-throughput-runner.yaml
       title: Extract shared core.throughput.runner with aligned ThroughputResult model
       category: Code Quality and Technical Debt
-      status: Not Started
+      status: In Progress
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow

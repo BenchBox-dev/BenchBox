@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:49:53.102307'
+generated_at: '2026-04-14T09:53:21.575467'
 total_items: 39
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -467,7 +467,7 @@ items:
   worktree: main
   category: Code Quality and Technical Debt
   priority: Medium
-  status: Not Started
+  status: In Progress
   tags:
   - quality-plan
   - phase-2
@@ -475,7 +475,7 @@ items:
   - throughput
   estimated_effort: Medium (2-3 days)
   work_total: 6
-  work_done: 0
+  work_done: 2
   work_ready: 1
   needs:
   - quality-consolidate-duplicate-code-clusters

@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:49:53.102364'
+generated_at: '2026-04-14T09:53:21.575530'
 total_items: 39
 statuses:
   Blocked:
@@ -9,8 +9,16 @@ statuses:
       title: Support unofficial TPC-DS scales with explicit methodology guardrails
       priority: High
       category: Core Functionality
+  In Progress:
+    count: 1
+    items:
+    - id: quality-extract-throughput-runner
+      file: TODO/main/planning/quality-extract-throughput-runner.yaml
+      title: Extract shared core.throughput.runner with aligned ThroughputResult model
+      priority: Medium
+      category: Code Quality and Technical Debt
   Not Started:
-    count: 29
+    count: 28
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -70,11 +78,6 @@ statuses:
     - id: quality-extract-transactional-benchmark-base
       file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
       title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: quality-extract-throughput-runner
-      file: TODO/main/planning/quality-extract-throughput-runner.yaml
-      title: Extract shared core.throughput.runner with aligned ThroughputResult model
       priority: Medium
       category: Code Quality and Technical Debt
     - id: future-ideas-backlog
