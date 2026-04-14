@@ -41,7 +41,7 @@ work:
   summary: "Introduce TransactionalBenchmarkBase[ResultT, OperationT] under benchbox/core/transactional/. Migrate transaction_primitives.Benchmark
     to inherit; one commit."
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Migrate write_primitives.Benchmark onto TransactionalBenchmarkBase[ResultT, OperationT]; verify type params bind
