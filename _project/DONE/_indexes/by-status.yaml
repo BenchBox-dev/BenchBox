@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T09:58:53.771528'
-total_items: 686
+generated_at: '2026-04-14T10:01:37.657091'
+total_items: 687
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Usability
   Not Started:
-    count: 46
+    count: 47
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -247,6 +247,11 @@ statuses:
       title: Register PySpark SQL mode in platform registry
       priority: High
       category: Platform Expansion
+    - id: explorer-add-tuning-config-visibility
+      file: DONE/main/planning/explorer-add-tuning-config-visibility.yaml
+      title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
+      priority: Medium-High
+      category: Core Functionality
   Identified:
     count: 2
     items:

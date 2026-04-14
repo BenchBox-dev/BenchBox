@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:58:52.052412'
+generated_at: '2026-04-14T10:01:35.934018'
 total_items: 39
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -19,6 +19,26 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
+- id: explorer-align-duration-metric
+  file: TODO/main/planning/explorer-align-duration-metric.yaml
+  title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - metrics
+  - geomean
+  - duration
+  - fidelity
+  estimated_effort: Small (0.5-1 day)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-extend-manifest-and-pipeline
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -475,7 +495,7 @@ items:
   - throughput
   estimated_effort: Medium (2-3 days)
   work_total: 6
-  work_done: 4
+  work_done: 5
   work_ready: 1
   needs:
   - quality-consolidate-duplicate-code-clusters
@@ -710,22 +730,3 @@ items:
   work_ready: 0
   needs:
   - implement-pr-based-result-submission-workflow
-- id: explorer-add-tuning-config-visibility
-  file: TODO/main/planning/explorer-add-tuning-config-visibility.yaml
-  title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - tuning
-  - fidelity
-  - comparison
-  estimated_effort: Small-Medium (1-2 days)
-  work_total: 4
-  work_done: 0
-  work_ready: 2
-  needs:
-  - explorer-extend-manifest-and-pipeline

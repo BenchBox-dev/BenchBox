@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T09:58:53.771359'
-total_items: 686
+generated_at: '2026-04-14T10:01:37.656926'
+total_items: 687
 priorities:
   Critical:
     count: 39
@@ -1411,7 +1411,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 103
+    count: 104
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1924,6 +1924,11 @@ priorities:
       title: Surface active driver version in CLI progress output
       category: Core Functionality
       status: Completed
+    - id: explorer-add-tuning-config-visibility
+      file: DONE/main/planning/explorer-add-tuning-config-visibility.yaml
+      title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
+      category: Core Functionality
+      status: Not Started
     - id: unified-adapter-interface
       file: DONE/core-functionality/planning/unified-adapter-interface.yaml
       title: Unify SQL and DataFrame Adapter Execution Interfaces

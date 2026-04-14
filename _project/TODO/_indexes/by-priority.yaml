@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:58:52.052462'
+generated_at: '2026-04-14T10:01:35.934063'
 total_items: 39
 priorities:
   Critical:
@@ -10,8 +10,13 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 6
+    count: 7
     items:
+    - id: explorer-align-duration-metric
+      file: TODO/main/planning/explorer-align-duration-metric.yaml
+      title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
+      category: Core Functionality
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -43,7 +48,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 8
+    count: 7
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -80,11 +85,6 @@ priorities:
       title: Surface contributor onboarding for results submission
       category: Documentation
       status: Completed
-    - id: explorer-add-tuning-config-visibility
-      file: TODO/main/planning/explorer-add-tuning-config-visibility.yaml
-      title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
-      category: Core Functionality
-      status: Not Started
   Medium:
     count: 13
     items:

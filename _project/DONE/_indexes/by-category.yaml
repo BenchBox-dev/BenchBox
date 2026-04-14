@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:58:53.771181'
+generated_at: '2026-04-14T10:01:37.656744'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -592,7 +592,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 224
+    count: 225
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1666,6 +1666,11 @@ categories:
       title: Surface active driver version in CLI progress output
       priority: Medium-High
       status: Completed
+    - id: explorer-add-tuning-config-visibility
+      file: DONE/main/planning/explorer-add-tuning-config-visibility.yaml
+      title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
+      priority: Medium-High
+      status: Not Started
     - id: duckdb-explain-analyze-default
       file: DONE/core-functionality/active/duckdb-explain-analyze-default.yaml
       title: Switch DuckDB plan capture to use EXPLAIN ANALYZE by default for actual per-operator timing

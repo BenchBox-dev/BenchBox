@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T09:58:53.770855'
-total_items: 686
+generated_at: '2026-04-14T10:01:37.656418'
+total_items: 687
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -9279,6 +9279,25 @@ items:
   work_total: 4
   work_done: 4
   work_ready: 0
+- id: explorer-add-tuning-config-visibility
+  file: DONE/main/planning/explorer-add-tuning-config-visibility.yaml
+  title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - tuning
+  - fidelity
+  - comparison
+  estimated_effort: Small-Medium (1-2 days)
+  work_total: 4
+  work_done: 0
+  work_ready: 2
+  needs:
+  - explorer-extend-manifest-and-pipeline
 - id: unified-adapter-interface
   file: DONE/core-functionality/planning/unified-adapter-interface.yaml
   title: Unify SQL and DataFrame Adapter Execution Interfaces

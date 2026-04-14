@@ -57,7 +57,7 @@ work:
   summary: "Migrate TPC-DS throughput_test.py to use core.throughput.runner.StreamRunner; preserve hard-coded 70% gate as
     the config default. One commit."
   needs: [w3]
-  status: pending
+  status: done
 
 - id: w6
   summary: "Re-run pylint duplicate-code at 15-line threshold over both throughput modules; confirm R-06 cluster drops out.

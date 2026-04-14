@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:58:52.052445'
+generated_at: '2026-04-14T10:01:35.934048'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -65,6 +65,11 @@ categories:
       title: Add normalized speedup and diverging bar charts to explorer compare view
       priority: Medium
       status: Not Started
+    - id: explorer-align-duration-metric
+      file: TODO/main/planning/explorer-align-duration-metric.yaml
+      title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
+      priority: High
+      status: Not Started
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
       title: Automate corpus-inventory.json generation from results-data/bundles/
@@ -120,11 +125,6 @@ categories:
       title: Support unofficial TPC-DS scales with explicit methodology guardrails
       priority: High
       status: Blocked
-    - id: explorer-add-tuning-config-visibility
-      file: TODO/main/planning/explorer-add-tuning-config-visibility.yaml
-      title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
-      priority: Medium-High
-      status: Not Started
   Documentation:
     count: 2
     items:
