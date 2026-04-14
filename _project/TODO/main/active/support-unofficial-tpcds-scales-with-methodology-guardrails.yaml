@@ -106,25 +106,33 @@ work:
 - id: w2
   summary: "Define the subscale data contract from probe results: missing-vs-empty tables, manifest expectations, and validation
     rules"
-  needs: [w1, w10]
+  needs: [w1]
   status: pending
   notes: |
     Translate probe evidence into a precise methodology contract. Decide which
     tables must exist, which may be empty, and how generated-data validation and
     loaded-data validation should behave for unofficial TPC-DS runs.
 
+    Review DuckDB cross-check findings from w10 before finalising the contract
+    (w10 is advisory, not a hard prerequisite -- do not let a stalled diagnostic
+    block this work unit).
+
     This work unit is a hard dependency for validator changes. Do not relax
     missing-table checks generically before the contract is written down.
 
 - id: w3
   summary: "Add a single TPC-DS compliance classifier and remove contradictory scale handling"
-  needs: [w1, w10]
+  needs: [w1]
   status: pending
   notes: |
     Replace duplicated benchmark-registry / runner / generator-manager logic
     with one shared classifier for `official`, `unofficial_nonstandard`, and
     `unofficial_subscale`. Remove the current silent `<1 -> 1.0` promotion in
     the benchmark runner.
+
+    Review DuckDB cross-check findings from w10 before finalising classifier
+    bucket boundaries (w10 is advisory, not a hard prerequisite -- do not let
+    a stalled diagnostic block this work unit).
 
     Call out the behavior decision explicitly: BenchBox currently blocks `sf<1`
     globally, but the discrete official scale set is only enforced on

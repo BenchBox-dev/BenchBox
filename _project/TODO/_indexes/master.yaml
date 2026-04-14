@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T01:53:37.811433'
+generated_at: '2026-04-14T08:06:28.197935'
 total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -89,7 +89,7 @@ items:
   estimated_effort: Large
   work_total: 10
   work_done: 1
-  work_ready: 1
+  work_ready: 3
   deferred_count: 3
   needs:
   - patch-and-redistribute-tpcds-dsdgen-subscale-support
