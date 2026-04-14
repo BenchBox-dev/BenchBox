@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T08:06:28.197969'
+generated_at: '2026-04-14T08:31:46.130593'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -58,12 +58,32 @@ categories:
       priority: Medium-High
       status: Not Started
   Core Functionality:
-    count: 12
+    count: 18
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
+      status: Not Started
+    - id: explorer-comparability-warnings
+      file: TODO/main/planning/explorer-comparability-warnings.yaml
+      title: Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons
+      priority: Medium
+      status: Not Started
+    - id: explorer-add-methodology-disclosure
+      file: TODO/main/planning/explorer-add-methodology-disclosure.yaml
+      title: Add methodology disclosure panel to result detail pages
+      priority: Medium-High
+      status: Not Started
+    - id: explorer-add-comparison-charts
+      file: TODO/main/planning/explorer-add-comparison-charts.yaml
+      title: Add normalized speedup and diverging bar charts to explorer compare view
+      priority: Medium
+      status: Not Started
+    - id: explorer-align-duration-metric
+      file: TODO/main/planning/explorer-align-duration-metric.yaml
+      title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
+      priority: High
       status: Not Started
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
@@ -95,6 +115,11 @@ categories:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       priority: Medium-High
       status: Completed
+    - id: explorer-extend-manifest-and-pipeline
+      file: TODO/main/planning/explorer-extend-manifest-and-pipeline.yaml
+      title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
+      priority: High
+      status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow
@@ -120,6 +145,11 @@ categories:
       title: Support unofficial TPC-DS scales with explicit methodology guardrails
       priority: High
       status: Blocked
+    - id: explorer-add-tuning-config-visibility
+      file: TODO/main/planning/explorer-add-tuning-config-visibility.yaml
+      title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
+      priority: Medium-High
+      status: Not Started
   Documentation:
     count: 2
     items:

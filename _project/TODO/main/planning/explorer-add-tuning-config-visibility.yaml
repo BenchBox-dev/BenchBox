@@ -1,0 +1,104 @@
+id: explorer-add-tuning-config-visibility
+title: "Surface tuning config in explorer detail pages and enable cross-tuning comparison"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Post-launch audit (2026-04-14) found that the explorer records only
+  `has_tuning: boolean` despite tuning config being one of BenchBox's
+  primary differentiators. A visitor comparing DuckDB "tuned" vs "notuning"
+  runs has no way to know they differ on this axis, let alone see what
+  tuning was applied.
+
+  This TODO:
+    1. Surfaces tuning_mode ("tuned" / "notuning" / "auto") as a visible
+       label on result detail pages and browse tables
+    2. Loads and displays the tuning config summary from the .tuning.json
+       sidecar (if present) on the detail page
+    3. Enables the Compare view to show a tuning-mode label per result so
+       cross-tuning comparisons are legible (not blocked — just labeled)
+
+  Prerequisite: explorer-extend-manifest-and-pipeline must land first
+  (tuning_mode and tuning_hash must be in the manifest).
+
+deps:
+  needs:
+    - explorer-extend-manifest-and-pipeline
+
+work:
+  - id: w1
+    summary: "Add tuning_mode label to BenchmarkIndex and PlatformIndex browse tables: small badge (styled like trust_label badge) showing 'Tuned' / 'No Tuning' / 'Auto'. Use tuning_mode from manifest."
+    status: pending
+
+  - id: w2
+    summary: "Add tuning section to ResultDetail.tsx: show tuning_mode prominently; collapsible panel lazy-fetches .tuning.json sidecar and renders key-value config."
+    status: pending
+
+  - id: w3
+    summary: "Update Compare.tsx: add tuning_mode label per result in the comparison header. If the two results have different tuning_mode values, show a visible 'Different tuning config' warning badge."
+    needs: [w1, w2]
+    status: pending
+
+  - id: w4
+    summary: "Add tuning filter to DuckDB-WASM browse queries: allow filtering by tuning_mode in Browse pages (All / Tuned / No Tuning). Uses tuning_mode column added by pipeline extension."
+    needs: [w1]
+    status: pending
+
+files_affected:
+  modified:
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+  added:
+    - "results-explorer/src/components/TuningBadge.tsx"
+
+must_preserve:
+  - "Existing compare view behavior when tuning is the same across both results (no regression)"
+  - "Results without a .tuning.json sidecar render cleanly — tuning panel shows 'No tuning config recorded' not an error"
+  - "TrustBadge layout unchanged — TuningBadge is a separate element"
+
+approach: |
+  Tuning mode label is simple: read tuning_mode from manifest, render a
+  styled badge (Tuned=green, No Tuning=gray, Auto=blue). Mirror the
+  TrustBadge component pattern.
+
+  Tuning config panel on detail page: lazy-fetch the .tuning.json sidecar
+  URL (already derivable from bundle_path convention). Render as a
+  collapsible key-value table. Only fetch on expand — not on page load.
+
+  Cross-tuning comparison: the strategy doc says tuning_mode is a
+  comparability-breaking dimension that should warn, not hard-block. The
+  warning must be visually prominent (yellow banner) but must not prevent
+  the comparison from rendering — a user may intentionally compare tuned
+  vs notuning to see the delta.
+
+anti_patterns:
+  - "DO NOT hard-block cross-tuning comparisons — because intentional tuned vs notuning comparisons are valid and valuable — warn visibly but allow"
+  - "DO NOT fetch the .tuning.json sidecar eagerly — because most visitors won't expand the panel — lazy-fetch on expand only"
+  - "DO NOT show tuning_hash to end users — because it is an internal grouping key — show tuning_mode and tuning summary instead"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/pages/"
+    - "results-explorer/src/components/TuningBadge.tsx (new)"
+  do_not_modify:
+    - "benchbox/core/explorer_pipeline/ (covered by prerequisite TODO)"
+
+verification:
+  - description: "Tuning badge renders in browse tables"
+    command: "grep -n 'TuningBadge\\|tuning_mode' results-explorer/src/pages/BenchmarkIndex.tsx"
+    expected_output: "TuningBadge imported and used"
+  - description: "Cross-tuning warning renders in Compare"
+    command: "grep -n 'tuning_mode\\|Different tuning' results-explorer/src/pages/Compare.tsx"
+    expected_output: "warning logic present"
+  - description: "TypeScript compiles cleanly"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "(no errors)"
+
+metadata:
+  tags: ["results", "explorer", "tuning", "fidelity", "comparison"]
+  estimated_effort: "Small-Medium (1-2 days)"
+  created_date: "2026-04-14"

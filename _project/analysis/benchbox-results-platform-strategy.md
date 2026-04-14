@@ -1,7 +1,7 @@
 # BenchBox Results Platform Product + Architecture Strategy
 
 **Created:** 2026-03-29
-**Revised:** 2026-03-30
+**Revised:** 2026-04-14
 **Originating TODO:** `productize-result-publishing-and-artifact-sharing`
 
 ## Executive Summary
@@ -80,6 +80,15 @@ differentiates on three axes:
 ClickBench was considered and rejected because its format cannot capture what
 BenchBox measures (items 2 and 3 above).
 
+> **Note (2026-04-14):** Axes 2 and 3 are currently aspirational. The Phase 1
+> explorer exposes a narrow read model (11 fields; see Fidelity Gaps section below)
+> that does not yet surface tuning config, execution plans, validation status,
+> execution mode, or cost data. These must be realized before the differentiation
+> claim is credible to a visitor who clicks through to a result detail page. The
+> fidelity gap TODOs (`explorer-extend-manifest-and-pipeline`,
+> `explorer-add-tuning-config-visibility`, `explorer-add-methodology-disclosure`)
+> address this.
+
 ### Explorer as Dynamic Tool
 
 The explorer is a **dynamic comparison tool**, not a static shootout page.
@@ -132,6 +141,91 @@ BenchBox in git history. The explorer's core value proposition (reproducible res
 `benchbox run` re-execution) is inseparable from BenchBox, making BenchBox placement
 the coherent choice. The working default is confirmed; no changes to existing
 scaffolding or CI/CD are needed.
+
+## Explorer Fidelity: Known Gaps and Requirements
+
+*Added 2026-04-14 following a post-launch audit of explorer vs CLI divergence.*
+
+### Canonical Duration Metric
+
+The explorer currently uses `total_duration_s` (wall-clock sum from the bundle's
+`run.total_duration_ms`). The CLI uses **geometric mean of per-query times** as
+the primary comparison metric for OLAP workloads. These produce different numbers
+for the same result, making cross-referencing between CLI output and the explorer
+confusing and misleading for results with different query counts.
+
+**Decision:** The explorer's primary comparison metric must be **geometric mean
+of per-query execution times (`geomean_ms`)**, computed at pipeline build time
+and stored in both the manifest and DuckDB schema. Wall-clock total duration may
+be surfaced as a secondary metric with a clear label, but it must not be the
+default sort/compare axis. This aligns with CLI behavior and with standard OLAP
+benchmarking practice.
+
+### Comparability Model
+
+Two results are **comparability-breaking** on the following dimensions — the
+compare view must warn or hard-block when they differ:
+
+| Dimension | Breaking? | Action |
+|-----------|-----------|--------|
+| Benchmark family | Yes (hard-block) | Already enforced |
+| Scale factor | Yes (hard-block) | Already enforced |
+| Execution mode (SQL vs DataFrame) | Yes (warn) | Not yet surfaced |
+| Tuning mode (tuned vs notuning) | Yes (warn) | Not yet surfaced |
+| Query subset vs full benchmark | Yes (warn) | Not yet surfaced |
+| Platform version | No (label) | Partially surfaced |
+
+The explorer cannot enforce the tuning and execution-mode warnings until those
+fields reach the manifest. See `explorer-extend-manifest-and-pipeline`.
+
+### Pipeline Fidelity Gap
+
+The schema-v2 bundle contains 13 blocks and 50+ fields. The Phase 1 pipeline
+transformer emits **11 manifest fields**, silently dropping:
+
+| Category | Dropped Fields | Impact |
+|----------|---------------|--------|
+| Execution metadata | `execution_mode` (SQL/DataFrame) | Can't distinguish modes |
+| Tuning config | `config.tuning_mode`, full config detail | No tuning UI, can't cross-compare |
+| Platform identity | `platform.version`, `engine_version` | Only driver version surfaced |
+| Run config | `config.platform_options`, `config.compression` | No config disclosure |
+| Phase timing | All `phases.*` breakdown | Can't see load vs query time |
+| Cost | `cost.total_usd` | No cost analysis |
+| Validation | `summary.validation` | No validation status visible |
+| Test type | Power vs throughput distinction | Can't label test type |
+| Query granularity | `run_type`, `iter`, `stream` per timing | Can't identify warmup vs measurement |
+
+The DuckDB `results` table currently has 11 columns. It should grow to ~20 to
+enable meaningful client-side filtering. See `explorer-extend-manifest-and-pipeline`.
+
+### Methodology Transparency
+
+A visitor to a result detail page currently cannot determine:
+- Whether `total_duration_s` is a sum, mean, or median
+- Whether the run used tuning (a configuration that can significantly affect
+  results)
+- Whether warmup queries are included in the timing
+- What hardware the result was produced on beyond OS/arch/CPU count
+
+Every result detail page must include a **methodology disclosure panel** that
+states the aggregation method, tuning state, execution mode, and key environment
+parameters. See `explorer-add-methodology-disclosure`.
+
+### Chart Parity Targets
+
+The CLI ships 15 chart types; the explorer ships 2 inline SVG components. Full
+parity is not required, but the following gap is strategically significant for
+the "dynamic comparison tool" claim:
+
+| Missing chart | Value | Priority |
+|---------------|-------|----------|
+| Normalized speedup (log scale, baseline-relative) | Primary comparison metric for large perf deltas | High |
+| Diverging bar (per-query regression/improvement) | Makes "which queries got slower?" obvious | High |
+| Phase breakdown (stacked load vs query) | Distinguishes load bottleneck from query bottleneck | Medium |
+| Percentile ladder (P50/P90/P95/P99) | Identifies tail-latency outliers | Medium |
+| Cost scatter | "Cost vs performance" is a primary analyst question | Low (Phase 2+) |
+
+See `explorer-add-comparison-charts`.
 
 ## Phase 1 MVP Definition
 
@@ -304,21 +398,32 @@ BenchBox needs three explicit user contracts, but they do NOT all ship at once.
 
 The static build pipeline transforms canonical schema-v2 bundles into:
 
-1. **`manifest.json`** — Global navigation index:
+1. **`manifest.json`** — Global navigation index. Target schema (fields marked
+   `*` are Phase 1 launched; unmarked fields are required additions per the
+   fidelity gap work):
    ```json
    {
      "results": [
        {
-         "id": "tpch-duckdb-sf1-20260315",
-         "benchmark": "tpch",
-         "platform": "duckdb",
-         "scale_factor": 1.0,
-         "timestamp": "2026-03-15T10:30:00Z",
-         "total_duration_ms": 1234,
-         "query_count": 22,
-         "queries_passed": 22,
-         "source": "maintainer",
-         "bundle_path": "bundles/tpch-duckdb-sf1-20260315.json"
+         "id": "tpch-duckdb-sf1-20260315",          // *
+         "benchmark": "tpch",                         // *
+         "platform": "duckdb",                        // *
+         "scale_factor": 1.0,                         // *
+         "run_date": "2026-03-15",                    // *
+         "total_duration_s": 1.234,                   // * (wall-clock; secondary metric)
+         "geomean_ms": 56.2,                          // target: canonical comparison metric
+         "query_count": 22,                           // *
+         "trust_label": "maintainer-run",             // *
+         "visibility": "public-curated",              // *
+         "driver_version": "1.1.0",                  // *
+         "platform_version": "1.1.0",                // target
+         "execution_mode": "sql",                     // target: "sql" | "dataframe"
+         "tuning_mode": "tuned",                      // target: "tuned" | "notuning" | "auto"
+         "tuning_hash": "abc123",                     // target: stable hash for cross-compare grouping
+         "test_type": "power",                        // target: "power" | "throughput"
+         "validation_status": "passed",               // target: "passed" | "failed" | "skipped"
+         "cost_usd": null,                            // target: null if unavailable
+         "bundle_path": "bundles/tpch-duckdb-sf1-20260315.json"  // *
        }
      ],
      "benchmarks": ["tpch", "tpcds", "ssb"],
@@ -327,23 +432,35 @@ The static build pipeline transforms canonical schema-v2 bundles into:
    }
    ```
 
-2. **Per-result detail JSON** — Full query timings + metadata for result pages:
+2. **Per-result detail JSON** — Full query timings + metadata for result pages.
+   Target query record:
    ```json
    {
      "id": "tpch-duckdb-sf1-20260315",
-     "metadata": { "benchmark": "...", "platform": "...", "environment": "..." },
+     "metadata": {
+       "benchmark": "tpch", "platform": "duckdb", "environment": "...",
+       "execution_mode": "sql",
+       "tuning_mode": "tuned", "tuning_summary": "DuckDB default tuning profile",
+       "platform_version": "1.1.0", "engine_version": null
+     },
      "queries": [
-       {"id": "Q1", "ms": 45.2, "rows": 4, "status": "passed"},
-       {"id": "Q2", "ms": 12.1, "rows": 460, "status": "passed"}
+       {"id": "Q1", "ms": 45.2, "rows": 4, "status": "passed",
+        "run_type": "measurement", "iter": 1, "stream": 1}
      ],
-     "summary": { "total_ms": 1234, "passed": 22, "failed": 0 },
+     "summary": {
+       "total_ms": 1234, "geomean_ms": 56.2,
+       "passed": 22, "failed": 0,
+       "validation_status": "passed"
+     },
      "bundle_download": "bundles/tpch-duckdb-sf1-20260315.json"
    }
    ```
 
 3. **`results.duckdb`** — DuckDB database for browser-side analysis:
-   - `results` table: one row per result run (flattened metadata)
-   - `queries` table: one row per query execution (result_id, query_id, ms, rows, status)
+   - `results` table: one row per result run — target ~20 columns (see manifest
+     target above; all manifest fields should be filterable via DuckDB-WASM)
+   - `queries` table: one row per query execution
+     `(result_id, query_id, ms, rows, status, run_type, iter, stream)`
    - Enables: `SELECT * FROM queries WHERE benchmark='tpch' AND platform='duckdb' ORDER BY ms`
 
 4. **`bundles/`** — Raw canonical schema-v2 bundles for download
@@ -478,16 +595,33 @@ platform or explorer.
 
 ## TODO Cluster and Priority
 
+### Planning and Infrastructure
+
+| TODO | Phase | Priority | Status |
+| --- | --- | --- | --- |
+| `define-results-platform-product-and-launch-strategy` | Planning | High | Done |
+| `resolve-results-explorer-brand-ownership` | Planning | High | Done |
+| `build-results-explorer-subsite-on-benchbox-dev` | Phase 1 | High | Done |
+| `implement-results-compare-view` | Phase 1 | High | Done |
+| `define-hosted-results-contract-and-governance-model` | Phase 2-3 prep | Medium | Done |
+| `design-results-ingest-storage-and-derived-read-model` | Phase 3 | Medium | Not started |
+| `integrate-benchbox-cli-submit-and-service-auth` | Phase 2-3 | Medium | Not started |
+| `operate-results-platform-security-observability-and-abuse-controls` | Phase 3 | Low | Not started |
+
+### Explorer Fidelity (added 2026-04-14)
+
+These TODOs address the gaps identified in the post-launch audit. They are
+sequenced: pipeline extension first (all others depend on the richer manifest),
+then UI features that consume the new fields.
+
 | TODO | Phase | Priority | Rationale |
 | --- | --- | --- | --- |
-| `define-results-platform-product-and-launch-strategy` | Planning | High | Must complete before any implementation |
-| `resolve-results-explorer-brand-ownership` | Planning | High | Must resolve before launch — implementation proceeds with BenchBox as working default |
-| `build-results-explorer-subsite-on-benchbox-dev` | Phase 1 | High | Core deliverable (umbrella) |
-| `implement-results-compare-view` | Phase 1 | High | **Primary deliverable** — the dynamic comparison tool is the core UX |
-| `define-hosted-results-contract-and-governance-model` | Phase 2-3 prep | Medium | Not needed for Phase 1 (all curated) |
-| `design-results-ingest-storage-and-derived-read-model` | Phase 3 | Medium | Phase 1 static pipeline is covered by dedicated implementation TODOs |
-| `integrate-benchbox-cli-submit-and-service-auth` | Phase 2-3 | Medium | Deferred until explorer is proven; `benchbox submit` command for PR-based and hosted corpus contribution |
-| `operate-results-platform-security-observability-and-abuse-controls` | Phase 3 | Low | No hosted services to operate until Phase 3 |
+| `explorer-extend-manifest-and-pipeline` | Phase 1.5 | High | Unblocks all other fidelity work; adds geomean_ms, execution_mode, tuning_mode, tuning_hash, platform_version, test_type, validation_status, cost_usd to manifest + DuckDB |
+| `explorer-align-duration-metric` | Phase 1.5 | High | Fixes the CLI vs explorer metric discrepancy; geomean becomes the primary comparison axis |
+| `explorer-add-tuning-config-visibility` | Phase 1.5 | Medium-High | Surfaces tuning config in detail pages and enables cross-tuning comparison |
+| `explorer-add-methodology-disclosure` | Phase 1.5 | Medium-High | Adds "how this was measured" panel; required before differentiation claims are credible |
+| `explorer-add-comparison-charts` | Phase 1.5 | Medium | Normalized speedup + diverging bar charts; closes the most visible CLI parity gap |
+| `explorer-comparability-warnings` | Phase 2 | Medium | Warn/block when comparing results that differ on execution mode or tuning; depends on pipeline extension |
 
 ## External Sources
 

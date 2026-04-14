@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:06:28.197935'
-total_items: 38
+generated_at: '2026-04-14T08:31:46.130552'
+total_items: 44
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -19,6 +19,44 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
+- id: explorer-align-duration-metric
+  file: TODO/main/planning/explorer-align-duration-metric.yaml
+  title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - metrics
+  - geomean
+  - duration
+  - fidelity
+  estimated_effort: Small (0.5-1 day)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-extend-manifest-and-pipeline
+- id: explorer-extend-manifest-and-pipeline
+  file: TODO/main/planning/explorer-extend-manifest-and-pipeline.yaml
+  title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - pipeline
+  - manifest
+  - duckdb
+  - fidelity
+  estimated_effort: Medium (2-3 days)
+  work_total: 7
+  work_done: 0
+  work_ready: 1
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -380,6 +418,48 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 6
+- id: explorer-comparability-warnings
+  file: TODO/main/planning/explorer-comparability-warnings.yaml
+  title: Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - comparability
+  - warnings
+  - compare
+  - fidelity
+  estimated_effort: Small (0.5-1 day)
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-extend-manifest-and-pipeline
+  - explorer-add-tuning-config-visibility
+- id: explorer-add-comparison-charts
+  file: TODO/main/planning/explorer-add-comparison-charts.yaml
+  title: Add normalized speedup and diverging bar charts to explorer compare view
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - charts
+  - compare
+  - visualization
+  - fidelity
+  estimated_effort: Medium (2-3 days)
+  work_total: 4
+  work_done: 0
+  work_ready: 2
+  needs:
+  - explorer-extend-manifest-and-pipeline
+  - explorer-align-duration-metric
 - id: define-phase-3-promotion-metrics
   file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
   title: Define Phase 3 promotion metrics, dashboard, and review cadence
@@ -589,6 +669,25 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
+- id: explorer-add-methodology-disclosure
+  file: TODO/main/planning/explorer-add-methodology-disclosure.yaml
+  title: Add methodology disclosure panel to result detail pages
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - methodology
+  - transparency
+  - fidelity
+  estimated_effort: Small (0.5-1 day)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-extend-manifest-and-pipeline
 - id: automate-corpus-inventory-generation
   file: TODO/main/planning/automate-corpus-inventory-generation.yaml
   title: Automate corpus-inventory.json generation from results-data/bundles/
@@ -704,3 +803,22 @@ items:
   work_ready: 0
   needs:
   - implement-pr-based-result-submission-workflow
+- id: explorer-add-tuning-config-visibility
+  file: TODO/main/planning/explorer-add-tuning-config-visibility.yaml
+  title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - tuning
+  - fidelity
+  - comparison
+  estimated_effort: Small-Medium (1-2 days)
+  work_total: 4
+  work_done: 0
+  work_ready: 2
+  needs:
+  - explorer-extend-manifest-and-pipeline

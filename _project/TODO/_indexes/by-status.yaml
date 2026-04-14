@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:06:28.197995'
-total_items: 38
+generated_at: '2026-04-14T08:31:46.130626'
+total_items: 44
 statuses:
   Blocked:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 28
+    count: 34
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -42,11 +42,31 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
+    - id: explorer-comparability-warnings
+      file: TODO/main/planning/explorer-comparability-warnings.yaml
+      title: Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons
+      priority: Medium
+      category: Core Functionality
+    - id: explorer-add-methodology-disclosure
+      file: TODO/main/planning/explorer-add-methodology-disclosure.yaml
+      title: Add methodology disclosure panel to result detail pages
+      priority: Medium-High
+      category: Core Functionality
+    - id: explorer-add-comparison-charts
+      file: TODO/main/planning/explorer-add-comparison-charts.yaml
+      title: Add normalized speedup and diverging bar charts to explorer compare view
+      priority: Medium
+      category: Core Functionality
     - id: quality-add-tests-for-extracted-dedup-helpers
       file: TODO/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
       title: Add unit tests for 5 helpers extracted by the dedup consolidation
       priority: Low
       category: Code Quality and Technical Debt
+    - id: explorer-align-duration-metric
+      file: TODO/main/planning/explorer-align-duration-metric.yaml
+      title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
+      priority: High
+      category: Core Functionality
     - id: quality-consolidate-duplicate-code-clusters-round-2
       file: TODO/main/planning/quality-consolidate-duplicate-code-clusters-round-2.yaml
       title: Consolidate 5 duplicate-code clusters surfaced by C901 refactor work
@@ -61,6 +81,11 @@ statuses:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
+      category: Core Functionality
+    - id: explorer-extend-manifest-and-pipeline
+      file: TODO/main/planning/explorer-extend-manifest-and-pipeline.yaml
+      title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
+      priority: High
       category: Core Functionality
     - id: quality-extract-transactional-benchmark-base
       file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
@@ -132,6 +157,11 @@ statuses:
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       priority: Low
       category: Benchmark Development
+    - id: explorer-add-tuning-config-visibility
+      file: TODO/main/planning/explorer-add-tuning-config-visibility.yaml
+      title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
+      priority: Medium-High
+      category: Core Functionality
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements

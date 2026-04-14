@@ -1,0 +1,108 @@
+id: explorer-add-methodology-disclosure
+title: "Add methodology disclosure panel to result detail pages"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Post-launch audit (2026-04-14) found that a visitor to a result detail
+  page cannot determine:
+    - What the "Duration" number means (sum? mean? median?)
+    - Whether tuning was applied (currently just a boolean)
+    - Whether warmup queries are included in the timing
+    - What execution mode was used (SQL vs DataFrame)
+    - What hardware the result was produced on beyond OS/arch/CPU count
+
+  This matters because BenchBox's differentiator over ClickBench is
+  "rich per-query detail — execution plans, tuning configurations,
+  validation status". If a visitor can't interpret the numbers, that
+  claim is hollow. The absence of methodology disclosure also makes it
+  impossible to assess whether two results are meaningfully comparable.
+
+  This TODO adds a "How this was measured" disclosure section to the
+  ResultDetail page that surfaces the aggregation method, execution mode,
+  tuning state, test type, and key environment parameters.
+
+deps:
+  needs:
+    - explorer-extend-manifest-and-pipeline
+
+work:
+  - id: w1
+    summary: "Design the disclosure panel content: list each disclosed item (metric definition, execution mode, tuning mode, test type, query scope, environment summary) and write the copy for each."
+    status: pending
+    notes: |
+      Metric definition copy: "Primary metric is geometric mean of per-query
+      execution times (measurement runs only). Wall-clock total is shown
+      separately. Lower geomean = faster."
+
+      Test type: "Power test (single-stream sequential)" or "Throughput test
+      (N concurrent streams)".
+
+      Query scope: "Full benchmark (22 queries)" or "Query subset: Q1, Q6, Q17".
+
+      Environment: already surfaced (OS/arch/CPU/memory/Python). Add
+      execution_mode and tuning_mode here too.
+
+  - id: w2
+    summary: "Implement MethodologyDisclosure component in results-explorer/src/components/. Collapsible panel, collapsed by default. Accepts detail result props; renders the disclosed items as a definition list."
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Integrate MethodologyDisclosure into ResultDetail.tsx below the query timing table. Ensure it renders for all bundles including those predating the extended manifest (graceful null handling)."
+    needs: [w2]
+    status: pending
+
+  - id: w4
+    summary: "Add comparability summary row to Compare.tsx header: execution_mode + tuning_mode + test_type per result. Surfaces differences without navigating to detail pages."
+    needs: [w2]
+    status: pending
+
+files_affected:
+  added:
+    - "results-explorer/src/components/MethodologyDisclosure.tsx"
+  modified:
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+
+must_preserve:
+  - "Existing ResultDetail layout above the disclosure panel — disclosure is additive"
+  - "Collapsed by default — visitors who don't care are not burdened"
+  - "Graceful rendering for bundles that lack execution_mode / tuning_mode (null-safe)"
+
+approach: |
+  Static disclosure — no new data fetching required. All the displayed
+  fields come from the detail result object already loaded by ResultDetail.
+  The panel is a simple definition list rendered from props.
+
+  Collapsed by default with a clear "How this was measured ↓" label.
+  The label should be visible on first load so the panel is discoverable.
+
+anti_patterns:
+  - "DO NOT expand the panel by default — because most visitors just want the numbers — disclosure is for the methodologically curious"
+  - "DO NOT add interactive filtering or controls to the disclosure panel — because this is read-only provenance — action controls belong elsewhere"
+  - "DO NOT omit the metric definition — because 'Geomean query time' is not obvious to a first-time visitor — always include the definition"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/components/MethodologyDisclosure.tsx (new)"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+
+verification:
+  - description: "MethodologyDisclosure component renders in ResultDetail"
+    command: "grep -n 'MethodologyDisclosure' results-explorer/src/pages/ResultDetail.tsx"
+    expected_output: "imported and used"
+  - description: "TypeScript compiles cleanly"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "(no errors)"
+  - description: "Component renders for null execution_mode (old bundle compatibility)"
+    command: "grep -n 'execution_mode.*null\\|null.*execution_mode\\|??' results-explorer/src/components/MethodologyDisclosure.tsx"
+    expected_output: "null-safe access present"
+
+metadata:
+  tags: ["results", "explorer", "methodology", "transparency", "fidelity"]
+  estimated_effort: "Small (0.5-1 day)"
+  created_date: "2026-04-14"
