@@ -36,7 +36,7 @@ work:
 
 - id: w2
   summary: "Add tests for get_spark_query_plan: cover normal plan capture, missing/closed connection, plan-string truncation."
-  status: pending
+  status: done
 
 - id: w3
   summary: "Add tests for _result_helpers.build_success_result_dict / build_failure_result_dict: required-field presence,
