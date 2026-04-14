@@ -63,7 +63,7 @@ work:
   summary: "Re-run pylint duplicate-code at 15-line threshold over both throughput modules; confirm R-06 cluster drops out.
     Update docs/development/duplication-residuals.md."
   needs: [w4, w5]
-  status: pending
+  status: done
 
 files_affected:
   modified:
