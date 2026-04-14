@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:31:46.130552'
-total_items: 44
+generated_at: '2026-04-14T08:35:50.565728'
+total_items: 43
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -766,25 +766,6 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
-- id: quality-reduce-complexity-hotspots-to-mccabe-20
-  file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
-  title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - quality-plan
-  - phase-1
-  - lint
-  - complexity
-  - ci-gate
-  estimated_effort: Medium (3-5 days, parallelizable after w1)
-  work_total: 4
-  work_done: 0
-  work_ready: 2
-  needs:
-  - quality-bulk-fix-encoding-lint-and-ratchet
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

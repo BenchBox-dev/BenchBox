@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:31:47.931584'
-total_items: 681
+generated_at: '2026-04-14T08:35:52.257862'
+total_items: 682
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 631
+    count: 632
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2563,6 +2563,11 @@ statuses:
       file: DONE/main/active/reduce-cc13-complexity-ceiling.yaml
       title: Reduce CC=13 complexity ceiling and lower warn threshold to 13
       priority: Medium
+      category: Code Quality and Technical Debt
+    - id: quality-reduce-complexity-hotspots-to-mccabe-20
+      file: DONE/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
+      title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently
+      priority: Medium-High
       category: Code Quality and Technical Debt
     - id: complexity-cli-prompts-w15
       file: DONE/core-functionality/active/complexity-cli-prompts-w15.yaml

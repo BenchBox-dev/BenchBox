@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T08:31:46.130593'
+generated_at: '2026-04-14T08:35:50.565767'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -25,7 +25,7 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 6
+    count: 5
     items:
     - id: quality-add-tests-for-extracted-dedup-helpers
       file: TODO/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
@@ -51,11 +51,6 @@ categories:
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
       priority: Low
-      status: Not Started
-    - id: quality-reduce-complexity-hotspots-to-mccabe-20
-      file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
-      title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently
-      priority: Medium-High
       status: Not Started
   Core Functionality:
     count: 18

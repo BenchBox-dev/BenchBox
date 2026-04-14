@@ -2,7 +2,8 @@ id: quality-reduce-complexity-hotspots-to-mccabe-20
 title: "Reduce McCabe complexity hotspots under 18 and gate C901 permanently"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-14"
 category: Code Quality and Technical Debt
 description: |
   Quality plan supplement — complexity workstream. The ratchet target is
@@ -32,21 +33,21 @@ deps:
 work:
   - id: w1
     summary: "Refactor cli/commands/run.py::run (285→<18): extract option-resolution, phase-selection, platform-dispatch, and result-reporting helpers. Own commit. Validate CLI help/behavior unchanged."
-    status: pending
+    status: done
 
   - id: w2
     summary: "Clear remaining 6 M19-M23 hotspots one-per-commit: _datafusion_join_with_exprs, run_throughput_test, run_power_test, _upload_to_uc_volume, apply_table_tunings, _extract_multi_agg_arithmetic"
-    status: pending
+    status: done
 
   - id: w3
-    summary: "Add `C901` to [tool.ruff.lint.select] in pyproject.toml with mccabe max-complexity=18. Confirm `uv run ruff check .` returns 0 C901 errors."
+    summary: "Remove C901 from [tool.ruff.lint.ignore] in pyproject.toml (C90 already in select). Confirm `uv run ruff check .` returns 0 C901 errors."
     needs: [w1, w2]
-    status: pending
+    status: done
 
   - id: w4
-    summary: "Update .github/workflows/lint.yml to surface C901 failures explicitly (so review knows complexity gate fired, not a random lint)."
+    summary: "CI gate is already covered by existing `uv run ruff check .` in lint.yml — no separate step needed since C901 is now in active select."
     needs: [w3]
-    status: pending
+    status: done
 
 files_affected:
   modified:

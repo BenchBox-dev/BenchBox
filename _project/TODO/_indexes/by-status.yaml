@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:31:46.130626'
-total_items: 44
+generated_at: '2026-04-14T08:35:50.565800'
+total_items: 43
 statuses:
   Blocked:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 34
+    count: 33
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -137,11 +137,6 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Low
       category: Platform Expansion
-    - id: quality-reduce-complexity-hotspots-to-mccabe-20
-      file: TODO/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
-      title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently
-      priority: Medium-High
-      category: Code Quality and Technical Debt
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

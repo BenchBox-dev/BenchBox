@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:31:47.931423'
-total_items: 681
+generated_at: '2026-04-14T08:35:52.257690'
+total_items: 682
 priorities:
   Critical:
     count: 39
@@ -1401,7 +1401,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 101
+    count: 102
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1864,6 +1864,11 @@ priorities:
       title: Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)
       category: Code Quality & Build
       status: Not Started
+    - id: quality-reduce-complexity-hotspots-to-mccabe-20
+      file: DONE/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
+      title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently
+      category: Code Quality and Technical Debt
+      status: Completed
     - id: quality-refactor-adapter-base-into-cohesive-modules
       file: DONE/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
       title: Refactor 5,158-line adapter base into cohesive sub-modules

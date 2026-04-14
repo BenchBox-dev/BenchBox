@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T08:31:47.931248'
+generated_at: '2026-04-14T08:35:52.257514'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 49
+    count: 50
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -472,6 +472,11 @@ categories:
       file: DONE/main/active/reduce-cc13-complexity-ceiling.yaml
       title: Reduce CC=13 complexity ceiling and lower warn threshold to 13
       priority: Medium
+      status: Completed
+    - id: quality-reduce-complexity-hotspots-to-mccabe-20
+      file: DONE/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
+      title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently
+      priority: Medium-High
       status: Completed
     - id: quality-refactor-adapter-base-into-cohesive-modules
       file: DONE/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml

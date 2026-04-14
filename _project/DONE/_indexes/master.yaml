@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:31:47.930931'
-total_items: 681
+generated_at: '2026-04-14T08:35:52.257182'
+total_items: 682
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -9047,6 +9047,26 @@ items:
   work_ready: 1
   needs:
   - productize-result-publishing-and-artifact-sharing
+- id: quality-reduce-complexity-hotspots-to-mccabe-20
+  file: DONE/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
+  title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-1
+  - lint
+  - complexity
+  - ci-gate
+  estimated_effort: Medium (3-5 days, parallelizable after w1)
+  completed_date: '2026-04-14'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - quality-bulk-fix-encoding-lint-and-ratchet
 - id: quality-refactor-adapter-base-into-cohesive-modules
   file: DONE/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
   title: Refactor 5,158-line adapter base into cohesive sub-modules
