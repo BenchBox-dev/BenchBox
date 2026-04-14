@@ -1,0 +1,187 @@
+id: quality-consolidate-duplicate-code-clusters-round-2
+title: "Consolidate 5 duplicate-code clusters surfaced by C901 refactor work"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Code Quality and Technical Debt
+description: |
+  Follow-up to quality-consolidate-duplicate-code-clusters. The C901
+  complexity-reduction grind (quality-reduce-complexity-hotspots-to-mccabe-20)
+  has surfaced 5 additional duplicate-code clusters that are prime targets
+  for shared helpers. Consolidating them removes ~200-300 LOC, reduces
+  maintenance surface when adding new cloud adapters / benchmark families,
+  and eliminates a common C901 contributor (the try/except-per-metadata-call
+  shape and long if/elif commitment-plan ladders).
+
+  Dependency note: w1 and w5 are independent and lowest-risk — start there.
+  w2 touches interactive code paths and should be done after w1 (same
+  adapters). w3 and w4 are independent of the rest.
+
+  Clusters identified:
+
+  1. Platform `get_platform_info` scaffolding
+     Files: benchbox/platforms/bigquery.py, snowflake.py, databricks/*.py,
+            redshift.py, athena.py (and clickhouse/metadata.py)
+     Pattern: Each cloud adapter repeats a try: value = fetch_metadata();
+              except Exception: value = None block per metadata call.
+     Proposed fix: Extract _safe_metadata_collect(name, fn) -> Any | None
+              in benchbox/platforms/_platform_info_utils.py.
+     Impact: ~80+ lines removed across 5+ files; side effect: reduces
+              C901 complexity on get_platform_info methods.
+
+  2. setup_*_credentials interactive flows
+     Files: benchbox/platforms/credentials/athena.py, bigquery.py,
+            Azure/GCP equivalents
+     Pattern: Each repeats env-var → existing-credentials-file → keyring →
+              interactive-prompt chain + auto-detect + validate + save-next-
+              steps section.
+     Proposed fix: credential_setup_flow(platform, fields, auto_detector,
+              validator) in benchbox/platforms/credentials/_flow.py; per-
+              platform modules keep only field schema + validator.
+     Impact: dedupe the auto-detect/prompt/finalize scaffolding today's
+              athena C901 refactor surfaced (commit 3288e108f).
+
+  3. Catalog-loader shape (TPC-H vs TPC-DS)
+     Files: benchbox/core/tpch/* and benchbox/core/tpcds/* —
+            _load_*_schema / _load_*_catalog pairs
+     Pattern: Same file-open → parse → validate → index shape, only
+              benchmark-specific field names differ.
+     Proposed fix: Parameterize over schema definitions; single
+              load_catalog(schema_path, spec) with per-benchmark spec object.
+     Impact: Lower maintenance cost when adding a new benchmark family
+              (e.g., TPC-DI follow-ons).
+
+  4. aws_cost_limits.py per-service collectors
+     Files: benchbox/platforms/_aws/aws_cost_limits.py (or equivalent)
+     Pattern: EC2, S3, Redshift, Athena each duplicate the budget/limit
+              fetch shape (client → describe → normalize → aggregate).
+     Proposed fix: ServiceLimitCollector protocol + shared dispatch loop;
+              per-service code becomes a short callable returning
+              normalized records.
+     Impact: Adding a new AWS service ~20 lines instead of ~80.
+
+  5. Pricing / commitment if/elif ladders → dict dispatch
+     Files: benchbox/platforms/bigquery.py (already refactored this session
+            via commitment_plan_map, commit 07cea9852), databricks/*.py,
+            redshift.py
+     Pattern: Long if plan == "x": ...; elif plan == "y": ... chains
+              mapping commitment/edition strings to pricing model fields.
+     Proposed fix: Module-level PRICING_PLAN_MAP: dict[str, tuple[
+              pricing_model, edition]] + single .get() lookup — mirrors
+              bigquery _determine_bigquery_pricing pattern.
+     Impact: Removes ~30-50 lines per adapter; also removes a common
+              C901 contributor.
+
+deps:
+  needs:
+    - quality-consolidate-duplicate-code-clusters
+
+work:
+  - id: w1
+    summary: "Extract _safe_metadata_collect helper in platforms/_platform_info_utils.py; migrate bigquery, snowflake, databricks, redshift, athena, clickhouse get_platform_info methods. Own commit per adapter."
+    status: pending
+
+  - id: w5
+    summary: "Convert pricing/commitment if-elif ladders in databricks + redshift to dict-dispatch tables (bigquery already done — use _determine_bigquery_pricing as reference). Own commit per adapter."
+    status: pending
+
+  - id: w2
+    summary: "Extract credential_setup_flow scaffolding in platforms/credentials/_flow.py; migrate athena + bigquery + one Azure/GCP to prove the pattern. Keep per-platform field schemas and validators local."
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Parameterize catalog loaders; collapse TPC-H / TPC-DS _load_*_schema pairs into a single load_catalog(path, spec) function with per-benchmark spec objects."
+    status: pending
+
+  - id: w4
+    summary: "Define ServiceLimitCollector protocol in aws_cost_limits; migrate EC2/S3/Redshift/Athena collectors to conform. Per-service code becomes normalized-record callables."
+    status: pending
+
+files_affected:
+  added:
+    - "benchbox/platforms/_platform_info_utils.py"
+    - "benchbox/platforms/credentials/_flow.py"
+  modified:
+    - "benchbox/platforms/bigquery.py"
+    - "benchbox/platforms/snowflake.py"
+    - "benchbox/platforms/databricks/adapter.py"
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/athena.py"
+    - "benchbox/platforms/clickhouse/metadata.py"
+    - "benchbox/platforms/credentials/athena.py"
+    - "benchbox/platforms/credentials/bigquery.py"
+    - "benchbox/core/tpch/*"
+    - "benchbox/core/tpcds/*"
+    - "benchbox/platforms/_aws/aws_cost_limits.py"
+
+must_preserve:
+  - "Public method signatures of get_platform_info, setup_*_credentials, catalog-loader entry points"
+  - "Existing behavior when metadata fetches fail (None → surfaced as None, not raised)"
+  - "Pricing dict-lookup must fall back to current default when plan string is unknown"
+  - "Interactive credential prompt sequence and error messages remain identical to the user"
+  - "Catalog-load output shape (column names, types, row ordering) is byte-identical per benchmark"
+
+approach: |
+  Each cluster gets its own commit (or small commit series). Start with
+  w1 and w5 — lowest-risk, highest-density wins.
+
+  w1 (_safe_metadata_collect): a trivial wrapper — the risk is only that
+  some call sites catch a *specific* exception today. Audit each try
+  block before migrating; preserve specificity where it exists.
+
+  w5 (pricing dict dispatch): mirror bigquery._determine_bigquery_pricing.
+  Key design choice: fall through to a DEFAULT_PRICING_PLAN entry rather
+  than returning None, to match current behavior.
+
+  w2 (credential_setup_flow): design the field-schema dataclass first;
+  migrate athena first since it has the cleanest shape (already refactored
+  for C901 in commit 3288e108f). Validator stays per-platform.
+
+  w3 (catalog loader): spec object per benchmark family; single loader
+  parses YAML/JSON and produces SchemaCollection. Preserve per-benchmark
+  quirks as spec-level flags, not branches in the loader.
+
+  w4 (ServiceLimitCollector): Protocol + dispatch registry. Start with
+  EC2 (most complex) to surface interface requirements, then port the
+  simpler services.
+
+anti_patterns:
+  - "DO NOT introduce a shared helper without at least 3 call sites — because two-site dedupe is premature abstraction — keep duplicated code if only 2 adapters use it"
+  - "DO NOT change behavior during extraction — because this is structural dedup — if a call site differs, preserve the difference via a helper parameter"
+  - "DO NOT bundle w1 + w2 + w3 into one commit — because review needs to be bounded — one commit per work unit minimum"
+  - "DO NOT collapse _safe_metadata_collect blocks that catch specific exceptions — because the specificity is intentional — preserve per-call exception filters"
+
+scope_limit:
+  only_modify:
+    - "files listed in the 5 clusters above"
+    - "new _platform_info_utils.py and _flow.py helper modules"
+  do_not_modify:
+    - "adapter logic outside get_platform_info / setup_*_credentials"
+    - "benchmark runners, query generators, result schema"
+    - "unrelated C901 hotspots (covered by quality-reduce-complexity-hotspots)"
+
+verification:
+  - description: "No new C901 violations"
+    command: "uv run ruff check --select=C901 benchbox/"
+    expected_output: "count does not increase vs baseline"
+  - description: "Full fast suite passes"
+    command: "BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass"
+  - description: "Targeted platform tests pass"
+    command: "BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest tests/ -k 'bigquery or snowflake or databricks or redshift or athena or clickhouse or credentials or catalog or cost_limits' -m fast -q"
+    expected_output: "all tests pass"
+  - description: "jscpd report shows reduced duplication"
+    command: "uv run jscpd --silent --threshold 50 --reporters console benchbox/ 2>&1 | tail -5"
+    expected_output: "duplicate-line count lower than pre-change baseline"
+
+metadata:
+  tags: ["quality-plan", "dedup", "dry", "cloud-adapters", "credentials"]
+  estimated_effort: "Medium (3-5 days; w1/w5 parallelizable, w2-w4 sequential)"
+  created_date: "2026-04-13"
+
+success_metrics:
+  - "~200-300 LOC removed across 10+ files"
+  - "Adding a new cloud adapter's get_platform_info drops from ~60 LOC to ~20 LOC"
+  - "Adding a new benchmark catalog drops from ~80 LOC to ~30 LOC spec object"
+  - "No regression in get_platform_info / setup_*_credentials behavior"

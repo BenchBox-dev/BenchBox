@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T15:31:34.687448'
-total_items: 37
+generated_at: '2026-04-13T23:37:04.710306'
+total_items: 38
 statuses:
   Blocked:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 27
+    count: 28
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -46,6 +46,11 @@ statuses:
       file: TODO/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
       title: Add unit tests for 5 helpers extracted by the dedup consolidation
       priority: Low
+      category: Code Quality and Technical Debt
+    - id: quality-consolidate-duplicate-code-clusters-round-2
+      file: TODO/main/planning/quality-consolidate-duplicate-code-clusters-round-2.yaml
+      title: Consolidate 5 duplicate-code clusters surfaced by C901 refactor work
+      priority: Medium-High
       category: Code Quality and Technical Debt
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml

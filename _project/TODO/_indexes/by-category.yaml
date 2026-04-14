@@ -1,4 +1,4 @@
-generated_at: '2026-04-13T15:31:34.687416'
+generated_at: '2026-04-13T23:37:04.710277'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -25,12 +25,17 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 5
+    count: 6
     items:
     - id: quality-add-tests-for-extracted-dedup-helpers
       file: TODO/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
       title: Add unit tests for 5 helpers extracted by the dedup consolidation
       priority: Low
+      status: Not Started
+    - id: quality-consolidate-duplicate-code-clusters-round-2
+      file: TODO/main/planning/quality-consolidate-duplicate-code-clusters-round-2.yaml
+      title: Consolidate 5 duplicate-code clusters surfaced by C901 refactor work
+      priority: Medium-High
       status: Not Started
     - id: quality-extract-transactional-benchmark-base
       file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-13T15:31:34.687436'
-total_items: 37
+generated_at: '2026-04-13T23:37:04.710295'
+total_items: 38
 priorities:
   Critical:
     count: 1
@@ -43,7 +43,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 7
+    count: 8
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -60,6 +60,11 @@ priorities:
       title: Automate corpus-inventory.json generation from results-data/bundles/
       category: Core Functionality
       status: Completed
+    - id: quality-consolidate-duplicate-code-clusters-round-2
+      file: TODO/main/planning/quality-consolidate-duplicate-code-clusters-round-2.yaml
+      title: Consolidate 5 duplicate-code clusters surfaced by C901 refactor work
+      category: Code Quality and Technical Debt
+      status: Not Started
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
