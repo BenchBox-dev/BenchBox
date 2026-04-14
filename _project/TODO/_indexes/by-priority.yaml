@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T17:14:56.056258'
-total_items: 35
+generated_at: '2026-04-14T17:47:21.928323'
+total_items: 34
 priorities:
   Critical:
     count: 1
@@ -10,13 +10,8 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 7
+    count: 6
     items:
-    - id: explorer-align-duration-metric
-      file: TODO/main/planning/explorer-align-duration-metric.yaml
-      title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
-      category: Core Functionality
-      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

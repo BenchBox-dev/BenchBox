@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T17:14:56.056209'
-total_items: 35
+generated_at: '2026-04-14T17:47:21.928273'
+total_items: 34
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -19,26 +19,6 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
-- id: explorer-align-duration-metric
-  file: TODO/main/planning/explorer-align-duration-metric.yaml
-  title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - metrics
-  - geomean
-  - duration
-  - fidelity
-  estimated_effort: Small (0.5-1 day)
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - explorer-extend-manifest-and-pipeline
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication

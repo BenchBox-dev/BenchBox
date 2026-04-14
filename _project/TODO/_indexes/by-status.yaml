@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T17:14:56.056269'
-total_items: 35
+generated_at: '2026-04-14T17:47:21.928334'
+total_items: 34
 statuses:
   Blocked:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 25
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -46,11 +46,6 @@ statuses:
       file: TODO/main/planning/explorer-add-methodology-disclosure.yaml
       title: Add methodology disclosure panel to result detail pages
       priority: Medium-High
-      category: Core Functionality
-    - id: explorer-align-duration-metric
-      file: TODO/main/planning/explorer-align-duration-metric.yaml
-      title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
-      priority: High
       category: Core Functionality
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml

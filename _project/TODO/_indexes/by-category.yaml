@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T17:14:56.056241'
+generated_at: '2026-04-14T17:47:21.928307'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -41,7 +41,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 14
+    count: 13
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -52,11 +52,6 @@ categories:
       file: TODO/main/planning/explorer-add-methodology-disclosure.yaml
       title: Add methodology disclosure panel to result detail pages
       priority: Medium-High
-      status: Not Started
-    - id: explorer-align-duration-metric
-      file: TODO/main/planning/explorer-align-duration-metric.yaml
-      title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
-      priority: High
       status: Not Started
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
