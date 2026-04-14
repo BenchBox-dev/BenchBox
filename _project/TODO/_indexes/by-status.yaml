@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T17:02:23.417791'
-total_items: 36
+generated_at: '2026-04-14T17:14:56.056269'
+total_items: 35
 statuses:
   Blocked:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 26
+    count: 25
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -137,11 +137,6 @@ statuses:
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: quality-cross-platform-validation-integration-matrix
-      file: TODO/main/planning/quality-cross-platform-validation-integration-matrix.yaml
-      title: Wire cross-platform validation comparator into a nightly integration matrix
-      priority: Medium
-      category: Testing and Quality Assurance
   Identified:
     count: 1
     items:

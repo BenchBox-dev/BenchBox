@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T16:47:23.402004'
-total_items: 690
+generated_at: '2026-04-14T17:14:57.746068'
+total_items: 692
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 639
+    count: 641
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1553,6 +1553,11 @@ statuses:
       title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
       priority: Medium
       category: Core Functionality
+    - id: quality-extract-transactional-benchmark-base
+      file: DONE/main/planning/quality-extract-transactional-benchmark-base.yaml
+      title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: dedup-cloud-platform-shared-utilities
       file: DONE/core-functionality/active/dedup-cloud-platform-shared-utilities.yaml
       title: Extract shared cloud platform utilities (session cache validation, credential prompts)
@@ -3065,6 +3070,11 @@ statuses:
       title: Visualization Framework - Chart Generation & Results Display
       priority: Critical
       category: Marketing Content Enablement
+    - id: quality-cross-platform-validation-integration-matrix
+      file: DONE/main/planning/quality-cross-platform-validation-integration-matrix.yaml
+      title: Wire cross-platform validation comparator into a nightly integration matrix
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: duckdb-architecture-verification
       file: DONE/blog-content/active/duckdb-architecture-verification.yaml
       title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'

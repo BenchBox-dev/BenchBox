@@ -2,7 +2,8 @@ id: quality-cross-platform-validation-integration-matrix
 title: "Wire cross-platform validation comparator into a nightly integration matrix"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-14"
 category: Testing and Quality Assurance
 description: |
   Follow-up slice of quality-add-cross-platform-result-validation.
@@ -31,22 +32,22 @@ deps:
 work:
   - id: w1
     summary: "Write tests/integration/validation/test_cross_platform.py: DuckDB × DataFusion, TPC-H SF=0.01; comparator STRICT by default; Tolerance overrides must cite spec rules"
-    status: pending
+    status: done
 
   - id: w2
     summary: "Extend the suite to DuckDB × Polars-DF and DuckDB × ClickHouse-local (docker). Keep test markers = live_integration so the fast lane is unaffected."
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Add .github/workflows/cross-platform-validation.yml running on cron (nightly) plus workflow_dispatch. On failure, upload a structured JSON diff artifact per failed (benchmark, platform-pair) cell."
     needs: [w2]
-    status: pending
+    status: done
 
   - id: w4
     summary: "Document a triage runbook: how to read the diff artifact, how to file a TODO with spec-anchored rationale if the divergence is legitimate, and how to roll back an adapter change that broke a column."
     needs: [w3]
-    status: pending
+    status: done
 
 files_affected:
   added:

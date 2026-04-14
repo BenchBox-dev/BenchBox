@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T17:02:23.417780'
-total_items: 36
+generated_at: '2026-04-14T17:14:56.056258'
+total_items: 35
 priorities:
   Critical:
     count: 1
@@ -86,7 +86,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 9
+    count: 8
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -121,11 +121,6 @@ priorities:
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
-      category: Testing and Quality Assurance
-      status: Not Started
-    - id: quality-cross-platform-validation-integration-matrix
-      file: TODO/main/planning/quality-cross-platform-validation-integration-matrix.yaml
-      title: Wire cross-platform validation comparator into a nightly integration matrix
       category: Testing and Quality Assurance
       status: Not Started
     - id: write-results-platform-phase-2-operations-runbook

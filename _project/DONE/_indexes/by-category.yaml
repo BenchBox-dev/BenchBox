@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T16:47:23.401656'
+generated_at: '2026-04-14T17:14:57.745716'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 53
+    count: 54
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -421,6 +421,11 @@ categories:
     - id: examples-code-duplication-consolidation
       file: DONE/unknown/planning/examples-code-duplication-consolidation.yaml
       title: Examples Code Duplication Consolidation
+      priority: Medium
+      status: Completed
+    - id: quality-extract-transactional-benchmark-base
+      file: DONE/main/planning/quality-extract-transactional-benchmark-base.yaml
+      title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
       priority: Medium
       status: Completed
     - id: quality-extract-throughput-runner
@@ -3322,7 +3327,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 36
+    count: 37
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3493,6 +3498,11 @@ categories:
     - id: test-suite-reliability-completed
       file: DONE/unknown/planning/test-suite-reliability-completed.yaml
       title: Test Suite Reliability ✅ COMPLETED
+      priority: Medium
+      status: Completed
+    - id: quality-cross-platform-validation-integration-matrix
+      file: DONE/main/planning/quality-cross-platform-validation-integration-matrix.yaml
+      title: Wire cross-platform validation comparator into a nightly integration matrix
       priority: Medium
       status: Completed
     - id: add-lightweight-example-smoke-tests

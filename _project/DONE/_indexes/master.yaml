@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T16:47:23.401309'
-total_items: 690
+generated_at: '2026-04-14T17:14:57.745384'
+total_items: 692
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6060,6 +6060,24 @@ items:
   work_total: 4
   work_done: 4
   work_ready: 0
+- id: quality-extract-transactional-benchmark-base
+  file: DONE/main/planning/quality-extract-transactional-benchmark-base.yaml
+  title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-2
+  - duplication
+  - transactional
+  estimated_effort: Medium (2-3 days)
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - quality-consolidate-duplicate-code-clusters
 - id: quality-extract-throughput-runner
   file: DONE/main/planning/quality-extract-throughput-runner.yaml
   title: Extract shared core.throughput.runner with aligned ThroughputResult model
@@ -7338,6 +7356,26 @@ items:
   priority: Medium
   status: Completed
   completed_date: '2025-12-14'
+- id: quality-cross-platform-validation-integration-matrix
+  file: DONE/main/planning/quality-cross-platform-validation-integration-matrix.yaml
+  title: Wire cross-platform validation comparator into a nightly integration matrix
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-2
+  - correctness
+  - validation
+  - ci
+  estimated_effort: Medium (2-3 days)
+  completed_date: '2026-04-14'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - quality-add-cross-platform-result-validation
 - id: duckdb-architecture-verification
   file: DONE/blog-content/active/duckdb-architecture-verification.yaml
   title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
