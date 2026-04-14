@@ -51,7 +51,7 @@ work:
 - id: w5
   summary: "Add tests for BaseSchemaTable: schema parsing, primary-key + partitioning passthrough, CREATE TABLE statement
     formatting per backend hook."
-  status: pending
+  status: done
 
 files_affected:
   added:
