@@ -4,21 +4,23 @@ worktree: main
 priority: Normal
 status: Not Started
 description: |
-  Both QuestDB and InfluxDB adapters override handle_existing_database() to work
-  around a base class limitation: when skip_database_management=True (used for
-  external managed databases), the base class immediately returns with
-  database_was_reused=True without validating whether the expected benchmark
-  tables actually exist.
-
-  This causes silent schema-creation skips when tables are stale or from a
-  different benchmark, leading to validation failures with empty tables.
+  QuestDB's handle_existing_database() override validates that all expected
+  benchmark tables exist before marking the database as reused. InfluxDB has a
+  separate override that logs a warning when force_recreate=True (it has no
+  table-validation logic). Both overrides work around a base class limitation:
+  when skip_database_management=True, the base class immediately returns with
+  database_was_reused=True without any table validation.
 
   Refactor the base class (benchbox/platforms/base/connection_lifecycle.py)
   to provide a check_benchmark_tables_exist() hook that managed-database
-  adapters can use without duplicating table-existence logic.
+  adapters can implement without duplicating connection and set-comparison logic.
 
-  Then migrate both QuestDB and InfluxDB to use the hook and remove their
-  near-duplicate overrides.
+  Migration plan:
+  - QuestDB: replace the full override body with a call to the base hook
+  - InfluxDB: keep its custom force_recreate warning; add a hook call for table
+    validation (the two concerns are independent and both should be preserved)
+  - Future managed-database adapters get correct reuse detection automatically
+    by implementing the hook rather than reimplementing the pattern from scratch.
 
 category: Architecture & Refactoring
 
