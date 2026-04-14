@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T09:41:56.157807'
-total_items: 40
+generated_at: '2026-04-14T09:49:53.102364'
+total_items: 39
 statuses:
   Blocked:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 30
+    count: 29
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -56,11 +56,6 @@ statuses:
       file: TODO/main/planning/explorer-add-comparison-charts.yaml
       title: Add normalized speedup and diverging bar charts to explorer compare view
       priority: Medium
-      category: Core Functionality
-    - id: explorer-align-duration-metric
-      file: TODO/main/planning/explorer-align-duration-metric.yaml
-      title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
-      priority: High
       category: Core Functionality
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml

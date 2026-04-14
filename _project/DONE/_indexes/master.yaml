@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T09:41:57.830533'
-total_items: 685
+generated_at: '2026-04-14T09:49:54.793198'
+total_items: 686
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -965,6 +965,27 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 3 weeks (0.75 FTE)
+- id: explorer-align-duration-metric
+  file: DONE/main/planning/explorer-align-duration-metric.yaml
+  title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - metrics
+  - geomean
+  - duration
+  - fidelity
+  estimated_effort: Small (0.5-1 day)
+  completed_date: '2026-04-14'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - explorer-extend-manifest-and-pipeline
 - id: apache-spark-platform-adapter
   file: DONE/platform-expansion-spark/planning/apache-spark-platform-adapter.yaml
   title: Apache Spark Platform Adapter

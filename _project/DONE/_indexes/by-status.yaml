@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T09:41:57.831237'
-total_items: 685
+generated_at: '2026-04-14T09:49:54.793878'
+total_items: 686
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 635
+    count: 636
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -753,6 +753,11 @@ statuses:
       file: DONE/main/active/align-benchbox-with-textcharts-de-benchboxing.yaml
       title: Align BenchBox call sites with textcharts de-benchboxed API
       priority: Medium-High
+      category: Core Functionality
+    - id: explorer-align-duration-metric
+      file: DONE/main/planning/explorer-align-duration-metric.yaml
+      title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
+      priority: High
       category: Core Functionality
     - id: athena-spark-platform
       file: DONE/platform-expansion/planning/athena-spark-platform.yaml

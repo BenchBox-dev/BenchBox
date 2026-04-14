@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:41:57.830878'
+generated_at: '2026-04-14T09:49:54.793536'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -592,7 +592,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 223
+    count: 224
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -768,6 +768,11 @@ categories:
       file: DONE/main/active/align-benchbox-with-textcharts-de-benchboxing.yaml
       title: Align BenchBox call sites with textcharts de-benchboxed API
       priority: Medium-High
+      status: Completed
+    - id: explorer-align-duration-metric
+      file: DONE/main/planning/explorer-align-duration-metric.yaml
+      title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
+      priority: High
       status: Completed
     - id: dataframe-read-primitives-architecture
       file: DONE/dataframe-benchmarks/active/dataframe-read-primitives-architecture.yaml
