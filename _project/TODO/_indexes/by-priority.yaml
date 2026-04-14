@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T16:47:21.675083'
+generated_at: '2026-04-14T17:02:23.417780'
 total_items: 36
 priorities:
   Critical:
@@ -86,7 +86,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 10
+    count: 9
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -108,11 +108,6 @@ priorities:
       title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Not Started
-    - id: quality-extract-transactional-benchmark-base
-      file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
-      title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow

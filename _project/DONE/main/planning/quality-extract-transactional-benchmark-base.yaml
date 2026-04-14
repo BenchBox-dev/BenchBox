@@ -2,7 +2,7 @@ id: quality-extract-transactional-benchmark-base
 title: "Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
 category: Code Quality and Technical Debt
 description: |
   Quality plan supplement — duplication workstream follow-up. Tracks
@@ -47,7 +47,7 @@ work:
   summary: "Migrate write_primitives.Benchmark onto TransactionalBenchmarkBase[ResultT, OperationT]; verify type params bind
     cleanly. One commit."
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w4
   summary: "Introduce OperationsRegistryBase[OperationT]; migrate transaction_primitives.Operations and write_primitives.Operations
@@ -59,7 +59,7 @@ work:
   summary: "Re-run pylint duplicate-code at 15-line threshold over both modules; confirm the three R-08 clusters drop out.
     Update docs/development/duplication-residuals.md."
   needs: [w3, w4]
-  status: pending
+  status: done
 
 files_affected:
   modified:

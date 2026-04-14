@@ -1,6 +1,14 @@
-generated_at: '2026-04-14T16:47:21.675068'
-total_categories: 9
+generated_at: '2026-04-14T17:02:23.417761'
+total_categories: 10
 categories:
+  Architecture & Refactoring:
+    count: 1
+    items:
+    - id: generalize-database-table-reuse-detection
+      file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
+      title: Generalize benchmark table reuse detection for managed databases
+      priority: Normal
+      status: Not Started
   Benchmark Development:
     count: 4
     items:
@@ -25,13 +33,8 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 2
+    count: 1
     items:
-    - id: quality-extract-transactional-benchmark-base
-      file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
-      title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
-      priority: Medium
-      status: In Progress
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds

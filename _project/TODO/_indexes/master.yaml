@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T16:47:21.675042'
+generated_at: '2026-04-14T17:02:23.417728'
 total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -421,24 +421,6 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
-- id: quality-extract-transactional-benchmark-base
-  file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
-  title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: In Progress
-  tags:
-  - quality-plan
-  - phase-2
-  - duplication
-  - transactional
-  estimated_effort: Medium (2-3 days)
-  work_total: 5
-  work_done: 2
-  work_ready: 1
-  needs:
-  - quality-consolidate-duplicate-code-clusters
 - id: implement-pr-based-result-submission-workflow
   file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
   title: Implement PR-based community result submission workflow
@@ -670,3 +652,16 @@ items:
   work_ready: 0
   needs:
   - implement-pr-based-result-submission-workflow
+- id: generalize-database-table-reuse-detection
+  file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
+  title: Generalize benchmark table reuse detection for managed databases
+  worktree: main
+  category: Architecture & Refactoring
+  priority: Normal
+  status: Not Started
+  tags:
+  - architecture
+  - database-adapters
+  - managed-databases
+  - refactoring
+  estimated_effort: Small
