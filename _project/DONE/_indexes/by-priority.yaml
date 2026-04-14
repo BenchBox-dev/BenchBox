@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:40:42.142088'
-total_items: 683
+generated_at: '2026-04-14T09:32:48.381901'
+total_items: 684
 priorities:
   Critical:
     count: 39
@@ -200,7 +200,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 239
+    count: 240
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -529,6 +529,11 @@ priorities:
       title: Expose interactive table mode selection and include it in equivalent CLI command
       category: User Experience
       status: Completed
+    - id: explorer-extend-manifest-and-pipeline
+      file: DONE/main/planning/explorer-extend-manifest-and-pipeline.yaml
+      title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
+      category: Core Functionality
+      status: Not Started
     - id: extract-ascii-charting-into-standalone-library
       file: DONE/main/active/extract-ascii-charting-into-standalone-library.yaml
       title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout

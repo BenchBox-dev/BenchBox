@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:40:42.141598'
-total_items: 683
+generated_at: '2026-04-14T09:32:48.381369'
+total_items: 684
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1561,6 +1561,24 @@ items:
   work_total: 8
   work_done: 8
   work_ready: 0
+- id: explorer-extend-manifest-and-pipeline
+  file: DONE/main/planning/explorer-extend-manifest-and-pipeline.yaml
+  title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - pipeline
+  - manifest
+  - duckdb
+  - fidelity
+  estimated_effort: Medium (2-3 days)
+  work_total: 7
+  work_done: 0
+  work_ready: 1
 - id: extract-ascii-charting-into-standalone-library
   file: DONE/main/active/extract-ascii-charting-into-standalone-library.yaml
   title: Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout

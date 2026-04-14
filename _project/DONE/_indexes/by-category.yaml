@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T08:40:42.141908'
+generated_at: '2026-04-14T09:32:48.381720'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -587,7 +587,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 222
+    count: 223
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -975,6 +975,11 @@ categories:
       title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
       priority: Medium-High
       status: Completed
+    - id: explorer-extend-manifest-and-pipeline
+      file: DONE/main/planning/explorer-extend-manifest-and-pipeline.yaml
+      title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
+      priority: High
+      status: Not Started
     - id: dedup-query-catalog-base
       file: DONE/core-functionality/active/dedup-query-catalog-base.yaml
       title: Extract BaseQueryCatalog for shared get_query logic and TranslatableQueryMixin

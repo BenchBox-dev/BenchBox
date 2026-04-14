@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T08:44:40.083738'
+generated_at: '2026-04-14T09:32:46.442931'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -31,7 +31,7 @@ categories:
       file: TODO/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
       title: Add unit tests for 5 helpers extracted by the dedup consolidation
       priority: Low
-      status: Not Started
+      status: In Progress
     - id: quality-extract-transactional-benchmark-base
       file: TODO/main/planning/quality-extract-transactional-benchmark-base.yaml
       title: Extract shared TransactionalBenchmarkBase + OperationsRegistryBase for transaction/write primitives
@@ -48,7 +48,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 18
+    count: 17
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -105,11 +105,6 @@ categories:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       priority: Medium-High
       status: Completed
-    - id: explorer-extend-manifest-and-pipeline
-      file: TODO/main/planning/explorer-extend-manifest-and-pipeline.yaml
-      title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
-      priority: High
-      status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow

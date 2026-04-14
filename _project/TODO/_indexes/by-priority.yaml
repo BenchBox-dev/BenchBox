@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:44:40.083760'
-total_items: 42
+generated_at: '2026-04-14T09:32:46.442952'
+total_items: 41
 priorities:
   Critical:
     count: 1
@@ -10,16 +10,11 @@ priorities:
       category: Core Functionality
       status: Completed
   High:
-    count: 8
+    count: 7
     items:
     - id: explorer-align-duration-metric
       file: TODO/main/planning/explorer-align-duration-metric.yaml
       title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
-      category: Core Functionality
-      status: Not Started
-    - id: explorer-extend-manifest-and-pipeline
-      file: TODO/main/planning/explorer-extend-manifest-and-pipeline.yaml
-      title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields
       category: Core Functionality
       status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
@@ -180,7 +175,7 @@ priorities:
       file: TODO/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
       title: Add unit tests for 5 helpers extracted by the dedup consolidation
       category: Code Quality and Technical Debt
-      status: Not Started
+      status: In Progress
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
