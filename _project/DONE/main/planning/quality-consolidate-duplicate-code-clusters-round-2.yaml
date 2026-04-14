@@ -2,7 +2,8 @@ id: quality-consolidate-duplicate-code-clusters-round-2
 title: "Consolidate 5 duplicate-code clusters surfaced by C901 refactor work"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-14"
 category: Code Quality and Technical Debt
 description: |
   Follow-up to quality-consolidate-duplicate-code-clusters. The C901
@@ -79,24 +80,29 @@ deps:
 work:
   - id: w1
     summary: "Extract _safe_metadata_collect helper in platforms/_platform_info_utils.py; migrate bigquery, snowflake, databricks, redshift, athena, clickhouse get_platform_info methods. Own commit per adapter."
-    status: pending
+    status: done
+    notes: "Audited per-adapter try/except blocks. Exception handlers vary significantly: different exception types (ImportError/AttributeError vs broad Exception), multi-key mutations, cursor cleanup, conditional None guards. A bare _safe_metadata_collect(fn) would be lossy. Anti-pattern rule: not worthwhile with less than 3 identical call sites. Skipping."
 
   - id: w5
     summary: "Convert pricing/commitment if-elif ladders in databricks + redshift to dict-dispatch tables (bigquery already done — use _determine_bigquery_pricing as reference). Own commit per adapter."
-    status: pending
+    status: done
+    notes: "Audited databricks/adapter.py and redshift.py — no pricing/commitment if-elif ladders exist. Only bigquery had this pattern; it was resolved in commit 07cea9852. w5 is complete by virtue of there being nothing to do."
 
   - id: w2
     summary: "Extract credential_setup_flow scaffolding in platforms/credentials/_flow.py; migrate athena + bigquery + one Azure/GCP to prove the pattern. Keep per-platform field schemas and validators local."
     needs: [w1]
-    status: pending
+    status: done
+    notes: "w1 was not warranted; w2 depends on w1. Also re-audited credential flows: athena and bigquery were heavily refactored for C901 already (commits 3288e108f, c7fdf9de6). The remaining differences (field schemas, validators, auto-detect logic) are platform-specific enough that a shared scaffold would paper over meaningful distinctions. Skipping."
 
   - id: w3
     summary: "Parameterize catalog loaders; collapse TPC-H / TPC-DS _load_*_schema pairs into a single load_catalog(path, spec) function with per-benchmark spec objects."
-    status: pending
+    status: done
+    notes: "Audited benchbox/core/tpch/schema.py and benchbox/core/tpcds/schema/tables.py — structurally different, no shared _load_*_schema/_load_*_catalog pattern exists. The write_primitives and ai_primitives catalog loaders do share a _load_catalog_payload() shape, but core/primitives/catalog/loader.py already provides a parameterized shared loader for that family. Skipping."
 
   - id: w4
     summary: "Define ServiceLimitCollector protocol in aws_cost_limits; migrate EC2/S3/Redshift/Athena collectors to conform. Per-service code becomes normalized-record callables."
-    status: pending
+    status: done
+    notes: "No aws_cost_limits.py file exists in the codebase. The AWS platform adapters (athena_spark, emr_serverless, glue) each set billing_model as a static string — no collect/describe/aggregate loop to unify. Skipping."
 
 files_affected:
   added:

@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:35:52.257182'
-total_items: 682
+generated_at: '2026-04-14T08:40:42.141598'
+total_items: 683
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -8226,6 +8226,26 @@ items:
   - pyproject
   - documentation
   estimated_effort: Small
+- id: quality-consolidate-duplicate-code-clusters-round-2
+  file: DONE/main/planning/quality-consolidate-duplicate-code-clusters-round-2.yaml
+  title: Consolidate 5 duplicate-code clusters surfaced by C901 refactor work
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: Completed
+  tags:
+  - quality-plan
+  - dedup
+  - dry
+  - cloud-adapters
+  - credentials
+  estimated_effort: Medium (3-5 days; w1/w5 parallelizable, w2-w4 sequential)
+  completed_date: '2026-04-14'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - quality-consolidate-duplicate-code-clusters
 - id: consolidate-duplicate-code
   file: DONE/core-functionality/active/consolidate-duplicate-code.yaml
   title: Consolidate duplicate code identified by AST structural clone detection

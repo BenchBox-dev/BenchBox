@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:35:52.257690'
-total_items: 682
+generated_at: '2026-04-14T08:40:42.142088'
+total_items: 683
 priorities:
   Critical:
     count: 39
@@ -1401,7 +1401,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 102
+    count: 103
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1623,6 +1623,11 @@ priorities:
       file: DONE/platform-expansion/active/cloud-spark-dependency-groups.yaml
       title: Cloud Spark Dependency Groups in pyproject.toml
       category: Core Functionality
+      status: Completed
+    - id: quality-consolidate-duplicate-code-clusters-round-2
+      file: DONE/main/planning/quality-consolidate-duplicate-code-clusters-round-2.yaml
+      title: Consolidate 5 duplicate-code clusters surfaced by C901 refactor work
+      category: Code Quality and Technical Debt
       status: Completed
     - id: consolidate-duplicate-code
       file: DONE/core-functionality/active/consolidate-duplicate-code.yaml

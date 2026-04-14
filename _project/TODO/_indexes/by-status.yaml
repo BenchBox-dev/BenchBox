@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:35:50.565800'
-total_items: 43
+generated_at: '2026-04-14T08:40:40.459044'
+total_items: 42
 statuses:
   Blocked:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 33
+    count: 32
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -67,11 +67,6 @@ statuses:
       title: Align explorer duration metric to geomean; retire wall-clock as primary comparison axis
       priority: High
       category: Core Functionality
-    - id: quality-consolidate-duplicate-code-clusters-round-2
-      file: TODO/main/planning/quality-consolidate-duplicate-code-clusters-round-2.yaml
-      title: Consolidate 5 duplicate-code clusters surfaced by C901 refactor work
-      priority: Medium-High
-      category: Code Quality and Technical Debt
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence

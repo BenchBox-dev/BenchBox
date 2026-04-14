@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:35:50.565728'
-total_items: 43
+generated_at: '2026-04-14T08:40:40.458975'
+total_items: 42
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -707,25 +707,6 @@ items:
   work_ready: 0
   needs:
   - implement-pr-based-result-submission-workflow
-- id: quality-consolidate-duplicate-code-clusters-round-2
-  file: TODO/main/planning/quality-consolidate-duplicate-code-clusters-round-2.yaml
-  title: Consolidate 5 duplicate-code clusters surfaced by C901 refactor work
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - quality-plan
-  - dedup
-  - dry
-  - cloud-adapters
-  - credentials
-  estimated_effort: Medium (3-5 days; w1/w5 parallelizable, w2-w4 sequential)
-  work_total: 5
-  work_done: 0
-  work_ready: 4
-  needs:
-  - quality-consolidate-duplicate-code-clusters
 - id: define-hosted-results-contract-and-governance-model
   file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
   title: Define hosted results contract, trust labels, and governance model

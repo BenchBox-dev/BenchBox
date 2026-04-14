@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T08:35:52.257862'
-total_items: 682
+generated_at: '2026-04-14T08:40:42.142254'
+total_items: 683
 statuses:
   In Progress:
     count: 2
@@ -261,7 +261,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 632
+    count: 633
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1049,6 +1049,11 @@ statuses:
       title: Connection Parameter Conflicts in TPC Test Methods
       priority: Medium
       category: Bug Fixes
+    - id: quality-consolidate-duplicate-code-clusters-round-2
+      file: DONE/main/planning/quality-consolidate-duplicate-code-clusters-round-2.yaml
+      title: Consolidate 5 duplicate-code clusters surfaced by C901 refactor work
+      priority: Medium-High
+      category: Code Quality and Technical Debt
     - id: dedup-wave2-dataframe-platform
       file: DONE/core-functionality/active/dedup-wave2-dataframe-platform.yaml
       title: 'Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading'

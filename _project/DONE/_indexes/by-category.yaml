@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T08:35:52.257514'
+generated_at: '2026-04-14T08:40:42.141908'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 50
+    count: 51
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -359,6 +359,11 @@ categories:
       file: DONE/core-functionality/active/complexity-check-triage-and-remediation.yaml
       title: 'Complexity check follow-up: triage intended complexity and remediate accidental complexity'
       priority: High
+      status: Completed
+    - id: quality-consolidate-duplicate-code-clusters-round-2
+      file: DONE/main/planning/quality-consolidate-duplicate-code-clusters-round-2.yaml
+      title: Consolidate 5 duplicate-code clusters surfaced by C901 refactor work
+      priority: Medium-High
       status: Completed
     - id: dedup-wave2-dataframe-platform
       file: DONE/core-functionality/active/dedup-wave2-dataframe-platform.yaml
