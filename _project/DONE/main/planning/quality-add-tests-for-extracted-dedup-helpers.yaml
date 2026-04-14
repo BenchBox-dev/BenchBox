@@ -2,7 +2,8 @@ id: quality-add-tests-for-extracted-dedup-helpers
 title: "Add unit tests for 5 helpers extracted by the dedup consolidation"
 worktree: main
 priority: Low
-status: In Progress
+status: Completed
+completed_date: "2026-04-14"
 category: Code Quality and Technical Debt
 description: |
   Code review of `quality-consolidate-duplicate-code-clusters` flagged

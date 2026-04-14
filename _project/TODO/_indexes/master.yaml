@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T09:39:55.794089'
-total_items: 41
+generated_at: '2026-04-14T09:41:56.157743'
+total_items: 40
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -186,23 +186,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: quality-add-tests-for-extracted-dedup-helpers
-  file: TODO/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
-  title: Add unit tests for 5 helpers extracted by the dedup consolidation
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Low
-  status: In Progress
-  tags:
-  - quality-plan
-  - tests
-  - duplication-followup
-  estimated_effort: Small (1 day, ~5 small test modules)
-  work_total: 5
-  work_done: 4
-  work_ready: 1
-  needs:
-  - quality-consolidate-duplicate-code-clusters
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

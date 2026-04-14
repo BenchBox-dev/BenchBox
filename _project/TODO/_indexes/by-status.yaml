@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T09:39:55.794157'
-total_items: 41
+generated_at: '2026-04-14T09:41:56.157807'
+total_items: 40
 statuses:
   Blocked:
     count: 1
@@ -9,14 +9,6 @@ statuses:
       title: Support unofficial TPC-DS scales with explicit methodology guardrails
       priority: High
       category: Core Functionality
-  In Progress:
-    count: 1
-    items:
-    - id: quality-add-tests-for-extracted-dedup-helpers
-      file: TODO/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
-      title: Add unit tests for 5 helpers extracted by the dedup consolidation
-      priority: Low
-      category: Code Quality and Technical Debt
   Not Started:
     count: 30
     items:

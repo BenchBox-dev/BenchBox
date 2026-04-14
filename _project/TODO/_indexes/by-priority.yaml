@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T09:39:55.794145'
-total_items: 41
+generated_at: '2026-04-14T09:41:56.157795'
+total_items: 40
 priorities:
   Critical:
     count: 1
@@ -159,7 +159,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 12
+    count: 11
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -171,11 +171,6 @@ priorities:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: quality-add-tests-for-extracted-dedup-helpers
-      file: TODO/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
-      title: Add unit tests for 5 helpers extracted by the dedup consolidation
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

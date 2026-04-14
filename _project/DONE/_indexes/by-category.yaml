@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:39:57.668272'
+generated_at: '2026-04-14T09:41:57.830878'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 51
+    count: 52
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -334,6 +334,11 @@ categories:
       file: DONE/core-functionality/active/dedup-wave3-ignore-rules.yaml
       title: Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage
       priority: Medium-High
+      status: Completed
+    - id: quality-add-tests-for-extracted-dedup-helpers
+      file: DONE/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
+      title: Add unit tests for 5 helpers extracted by the dedup consolidation
+      priority: Low
       status: Completed
     - id: quality-add-dependency-upper-bounds-policy
       file: DONE/main/quality/quality-add-dependency-upper-bounds-policy.yaml
