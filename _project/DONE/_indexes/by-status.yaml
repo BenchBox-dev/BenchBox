@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T10:03:40.903815'
-total_items: 688
+generated_at: '2026-04-14T16:43:35.873739'
+total_items: 689
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 637
+    count: 638
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -603,6 +603,11 @@ statuses:
       title: Add blog to BenchBox site using ABlog Sphinx extension
       priority: Medium
       category: Documentation
+    - id: explorer-comparability-warnings
+      file: DONE/main/planning/explorer-comparability-warnings.yaml
+      title: Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons
+      priority: Medium
+      category: Core Functionality
     - id: complexity-ignore-required-w15
       file: DONE/core-functionality/active/complexity-ignore-required-w15.yaml
       title: Add complexity exclusions for 5 functions with inherent required complexity

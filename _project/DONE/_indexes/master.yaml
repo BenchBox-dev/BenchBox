@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T10:03:40.903049'
-total_items: 688
+generated_at: '2026-04-14T16:43:35.873009'
+total_items: 689
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4936,6 +4936,28 @@ items:
   - sphinx
   - ablog
   estimated_effort: 2-3 hours
+- id: explorer-comparability-warnings
+  file: DONE/main/planning/explorer-comparability-warnings.yaml
+  title: Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - comparability
+  - warnings
+  - compare
+  - fidelity
+  estimated_effort: Small (0.5-1 day)
+  completed_date: '2026-04-14'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+  needs:
+  - explorer-extend-manifest-and-pipeline
+  - explorer-add-tuning-config-visibility
 - id: complexity-ignore-required-w15
   file: DONE/core-functionality/active/complexity-ignore-required-w15.yaml
   title: Add complexity exclusions for 5 functions with inherent required complexity

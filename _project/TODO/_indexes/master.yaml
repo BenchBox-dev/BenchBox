@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T10:03:39.207939'
-total_items: 38
+generated_at: '2026-04-14T16:43:34.146525'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -383,27 +383,6 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 6
-- id: explorer-comparability-warnings
-  file: TODO/main/planning/explorer-comparability-warnings.yaml
-  title: Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - comparability
-  - warnings
-  - compare
-  - fidelity
-  estimated_effort: Small (0.5-1 day)
-  work_total: 3
-  work_done: 0
-  work_ready: 1
-  needs:
-  - explorer-extend-manifest-and-pipeline
-  - explorer-add-tuning-config-visibility
 - id: explorer-add-comparison-charts
   file: TODO/main/planning/explorer-add-comparison-charts.yaml
   title: Add normalized speedup and diverging bar charts to explorer compare view

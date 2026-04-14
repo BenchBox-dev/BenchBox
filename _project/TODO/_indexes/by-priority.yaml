@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T10:03:39.207985'
-total_items: 38
+generated_at: '2026-04-14T16:43:34.146585'
+total_items: 37
 priorities:
   Critical:
     count: 1
@@ -86,7 +86,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 12
+    count: 11
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -97,11 +97,6 @@ priorities:
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: explorer-comparability-warnings
-      file: TODO/main/planning/explorer-comparability-warnings.yaml
-      title: Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons
-      category: Core Functionality
       status: Not Started
     - id: explorer-add-comparison-charts
       file: TODO/main/planning/explorer-add-comparison-charts.yaml

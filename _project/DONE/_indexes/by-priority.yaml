@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T10:03:40.903642'
-total_items: 688
+generated_at: '2026-04-14T16:43:35.873567'
+total_items: 689
 priorities:
   Critical:
     count: 39
@@ -1935,7 +1935,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 279
+    count: 280
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2166,6 +2166,11 @@ priorities:
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
       title: Add blog to BenchBox site using ABlog Sphinx extension
       category: Documentation
+      status: Completed
+    - id: explorer-comparability-warnings
+      file: DONE/main/planning/explorer-comparability-warnings.yaml
+      title: Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons
+      category: Core Functionality
       status: Completed
     - id: complexity-ignore-required-w15
       file: DONE/core-functionality/active/complexity-ignore-required-w15.yaml

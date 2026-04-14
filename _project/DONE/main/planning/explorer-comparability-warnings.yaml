@@ -2,7 +2,8 @@ id: explorer-comparability-warnings
 title: "Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-14"
 category: Core Functionality
 
 description: |
@@ -33,7 +34,7 @@ deps:
 work:
   - id: w1
     summary: "Add comparability check function to Compare.tsx: given two DetailResult objects, return a list of ComparabilityWarning records {dimension, value_a, value_b, severity}."
-    status: pending
+    status: done
     notes: |
       Dimensions to check:
         - execution_mode: warn if "sql" vs "dataframe"
@@ -46,12 +47,12 @@ work:
   - id: w2
     summary: "Render ComparabilityWarning banners above the compare chart: yellow background, icon + message per differing dimension. Dismissible."
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Extend cohort validation in Compare.tsx: execution_mode + tuning_mode mismatches produce soft-warns; benchmark + scale mismatches remain hard-blocks."
     needs: [w2]
-    status: pending
+    status: done
 
 files_affected:
   modified:

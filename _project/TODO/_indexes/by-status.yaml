@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T10:03:39.207997'
-total_items: 38
+generated_at: '2026-04-14T16:43:34.146597'
+total_items: 37
 statuses:
   Blocked:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Core Functionality
   Not Started:
-    count: 28
+    count: 27
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -41,11 +41,6 @@ statuses:
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
-      category: Core Functionality
-    - id: explorer-comparability-warnings
-      file: TODO/main/planning/explorer-comparability-warnings.yaml
-      title: Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons
-      priority: Medium
       category: Core Functionality
     - id: explorer-add-methodology-disclosure
       file: TODO/main/planning/explorer-add-methodology-disclosure.yaml

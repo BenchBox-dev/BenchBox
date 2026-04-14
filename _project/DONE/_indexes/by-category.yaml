@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T10:03:40.903449'
+generated_at: '2026-04-14T16:43:35.873382'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -597,7 +597,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 225
+    count: 226
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -724,6 +724,11 @@ categories:
       title: Add Time Series Benchmark Suite (TSBS) Implementation
       priority: Medium
       status: In Progress
+    - id: explorer-comparability-warnings
+      file: DONE/main/planning/explorer-comparability-warnings.yaml
+      title: Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons
+      priority: Medium
+      status: Completed
     - id: complexity-ignore-required-w15
       file: DONE/core-functionality/active/complexity-ignore-required-w15.yaml
       title: Add complexity exclusions for 5 functions with inherent required complexity

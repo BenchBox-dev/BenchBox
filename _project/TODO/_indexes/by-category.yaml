@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T10:03:39.207970'
+generated_at: '2026-04-14T16:43:34.146563'
 total_categories: 9
 categories:
   Benchmark Development:
@@ -38,17 +38,12 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 16
+    count: 15
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
-      status: Not Started
-    - id: explorer-comparability-warnings
-      file: TODO/main/planning/explorer-comparability-warnings.yaml
-      title: Add comparability warnings to Compare view for cross-mode and cross-tuning comparisons
-      priority: Medium
       status: Not Started
     - id: explorer-add-methodology-disclosure
       file: TODO/main/planning/explorer-add-methodology-disclosure.yaml
