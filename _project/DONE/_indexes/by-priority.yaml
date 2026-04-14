@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T10:03:20.839564'
-total_items: 687
+generated_at: '2026-04-14T10:03:40.903642'
+total_items: 688
 priorities:
   Critical:
     count: 39
@@ -1935,7 +1935,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 278
+    count: 279
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2588,6 +2588,11 @@ priorities:
       file: DONE/core-functionality/active/dedup-spark-shared-base.yaml
       title: Extract shared Spark base for LakeSail/Spark duplicated load_data and execute_query
       category: Core Functionality
+      status: Completed
+    - id: quality-extract-throughput-runner
+      file: DONE/main/planning/quality-extract-throughput-runner.yaml
+      title: Extract shared core.throughput.runner with aligned ThroughputResult model
+      category: Code Quality and Technical Debt
       status: Completed
     - id: dedup-simple-benchmark-base-methods
       file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml

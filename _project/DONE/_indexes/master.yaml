@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T10:03:20.839071'
-total_items: 687
+generated_at: '2026-04-14T10:03:40.903049'
+total_items: 688
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6016,6 +6016,25 @@ items:
   work_total: 4
   work_done: 4
   work_ready: 0
+- id: quality-extract-throughput-runner
+  file: DONE/main/planning/quality-extract-throughput-runner.yaml
+  title: Extract shared core.throughput.runner with aligned ThroughputResult model
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - phase-2
+  - duplication
+  - throughput
+  estimated_effort: Medium (2-3 days)
+  completed_date: '2026-04-14'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  needs:
+  - quality-consolidate-duplicate-code-clusters
 - id: dedup-simple-benchmark-base-methods
   file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
   title: Extract shared run_benchmark and _load_data to SimpleBenchmarkMixin

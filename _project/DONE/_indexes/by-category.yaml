@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T10:03:20.839388'
+generated_at: '2026-04-14T10:03:40.903449'
 total_categories: 76
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 52
+    count: 53
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -421,6 +421,11 @@ categories:
     - id: examples-code-duplication-consolidation
       file: DONE/unknown/planning/examples-code-duplication-consolidation.yaml
       title: Examples Code Duplication Consolidation
+      priority: Medium
+      status: Completed
+    - id: quality-extract-throughput-runner
+      file: DONE/main/planning/quality-extract-throughput-runner.yaml
+      title: Extract shared core.throughput.runner with aligned ThroughputResult model
       priority: Medium
       status: Completed
     - id: fix-cli-benchmarks-module-critical-issues
