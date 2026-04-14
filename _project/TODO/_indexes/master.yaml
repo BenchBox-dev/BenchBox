@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T09:53:21.575467'
+generated_at: '2026-04-14T09:56:10.524676'
 total_items: 39
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -475,8 +475,8 @@ items:
   - throughput
   estimated_effort: Medium (2-3 days)
   work_total: 6
-  work_done: 2
-  work_ready: 1
+  work_done: 3
+  work_ready: 2
   needs:
   - quality-consolidate-duplicate-code-clusters
 - id: implement-pr-based-result-submission-workflow

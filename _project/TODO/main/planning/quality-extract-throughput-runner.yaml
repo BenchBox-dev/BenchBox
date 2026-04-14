@@ -45,7 +45,7 @@ work:
   summary: "Introduce benchbox/core/throughput/runner.py with StreamRunner protocol, concurrent-stream executor, metrics calc.
     Success-rate via config (TPC-DS default 70%, overridable). One commit."
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w4
   summary: "Migrate TPC-H throughput_test.py to use core.throughput.runner.StreamRunner; preserve config.min_success_rate
