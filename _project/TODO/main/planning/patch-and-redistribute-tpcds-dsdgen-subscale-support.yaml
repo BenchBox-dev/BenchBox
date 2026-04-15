@@ -44,7 +44,31 @@ work:
 - id: w3
   summary: "Prototype the source patch on the native Darwin toolchain and rerun Gate Zero at 0.01, 0.1, and 0.5 with row counts and checksums."
   needs: [w1, w2]
-  status: pending
+  status: done
+  notes: |
+    Completed on 2026-04-14. Source patch applied to _sources/tpc-ds/tools/ across
+    five files (params.h, r_params.h, r_params.c, scaling.c, w_call_center.c) following
+    the DuckDB TPC-DS extension approach: read SCALE as double via a new get_dbl(),
+    route sub-SF1 scales through the case-1 switch branch via iScale = max(1, int(nScale)),
+    and apply the fractional factor as a post-multiplier on the SF=1 baseline with a
+    minimum-1-row floor. See _sources/tpc-ds/PATCHES.md "Sub-SF1 Scale Factor Support"
+    for the full diff description.
+
+    Built from source at /tmp/tpcds_subscale_build/tools/dsdgen on darwin-arm64 and
+    reran the Gate Zero probe for call_center, store, warehouse, web_site at
+    sf=0.01, 0.1, 0.5 plus the sf=1.0 control. All 16 combinations exit 0 with
+    non-empty output (previously all 12 sub-SF1 combinations exit 139). sf=1.0 row
+    counts and SHA-256 checksums match the pre-patch control column exactly, so the
+    patch does not perturb canonical generation. sf=0.5 row counts are exactly 50%
+    of sf=1.0, and sf=0.01 / sf=0.1 hit the min-1 floor on the small-dimension
+    tables as designed. Full table of row counts and checksums is in
+    _sources/tpcds-subscale-probe.md "Post-Patch Gate Zero (w3)".
+
+    Scope caveat: this item is satisfied for darwin-arm64 only. Cross-bundle Gate
+    Zero evidence (darwin-x86_64, linux-arm64, linux-x86_64, windows-x86_64) is the
+    w4 deliverable and is still pending. Shipped _binaries/ bundles remain
+    unpatched; BenchBox's scale_factor >= 1.0 Python guard stays in place until w4
+    completes across every target.
 
 - id: w4
   summary: "Build and verify the patched bundle set for every distributed target (`darwin-*`, `linux-*`, `windows-*`) or document exactly which targets remain unsupported."
