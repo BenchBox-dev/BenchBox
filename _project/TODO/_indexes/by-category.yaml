@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T08:52:22.087988'
+generated_at: '2026-04-15T09:02:41.070709'
 total_categories: 9
 categories:
   Architecture & Refactoring:
@@ -41,7 +41,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 19
+    count: 18
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -98,11 +98,6 @@ categories:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       priority: Medium-High
       status: Completed
-    - id: explorer-fix-read-model-contract
-      file: TODO/main/planning/explorer-fix-read-model-contract.yaml
-      title: 'Fix explorer read-model contract: platform/provenance split, canonical query reduction, ranking eligibility'
-      priority: Critical
-      status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow

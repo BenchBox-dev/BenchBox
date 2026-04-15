@@ -1,8 +1,8 @@
-generated_at: '2026-04-15T08:52:24.052211'
-total_items: 694
+generated_at: '2026-04-15T09:02:42.786619'
+total_items: 695
 priorities:
   Critical:
-    count: 39
+    count: 40
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -103,6 +103,11 @@ priorities:
       file: DONE/main/planning/fix-platform-format-preference-defaults.yaml
       title: Fix data format selection to always default to platform preferences
       category: Bug Fix
+      status: Completed
+    - id: explorer-fix-read-model-contract
+      file: DONE/main/planning/explorer-fix-read-model-contract.yaml
+      title: 'Fix explorer read-model contract: platform/provenance split, canonical query reduction, ranking eligibility'
+      category: Core Functionality
       status: Completed
     - id: fix-interactive-runner-defects
       file: DONE/main/active/fix-interactive-runner-defects.yaml

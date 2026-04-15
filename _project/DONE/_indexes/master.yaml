@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T08:52:24.051621'
-total_items: 694
+generated_at: '2026-04-15T09:02:42.786082'
+total_items: 695
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -314,6 +314,24 @@ items:
   completed_date: '2026-04-07'
   work_total: 5
   work_done: 5
+  work_ready: 0
+- id: explorer-fix-read-model-contract
+  file: DONE/main/planning/explorer-fix-read-model-contract.yaml
+  title: 'Fix explorer read-model contract: platform/provenance split, canonical query reduction, ranking eligibility'
+  worktree: main
+  category: Core Functionality
+  priority: Critical
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - pipeline
+  - read-model
+  - data-contract
+  estimated_effort: Medium (1-2 days)
+  completed_date: '2026-04-15'
+  work_total: 6
+  work_done: 6
   work_ready: 0
 - id: fix-interactive-runner-defects
   file: DONE/main/active/fix-interactive-runner-defects.yaml

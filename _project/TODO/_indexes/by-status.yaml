@@ -1,8 +1,8 @@
-generated_at: '2026-04-15T08:52:22.088021'
-total_items: 40
+generated_at: '2026-04-15T09:02:41.070741'
+total_items: 39
 statuses:
   Not Started:
-    count: 32
+    count: 31
     items:
     - id: explorer-heatmap-accessibility-and-tests
       file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
@@ -68,11 +68,6 @@ statuses:
       file: TODO/main/planning/explorer-emit-benchmark-summary-artifact.yaml
       title: Emit per-benchmark summary artifact for matrix leaderboard view
       priority: High
-      category: Core Functionality
-    - id: explorer-fix-read-model-contract
-      file: TODO/main/planning/explorer-fix-read-model-contract.yaml
-      title: 'Fix explorer read-model contract: platform/provenance split, canonical query reduction, ranking eligibility'
-      priority: Critical
       category: Core Functionality
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml

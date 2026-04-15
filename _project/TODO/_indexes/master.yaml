@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T08:52:22.087947'
-total_items: 40
+generated_at: '2026-04-15T09:02:41.070671'
+total_items: 39
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -19,23 +19,6 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
-- id: explorer-fix-read-model-contract
-  file: TODO/main/planning/explorer-fix-read-model-contract.yaml
-  title: 'Fix explorer read-model contract: platform/provenance split, canonical query reduction, ranking eligibility'
-  worktree: main
-  category: Core Functionality
-  priority: Critical
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - pipeline
-  - read-model
-  - data-contract
-  estimated_effort: Medium (1-2 days)
-  work_total: 6
-  work_done: 0
-  work_ready: 3
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
   title: Verify the validate-submission CI workflow end-to-end with a real PR

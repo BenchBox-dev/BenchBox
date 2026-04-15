@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T08:52:24.052023'
+generated_at: '2026-04-15T09:02:42.786433'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -602,7 +602,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 228
+    count: 229
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1154,6 +1154,11 @@ categories:
       file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml
       title: Fix datagen layout, naming normalization, and manifest/cache hygiene
       priority: High
+      status: Completed
+    - id: explorer-fix-read-model-contract
+      file: DONE/main/planning/explorer-fix-read-model-contract.yaml
+      title: 'Fix explorer read-model contract: platform/provenance split, canonical query reduction, ranking eligibility'
+      priority: Critical
       status: Completed
     - id: fix-result-filename-redundancy
       file: DONE/core-functionality/completed/fix-result-filename-redundancy.yaml

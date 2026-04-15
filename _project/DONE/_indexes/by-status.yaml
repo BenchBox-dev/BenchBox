@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T08:52:24.052387'
-total_items: 694
+generated_at: '2026-04-15T09:02:42.786792'
+total_items: 695
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 643
+    count: 644
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1767,6 +1767,11 @@ statuses:
       file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml
       title: Fix datagen layout, naming normalization, and manifest/cache hygiene
       priority: High
+      category: Core Functionality
+    - id: explorer-fix-read-model-contract
+      file: DONE/main/planning/explorer-fix-read-model-contract.yaml
+      title: 'Fix explorer read-model contract: platform/provenance split, canonical query reduction, ranking eligibility'
+      priority: Critical
       category: Core Functionality
     - id: fix-interactive-runner-defects
       file: DONE/main/active/fix-interactive-runner-defects.yaml
