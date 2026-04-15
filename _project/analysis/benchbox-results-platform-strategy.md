@@ -266,9 +266,12 @@ the benchmark family has no published aggregate metric (ClickBench, SSB,
 custom benchmarks). For **TPC-H and TPC-DS**, the canonical metric is
 `power_score` as defined by the TPC specification — users arriving from
 published TPC results expect to see that number. The explorer pipeline
-exposes a per-family `RANKING_METRIC_BY_FAMILY` registry that selects the
-primary metric; `geomean_ms` remains as the universal secondary metric
-shown alongside. See `explorer-align-ranking-metric-with-tpc-standards`.
+exposes a per-family `RANKING_METRIC_BY_FAMILY` registry
+(`benchbox/core/explorer_pipeline/models.py`) that selects the primary
+metric per benchmark family and serializes the choice into each
+`BenchmarkSummary` artifact's `ranking` field — no ranking logic lives in
+TypeScript. `geomean_ms` / `display_geomean_ms` remains as the universal
+secondary metric shown alongside. Implemented in `explorer-align-ranking-metric-with-tpc-standards`.
 
 ### Comparability Model
 

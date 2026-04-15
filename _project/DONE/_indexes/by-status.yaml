@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:11:17.154335'
-total_items: 697
+generated_at: '2026-04-15T09:17:53.764398'
+total_items: 698
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 646
+    count: 647
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2849,6 +2849,11 @@ statuses:
       title: Security Audit
       priority: Medium
       category: Pre-Release Medium Priority Tasks (Nice-to-Have)
+    - id: explorer-align-ranking-metric-with-tpc-standards
+      file: DONE/main/planning/explorer-align-ranking-metric-with-tpc-standards.yaml
+      title: Select ranking metric per benchmark family (power_score for TPC, geomean elsewhere)
+      priority: High
+      category: Core Functionality
     - id: surface-polars-driver-version-in-cli-output
       file: DONE/main/active/surface-polars-driver-version-in-cli-output.yaml
       title: Set driver_package for Polars platform so version appears in CLI run announcement

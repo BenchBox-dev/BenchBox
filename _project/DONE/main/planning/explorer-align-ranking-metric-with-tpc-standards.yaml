@@ -1,0 +1,124 @@
+id: explorer-align-ranking-metric-with-tpc-standards
+title: "Select ranking metric per benchmark family (power_score for TPC, geomean elsewhere)"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-15"
+category: Core Functionality
+
+description: |
+  The strategy review (2026-04-15) identified that defaulting to geometric
+  mean as the single ranking metric across all benchmarks is wrong:
+
+  - TPC-H and TPC-DS define **power_score** (= 3600 / geomean × scale
+    adjustment) as the standard metric. Users arriving from published
+    TPC results expect to see that number.
+  - ClickBench and SSB have no published aggregate; geomean is a
+    reasonable default there.
+  - Custom or ad-hoc benchmarks should expose both so users can pick.
+
+  This TODO introduces a per-benchmark-family ranking metric registry and
+  threads it through the pipeline and UI. The matrix leaderboard uses
+  `power_score` for TPC-H/TPC-DS and `geomean_ms` for everything else;
+  both are shown in each row, but the primary sort is the canonical one.
+
+  Scope excludes computing power_score (the CLI already does this) — this
+  TODO only ensures the explorer surfaces and ranks by the right metric.
+
+deps:
+  needs:
+  - explorer-emit-benchmark-summary-artifact
+
+work:
+- id: w1
+  summary: "Add RANKING_METRIC_BY_FAMILY registry in benchbox/core/explorer/models.py"
+  status: done
+  notes: |
+    Map benchmark family → {primary: str, secondary: str, primary_order:
+    'asc'|'desc'}. Initial entries:
+      - tpch → power_score (desc)
+      - tpcds → power_score (desc)
+      - star_schema → geomean_ms (asc)
+      - clickbench → geomean_ms (asc)
+    Fallback for unknown families: geomean_ms (asc).
+
+- id: w2
+  summary: "Extend BenchmarkSummary serialization with a top-level `ranking` field"
+  needs: [w1]
+  status: done
+  notes: |
+    Shape: {primary_metric, secondary_metric, primary_order}. Lives
+    alongside platform rows so the frontend does not need to know the
+    registry.
+
+- id: w3
+  summary: "In QueryHeatmap.tsx, read summary.ranking and sort/display by primary_metric"
+  needs: [w2]
+  status: done
+  notes: |
+    Display primary metric in a dedicated column with its unit;
+    display secondary metric below it in muted text. Power score has
+    no unit suffix (composite); geomean is "Xms". Column header is
+    dynamic: "Power Score" vs "Geomean" vs family-specific label.
+
+- id: w4
+  summary: "Cross-reference RANKING_METRIC_BY_FAMILY in the strategy doc's 'Canonical Duration Metric' section"
+  needs: [w1]
+  status: done
+
+files_affected:
+  modified:
+  - "benchbox/core/explorer/models.py"
+  - "benchbox/core/explorer/pipeline.py"
+  - "results-explorer/src/types.ts"
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "_project/analysis/benchbox-results-platform-strategy.md"
+
+must_preserve:
+- "CLI-computed power_score values — do not recompute in the pipeline; read from bundle metadata"
+- "Existing `geomean_ms` field on platform rows — remains present as secondary metric for all benchmarks"
+- "The 'Canonical Duration Metric' decision from 2026-04-14 — refines, does not overturn"
+
+approach: |
+  The cleanest path is a single registry lookup in the pipeline.
+  Pipeline reads summary.benchmark, looks up the metric config, attaches
+  it to the emitted BenchmarkSummary. The frontend is purely declarative
+  from that point — no family logic in TypeScript.
+
+  Registry entries are strings keyed on canonical benchmark family names
+  (tpch, tpcds, star_schema, clickbench, nyctaxi, tsbs-devops, h2odb,
+  datavault, ...). Unknown families fall back to geomean_ms asc.
+
+anti_patterns:
+- "DO NOT recompute power_score in the pipeline — because the CLI already emits it per-bundle — read the pre-computed value
+  and null if absent"
+- "DO NOT hard-code the benchmark → metric mapping in TypeScript — because it creates two sources of truth — serialize the
+  choice into the summary artifact"
+- "DO NOT drop the secondary metric from the UI — because some users will want to cross-reference — show both, primary prominent,
+  secondary muted"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/explorer/models.py"
+  - "benchbox/core/explorer/pipeline.py"
+  - "results-explorer/src/types.ts"
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "_project/analysis/benchbox-results-platform-strategy.md"
+
+verification:
+- description: "Registry is defined and exported"
+  command: "grep -n 'RANKING_METRIC_BY_FAMILY' benchbox/core/explorer/models.py"
+  expected_output: "constant defined"
+- description: "tpch artifact declares power_score as primary metric"
+  command: "uv run -- python -c 'import gzip, json; d = json.loads(gzip.open(\"results-explorer/public/data/benchmarks/tpch_sf0.01_power.json.gz\"\
+    ).read()); assert d[\"ranking\"][\"primary_metric\"] == \"power_score\"'"
+  expected_output: "no assertion failure"
+- description: "star_schema artifact declares geomean_ms as primary metric"
+  command: "uv run -- python -c 'import gzip, json; d = json.loads(gzip.open(\"results-explorer/public/data/benchmarks/star_schema_sf0.01_power.json.gz\"\
+    ).read()); assert d[\"ranking\"][\"primary_metric\"] == \"geomean_ms\"'"
+  expected_output: "no assertion failure"
+
+metadata:
+  tags: ["results", "explorer", "ranking", "tpc", "metrics"]
+  estimated_effort: "Small (0.5-1 day)"
+  created_date: "2026-04-15"

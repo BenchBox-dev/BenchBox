@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T09:11:15.374965'
+generated_at: '2026-04-15T09:17:52.032634'
 total_categories: 9
 categories:
   Architecture & Refactoring:
@@ -41,7 +41,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 16
+    count: 15
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -107,11 +107,6 @@ categories:
       file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
-      status: Not Started
-    - id: explorer-align-ranking-metric-with-tpc-standards
-      file: TODO/main/planning/explorer-align-ranking-metric-with-tpc-standards.yaml
-      title: Select ranking metric per benchmark family (power_score for TPC, geomean elsewhere)
-      priority: High
       status: Not Started
     - id: explorer-surface-trust-tiers-as-badges
       file: TODO/main/planning/explorer-surface-trust-tiers-as-badges.yaml

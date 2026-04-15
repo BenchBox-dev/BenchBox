@@ -1,8 +1,8 @@
-generated_at: '2026-04-15T09:11:15.375001'
-total_items: 37
+generated_at: '2026-04-15T09:17:52.032666'
+total_items: 36
 statuses:
   Not Started:
-    count: 29
+    count: 28
     items:
     - id: explorer-heatmap-accessibility-and-tests
       file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
@@ -113,11 +113,6 @@ statuses:
       file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
-      category: Core Functionality
-    - id: explorer-align-ranking-metric-with-tpc-standards
-      file: TODO/main/planning/explorer-align-ranking-metric-with-tpc-standards.yaml
-      title: Select ranking metric per benchmark family (power_score for TPC, geomean elsewhere)
-      priority: High
       category: Core Functionality
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:11:17.153625'
-total_items: 697
+generated_at: '2026-04-15T09:17:53.763706'
+total_items: 698
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3602,6 +3602,26 @@ items:
   priority: High
   status: Completed
   completed_date: '2025-11-27'
+- id: explorer-align-ranking-metric-with-tpc-standards
+  file: DONE/main/planning/explorer-align-ranking-metric-with-tpc-standards.yaml
+  title: Select ranking metric per benchmark family (power_score for TPC, geomean elsewhere)
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - ranking
+  - tpc
+  - metrics
+  estimated_effort: Small (0.5-1 day)
+  completed_date: '2026-04-15'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - explorer-emit-benchmark-summary-artifact
 - id: first-class-clickhouse-local-server-cloud-platforms
   file: DONE/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
   title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms

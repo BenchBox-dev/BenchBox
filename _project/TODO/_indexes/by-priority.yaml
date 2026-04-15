@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:11:15.374989'
-total_items: 37
+generated_at: '2026-04-15T09:17:52.032655'
+total_items: 36
 priorities:
   Critical:
     count: 2
@@ -15,7 +15,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 6
+    count: 5
     items:
     - id: explorer-matrix-leaderboard-view
       file: TODO/main/planning/explorer-matrix-leaderboard-view.yaml
@@ -36,11 +36,6 @@ priorities:
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
-      status: Not Started
-    - id: explorer-align-ranking-metric-with-tpc-standards
-      file: TODO/main/planning/explorer-align-ranking-metric-with-tpc-standards.yaml
-      title: Select ranking metric per benchmark family (power_score for TPC, geomean elsewhere)
-      category: Core Functionality
       status: Not Started
     - id: verify-trust-badge-rendering-in-explorer
       file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml

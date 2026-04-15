@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:11:15.374926'
-total_items: 37
+generated_at: '2026-04-15T09:17:52.032590'
+total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -116,25 +116,6 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
-- id: explorer-align-ranking-metric-with-tpc-standards
-  file: TODO/main/planning/explorer-align-ranking-metric-with-tpc-standards.yaml
-  title: Select ranking metric per benchmark family (power_score for TPC, geomean elsewhere)
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - ranking
-  - tpc
-  - metrics
-  estimated_effort: Small (0.5-1 day)
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - explorer-emit-benchmark-summary-artifact
 - id: verify-trust-badge-rendering-in-explorer
   file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
   title: Visually verify TrustBadge rendering across all 4 explorer pages
