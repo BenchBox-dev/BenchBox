@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:06:18.470825'
-total_items: 696
+generated_at: '2026-04-15T09:11:17.153625'
+total_items: 697
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1430,6 +1430,26 @@ items:
   work_ready: 0
   needs:
   - propagate-duration-seconds-in-enhanced-results
+- id: explorer-emit-benchmark-summary-artifact
+  file: DONE/main/planning/explorer-emit-benchmark-summary-artifact.yaml
+  title: Emit per-benchmark summary artifact for matrix leaderboard view
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - matrix
+  - leaderboard
+  - pipeline
+  estimated_effort: Medium (1-2 days)
+  completed_date: '2026-04-15'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - explorer-fix-read-model-contract
 - id: table-format-integration-ci-coverage
   file: DONE/ci-infrastructure/active/table-format-integration-ci-coverage.yaml
   title: Enforce Delta/Iceberg table-format integration coverage in CI

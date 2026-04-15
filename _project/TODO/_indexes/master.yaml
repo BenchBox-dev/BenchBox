@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:06:16.760596'
-total_items: 38
+generated_at: '2026-04-15T09:11:15.374926'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -59,25 +59,6 @@ items:
   needs:
   - explorer-emit-benchmark-summary-artifact
   - explorer-align-ranking-metric-with-tpc-standards
-- id: explorer-emit-benchmark-summary-artifact
-  file: TODO/main/planning/explorer-emit-benchmark-summary-artifact.yaml
-  title: Emit per-benchmark summary artifact for matrix leaderboard view
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - matrix
-  - leaderboard
-  - pipeline
-  estimated_effort: Medium (1-2 days)
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - explorer-fix-read-model-contract
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication

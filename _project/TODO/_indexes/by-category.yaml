@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T09:06:16.760636'
+generated_at: '2026-04-15T09:11:15.374965'
 total_categories: 9
 categories:
   Architecture & Refactoring:
@@ -41,7 +41,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 17
+    count: 16
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -82,11 +82,6 @@ categories:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
-      status: Not Started
-    - id: explorer-emit-benchmark-summary-artifact
-      file: TODO/main/planning/explorer-emit-benchmark-summary-artifact.yaml
-      title: Emit per-benchmark summary artifact for matrix leaderboard view
-      priority: High
       status: Not Started
     - id: expand-seed-corpus-to-sf-0-1
       file: TODO/main/planning/expand-seed-corpus-to-sf-0-1.yaml

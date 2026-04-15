@@ -1,8 +1,8 @@
-generated_at: '2026-04-15T09:06:16.760670'
-total_items: 38
+generated_at: '2026-04-15T09:11:15.375001'
+total_items: 37
 statuses:
   Not Started:
-    count: 30
+    count: 29
     items:
     - id: explorer-heatmap-accessibility-and-tests
       file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
@@ -58,11 +58,6 @@ statuses:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
-      category: Core Functionality
-    - id: explorer-emit-benchmark-summary-artifact
-      file: TODO/main/planning/explorer-emit-benchmark-summary-artifact.yaml
-      title: Emit per-benchmark summary artifact for matrix leaderboard view
-      priority: High
       category: Core Functionality
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml

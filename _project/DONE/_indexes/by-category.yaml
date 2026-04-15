@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T09:06:18.471179'
+generated_at: '2026-04-15T09:11:17.153972'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -602,7 +602,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 230
+    count: 231
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -957,6 +957,11 @@ categories:
     - id: emit-datagen-metrics-in-results-json
       file: DONE/core-functionality/active/emit-datagen-metrics-in-results-json.yaml
       title: Emit meaningful datagen metrics in results JSON
+      priority: High
+      status: Completed
+    - id: explorer-emit-benchmark-summary-artifact
+      file: DONE/main/planning/explorer-emit-benchmark-summary-artifact.yaml
+      title: Emit per-benchmark summary artifact for matrix leaderboard view
       priority: High
       status: Completed
     - id: enforce-explicit-query-run-type-across-executions
