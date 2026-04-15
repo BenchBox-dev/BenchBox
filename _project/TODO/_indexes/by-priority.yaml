@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T18:45:56.149002'
+generated_at: '2026-04-15T19:33:53.384303'
 total_items: 32
 priorities:
   Critical:
@@ -84,10 +84,10 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: audit-imported-dependencies-for-elimination
-      file: TODO/main/planning/audit-imported-dependencies-for-elimination.yaml
+      file: TODO/main/active/audit-imported-dependencies-for-elimination.yaml
       title: Audit all imported dependencies and eliminate any not strictly required
       category: Code Quality and Technical Debt
-      status: Not Started
+      status: In Progress
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence

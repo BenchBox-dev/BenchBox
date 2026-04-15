@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T18:45:56.148984'
+generated_at: '2026-04-15T19:33:53.384287'
 total_categories: 9
 categories:
   Architecture & Refactoring:
@@ -36,10 +36,10 @@ categories:
     count: 2
     items:
     - id: audit-imported-dependencies-for-elimination
-      file: TODO/main/planning/audit-imported-dependencies-for-elimination.yaml
+      file: TODO/main/active/audit-imported-dependencies-for-elimination.yaml
       title: Audit all imported dependencies and eliminate any not strictly required
       priority: Medium
-      status: Not Started
+      status: In Progress
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
