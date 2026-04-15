@@ -1,14 +1,19 @@
-generated_at: '2026-04-15T08:42:42.152754'
-total_items: 39
+generated_at: '2026-04-15T08:52:22.088009'
+total_items: 40
 priorities:
   Critical:
-    count: 2
+    count: 3
     items:
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
       category: Core Functionality
       status: Completed
+    - id: explorer-fix-read-model-contract
+      file: TODO/main/planning/explorer-fix-read-model-contract.yaml
+      title: 'Fix explorer read-model contract: platform/provenance split, canonical query reduction, ranking eligibility'
+      category: Core Functionality
+      status: Not Started
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR
@@ -53,7 +58,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 9
+    count: 8
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -95,13 +100,8 @@ priorities:
       title: Surface trust tiers as visible badges, not a default hide filter
       category: Core Functionality
       status: Not Started
-    - id: explorer-compare-url-short-ids
-      file: TODO/main/planning/explorer-compare-url-short-ids.yaml
-      title: Use short hash IDs in Compare URLs to avoid URL-length limits
-      category: Core Functionality
-      status: Not Started
   Medium:
-    count: 9
+    count: 10
     items:
     - id: explorer-heatmap-accessibility-and-tests
       file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
@@ -141,6 +141,11 @@ priorities:
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
+      category: Core Functionality
+      status: Not Started
+    - id: explorer-compare-url-short-ids
+      file: TODO/main/planning/explorer-compare-url-short-ids.yaml
+      title: Use short hash IDs in Compare URLs to avoid URL-length limits
       category: Core Functionality
       status: Not Started
     - id: write-results-platform-phase-2-operations-runbook

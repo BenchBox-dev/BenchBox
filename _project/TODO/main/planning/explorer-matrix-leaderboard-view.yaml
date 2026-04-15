@@ -107,14 +107,40 @@ work:
       more with benchbox run ...'. When 0 query overlap across
       platforms, show 'No shared queries to compare'.
 
+  - id: w7
+    summary: "Fix Compare.tsx to use display_ms from DetailResult instead of first-row raw duration_ms"
+    needs: []
+    status: pending
+    notes: |
+      The current Compare.tsx calls find() to get the first QueryTiming
+      row for each query (Compare.tsx:107, :350). This returns the
+      cold-cache outlier when multiple measurement iterations exist (e.g.,
+      [16, 11, 11, 11] → 16ms displayed).
+
+      Fix: read `display_timings` (list[QueryDisplayTiming]) from the
+      detail JSON instead of scanning the raw `queries` array. The
+      `display_ms` value per query_id is the median of successful runs,
+      computed by the pipeline (see explorer-fix-read-model-contract).
+
+      Add a helper in src/lib/queryReduction.ts:
+        `getDisplayMs(detail: DetailResult, queryId: string): number | null`
+      It reads `detail.display_timings.find(t => t.query_id === queryId)?.display_ms ?? null`.
+      Replace both find() call-sites in Compare.tsx with this helper.
+
+      This makes the matrix and the Compare page agree on what a query's
+      performance is — they will now both use the same canonical reduced
+      value from the pipeline.
+
 files_affected:
   added:
     - "results-explorer/src/components/QueryHeatmap.tsx"
     - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+    - "results-explorer/src/lib/queryReduction.ts"
   modified:
     - "results-explorer/src/types.ts"
     - "results-explorer/src/lib/manifest.ts"
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
 
 must_preserve:
   - "Existing /results/:benchmark/ route — do not change URL pattern, only the rendered content"
@@ -151,8 +177,9 @@ scope_limit:
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/types.ts"
     - "results-explorer/src/lib/manifest.ts"
-  do_not_modify:
+    - "results-explorer/src/lib/queryReduction.ts"
     - "results-explorer/src/pages/Compare.tsx"
+  do_not_modify:
     - "results-explorer/src/pages/ResultDetail.tsx"
     - "benchbox/**"
 

@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T08:42:42.152681'
-total_items: 39
+generated_at: '2026-04-15T08:52:22.087947'
+total_items: 40
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -19,6 +19,23 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
+- id: explorer-fix-read-model-contract
+  file: TODO/main/planning/explorer-fix-read-model-contract.yaml
+  title: 'Fix explorer read-model contract: platform/provenance split, canonical query reduction, ranking eligibility'
+  worktree: main
+  category: Core Functionality
+  priority: Critical
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - pipeline
+  - read-model
+  - data-contract
+  estimated_effort: Medium (1-2 days)
+  work_total: 6
+  work_done: 0
+  work_ready: 3
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
   title: Verify the validate-submission CI workflow end-to-end with a real PR
@@ -53,9 +70,9 @@ items:
   - heatmap
   - ui
   estimated_effort: Medium-Large (2-3 days)
-  work_total: 6
+  work_total: 7
   work_done: 0
-  work_ready: 1
+  work_ready: 2
   needs:
   - explorer-emit-benchmark-summary-artifact
   - explorer-align-ranking-metric-with-tpc-standards
@@ -77,7 +94,7 @@ items:
   work_done: 0
   work_ready: 1
   needs:
-  - explorer-extend-manifest-and-pipeline
+  - explorer-fix-read-model-contract
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -522,6 +539,24 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: explorer-compare-url-short-ids
+  file: TODO/main/planning/explorer-compare-url-short-ids.yaml
+  title: Use short hash IDs in Compare URLs to avoid URL-length limits
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - urls
+  - compare
+  estimated_effort: Small (1 day)
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-matrix-leaderboard-view
 - id: write-results-platform-phase-2-operations-runbook
   file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
   title: Write the Phase 2 results-platform operations runbook
@@ -692,24 +727,6 @@ items:
   work_ready: 1
   needs:
   - explorer-emit-benchmark-summary-artifact
-  - explorer-matrix-leaderboard-view
-- id: explorer-compare-url-short-ids
-  file: TODO/main/planning/explorer-compare-url-short-ids.yaml
-  title: Use short hash IDs in Compare URLs to avoid URL-length limits
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - urls
-  - compare
-  estimated_effort: Small (1 day)
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
   - explorer-matrix-leaderboard-view
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
