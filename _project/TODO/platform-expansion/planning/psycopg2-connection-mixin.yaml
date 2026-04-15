@@ -1,0 +1,130 @@
+id: "psycopg2-connection-mixin"
+title: "Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters"
+worktree: "platform-expansion"
+priority: "Medium-High"
+status: "Not Started"
+category: "Platform Expansion"
+description: |
+  Extract shared PostgreSQL wire protocol mechanics from PostgreSQLAdapter into a
+  reusable Psycopg2ConnectionMixin. This refactor decouples connection management
+  and query execution from database-specific management logic (like CREATE DATABASE),
+  allowing QuestDB and other wire-compatible platforms to share code without
+  incorrect inheritance.
+
+  Currently, QuestDBAdapter duplicates several methods from PostgreSQLAdapter
+  because inheriting would pull in incompatible database management behaviors.
+  This mixin provides a clean path for shared functionality while adhering to
+  the Liskov Substitution Principle.
+
+  QuestDB uses `pg_port` (not `port`), has a 127-char identifier limit (vs
+  PostgreSQL's 63), and uses `tables()` for catalog queries rather than
+  `information_schema.tables`. These divergences must be handled via class-level
+  constants and overrides, not inlined into the mixin.
+
+impact:
+  technical_debt: |
+    Eliminates code duplication between PostgreSQLAdapter and QuestDBAdapter.
+    Improves maintainability of PG-wire compatible platforms.
+    Standardizes SQL identifier validation and execution wrappers.
+
+work:
+  - id: w1
+    summary: "Audit methods shared by PostgreSQLAdapter and QuestDBAdapter; decide mixin boundary"
+    status: pending
+    notes: |
+      Candidates: _validate_identifier (diverges on length limit — needs class constant),
+      close_connection (identical), _get_existing_tables (both now cursor-based),
+      execute_query (QuestDB should delegate to execute_sql_query() helper instead of inlining).
+      Not in scope: get_query_plan (EXPLAIN ANALYZE vs plain EXPLAIN), _get_connection_params
+      (port-naming differs), get_platform_info (adapter-specific version queries).
+  - id: w2
+    summary: "Create benchbox/platforms/base/psycopg2_mixin.py with extracted methods"
+    needs: [w1]
+    status: pending
+    notes: |
+      Include: close_connection, _validate_identifier (with _max_identifier_length = 63
+      class constant), _get_existing_tables (information_schema.tables default).
+      Do NOT include: get_query_plan, get_platform_info, _get_connection_params.
+  - id: w3
+    summary: "Write unit tests for Psycopg2ConnectionMixin in isolation (no live DB)"
+    needs: [w2]
+    status: pending
+  - id: w4
+    summary: "Refactor PostgreSQLAdapter to inherit from Psycopg2ConnectionMixin; remove duplicates"
+    needs: [w3]
+    status: pending
+  - id: w5
+    summary: "Refactor QuestDBAdapter: inherit mixin, override _max_identifier_length=127, drop inline execute_query (delegate to execute_sql_query helper)"
+    needs: [w4]
+    status: pending
+  - id: w6
+    summary: "Run fast test suite; confirm PostgreSQL, QuestDB, and all subclass adapters pass"
+    needs: [w5]
+    status: pending
+
+must_preserve:
+  - "PostgreSQLAdapter continues to support TimescaleDB extensions via enable_timescale flag"
+  - "QuestDBAdapter continues to use REST API/ILP for its primary data loading path"
+  - "QuestDB _validate_identifier uses 127-char limit, PostgreSQL uses 63-char limit — do not unify to one value"
+  - "CedarDB, TimescaleDB, pg_duckdb, pg_mooncake continue to work unchanged via transitive PostgreSQLAdapter inheritance"
+  - "execute_sql_query() helper in base/sql_execution.py remains the canonical implementation for cursor-based query execution"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/postgresql.py"
+    - "benchbox/platforms/questdb.py"
+    - "benchbox/platforms/base/__init__.py"
+    - "benchbox/platforms/base/psycopg2_mixin.py"
+    - "tests/unit/platforms/test_psycopg2_mixin.py"
+
+approach: |
+  1. Audit divergences (w1): confirm identifier limits, catalog query syntax, whether
+     execute_query can be unified via execute_sql_query() helper in both adapters.
+  2. Create benchbox/platforms/base/psycopg2_mixin.py (w2):
+     - class Psycopg2ConnectionMixin
+     - _max_identifier_length: int = 63  (class constant, QuestDB overrides to 127)
+     - _validate_identifier() using the class constant
+     - close_connection() (identical in both)
+     - _get_existing_tables() using information_schema.tables cursor-based default
+  3. Write mixin unit tests (w3) — mock psycopg2, no live DB.
+  4. Refactor PostgreSQLAdapter (w4): inherit Psycopg2ConnectionMixin, delete duplicated methods.
+  5. Refactor QuestDBAdapter (w5): inherit Psycopg2ConnectionMixin, set _max_identifier_length=127,
+     override _get_existing_tables() to use tables() function, make execute_query() delegate to
+     execute_sql_query() helper instead of inlining.
+
+anti_patterns:
+  - "DO NOT inherit QuestDBAdapter from PostgreSQLAdapter — because they diverge fundamentally in database management, data loading, and catalog queries — use Psycopg2ConnectionMixin directly."
+  - "DO NOT unify _validate_identifier length limits to a single constant — because QuestDB (127) and PostgreSQL (63) have different limits and unifying silently applies the wrong limit — use a class constant _max_identifier_length that each adapter sets."
+  - "DO NOT move get_query_plan to the mixin — because PostgreSQL uses EXPLAIN ANALYZE and QuestDB uses plain EXPLAIN — they must stay as adapter-specific overrides."
+
+verification:
+  - description: "Unit tests for PostgreSQL adapter still pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_postgresql_adapter.py -v"
+  - description: "Unit tests for QuestDB adapter still pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_questdb_adapter.py tests/unit/platforms/test_questdb_coverage.py -v"
+  - description: "New mixin unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_psycopg2_mixin.py -v"
+  - description: "Mixin is importable from base package"
+    command: "uv run -- python -c 'from benchbox.platforms.base.psycopg2_mixin import Psycopg2ConnectionMixin; print(\"OK\")'"
+  - description: "Fast suite passes (catches transitive subclass regressions)"
+    command: "uv run -- python -m pytest -m fast -q"
+
+files_affected:
+  modified:
+    - "benchbox/platforms/postgresql.py"
+    - "benchbox/platforms/questdb.py"
+    - "benchbox/platforms/base/__init__.py"
+  added:
+    - "benchbox/platforms/base/psycopg2_mixin.py"
+    - "tests/unit/platforms/test_psycopg2_mixin.py"
+
+metadata:
+  owners:
+    - "joe"
+  tags:
+    - "refactor"
+    - "postgresql"
+    - "questdb"
+    - "mixin"
+  estimated_effort: "1-2 days"
+  created_date: "2026-04-15"

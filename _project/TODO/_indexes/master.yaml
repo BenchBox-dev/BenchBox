@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T13:27:00.382237'
+generated_at: '2026-04-15T13:27:53.760619'
 total_items: 32
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -541,7 +541,7 @@ items:
 - id: psycopg2-connection-mixin
   file: TODO/platform-expansion/planning/psycopg2-connection-mixin.yaml
   title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
-  worktree: psycopg2-mixin-refactor
+  worktree: platform-expansion
   category: Platform Expansion
   priority: Medium-High
   status: Not Started
@@ -552,8 +552,8 @@ items:
   - mixin
   owners:
   - joe
-  estimated_effort: 1 day
-  work_total: 4
+  estimated_effort: 1-2 days
+  work_total: 6
   work_done: 0
   work_ready: 1
 - id: surface-contributor-onboarding-for-results
