@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T19:52:09.537578'
+generated_at: '2026-04-15T19:53:40.149303'
 total_items: 41
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -121,7 +121,7 @@ items:
   - git
   - history-rewrite
   - author
-  estimated_effort: Small
+  estimated_effort: Medium
   work_total: 10
   work_done: 0
   work_ready: 1

@@ -38,7 +38,7 @@ metadata:
   - git
   - history-rewrite
   - author
-  estimated_effort: "Small"
+  estimated_effort: "Medium"
   created_date: "2026-04-15"
   source_review: "Discovered in conversation: git config user.name was set to literal string 'user.email'"
 
@@ -187,7 +187,8 @@ work:
     exists in the rewritten history.
 
     Recovery steps:
-    1. Fetch the 3 remote-only commits:
+    1. Fetch the 3 remote-only commits (w6 already ran `git fetch private`, so this
+       tracking ref may already exist — re-fetching is harmless and ensures it's current):
          git fetch private claude/seed-corpus-infra:refs/remotes/private/claude/seed-corpus-infra
 
     2. Identify the 3 commits and their old base on main:
@@ -197,6 +198,10 @@ work:
     3. The old base SHA no longer exists. Find its equivalent in new history by
        matching commit message:
          git log --format="%H %s" | grep "<message of old base commit>"
+       If multiple matches appear, narrow by date:
+         git log --format="%H %ad %s" --date=short | grep "<message>"
+       Pick the commit whose date matches the old base SHA's date (visible in step 2
+       output via `git show <old-base-sha> --format="%ad" --date=short`).
 
     4. Cherry-pick the 3 branch-only commits onto the new base:
          git checkout -b tmp/seed-corpus-recovery <new-base-sha>
