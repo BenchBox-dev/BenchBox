@@ -4,6 +4,11 @@ statuses:
   Not Started:
     count: 23
     items:
+    - id: explorer-heatmap-accessibility-and-tests
+      file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
+      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
       title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -34,6 +39,11 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
+    - id: audit-imported-dependencies-for-elimination
+      file: TODO/main/planning/audit-imported-dependencies-for-elimination.yaml
+      title: Audit all imported dependencies and eliminate any not strictly required
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence

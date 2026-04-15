@@ -4593,15 +4593,15 @@ items:
   category: Data Quality and Compatibility Issues
   priority: Medium
   status: Completed
-- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
-  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
+- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
+  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
   title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
   worktree: unknown
   category: Project Lifecycle Management
   priority: Medium
   status: Completed
-- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
-  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
+- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
+  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
   title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
   worktree: unknown
   category: Project Lifecycle Management
@@ -4649,7 +4649,7 @@ items:
   worktree: main
   category: Testing and Quality Assurance
   priority: Medium
-  status: Completed
+  status: In Progress
   tags:
   - results
   - explorer
@@ -4657,7 +4657,6 @@ items:
   - testing
   - a11y
   estimated_effort: Medium (1-2 days)
-  completed_date: '2026-04-15'
   work_total: 5
   work_done: 5
   work_ready: 0
@@ -7523,14 +7522,13 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Completed
+  status: Not Started
   tags:
   - results
   - explorer
   - urls
   - compare
   estimated_effort: Small (1 day)
-  completed_date: '2026-04-15'
   work_total: 5
   work_done: 5
   work_ready: 0
@@ -7716,15 +7714,15 @@ items:
   category: User Experience and CLI Enhancement
   priority: Medium
   status: Completed
-- id: implement-or-remove-incomplete-cli-commands
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+- id: implement-or-remove-incomplete-cli-commands-2
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)
   priority: Medium
   status: Completed
-- id: implement-or-remove-incomplete-cli-commands-2
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+- id: implement-or-remove-incomplete-cli-commands
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)

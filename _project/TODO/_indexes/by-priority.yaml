@@ -71,8 +71,13 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 7
+    count: 9
     items:
+    - id: explorer-heatmap-accessibility-and-tests
+      file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
+      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
+      category: Testing and Quality Assurance
+      status: Not Started
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
@@ -82,6 +87,11 @@ priorities:
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: audit-imported-dependencies-for-elimination
+      file: TODO/main/planning/audit-imported-dependencies-for-elimination.yaml
+      title: Audit all imported dependencies and eliminate any not strictly required
+      category: Code Quality and Technical Debt
       status: Not Started
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml

@@ -307,6 +307,25 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: explorer-heatmap-accessibility-and-tests
+  file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
+  title: Accessibility hardening and snapshot test coverage for matrix leaderboard
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - accessibility
+  - testing
+  - a11y
+  estimated_effort: Medium (1-2 days)
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-matrix-leaderboard-view
 - id: ballista-distributed-adapter
   file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
   title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
@@ -346,6 +365,25 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 6
+- id: audit-imported-dependencies-for-elimination
+  file: TODO/main/planning/audit-imported-dependencies-for-elimination.yaml
+  title: Audit all imported dependencies and eliminate any not strictly required
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Not Started
+  tags:
+  - quality-plan
+  - maintenance
+  - supply-chain
+  - deps
+  - audit
+  - tech-debt
+  estimated_effort: Medium (1-2 days for inventory + report; follow-up removals tracked separately)
+  work_total: 7
+  work_done: 0
+  work_ready: 1
+  deferred_count: 3
 - id: define-phase-3-promotion-metrics
   file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
   title: Define Phase 3 promotion metrics, dashboard, and review cadence
