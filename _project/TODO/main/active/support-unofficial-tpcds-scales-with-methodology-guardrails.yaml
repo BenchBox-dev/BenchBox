@@ -137,21 +137,22 @@ work:
 - id: w3
   summary: "Add a single TPC-DS compliance classifier and remove contradictory scale handling"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
-    Replace duplicated benchmark-registry / runner / generator-manager logic
-    with one shared classifier for `official`, `unofficial_nonstandard`, and
-    `unofficial_subscale`. Remove the current silent `<1 -> 1.0` promotion in
-    the benchmark runner.
+    Completed on 2026-04-14. New module: benchbox/core/tpcds/compliance.py.
 
-    Review DuckDB cross-check findings from w10 before finalising classifier
-    bucket boundaries (w10 is advisory, not a hard prerequisite -- do not let
-    a stalled diagnostic block this work unit).
+    Three changes:
+    1. Created TpcdsComplianceClass enum (OFFICIAL, UNOFFICIAL_NONSTANDARD, UNOFFICIAL_SUBSCALE)
+       with classify_tpcds_run() and validate_tpcds_scale() functions. Single source of truth.
+    2. Removed the silent scale_factor < 1.0 → 1.0 rounding in benchmark/runner.py.
+       Replaced with validate_tpcds_scale() call (clear error until w4 wires opt-in).
+    3. Both generator/manager.py and benchmark_registry.py now delegate to validate_tpcds_scale.
+       The allow_unofficial_scale=False parameter exists in both; w4 will wire the CLI flag through.
+    4. benchmark_registry.py min_scale removed for tpcds; compliance.py owns that boundary.
 
-    Call out the behavior decision explicitly: BenchBox currently blocks `sf<1`
-    globally, but the discrete official scale set is only enforced on
-    `--official` flows. If plain non-official `sf>=1` should now require opt-in,
-    treat that as an intentional product change and document it.
+    Behavior decision: non-official sf>=1.0 runs unchanged. Only sf<1.0 is newly gated
+    (with a clear error pointing to --allow-unofficial-scale). No retroactive opt-in required
+    for existing non-official SF>=1.0 workflows.
 
 - id: w4
   summary: "Wire explicit CLI opt-in and warning banners through `run` and `datagen`"
