@@ -182,13 +182,26 @@ work:
   summary: "Make compliance durable across result objects, schema export/import, loader, normalizer, database, and publication
     metadata"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
-    Add first-class methodology/comparability fields to the result pipeline and
-    persist them end-to-end. Do not rely on a nested
-    `execution_metadata[\"compliance\"]` object alone: schema export currently
-    cherry-picks known fields, and the historical database does not persist
-    arbitrary execution metadata.
+    Completed 2026-04-14. compliance_class is now first-class across the full
+    result pipeline.
+
+    Changes:
+    - benchbox/core/results/models.py: Added compliance_class: str | None = None
+      field to BenchmarkResults dataclass.
+    - benchbox/core/results/builder.py: Added compliance_class field to
+      BenchmarkInfoInput; passed from benchmark._benchmark.compliance_class in
+      ResultBuilder.build().
+    - benchbox/core/results/result_factory.py: Reads getattr(benchmark,
+      "compliance_class", None) when constructing BenchmarkInfoInput.
+    - benchbox/base.py: Same — getattr(self, "compliance_class", None).
+    - benchbox/core/results/schema.py: _build_benchmark_section() now includes
+      compliance_class key when non-None.
+    - benchbox/core/results/loader.py: reconstruct_benchmark_results() reads
+      benchmark_section.get("compliance_class").
+    - benchbox/core/results/normalizer.py: NormalizedResultDict gets
+      compliance_class field; _normalize_v2() extracts it from benchmark_block.
 
 - id: w6
   summary: "Suppress official TPC metrics and isolate unofficial TPC-DS runs in summaries, rankings, visualizations, and comparisons"
