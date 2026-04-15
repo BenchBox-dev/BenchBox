@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T17:47:21.928334'
+generated_at: '2026-04-14T20:16:44.532069'
 total_items: 34
 statuses:
   Blocked:
@@ -105,7 +105,7 @@ statuses:
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
-      priority: Medium
+      priority: High
       category: Testing and Quality Assurance
     - id: evaluate-results-data-repo-extraction-checkpoint
       file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
@@ -125,7 +125,7 @@ statuses:
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR
-      priority: High
+      priority: Critical
       category: Testing and Quality Assurance
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml

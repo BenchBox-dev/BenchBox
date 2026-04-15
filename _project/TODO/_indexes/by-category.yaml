@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T17:47:21.928307'
+generated_at: '2026-04-14T20:16:44.532038'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -181,12 +181,12 @@ categories:
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
-      priority: Medium
+      priority: High
       status: Not Started
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR
-      priority: High
+      priority: Critical
       status: Not Started
     - id: verify-trust-badge-rendering-in-explorer
       file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml

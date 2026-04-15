@@ -1,14 +1,19 @@
-generated_at: '2026-04-14T17:47:21.928323'
+generated_at: '2026-04-14T20:16:44.532058'
 total_items: 34
 priorities:
   Critical:
-    count: 1
+    count: 2
     items:
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
       category: Core Functionality
       status: Completed
+    - id: verify-ci-validation-workflow-end-to-end
+      file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+      title: Verify the validate-submission CI workflow end-to-end with a real PR
+      category: Testing and Quality Assurance
+      status: Not Started
   High:
     count: 6
     items:
@@ -27,16 +32,16 @@ priorities:
       title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
       category: Tooling and Distribution
       status: Identified
+    - id: external-contributor-submission-dry-run
+      file: TODO/main/planning/external-contributor-submission-dry-run.yaml
+      title: Run a Phase 2 dry-run with one external trusted contributor
+      category: Testing and Quality Assurance
+      status: Not Started
     - id: support-unofficial-tpcds-scales-with-methodology-guardrails
       file: TODO/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
       title: Support unofficial TPC-DS scales with explicit methodology guardrails
       category: Core Functionality
       status: Blocked
-    - id: verify-ci-validation-workflow-end-to-end
-      file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
-      title: Verify the validate-submission CI workflow end-to-end with a real PR
-      category: Testing and Quality Assurance
-      status: Not Started
     - id: verify-trust-badge-rendering-in-explorer
       file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
       title: Visually verify TrustBadge rendering across all 4 explorer pages
@@ -81,7 +86,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 8
+    count: 7
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -112,11 +117,6 @@ priorities:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
-      status: Not Started
-    - id: external-contributor-submission-dry-run
-      file: TODO/main/planning/external-contributor-submission-dry-run.yaml
-      title: Run a Phase 2 dry-run with one external trusted contributor
-      category: Testing and Quality Assurance
       status: Not Started
     - id: write-results-platform-phase-2-operations-runbook
       file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml

@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T17:47:21.928273'
+generated_at: '2026-04-14T20:16:44.532001'
 total_items: 34
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -19,6 +19,25 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
+- id: verify-ci-validation-workflow-end-to-end
+  file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+  title: Verify the validate-submission CI workflow end-to-end with a real PR
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Critical
+  status: Not Started
+  tags:
+  - results
+  - ci
+  - phase-2
+  - validation
+  - end-to-end
+  estimated_effort: Small
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - implement-pr-based-result-submission-workflow
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -72,6 +91,27 @@ items:
   work_total: 5
   work_done: 1
   work_ready: 1
+- id: external-contributor-submission-dry-run
+  file: TODO/main/planning/external-contributor-submission-dry-run.yaml
+  title: Run a Phase 2 dry-run with one external trusted contributor
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - contributor-experience
+  - phase-2
+  - dry-run
+  - user-research
+  estimated_effort: Small
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - verify-ci-validation-workflow-end-to-end
+  - verify-trust-badge-rendering-in-explorer
+  - surface-contributor-onboarding-for-results
 - id: support-unofficial-tpcds-scales-with-methodology-guardrails
   file: TODO/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
   title: Support unofficial TPC-DS scales with explicit methodology guardrails
@@ -93,25 +133,6 @@ items:
   deferred_count: 3
   needs:
   - patch-and-redistribute-tpcds-dsdgen-subscale-support
-- id: verify-ci-validation-workflow-end-to-end
-  file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
-  title: Verify the validate-submission CI workflow end-to-end with a real PR
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: High
-  status: Not Started
-  tags:
-  - results
-  - ci
-  - phase-2
-  - validation
-  - end-to-end
-  estimated_effort: Small
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - implement-pr-based-result-submission-workflow
 - id: verify-trust-badge-rendering-in-explorer
   file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
   title: Visually verify TrustBadge rendering across all 4 explorer pages
@@ -441,27 +462,6 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
-- id: external-contributor-submission-dry-run
-  file: TODO/main/planning/external-contributor-submission-dry-run.yaml
-  title: Run a Phase 2 dry-run with one external trusted contributor
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - contributor-experience
-  - phase-2
-  - dry-run
-  - user-research
-  estimated_effort: Small
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - verify-ci-validation-workflow-end-to-end
-  - verify-trust-badge-rendering-in-explorer
-  - surface-contributor-onboarding-for-results
 - id: write-results-platform-phase-2-operations-runbook
   file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
   title: Write the Phase 2 results-platform operations runbook

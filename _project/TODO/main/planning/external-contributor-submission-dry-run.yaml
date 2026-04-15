@@ -1,7 +1,7 @@
 id: external-contributor-submission-dry-run
 title: "Run a Phase 2 dry-run with one external trusted contributor"
 worktree: main
-priority: Medium
+priority: High
 status: Not Started
 category: Testing and Quality Assurance
 
