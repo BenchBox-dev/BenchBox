@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T21:05:28.383149'
-total_items: 693
+generated_at: '2026-04-15T00:50:16.539988'
+total_items: 694
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3649,6 +3649,28 @@ items:
   work_total: 15
   work_done: 15
   work_ready: 0
+- id: support-unofficial-tpcds-scales-with-methodology-guardrails
+  file: DONE/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
+  title: Support unofficial TPC-DS scales with explicit methodology guardrails
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - tpcds
+  - unofficial
+  - scale-factor
+  - results
+  - validation
+  - publishing
+  estimated_effort: Large
+  completed_date: '2026-04-15'
+  work_total: 10
+  work_done: 10
+  work_ready: 0
+  deferred_count: 3
+  needs:
+  - patch-and-redistribute-tpcds-dsdgen-subscale-support
 - id: tco-calculator-cost-forecasting
   file: DONE/cost-intelligence-tco/completed/tco-calculator-cost-forecasting.yaml
   title: TCO Calculator & Cost Forecasting

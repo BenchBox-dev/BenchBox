@@ -1,4 +1,4 @@
-generated_at: '2026-04-14T21:05:28.383607'
+generated_at: '2026-04-15T00:50:16.540317'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -602,7 +602,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 227
+    count: 228
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1679,6 +1679,11 @@ categories:
     - id: presorted-open-table-format-datasets
       file: DONE/physical-tuning/active/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+      priority: High
+      status: Completed
+    - id: support-unofficial-tpcds-scales-with-methodology-guardrails
+      file: DONE/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
+      title: Support unofficial TPC-DS scales with explicit methodology guardrails
       priority: High
       status: Completed
     - id: surface-driver-version-in-cli-progress-output

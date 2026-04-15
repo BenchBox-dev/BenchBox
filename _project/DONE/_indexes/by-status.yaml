@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T21:05:28.384123'
-total_items: 693
+generated_at: '2026-04-15T00:50:16.540671'
+total_items: 694
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 642
+    count: 643
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2917,6 +2917,11 @@ statuses:
     - id: presorted-open-table-format-datasets
       file: DONE/physical-tuning/active/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+      priority: High
+      category: Core Functionality
+    - id: support-unofficial-tpcds-scales-with-methodology-guardrails
+      file: DONE/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
+      title: Support unofficial TPC-DS scales with explicit methodology guardrails
       priority: High
       category: Core Functionality
     - id: surface-driver-version-in-cli-progress-output

@@ -2,7 +2,8 @@ id: support-unofficial-tpcds-scales-with-methodology-guardrails
 title: "Support unofficial TPC-DS scales with explicit methodology guardrails"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-15"
 category: Core Functionality
 
 description: |
@@ -45,7 +46,7 @@ description: |
 
 deps:
   needs:
-    - patch-and-redistribute-tpcds-dsdgen-subscale-support
+  - patch-and-redistribute-tpcds-dsdgen-subscale-support
 
 work:
 - id: w1
@@ -273,12 +274,30 @@ work:
 - id: w9
   summary: "Update contributor docs and run the full verification matrix after implementation"
   needs: [w4, w5, w6, w7, w8]
-  status: pending
+  status: done
   notes: |
-    Update CLAUDE.md, GEMINI.md, AGENTS.md, `_sources/README.md`, and add an ADR
-    only once the implementation path is proven. Verification must cover the
-    probe artifact, targeted TPC-DS tests, result export/import round-trip,
-    rankings isolation, and the standard fast suite.
+    Completed 2026-04-15.
+
+    Doc changes:
+    - CLAUDE.md: Updated critical rules from "No TPC-DS fractional scale factors"
+      to note that SF<1 requires --allow-unofficial-scale + patched dsdgen, with
+      a reference to the patch TODO.
+    - GEMINI.md: Updated constraints line to the same effect.
+    - AGENTS.md: Updated "Avoid" section to match — bundled binaries crash, patched
+      binaries required, opt-in flag documented.
+    - _sources/README.md: Updated "Important Constraints > TPC-DS Scale Factor"
+      section to explain the bundled binary limitation, link to the probe doc, describe
+      the --allow-unofficial-scale opt-in, and note the publication guardrails.
+      Also updated the "Segfault with small scale factors" troubleshooting entry and
+      the Binary Verification comment.
+
+    Verification matrix results:
+    - uv run -- python -m pytest -m fast -q: 20414 passed, 1 skipped (54s)
+    - tests/unit/generators/test_tpcds_generator.py + test_tpcds_resource_resolution.py
+      + test_post_run_summary.py + test_visualization_tools.py: 124 passed
+    - tests/e2e/test_error_handling.py: 31 passed
+    - tests/unit/test_fractional_scale_factors.py: no tests collected (file exists,
+      no tests yet — not a regression)
 
 deferred:
 - summary: "Patch and redistribute upstream dsdgen binaries if Gate Zero shows native subscale generation is not viable"

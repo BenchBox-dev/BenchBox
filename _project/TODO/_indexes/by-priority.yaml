@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T21:05:25.878179'
-total_items: 33
+generated_at: '2026-04-15T00:50:14.795065'
+total_items: 32
 priorities:
   Critical:
     count: 2
@@ -15,7 +15,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 5
+    count: 4
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -32,11 +32,6 @@ priorities:
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
       status: Not Started
-    - id: support-unofficial-tpcds-scales-with-methodology-guardrails
-      file: TODO/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
-      title: Support unofficial TPC-DS scales with explicit methodology guardrails
-      category: Core Functionality
-      status: Blocked
     - id: verify-trust-badge-rendering-in-explorer
       file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
       title: Visually verify TrustBadge rendering across all 4 explorer pages

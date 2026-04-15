@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T21:05:28.383876'
-total_items: 693
+generated_at: '2026-04-15T00:50:16.540500'
+total_items: 694
 priorities:
   Critical:
     count: 39
@@ -200,7 +200,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 242
+    count: 243
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -1182,6 +1182,11 @@ priorities:
     - id: presorted-open-table-format-datasets
       file: DONE/physical-tuning/active/presorted-open-table-format-datasets.yaml
       title: Support creation of pre-sorted / pre-clustered datasets in open table formats
+      category: Core Functionality
+      status: Completed
+    - id: support-unofficial-tpcds-scales-with-methodology-guardrails
+      file: DONE/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
+      title: Support unofficial TPC-DS scales with explicit methodology guardrails
       category: Core Functionality
       status: Completed
     - id: tco-calculator-cost-forecasting

@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T21:05:25.878105'
-total_items: 33
+generated_at: '2026-04-15T00:50:14.795017'
+total_items: 32
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -95,27 +95,6 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
-- id: support-unofficial-tpcds-scales-with-methodology-guardrails
-  file: TODO/main/active/support-unofficial-tpcds-scales-with-methodology-guardrails.yaml
-  title: Support unofficial TPC-DS scales with explicit methodology guardrails
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Blocked
-  tags:
-  - tpcds
-  - unofficial
-  - scale-factor
-  - results
-  - validation
-  - publishing
-  estimated_effort: Large
-  work_total: 10
-  work_done: 2
-  work_ready: 2
-  deferred_count: 3
-  needs:
-  - patch-and-redistribute-tpcds-dsdgen-subscale-support
 - id: verify-trust-badge-rendering-in-explorer
   file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
   title: Visually verify TrustBadge rendering across all 4 explorer pages
