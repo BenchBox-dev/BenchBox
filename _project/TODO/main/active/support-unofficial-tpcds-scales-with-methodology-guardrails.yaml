@@ -2,7 +2,7 @@ id: support-unofficial-tpcds-scales-with-methodology-guardrails
 title: "Support unofficial TPC-DS scales with explicit methodology guardrails"
 worktree: main
 priority: High
-status: Blocked
+status: In Progress
 category: Core Functionality
 
 description: |
@@ -119,18 +119,20 @@ work:
   summary: "Define the subscale data contract from probe results: missing-vs-empty tables, manifest expectations, and validation
     rules"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
-    Translate probe evidence into a precise methodology contract. Decide which
-    tables must exist, which may be empty, and how generated-data validation and
-    loaded-data validation should behave for unofficial TPC-DS runs.
+    Completed on 2026-04-14. Full contract in _sources/tpcds-subscale-contract.md.
 
-    Review DuckDB cross-check findings from w10 before finalising the contract
-    (w10 is advisory, not a hard prerequisite -- do not let a stalled diagnostic
-    block this work unit).
-
-    This work unit is a hard dependency for validator changes. Do not relax
-    missing-table checks generically before the contract is written down.
+    Key decisions:
+    - All 25 tables mandatory (no missing-table exceptions); min-1-row floor ensures this.
+    - "Fixed-size" table exemption does NOT apply at sf < 1.0 — fixed tables scale
+      proportionally with max(1, floor(sf1_baseline * sf)) like all other tables.
+    - Same 5% validation tolerance applies at subscale; min-1 floor ensures expected_rows > 0.
+    - New manifest field: compliance_class = "unofficial_subscale" for sf < 1.0 runs.
+    - Official TPC metrics (power_at_size, throughput_at_size, qph_at_size) must not be
+      computed for unofficial_subscale compliance class.
+    - Non-official sf >= 1.0 runs do NOT require new opt-in; only sf < 1.0 is gated.
+    - Windows bundles remain unpatched; must surface a clear error (not a crash).
 
 - id: w3
   summary: "Add a single TPC-DS compliance classifier and remove contradictory scale handling"
