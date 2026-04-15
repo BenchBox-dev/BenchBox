@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T00:50:14.795065'
-total_items: 32
+generated_at: '2026-04-15T08:42:42.152754'
+total_items: 39
 priorities:
   Critical:
     count: 2
@@ -15,8 +15,18 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 4
+    count: 7
     items:
+    - id: explorer-matrix-leaderboard-view
+      file: TODO/main/planning/explorer-matrix-leaderboard-view.yaml
+      title: Build ClickBench-style matrix leaderboard as primary benchmark landing view
+      category: Core Functionality
+      status: Not Started
+    - id: explorer-emit-benchmark-summary-artifact
+      file: TODO/main/planning/explorer-emit-benchmark-summary-artifact.yaml
+      title: Emit per-benchmark summary artifact for matrix leaderboard view
+      category: Core Functionality
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -32,13 +42,18 @@ priorities:
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
       status: Not Started
+    - id: explorer-align-ranking-metric-with-tpc-standards
+      file: TODO/main/planning/explorer-align-ranking-metric-with-tpc-standards.yaml
+      title: Select ranking metric per benchmark family (power_score for TPC, geomean elsewhere)
+      category: Core Functionality
+      status: Not Started
     - id: verify-trust-badge-rendering-in-explorer
       file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
       title: Visually verify TrustBadge rendering across all 4 explorer pages
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 7
+    count: 9
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -75,9 +90,24 @@ priorities:
       title: Surface contributor onboarding for results submission
       category: Documentation
       status: Completed
+    - id: explorer-surface-trust-tiers-as-badges
+      file: TODO/main/planning/explorer-surface-trust-tiers-as-badges.yaml
+      title: Surface trust tiers as visible badges, not a default hide filter
+      category: Core Functionality
+      status: Not Started
+    - id: explorer-compare-url-short-ids
+      file: TODO/main/planning/explorer-compare-url-short-ids.yaml
+      title: Use short hash IDs in Compare URLs to avoid URL-length limits
+      category: Core Functionality
+      status: Not Started
   Medium:
-    count: 7
+    count: 9
     items:
+    - id: explorer-heatmap-accessibility-and-tests
+      file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
+      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
+      category: Testing and Quality Assurance
+      status: Not Started
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
@@ -87,6 +117,11 @@ priorities:
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: explorer-cross-benchmark-meta-leaderboard
+      file: TODO/main/planning/explorer-cross-benchmark-meta-leaderboard.yaml
+      title: Add cross-benchmark meta-leaderboard to the home page
+      category: Core Functionality
       status: Not Started
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml

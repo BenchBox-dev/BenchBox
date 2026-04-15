@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T00:50:14.795017'
-total_items: 32
+generated_at: '2026-04-15T08:42:42.152681'
+total_items: 39
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -38,6 +38,46 @@ items:
   work_ready: 1
   needs:
   - implement-pr-based-result-submission-workflow
+- id: explorer-matrix-leaderboard-view
+  file: TODO/main/planning/explorer-matrix-leaderboard-view.yaml
+  title: Build ClickBench-style matrix leaderboard as primary benchmark landing view
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - matrix
+  - leaderboard
+  - heatmap
+  - ui
+  estimated_effort: Medium-Large (2-3 days)
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-emit-benchmark-summary-artifact
+  - explorer-align-ranking-metric-with-tpc-standards
+- id: explorer-emit-benchmark-summary-artifact
+  file: TODO/main/planning/explorer-emit-benchmark-summary-artifact.yaml
+  title: Emit per-benchmark summary artifact for matrix leaderboard view
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - matrix
+  - leaderboard
+  - pipeline
+  estimated_effort: Medium (1-2 days)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-extend-manifest-and-pipeline
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -95,6 +135,25 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
+- id: explorer-align-ranking-metric-with-tpc-standards
+  file: TODO/main/planning/explorer-align-ranking-metric-with-tpc-standards.yaml
+  title: Select ranking metric per benchmark family (power_score for TPC, geomean elsewhere)
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - ranking
+  - tpc
+  - metrics
+  estimated_effort: Small (0.5-1 day)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-emit-benchmark-summary-artifact
 - id: verify-trust-badge-rendering-in-explorer
   file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
   title: Visually verify TrustBadge rendering across all 4 explorer pages
@@ -307,6 +366,25 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: explorer-heatmap-accessibility-and-tests
+  file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
+  title: Accessibility hardening and snapshot test coverage for matrix leaderboard
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - accessibility
+  - testing
+  - a11y
+  estimated_effort: Medium (1-2 days)
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-matrix-leaderboard-view
 - id: ballista-distributed-adapter
   file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
   title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
@@ -346,6 +424,26 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 6
+- id: explorer-cross-benchmark-meta-leaderboard
+  file: TODO/main/planning/explorer-cross-benchmark-meta-leaderboard.yaml
+  title: Add cross-benchmark meta-leaderboard to the home page
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - home
+  - meta-leaderboard
+  - differentiator
+  estimated_effort: Medium (1-2 days)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-emit-benchmark-summary-artifact
+  - explorer-matrix-leaderboard-view
 - id: define-phase-3-promotion-metrics
   file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
   title: Define Phase 3 promotion metrics, dashboard, and review cadence
@@ -575,6 +673,44 @@ items:
   work_ready: 0
   needs:
   - implement-pr-based-result-submission-workflow
+- id: explorer-surface-trust-tiers-as-badges
+  file: TODO/main/planning/explorer-surface-trust-tiers-as-badges.yaml
+  title: Surface trust tiers as visible badges, not a default hide filter
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - trust
+  - transparency
+  - ui
+  estimated_effort: Small (1 day)
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-emit-benchmark-summary-artifact
+  - explorer-matrix-leaderboard-view
+- id: explorer-compare-url-short-ids
+  file: TODO/main/planning/explorer-compare-url-short-ids.yaml
+  title: Use short hash IDs in Compare URLs to avoid URL-length limits
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - urls
+  - compare
+  estimated_effort: Small (1 day)
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-matrix-leaderboard-view
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

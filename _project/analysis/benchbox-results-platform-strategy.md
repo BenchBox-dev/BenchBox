@@ -1,7 +1,7 @@
 # BenchBox Results Platform Product + Architecture Strategy
 
 **Created:** 2026-03-29
-**Revised:** 2026-04-14
+**Revised:** 2026-04-15 (see [Primary Surface Revision](#primary-surface-revision-2026-04-15))
 **Originating TODO:** `productize-result-publishing-and-artifact-sharing`
 
 ## Executive Summary
@@ -91,6 +91,15 @@ BenchBox measures (items 2 and 3 above).
 
 ### Explorer as Dynamic Tool
 
+> **Superseded 2026-04-15.** The "dynamic comparison tool, not a curated
+> leaderboard" framing was correct as a rejection of vanity-ranking pages
+> but wrong as a rejection of the matrix leaderboard pattern. See
+> [Primary Surface Revision](#primary-surface-revision-2026-04-15). The
+> revised position: **the per-benchmark primary surface is a ClickBench-style
+> Platform × Query matrix leaderboard**, with the dynamic Compare page as
+> a secondary deeper-analysis surface. Both ship; the matrix is the
+> landing view.
+
 The explorer is a **dynamic comparison tool**, not a static shootout page.
 Visitors pick benchmark, scale factor, and platforms to build their own
 comparisons. This is the core UX — not a curated leaderboard.
@@ -142,6 +151,97 @@ BenchBox in git history. The explorer's core value proposition (reproducible res
 the coherent choice. The working default is confirmed; no changes to existing
 scaffolding or CI/CD are needed.
 
+## Primary Surface Revision (2026-04-15)
+
+*Added following a strategic review of the explorer vs ClickBench paradigm
+and an adversarial review of the initial proposal.*
+
+### What changed and why
+
+The 2026-04-14 fidelity work identified that the explorer dropped too many
+bundle fields in its derived read model. The 2026-04-15 review went one
+level up: **the UX paradigm itself is wrong**. The current explorer is
+browse-first (land on home → navigate to benchmark → get a sorted list →
+maybe click Compare). ClickBench is compare-first: the landing view for a
+benchmark is already the cross-platform answer.
+
+That is not a cosmetic difference. It is the product definition. The
+revised product position:
+
+> The per-benchmark landing view is a Platform × Query matrix leaderboard
+> (ClickBench-style). The dynamic Compare page remains as a secondary
+> surface for deeper per-query analysis. The detail page remains as the
+> reproducibility-story surface. All three ship.
+
+### Why the original "matrix only, dynamic only" framings were both wrong
+
+The original strategy doc rejected a "curated leaderboard" page. That
+rejection still stands — there is no vanity-ranking page in the product.
+But a **matrix leaderboard** is not a vanity ranking: it is a cohort-aware,
+per-query, per-column-normalized view where ranking emerges from the data
+rather than from editorial weighting. It is the comparison tool, rendered
+densely, rather than a competitor to it.
+
+The initial redesign proposal (see the companion review) was correct in
+its main recommendation but wrong in several specifics. The final adopted
+shape incorporates the following corrections:
+
+| Area | Initial proposal | Final adopted position |
+|---|---|---|
+| Artifact key | `(benchmark, scale)` | `(benchmark, scale, phase)` — phase cannot be silently collapsed |
+| Color scale | linear min-max | log10 ratio-to-fastest, clamped at 10× |
+| Primary ranking metric | geomean_ms default | per-family registry: `power_score` for TPC-H/TPC-DS, `geomean_ms` fallback |
+| Trust default | filter to `maintainer-run` only | show all tiers with visible badges; trust is an optional filter |
+| Compare URL | full result_ids in query string | short hash IDs with full-form fallback |
+| Home page | recent results list | cross-benchmark meta-leaderboard (avg-rank aggregation) + recent results secondary |
+| Accessibility | unspecified | aria-labels on every data cell, keyboard nav, reduced-color mode, axe-core in CI |
+
+### Revised derived read model
+
+In addition to the artifacts already specified in [Derived Read Model
+Schema](#derived-read-model-schema), the pipeline emits:
+
+1. **`benchmarks/{benchmark}_sf{sf}_{phase}.json.gz`** — one file per
+   unique `(benchmark, scale_factor, phase)` tuple, containing the full
+   cross-platform query matrix plus per-platform `power_score`,
+   `geomean_ms`, `cost_usd`, `trust_label`, `tuning_mode`, and
+   `short_id`. Gzip compressed on write.
+
+2. **`short_ids.json`** — lookup table `{short_id: full_result_id}` to
+   allow compact Compare URLs without breaking existing long-form URLs.
+
+3. **`meta_leaderboard.json`** — cross-benchmark rank aggregation used
+   by the home page. Platforms ranked within each cohort (cohorts with
+   ≥2 platforms only), then aggregated as simple mean of ranks across
+   appearances. No weighted composite score.
+
+### Revised UX surfaces
+
+| Surface | Revised role |
+|---|---|
+| Home (`/results/`) | Cross-benchmark meta-leaderboard is the hero panel. Recent results list drops to secondary position. |
+| Benchmark landing (`/results/tpch/`) | **Matrix leaderboard** as the default view. List view available via toggle for mobile. |
+| Compare (`/results/compare?ids=...`) | Unchanged in role; accepts short IDs. Reached from matrix-row checkboxes. |
+| Detail (`/results/r/<id>`) | Unchanged. Surface for methodology disclosure and reproducibility. |
+
+### What explicitly does not change
+
+- **No branded leaderboard page** remains the rule. The matrix leaderboard
+  is cohort-aware (single scale, single phase, same benchmark); it is not
+  a cross-context vanity ranking.
+- **All three differentiators remain** (multi-benchmark coverage, rich
+  per-query detail, reproducibility). The matrix leaderboard strengthens
+  differentiator #1 by making the multi-benchmark story visible on the
+  home page.
+- **Cohort-breaking guardrails** (benchmark, scale, tuning mode,
+  execution mode, phase) remain enforced. The matrix view exposes all
+  five as explicit axes in the filter bar instead of hiding them.
+
+### TODO cluster
+
+Addressed by the `explorer-` TODO cluster added 2026-04-15. See [TODO
+Cluster and Priority](#todo-cluster-and-priority) for the full table.
+
 ## Explorer Fidelity: Known Gaps and Requirements
 
 *Added 2026-04-14 following a post-launch audit of explorer vs CLI divergence.*
@@ -160,6 +260,15 @@ and stored in both the manifest and DuckDB schema. Wall-clock total duration may
 be surfaced as a secondary metric with a clear label, but it must not be the
 default sort/compare axis. This aligns with CLI behavior and with standard OLAP
 benchmarking practice.
+
+**Refinement (2026-04-15):** The geomean-is-canonical decision applies where
+the benchmark family has no published aggregate metric (ClickBench, SSB,
+custom benchmarks). For **TPC-H and TPC-DS**, the canonical metric is
+`power_score` as defined by the TPC specification — users arriving from
+published TPC results expect to see that number. The explorer pipeline
+exposes a per-family `RANKING_METRIC_BY_FAMILY` registry that selects the
+primary metric; `geomean_ms` remains as the universal secondary metric
+shown alongside. See `explorer-align-ranking-metric-with-tpc-standards`.
 
 ### Comparability Model
 
@@ -622,6 +731,23 @@ then UI features that consume the new fields.
 | `explorer-add-methodology-disclosure` | Phase 1.5 | Medium-High | Adds "how this was measured" panel; required before differentiation claims are credible |
 | `explorer-add-comparison-charts` | Phase 1.5 | Medium | Normalized speedup + diverging bar charts; closes the most visible CLI parity gap |
 | `explorer-comparability-warnings` | Phase 2 | Medium | Warn/block when comparing results that differ on execution mode or tuning; depends on pipeline extension |
+
+### Primary Surface Revision (added 2026-04-15)
+
+These TODOs implement the ClickBench-style matrix leaderboard pivot
+documented in [Primary Surface Revision](#primary-surface-revision-2026-04-15).
+They are sequenced: artifact first, then matrix UI + ranking, then
+trust/URLs, then home-page meta-leaderboard and a11y.
+
+| TODO | Phase | Priority | Rationale |
+| --- | --- | --- | --- |
+| `explorer-emit-benchmark-summary-artifact` | Phase 1.6 | High | New derived artifact keyed on (benchmark, scale, phase) — foundation for the matrix leaderboard |
+| `explorer-matrix-leaderboard-view` | Phase 1.6 | High | Replaces BenchmarkIndex sorted list with ClickBench-style Platform × Query matrix; log-ratio coloring; row-checkbox → Compare |
+| `explorer-align-ranking-metric-with-tpc-standards` | Phase 1.6 | High | Per-family registry so TPC-H/TPC-DS rank by power_score; geomean fallback elsewhere |
+| `explorer-surface-trust-tiers-as-badges` | Phase 1.6 | Medium-High | Trust tiers as visible badges (not a default hide filter); BenchBox's differentiator made explicit |
+| `explorer-compare-url-short-ids` | Phase 1.6 | Medium-High | Short hash IDs avoid URL-length limits; backward-compatible |
+| `explorer-cross-benchmark-meta-leaderboard` | Phase 1.6 | Medium | Home page hero: cross-benchmark rank aggregation — leans into multi-benchmark differentiator |
+| `explorer-heatmap-accessibility-and-tests` | Phase 1.6 | Medium | aria-labels, keyboard nav, reduced-color mode, axe-core in CI |
 
 ## External Sources
 
