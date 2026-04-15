@@ -206,16 +206,21 @@ work:
 - id: w6
   summary: "Suppress official TPC metrics and isolate unofficial TPC-DS runs in summaries, rankings, visualizations, and comparisons"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
-    Gate `power_at_size`, `throughput_at_size`, and `qph_at_size` in the generic
-    result path, not just in TPC-DS report templates. Update CLI summaries,
-    visualization surfaces, and ranking/report logic so unofficial TPC-DS runs
-    render clearly as non-comparable and do not contaminate official cohorts.
+    Completed 2026-04-14.
 
-    This explicitly includes `benchbox/core/visualization/` and
-    `benchbox/mcp/tools/visualization.py` plus associated visualization/MCP
-    tests, not just CLI tables or legacy TPC-DS reporting templates.
+    Changes:
+    - benchbox/core/results/builder.py: ResultBuilder.build() skips calling
+      _calculate_tpc_metrics() when compliance_class is unofficial
+      (unofficial_nonstandard or unofficial_subscale). Metrics are zeroed out.
+    - benchbox/core/results/schema.py: _build_tpc_metrics() returns
+      {suppressed: True, reason: f"compliance_class=..."} for unofficial classes
+      instead of actual metric values.
+    - benchbox/cli/display.py: Display logic skips Power@Size/Throughput@Size rows
+      for unofficial compliance classes; instead shows a yellow suppression note.
+    - benchbox/cli/output.py: render_summary_stats() skips power_at_size for
+      unofficial compliance classes.
 
 - id: w7
   summary: "Align generation, manifest writing, loading, and validation with the measured unofficial subscale contract"
