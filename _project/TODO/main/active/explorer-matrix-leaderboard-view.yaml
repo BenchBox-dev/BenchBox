@@ -80,7 +80,7 @@ work:
 - id: w4
   summary: "Rewrite BenchmarkIndex.tsx to render QueryHeatmap as default view with filter controls"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Load BenchmarkSummary and render QueryHeatmap. Keep existing
     sorted-list behind a 'List view' toggle for mobile. Add
@@ -90,7 +90,7 @@ work:
 - id: w5
   summary: "Wire row checkboxes to Compare URL with sticky 'Compare N selected' button"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Selecting ≥2 rows reveals a sticky button that navigates to
     /results/compare?ids=<selected>. Uses short IDs once
@@ -100,7 +100,7 @@ work:
 - id: w6
   summary: "Empty-state + single-platform handling with guidance banners"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     When only 1 platform has run a (benchmark, scale, phase) tuple,
     hide heat coloring and show 'Only 1 result in this cohort — add
