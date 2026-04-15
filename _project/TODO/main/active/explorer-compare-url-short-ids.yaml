@@ -1,0 +1,142 @@
+id: explorer-compare-url-short-ids
+title: "Use short hash IDs in Compare URLs to avoid URL-length limits"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+
+description: |
+  The current Compare URL format is
+  `/results/compare?ids=<full_result_id>,<full_result_id>,...`.
+
+  Full result IDs average ~40 characters (e.g.,
+  `tpch-duckdb-sf0.01-20260403-7fe93365`). With 4+ selections plus the
+  base URL, encoded commas, and any future additional query params, the
+  URL approaches 2KB. Chrome handles this, but proxies, older browsers,
+  and CDN caches have been observed to truncate or reject URLs above
+  1024 bytes. Once the matrix leaderboard ships and users can
+  one-click-compare 6–8 platforms, this becomes a real failure mode.
+
+  This TODO introduces a short-ID scheme: a stable 8-character prefix
+  of a deterministic hash of the full result_id. The pipeline emits a
+  lookup table `short_ids.json` mapping short → full; the frontend
+  resolves both directions.
+
+  Collision handling: if two short IDs collide in the active corpus,
+  the pipeline extends the colliding pair to 10 chars (and so on). This
+  is logged at build time. At current corpus scale (12 bundles) and
+  foreseeable scale (hundreds), 8 chars is effectively collision-free,
+  but the extend-on-collision rule is required for robustness.
+
+deps:
+  needs:
+  - explorer-matrix-leaderboard-view
+
+work:
+- id: w1
+  summary: "Add short_id generation to benchbox/core/explorer/pipeline.py with collision extension"
+  status: done
+  notes: |
+    For each result_id, compute sha256(result_id)[:8]. Build a dict
+    {short: full}; on collision, extend both entries to 10 chars,
+    then 12, up to 16. Emit to
+    results-explorer/public/data/short_ids.json.
+
+- id: w2
+  summary: "Add `short_id` field to each PlatformRow in BenchmarkSummary"
+  needs: [w1]
+  status: done
+  notes: |
+    Lets the frontend read short_ids from the matrix artifact directly,
+    no second lookup needed for the common case.
+
+- id: w3
+  summary: "Add resolveShortId/resolveFullId helpers in src/lib/manifest.ts"
+  needs: [w1]
+  status: done
+  notes: |
+    Load short_ids.json on first call, cache in module scope. Unknown
+    IDs return input unchanged so stale bookmarks fall through to
+    normal 404 handling.
+
+- id: w4
+  summary: "Emit short IDs in Compare URLs from QueryHeatmap; accept either form in Compare.tsx"
+  needs: [w2, w3]
+  status: done
+  notes: |
+    Long-form URLs remain valid — this is additive.
+
+- id: w5
+  summary: "Add URL canonicalization in Compare.tsx via history.replaceState"
+  needs: [w4]
+  status: done
+  notes: |
+    When Compare.tsx receives any full IDs, replace the URL with the
+    canonical short-ID form so shared links propagate compact form.
+
+files_affected:
+  added:
+  - "results-explorer/public/data/short_ids.json (generated)"
+  modified:
+  - "benchbox/core/explorer/pipeline.py"
+  - "benchbox/core/explorer/models.py"
+  - "results-explorer/src/lib/manifest.ts"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/types.ts"
+
+must_preserve:
+- "Existing long-form Compare URLs continue to work — backward compatible"
+- "Direct links to /results/r/<full_result_id> remain unchanged — this TODO only affects Compare query params"
+- "Pipeline remains a single pass — short-ID generation piggybacks on the existing bundle-id enumeration"
+
+approach: |
+  Hashing is cheap and deterministic; use sha256 so short IDs are
+  stable across pipeline runs. The collision-extension rule is the
+  only nuance — implement it as a second pass over the first-pass
+  dict: sort entries, find collisions, extend both sides by 2 chars
+  until unique, repeat.
+
+  The frontend load pattern: fetch short_ids.json on first navigation
+  to /results/compare, cache in module scope. For the
+  Matrix → Compare flow, the short_id is already on each PlatformRow
+  so no extra fetch is needed.
+
+anti_patterns:
+- "DO NOT use a random or timestamp-based short ID — because it would change on each pipeline run and break shared links —
+  use a deterministic hash"
+- "DO NOT break existing full-ID URLs — because users have already shared them — both forms must resolve"
+- "DO NOT pre-emptively encode short IDs in /results/r/<id> paths — because that breaks stable detail-page URLs — keep detail
+  URLs long-form"
+- "DO NOT reject unknown IDs — because a stale bookmark should still try to resolve gracefully — unknown IDs fall through
+  to normal 404 handling"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/explorer/pipeline.py"
+  - "benchbox/core/explorer/models.py"
+  - "results-explorer/src/lib/manifest.ts"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/types.ts"
+  - "results-explorer/public/data/short_ids.json"
+
+verification:
+- description: "short_ids.json is emitted by the pipeline"
+  command: "test -f results-explorer/public/data/short_ids.json && echo exists"
+  expected_output: "exists"
+- description: "Short IDs are 8 chars by default with no collisions at current corpus size"
+  command: "uv run -- python -c 'import json; d = json.load(open(\"results-explorer/public/data/short_ids.json\")); assert
+    all(len(k) >= 8 for k in d); assert len(set(d.keys())) == len(d)'"
+  expected_output: "no assertion failure"
+- description: "Compare page accepts short IDs"
+  command: "grep -n 'resolveShortId' results-explorer/src/pages/Compare.tsx"
+  expected_output: "function is called"
+- description: "Matrix → Compare URLs emit short IDs"
+  command: "grep -n 'short_id' results-explorer/src/components/QueryHeatmap.tsx"
+  expected_output: "short_id referenced in URL construction"
+
+metadata:
+  tags: ["results", "explorer", "urls", "compare"]
+  estimated_effort: "Small (1 day)"
+  created_date: "2026-04-15"
