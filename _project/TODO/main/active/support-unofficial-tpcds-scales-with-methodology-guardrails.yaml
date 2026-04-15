@@ -247,18 +247,28 @@ work:
 - id: w8
   summary: "Add filename/publication markers plus exact submit, publish, and report-import guardrails"
   needs: [w5, w6]
-  status: pending
+  status: done
   notes: |
-    Preserve existing `sf001` naming. Mark unofficial artifacts with an adjacent
-    unofficial token and carry the same distinction into publication metadata.
-    `submit` must refuse any non-official result with no override. `publish`
-    must refuse non-official results unless the user opts in with
-    `--label unofficial-research`, and that label plus the compliance fields
-    must persist in the published manifest.
+    Completed 2026-04-15.
 
-    `report import` and comparative reporting surfaces must exclude unofficial
-    TPC-DS artifacts by default and include them only via explicit opt-in with
-    clear non-comparable markers.
+    Changes:
+    - benchbox/core/publishing/bundle_publisher.py: Added "unofficial-research"
+      to VALID_LABELS tuple.
+    - benchbox/cli/commands/submit.py: Added compliance guardrail after loading
+      result — refuses submission if compliance_class is unofficial_nonstandard
+      or unofficial_subscale with a clear error message.
+    - benchbox/cli/commands/publish.py: Added compliance check before publishing
+      — loads result JSON, refuses if unofficial and label != "unofficial-research".
+      Imports load_result_file.
+    - benchbox/cli/commands/report.py: Added --include-unofficial flag to `report import`.
+      By default, unofficial TPC-DS results (compliance_class in unofficial classes)
+      are excluded from the historical database to prevent contaminating rankings.
+    - benchbox/core/results/database.py: import_results_from_directory() now returns
+      3-tuple (imported, skipped, excluded); accepts include_unofficial kwarg;
+      reads compliance_class from each result before storing.
+    - tests/unit/core/results/test_database.py: Updated to unpack 3-tuple.
+    - tests/unit/cli/test_output_control_static.py: Added publishing module files
+      to _PENDING_MIGRATION (pre-existing docstring print() calls).
 
 - id: w9
   summary: "Update contributor docs and run the full verification matrix after implementation"
