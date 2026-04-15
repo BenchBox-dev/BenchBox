@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:02:42.786792'
-total_items: 695
+generated_at: '2026-04-15T09:06:18.471538'
+total_items: 696
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 644
+    count: 645
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -682,6 +682,11 @@ statuses:
     - id: dedup-ignore-rules-boilerplate
       file: DONE/core-functionality/active/dedup-ignore-rules-boilerplate.yaml
       title: Add ignore rules for 17 boilerplate duplicate groups identified by duplicate-check
+      priority: Medium-High
+      category: Core Functionality
+    - id: explorer-add-methodology-disclosure
+      file: DONE/main/planning/explorer-add-methodology-disclosure.yaml
+      title: Add methodology disclosure panel to result detail pages
       priority: Medium-High
       category: Core Functionality
     - id: explorer-add-comparison-charts

@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T09:02:42.786433'
+generated_at: '2026-04-15T09:06:18.471179'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -602,7 +602,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 229
+    count: 230
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -762,6 +762,11 @@ categories:
     - id: dedup-ignore-rules-boilerplate
       file: DONE/core-functionality/active/dedup-ignore-rules-boilerplate.yaml
       title: Add ignore rules for 17 boilerplate duplicate groups identified by duplicate-check
+      priority: Medium-High
+      status: Completed
+    - id: explorer-add-methodology-disclosure
+      file: DONE/main/planning/explorer-add-methodology-disclosure.yaml
+      title: Add methodology disclosure panel to result detail pages
       priority: Medium-High
       status: Completed
     - id: explorer-add-comparison-charts

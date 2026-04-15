@@ -1,8 +1,8 @@
-generated_at: '2026-04-15T09:02:41.070741'
-total_items: 39
+generated_at: '2026-04-15T09:06:16.760670'
+total_items: 38
 statuses:
   Not Started:
-    count: 31
+    count: 30
     items:
     - id: explorer-heatmap-accessibility-and-tests
       file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
@@ -43,11 +43,6 @@ statuses:
       file: TODO/main/planning/explorer-cross-benchmark-meta-leaderboard.yaml
       title: Add cross-benchmark meta-leaderboard to the home page
       priority: Medium
-      category: Core Functionality
-    - id: explorer-add-methodology-disclosure
-      file: TODO/main/planning/explorer-add-methodology-disclosure.yaml
-      title: Add methodology disclosure panel to result detail pages
-      priority: Medium-High
       category: Core Functionality
     - id: explorer-matrix-leaderboard-view
       file: TODO/main/planning/explorer-matrix-leaderboard-view.yaml

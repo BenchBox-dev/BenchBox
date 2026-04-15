@@ -2,7 +2,8 @@ id: explorer-add-methodology-disclosure
 title: "Add methodology disclosure panel to result detail pages"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-15"
 category: Core Functionality
 
 description: |
@@ -31,7 +32,7 @@ deps:
 work:
   - id: w1
     summary: "Design the disclosure panel content: list each disclosed item (metric definition, execution mode, tuning mode, test type, query scope, environment summary) and write the copy for each."
-    status: pending
+    status: done
     notes: |
       Metric definition copy: "Primary metric is geometric mean of per-query
       execution times (measurement runs only). Wall-clock total is shown
@@ -48,17 +49,17 @@ work:
   - id: w2
     summary: "Implement MethodologyDisclosure component in results-explorer/src/components/. Collapsible panel, collapsed by default. Accepts detail result props; renders the disclosed items as a definition list."
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Integrate MethodologyDisclosure into ResultDetail.tsx below the query timing table. Ensure it renders for all bundles including those predating the extended manifest (graceful null handling)."
     needs: [w2]
-    status: pending
+    status: done
 
   - id: w4
     summary: "Add comparability summary row to Compare.tsx header: execution_mode + tuning_mode + test_type per result. Surfaces differences without navigating to detail pages."
     needs: [w2]
-    status: pending
+    status: done
 
 files_affected:
   added:

@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:02:42.786619'
-total_items: 695
+generated_at: '2026-04-15T09:06:18.471365'
+total_items: 696
 priorities:
   Critical:
     count: 40
@@ -1426,7 +1426,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 104
+    count: 105
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1537,6 +1537,11 @@ priorities:
     - id: dedup-ignore-rules-boilerplate
       file: DONE/core-functionality/active/dedup-ignore-rules-boilerplate.yaml
       title: Add ignore rules for 17 boilerplate duplicate groups identified by duplicate-check
+      category: Core Functionality
+      status: Completed
+    - id: explorer-add-methodology-disclosure
+      file: DONE/main/planning/explorer-add-methodology-disclosure.yaml
+      title: Add methodology disclosure panel to result detail pages
       category: Core Functionality
       status: Completed
     - id: platform-setup-numbered-list-selection

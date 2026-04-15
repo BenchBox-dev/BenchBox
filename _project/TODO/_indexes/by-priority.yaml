@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:02:41.070730'
-total_items: 39
+generated_at: '2026-04-15T09:06:16.760658'
+total_items: 38
 priorities:
   Critical:
     count: 2
@@ -53,7 +53,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 8
+    count: 7
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -63,11 +63,6 @@ priorities:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
-      category: Core Functionality
-      status: Not Started
-    - id: explorer-add-methodology-disclosure
-      file: TODO/main/planning/explorer-add-methodology-disclosure.yaml
-      title: Add methodology disclosure panel to result detail pages
       category: Core Functionality
       status: Not Started
     - id: automate-corpus-inventory-generation

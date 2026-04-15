@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T09:02:41.070709'
+generated_at: '2026-04-15T09:06:16.760636'
 total_categories: 9
 categories:
   Architecture & Refactoring:
@@ -41,7 +41,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 18
+    count: 17
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -52,11 +52,6 @@ categories:
       file: TODO/main/planning/explorer-cross-benchmark-meta-leaderboard.yaml
       title: Add cross-benchmark meta-leaderboard to the home page
       priority: Medium
-      status: Not Started
-    - id: explorer-add-methodology-disclosure
-      file: TODO/main/planning/explorer-add-methodology-disclosure.yaml
-      title: Add methodology disclosure panel to result detail pages
-      priority: Medium-High
       status: Not Started
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml

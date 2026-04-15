@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:02:41.070671'
-total_items: 39
+generated_at: '2026-04-15T09:06:16.760596'
+total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -595,25 +595,6 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
-- id: explorer-add-methodology-disclosure
-  file: TODO/main/planning/explorer-add-methodology-disclosure.yaml
-  title: Add methodology disclosure panel to result detail pages
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - methodology
-  - transparency
-  - fidelity
-  estimated_effort: Small (0.5-1 day)
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - explorer-extend-manifest-and-pipeline
 - id: automate-corpus-inventory-generation
   file: TODO/main/planning/automate-corpus-inventory-generation.yaml
   title: Automate corpus-inventory.json generation from results-data/bundles/
