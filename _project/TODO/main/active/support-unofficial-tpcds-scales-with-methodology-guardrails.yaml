@@ -157,12 +157,26 @@ work:
 - id: w4
   summary: "Wire explicit CLI opt-in and warning banners through `run` and `datagen`"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
-    Add `--allow-unofficial-scale` to `benchbox run` and forward it through the
-    `benchbox datagen` wrapper. Emit a non-interactive warning banner that names
-    the exact scale factor, the compliance bucket, and the downstream
-    publish/submit restrictions.
+    Completed 2026-04-14.
+
+    Changes:
+    - benchbox/cli/commands/run.py: Added --allow-unofficial-scale flag (is_flag),
+      wired into SimpleNamespace, all 4 validate_scale_factor() call sites, and
+      both BenchmarkConfig.options dicts (allow_unofficial_scale key).
+      Warning banner emitted when flag + tpcds + scale<1.0.
+    - benchbox/cli/commands/datagen.py: Added --allow-unofficial-scale flag,
+      forwarded into run_args when set.
+    - benchbox/cli/benchmarks.py: BenchmarkManager.validate_scale_factor() updated
+      to accept and forward allow_unofficial_scale kwarg.
+    - benchbox/core/benchmark_loader.py: get_benchmark_instance() reads
+      allow_unofficial_scale from BenchmarkConfig.options and passes it to
+      TPCDSBenchmark constructor.
+    - benchbox/cli/dryrun.py: generate_cli_command() updated to accept
+      allow_unofficial_scale and emit --allow-unofficial-scale in the bool flags.
+    - tests/system/test_module_size_thresholds.py: Bumped run.py limit from 2700
+      to 2710 (net +3 lines for flag wiring).
 
 - id: w5
   summary: "Make compliance durable across result objects, schema export/import, loader, normalizer, database, and publication
