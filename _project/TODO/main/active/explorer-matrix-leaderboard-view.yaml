@@ -1,0 +1,208 @@
+id: explorer-matrix-leaderboard-view
+title: "Build ClickBench-style matrix leaderboard as primary benchmark landing view"
+worktree: main
+priority: High
+status: In Progress
+category: Core Functionality
+
+description: |
+  The strategy review (2026-04-15) concluded that the explorer's primary
+  surface per benchmark must be a Platform × Query matrix leaderboard,
+  modelled on ClickBench but adapted to BenchBox's multi-dimensional data
+  (trust tiers, tuning modes, phases). The current BenchmarkIndex.tsx
+  renders a sorted list — this TODO replaces it with the matrix.
+
+  The matrix is the product definition: arriving at /results/tpch/ should
+  immediately answer "which engine wins, and by how much, on each query?"
+  without navigating further.
+
+  Layout:
+
+    [Scale ▾] [Tuning ▾] [Phase ▾] [Trust ▾]  [View: Matrix | List]
+
+    Platform      Trust    Power/Geomean  Cost   Q1    Q2   ... Q22
+    ──────────────────────────────────────────────────────────────────
+    DuckDB        maintainer   3184.9 / 11.5ms  $0    18ms  4ms  ... 6ms
+    Polars        maintainer   ——     / 8.2ms   $0    12ms  3ms  ... 4ms
+    DataFusion    community    2847.1 / 13.7ms  $0    22ms  6ms  ... 9ms
+
+  Heat coloring rules (corrected from the original proposal):
+
+  - Per-column normalization (each query independently).
+  - **Log scale**, not linear — SQLite at 892ms vs DuckDB at 11ms would
+    collapse the DuckDB/Polars/DataFusion gradation under linear.
+  - Scale is **ratio-to-fastest-in-column** (ClickBench-style),
+    not min-max.
+  - Null cells render "—" in muted gray with `aria-label="no data"`.
+
+  Row selection: checkboxes on each row feed the existing Compare page
+  via URL-encoded IDs. See explorer-compare-url-short-ids for the ID
+  encoding concern.
+
+deps:
+  needs:
+  - explorer-emit-benchmark-summary-artifact
+  - explorer-align-ranking-metric-with-tpc-standards
+
+work:
+- id: w1
+  summary: "Add BenchmarkSummary TS type and getBenchmarkSummary(benchmark, sf, phase) loader in src/lib/manifest.ts"
+  status: pending
+  notes: |
+    Mirror the Pydantic model in src/types.ts. Loader fetches and
+    decompresses the gzipped artifact via DecompressionStream API.
+
+- id: w2
+  summary: "Build QueryHeatmap component at src/components/QueryHeatmap.tsx with log-ratio heat coloring"
+  needs: [w1]
+  status: pending
+  notes: |
+    Props: summary (BenchmarkSummary), rankingMetric ('power_score' |
+    'geomean_ms'). Sticky left-column (platform + trust badge +
+    metric), horizontally scrollable query cells, row-level checkbox.
+
+    Color math: per column, log10(ms / min_in_column) mapped to hsl
+    hue 120° (green) → 0° (red) across [0, log10(10)] clamped.
+    CSS custom properties for the color so high-contrast and dark
+    modes can override. Each cell emits numeric text AND
+    `aria-label="${ms}ms, ${ratio}× slowest"` for screen readers.
+
+- id: w3
+  summary: "Write snapshot tests at src/components/__tests__/QueryHeatmap.test.tsx"
+  needs: [w2]
+  status: pending
+  notes: |
+    Cases: (a) known timings produce stable color classes; (b) null
+    cells render '—'; (c) single-platform matrix degrades gracefully;
+    (d) empty matrix shows empty state; (e) ratio calculation matches
+    expected values for a 10x-range fixture.
+
+- id: w4
+  summary: "Rewrite BenchmarkIndex.tsx to render QueryHeatmap as default view with filter controls"
+  needs: [w2]
+  status: pending
+  notes: |
+    Load BenchmarkSummary and render QueryHeatmap. Keep existing
+    sorted-list behind a 'List view' toggle for mobile. Add
+    Scale/Tuning/Phase/Trust filter controls; Scale and Phase are
+    required (one value each); Tuning and Trust default to 'All'.
+
+- id: w5
+  summary: "Wire row checkboxes to Compare URL with sticky 'Compare N selected' button"
+  needs: [w4]
+  status: pending
+  notes: |
+    Selecting ≥2 rows reveals a sticky button that navigates to
+    /results/compare?ids=<selected>. Uses short IDs once
+    explorer-compare-url-short-ids lands; until then falls back to
+    full result_ids.
+
+- id: w6
+  summary: "Empty-state + single-platform handling with guidance banners"
+  needs: [w4]
+  status: pending
+  notes: |
+    When only 1 platform has run a (benchmark, scale, phase) tuple,
+    hide heat coloring and show 'Only 1 result in this cohort — add
+    more with benchbox run ...'. When 0 query overlap across
+    platforms, show 'No shared queries to compare'.
+
+- id: w7
+  summary: "Fix Compare.tsx to use display_ms from DetailResult instead of first-row raw duration_ms"
+  needs: []
+  status: done
+  notes: |
+    The current Compare.tsx calls find() to get the first QueryTiming
+    row for each query (Compare.tsx:107, :350). This returns the
+    cold-cache outlier when multiple measurement iterations exist (e.g.,
+    [16, 11, 11, 11] → 16ms displayed).
+
+    Fix: read `display_timings` (list[QueryDisplayTiming]) from the
+    detail JSON instead of scanning the raw `queries` array. The
+    `display_ms` value per query_id is the median of successful runs,
+    computed by the pipeline (see explorer-fix-read-model-contract).
+
+    Add a helper in src/lib/queryReduction.ts:
+      `getDisplayMs(detail: DetailResult, queryId: string): number | null`
+    It reads `detail.display_timings.find(t => t.query_id === queryId)?.display_ms ?? null`.
+    Replace both find() call-sites in Compare.tsx with this helper.
+
+    This makes the matrix and the Compare page agree on what a query's
+    performance is — they will now both use the same canonical reduced
+    value from the pipeline.
+
+files_affected:
+  added:
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+  - "results-explorer/src/lib/queryReduction.ts"
+  modified:
+  - "results-explorer/src/types.ts"
+  - "results-explorer/src/lib/manifest.ts"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
+
+must_preserve:
+- "Existing /results/:benchmark/ route — do not change URL pattern, only the rendered content"
+- "BenchmarkIndex list view remains available via a toggle for mobile users"
+- "Existing manifest.json consumers — this TODO adds a new loader, does not remove the existing one"
+- "Compare page contract — selection emits URLs the Compare page already understands"
+
+approach: |
+  The heatmap is a single component with no internal state beyond
+  selection. All data comes from the summary prop. Filter controls
+  live in BenchmarkIndex and drive the (sf, phase) → artifact URL
+  selection + client-side filtering of rows by tuning/trust.
+
+  For coloring: write a pure function colorForCell(ms, minInCol,
+  maxInCol) → CSSValue. Unit-test it directly with known inputs before
+  wiring it to the component. The color math is where a proposal most
+  easily goes wrong; keep it isolated and snapshot-tested.
+
+  For the log-ratio color: clamp the ratio at 10x so a 100x-slower
+  outlier doesn't compress everything else. Values above the clamp
+  still render red but don't stretch the scale further.
+
+anti_patterns:
+- "DO NOT use linear min-max coloring — because linear compresses sub-2x gaps when a 80x outlier is present — use log10(ratio-to-fastest)
+  with a 10x clamp"
+- "DO NOT default the ranking metric to geomean_ms for TPC-H/DS — because those benchmarks define power_score as the standard
+  metric — use the benchmark-aware choice from explorer-align-ranking-metric-with-tpc-standards"
+- "DO NOT hide community-tier rows by default — because hiding them defeats the trust model — render them with a visible tier
+  badge instead"
+- "DO NOT emit color via hard-coded hex — because dark mode and high-contrast accessibility settings need to override — use
+  CSS custom properties"
+- "DO NOT omit aria-label on heat cells — because colored cells alone are invisible to screen readers — always include numeric
+  + relative label"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/types.ts"
+  - "results-explorer/src/lib/manifest.ts"
+  - "results-explorer/src/lib/queryReduction.ts"
+  - "results-explorer/src/pages/Compare.tsx"
+  do_not_modify:
+  - "results-explorer/src/pages/ResultDetail.tsx"
+  - "benchbox/**"
+
+verification:
+- description: "TypeScript compiles"
+  command: "cd results-explorer && npm run typecheck"
+  expected_output: "no errors"
+- description: "Snapshot tests pass"
+  command: "cd results-explorer && npm test -- QueryHeatmap"
+  expected_output: "all tests pass"
+- description: "BenchmarkIndex renders QueryHeatmap by default"
+  command: "grep -n 'QueryHeatmap' results-explorer/src/pages/BenchmarkIndex.tsx"
+  expected_output: "imported and rendered as default view"
+- description: "Color function is pure and exported for testing"
+  command: "grep -nE 'export.*colorForCell' results-explorer/src/components/QueryHeatmap.tsx"
+  expected_output: "function is exported"
+
+metadata:
+  tags: ["results", "explorer", "matrix", "leaderboard", "heatmap", "ui"]
+  estimated_effort: "Medium-Large (2-3 days)"
+  created_date: "2026-04-15"
