@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T19:46:44.576301'
-total_items: 37
+generated_at: '2026-04-15T19:50:25.254659'
+total_items: 41
 priorities:
   Critical:
     count: 3
@@ -20,8 +20,13 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 4
+    count: 7
     items:
+    - id: explorer-emit-comparison-artifact-from-pipeline
+      file: TODO/main/planning/explorer-emit-comparison-artifact-from-pipeline.yaml
+      title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
+      category: Core Functionality
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -32,10 +37,20 @@ priorities:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
       status: Not Started
+    - id: fix-git-author-history-rewrite
+      file: TODO/main/planning/fix-git-author-history-rewrite.yaml
+      title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+      category: Repository Maintenance
+      status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
+      status: Not Started
+    - id: explorer-unify-visualization-foundations
+      file: TODO/main/planning/explorer-unify-visualization-foundations.yaml
+      title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
+      category: Core Functionality
       status: Not Started
     - id: verify-trust-badge-rendering-in-explorer
       file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
@@ -43,7 +58,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 6
+    count: 7
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -60,6 +75,11 @@ priorities:
       title: Automate corpus-inventory.json generation from results-data/bundles/
       category: Core Functionality
       status: Completed
+    - id: explorer-close-chart-type-coverage-gaps
+      file: TODO/main/planning/explorer-close-chart-type-coverage-gaps.yaml
+      title: 'Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others'
+      category: Core Functionality
+      status: Not Started
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model

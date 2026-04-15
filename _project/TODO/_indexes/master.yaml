@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T19:46:44.576245'
-total_items: 37
+generated_at: '2026-04-15T19:50:25.254601'
+total_items: 41
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -56,6 +56,24 @@ items:
   work_ready: 1
   needs:
   - implement-pr-based-result-submission-workflow
+- id: explorer-emit-comparison-artifact-from-pipeline
+  file: TODO/main/planning/explorer-emit-comparison-artifact-from-pipeline.yaml
+  title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - explorer
+  - visualization
+  - pipeline
+  - architecture
+  - single-source-of-truth
+  estimated_effort: Large (4-6 days)
+  work_total: 7
+  work_done: 0
+  work_ready: 1
+  deferred_count: 2
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -92,6 +110,21 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
+- id: fix-git-author-history-rewrite
+  file: TODO/main/planning/fix-git-author-history-rewrite.yaml
+  title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+  worktree: main
+  category: Repository Maintenance
+  priority: High
+  status: Not Started
+  tags:
+  - git
+  - history-rewrite
+  - author
+  estimated_effort: Small
+  work_total: 10
+  work_done: 0
+  work_ready: 1
 - id: external-contributor-submission-dry-run
   file: TODO/main/planning/external-contributor-submission-dry-run.yaml
   title: Run a Phase 2 dry-run with one external trusted contributor
@@ -113,6 +146,24 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
+- id: explorer-unify-visualization-foundations
+  file: TODO/main/planning/explorer-unify-visualization-foundations.yaml
+  title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - explorer
+  - visualization
+  - ux
+  - refactor
+  - consistency
+  estimated_effort: Medium-Large (3-5 days)
+  work_total: 7
+  work_done: 0
+  work_ready: 3
+  deferred_count: 3
 - id: verify-trust-badge-rendering-in-explorer
   file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
   title: Visually verify TrustBadge rendering across all 4 explorer pages
@@ -602,6 +653,28 @@ items:
   work_ready: 0
   needs:
   - implement-pr-based-result-submission-workflow
+- id: explorer-close-chart-type-coverage-gaps
+  file: TODO/main/planning/explorer-close-chart-type-coverage-gaps.yaml
+  title: 'Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others'
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - explorer
+  - visualization
+  - coverage
+  - charts
+  - parity
+  estimated_effort: Large (2-3 weeks across tiers)
+  work_total: 5
+  work_done: 0
+  work_ready: 2
+  deferred_count: 4
+  needs:
+  - explorer-establish-cli-explorer-parity-tests
+  - explorer-emit-comparison-artifact-from-pipeline
+  - explorer-unify-visualization-foundations
 - id: define-hosted-results-contract-and-governance-model
   file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
   title: Define hosted results contract, trust labels, and governance model

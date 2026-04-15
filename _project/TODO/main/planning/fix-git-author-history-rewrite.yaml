@@ -1,0 +1,295 @@
+id: fix-git-author-history-rewrite
+title: "Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  On 2026-01-28, a local git config entry `user.name=user.email` was written
+  to .git/config, setting the commit author name to the literal string "user.email"
+  instead of "Joe Harris". This was discovered and fixed on 2026-04-14 (the config
+  entry has been removed). However, all commits between 80e17e9 (2026-01-28 09:21)
+  and 2cfdcfd (2026-04-14 20:16) were made with the bad author name — a total of
+  2,286 commits on main and 1,850 commits on published-results (overlapping with main).
+
+  git-filter-repo is available at /Users/joe/.local/bin/git-filter-repo and will
+  be used to rewrite the author name across all affected commits.
+
+  Refs affected:
+  - main: 2,286 commits with author "user.email" (first: 80e17e9, last: 2cfdcfd)
+  - published-results: 1,850 commits affected (shares history with main)
+  - Tags v0.1.0–v0.2.0: point to correct-author commits, but their SHAs shift
+    during rewrite — tags must be force-pushed after rewrite
+  - private/claude/seed-corpus-infra: 3 remote-only commits on top of old main;
+    these are NOT rewritten by filter-repo and must be cherry-picked onto new main
+  - claude/condescending-mcnulty: local branch, 0 commits ahead of main — safe to
+    reset to new main HEAD after rewrite
+  - public remote: READ-ONLY by repo policy — must NEVER receive a push
+
+  filter-repo behavior to account for:
+  - Rewrites ALL commits reachable from any local ref (both branches, all tags)
+  - Strips all remote-tracking refs after rewrite (safety mechanism) — remotes
+    must be re-added manually before any push
+  - Does NOT have a safe --dry-run mode for name callbacks
+
+category: Repository Maintenance
+
+metadata:
+  tags:
+  - git
+  - history-rewrite
+  - author
+  estimated_effort: "Small"
+  created_date: "2026-04-15"
+  source_review: "Discovered in conversation: git config user.name was set to literal string 'user.email'"
+
+work:
+- id: w1
+  summary: "Pre-flight: snapshot current state of all refs"
+  status: pending
+  needs: []
+  description: |
+    Capture a complete snapshot of current ref state before any changes.
+    This is the recovery reference if anything goes wrong.
+
+    Run and save output:
+      git log --format="%H %D" --decorate=full | head -50   # branch/tag positions
+      git tag -l --format="%(refname:short) %(objectname:short) %(*objectname:short)"
+      git remote -v
+      git log --format="%H %an %s" --author="user.email" | head -5   # confirm bad commits
+      git log --format="%H %an %s" --author="user.email" | tail -5   # first bad commit
+
+    Verify the correct filter-repo command works syntactically by inspecting the callback.
+    Expected: first bad commit is 80e17e9, last is 2cfdcfd; tags v0.1.0–v0.2.0 present.
+
+- id: w2
+  summary: "Create backup tags before running filter-repo"
+  status: pending
+  needs: [w1]
+  description: |
+    Create local backup tags pointing to current branch HEADs. These are the
+    escape hatch if the rewrite produces unexpected results.
+
+      git tag backup/pre-author-fix/main main
+      git tag backup/pre-author-fix/published-results published-results
+
+    Do NOT push these backup tags to any remote. They are local safety refs only.
+    Confirm both tags were created:
+      git tag | grep backup/
+
+- id: w3
+  summary: "Run git-filter-repo to rewrite author name"
+  status: pending
+  needs: [w2]
+  description: |
+    Execute the rewrite. This command rewrites ALL commits in the repo where
+    the author name is the literal string "user.email":
+
+      git filter-repo --name-callback 'return b"Joe Harris" if name == b"user.email" else name'
+
+    Expected behavior:
+    - All commits with author name "user.email" get name rewritten to "Joe Harris"
+    - All commit SHAs change (even those not directly modified, due to parent chain)
+    - Remote-tracking refs (private/*, public/*) are stripped — this is expected
+    - Local branch refs (main, published-results, claude/condescending-mcnulty) are updated
+    - Tags v0.1.0–v0.2.0 are updated to point to new SHAs
+
+    If filter-repo fails or produces unexpected output, restore from backup:
+      git reset --hard backup/pre-author-fix/main
+      git checkout published-results && git reset --hard backup/pre-author-fix/published-results
+
+- id: w4
+  summary: "Verify rewrite correctness before touching any remote"
+  status: pending
+  needs: [w3]
+  description: |
+    Confirm the rewrite worked correctly. DO NOT proceed to w5 until all checks pass.
+
+    Check 1 — no "user.email" author remains on any branch:
+      git log --all --format="%an" | sort -u
+      Expected: only "Joe Harris" appears (plus any automated commit authors)
+
+    Check 2 — total commit count is unchanged:
+      git log --all --oneline | wc -l
+      Expected: same count as before rewrite
+
+    Check 3 — spot-check a known bad commit by its message:
+      git log --all --format="%H %an %s" | grep "add platform and mode params"
+      Expected: new SHA, author "Joe Harris"
+
+    Check 4 — spot-check a known good commit by its message (pre-Jan-28):
+      git log --all --format="%H %an %s" | grep "remove duplicated fields from result JSON"
+      Expected: new SHA, author "Joe Harris"
+
+    Check 5 — tags still exist:
+      git tag | grep "^v"
+      Expected: v0.1.0 through v0.2.0 still present
+
+    If any check fails, restore from backup tags before proceeding.
+
+- id: w5
+  summary: "Re-add remotes (filter-repo strips them)"
+  status: pending
+  needs: [w4]
+  description: |
+    filter-repo removes remote-tracking refs as a safety mechanism.
+    Re-add both remotes. The public remote must be added back as read-only by policy.
+
+      git remote add private https://github.com/joeharris76/benchbox-private.git
+      git remote add public https://github.com/joeharris76/BenchBox.git
+
+    Verify:
+      git remote -v
+      Expected: private → benchbox-private.git, public → BenchBox.git (both fetch+push URLs)
+
+- id: w6
+  summary: "Force-push main and published-results to private remote"
+  status: pending
+  needs: [w5]
+  description: |
+    Push the rewritten branches to the private remote. Force-push is required
+    because history has been rewritten and the remote has the old SHAs.
+
+    CRITICAL: Only push to `private`. Never push to `public`.
+
+      git push private main --force
+      git push private published-results --force
+
+    Verify remote accepted the rewritten history:
+      git fetch private
+      git log private/main --format="%an" | sort -u
+      Expected: only "Joe Harris"
+
+- id: w7
+  summary: "Force-push version tags to private remote"
+  status: pending
+  needs: [w6]
+  description: |
+    The version tags (v0.1.0–v0.2.0) now point to new SHAs after the rewrite.
+    Push all tags to private, force-pushing to update the remote tag SHAs.
+
+      git push private --force --tags
+
+    CRITICAL: Do NOT run `git push public --tags` or `git push --tags` without
+    specifying `private`. The public remote must never receive a push.
+
+    Verify:
+      git ls-remote private --tags
+      Expected: all 7 version tags appear with new SHA values
+
+- id: w8
+  summary: "Recover private/claude/seed-corpus-infra branch"
+  status: pending
+  needs: [w6]
+  description: |
+    The remote branch private/claude/seed-corpus-infra has 3 commits that are
+    NOT in the local repo (they exist only on GitHub). These commits were NOT
+    rewritten by filter-repo. They branch off an old main SHA that no longer
+    exists in the rewritten history.
+
+    Recovery steps:
+    1. Fetch the 3 remote-only commits:
+         git fetch private claude/seed-corpus-infra:refs/remotes/private/claude/seed-corpus-infra
+
+    2. Identify the 3 commits and their old base on main:
+         git log private/claude/seed-corpus-infra ^private/main --oneline
+         git merge-base private/claude/seed-corpus-infra private/main   # old base SHA
+
+    3. The old base SHA no longer exists. Find its equivalent in new history by
+       matching commit message:
+         git log --format="%H %s" | grep "<message of old base commit>"
+
+    4. Cherry-pick the 3 branch-only commits onto the new base:
+         git checkout -b tmp/seed-corpus-recovery <new-base-sha>
+         git cherry-pick <commit1> <commit2> <commit3>
+
+    5. Force-push to replace the stale remote branch:
+         git push private tmp/seed-corpus-recovery:claude/seed-corpus-infra --force
+
+    6. Clean up the temp branch:
+         git checkout main && git branch -D tmp/seed-corpus-recovery
+
+    Verify:
+      git fetch private && git log private/claude/seed-corpus-infra --format="%an" | sort -u
+      Expected: no "user.email" commits
+
+- id: w9
+  summary: "Reset local claude/condescending-mcnulty to new main"
+  status: pending
+  needs: [w3]
+  description: |
+    The local branch claude/condescending-mcnulty was 0 commits ahead of main
+    before the rewrite. It now points to the old main HEAD SHA, which no longer
+    exists. Reset it to the new main HEAD.
+
+      git checkout claude/condescending-mcnulty
+      git reset --hard main
+      git checkout main
+
+    Verify:
+      git log claude/condescending-mcnulty --format="%an" | head -3
+      Expected: "Joe Harris"
+
+- id: w10
+  summary: "Delete local backup tags after validation"
+  status: pending
+  needs: [w6, w7, w8, w9]
+  description: |
+    After confirming all remotes are correct and history looks good, remove
+    the local backup safety tags.
+
+      git tag -d backup/pre-author-fix/main
+      git tag -d backup/pre-author-fix/published-results
+
+    Do NOT push these backup tags to any remote before deleting — they should
+    remain local-only throughout the entire process.
+
+    Final sanity check:
+      git log --all --format="%an" | sort -u
+      Expected: only "Joe Harris" (and any CI/bot authors if present)
+      git tag | grep backup
+      Expected: no output
+
+must_preserve:
+- "public remote: must never receive a push at any point during this process"
+- "published-results branch: must be rewritten and force-pushed to private with correct authorship"
+- "version tags v0.1.0–v0.2.0: must survive the rewrite and be accessible on private remote"
+- "private/claude/seed-corpus-infra: 3 unique commits must be recoverable and pushed with correct authorship"
+- "Total commit count must be unchanged after rewrite"
+
+approach: |
+  Use git-filter-repo with a name-callback to target only commits where
+  author name == b"user.email", leaving all other authors untouched.
+  Work in strict order: backup → rewrite → verify → re-add remotes → push.
+  Never push until w4 (verification) passes completely.
+  Handle the remote-only seed-corpus-infra branch last, via cherry-pick.
+
+anti_patterns:
+- "DO NOT run `git push` or `git push public` without specifying `private` as the remote — this would push to the public repo, leaking private history"
+- "DO NOT skip w2 (backup tags) — filter-repo is irreversible without a backup ref; restoring from backup/pre-author-fix/* is the only recovery path"
+- "DO NOT proceed past w4 if any verification check fails — push only after confirming the rewrite is correct"
+- "DO NOT push the backup/* tags to any remote — they're local safety refs only and contain the old 'user.email' commits"
+- "DO NOT try to run filter-repo twice — the second run would find nothing to fix and produce a clean-run, but may corrupt the backup tags"
+- "DO NOT use `git push --force-with-lease` here — the lease check will always fail since the remote has old SHAs; plain `--force` is correct and intentional"
+
+verification:
+- description: "No 'user.email' author commits remain anywhere in the repo"
+  command: "git log --all --format='%an' | sort -u | grep -c 'user\\.email'"
+  expected_output: "0"
+- description: "All version tags still exist"
+  command: "git tag | grep '^v' | sort"
+  expected_output: "v0.1.0\nv0.1.1\nv0.1.2\nv0.1.3\nv0.1.4\nv0.1.5\nv0.2.0"
+- description: "private/main has correct authorship"
+  command: "git log private/main --format='%an' | sort -u"
+  expected_output: "Joe Harris"
+- description: "private/published-results has correct authorship"
+  command: "git log private/published-results --format='%an' | sort -u"
+  expected_output: "Joe Harris"
+
+scope_limit:
+  only_modify:
+  - "git commit objects (author metadata only)"
+  - "git refs (branch and tag pointers after rewrite)"
+  do_not_touch:
+  - "Source code files — no file content changes"
+  - "public remote — zero pushes to joeharris76/BenchBox"
+  - "Any other git repositories on the filesystem"

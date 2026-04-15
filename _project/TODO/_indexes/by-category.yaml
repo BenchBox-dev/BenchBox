@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T19:46:44.576283'
-total_categories: 9
+generated_at: '2026-04-15T19:50:25.254637'
+total_categories: 10
 categories:
   Architecture & Refactoring:
     count: 1
@@ -66,7 +66,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 11
+    count: 14
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -78,6 +78,11 @@ categories:
       title: Automate corpus-inventory.json generation from results-data/bundles/
       priority: Medium-High
       status: Completed
+    - id: explorer-close-chart-type-coverage-gaps
+      file: TODO/main/planning/explorer-close-chart-type-coverage-gaps.yaml
+      title: 'Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others'
+      priority: Medium-High
+      status: Not Started
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
@@ -97,6 +102,11 @@ categories:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
+      status: Not Started
+    - id: explorer-emit-comparison-artifact-from-pipeline
+      file: TODO/main/planning/explorer-emit-comparison-artifact-from-pipeline.yaml
+      title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
+      priority: High
       status: Not Started
     - id: expand-seed-corpus-to-sf-0-1
       file: TODO/main/planning/expand-seed-corpus-to-sf-0-1.yaml
@@ -122,6 +132,11 @@ categories:
       file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
+      status: Not Started
+    - id: explorer-unify-visualization-foundations
+      file: TODO/main/planning/explorer-unify-visualization-foundations.yaml
+      title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
+      priority: High
       status: Not Started
   Documentation:
     count: 2
@@ -173,6 +188,14 @@ categories:
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
       priority: Low
+      status: Not Started
+  Repository Maintenance:
+    count: 1
+    items:
+    - id: fix-git-author-history-rewrite
+      file: TODO/main/planning/fix-git-author-history-rewrite.yaml
+      title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+      priority: High
       status: Not Started
   Supporting Infrastructure:
     count: 1

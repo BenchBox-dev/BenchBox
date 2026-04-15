@@ -1,8 +1,8 @@
-generated_at: '2026-04-15T19:46:44.576310'
-total_items: 37
+generated_at: '2026-04-15T19:50:25.254670'
+total_items: 41
 statuses:
   Not Started:
-    count: 29
+    count: 33
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -39,6 +39,11 @@ statuses:
       title: Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)
       priority: Low
       category: Code Quality and Technical Debt
+    - id: explorer-close-chart-type-coverage-gaps
+      file: TODO/main/planning/explorer-close-chart-type-coverage-gaps.yaml
+      title: 'Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others'
+      priority: Medium-High
+      category: Core Functionality
     - id: declare-undeclared-runtime-imports
       file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
       title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
@@ -64,6 +69,11 @@ statuses:
       title: Drop lxml dev dep (port single test to stdlib xml.etree)
       priority: Low
       category: Code Quality and Technical Debt
+    - id: explorer-emit-comparison-artifact-from-pipeline
+      file: TODO/main/planning/explorer-emit-comparison-artifact-from-pipeline.yaml
+      title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
+      priority: High
+      category: Core Functionality
     - id: explorer-establish-cli-explorer-parity-tests
       file: TODO/main/planning/explorer-establish-cli-explorer-parity-tests.yaml
       title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
@@ -119,6 +129,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Low
       category: Platform Expansion
+    - id: fix-git-author-history-rewrite
+      file: TODO/main/planning/fix-git-author-history-rewrite.yaml
+      title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+      priority: High
+      category: Repository Maintenance
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
@@ -139,6 +154,11 @@ statuses:
       title: TigerData Cloud Enhancements
       priority: Low
       category: Platform Expansion
+    - id: explorer-unify-visualization-foundations
+      file: TODO/main/planning/explorer-unify-visualization-foundations.yaml
+      title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
+      priority: High
+      category: Core Functionality
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR
