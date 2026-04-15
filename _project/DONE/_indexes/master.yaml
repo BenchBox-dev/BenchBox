@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T14:33:27.522116'
-total_items: 704
+generated_at: '2026-04-15T19:46:46.134549'
+total_items: 705
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4593,15 +4593,15 @@ items:
   category: Data Quality and Compatibility Issues
   priority: Medium
   status: Completed
-- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
-  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
+- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
+  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
   title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
   worktree: unknown
   category: Project Lifecycle Management
   priority: Medium
   status: Completed
-- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
-  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
+- id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
+  file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
   title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
   worktree: unknown
   category: Project Lifecycle Management
@@ -4649,7 +4649,7 @@ items:
   worktree: main
   category: Testing and Quality Assurance
   priority: Medium
-  status: In Progress
+  status: Completed
   tags:
   - results
   - explorer
@@ -4657,6 +4657,7 @@ items:
   - testing
   - a11y
   estimated_effort: Medium (1-2 days)
+  completed_date: '2026-04-15'
   work_total: 5
   work_done: 5
   work_ready: 0
@@ -5327,6 +5328,26 @@ items:
   work_total: 4
   work_done: 4
   work_ready: 0
+- id: audit-imported-dependencies-for-elimination
+  file: DONE/main/active/audit-imported-dependencies-for-elimination.yaml
+  title: Audit all imported dependencies and eliminate any not strictly required
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - quality-plan
+  - maintenance
+  - supply-chain
+  - deps
+  - audit
+  - tech-debt
+  estimated_effort: Medium (1-2 days for inventory + report; follow-up removals tracked separately)
+  completed_date: '2026-04-15'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  deferred_count: 3
 - id: auto-compile-tpc-binary-tools-completed
   file: DONE/unknown/planning/auto-compile-tpc-binary-tools-completed.yaml
   title: Auto-Compile TPC Binary Tools ✅ COMPLETED
@@ -7522,13 +7543,14 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Not Started
+  status: Completed
   tags:
   - results
   - explorer
   - urls
   - compare
   estimated_effort: Small (1 day)
+  completed_date: '2026-04-15'
   work_total: 5
   work_done: 5
   work_ready: 0
@@ -7714,15 +7736,15 @@ items:
   category: User Experience and CLI Enhancement
   priority: Medium
   status: Completed
-- id: implement-or-remove-incomplete-cli-commands-2
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+- id: implement-or-remove-incomplete-cli-commands
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)
   priority: Medium
   status: Completed
-- id: implement-or-remove-incomplete-cli-commands
-  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+- id: implement-or-remove-incomplete-cli-commands-2
+  file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
   title: ✅ Implement or Remove Incomplete CLI Commands
   worktree: unknown
   category: Pre-Release High Priority Tasks (COMPLETED)

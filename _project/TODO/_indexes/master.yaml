@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T19:33:53.384257'
-total_items: 32
+generated_at: '2026-04-15T19:46:44.576245'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -19,6 +19,24 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
+- id: explorer-establish-cli-explorer-parity-tests
+  file: TODO/main/planning/explorer-establish-cli-explorer-parity-tests.yaml
+  title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Critical
+  status: Not Started
+  tags:
+  - explorer
+  - visualization
+  - testing
+  - parity
+  - contract-tests
+  estimated_effort: Medium (2-3 days)
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  deferred_count: 2
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
   title: Verify the validate-submission CI workflow end-to-end with a real PR
@@ -149,6 +167,58 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: clean-up-unused-sphinx-dev-deps
+  file: TODO/main/planning/clean-up-unused-sphinx-dev-deps.yaml
+  title: Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Not Started
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - docs
+  - audit-followup
+  estimated_effort: Small (< 1 hour)
+  work_total: 4
+  work_done: 0
+  work_ready: 2
+  deferred_count: 1
+- id: declare-undeclared-runtime-imports
+  file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
+  title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Not Started
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - audit-followup
+  estimated_effort: 'Small-Medium (2-4 hours: inventory + extras additions + doc update)'
+  work_total: 5
+  work_done: 0
+  work_ready: 3
+  deferred_count: 1
+- id: drop-lxml-dev-dep-or-port-test-to-stdlib
+  file: TODO/main/planning/drop-lxml-dev-dep-or-port-test-to-stdlib.yaml
+  title: Drop lxml dev dep (port single test to stdlib xml.etree)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Not Started
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - audit-followup
+  estimated_effort: Small (1-2 hours)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  deferred_count: 1
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -205,6 +275,23 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
+- id: move-jsonschema-out-of-core-runtime-deps
+  file: TODO/main/planning/move-jsonschema-out-of-core-runtime-deps.yaml
+  title: Move jsonschema out of core deps (used only by _project/ tooling)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Not Started
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - audit-followup
+  estimated_effort: Small (< 1 hour)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  deferred_count: 1
 - id: review-dependency-upper-bounds-quarterly
   file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
   title: Quarterly review of dependency upper bounds
@@ -346,25 +433,6 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 6
-- id: audit-imported-dependencies-for-elimination
-  file: TODO/main/active/audit-imported-dependencies-for-elimination.yaml
-  title: Audit all imported dependencies and eliminate any not strictly required
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: In Progress
-  tags:
-  - quality-plan
-  - maintenance
-  - supply-chain
-  - deps
-  - audit
-  - tech-debt
-  estimated_effort: Medium (1-2 days for inventory + report; follow-up removals tracked separately)
-  work_total: 7
-  work_done: 1
-  work_ready: 2
-  deferred_count: 3
 - id: define-phase-3-promotion-metrics
   file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
   title: Define Phase 3 promotion metrics, dashboard, and review cadence
@@ -403,6 +471,23 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
+- id: drop-chdb-core-from-core-dependencies
+  file: TODO/main/planning/drop-chdb-core-from-core-dependencies.yaml
+  title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Not Started
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - audit-followup
+  estimated_effort: Small (< 1 hour)
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  deferred_count: 1
 - id: implement-pr-based-result-submission-workflow
   file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
   title: Implement PR-based community result submission workflow

@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T19:33:53.384287'
+generated_at: '2026-04-15T19:46:44.576283'
 total_categories: 9
 categories:
   Architecture & Refactoring:
@@ -33,13 +33,33 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 2
+    count: 6
     items:
-    - id: audit-imported-dependencies-for-elimination
-      file: TODO/main/active/audit-imported-dependencies-for-elimination.yaml
-      title: Audit all imported dependencies and eliminate any not strictly required
+    - id: clean-up-unused-sphinx-dev-deps
+      file: TODO/main/planning/clean-up-unused-sphinx-dev-deps.yaml
+      title: Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)
+      priority: Low
+      status: Not Started
+    - id: declare-undeclared-runtime-imports
+      file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
+      title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
+      priority: Low
+      status: Not Started
+    - id: drop-chdb-core-from-core-dependencies
+      file: TODO/main/planning/drop-chdb-core-from-core-dependencies.yaml
+      title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
       priority: Medium
-      status: In Progress
+      status: Not Started
+    - id: drop-lxml-dev-dep-or-port-test-to-stdlib
+      file: TODO/main/planning/drop-lxml-dev-dep-or-port-test-to-stdlib.yaml
+      title: Drop lxml dev dep (port single test to stdlib xml.etree)
+      priority: Low
+      status: Not Started
+    - id: move-jsonschema-out-of-core-runtime-deps
+      file: TODO/main/planning/move-jsonschema-out-of-core-runtime-deps.yaml
+      title: Move jsonschema out of core deps (used only by _project/ tooling)
+      priority: Low
+      status: Not Started
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
@@ -171,8 +191,13 @@ categories:
       priority: Medium-High
       status: Not Started
   Testing and Quality Assurance:
-    count: 3
+    count: 4
     items:
+    - id: explorer-establish-cli-explorer-parity-tests
+      file: TODO/main/planning/explorer-establish-cli-explorer-parity-tests.yaml
+      title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
+      priority: Critical
+      status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

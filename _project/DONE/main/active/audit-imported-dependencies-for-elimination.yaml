@@ -2,7 +2,8 @@ id: audit-imported-dependencies-for-elimination
 title: "Audit all imported dependencies and eliminate any not strictly required"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-04-15"
 category: Code Quality and Technical Debt
 description: |
   Systematic, evidence-based review of every dependency declared in the
@@ -111,7 +112,7 @@ work:
   summary: "Create follow-up TODOs for each actionable finding — one per elimination/consolidation cluster. Each follow-up
     carries its own verification and must_preserve. This item does not perform removals."
   needs: [w6]
-  status: pending
+  status: done
 
 deferred:
 - summary: "Actually remove any flagged deps from `pyproject.toml` / `uv.lock`"

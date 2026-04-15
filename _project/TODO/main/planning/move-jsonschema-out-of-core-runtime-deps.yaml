@@ -1,0 +1,104 @@
+id: move-jsonschema-out-of-core-runtime-deps
+title: "Move jsonschema out of core deps (used only by _project/ tooling)"
+worktree: main
+priority: Low
+status: Not Started
+category: Code Quality and Technical Debt
+description: |
+  `jsonschema>=4.25.1` is declared on line 42 of `pyproject.toml` as a CORE
+  runtime dep, but the only import site in the entire repo is
+  `_project/scripts/validate_todo.py:18` — internal TODO management
+  tooling that is **not** packaged into the wheel.
+
+  Two reasonable resolutions:
+    A. Move `jsonschema` to `[dependency-groups] dev` (or a dedicated
+       `dev-tooling` group) so contributors who run TODO tooling still
+       get it but end users don't.
+    B. Move it into a tooling-scoped `_project/scripts/pyproject.toml`
+       so internal tooling has its own dependency surface.
+
+  Option A is the smaller change and the recommended path here. Option B
+  is a larger refactor and out of scope.
+
+  Source for this finding: `docs/development/dependency-inventory.md` (F2),
+  produced by `audit-imported-dependencies-for-elimination`.
+
+work:
+  - id: w1
+    summary: "Confirm zero shipped-wheel imports of jsonschema: `grep -rn 'jsonschema' benchbox tests scripts docs`. Document any unexpected hits."
+    status: pending
+
+  - id: w2
+    summary: "Move `jsonschema>=4.25.1` from `[project] dependencies` to `[dependency-groups] dev` in pyproject.toml. Refresh uv.lock with `uv lock`."
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Run TODO validation tooling to confirm dev install still has jsonschema: `uv run --project ~/.claude/tools/todo todo-cli check-graph`."
+    needs: [w2]
+    status: pending
+
+  - id: w4
+    summary: "Run fast suite to confirm no shipped-wheel regressions."
+    needs: [w2]
+    status: pending
+
+deferred:
+  - summary: "Extract _project/scripts/ to its own pyproject.toml"
+    reason: "Larger refactor; out of scope for this small cleanup."
+
+files_affected:
+  modified:
+    - "pyproject.toml"
+    - "uv.lock"
+
+must_preserve:
+  - "TODO tooling (`_project/scripts/validate_todo.py`, `todo_cli.py`) keeps working under the dev install path"
+  - "Fast test suite green after the change"
+  - "No new explicit `import jsonschema` is introduced into shipped source"
+
+approach: |
+  Single-line move from core deps to dep-groups. Verify with the existing
+  `validate_todo.py` workflow which is the sole consumer.
+
+anti_patterns:
+  - "DO NOT remove the dep entirely — because TODO tooling needs it — move to dev only"
+
+verification:
+  - description: "jsonschema no longer in [project] dependencies but present in dep-group:dev"
+    command: "uv run -- python -c \"import tomllib, pathlib; d = tomllib.loads(pathlib.Path('pyproject.toml').read_text()); core = d['project']['dependencies']; dev = d['dependency-groups']['dev']; assert not any('jsonschema' in s for s in core), 'still in core'; assert any('jsonschema' in s for s in dev), 'missing from dev'; print('OK: moved core -> dev')\""
+    expected_output: "OK: moved core -> dev"
+  - description: "Fast suite passes"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "no failures"
+
+scope_limit:
+  only_modify:
+    - "pyproject.toml"
+    - "uv.lock"
+  do_not_modify:
+    - "benchbox/"
+    - "_project/scripts/"
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["maintenance", "supply-chain", "deps", "audit-followup"]
+  estimated_effort: "Small (< 1 hour)"
+  created_date: "2026-04-15"
+
+impact:
+  business_value: |
+    Honest dep boundary — declarations match where the code actually runs.
+  user_impact: |
+    End users no longer install jsonschema (and its small transitive set:
+    attrs, referencing, rpds-py, jsonschema-specifications) when they have
+    no need for it.
+  technical_debt: |
+    Closes finding F2 from the dependency-inventory audit.
+
+success_metrics:
+  - "Verification 'OK: moved core -> dev' passes"
+  - "TODO tooling still works under `uv sync --group dev`"
+  - "Fast suite green"

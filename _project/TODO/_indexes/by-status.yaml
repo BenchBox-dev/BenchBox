@@ -1,16 +1,8 @@
-generated_at: '2026-04-15T19:33:53.384313'
-total_items: 32
+generated_at: '2026-04-15T19:46:44.576310'
+total_items: 37
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: audit-imported-dependencies-for-elimination
-      file: TODO/main/active/audit-imported-dependencies-for-elimination.yaml
-      title: Audit all imported dependencies and eliminate any not strictly required
-      priority: Medium
-      category: Code Quality and Technical Debt
   Not Started:
-    count: 23
+    count: 29
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -42,6 +34,16 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
+    - id: clean-up-unused-sphinx-dev-deps
+      file: TODO/main/planning/clean-up-unused-sphinx-dev-deps.yaml
+      title: Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)
+      priority: Low
+      category: Code Quality and Technical Debt
+    - id: declare-undeclared-runtime-imports
+      file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
+      title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
+      priority: Low
+      category: Code Quality and Technical Debt
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence
@@ -52,6 +54,21 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
+    - id: drop-chdb-core-from-core-dependencies
+      file: TODO/main/planning/drop-chdb-core-from-core-dependencies.yaml
+      title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: drop-lxml-dev-dep-or-port-test-to-stdlib
+      file: TODO/main/planning/drop-lxml-dev-dep-or-port-test-to-stdlib.yaml
+      title: Drop lxml dev dep (port single test to stdlib xml.etree)
+      priority: Low
+      category: Code Quality and Technical Debt
+    - id: explorer-establish-cli-explorer-parity-tests
+      file: TODO/main/planning/explorer-establish-cli-explorer-parity-tests.yaml
+      title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
+      priority: Critical
+      category: Testing and Quality Assurance
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -82,6 +99,11 @@ statuses:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       priority: High
       category: Platform Expansion
+    - id: move-jsonschema-out-of-core-runtime-deps
+      file: TODO/main/planning/move-jsonschema-out-of-core-runtime-deps.yaml
+      title: Move jsonschema out of core deps (used only by _project/ tooling)
+      priority: Low
+      category: Code Quality and Technical Debt
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

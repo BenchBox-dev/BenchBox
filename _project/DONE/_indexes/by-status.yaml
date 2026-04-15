@@ -1,14 +1,9 @@
-generated_at: '2026-04-15T14:33:27.522857'
-total_items: 704
+generated_at: '2026-04-15T19:46:46.136398'
+total_items: 705
 statuses:
   In Progress:
-    count: 3
+    count: 2
     items:
-    - id: explorer-heatmap-accessibility-and-tests
-      file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
-      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
-      priority: Medium
-      category: Testing and Quality Assurance
     - id: add-time-series-benchmark-suite-tsbs-implementation
       file: DONE/benchmark-expansion/active/add-time-series-benchmark-suite-tsbs-implementation.yaml
       title: Add Time Series Benchmark Suite (TSBS) Implementation
@@ -20,7 +15,7 @@ statuses:
       priority: High
       category: Usability
   Not Started:
-    count: 48
+    count: 47
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -257,11 +252,6 @@ statuses:
       title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
       priority: Medium-High
       category: Core Functionality
-    - id: explorer-compare-url-short-ids
-      file: DONE/main/active/explorer-compare-url-short-ids.yaml
-      title: Use short hash IDs in Compare URLs to avoid URL-length limits
-      priority: Medium
-      category: Core Functionality
   Identified:
     count: 2
     items:
@@ -276,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 653
+    count: 654
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -338,13 +328,13 @@ statuses:
       title: '"✅ CLI: Detect and Skip Unneeded Data Generation"'
       priority: Medium
       category: Data Quality and Compatibility Issues
-    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
-      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
+    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
+      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
       title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
       priority: Medium
       category: Project Lifecycle Management
-    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
-      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2.yaml
+    - id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes
+      file: DONE/unknown/completed/databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes.yaml
       title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
       priority: Medium
       category: Project Lifecycle Management
@@ -397,6 +387,11 @@ statuses:
       file: DONE/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
       title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
       priority: High
+      category: Testing and Quality Assurance
+    - id: explorer-heatmap-accessibility-and-tests
+      file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
+      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
+      priority: Medium
       category: Testing and Quality Assurance
     - id: adapt-benchbox-to-textcharts-neutral-defaults
       file: DONE/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
@@ -829,6 +824,11 @@ statuses:
       title: Audit 276 skip/xfail test markers — add rationale or remove
       priority: Medium
       category: Testing and Quality Assurance
+    - id: audit-imported-dependencies-for-elimination
+      file: DONE/main/active/audit-imported-dependencies-for-elimination.yaml
+      title: Audit all imported dependencies and eliminate any not strictly required
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: auto-compile-tpc-binary-tools-completed
       file: DONE/unknown/planning/auto-compile-tpc-binary-tools-completed.yaml
       title: Auto-Compile TPC Binary Tools ✅ COMPLETED
@@ -3115,6 +3115,11 @@ statuses:
       title: Unify runtime query timing contract to execution_time_seconds
       priority: High
       category: Core Functionality
+    - id: explorer-compare-url-short-ids
+      file: DONE/main/active/explorer-compare-url-short-ids.yaml
+      title: Use short hash IDs in Compare URLs to avoid URL-length limits
+      priority: Medium
+      category: Core Functionality
     - id: validate-isolated-runtime-importability
       file: DONE/core-functionality/active/validate-isolated-runtime-importability.yaml
       title: Validate isolated runtime importability before treating as cache hit
@@ -3320,13 +3325,13 @@ statuses:
       title: ✅ Implement Standalone Export Command
       priority: Medium
       category: User Experience and CLI Enhancement
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       category: Pre-Release High Priority Tasks (COMPLETED)
