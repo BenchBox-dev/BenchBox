@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T14:33:25.813272'
+generated_at: '2026-04-15T18:45:56.148984'
 total_categories: 9
 categories:
   Architecture & Refactoring:
@@ -171,13 +171,8 @@ categories:
       priority: Medium-High
       status: Not Started
   Testing and Quality Assurance:
-    count: 4
+    count: 3
     items:
-    - id: explorer-heatmap-accessibility-and-tests
-      file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
-      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
-      priority: Medium
-      status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

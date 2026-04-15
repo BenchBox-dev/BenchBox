@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T14:33:25.813290'
-total_items: 31
+generated_at: '2026-04-15T18:45:56.149002'
+total_items: 32
 priorities:
   Critical:
     count: 2
@@ -71,13 +71,8 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 9
+    count: 8
     items:
-    - id: explorer-heatmap-accessibility-and-tests
-      file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
-      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
-      category: Testing and Quality Assurance
-      status: Not Started
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter

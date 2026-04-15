@@ -58,7 +58,7 @@ work:
       Parse `pyproject.toml` directly (tomllib) — do not use `uv pip list`
       because it surfaces transitives. Include env markers (python_version,
       sys_platform) in the captured row. Write raw table to
-      `_project/scratch/dep-audit-raw.md`.
+      `docs/development/dependency-audit-raw.md`.
 
   - id: w2
     summary: "Build import-site map for each declared dep: Grep `import <name>` / `from <name>` across benchbox/, scripts/, tests/, docs/. Record every file:line that imports each dep."
@@ -117,7 +117,7 @@ deferred:
 files_affected:
   added:
     - "docs/development/dependency-inventory.md"
-    - "_project/scratch/dep-audit-raw.md"
+    - "docs/development/dependency-audit-raw.md"
   modified:
     - "AGENTS.md"
 
@@ -162,7 +162,7 @@ anti_patterns:
 
 verification:
   - description: "Inventory document exists and lists every dep declared in pyproject.toml"
-    command: "uv run -- python -c \"import tomllib, pathlib; d = tomllib.loads(pathlib.Path('pyproject.toml').read_text()); core = {s.split('>')[0].split('<')[0].split('=')[0].split(';')[0].strip() for s in d['project']['dependencies']}; extras = {s.split('>')[0].split('<')[0].split('=')[0].split(';')[0].split('[')[0].strip() for g in d['project']['optional-dependencies'].values() for s in g}; groups = {s.split('>')[0].split('<')[0].split('=')[0].split(';')[0].split('[')[0].strip() for g in d.get('dependency-groups', {}).values() for s in g if isinstance(s, str)}; all_deps = (core | extras | groups) - {''}; missing = [p for p in sorted(all_deps) if p.lower() not in pathlib.Path('docs/development/dependency-inventory.md').read_text().lower()]; print('MISSING:', missing) if missing else print('OK: all', len(all_deps), 'deps present in inventory')\""
+    command: "uv run -- python -c \"\nimport tomllib, pathlib, re\ndata = tomllib.loads(pathlib.Path('pyproject.toml').read_text())\ndef name(s): return re.split(r'[><=!;@\\[]', s.strip())[0].strip().lower()\ndeps = set()\nfor s in data['project'].get('dependencies', []): deps.add(name(s))\nfor g in data['project'].get('optional-dependencies', {}).values():\n    for s in g:\n        if isinstance(s, str): deps.add(name(s))\nfor g in data.get('dependency-groups', {}).values():\n    for s in g:\n        if isinstance(s, str): deps.add(name(s))\ndeps.discard('')\ninv = pathlib.Path('docs/development/dependency-inventory.md').read_text().lower()\nmissing = [p for p in sorted(deps) if not re.search(r'\\\\b' + re.escape(p) + r'\\\\b', inv)]\nprint('MISSING:', missing) if missing else print(f'OK: all {len(deps)} deps present in inventory')\n\""
     expected_output: "OK: all N deps present in inventory"
   - description: "No source files were modified under benchbox/"
     command: "git diff --name-only HEAD -- benchbox/ | wc -l"
@@ -170,14 +170,14 @@ verification:
   - description: "pyproject.toml and uv.lock are untouched by this work"
     command: "git diff --name-only HEAD -- pyproject.toml uv.lock | wc -l"
     expected_output: "0"
-  - description: "Follow-up TODOs exist in planning/ for every FLAG-* entry in the inventory"
-    command: "uv run -- python -c \"import re, pathlib; inv = pathlib.Path('docs/development/dependency-inventory.md').read_text(); flags = set(re.findall(r'FLAG-\\w+.*?\\b([a-z0-9][a-z0-9_-]+)\\b', inv, re.I)); todos = {p.name for p in pathlib.Path('_project/TODO/main/planning').glob('*depend*')}; print('flagged:', len(flags), 'follow-up TODOs:', len(todos))\""
-    expected_output: "flagged count and follow-up TODO count both non-zero (manual cross-check in PR)"
+  - description: "Inventory contains FLAG-* entries and at least one follow-up dep TODO exists in planning/"
+    command: "uv run -- python -c \"\nimport pathlib, sys\ninv = pathlib.Path('docs/development/dependency-inventory.md').read_text()\nflag_count = inv.count('FLAG-')\ntodos = list(pathlib.Path('_project/TODO/main/planning').glob('*dep*'))\nif flag_count == 0: sys.exit('ERROR: no FLAG-* entries found in inventory')\nif not todos: sys.exit('ERROR: no follow-up dep TODOs found in planning/')\nprint(f'OK: {flag_count} FLAG-* entries, {len(todos)} follow-up TODO(s)')\n\""
+    expected_output: "OK: N FLAG-* entries, M follow-up TODO(s)"
 
 scope_limit:
   only_modify:
     - "docs/development/dependency-inventory.md"
-    - "_project/scratch/dep-audit-raw.md"
+    - "docs/development/dependency-audit-raw.md"
     - "AGENTS.md"
     - "_project/TODO/main/planning/"
   do_not_modify:

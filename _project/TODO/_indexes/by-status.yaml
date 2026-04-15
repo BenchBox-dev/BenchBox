@@ -1,14 +1,9 @@
-generated_at: '2026-04-15T14:33:25.813301'
-total_items: 31
+generated_at: '2026-04-15T18:45:56.149012'
+total_items: 32
 statuses:
   Not Started:
-    count: 23
+    count: 24
     items:
-    - id: explorer-heatmap-accessibility-and-tests
-      file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
-      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
-      priority: Medium
-      category: Testing and Quality Assurance
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
       title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
