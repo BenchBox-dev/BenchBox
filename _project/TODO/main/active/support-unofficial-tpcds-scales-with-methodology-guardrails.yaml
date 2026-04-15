@@ -225,12 +225,24 @@ work:
 - id: w7
   summary: "Align generation, manifest writing, loading, and validation with the measured unofficial subscale contract"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
-    Reconcile the current mismatch where generation/loading may skip empty or
-    missing subscale artifacts but validation still requires a full 25-table
-    TPC-DS dataset. Keep methodology-specific validation strict; do not replace
-    it with broad best-effort behavior.
+    Completed 2026-04-15.
+
+    Changes:
+    - benchbox/utils/data_validation.py: _scale_expectations() now differentiates
+      between TPC-H invariant-fixed tables (nation, region — always 25/5 regardless
+      of sf) and TPC-DS "official-fixed" tables (call_center, reason, ship_mode,
+      warehouse, income_band, web_site, store, time_dim — fixed at sf>=1.0 only;
+      at sf<1.0 scale proportionally with max(1, floor(sf1_baseline * sf))).
+      Also switched from int() to max(1, int()) globally to enforce the min-1-row
+      floor from the data contract.
+    - benchbox/core/tpcds/generator/filesystem.py: _write_manifest() now includes
+      compliance_class in the generated manifest JSON (reads from self.compliance_class
+      which is set by validate_tpcds_scale() in manager.__init__).
+    - tests/unit/utils/test_data_validation.py: Updated test_tpcds_fixed_tables_at_different_scale
+      to reflect new subscale behavior; added test_tpcds_fixed_tables_at_official_scale
+      to document the sf>=1.0 baseline still holds.
 
 - id: w8
   summary: "Add filename/publication markers plus exact submit, publish, and report-import guardrails"
