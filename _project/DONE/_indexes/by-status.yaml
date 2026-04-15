@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:35:36.063084'
-total_items: 699
+generated_at: '2026-04-15T09:38:38.315636'
+total_items: 700
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 648
+    count: 649
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2959,6 +2959,11 @@ statuses:
       title: Surface driver_version and driver_auto_install more prominently in CLI help
       priority: Medium
       category: Documentation
+    - id: explorer-surface-trust-tiers-as-badges
+      file: DONE/main/planning/explorer-surface-trust-tiers-as-badges.yaml
+      title: Surface trust tiers as visible badges, not a default hide filter
+      priority: Medium-High
+      category: Core Functionality
     - id: duckdb-explain-analyze-default
       file: DONE/core-functionality/active/duckdb-explain-analyze-default.yaml
       title: Switch DuckDB plan capture to use EXPLAIN ANALYZE by default for actual per-operator timing

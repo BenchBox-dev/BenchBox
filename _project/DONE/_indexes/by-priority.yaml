@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:35:36.062912'
-total_items: 699
+generated_at: '2026-04-15T09:38:38.315469'
+total_items: 700
 priorities:
   Critical:
     count: 40
@@ -1441,7 +1441,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 105
+    count: 106
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1957,6 +1957,11 @@ priorities:
     - id: surface-driver-version-in-cli-progress-output
       file: DONE/main/active/surface-driver-version-in-cli-progress-output.yaml
       title: Surface active driver version in CLI progress output
+      category: Core Functionality
+      status: Completed
+    - id: explorer-surface-trust-tiers-as-badges
+      file: DONE/main/planning/explorer-surface-trust-tiers-as-badges.yaml
+      title: Surface trust tiers as visible badges, not a default hide filter
       category: Core Functionality
       status: Completed
     - id: explorer-add-tuning-config-visibility

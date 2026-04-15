@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:35:34.282795'
-total_items: 35
+generated_at: '2026-04-15T09:38:36.548468'
+total_items: 34
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -613,26 +613,6 @@ items:
   work_ready: 0
   needs:
   - implement-pr-based-result-submission-workflow
-- id: explorer-surface-trust-tiers-as-badges
-  file: TODO/main/planning/explorer-surface-trust-tiers-as-badges.yaml
-  title: Surface trust tiers as visible badges, not a default hide filter
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - trust
-  - transparency
-  - ui
-  estimated_effort: Small (1 day)
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - explorer-emit-benchmark-summary-artifact
-  - explorer-matrix-leaderboard-view
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

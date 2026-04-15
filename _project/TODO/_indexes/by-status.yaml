@@ -1,8 +1,8 @@
-generated_at: '2026-04-15T09:35:34.282868'
-total_items: 35
+generated_at: '2026-04-15T09:38:36.548574'
+total_items: 34
 statuses:
   Not Started:
-    count: 27
+    count: 26
     items:
     - id: explorer-heatmap-accessibility-and-tests
       file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
@@ -114,11 +114,6 @@ statuses:
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: explorer-surface-trust-tiers-as-badges
-      file: TODO/main/planning/explorer-surface-trust-tiers-as-badges.yaml
-      title: Surface trust tiers as visible badges, not a default hide filter
-      priority: Medium-High
-      category: Core Functionality
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements

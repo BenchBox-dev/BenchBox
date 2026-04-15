@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T09:35:34.282840'
+generated_at: '2026-04-15T09:38:36.548522'
 total_categories: 9
 categories:
   Architecture & Refactoring:
@@ -41,7 +41,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 14
+    count: 13
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -102,11 +102,6 @@ categories:
       file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
-      status: Not Started
-    - id: explorer-surface-trust-tiers-as-badges
-      file: TODO/main/planning/explorer-surface-trust-tiers-as-badges.yaml
-      title: Surface trust tiers as visible badges, not a default hide filter
-      priority: Medium-High
       status: Not Started
     - id: explorer-compare-url-short-ids
       file: TODO/main/planning/explorer-compare-url-short-ids.yaml

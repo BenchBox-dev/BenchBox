@@ -2,7 +2,7 @@ id: explorer-surface-trust-tiers-as-badges
 title: "Surface trust tiers as visible badges, not a default hide filter"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
 category: Core Functionality
 
 description: |
@@ -140,3 +140,4 @@ metadata:
   tags: ["results", "explorer", "trust", "transparency", "ui"]
   estimated_effort: "Small (1 day)"
   created_date: "2026-04-15"
+completed_date: "2026-04-15"

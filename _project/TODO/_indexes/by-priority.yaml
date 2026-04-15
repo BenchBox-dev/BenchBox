@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:35:34.282856'
-total_items: 35
+generated_at: '2026-04-15T09:38:36.548551'
+total_items: 34
 priorities:
   Critical:
     count: 2
@@ -38,7 +38,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 7
+    count: 6
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -70,11 +70,6 @@ priorities:
       title: Surface contributor onboarding for results submission
       category: Documentation
       status: Completed
-    - id: explorer-surface-trust-tiers-as-badges
-      file: TODO/main/planning/explorer-surface-trust-tiers-as-badges.yaml
-      title: Surface trust tiers as visible badges, not a default hide filter
-      category: Core Functionality
-      status: Not Started
   Medium:
     count: 10
     items:

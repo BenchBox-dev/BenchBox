@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:35:36.062380'
-total_items: 699
+generated_at: '2026-04-15T09:38:38.314965'
+total_items: 700
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -9520,6 +9520,27 @@ items:
   work_total: 4
   work_done: 4
   work_ready: 0
+- id: explorer-surface-trust-tiers-as-badges
+  file: DONE/main/planning/explorer-surface-trust-tiers-as-badges.yaml
+  title: Surface trust tiers as visible badges, not a default hide filter
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - trust
+  - transparency
+  - ui
+  estimated_effort: Small (1 day)
+  completed_date: '2026-04-15'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - explorer-emit-benchmark-summary-artifact
+  - explorer-matrix-leaderboard-view
 - id: explorer-add-tuning-config-visibility
   file: DONE/main/planning/explorer-add-tuning-config-visibility.yaml
   title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
