@@ -1,0 +1,281 @@
+id: explorer-close-chart-type-coverage-gaps
+title: "Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  The 2026-04-15 review found that the CLI registers **16 canonical
+  chart types** in `benchbox/core/visualization/chart_types.py:17-45`,
+  but the explorer implements only **6 visualization components**
+  (QueryHeatmap, QueryTimingChart, GroupedQueryChart,
+  NormalizedSpeedupChart, DivergingBarChart, MetaLeaderboard) —
+  and only 3-4 of those have CLI counterparts that compute the same
+  values. **10 CLI chart types have no explorer equivalent.**
+
+  Missing chart types and their importance for benchmark credibility:
+
+    | Chart                | Why it matters                                                   |
+    |----------------------|------------------------------------------------------------------|
+    | `percentile_ladder`  | Tail-latency P50/P90/P95/P99 — central to fair benchmark claims  |
+    | `cdf_chart`          | Distribution shape — exposes "fast median, slow tail" patterns   |
+    | `rank_table`         | Compact per-query ranking — denser than heatmap for many queries |
+    | `distribution_box`   | Box-plot of per-query latencies — shows variance/outliers        |
+    | `query_histogram`    | Per-query latency distribution                                   |
+    | `time_series`        | Trend over runs — regression detection                           |
+    | `cost_scatter`       | Cost vs performance — central to cloud-warehouse comparisons     |
+    | `power_bar`          | Dedicated TPC Power@Size visual                                  |
+    | `sparkline_table`    | Compact metrics summary with embedded micro-charts               |
+    | `stacked_phase`      | Phase breakdown (load/warmup/power/throughput)                   |
+
+  This item ports each missing chart type to the explorer in priority
+  order. Every new chart consumes pipeline-emitted data
+  (per `explorer-emit-comparison-artifact-from-pipeline` — extending
+  the artifact emission as needed) and ships with a parity fixture
+  (per `explorer-establish-cli-explorer-parity-tests`) so the math
+  is verified against the canonical Python implementation from day one.
+
+  Out of scope: building entirely NEW chart types that don't exist in
+  the CLI either. Those should be evaluated and added to both sides
+  through the canonical chart_types.py registry first.
+
+work:
+  - id: w1
+    summary: "Tier-1 (tail-latency credibility): port `percentile_ladder` and `cdf_chart`"
+    needs: []
+    status: pending
+    notes: |
+      These two are the highest-impact missing charts because they
+      directly answer the most common credibility question for a
+      benchmark result: "what does the slow tail look like?"
+
+      For each:
+        1. Read the CLI implementation (textcharts package +
+           result_plotter renderer wiring) to understand inputs
+           and reduction logic.
+        2. Add corresponding Python helper (or extend transformer.py)
+           that emits per-query percentile arrays (`p50, p90, p95, p99`)
+           into the BenchmarkSummary or DetailResult artifact.
+        3. Add fixtures via the parity infrastructure.
+        4. Build the Preact component (SVG) consuming the artifact.
+        5. Wire into ResultDetail page (per-result percentiles) and
+           Compare page (cross-result percentile ladder).
+        6. Vitest tests + parity assertions.
+
+      Suggested placement:
+        - PercentileLadder: ResultDetail.tsx side panel + Compare.tsx
+          tab alongside Speedup/Diverging/Grouped
+        - CDFChart: Compare.tsx tab; per-result detail page
+
+  - id: w2
+    summary: "Tier-2 (compactness for large benchmarks): port `rank_table` and `distribution_box`"
+    needs: []
+    status: pending
+    notes: |
+      Rank table: per-query ranks (1..N) across platforms, optionally
+      with arrow indicators (↑↓) showing rank changes. Useful for
+      TPC-DS (99 queries) where the heatmap becomes unwieldy.
+
+      Distribution box: per-query box plot showing min/Q1/median/Q3/max
+      across all measurement runs (not just the median display value).
+      Reveals platforms with high variance even if median looks good.
+
+      Both consume data already in DetailResult.queries (raw per-sample
+      timings) — minimal pipeline changes needed; just add reduction
+      helpers to transformer.py and fixtures.
+
+      Add as alternate views in Compare.tsx and on a new page or section
+      "Per-query distribution" in ResultDetail.tsx.
+
+  - id: w3
+    summary: "Tier-3 (specialized): port `query_histogram`, `power_bar`, `stacked_phase`"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      query_histogram: per-query timing histogram across all platforms
+        (the CLI auto-splits when query count > 33 — match that behavior).
+
+      power_bar: dedicated visualization for TPC Power@Size — bigger=better
+        (currently buried in Compare summary cards as a small dl row).
+        Make it a first-class chart on BenchmarkIndex when power_score
+        is the primary metric.
+
+      stacked_phase: phase breakdown (load/warmup/power/throughput) as
+        stacked bars per platform. Useful for TPC-H/TPC-DS where load
+        and throughput phases matter for comparison fairness.
+
+      All three are smaller individual ports — group them together.
+
+  - id: w4
+    summary: "Tier-4 (cross-cutting analytics): port `time_series`, `cost_scatter`, `sparkline_table`"
+    needs: [w3]
+    status: pending
+    notes: |
+      time_series: trend chart of geomean_ms / power_score over run_date,
+        per platform. Surfaces regressions across releases. Lives on
+        PlatformIndex.tsx (per-platform history) and a new
+        BenchmarkIndex tab "Trends".
+
+      cost_scatter: cost_usd vs power_score (or geomean_ms) — central
+        for cloud DW comparisons (Snowflake/BigQuery/Athena/Databricks).
+        Lives on BenchmarkIndex when cost_usd is populated for >0 results.
+        Hide chart entirely when no cost data exists (don't render an
+        empty axis).
+
+      sparkline_table: compact metrics table with embedded micro-charts
+        (one mini per-query trend per row). Compact alternative to the
+        heatmap for the home page or platform overview.
+
+  - id: w5
+    summary: "Add an explorer chart-type registry mirroring `chart_types.py` and document the parity contract"
+    needs: [w1, w2, w3, w4]
+    status: pending
+    notes: |
+      Final integration step:
+        - Create `results-explorer/src/lib/chartRegistry.ts` mirroring
+          the canonical 16-entry list from
+          benchbox/core/visualization/chart_types.py.
+        - Each registry entry: `{ id, title, description, requires:
+          DataRequirements, component: ComponentRef, cli_equivalent: str }`.
+        - Add a meta-test that fails if the explorer registry diverges
+          from the CLI registry (e.g. a new chart type added on one
+          side without the other).
+        - Update `docs/visualization-parity.md` (created by
+          `explorer-establish-cli-explorer-parity-tests`) with the
+          full chart-type matrix and the policy: "New chart types are
+          added to chart_types.py first; explorer follows."
+
+deferred:
+  - summary: "Build entirely NEW chart types that don't exist in CLI either"
+    reason: "Out of scope for this item. Those should be added to chart_types.py registry first via a separate planning round."
+  - summary: "WebGL/Canvas rendering for high-density visualizations (e.g. histogram with thousands of points)"
+    reason: "Premature optimization — SVG handles realistic data sizes; revisit if profiling shows pain points."
+  - summary: "User-saveable chart configurations / dashboards"
+    reason: "Product feature, not a coverage gap. Address after the chart catalog is complete."
+  - summary: "Interactive drilldowns (click chart bar to filter table)"
+    reason: "Cross-cutting UX work; better tackled as a focused interactivity item once all charts exist."
+
+files_affected:
+  added:
+    - "results-explorer/src/components/PercentileLadder.tsx"
+    - "results-explorer/src/components/CDFChart.tsx"
+    - "results-explorer/src/components/RankTable.tsx"
+    - "results-explorer/src/components/DistributionBox.tsx"
+    - "results-explorer/src/components/QueryHistogram.tsx"
+    - "results-explorer/src/components/PowerBar.tsx"
+    - "results-explorer/src/components/StackedPhase.tsx"
+    - "results-explorer/src/components/TimeSeries.tsx"
+    - "results-explorer/src/components/CostScatter.tsx"
+    - "results-explorer/src/components/SparklineTable.tsx"
+    - "results-explorer/src/lib/chartRegistry.ts"
+    - "results-explorer/src/components/__tests__/<each-chart>.test.tsx"
+    - "tests/parity/fixtures/<each-chart>.json"
+  modified:
+    - "benchbox/core/explorer_pipeline/transformer.py"
+    - "benchbox/core/explorer_pipeline/models.py"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+
+must_preserve:
+  - "Existing 6 explorer chart components must continue to work — new charts add tabs/sections, do not replace existing visualizations"
+  - "ResultDetail / BenchmarkIndex / PlatformIndex existing layouts and navigation patterns — additions are introduced as tabs or new sections, not page rewrites"
+  - "BenchmarkSummary and DetailResult artifact backward compatibility — extensions add new fields, do not rename or remove existing ones"
+  - "CLI chart_types.py registry as the single canonical source — explorer mirrors it, never the other way around"
+
+approach: |
+  Tier-by-tier (w1 → w4) so user-visible value lands in priority order.
+  Tier 1 (percentile_ladder, cdf_chart) ships first because that's the
+  highest-impact gap for benchmark credibility.
+
+  Per-chart workflow (apply uniformly):
+    1. Read the CLI implementation (find the textcharts call site,
+       identify input shape and reduction).
+    2. Decide where the math lives. Default: in
+       `transformer.py`, emitted via the appropriate artifact
+       (BenchmarkSummary for cross-platform; DetailResult for
+       single-result). Avoid TS-side computation.
+    3. Generate parity fixtures.
+    4. Build the SVG component using `chartTheme.ts` constants and
+       `useElementSize` for responsiveness.
+    5. Wire into the appropriate page (Compare, ResultDetail,
+       BenchmarkIndex, PlatformIndex).
+    6. Vitest unit + parity test.
+    7. Manual smoke at 3 viewport widths.
+
+  This item is sequenced AFTER the foundational items
+  (`explorer-establish-cli-explorer-parity-tests`,
+  `explorer-emit-comparison-artifact-from-pipeline`,
+  `explorer-unify-visualization-foundations`) because each new chart
+  needs the parity fixtures, theme constants, and pipeline-emitted
+  data structures those items deliver.
+
+anti_patterns:
+  - "DO NOT add a new chart in the explorer without a corresponding entry in chart_types.py — because that recreates the divergence we're trying to eliminate — extend the registry first if a new type is genuinely warranted"
+  - "DO NOT compute percentiles in TS using `array.sort()[Math.floor(n*p)]` — because Python's numpy.percentile uses linear interpolation by default and the numbers will differ — read the CLI's exact percentile method and either match it in TS or pre-compute in Python and ship in artifact"
+  - "DO NOT skip parity fixtures for 'simple' charts like rank_table — because rank ties are exactly the kind of edge case where Python and JS sort algorithms can differ silently — every chart gets a fixture"
+  - "DO NOT render cost_scatter when cost_usd is null for all results — because an empty scatter plot looks broken — hide the section entirely with a small note about cost data availability"
+  - "DO NOT replace the existing QueryHeatmap with rank_table on TPC-DS just because the heatmap is wide — because users have built mental models around the heatmap — add rank_table as an alternate view, let users switch"
+  - "DO NOT reuse PALETTE colors for time_series lines without a contrast check — because 4 line colors must be distinguishable when overlapping — extend chartTheme.ts with a dedicated TIME_SERIES_PALETTE if the 4-color palette is insufficient"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/explorer_pipeline/transformer.py"
+    - "benchbox/core/explorer_pipeline/models.py"
+    - "tests/unit/core/explorer_pipeline/**"
+    - "tests/parity/fixtures/**"
+    - "results-explorer/src/components/**"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/lib/chartRegistry.ts"
+    - "results-explorer/src/__tests__/**"
+  do_not_modify:
+    - "benchbox/core/visualization/**"
+    - "benchbox/cli/**"
+    - "results-explorer/src/manifest.ts"
+    - "results-explorer/src/types.ts"
+
+verification:
+  - description: "All 10 missing chart components exist as files"
+    command: "ls results-explorer/src/components/{PercentileLadder,CDFChart,RankTable,DistributionBox,QueryHistogram,PowerBar,StackedPhase,TimeSeries,CostScatter,SparklineTable}.tsx"
+    expected_output: "all 10 files present"
+  - description: "Every new chart has a corresponding parity fixture"
+    command: "ls tests/parity/fixtures/{percentile_ladder,cdf,rank_table,distribution_box,query_histogram,power_bar,stacked_phase,time_series,cost_scatter,sparkline_table}.json"
+    expected_output: "all 10 fixtures present"
+  - description: "Parity suite passes for all new charts"
+    command: "cd results-explorer && npm test -- chartMath.parity"
+    expected_output: "all 10 chart fixtures pass equivalence assertions"
+  - description: "Explorer chartRegistry mirrors CLI chart_types"
+    command: "cd results-explorer && npm test -- chartRegistry"
+    expected_output: "registry-parity test passes — 16 entries on both sides, no divergence"
+  - description: "Each new chart has Vitest unit coverage"
+    command: "cd results-explorer && npm test -- 'PercentileLadder|CDFChart|RankTable|DistributionBox|QueryHistogram|PowerBar|StackedPhase|TimeSeries|CostScatter|SparklineTable'"
+    expected_output: "tests cover empty data, single result, missing fields, and at least one realistic data shape per chart"
+  - description: "Pipeline emits the new derived data fields"
+    command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -v"
+    expected_output: "tests cover percentile arrays, distribution stats, etc. as added to BenchmarkSummary / DetailResult"
+  - description: "TypeScript compiles, full test suite green"
+    command: "cd results-explorer && npm run typecheck && npm test && cd .. && uv run -- python -m pytest -m fast -q"
+    expected_output: "all green"
+
+deps:
+  needs:
+    - explorer-establish-cli-explorer-parity-tests
+    - explorer-emit-comparison-artifact-from-pipeline
+    - explorer-unify-visualization-foundations
+
+success_metrics:
+  - "Explorer renders all 16 canonical chart types from chart_types.py"
+  - "For each chart type, the explorer's numeric output matches the CLI's output for the same input within 1e-9 (fixtures pass)"
+  - "On a TPC-DS (99-query) page, users can switch between heatmap, rank table, and CDF views to find the one that suits their question"
+  - "On a Snowflake/Databricks comparison, cost_scatter renders with cost vs power_score axes"
+  - "Adding a 17th chart type requires adding it to chart_types.py + chartRegistry.ts; meta-test enforces this"
+
+metadata:
+  tags: ["explorer", "visualization", "coverage", "charts", "parity"]
+  estimated_effort: "Large (2-3 weeks across tiers)"
+  created_date: "2026-04-15"

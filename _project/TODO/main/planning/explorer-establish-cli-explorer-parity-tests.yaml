@@ -1,0 +1,232 @@
+id: explorer-establish-cli-explorer-parity-tests
+title: "Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)"
+worktree: main
+priority: Critical
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  The 2026-04-15 visualization review identified that the Python CLI
+  (`benchbox/core/visualization/`) and the Preact explorer
+  (`results-explorer/src/components/`) reimplement the same
+  visualization math in two languages with **zero shared computation
+  and zero contract tests**.
+
+  Concrete drift surfaces today:
+    - Heatmap color: `colorForCell` (QueryHeatmap.tsx:39-45) duplicates
+      `textcharts.heatmap` log10-ratio→hue logic.
+    - Per-baseline speedup: `NormalizedSpeedupChart.tsx:57` duplicates
+      `textcharts.normalized_speedup` (`baseline / this`).
+    - Diverging delta: `DivergingBarChart.tsx:49` duplicates the
+      `textcharts.diverging_bar` `(this - baseline) / baseline * 100`
+      formula, plus an independent magnitude sort at line 63-67.
+    - Per-query "fastest" highlight: Compare.tsx:388-411 inlines its own
+      ranking that has no CLI counterpart and disagrees with Compare's
+      summary-card definition (see explorer-unify-visualization-foundations
+      for the dual-definition bug).
+
+  The user requirement is explicit: **"there should be only ONE place
+  where visualization values are composed, when that is not possible
+  we must have test infrastructure that ENSURES the parallel
+  implementations match."** This item builds that test infrastructure.
+  Centralizing computation server-side is tracked separately
+  (explorer-emit-comparison-artifact-from-pipeline).
+
+  Strategy: Python emits canonical fixtures (input data + expected
+  output values) for every chart-type computation. Vitest loads the
+  fixtures and asserts that the explorer's pure helper functions produce
+  byte-identical numbers (within float tolerance). Any future drift
+  fails CI, regardless of which side changes.
+
+work:
+  - id: w1
+    summary: "Audit and extract pure computation functions out of every explorer chart component into testable helpers in `results-explorer/src/lib/chartMath.ts`"
+    status: pending
+    notes: |
+      Move the math out of the SVG components into pure functions:
+        - `colorForCell`, `lightnessForCell` (already pure, re-export from QueryHeatmap)
+        - `speedupRatio(baselineMs, thisMs)` from NormalizedSpeedupChart.tsx:57
+        - `deltaPct(thisMs, baselineMs)` from DivergingBarChart.tsx:49
+        - `sortByMagnitudeDesc(entries)` from DivergingBarChart.tsx:63-67
+        - `perQuerySpeedup(timings)` (slowest/fastest) from Compare.tsx:388-393
+        - `geomeanMs(samples)` (median-based reduction matching transformer)
+      Components import these helpers; no behavior change. Each helper
+      returns plain numbers — no SVG, no DOM — so Vitest can call them
+      directly from a fixture loop.
+
+  - id: w2
+    summary: "Build Python fixture generator at `tests/parity/generate_visualization_fixtures.py` that emits JSON fixtures per chart computation"
+    needs: [w1]
+    status: pending
+    notes: |
+      Pytest-runnable script (or a regular pytest test using
+      `--generate-fixtures` flag) that produces files at
+      `tests/parity/fixtures/{chart_name}.json` with shape:
+
+        {
+          "chart": "heatmap_color",
+          "version": 1,
+          "cases": [
+            {"id": "fastest_in_col", "input": {"ms": 100, "minInCol": 100},
+             "expected": {"hue": 120}},
+            {"id": "ten_x_slower",   "input": {"ms": 1000, "minInCol": 100},
+             "expected": {"hue": 0}},
+            ...
+          ]
+        }
+
+      One fixture file per chart computation listed in w1. Cases must
+      include: identity (ratio=1), boundary (ratio=10 clamp), missing
+      data (None/null), and at least one realistic mid-range value.
+
+      Fixtures are CHECKED INTO GIT — they are the contract. Regenerating
+      them must be a deliberate act (changes the contract) and require
+      the Vitest suite to accept the new numbers via re-run.
+
+  - id: w3
+    summary: "Add Vitest parity suite at `results-explorer/src/__tests__/parity/chartMath.parity.test.ts` that loads each fixture and asserts equivalence"
+    needs: [w2]
+    status: pending
+    notes: |
+      Pattern: read each `tests/parity/fixtures/*.json` (relative path
+      computed in vitest config), iterate `cases`, call the corresponding
+      TS helper from `chartMath.ts`, assert
+      `Math.abs(result - expected) < 1e-9` for floats and strict equality
+      for ints/strings.
+
+      Use `describe.each` or generator pattern so each case appears as
+      its own test name (debuggable on failure). On a fixture mismatch,
+      the failure message must show: chart name, case id, input, expected
+      vs actual, and the suspected source of drift (Python file vs TS file).
+
+  - id: w4
+    summary: "Wire fixture generation into a Make target / CI gate so divergence is detected automatically"
+    needs: [w3]
+    status: pending
+    notes: |
+      - `make parity-fixtures` regenerates fixtures via the Python script
+      - `make parity-check` runs Python generation into a tmpdir, diffs
+        against the checked-in fixtures, fails if they differ
+      - GitHub Actions: run `make parity-check` AND `cd results-explorer
+        && npm test` on every PR
+      - Document the workflow in `docs/contributing-to-explorer.md`
+        (or new `docs/visualization-parity.md`): "If you change a chart
+        computation, regenerate fixtures with `make parity-fixtures` —
+        this changes the contract; reviewers must approve the diff."
+
+  - id: w5
+    summary: "Backfill parity for the existing `colorForCell` and `lightnessForCell` tests so they share the fixture suite"
+    needs: [w3]
+    status: pending
+    notes: |
+      The current `QueryHeatmap.test.tsx` tests `colorForCell` against
+      hardcoded TS expectations only. Replace those assertions with the
+      fixture-driven path so QueryHeatmap is the proof-of-concept for
+      the new infrastructure. Delete the duplicated hardcoded numbers.
+
+deferred:
+  - summary: "WASM-compile the Python compute layer and call it from the browser"
+    reason: |
+      Overkill for trivial math (log10, ratios, medians). Cost in build
+      complexity and runtime size is not justified when fixture-pinned
+      contracts achieve the same correctness guarantee.
+  - summary: "Property-based parity tests via Hypothesis + fast-check"
+    reason: |
+      Tracked separately in `add-hypothesis-property-tests.yaml`. Should
+      build on this fixture infrastructure once it is established.
+
+files_affected:
+  added:
+    - "results-explorer/src/lib/chartMath.ts"
+    - "tests/parity/generate_visualization_fixtures.py"
+    - "tests/parity/fixtures/.gitkeep"
+    - "results-explorer/src/__tests__/parity/chartMath.parity.test.ts"
+    - "docs/visualization-parity.md"
+  modified:
+    - "results-explorer/src/components/QueryHeatmap.tsx"
+    - "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+    - "results-explorer/src/components/DivergingBarChart.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+    - "Makefile"
+    - ".github/workflows/ci.yml"
+
+must_preserve:
+  - "Existing chart visual output — extracting helpers must not change pixel-level rendering for the same input data"
+  - "Existing `colorForCell` / `lightnessForCell` exported signatures from QueryHeatmap.tsx — these are imported elsewhere and tested"
+  - "Vitest setup at `results-explorer/src/test/setup.ts` — append, do not replace"
+  - "Existing 36-test Vitest suite continues to pass alongside the new parity suite"
+
+approach: |
+  Build foundation-first: extract pure helpers (w1) before generating
+  fixtures (w2), because the fixture generator must mirror the exact
+  signatures the helpers expose.
+
+  Reuse the project's existing Python visualization functions where they
+  exist as pure helpers — `core/visualization/ascii/heatmap.py` and
+  siblings delegate to `textcharts`, but the pre-textcharts color/sort
+  math may live in `result_plotter.py`. If a Python equivalent does not
+  exist, ADD it (in Python) rather than picking a TS-only number, so
+  parity is bidirectional.
+
+  Fixture format mirrors the textcharts test pattern (if any) so future
+  contributors recognize the convention. Keep fixtures small and readable
+  — explicit `id` on each case is mandatory so failures are debuggable.
+
+anti_patterns:
+  - "DO NOT generate fixtures from the TS side — because that makes Python the follower, not the source of truth — Python (the canonical compute layer) emits, TS verifies"
+  - "DO NOT use `toEqual` for floats in the parity suite — because IEEE-754 noise differs between Python and JS — use `Math.abs(a - b) < 1e-9` with explicit tolerance"
+  - "DO NOT inline the math back into components after extraction — because that defeats the test contract — components import helpers, no exceptions"
+  - "DO NOT skip cases for missing-data inputs (null/None) — because that is exactly where Python and JS often disagree (NaN vs null) — every helper must have at least one null-input case"
+  - "DO NOT commit auto-regenerated fixtures without inspecting the diff — because the fixture IS the contract and silent regeneration hides drift — `make parity-check` must be run separately to detect diffs"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/lib/chartMath.ts"
+    - "results-explorer/src/components/QueryHeatmap.tsx"
+    - "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+    - "results-explorer/src/components/DivergingBarChart.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+    - "results-explorer/src/__tests__/parity/**"
+    - "tests/parity/**"
+    - "docs/visualization-parity.md"
+    - "Makefile"
+    - ".github/workflows/ci.yml"
+  do_not_modify:
+    - "benchbox/core/visualization/ascii/**"
+    - "benchbox/core/visualization/result_plotter.py"
+    - "benchbox/core/explorer_pipeline/**"
+
+verification:
+  - description: "Pure helper module exists and re-exports the documented functions"
+    command: "grep -E 'export (function|const) (colorForCell|lightnessForCell|speedupRatio|deltaPct|sortByMagnitudeDesc|perQuerySpeedup|geomeanMs)' results-explorer/src/lib/chartMath.ts"
+    expected_output: "all 7 named exports present"
+  - description: "Fixture generator runs and produces one file per chart computation"
+    command: "uv run -- python tests/parity/generate_visualization_fixtures.py --out tests/parity/fixtures && ls tests/parity/fixtures/*.json"
+    expected_output: "at least 7 .json files matching the 7 helpers in w1"
+  - description: "Vitest parity suite runs all fixture cases and passes"
+    command: "cd results-explorer && npm test -- chartMath.parity"
+    expected_output: "parity suite present, all cases pass"
+  - description: "Make target detects fixture drift"
+    command: "make parity-check"
+    expected_output: "exit 0 when fixtures match, exit non-zero with diff when they don't"
+  - description: "Existing QueryHeatmap unit tests still pass (refactored to use fixtures)"
+    command: "cd results-explorer && npm test -- QueryHeatmap"
+    expected_output: "all QueryHeatmap tests pass; no hardcoded color numbers remain in the test file"
+  - description: "Full Vitest suite still passes (36 + new parity tests)"
+    command: "cd results-explorer && npm test"
+    expected_output: "all tests pass"
+
+deps:
+  needs: []
+
+success_metrics:
+  - "Every chart math helper in `chartMath.ts` has at least one parity fixture case"
+  - "CI fails when a TS helper is changed without regenerating fixtures, AND when a Python helper is changed without re-running parity"
+  - "Zero hardcoded expected color/speedup numbers remain in `*.test.tsx` files — they all flow through fixtures"
+
+metadata:
+  tags: ["explorer", "visualization", "testing", "parity", "contract-tests"]
+  estimated_effort: "Medium (2-3 days)"
+  created_date: "2026-04-15"
