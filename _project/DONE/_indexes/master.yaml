@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T13:27:55.557893'
-total_items: 703
+generated_at: '2026-04-15T14:33:27.522116'
+total_items: 704
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -8944,6 +8944,25 @@ items:
   - joe
   estimated_effort: Large
   completed_date: '2026-01-04'
+- id: psycopg2-connection-mixin
+  file: DONE/platform-expansion/active/psycopg2-connection-mixin.yaml
+  title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - refactor
+  - postgresql
+  - questdb
+  - mixin
+  owners:
+  - joe
+  estimated_effort: 1-2 days
+  completed_date: '2026-04-15'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: implement-tpcds-obt-dataframe-queries
   file: DONE/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml
   title: Implement TPC-DS-OBT DataFrame Query Families

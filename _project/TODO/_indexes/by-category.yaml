@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T13:27:53.760653'
+generated_at: '2026-04-15T14:33:25.813272'
 total_categories: 9
 categories:
   Architecture & Refactoring:
@@ -112,7 +112,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 8
+    count: 7
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -133,11 +133,6 @@ categories:
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       priority: Medium
-      status: Not Started
-    - id: psycopg2-connection-mixin
-      file: TODO/platform-expansion/planning/psycopg2-connection-mixin.yaml
-      title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
-      priority: Medium-High
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml

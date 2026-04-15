@@ -1,8 +1,8 @@
-generated_at: '2026-04-15T13:27:53.760681'
-total_items: 32
+generated_at: '2026-04-15T14:33:25.813301'
+total_items: 31
 statuses:
   Not Started:
-    count: 24
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -64,11 +64,6 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: psycopg2-connection-mixin
-      file: TODO/platform-expansion/planning/psycopg2-connection-mixin.yaml
-      title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
-      priority: Medium-High
-      category: Platform Expansion
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

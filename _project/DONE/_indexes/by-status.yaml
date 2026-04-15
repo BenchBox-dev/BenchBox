@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T13:27:55.558594'
-total_items: 703
+generated_at: '2026-04-15T14:33:27.522857'
+total_items: 704
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 652
+    count: 653
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1968,6 +1968,11 @@ statuses:
       title: Implement Physical Tuning DDL Generation Across All Platforms
       priority: Medium-High
       category: Core Functionality
+    - id: psycopg2-connection-mixin
+      file: DONE/platform-expansion/active/psycopg2-connection-mixin.yaml
+      title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
+      priority: Medium-High
+      category: Platform Expansion
     - id: implement-tpcdi-dataframe-pipeline
       file: DONE/dataframe-benchmarks/active/implement-tpcdi-dataframe-pipeline.yaml
       title: Implement TPC-DI DataFrame Pipeline Execution

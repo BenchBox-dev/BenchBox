@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T13:27:55.558427'
-total_items: 703
+generated_at: '2026-04-15T14:33:27.522679'
+total_items: 704
 priorities:
   Critical:
     count: 40
@@ -1441,7 +1441,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 106
+    count: 107
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1773,6 +1773,11 @@ priorities:
       file: DONE/physical-tuning/_archived/physical-tuning-ddl-generation.yaml
       title: Implement Physical Tuning DDL Generation Across All Platforms
       category: Core Functionality
+      status: Completed
+    - id: psycopg2-connection-mixin
+      file: DONE/platform-expansion/active/psycopg2-connection-mixin.yaml
+      title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
+      category: Platform Expansion
       status: Completed
     - id: implement-tpcds-obt-dataframe-queries
       file: DONE/dataframe-benchmarks/active/implement-tpcds-obt-dataframe-queries.yaml

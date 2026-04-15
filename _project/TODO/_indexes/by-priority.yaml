@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T13:27:53.760671'
-total_items: 32
+generated_at: '2026-04-15T14:33:25.813290'
+total_items: 31
 priorities:
   Critical:
     count: 2
@@ -38,7 +38,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 7
+    count: 6
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -65,11 +65,6 @@ priorities:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Completed
-    - id: psycopg2-connection-mixin
-      file: TODO/platform-expansion/planning/psycopg2-connection-mixin.yaml
-      title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
-      category: Platform Expansion
-      status: Not Started
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission

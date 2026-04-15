@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T13:27:53.760619'
-total_items: 32
+generated_at: '2026-04-15T14:33:25.813234'
+total_items: 31
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -538,24 +538,6 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
-- id: psycopg2-connection-mixin
-  file: TODO/platform-expansion/planning/psycopg2-connection-mixin.yaml
-  title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - refactor
-  - postgresql
-  - questdb
-  - mixin
-  owners:
-  - joe
-  estimated_effort: 1-2 days
-  work_total: 6
-  work_done: 0
-  work_ready: 1
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

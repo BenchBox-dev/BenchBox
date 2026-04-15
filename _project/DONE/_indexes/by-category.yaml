@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T13:27:55.558241'
+generated_at: '2026-04-15T14:33:27.522479'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -2365,7 +2365,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 81
+    count: 82
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2661,6 +2661,11 @@ categories:
       file: DONE/platform-expansion/planning/dataproc-serverless-platform.yaml
       title: GCP Dataproc Serverless Platform
       priority: Medium
+      status: Completed
+    - id: psycopg2-connection-mixin
+      file: DONE/platform-expansion/active/psycopg2-connection-mixin.yaml
+      title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
+      priority: Medium-High
       status: Completed
     - id: pyspark-sql-data-loading
       file: DONE/dataframe-expansion/planning/pyspark-sql-data-loading.yaml
