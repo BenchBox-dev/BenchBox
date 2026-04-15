@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T17:47:23.599130'
-total_categories: 76
+generated_at: '2026-04-14T21:05:28.383607'
+total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -3513,6 +3513,14 @@ categories:
     - id: test-suite-alignment-schema-v1-1-and-platform-enhancements
       file: DONE/unknown/completed/test-suite-alignment-schema-v1-1-and-platform-enhancements.yaml
       title: ✅ Test Suite Alignment - Schema v1.1 and Platform Enhancements
+      priority: High
+      status: Completed
+  Tooling and Distribution:
+    count: 1
+    items:
+    - id: patch-and-redistribute-tpcds-dsdgen-subscale-support
+      file: DONE/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml
+      title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
       priority: High
       status: Completed
   Uncategorized:

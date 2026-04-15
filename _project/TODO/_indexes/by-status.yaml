@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T20:16:44.532069'
-total_items: 34
+generated_at: '2026-04-14T21:05:25.878196'
+total_items: 33
 statuses:
   Blocked:
     count: 1
@@ -132,14 +132,6 @@ statuses:
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
-  Identified:
-    count: 1
-    items:
-    - id: patch-and-redistribute-tpcds-dsdgen-subscale-support
-      file: TODO/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml
-      title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
-      priority: High
-      category: Tooling and Distribution
   Completed:
     count: 8
     items:

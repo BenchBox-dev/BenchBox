@@ -2,7 +2,8 @@ id: patch-and-redistribute-tpcds-dsdgen-subscale-support
 title: "Patch and redistribute TPC-DS dsdgen binaries for subscale support"
 worktree: main
 priority: High
-status: Identified
+status: Completed
+completed_date: "2026-04-14"
 category: Tooling and Distribution
 
 description: |
@@ -92,13 +93,45 @@ work:
   summary: "Build and verify the patched bundle set for every distributed target (`darwin-*`, `linux-*`, `windows-*`) or document
     exactly which targets remain unsupported."
   needs: [w3]
-  status: pending
+  status: done
+  notes: |
+    Completed on 2026-04-14. Full results in _sources/tpcds-subscale-probe.md "Cross-Bundle Gate Zero (w4)".
+
+    Built and verified four of six bundle targets:
+    - darwin-arm64: macOS native gcc/clang (arm64 host)
+    - darwin-x86_64: macOS native gcc/clang with -arch x86_64 flag
+    - linux-arm64: Docker ubuntu:22.04 --platform linux/arm64
+    - linux-x86_64: Docker ubuntu:22.04 --platform linux/amd64
+
+    All 16 SF×table combinations (sf=0.01, 0.1, 0.5, 1.0 × call_center, store, warehouse,
+    web_site) exit 0 across all four platforms. SF=1.0 checksums match the pre-patch control
+    exactly. Cross-platform checksums are byte-identical — deterministic output confirmed.
+
+    Windows status: windows-arm64 and windows-x86_64 NOT rebuilt. No MinGW or Windows
+    cross-compiler available on the darwin-arm64 build host. Upstream unpatched binaries
+    remain in those bundle directories; they will continue to exit 139 for sf < 1.0.
+    A separate TODO should track obtaining a Windows cross-compilation environment.
+
+    Deployed: patched dsdgen + dsqgen to _binaries/tpc-ds/{darwin-arm64,darwin-x86_64,
+    linux-arm64,linux-x86_64}/. Added EULA.txt and NOTICE.txt to all six bundle directories
+    and _binaries/tpc-ds/NOTICE.txt at the top level to satisfy TPC EULA v2.2 Clause 9a/9b.
 
 - id: w5
   summary: "Publish the updated probe artifact and either unblock `support-unofficial-tpcds-scales-with-methodology-guardrails`
     or open the user-supplied-data fallback item with concrete evidence."
   needs: [w4]
-  status: pending
+  status: done
+  notes: |
+    Completed on 2026-04-14. _sources/tpcds-subscale-probe.md updated with two new
+    sections: "Post-Patch Gate Zero (w3)" (darwin-arm64 source-build results) and
+    "Cross-Bundle Gate Zero (w4)" (darwin-x86_64, linux-arm64, linux-x86_64 results plus
+    Windows status documentation). All evidence committed to main.
+
+    Decision: unblock `support-unofficial-tpcds-scales-with-methodology-guardrails`.
+    Four of six bundle targets have patched binaries with cross-platform Gate Zero evidence.
+    Windows targets are explicitly documented as unsupported until a cross-compilation
+    environment is available. The higher-level feature can proceed on this basis with the
+    Windows limitation clearly surfaced in NOTICE.txt and the probe artifact.
 
 files_affected:
   modified:

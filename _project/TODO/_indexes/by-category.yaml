@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T20:16:44.532038'
-total_categories: 10
+generated_at: '2026-04-14T21:05:25.878156'
+total_categories: 9
 categories:
   Architecture & Refactoring:
     count: 1
@@ -193,11 +193,3 @@ categories:
       title: Visually verify TrustBadge rendering across all 4 explorer pages
       priority: High
       status: Completed
-  Tooling and Distribution:
-    count: 1
-    items:
-    - id: patch-and-redistribute-tpcds-dsdgen-subscale-support
-      file: TODO/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml
-      title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
-      priority: High
-      status: Identified

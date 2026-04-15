@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T17:47:23.599315'
-total_items: 692
+generated_at: '2026-04-14T21:05:28.383876'
+total_items: 693
 priorities:
   Critical:
     count: 39
@@ -200,7 +200,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 241
+    count: 242
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -893,6 +893,11 @@ priorities:
       file: DONE/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
       title: Patch TPC-H source to fix stdout data generation
       category: Core Functionality
+      status: Completed
+    - id: patch-and-redistribute-tpcds-dsdgen-subscale-support
+      file: DONE/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml
+      title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
+      category: Tooling and Distribution
       status: Completed
     - id: platform-driver-version-capability-matrix-and-cloud-version-model
       file: DONE/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml

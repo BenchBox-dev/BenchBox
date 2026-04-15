@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T20:16:44.532001'
-total_items: 34
+generated_at: '2026-04-14T21:05:25.878105'
+total_items: 33
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -73,23 +73,6 @@ items:
   estimated_effort: Medium — requires MotherDuck free-tier account
   work_total: 3
   work_done: 0
-  work_ready: 1
-- id: patch-and-redistribute-tpcds-dsdgen-subscale-support
-  file: TODO/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml
-  title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
-  worktree: main
-  category: Tooling and Distribution
-  priority: High
-  status: Identified
-  tags:
-  - tpcds
-  - dsdgen
-  - binaries
-  - subscale
-  - licensing
-  estimated_effort: Medium
-  work_total: 5
-  work_done: 1
   work_ready: 1
 - id: external-contributor-submission-dry-run
   file: TODO/main/planning/external-contributor-submission-dry-run.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T20:16:44.532058'
-total_items: 34
+generated_at: '2026-04-14T21:05:25.878179'
+total_items: 33
 priorities:
   Critical:
     count: 2
@@ -15,7 +15,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 6
+    count: 5
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -27,11 +27,6 @@ priorities:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
       status: Not Started
-    - id: patch-and-redistribute-tpcds-dsdgen-subscale-support
-      file: TODO/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml
-      title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
-      category: Tooling and Distribution
-      status: Identified
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

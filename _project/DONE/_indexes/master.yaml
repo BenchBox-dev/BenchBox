@@ -1,5 +1,5 @@
-generated_at: '2026-04-14T17:47:23.598763'
-total_items: 692
+generated_at: '2026-04-14T21:05:28.383149'
+total_items: 693
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2736,6 +2736,24 @@ items:
   - stdout
   - patch
   estimated_effort: 1-2 hours
+- id: patch-and-redistribute-tpcds-dsdgen-subscale-support
+  file: DONE/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml
+  title: Patch and redistribute TPC-DS dsdgen binaries for subscale support
+  worktree: main
+  category: Tooling and Distribution
+  priority: High
+  status: Completed
+  tags:
+  - tpcds
+  - dsdgen
+  - binaries
+  - subscale
+  - licensing
+  estimated_effort: Medium
+  completed_date: '2026-04-14'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
 - id: platform-driver-version-capability-matrix-and-cloud-version-model
   file: DONE/core-functionality/active/platform-driver-version-capability-matrix-and-cloud-version-model.yaml
   title: Plan cross-platform multi-driver-version support and cloud engine-version metadata
