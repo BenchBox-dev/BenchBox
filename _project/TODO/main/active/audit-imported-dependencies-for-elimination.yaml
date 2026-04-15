@@ -65,7 +65,7 @@ work:
   summary: "Build import-site map for each declared dep: Grep `import <name>` / `from <name>` across benchbox/, scripts/,
     tests/, docs/. Record every file:line that imports each dep."
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Handle package-name vs import-name mismatches: pyyaml→yaml,
     psycopg2-binary→psycopg2, google-cloud-bigquery→google.cloud.bigquery,
@@ -76,7 +76,7 @@ work:
   summary: "Inverse check: find third-party imports in source that are NOT declared in pyproject.toml. Classify as (a) truly
     undeclared, (b) transitive-reach, or (c) stdlib misidentified."
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Ground truth for transitive reach is `uv tree`. Any "transitive-reach"
     finding is fragile and becomes a candidate for promotion to an explicit
@@ -86,7 +86,7 @@ work:
   summary: "Classify each declared dep by purpose (Core / SQL-adapter / Cloud-storage / DataFrame / Benchmark / Dev-test /
     Docs / MCP) and identify the owning benchbox module(s)."
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Flag deps declared across multiple extras groups where one group
     already transitively includes the other — consolidation candidates.
@@ -95,7 +95,7 @@ work:
   summary: "Produce elimination candidate list per dep: KEEP, FLAG-UNUSED, FLAG-REDUNDANT, or FLAG-DEAD-EXTRA. Each FLAG entry
     gets a one-line justification + evidence."
   needs: [w3, w4]
-  status: pending
+  status: done
   notes: |
     Evidence = import-site count from w2, owner module from w4, overlap
     source for REDUNDANT. Verify plugin-style deps (ray for modin, entry-
@@ -105,7 +105,7 @@ work:
   summary: "Write docs/development/dependency-inventory.md — inventory table, elimination candidates with evidence, consolidation
     proposals, used-but-undeclared findings. Cross-link from AGENTS.md."
   needs: [w5]
-  status: pending
+  status: done
 
 - id: w7
   summary: "Create follow-up TODOs for each actionable finding — one per elimination/consolidation cluster. Each follow-up
