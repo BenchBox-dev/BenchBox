@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:17:53.763706'
-total_items: 698
+generated_at: '2026-04-15T09:35:36.062380'
+total_items: 699
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1050,6 +1050,28 @@ items:
   - joeharris76
   estimated_effort: 2-3 days
   completed_date: '2026-01-18'
+- id: explorer-matrix-leaderboard-view
+  file: DONE/main/planning/explorer-matrix-leaderboard-view.yaml
+  title: Build ClickBench-style matrix leaderboard as primary benchmark landing view
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - matrix
+  - leaderboard
+  - heatmap
+  - ui
+  estimated_effort: Medium-Large (2-3 days)
+  completed_date: '2026-04-15'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  needs:
+  - explorer-emit-benchmark-summary-artifact
+  - explorer-align-ranking-metric-with-tpc-standards
 - id: result-integrity-validator
   file: DONE/main/active/result-integrity-validator.yaml
   title: Build result integrity validator for benchmark JSON output

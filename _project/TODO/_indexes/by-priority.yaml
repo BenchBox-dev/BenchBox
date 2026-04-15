@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:17:52.032655'
-total_items: 36
+generated_at: '2026-04-15T09:35:34.282856'
+total_items: 35
 priorities:
   Critical:
     count: 2
@@ -15,13 +15,8 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 5
+    count: 4
     items:
-    - id: explorer-matrix-leaderboard-view
-      file: TODO/main/planning/explorer-matrix-leaderboard-view.yaml
-      title: Build ClickBench-style matrix leaderboard as primary benchmark landing view
-      category: Core Functionality
-      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

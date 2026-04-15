@@ -1,8 +1,8 @@
-generated_at: '2026-04-15T09:17:52.032666'
-total_items: 36
+generated_at: '2026-04-15T09:35:34.282868'
+total_items: 35
 statuses:
   Not Started:
-    count: 28
+    count: 27
     items:
     - id: explorer-heatmap-accessibility-and-tests
       file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
@@ -43,11 +43,6 @@ statuses:
       file: TODO/main/planning/explorer-cross-benchmark-meta-leaderboard.yaml
       title: Add cross-benchmark meta-leaderboard to the home page
       priority: Medium
-      category: Core Functionality
-    - id: explorer-matrix-leaderboard-view
-      file: TODO/main/planning/explorer-matrix-leaderboard-view.yaml
-      title: Build ClickBench-style matrix leaderboard as primary benchmark landing view
-      priority: High
       category: Core Functionality
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml

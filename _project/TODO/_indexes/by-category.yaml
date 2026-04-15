@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T09:17:52.032634'
+generated_at: '2026-04-15T09:35:34.282840'
 total_categories: 9
 categories:
   Architecture & Refactoring:
@@ -41,7 +41,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 15
+    count: 14
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -58,11 +58,6 @@ categories:
       title: Automate corpus-inventory.json generation from results-data/bundles/
       priority: Medium-High
       status: Completed
-    - id: explorer-matrix-leaderboard-view
-      file: TODO/main/planning/explorer-matrix-leaderboard-view.yaml
-      title: Build ClickBench-style matrix leaderboard as primary benchmark landing view
-      priority: High
-      status: Not Started
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy

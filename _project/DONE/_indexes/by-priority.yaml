@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:17:53.764227'
-total_items: 698
+generated_at: '2026-04-15T09:35:36.062912'
+total_items: 699
 priorities:
   Critical:
     count: 40
@@ -205,7 +205,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 245
+    count: 246
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -360,6 +360,11 @@ priorities:
     - id: bidirectional-repo-sync-v2
       file: DONE/release-sync/active/bidirectional-repo-sync-v2.yaml
       title: Bidirectional Repository Sync (Redesigned)
+      category: Core Functionality
+      status: Completed
+    - id: explorer-matrix-leaderboard-view
+      file: DONE/main/planning/explorer-matrix-leaderboard-view.yaml
+      title: Build ClickBench-style matrix leaderboard as primary benchmark landing view
       category: Core Functionality
       status: Completed
     - id: result-integrity-validator

@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T09:17:53.764043'
+generated_at: '2026-04-15T09:35:36.062724'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -602,7 +602,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 232
+    count: 233
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -818,6 +818,11 @@ categories:
       file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
       title: Bidirectional Sync and True-Up Releases for Public/Private Repos
       priority: Medium-High
+      status: Completed
+    - id: explorer-matrix-leaderboard-view
+      file: DONE/main/planning/explorer-matrix-leaderboard-view.yaml
+      title: Build ClickBench-style matrix leaderboard as primary benchmark landing view
+      priority: High
       status: Completed
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: DONE/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml

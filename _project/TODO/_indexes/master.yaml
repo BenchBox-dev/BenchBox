@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:17:52.032590'
-total_items: 36
+generated_at: '2026-04-15T09:35:34.282795'
+total_items: 35
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -38,27 +38,6 @@ items:
   work_ready: 1
   needs:
   - implement-pr-based-result-submission-workflow
-- id: explorer-matrix-leaderboard-view
-  file: TODO/main/planning/explorer-matrix-leaderboard-view.yaml
-  title: Build ClickBench-style matrix leaderboard as primary benchmark landing view
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - matrix
-  - leaderboard
-  - heatmap
-  - ui
-  estimated_effort: Medium-Large (2-3 days)
-  work_total: 7
-  work_done: 0
-  work_ready: 2
-  needs:
-  - explorer-emit-benchmark-summary-artifact
-  - explorer-align-ranking-metric-with-tpc-standards
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
