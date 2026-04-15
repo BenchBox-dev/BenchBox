@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:38:38.315636'
-total_items: 700
+generated_at: '2026-04-15T13:27:02.205576'
+total_items: 703
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 649
+    count: 652
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -387,6 +387,11 @@ statuses:
       file: DONE/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
       title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
       priority: High
+      category: Testing and Quality Assurance
+    - id: explorer-heatmap-accessibility-and-tests
+      file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
+      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
+      priority: Medium
       category: Testing and Quality Assurance
     - id: adapt-benchbox-to-textcharts-neutral-defaults
       file: DONE/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
@@ -629,6 +634,11 @@ statuses:
       title: Add cost tracking for local/self-hosted platforms
       priority: Low
       category: Platform Expansion
+    - id: explorer-cross-benchmark-meta-leaderboard
+      file: DONE/main/active/explorer-cross-benchmark-meta-leaderboard.yaml
+      title: Add cross-benchmark meta-leaderboard to the home page
+      priority: Medium
+      category: Core Functionality
     - id: quality-add-cross-platform-result-validation
       file: DONE/main/quality/quality-add-cross-platform-result-validation.yaml
       title: Add cross-platform query-result validation suite
@@ -3094,6 +3104,11 @@ statuses:
       file: DONE/main/active/timing-query-contract-unification.yaml
       title: Unify runtime query timing contract to execution_time_seconds
       priority: High
+      category: Core Functionality
+    - id: explorer-compare-url-short-ids
+      file: DONE/main/active/explorer-compare-url-short-ids.yaml
+      title: Use short hash IDs in Compare URLs to avoid URL-length limits
+      priority: Medium
       category: Core Functionality
     - id: validate-isolated-runtime-importability
       file: DONE/core-functionality/active/validate-isolated-runtime-importability.yaml

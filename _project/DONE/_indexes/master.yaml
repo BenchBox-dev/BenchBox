@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:38:38.314965'
-total_items: 700
+generated_at: '2026-04-15T13:27:02.204848'
+total_items: 703
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4643,6 +4643,26 @@ items:
   priority: Medium
   status: Not Started
   estimated_effort: 2 weeks (0.75 FTE ML engineer)
+- id: explorer-heatmap-accessibility-and-tests
+  file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
+  title: Accessibility hardening and snapshot test coverage for matrix leaderboard
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - accessibility
+  - testing
+  - a11y
+  estimated_effort: Medium (1-2 days)
+  completed_date: '2026-04-15'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - explorer-matrix-leaderboard-view
 - id: interactive-wizard-capture-plans
   file: DONE/ux-improvements/planning/interactive-wizard-capture-plans.yaml
   title: Add --capture-plans option to interactive wizard
@@ -5093,6 +5113,27 @@ items:
   work_total: 1
   work_done: 1
   work_ready: 0
+- id: explorer-cross-benchmark-meta-leaderboard
+  file: DONE/main/active/explorer-cross-benchmark-meta-leaderboard.yaml
+  title: Add cross-benchmark meta-leaderboard to the home page
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - home
+  - meta-leaderboard
+  - differentiator
+  estimated_effort: Medium (1-2 days)
+  completed_date: '2026-04-15'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - explorer-emit-benchmark-summary-artifact
+  - explorer-matrix-leaderboard-view
 - id: add-dedicated-tags-for-platforms-and-benchmarks
   file: DONE/docs-experience/add-dedicated-tags-for-platforms-and-benchmarks.yaml
   title: Add dedicated tags for all platforms and benchmarks
@@ -7476,6 +7517,25 @@ items:
   priority: Medium
   status: Completed
   completed_date: '2025-12-14'
+- id: explorer-compare-url-short-ids
+  file: DONE/main/active/explorer-compare-url-short-ids.yaml
+  title: Use short hash IDs in Compare URLs to avoid URL-length limits
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - urls
+  - compare
+  estimated_effort: Small (1 day)
+  completed_date: '2026-04-15'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - explorer-matrix-leaderboard-view
 - id: quality-cross-platform-validation-integration-matrix
   file: DONE/main/planning/quality-cross-platform-validation-integration-matrix.yaml
   title: Wire cross-platform validation comparator into a nightly integration matrix

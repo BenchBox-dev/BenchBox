@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:38:36.548551'
-total_items: 34
+generated_at: '2026-04-15T13:27:00.382287'
+total_items: 32
 priorities:
   Critical:
     count: 2
@@ -38,7 +38,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 6
+    count: 7
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -65,19 +65,19 @@ priorities:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Completed
+    - id: psycopg2-connection-mixin
+      file: TODO/platform-expansion/planning/psycopg2-connection-mixin.yaml
+      title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
+      category: Platform Expansion
+      status: Not Started
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
       category: Documentation
       status: Completed
   Medium:
-    count: 10
+    count: 7
     items:
-    - id: explorer-heatmap-accessibility-and-tests
-      file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
-      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
-      category: Testing and Quality Assurance
-      status: Not Started
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
@@ -87,11 +87,6 @@ priorities:
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: explorer-cross-benchmark-meta-leaderboard
-      file: TODO/main/planning/explorer-cross-benchmark-meta-leaderboard.yaml
-      title: Add cross-benchmark meta-leaderboard to the home page
-      category: Core Functionality
       status: Not Started
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
@@ -111,11 +106,6 @@ priorities:
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
-      category: Core Functionality
-      status: Not Started
-    - id: explorer-compare-url-short-ids
-      file: TODO/main/planning/explorer-compare-url-short-ids.yaml
-      title: Use short hash IDs in Compare URLs to avoid URL-length limits
       category: Core Functionality
       status: Not Started
     - id: write-results-platform-phase-2-operations-runbook

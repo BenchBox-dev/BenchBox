@@ -2,7 +2,8 @@ id: explorer-cross-benchmark-meta-leaderboard
 title: "Add cross-benchmark meta-leaderboard to the home page"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-15"
 category: Core Functionality
 
 description: |

@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T09:38:38.315287'
+generated_at: '2026-04-15T13:27:02.205206'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -602,7 +602,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 234
+    count: 236
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -737,6 +737,11 @@ categories:
     - id: complexity-ignore-required-w15
       file: DONE/core-functionality/active/complexity-ignore-required-w15.yaml
       title: Add complexity exclusions for 5 functions with inherent required complexity
+      priority: Medium
+      status: Completed
+    - id: explorer-cross-benchmark-meta-leaderboard
+      file: DONE/main/active/explorer-cross-benchmark-meta-leaderboard.yaml
+      title: Add cross-benchmark meta-leaderboard to the home page
       priority: Medium
       status: Completed
     - id: spark-mixin-open-table-format-loading
@@ -1760,6 +1765,11 @@ categories:
       file: DONE/main/active/timing-query-contract-unification.yaml
       title: Unify runtime query timing contract to execution_time_seconds
       priority: High
+      status: Completed
+    - id: explorer-compare-url-short-ids
+      file: DONE/main/active/explorer-compare-url-short-ids.yaml
+      title: Use short hash IDs in Compare URLs to avoid URL-length limits
+      priority: Medium
       status: Completed
     - id: validate-isolated-runtime-importability
       file: DONE/core-functionality/active/validate-isolated-runtime-importability.yaml
@@ -3362,7 +3372,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 37
+    count: 38
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3373,6 +3383,11 @@ categories:
       file: DONE/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
       title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
       priority: High
+      status: Completed
+    - id: explorer-heatmap-accessibility-and-tests
+      file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
+      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
+      priority: Medium
       status: Completed
     - id: pyspark-sql-tests
       file: DONE/dataframe-expansion/planning/pyspark-sql-tests.yaml

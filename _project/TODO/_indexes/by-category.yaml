@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T09:38:36.548522'
+generated_at: '2026-04-15T13:27:00.382273'
 total_categories: 9
 categories:
   Architecture & Refactoring:
@@ -41,17 +41,12 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 13
+    count: 11
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
-      status: Not Started
-    - id: explorer-cross-benchmark-meta-leaderboard
-      file: TODO/main/planning/explorer-cross-benchmark-meta-leaderboard.yaml
-      title: Add cross-benchmark meta-leaderboard to the home page
-      priority: Medium
       status: Not Started
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
@@ -103,11 +98,6 @@ categories:
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
       status: Not Started
-    - id: explorer-compare-url-short-ids
-      file: TODO/main/planning/explorer-compare-url-short-ids.yaml
-      title: Use short hash IDs in Compare URLs to avoid URL-length limits
-      priority: Medium
-      status: Not Started
   Documentation:
     count: 2
     items:
@@ -122,7 +112,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 7
+    count: 8
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -143,6 +133,11 @@ categories:
       file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       priority: Medium
+      status: Not Started
+    - id: psycopg2-connection-mixin
+      file: TODO/platform-expansion/planning/psycopg2-connection-mixin.yaml
+      title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
+      priority: Medium-High
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
@@ -176,13 +171,8 @@ categories:
       priority: Medium-High
       status: Not Started
   Testing and Quality Assurance:
-    count: 4
+    count: 3
     items:
-    - id: explorer-heatmap-accessibility-and-tests
-      file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
-      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
-      priority: Medium
-      status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

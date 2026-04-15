@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T09:38:36.548468'
-total_items: 34
+generated_at: '2026-04-15T13:27:00.382237'
+total_items: 32
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -307,25 +307,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: explorer-heatmap-accessibility-and-tests
-  file: TODO/main/planning/explorer-heatmap-accessibility-and-tests.yaml
-  title: Accessibility hardening and snapshot test coverage for matrix leaderboard
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - accessibility
-  - testing
-  - a11y
-  estimated_effort: Medium (1-2 days)
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - explorer-matrix-leaderboard-view
 - id: ballista-distributed-adapter
   file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
   title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
@@ -365,26 +346,6 @@ items:
   work_done: 0
   work_ready: 1
   deferred_count: 6
-- id: explorer-cross-benchmark-meta-leaderboard
-  file: TODO/main/planning/explorer-cross-benchmark-meta-leaderboard.yaml
-  title: Add cross-benchmark meta-leaderboard to the home page
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - home
-  - meta-leaderboard
-  - differentiator
-  estimated_effort: Medium (1-2 days)
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - explorer-emit-benchmark-summary-artifact
-  - explorer-matrix-leaderboard-view
 - id: define-phase-3-promotion-metrics
   file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
   title: Define Phase 3 promotion metrics, dashboard, and review cadence
@@ -463,24 +424,6 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
-- id: explorer-compare-url-short-ids
-  file: TODO/main/planning/explorer-compare-url-short-ids.yaml
-  title: Use short hash IDs in Compare URLs to avoid URL-length limits
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - explorer
-  - urls
-  - compare
-  estimated_effort: Small (1 day)
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - explorer-matrix-leaderboard-view
 - id: write-results-platform-phase-2-operations-runbook
   file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
   title: Write the Phase 2 results-platform operations runbook
@@ -595,6 +538,24 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
+- id: psycopg2-connection-mixin
+  file: TODO/platform-expansion/planning/psycopg2-connection-mixin.yaml
+  title: Implement Psycopg2ConnectionMixin for PostgreSQL-based Adapters
+  worktree: psycopg2-mixin-refactor
+  category: Platform Expansion
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - refactor
+  - postgresql
+  - questdb
+  - mixin
+  owners:
+  - joe
+  estimated_effort: 1 day
+  work_total: 4
+  work_done: 0
+  work_ready: 1
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission
