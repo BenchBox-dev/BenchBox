@@ -47,7 +47,7 @@ deps:
 work:
 - id: w1
   summary: "Add BenchmarkSummary TS type and getBenchmarkSummary(benchmark, sf, phase) loader in src/lib/manifest.ts"
-  status: pending
+  status: done
   notes: |
     Mirror the Pydantic model in src/types.ts. Loader fetches and
     decompresses the gzipped artifact via DecompressionStream API.
@@ -55,7 +55,7 @@ work:
 - id: w2
   summary: "Build QueryHeatmap component at src/components/QueryHeatmap.tsx with log-ratio heat coloring"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Props: summary (BenchmarkSummary), rankingMetric ('power_score' |
     'geomean_ms'). Sticky left-column (platform + trust badge +
@@ -70,7 +70,7 @@ work:
 - id: w3
   summary: "Write snapshot tests at src/components/__tests__/QueryHeatmap.test.tsx"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Cases: (a) known timings produce stable color classes; (b) null
     cells render '—'; (c) single-platform matrix degrades gracefully;
