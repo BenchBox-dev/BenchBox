@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T16:33:44.424304'
-total_items: 35
+generated_at: '2026-04-16T16:48:32.529485'
+total_items: 36
 priorities:
   Critical:
     count: 2
@@ -124,7 +124,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 12
+    count: 13
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -180,6 +180,11 @@ priorities:
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
       category: Platform Expansion
+      status: Not Started
+    - id: unify-platform-label-disambiguator
+      file: TODO/main/planning/unify-platform-label-disambiguator.yaml
+      title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
+      category: Architecture & Refactoring
       status: Not Started
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml

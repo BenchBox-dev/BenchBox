@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T16:33:44.424315'
-total_items: 35
+generated_at: '2026-04-16T16:48:32.529496'
+total_items: 36
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Code Quality and Technical Debt
   Not Started:
-    count: 26
+    count: 27
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -132,6 +132,11 @@ statuses:
       title: TigerData Cloud Enhancements
       priority: Low
       category: Platform Expansion
+    - id: unify-platform-label-disambiguator
+      file: TODO/main/planning/unify-platform-label-disambiguator.yaml
+      title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
+      priority: Low
+      category: Architecture & Refactoring
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR

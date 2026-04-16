@@ -1,8 +1,8 @@
-generated_at: '2026-04-16T16:33:44.424288'
+generated_at: '2026-04-16T16:48:32.529464'
 total_categories: 11
 categories:
   Architecture & Refactoring:
-    count: 2
+    count: 3
     items:
     - id: generalize-database-table-reuse-detection
       file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
@@ -12,6 +12,11 @@ categories:
     - id: reconcile-docs-review-code-followups
       file: TODO/main/planning/reconcile-docs-review-code-followups.yaml
       title: Reconcile three code-level inconsistencies surfaced by docs review
+      priority: Low
+      status: Not Started
+    - id: unify-platform-label-disambiguator
+      file: TODO/main/planning/unify-platform-label-disambiguator.yaml
+      title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
       priority: Low
       status: Not Started
   Benchmark Development:
