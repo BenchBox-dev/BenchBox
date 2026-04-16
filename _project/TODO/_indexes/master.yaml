@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:04:41.619115'
-total_items: 43
+generated_at: '2026-04-15T20:06:50.256877'
+total_items: 42
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -239,23 +239,6 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 3
-  deferred_count: 1
-- id: drop-lxml-dev-dep-or-port-test-to-stdlib
-  file: TODO/main/planning/drop-lxml-dev-dep-or-port-test-to-stdlib.yaml
-  title: Drop lxml dev dep (port single test to stdlib xml.etree)
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Low
-  status: Not Started
-  tags:
-  - maintenance
-  - supply-chain
-  - deps
-  - audit-followup
-  estimated_effort: Small (1-2 hours)
-  work_total: 4
-  work_done: 0
-  work_ready: 1
   deferred_count: 1
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml

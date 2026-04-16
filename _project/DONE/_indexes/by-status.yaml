@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:04:43.289314'
-total_items: 706
+generated_at: '2026-04-15T20:06:51.933814'
+total_items: 707
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 655
+    count: 656
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1367,6 +1367,11 @@ statuses:
       title: Drop Plotly dependency and HTML chart rendering — go ASCII-only
       priority: High
       category: Core Functionality
+    - id: drop-lxml-dev-dep-or-port-test-to-stdlib
+      file: DONE/main/active/drop-lxml-dev-dep-or-port-test-to-stdlib.yaml
+      title: Drop lxml dev dep (port single test to stdlib xml.etree)
+      priority: Low
+      category: Code Quality and Technical Debt
     - id: dry-run-feature-completed
       file: DONE/unknown/planning/dry-run-feature-completed.yaml
       title: Dry Run Feature ✅ COMPLETED

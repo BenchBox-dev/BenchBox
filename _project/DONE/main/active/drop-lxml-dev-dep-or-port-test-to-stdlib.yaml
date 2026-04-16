@@ -2,7 +2,8 @@ id: drop-lxml-dev-dep-or-port-test-to-stdlib
 title: "Drop lxml dev dep (port single test to stdlib xml.etree)"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-04-15"
 category: Code Quality and Technical Debt
 description: |
   `lxml>=5.0.0` is declared in `[dependency-groups] dev`. The only import
@@ -23,22 +24,22 @@ description: |
 work:
   - id: w1
     summary: "Read `tests/unit/core/tpcdi/test_etl_sources.py` and identify which lxml API surface (XPath / validation / parser) the test actually uses."
-    status: pending
+    status: done
 
   - id: w2
     summary: "Decide port-vs-keep based on w1 findings: stdlib-only API → port to xml.etree; lxml-specific features → keep dep with inline rationale."
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "If ported: remove `lxml>=5.0.0` from `[dependency-groups] dev` and refresh uv.lock."
     needs: [w2]
-    status: pending
+    status: done
 
   - id: w4
     summary: "Run the affected test to confirm it still passes: `uv run -- python -m pytest tests/unit/core/tpcdi/test_etl_sources.py -v`."
     needs: [w2]
-    status: pending
+    status: done
 
 deferred:
   - summary: "Audit other dev deps with single-test usage"

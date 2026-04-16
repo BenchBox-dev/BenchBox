@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:04:43.289164'
-total_items: 706
+generated_at: '2026-04-15T20:06:51.933637'
+total_items: 707
 priorities:
   Critical:
     count: 40
@@ -3421,7 +3421,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 26
+    count: 27
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3487,6 +3487,11 @@ priorities:
       file: DONE/platform-expansion/active/pg-mooncake-type-compat-matrix.yaml
       title: Document pg_mooncake data type compatibility matrix with automated probing
       category: Platform Expansion
+      status: Completed
+    - id: drop-lxml-dev-dep-or-port-test-to-stdlib
+      file: DONE/main/active/drop-lxml-dev-dep-or-port-test-to-stdlib.yaml
+      title: Drop lxml dev dep (port single test to stdlib xml.etree)
+      category: Code Quality and Technical Debt
       status: Completed
     - id: quality-expand-agents-md-and-document-test-lock
       file: DONE/main/quality/quality-expand-agents-md-and-document-test-lock.yaml

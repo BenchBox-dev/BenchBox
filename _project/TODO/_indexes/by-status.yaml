@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:04:41.619181'
-total_items: 43
+generated_at: '2026-04-15T20:06:50.256953'
+total_items: 42
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Critical
       category: Testing and Quality Assurance
   Not Started:
-    count: 34
+    count: 33
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -66,11 +66,6 @@ statuses:
       file: TODO/main/planning/drop-chdb-core-from-core-dependencies.yaml
       title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
       priority: Medium
-      category: Code Quality and Technical Debt
-    - id: drop-lxml-dev-dep-or-port-test-to-stdlib
-      file: TODO/main/planning/drop-lxml-dev-dep-or-port-test-to-stdlib.yaml
-      title: Drop lxml dev dep (port single test to stdlib xml.etree)
-      priority: Low
       category: Code Quality and Technical Debt
     - id: explorer-emit-comparison-artifact-from-pipeline
       file: TODO/main/planning/explorer-emit-comparison-artifact-from-pipeline.yaml

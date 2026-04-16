@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:04:43.288727'
-total_items: 706
+generated_at: '2026-04-15T20:06:51.933051'
+total_items: 707
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4342,6 +4342,24 @@ items:
   completed_date: '2026-02-22'
   work_total: 2
   work_done: 2
+  work_ready: 0
+  deferred_count: 1
+- id: drop-lxml-dev-dep-or-port-test-to-stdlib
+  file: DONE/main/active/drop-lxml-dev-dep-or-port-test-to-stdlib.yaml
+  title: Drop lxml dev dep (port single test to stdlib xml.etree)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Completed
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - audit-followup
+  estimated_effort: Small (1-2 hours)
+  completed_date: '2026-04-15'
+  work_total: 4
+  work_done: 4
   work_ready: 0
   deferred_count: 1
 - id: quality-expand-agents-md-and-document-test-lock

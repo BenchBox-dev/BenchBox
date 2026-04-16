@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:04:41.619152'
+generated_at: '2026-04-15T20:06:50.256918'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -33,7 +33,7 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 8
+    count: 7
     items:
     - id: declare-undeclared-runtime-imports
       file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
@@ -44,11 +44,6 @@ categories:
       file: TODO/main/planning/drop-chdb-core-from-core-dependencies.yaml
       title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
       priority: Medium
-      status: Not Started
-    - id: drop-lxml-dev-dep-or-port-test-to-stdlib
-      file: TODO/main/planning/drop-lxml-dev-dep-or-port-test-to-stdlib.yaml
-      title: Drop lxml dev dep (port single test to stdlib xml.etree)
-      priority: Low
       status: Not Started
     - id: extract-project-scripts-to-isolated-env
       file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
