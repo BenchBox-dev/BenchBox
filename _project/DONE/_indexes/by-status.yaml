@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T00:57:08.375734'
-total_items: 715
+generated_at: '2026-04-16T01:15:58.469923'
+total_items: 716
 statuses:
   In Progress:
     count: 2
@@ -271,7 +271,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 663
+    count: 664
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2764,6 +2764,11 @@ statuses:
       title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
       priority: High
       category: Core Functionality
+    - id: cleanup-project-scratch-directory
+      file: DONE/main/active/cleanup-project-scratch-directory.yaml
+      title: Relocate canonical assets out of _project/ scratch area to proper homes
+      priority: Medium-High
+      category: Code Quality and Technical Debt
     - id: remediate-coverage-theater
       file: DONE/main/active/remediate-coverage-theater.yaml
       title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'

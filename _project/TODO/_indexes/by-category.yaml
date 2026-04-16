@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T00:57:06.782640'
+generated_at: '2026-04-16T01:15:56.868391'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -33,7 +33,7 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 3
+    count: 2
     items:
     - id: migrate-psycopg2-to-psycopg3
       file: TODO/main/planning/migrate-psycopg2-to-psycopg3.yaml
@@ -45,11 +45,6 @@ categories:
       title: Quarterly review of dependency upper bounds
       priority: Low
       status: Not Started
-    - id: cleanup-project-scratch-directory
-      file: TODO/main/active/cleanup-project-scratch-directory.yaml
-      title: Relocate canonical assets out of _project/ scratch area to proper homes
-      priority: Medium-High
-      status: In Progress
   Core Functionality:
     count: 13
     items:

@@ -2,7 +2,7 @@ id: cleanup-project-scratch-directory
 title: "Relocate canonical assets out of _project/ scratch area to proper homes"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
 category: Code Quality and Technical Debt
 
 description: |
@@ -224,7 +224,7 @@ work:
   - id: w7
     summary: "Validate TODO system integrity and commit all changes"
     needs: [w2, w3, w4, w5, w6]
-    status: pending
+    status: done
     notes: |
       Run full validation suite:
         uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all
@@ -406,6 +406,8 @@ success_metrics:
   - "No file in the main codebase links to a path that no longer exists (verified by grep)"
   - "The 5 research-gate questions have documented, specific answers recorded in w1 notes"
   - "_project/ root is visibly cleaner: monolithic YAMLs, generated files, and POC code gone"
+
+completed_date: "2026-04-16"
 
 metadata:
   tags:

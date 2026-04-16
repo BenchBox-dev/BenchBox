@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T00:57:06.782656'
-total_items: 36
+generated_at: '2026-04-16T01:15:56.868404'
+total_items: 35
 priorities:
   Critical:
     count: 2
@@ -48,7 +48,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 8
+    count: 7
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -80,11 +80,6 @@ priorities:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Completed
-    - id: cleanup-project-scratch-directory
-      file: TODO/main/active/cleanup-project-scratch-directory.yaml
-      title: Relocate canonical assets out of _project/ scratch area to proper homes
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
