@@ -308,7 +308,7 @@ work:
   summary: "Migrate dev scripts: probe_mooncake_types.py and benchmark_mooncake_migration.py — import renames only, no logic
     changes."
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     scripts/probe_mooncake_types.py (lines 444-456, 464):
       import psycopg2 → import psycopg
