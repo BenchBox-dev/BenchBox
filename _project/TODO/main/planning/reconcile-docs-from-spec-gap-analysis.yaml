@@ -139,7 +139,6 @@ work:
   - id: w6
     summary: "Fix nyctaxi.md: document the spatial query layer (benchbox/core/nyctaxi/spatial.py)"
     status: pending
-    needs: []
     notes: |
       RESEARCH GATE (run before editing):
         # Confirm spatial.py API surface
@@ -306,11 +305,11 @@ work:
         DimSecurity, etc. — use actual table names from the code)
 
   - id: w13
-    summary: "Fix miscellaneous P3 omissions: tpc-h thread safety, tpc-ds scale flag, coffeeshop schema, clickbench CSV"
+    summary: "Fix P3 omissions from w8/w9 research: tpc-h thread safety and tpc-ds --allow-unofficial-scale"
     status: pending
     needs: [w8, w9]
     notes: |
-      Batch fix for smaller P3 items. Run research gate for each before editing.
+      Batch fix for P3 items whose research was already performed in w8 and w9.
 
       1. docs/benchmarks/tpc-h.md — DuckDB thread safety caveat:
          Confirmed or denied in w8. If confirmed, add to DuckDB platform notes.
@@ -318,7 +317,14 @@ work:
       2. docs/benchmarks/tpc-ds.md — --allow-unofficial-scale for SF<1:
          Confirmed or denied in w9. If confirmed, add to Scale Factor section.
 
-      3. docs/benchmarks/coffeeshop.md — dim_locations.regional_weight column:
+  - id: w14
+    summary: "Fix P3 omissions: coffeeshop regional_weight, clickbench CSV semantics, metadata-primitives tier legend"
+    status: pending
+    needs: [w5]
+    notes: |
+      Batch fix for remaining P3 items. Run research gate for each before editing.
+
+      1. docs/benchmarks/coffeeshop.md — dim_locations.regional_weight column:
          RESEARCH GATE:
            grep -n "regional_weight" benchbox/core/coffeeshop/schema.py benchbox/core/coffeeshop/generator.py
          If the column exists in the schema, add it to the dim_locations schema table
@@ -327,7 +333,7 @@ work:
          NOTE: the docs are CORRECT on SF=1 order count (8.5M); the spec was wrong.
          Do NOT change the order count — generator.py:57 confirms SF1_ORDER_COUNT = 8_500_000.
 
-      4. docs/benchmarks/clickbench.md — CSV empty-string preservation:
+      2. docs/benchmarks/clickbench.md — CSV empty-string preservation:
          RESEARCH GATE:
            grep -rn "empty\|''\|empty_string\|csv.*null\|null.*csv" \
              benchbox/core/clickbench/ 2>/dev/null | head -10
@@ -336,32 +342,35 @@ work:
          (not NULL). ClickBench result validation uses string equality (= '') which
          requires this behavior."
 
-      5. docs/benchmarks/metadata-primitives.md — tier model definition:
+      3. docs/benchmarks/metadata-primitives.md — tier model definition:
          Confirmed or denied in w5. If tier concept exists in code, add a legend row
          below the platform table defining Tier 1 / 2 / 3 meanings.
 
 verification:
-  - command: "uv run -- python -m pytest tests/ -k 'transaction_primitives or nyctaxi or coffeeshop or amplab or datavault or tpcds or tpcdi' -m fast -q --tb=no -q 2>&1 | tail -5"
-    expected: "All docs-related fast tests pass (0 failures)"
-  - command: "cd docs && make linkcheck 2>&1 | grep -c 'broken' || echo '0 broken'"
-    expected: "0 broken links introduced"
+  - description: "Fast benchmark tests still pass after docs edits"
+    command: "uv run -- python -m pytest tests/ -k 'transaction_primitives or nyctaxi or coffeeshop or amplab or datavault or tpcds or tpcdi' -m fast -q --tb=no 2>&1 | tail -5"
+    expected_output: "passed"
+  - description: "No broken links introduced in docs"
+    command: "cd docs && make linkcheck 2>&1 | grep -c 'broken' || echo '0'"
+    expected_output: "0"
 
-scope_limit: |
-  Touch ONLY the documentation pages listed in each work unit:
-    docs/benchmarks/transaction-primitives.md
-    docs/benchmarks/amplab.md
-    docs/benchmarks/tpc-ds-obt.md
-    docs/benchmarks/tsbs-devops.md
-    docs/benchmarks/metadata-primitives.md
-    docs/benchmarks/nyctaxi.md
-    docs/benchmarks/tpc-di.md
-    docs/benchmarks/tpc-h.md
-    docs/benchmarks/tpc-ds.md
-    docs/benchmarks/datavault.md
-    docs/benchmarks/coffeeshop.md
-    docs/benchmarks/clickbench.md
-  Do NOT touch source code, tests, or other doc pages.
-  Do NOT add speculative content — every sentence must have a code source.
+scope_limit:
+  only_modify:
+    - "docs/benchmarks/transaction-primitives.md"
+    - "docs/benchmarks/amplab.md"
+    - "docs/benchmarks/tpc-ds-obt.md"
+    - "docs/benchmarks/tsbs-devops.md"
+    - "docs/benchmarks/metadata-primitives.md"
+    - "docs/benchmarks/nyctaxi.md"
+    - "docs/benchmarks/tpc-di.md"
+    - "docs/benchmarks/tpc-h.md"
+    - "docs/benchmarks/tpc-ds.md"
+    - "docs/benchmarks/datavault.md"
+    - "docs/benchmarks/coffeeshop.md"
+    - "docs/benchmarks/clickbench.md"
+  do_not_modify:
+    - "benchbox/"
+    - "tests/"
 
 anti_patterns:
   - "DO NOT copy text from the archived spec into the doc verbatim — because specs were

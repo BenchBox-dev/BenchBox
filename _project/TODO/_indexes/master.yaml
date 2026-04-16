@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T09:28:54.079534'
+generated_at: '2026-04-16T15:44:05.160606'
 total_items: 34
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -578,7 +578,7 @@ items:
   category: Documentation
   priority: Medium-High
   status: Not Started
-  work_total: 13
+  work_total: 14
   work_done: 0
   work_ready: 10
 - id: surface-contributor-onboarding-for-results
