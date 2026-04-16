@@ -96,7 +96,7 @@ work:
 
 - id: w4
   summary: "Fix tsbs-devops.md: verify disk table schema and duration scaling behavior"
-  status: pending
+  status: done
   notes: |
     RESEARCH GATE (run before editing):
       # Get disk table column list from schema
