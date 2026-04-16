@@ -102,7 +102,7 @@ work:
   - id: w4
     summary: "Wire fixture generation into a Make target / CI gate so divergence is detected automatically"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       - `make parity-fixtures` regenerates fixtures via the Python script
       - `make parity-check` runs Python generation into a tmpdir, diffs
