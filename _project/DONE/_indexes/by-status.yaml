@@ -1,14 +1,9 @@
-generated_at: '2026-04-15T20:49:24.301746'
+generated_at: '2026-04-16T03:43:23.803774'
 total_items: 715
 statuses:
   In Progress:
-    count: 3
+    count: 2
     items:
-    - id: explorer-heatmap-accessibility-and-tests
-      file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
-      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
-      priority: Medium
-      category: Testing and Quality Assurance
     - id: add-time-series-benchmark-suite-tsbs-implementation
       file: DONE/benchmark-expansion/active/add-time-series-benchmark-suite-tsbs-implementation.yaml
       title: Add Time Series Benchmark Suite (TSBS) Implementation
@@ -276,7 +271,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 662
+    count: 663
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -397,6 +392,11 @@ statuses:
       file: DONE/main/active/accelerate-slow-and-resource-heavy-tests-4x.yaml
       title: Accelerate slow and resource-heavy test suites by 4x without coverage loss
       priority: High
+      category: Testing and Quality Assurance
+    - id: explorer-heatmap-accessibility-and-tests
+      file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
+      title: Accessibility hardening and snapshot test coverage for matrix leaderboard
+      priority: Medium
       category: Testing and Quality Assurance
     - id: adapt-benchbox-to-textcharts-neutral-defaults
       file: DONE/main/active/adapt-benchbox-to-textcharts-neutral-defaults.yaml
@@ -1084,13 +1084,13 @@ statuses:
       title: Compressed Data Generation Gaps (all benchmarks) ✅
       priority: Medium
       category: Data Quality and Compatibility Issues
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       category: Performance and Efficiency
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       category: Performance and Efficiency
@@ -2934,13 +2934,13 @@ statuses:
       title: Set driver_package for Polars platform so version appears in CLI run announcement
       priority: Medium
       category: Core Functionality
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
@@ -3375,13 +3375,13 @@ statuses:
       title: ✅ Implement Standalone Export Command
       priority: Medium
       category: User Experience and CLI Enhancement
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       category: Pre-Release High Priority Tasks (COMPLETED)
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       category: Pre-Release High Priority Tasks (COMPLETED)

@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:49:24.301349'
+generated_at: '2026-04-16T03:43:23.802845'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -2312,13 +2312,13 @@ categories:
   Performance and Efficiency:
     count: 9
     items:
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       status: Completed
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       priority: Medium
       status: Completed
@@ -2863,13 +2863,13 @@ categories:
       title: DuckDB TPC-DS and TPC-H Example Updates for Enhanced Tuning ✅ COMPLETED
       priority: Medium
       status: Completed
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Completed
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       priority: Medium
       status: Completed
@@ -2916,13 +2916,13 @@ categories:
       title: ✅ Harmonize CLI Parameters with unified_runner (Eliminate Brittle test_type Logic)
       priority: High
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       priority: Medium
       status: Completed
@@ -3443,7 +3443,7 @@ categories:
       file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
       title: Accessibility hardening and snapshot test coverage for matrix leaderboard
       priority: Medium
-      status: In Progress
+      status: Completed
     - id: pyspark-sql-tests
       file: DONE/dataframe-expansion/planning/pyspark-sql-tests.yaml
       title: Add comprehensive tests for PySpark SQL adapter

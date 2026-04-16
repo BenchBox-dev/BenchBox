@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:49:24.301554'
+generated_at: '2026-04-16T03:43:23.803319'
 total_items: 715
 priorities:
   Critical:
@@ -2091,7 +2091,7 @@ priorities:
       file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
       title: Accessibility hardening and snapshot test coverage for matrix leaderboard
       category: Testing and Quality Assurance
-      status: In Progress
+      status: Completed
     - id: interactive-wizard-capture-plans
       file: DONE/ux-improvements/planning/interactive-wizard-capture-plans.yaml
       title: Add --capture-plans option to interactive wizard
@@ -2397,13 +2397,13 @@ priorities:
       title: Compressed Data Generation Gaps (all benchmarks) ✅
       category: Data Quality and Compatibility Issues
       status: Completed
-    - id: compressed-data-generation-completed
-      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
+    - id: compressed-data-generation-completed-2
+      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Completed
-    - id: compressed-data-generation-completed-2
-      file: DONE/unknown/planning/compressed-data-generation-completed-2.yaml
+    - id: compressed-data-generation-completed
+      file: DONE/unknown/planning/compressed-data-generation-completed.yaml
       title: Compressed Data Generation ✅ COMPLETED
       category: Performance and Efficiency
       status: Completed
@@ -3130,13 +3130,13 @@ priorities:
       title: Set driver_package for Polars platform so version appears in CLI run announcement
       category: Core Functionality
       status: Completed
-    - id: simple-cloud-storage-path-support-completed
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
+    - id: simple-cloud-storage-path-support-completed-2
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       category: Platform Support and Deployment
       status: Completed
-    - id: simple-cloud-storage-path-support-completed-2
-      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed-2.yaml
+    - id: simple-cloud-storage-path-support-completed
+      file: DONE/unknown/planning/simple-cloud-storage-path-support-completed.yaml
       title: Simple Cloud Storage Path Support ✅ COMPLETED
       category: Platform Support and Deployment
       status: Completed
@@ -3355,13 +3355,13 @@ priorities:
       title: ✅ Implement Standalone Export Command
       category: User Experience and CLI Enhancement
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
+    - id: implement-or-remove-incomplete-cli-commands-2
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       category: Pre-Release High Priority Tasks (COMPLETED)
       status: Completed
-    - id: implement-or-remove-incomplete-cli-commands-2
-      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands-2.yaml
+    - id: implement-or-remove-incomplete-cli-commands
+      file: DONE/unknown/planning/implement-or-remove-incomplete-cli-commands.yaml
       title: ✅ Implement or Remove Incomplete CLI Commands
       category: Pre-Release High Priority Tasks (COMPLETED)
       status: Completed
