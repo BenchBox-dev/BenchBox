@@ -215,7 +215,7 @@ work:
   summary: "Migrate timescaledb.py: rename import psycopg2/sql → psycopg/sql. The psql alias and all sql.SQL/Identifier/Literal
     call sites are API-identical — zero logic changes."
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Import block (lines 37-42):
       Before:
