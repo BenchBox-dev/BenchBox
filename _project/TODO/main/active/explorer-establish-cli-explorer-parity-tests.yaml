@@ -2,7 +2,7 @@ id: explorer-establish-cli-explorer-parity-tests
 title: "Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)"
 worktree: main
 priority: Critical
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
