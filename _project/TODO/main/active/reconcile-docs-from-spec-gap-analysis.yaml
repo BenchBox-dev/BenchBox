@@ -170,7 +170,7 @@ work:
 
 - id: w7
   summary: "Fix tpc-di.md: reconcile query catalog naming and add FinWire format documentation"
-  status: pending
+  status: done
   notes: |
     RESEARCH GATE (run before editing):
       # Get definitive query list and naming from code
