@@ -156,7 +156,7 @@ work:
   summary: "Migrate postgresql.py: rename imports, rewrite copy_expert() → cursor.copy() with 64KB streaming, update version
     key and guard checks."
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Change 1 — Import block (lines 46-49): drop psycopg2.extras (vestigial per w1), rename:
       try:
