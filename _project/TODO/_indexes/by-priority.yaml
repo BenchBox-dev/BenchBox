@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:49:22.461291'
+generated_at: '2026-04-15T20:50:44.519566'
 total_items: 36
 priorities:
   Critical:
@@ -18,7 +18,7 @@ priorities:
     count: 6
     items:
     - id: explorer-emit-comparison-artifact-from-pipeline
-      file: TODO/main/planning/explorer-emit-comparison-artifact-from-pipeline.yaml
+      file: TODO/main/active/explorer-emit-comparison-artifact-from-pipeline.yaml
       title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
       category: Core Functionality
       status: Not Started

@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:49:22.461276'
+generated_at: '2026-04-15T20:50:44.519545'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -89,7 +89,7 @@ categories:
       priority: Medium
       status: Not Started
     - id: explorer-emit-comparison-artifact-from-pipeline
-      file: TODO/main/planning/explorer-emit-comparison-artifact-from-pipeline.yaml
+      file: TODO/main/active/explorer-emit-comparison-artifact-from-pipeline.yaml
       title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
       priority: High
       status: Not Started

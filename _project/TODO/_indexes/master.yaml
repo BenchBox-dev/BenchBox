@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:49:22.461241'
+generated_at: '2026-04-15T20:50:44.519500'
 total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -39,7 +39,7 @@ items:
   needs:
   - implement-pr-based-result-submission-workflow
 - id: explorer-emit-comparison-artifact-from-pipeline
-  file: TODO/main/planning/explorer-emit-comparison-artifact-from-pipeline.yaml
+  file: TODO/main/active/explorer-emit-comparison-artifact-from-pipeline.yaml
   title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
   worktree: main
   category: Core Functionality
