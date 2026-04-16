@@ -80,7 +80,6 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
     "psutil": {"psutil"},
     "pydantic": {"pydantic"},
     "packaging": {"packaging"},
-    "jsonschema": {"jsonschema"},
     "numpy": {"numpy"},
     "zstandard": {"zstandard"},
     "sqlglot": {"sqlglot"},
