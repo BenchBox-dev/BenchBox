@@ -102,7 +102,7 @@ work:
   summary: "Update pyproject.toml: replace psycopg2-binary>=2.9.0 with psycopg[binary]>=3.1 at all 4 declaration sites (lines
     112, 170, 171, 464). Run uv lock."
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Lines to change in pyproject.toml:
       112: "psycopg2-binary>=2.9.0"  →  "psycopg[binary]>=3.1"  (extras:all)
