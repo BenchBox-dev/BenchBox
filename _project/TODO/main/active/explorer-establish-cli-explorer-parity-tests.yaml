@@ -41,7 +41,7 @@ description: |
 work:
   - id: w1
     summary: "Audit and extract pure computation functions out of every explorer chart component into testable helpers in `results-explorer/src/lib/chartMath.ts`"
-    status: pending
+    status: done
     notes: |
       Move the math out of the SVG components into pure functions:
         - `colorForCell`, `lightnessForCell` (already pure, re-export from QueryHeatmap)
@@ -57,7 +57,7 @@ work:
   - id: w2
     summary: "Build Python fixture generator at `tests/parity/generate_visualization_fixtures.py` that emits JSON fixtures per chart computation"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Pytest-runnable script (or a regular pytest test using
       `--generate-fixtures` flag) that produces files at
