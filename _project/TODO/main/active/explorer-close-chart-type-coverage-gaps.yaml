@@ -2,7 +2,7 @@ id: explorer-close-chart-type-coverage-gaps
 title: "Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Core Functionality
 
 description: |
