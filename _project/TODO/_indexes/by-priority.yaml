@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:06:50.256940'
-total_items: 42
+generated_at: '2026-04-15T20:09:40.501493'
+total_items: 41
 priorities:
   Critical:
     count: 3
@@ -154,7 +154,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 13
+    count: 12
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -185,11 +185,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: move-jsonschema-out-of-core-runtime-deps
-      file: TODO/main/planning/move-jsonschema-out-of-core-runtime-deps.yaml
-      title: Move jsonschema out of core deps (used only by _project/ tooling)
-      category: Code Quality and Technical Debt
       status: Not Started
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml

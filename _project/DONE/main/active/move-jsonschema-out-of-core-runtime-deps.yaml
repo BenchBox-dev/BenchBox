@@ -2,7 +2,8 @@ id: move-jsonschema-out-of-core-runtime-deps
 title: "Move jsonschema out of core deps (used only by _project/ tooling)"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-04-15"
 category: Code Quality and Technical Debt
 description: |
   `jsonschema>=4.25.1` is declared on line 42 of `pyproject.toml` as a CORE
@@ -26,22 +27,22 @@ description: |
 work:
   - id: w1
     summary: "Confirm zero shipped-wheel imports of jsonschema: `grep -rn 'jsonschema' benchbox tests scripts docs`. Document any unexpected hits."
-    status: pending
+    status: done
 
   - id: w2
     summary: "Move `jsonschema>=4.25.1` from `[project] dependencies` to `[dependency-groups] dev` in pyproject.toml. Refresh uv.lock with `uv lock`."
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Run TODO validation tooling to confirm dev install still has jsonschema: `uv run --project ~/.claude/tools/todo todo-cli check-graph`."
     needs: [w2]
-    status: pending
+    status: done
 
   - id: w4
     summary: "Run fast suite to confirm no shipped-wheel regressions."
     needs: [w2]
-    status: pending
+    status: done
 
 deferred:
   - summary: "Extract _project/scripts/ to its own pyproject.toml"

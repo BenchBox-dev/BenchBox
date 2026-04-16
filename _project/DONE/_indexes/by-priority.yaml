@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:06:51.933637'
-total_items: 707
+generated_at: '2026-04-15T20:09:42.279768'
+total_items: 708
 priorities:
   Critical:
     count: 40
@@ -3421,7 +3421,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 27
+    count: 28
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3523,6 +3523,11 @@ priorities:
       title: Fix TPC-DS Optional Dependency Example Test
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
       status: Identified
+    - id: move-jsonschema-out-of-core-runtime-deps
+      file: DONE/main/active/move-jsonschema-out-of-core-runtime-deps.yaml
+      title: Move jsonschema out of core deps (used only by _project/ tooling)
+      category: Code Quality and Technical Debt
+      status: Completed
     - id: phase-9-advanced-features
       file: DONE/query-plan-remediation/phase-9-advanced-features.yaml
       title: 'Query Plan Remediation - Phase 9: Advanced Features'

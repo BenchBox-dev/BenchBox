@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:06:50.256953'
-total_items: 42
+generated_at: '2026-04-15T20:09:40.501505'
+total_items: 41
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Critical
       category: Testing and Quality Assurance
   Not Started:
-    count: 33
+    count: 32
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -107,11 +107,6 @@ statuses:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       priority: High
       category: Platform Expansion
-    - id: move-jsonschema-out-of-core-runtime-deps
-      file: TODO/main/planning/move-jsonschema-out-of-core-runtime-deps.yaml
-      title: Move jsonschema out of core deps (used only by _project/ tooling)
-      priority: Low
-      category: Code Quality and Technical Debt
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:06:50.256877'
-total_items: 42
+generated_at: '2026-04-15T20:09:40.501423'
+total_items: 41
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -34,7 +34,7 @@ items:
   - contract-tests
   estimated_effort: Medium (2-3 days)
   work_total: 5
-  work_done: 0
+  work_done: 1
   work_ready: 1
   deferred_count: 2
 - id: verify-ci-validation-workflow-end-to-end
@@ -296,23 +296,6 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
-- id: move-jsonschema-out-of-core-runtime-deps
-  file: TODO/main/planning/move-jsonschema-out-of-core-runtime-deps.yaml
-  title: Move jsonschema out of core deps (used only by _project/ tooling)
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Low
-  status: Not Started
-  tags:
-  - maintenance
-  - supply-chain
-  - deps
-  - audit-followup
-  estimated_effort: Small (< 1 hour)
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  deferred_count: 1
 - id: review-dependency-upper-bounds-quarterly
   file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
   title: Quarterly review of dependency upper bounds

@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:06:51.933814'
-total_items: 707
+generated_at: '2026-04-15T20:09:42.281191'
+total_items: 708
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 656
+    count: 657
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2249,6 +2249,11 @@ statuses:
       title: Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement
       priority: Medium
       category: Core Functionality
+    - id: move-jsonschema-out-of-core-runtime-deps
+      file: DONE/main/active/move-jsonschema-out-of-core-runtime-deps.yaml
+      title: Move jsonschema out of core deps (used only by _project/ tooling)
+      priority: Low
+      category: Code Quality and Technical Debt
     - id: move-remaining-platform-drivers-to-optional-extras
       file: DONE/main/active/move-remaining-platform-drivers-to-optional-extras.yaml
       title: Move polars, clickhouse-connect, and psycopg2-binary out of core dependencies into optional extras

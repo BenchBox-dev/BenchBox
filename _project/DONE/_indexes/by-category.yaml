@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:06:51.933441'
+generated_at: '2026-04-15T20:09:42.278445'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 57
+    count: 58
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -472,6 +472,11 @@ categories:
       file: DONE/main/active/timing-runtime-wide-monotonic-migration.yaml
       title: Migrate runtime elapsed and timeout timing to centralized monotonic clock
       priority: Medium-High
+      status: Completed
+    - id: move-jsonschema-out-of-core-runtime-deps
+      file: DONE/main/active/move-jsonschema-out-of-core-runtime-deps.yaml
+      title: Move jsonschema out of core deps (used only by _project/ tooling)
+      priority: Low
       status: Completed
     - id: notimplementederror-completions-completed
       file: DONE/unknown/planning/notimplementederror-completions-completed.yaml

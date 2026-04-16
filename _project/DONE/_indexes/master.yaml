@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:06:51.933051'
-total_items: 707
+generated_at: '2026-04-15T20:09:42.278049'
+total_items: 708
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4456,6 +4456,24 @@ items:
   - dependencies
   owners:
   - '"@benchbox-maintainers"'
+- id: move-jsonschema-out-of-core-runtime-deps
+  file: DONE/main/active/move-jsonschema-out-of-core-runtime-deps.yaml
+  title: Move jsonschema out of core deps (used only by _project/ tooling)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Completed
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - audit-followup
+  estimated_effort: Small (< 1 hour)
+  completed_date: '2026-04-15'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  deferred_count: 1
 - id: phase-9-advanced-features
   file: DONE/query-plan-remediation/phase-9-advanced-features.yaml
   title: 'Query Plan Remediation - Phase 9: Advanced Features'
