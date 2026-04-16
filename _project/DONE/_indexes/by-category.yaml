@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:09:42.278445'
+generated_at: '2026-04-15T20:12:14.782191'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 58
+    count: 59
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -421,6 +421,11 @@ categories:
     - id: quality-define-dataframe-protocol-and-remove-any
       file: DONE/main/quality/quality-define-dataframe-protocol-and-remove-any.yaml
       title: Define DataFrameProtocol and remove Any annotations from unified frame layer
+      priority: Medium
+      status: Completed
+    - id: drop-chdb-core-from-core-dependencies
+      file: DONE/main/active/drop-chdb-core-from-core-dependencies.yaml
+      title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
       priority: Medium
       status: Completed
     - id: drop-lxml-dev-dep-or-port-test-to-stdlib

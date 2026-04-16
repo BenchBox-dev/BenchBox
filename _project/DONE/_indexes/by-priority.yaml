@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:09:42.279768'
-total_items: 708
+generated_at: '2026-04-15T20:12:14.782357'
+total_items: 709
 priorities:
   Critical:
     count: 40
@@ -1980,7 +1980,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 287
+    count: 288
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2558,6 +2558,11 @@ priorities:
       file: DONE/main/active/document-driver-version-selection-behavior.yaml
       title: Document how BenchBox selects driver versions and how to reliably use a specific version
       category: Documentation
+      status: Completed
+    - id: drop-chdb-core-from-core-dependencies
+      file: DONE/main/active/drop-chdb-core-from-core-dependencies.yaml
+      title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
+      category: Code Quality and Technical Debt
       status: Completed
     - id: dry-run-feature-completed
       file: DONE/unknown/planning/dry-run-feature-completed.yaml

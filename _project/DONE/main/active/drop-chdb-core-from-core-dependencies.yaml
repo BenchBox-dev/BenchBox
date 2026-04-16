@@ -2,7 +2,8 @@ id: drop-chdb-core-from-core-dependencies
 title: "Drop chdb-core from [project] dependencies (transitive of optional chdb)"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-15"
 category: Code Quality and Technical Debt
 description: |
   `chdb-core>=26.1.0` is declared on line 49 of `pyproject.toml` as a CORE
@@ -23,17 +24,17 @@ description: |
 work:
   - id: w1
     summary: "Confirm zero direct `chdb_core` imports in shipped source: `grep -rn 'chdb_core' benchbox tests scripts docs`. Document the result in the commit message."
-    status: pending
+    status: done
 
   - id: w2
     summary: "Edit pyproject.toml: remove `chdb-core>=26.1.0` from `[project] dependencies`. Refresh uv.lock with `uv lock`."
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Run fast suite to confirm no regressions. Verify chdb-using extras still pull chdb-core transitively: `uv tree --depth 2 | grep -B1 chdb-core`."
     needs: [w2]
-    status: pending
+    status: done
 
 deferred:
   - summary: "Audit other transitive-only deps that may also be in core"

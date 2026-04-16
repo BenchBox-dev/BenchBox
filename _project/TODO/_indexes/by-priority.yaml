@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:09:40.501493'
+generated_at: '2026-04-15T20:12:12.944590'
 total_items: 41
 priorities:
   Critical:
@@ -118,11 +118,6 @@ priorities:
       title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Not Started
-    - id: drop-chdb-core-from-core-dependencies
-      file: TODO/main/planning/drop-chdb-core-from-core-dependencies.yaml
-      title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
-      category: Code Quality and Technical Debt
-      status: Not Started
     - id: extract-project-scripts-to-isolated-env
       file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
       title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
@@ -133,6 +128,11 @@ priorities:
       title: Implement PR-based community result submission workflow
       category: Core Functionality
       status: Completed
+    - id: migrate-psycopg2-to-psycopg3
+      file: TODO/main/planning/migrate-psycopg2-to-psycopg3.yaml
+      title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
+      category: Code Quality and Technical Debt
+      status: Not Started
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

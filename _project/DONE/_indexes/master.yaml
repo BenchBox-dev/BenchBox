@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:09:42.278049'
-total_items: 708
+generated_at: '2026-04-15T20:12:14.781876'
+total_items: 709
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6072,6 +6072,24 @@ items:
   work_total: 3
   work_done: 3
   work_ready: 0
+- id: drop-chdb-core-from-core-dependencies
+  file: DONE/main/active/drop-chdb-core-from-core-dependencies.yaml
+  title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - audit-followup
+  estimated_effort: Small (< 1 hour)
+  completed_date: '2026-04-15'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+  deferred_count: 1
 - id: dry-run-feature-completed
   file: DONE/unknown/planning/dry-run-feature-completed.yaml
   title: Dry Run Feature ✅ COMPLETED

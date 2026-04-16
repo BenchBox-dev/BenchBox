@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:09:40.501423'
+generated_at: '2026-04-15T20:12:12.944499'
 total_items: 41
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -34,7 +34,7 @@ items:
   - contract-tests
   estimated_effort: Medium (2-3 days)
   work_total: 5
-  work_done: 1
+  work_done: 2
   work_ready: 1
   deferred_count: 2
 - id: verify-ci-validation-workflow-end-to-end
@@ -475,23 +475,6 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
-- id: drop-chdb-core-from-core-dependencies
-  file: TODO/main/planning/drop-chdb-core-from-core-dependencies.yaml
-  title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: Not Started
-  tags:
-  - maintenance
-  - supply-chain
-  - deps
-  - audit-followup
-  estimated_effort: Small (< 1 hour)
-  work_total: 3
-  work_done: 0
-  work_ready: 1
-  deferred_count: 1
 - id: extract-project-scripts-to-isolated-env
   file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
   title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
@@ -532,6 +515,24 @@ items:
   work_ready: 0
   needs:
   - launch-results-explorer-acceptance-and-seed
+- id: migrate-psycopg2-to-psycopg3
+  file: TODO/main/planning/migrate-psycopg2-to-psycopg3.yaml
+  title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Not Started
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - driver-modernization
+  - postgresql
+  estimated_effort: Medium (7-10 hours across 10 work units)
+  work_total: 10
+  work_done: 0
+  work_ready: 1
+  deferred_count: 4
 - id: operate-results-platform-security-observability-and-abuse-controls
   file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
   title: Operate results platform security, observability, and abuse controls

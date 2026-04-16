@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:09:40.501505'
+generated_at: '2026-04-15T20:12:12.944603'
 total_items: 41
 statuses:
   In Progress:
@@ -62,11 +62,6 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
-    - id: drop-chdb-core-from-core-dependencies
-      file: TODO/main/planning/drop-chdb-core-from-core-dependencies.yaml
-      title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: explorer-emit-comparison-artifact-from-pipeline
       file: TODO/main/planning/explorer-emit-comparison-artifact-from-pipeline.yaml
       title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
@@ -102,6 +97,11 @@ statuses:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: High
       category: Core Functionality
+    - id: migrate-psycopg2-to-psycopg3
+      file: TODO/main/planning/migrate-psycopg2-to-psycopg3.yaml
+      title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
