@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T01:15:58.469322'
-total_items: 716
+generated_at: '2026-04-16T08:04:19.805923'
+total_items: 717
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1491,6 +1491,28 @@ items:
   work_ready: 0
   needs:
   - explorer-fix-read-model-contract
+- id: explorer-emit-comparison-artifact-from-pipeline
+  file: DONE/main/active/explorer-emit-comparison-artifact-from-pipeline.yaml
+  title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - visualization
+  - pipeline
+  - architecture
+  - single-source-of-truth
+  estimated_effort: Large (4-6 days)
+  completed_date: '2026-04-16'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  deferred_count: 2
+  needs:
+  - explorer-establish-cli-explorer-parity-tests
+  - explorer-unify-visualization-foundations
 - id: table-format-integration-ci-coverage
   file: DONE/ci-infrastructure/active/table-format-integration-ci-coverage.yaml
   title: Enforce Delta/Iceberg table-format integration coverage in CI

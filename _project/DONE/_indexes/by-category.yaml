@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T01:15:58.469589'
+generated_at: '2026-04-16T08:04:19.806203'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -652,7 +652,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 237
+    count: 238
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1022,6 +1022,11 @@ categories:
     - id: explorer-emit-benchmark-summary-artifact
       file: DONE/main/planning/explorer-emit-benchmark-summary-artifact.yaml
       title: Emit per-benchmark summary artifact for matrix leaderboard view
+      priority: High
+      status: Completed
+    - id: explorer-emit-comparison-artifact-from-pipeline
+      file: DONE/main/active/explorer-emit-comparison-artifact-from-pipeline.yaml
+      title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
       priority: High
       status: Completed
     - id: enforce-explicit-query-run-type-across-executions

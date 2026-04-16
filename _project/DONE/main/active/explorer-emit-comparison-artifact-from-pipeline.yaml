@@ -2,7 +2,8 @@ id: explorer-emit-comparison-artifact-from-pipeline
 title: "Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-16"
 category: Core Functionality
 
 description: |
@@ -141,7 +142,7 @@ work:
 - id: w8
   summary: "Wire pipeline to optionally pre-emit comparison artifacts for top-N popular combinations per benchmark"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Pipeline-level pre-emission for the static site:
       - Config flag in `pipeline.py` (default 0 = off) for the
@@ -155,7 +156,7 @@ work:
 - id: w5
   summary: "Refactor `Compare.tsx` to fetch `ComparisonArtifact` instead of N `DetailResult` files"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     New explorer flow:
       1. Resolve short IDs to full IDs (existing).
@@ -193,7 +194,7 @@ work:
 - id: w7
   summary: "Add a parity fixture pair so the explorer's renderer assertions cover the artifact contract"
   needs: [w5, w6]
-  status: pending
+  status: done
   notes: |
     Requires the parity infrastructure to exist — declared as a hard
     cross-item dep on `explorer-establish-cli-explorer-parity-tests`

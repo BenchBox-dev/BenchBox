@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T01:15:58.469752'
-total_items: 716
+generated_at: '2026-04-16T08:04:19.806378'
+total_items: 717
 priorities:
   Critical:
     count: 41
@@ -210,7 +210,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 247
+    count: 248
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -496,6 +496,11 @@ priorities:
     - id: explorer-emit-benchmark-summary-artifact
       file: DONE/main/planning/explorer-emit-benchmark-summary-artifact.yaml
       title: Emit per-benchmark summary artifact for matrix leaderboard view
+      category: Core Functionality
+      status: Completed
+    - id: explorer-emit-comparison-artifact-from-pipeline
+      file: DONE/main/active/explorer-emit-comparison-artifact-from-pipeline.yaml
+      title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
       category: Core Functionality
       status: Completed
     - id: table-format-integration-ci-coverage

@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T01:15:58.469923'
-total_items: 716
+generated_at: '2026-04-16T08:04:19.806543'
+total_items: 717
 statuses:
   In Progress:
     count: 2
@@ -271,7 +271,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 664
+    count: 665
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1430,6 +1430,11 @@ statuses:
     - id: explorer-emit-benchmark-summary-artifact
       file: DONE/main/planning/explorer-emit-benchmark-summary-artifact.yaml
       title: Emit per-benchmark summary artifact for matrix leaderboard view
+      priority: High
+      category: Core Functionality
+    - id: explorer-emit-comparison-artifact-from-pipeline
+      file: DONE/main/active/explorer-emit-comparison-artifact-from-pipeline.yaml
+      title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
       priority: High
       category: Core Functionality
     - id: enable-fractional-scale-factor-support

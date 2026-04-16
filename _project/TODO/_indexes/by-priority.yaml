@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T01:15:56.868404'
-total_items: 35
+generated_at: '2026-04-16T08:04:18.138436'
+total_items: 34
 priorities:
   Critical:
     count: 2
@@ -15,13 +15,8 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 6
+    count: 5
     items:
-    - id: explorer-emit-comparison-artifact-from-pipeline
-      file: TODO/main/active/explorer-emit-comparison-artifact-from-pipeline.yaml
-      title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
-      category: Core Functionality
-      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
