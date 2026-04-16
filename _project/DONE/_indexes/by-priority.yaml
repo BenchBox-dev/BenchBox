@@ -1,8 +1,8 @@
-generated_at: '2026-04-15T20:17:52.414066'
-total_items: 710
+generated_at: '2026-04-15T20:22:10.688648'
+total_items: 711
 priorities:
   Critical:
-    count: 40
+    count: 41
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -68,6 +68,11 @@ priorities:
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
       title: Design and Implement Core DataFrame Abstractions
       category: Core Functionality
+      status: Completed
+    - id: explorer-establish-cli-explorer-parity-tests
+      file: DONE/main/active/explorer-establish-cli-explorer-parity-tests.yaml
+      title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
+      category: Testing and Quality Assurance
       status: Completed
     - id: fix-dataframe-parameter-parity-follow-up-findings
       file: DONE/core-functionality/active/fix-dataframe-parameter-parity-follow-up-findings.yaml

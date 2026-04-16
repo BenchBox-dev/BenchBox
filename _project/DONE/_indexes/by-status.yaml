@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:17:52.414250'
-total_items: 710
+generated_at: '2026-04-15T20:22:10.688814'
+total_items: 711
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 659
+    count: 660
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1498,6 +1498,11 @@ statuses:
       title: Error Message Polish
       priority: High
       category: User Experience
+    - id: explorer-establish-cli-explorer-parity-tests
+      file: DONE/main/active/explorer-establish-cli-explorer-parity-tests.yaml
+      title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
+      priority: Critical
+      category: Testing and Quality Assurance
     - id: timing-clock-foundation-and-correctness
       file: DONE/main/active/timing-clock-foundation-and-correctness.yaml
       title: Establish centralized clock module and fix timing correctness bugs

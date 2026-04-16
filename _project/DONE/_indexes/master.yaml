@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:17:52.413469'
-total_items: 710
+generated_at: '2026-04-15T20:22:10.688197'
+total_items: 711
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -189,6 +189,25 @@ items:
   - '@benchbox-maintainers'
   estimated_effort: 1 week
   completed_date: '2025-12-02'
+- id: explorer-establish-cli-explorer-parity-tests
+  file: DONE/main/active/explorer-establish-cli-explorer-parity-tests.yaml
+  title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Critical
+  status: Completed
+  tags:
+  - explorer
+  - visualization
+  - testing
+  - parity
+  - contract-tests
+  estimated_effort: Medium (2-3 days)
+  completed_date: '2026-04-15'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  deferred_count: 2
 - id: fix-dataframe-parameter-parity-follow-up-findings
   file: DONE/core-functionality/active/fix-dataframe-parameter-parity-follow-up-findings.yaml
   title: Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)

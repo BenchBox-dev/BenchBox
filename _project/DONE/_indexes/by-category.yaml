@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:17:52.413865'
+generated_at: '2026-04-15T20:22:10.688478'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -3407,7 +3407,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 38
+    count: 39
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3489,6 +3489,11 @@ categories:
       file: DONE/ci-infrastructure/active/local-ci-equivalents.yaml
       title: Ensure local equivalents exist for all CI workflow steps
       priority: High
+      status: Completed
+    - id: explorer-establish-cli-explorer-parity-tests
+      file: DONE/main/active/explorer-establish-cli-explorer-parity-tests.yaml
+      title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
+      priority: Critical
       status: Completed
     - id: fix-ci-critical-issues
       file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml

@@ -1,19 +1,14 @@
-generated_at: '2026-04-15T20:17:50.675455'
-total_items: 40
+generated_at: '2026-04-15T20:22:08.993201'
+total_items: 39
 priorities:
   Critical:
-    count: 3
+    count: 2
     items:
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
       category: Core Functionality
       status: Completed
-    - id: explorer-establish-cli-explorer-parity-tests
-      file: TODO/main/active/explorer-establish-cli-explorer-parity-tests.yaml
-      title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
-      category: Testing and Quality Assurance
-      status: In Progress
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR
@@ -122,7 +117,7 @@ priorities:
       file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
       title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
       category: Code Quality and Technical Debt
-      status: Not Started
+      status: In Progress
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow

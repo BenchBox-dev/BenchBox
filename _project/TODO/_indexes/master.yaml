@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:17:50.675398'
-total_items: 40
+generated_at: '2026-04-15T20:22:08.993147'
+total_items: 39
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -19,24 +19,6 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
-- id: explorer-establish-cli-explorer-parity-tests
-  file: TODO/main/active/explorer-establish-cli-explorer-parity-tests.yaml
-  title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: Critical
-  status: In Progress
-  tags:
-  - explorer
-  - visualization
-  - testing
-  - parity
-  - contract-tests
-  estimated_effort: Medium (2-3 days)
-  work_total: 5
-  work_done: 4
-  work_ready: 1
-  deferred_count: 2
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
   title: Verify the validate-submission CI workflow end-to-end with a real PR
@@ -464,7 +446,7 @@ items:
   worktree: main
   category: Code Quality and Technical Debt
   priority: Medium
-  status: Not Started
+  status: In Progress
   tags:
   - maintenance
   - supply-chain

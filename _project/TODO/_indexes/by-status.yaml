@@ -1,16 +1,16 @@
-generated_at: '2026-04-15T20:17:50.675467'
-total_items: 40
+generated_at: '2026-04-15T20:22:08.993212'
+total_items: 39
 statuses:
   In Progress:
     count: 1
     items:
-    - id: explorer-establish-cli-explorer-parity-tests
-      file: TODO/main/active/explorer-establish-cli-explorer-parity-tests.yaml
-      title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
-      priority: Critical
-      category: Testing and Quality Assurance
+    - id: extract-project-scripts-to-isolated-env
+      file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
+      title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
+      priority: Medium
+      category: Code Quality and Technical Debt
   Not Started:
-    count: 31
+    count: 30
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -62,11 +62,6 @@ statuses:
       title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
       priority: High
       category: Core Functionality
-    - id: extract-project-scripts-to-isolated-env
-      file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
-      title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
