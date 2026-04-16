@@ -49,9 +49,6 @@ codespell:
 # Sphinx and documentation build plugins — activated via docs/conf.py
 # extensions list or as theme packages.
 # --------------------------------------------------------------------------
-sphinx:
-  reason: "Docs builder CLI/API; invoked via `make docs` / `sphinx-build`. Not imported in main source."
-
 furo:
   reason: "Sphinx HTML theme; activated via html_theme='furo' in docs/conf.py. Not imported."
 
@@ -69,9 +66,6 @@ sphinx-design:
 
 ablog:
   reason: "Sphinx blogging extension; activated in docs/conf.py extensions."
-
-pygments:
-  reason: "Syntax highlighter; loaded by Sphinx. Used in docs/_static/pygments_cobalt2.py — captured as first-party local script, not a direct import of the pygments package."
 
 roman-numerals:
   reason: "Sphinx dependency for roman numeral support; pulled in via sphinx>=9 requirement. Not directly imported."

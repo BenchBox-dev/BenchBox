@@ -19,19 +19,26 @@
 
 # --------------------------------------------------------------------------
 # NVIDIA RAPIDS / CUDA stack — optional GPU acceleration.
-# extras:cudf is currently a placeholder (empty group); these entries are
-# preemptive.  Once cudf/cupy are added to extras:cudf they will have guarded
-# import sites in benchbox/platforms/dataframe/cudf_df.py and may not need
-# this allowlist — but we keep the entries so the intent is documented.
+#
+# NOTE: cudf/cupy/cuml are currently NOT declared as packages in pyproject.toml;
+# extras:cudf = [] is an empty placeholder.  These entries are therefore never
+# consulted by the audit (only declared packages reach the allowlist check).
+# They are kept here as forward-declarations so that when extras:cudf is
+# populated, maintainers know these packages should be added to the allowlist
+# only if they somehow lack import sites at that point.
+#
+# As of this writing, cudf and cupy DO have guarded try/except import sites in
+# benchbox/platforms/dataframe/cudf_df.py, so the AST scanner would find them
+# even if they were declared — they would pass via import sites, not allowlist.
 # --------------------------------------------------------------------------
 cudf:
-  reason: "GPU DataFrame backend; guarded import in cudf_df.py. extras:cudf currently empty placeholder."
+  reason: "GPU DataFrame backend; guarded import in cudf_df.py. extras:cudf is currently an empty placeholder — not yet a declared package."
   extras_group: "extras:cudf"
 
 cupy:
-  reason: "CUDA array library; guarded import in cudf_df.py. Pulled via cudf."
+  reason: "CUDA array library; guarded import in cudf_df.py. Not declared in pyproject.toml; pulled transitively via cudf."
   extras_group: "extras:cudf"
 
 cuml:
-  reason: "CUDA ML library; guarded import in RAPIDS paths. Pulled via cudf."
+  reason: "CUDA ML library; used in RAPIDS paths. Not declared in pyproject.toml; pulled transitively via cudf."
   extras_group: "extras:cudf"
