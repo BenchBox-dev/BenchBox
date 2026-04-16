@@ -117,7 +117,7 @@ work:
   - id: w5
     summary: "Backfill parity for the existing `colorForCell` and `lightnessForCell` tests so they share the fixture suite"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       The current `QueryHeatmap.test.tsx` tests `colorForCell` against
       hardcoded TS expectations only. Replace those assertions with the
