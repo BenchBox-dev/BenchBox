@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T15:59:27.212180'
-total_items: 718
+generated_at: '2026-04-16T16:11:00.763364'
+total_items: 719
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -9700,6 +9700,17 @@ items:
   work_ready: 1
   needs:
   - productize-result-publishing-and-artifact-sharing
+- id: reconcile-docs-from-spec-gap-analysis
+  file: DONE/main/planning/reconcile-docs-from-spec-gap-analysis.yaml
+  title: Reconcile documentation gaps found in archived spec review
+  worktree: main
+  category: Documentation
+  priority: Medium-High
+  status: Completed
+  completed_date: '2026-04-16'
+  work_total: 14
+  work_done: 14
+  work_ready: 0
 - id: quality-reduce-complexity-hotspots-to-mccabe-20
   file: DONE/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
   title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently

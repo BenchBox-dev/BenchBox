@@ -1,19 +1,14 @@
-generated_at: '2026-04-16T15:59:24.721184'
-total_items: 35
+generated_at: '2026-04-16T16:10:58.938690'
+total_items: 34
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
     - id: migrate-psycopg2-to-psycopg3
       file: TODO/main/active/migrate-psycopg2-to-psycopg3.yaml
       title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
       priority: Medium
       category: Code Quality and Technical Debt
-    - id: reconcile-docs-from-spec-gap-analysis
-      file: TODO/main/active/reconcile-docs-from-spec-gap-analysis.yaml
-      title: Reconcile documentation gaps found in archived spec review
-      priority: Medium-High
-      category: Documentation
   Not Started:
     count: 25
     items:

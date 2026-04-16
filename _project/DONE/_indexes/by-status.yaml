@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T15:59:27.215618'
-total_items: 718
+generated_at: '2026-04-16T16:11:00.764035'
+total_items: 719
 statuses:
   In Progress:
     count: 2
@@ -271,7 +271,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 666
+    count: 667
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2699,6 +2699,11 @@ statuses:
       title: Rebuild TPC-H binaries with stdout fix for all platforms
       priority: High
       category: Core Functionality
+    - id: reconcile-docs-from-spec-gap-analysis
+      file: DONE/main/planning/reconcile-docs-from-spec-gap-analysis.yaml
+      title: Reconcile documentation gaps found in archived spec review
+      priority: Medium-High
+      category: Documentation
     - id: reduce-cc14-complexity-cluster
       file: DONE/main/active/reduce-cc14-complexity-cluster.yaml
       title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10

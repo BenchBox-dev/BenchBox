@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T15:59:24.721153'
+generated_at: '2026-04-16T16:10:58.938661'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -104,13 +104,8 @@ categories:
       priority: Low
       status: Not Started
   Documentation:
-    count: 3
+    count: 2
     items:
-    - id: reconcile-docs-from-spec-gap-analysis
-      file: TODO/main/active/reconcile-docs-from-spec-gap-analysis.yaml
-      title: Reconcile documentation gaps found in archived spec review
-      priority: Medium-High
-      status: In Progress
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission

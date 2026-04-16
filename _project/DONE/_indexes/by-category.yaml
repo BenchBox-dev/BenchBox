@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T15:59:27.213785'
+generated_at: '2026-04-16T16:11:00.763683'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -1966,7 +1966,7 @@ categories:
       priority: Medium-High
       status: Completed
   Documentation:
-    count: 20
+    count: 21
     items:
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
@@ -2047,6 +2047,11 @@ categories:
       file: DONE/query-plan-remediation/phase-8-documentation-usability.yaml
       title: 'Query Plan Remediation - Phase 8: Documentation & Usability'
       priority: Medium
+      status: Completed
+    - id: reconcile-docs-from-spec-gap-analysis
+      file: DONE/main/planning/reconcile-docs-from-spec-gap-analysis.yaml
+      title: Reconcile documentation gaps found in archived spec review
+      priority: Medium-High
       status: Completed
     - id: comparison-matrix-restructure
       file: DONE/docs-experience/active/comparison-matrix-restructure.yaml

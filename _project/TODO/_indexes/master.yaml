@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T15:59:24.721119'
-total_items: 35
+generated_at: '2026-04-16T16:10:58.938626'
+total_items: 34
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -589,16 +589,6 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
-- id: reconcile-docs-from-spec-gap-analysis
-  file: TODO/main/active/reconcile-docs-from-spec-gap-analysis.yaml
-  title: Reconcile documentation gaps found in archived spec review
-  worktree: main
-  category: Documentation
-  priority: Medium-High
-  status: In Progress
-  work_total: 14
-  work_done: 5
-  work_ready: 7
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

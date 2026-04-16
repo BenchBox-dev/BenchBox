@@ -2,7 +2,8 @@ id: reconcile-docs-from-spec-gap-analysis
 title: "Reconcile documentation gaps found in archived spec review"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-04-16"
 category: Documentation
 description: |
   Commit 35212ca4e23ba11ee01dfcacbdc7deec383073c8 removed ~140 archived spec files
@@ -224,7 +225,7 @@ work:
 
 - id: w9
   summary: "Fix tpc-ds.md: add QphDS metric, throughput permutation modes, and maintenance ops"
-  status: pending
+  status: done
   notes: |
     RESEARCH GATE (run before editing):
       # Check QphDS implementation
@@ -252,7 +253,7 @@ work:
 
 - id: w10
   summary: "Fix datavault.md: add SHA1 hash algorithm and ValidationReport API object"
-  status: pending
+  status: done
   notes: |
     RESEARCH GATE (run before editing):
       # Verify hash algorithm list
@@ -279,7 +280,7 @@ work:
 
 - id: w11
   summary: "Fix tsbs-devops.md (P3): expand disk table schema and add counter semantics note"
-  status: pending
+  status: done
   needs: [w4]
   notes: |
     Depends on w4 research findings. After w4 verifies the disk schema from code,
@@ -293,7 +294,7 @@ work:
 
 - id: w12
   summary: "Fix tpc-di.md (P3): add SCD Type 2 validation methodology section"
-  status: pending
+  status: done
   needs: [w7]
   notes: |
     Depends on w7 research findings. If SCD Type 2 validation queries were confirmed to
@@ -306,7 +307,7 @@ work:
 
 - id: w13
   summary: "Fix P3 omissions from w8/w9 research: tpc-h thread safety and tpc-ds --allow-unofficial-scale"
-  status: pending
+  status: done
   needs: [w8, w9]
   notes: |
     Batch fix for P3 items whose research was already performed in w8 and w9.
@@ -319,7 +320,7 @@ work:
 
 - id: w14
   summary: "Fix P3 omissions: coffeeshop regional_weight, clickbench CSV semantics, metadata-primitives tier legend"
-  status: pending
+  status: done
   needs: [w5]
   notes: |
     Batch fix for remaining P3 items. Run research gate for each before editing.

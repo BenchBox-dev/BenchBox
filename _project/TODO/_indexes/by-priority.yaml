@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T15:59:24.721173'
-total_items: 35
+generated_at: '2026-04-16T16:10:58.938679'
+total_items: 34
 priorities:
   Critical:
     count: 2
@@ -48,7 +48,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 7
+    count: 6
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -75,11 +75,6 @@ priorities:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Completed
-    - id: reconcile-docs-from-spec-gap-analysis
-      file: TODO/main/active/reconcile-docs-from-spec-gap-analysis.yaml
-      title: Reconcile documentation gaps found in archived spec review
-      category: Documentation
-      status: In Progress
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
