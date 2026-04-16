@@ -161,7 +161,7 @@ work:
   - id: w5
     summary: "Execute research-gate decisions for specs, design docs, roadmaps, and handoffs"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Apply one of the classified actions per research gate outcome. The exact moves
       depend entirely on w1 findings — the options are specified here:
