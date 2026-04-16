@@ -41,95 +41,131 @@ description: |
   through the canonical chart_types.py registry first.
 
 work:
+  # Per-chart workflow (apply uniformly to w1..w10):
+  #   1. Read the CLI implementation (textcharts call site + reduction logic).
+  #   2. Add Python helper / extend transformer.py to emit derived data
+  #      via BenchmarkSummary or DetailResult.
+  #   3. Generate parity fixture.
+  #   4. Build SVG component using chartTheme.ts + useElementSize.
+  #   5. Wire into the appropriate page (Compare/ResultDetail/BenchmarkIndex/PlatformIndex).
+  #   6. Vitest unit + parity test.
+  #   7. Manual smoke at 3 viewport widths.
+  #
+  # Tiering encoded via `needs`: w1/w2 (tail-latency) ship first; tier-2
+  # depth (w3/w4) next; tier-3 specialized (w5/w6/w7) after; tier-4
+  # cross-cutting (w8/w9/w10) last; w11 closes with the registry.
+
   - id: w1
-    summary: "Tier-1 (tail-latency credibility): port `percentile_ladder` and `cdf_chart`"
+    summary: "Port `percentile_ladder`: emit p50/p90/p95/p99 arrays + ladder SVG component"
     needs: []
     status: pending
     notes: |
-      These two are the highest-impact missing charts because they
-      directly answer the most common credibility question for a
-      benchmark result: "what does the slow tail look like?"
+      Tier 1 — highest-impact missing chart for tail-latency credibility.
+      Placement: ResultDetail.tsx side panel + Compare.tsx tab alongside
+      Speedup/Diverging/Grouped.
 
-      For each:
-        1. Read the CLI implementation (textcharts package +
-           result_plotter renderer wiring) to understand inputs
-           and reduction logic.
-        2. Add corresponding Python helper (or extend transformer.py)
-           that emits per-query percentile arrays (`p50, p90, p95, p99`)
-           into the BenchmarkSummary or DetailResult artifact.
-        3. Add fixtures via the parity infrastructure.
-        4. Build the Preact component (SVG) consuming the artifact.
-        5. Wire into ResultDetail page (per-result percentiles) and
-           Compare page (cross-result percentile ladder).
-        6. Vitest tests + parity assertions.
-
-      Suggested placement:
-        - PercentileLadder: ResultDetail.tsx side panel + Compare.tsx
-          tab alongside Speedup/Diverging/Grouped
-        - CDFChart: Compare.tsx tab; per-result detail page
+      Percentile method MUST match the Python reference exactly
+      (numpy.percentile linear interpolation) — pre-compute in the
+      pipeline and ship in the artifact, do not recompute in TS.
 
   - id: w2
-    summary: "Tier-2 (compactness for large benchmarks): port `rank_table` and `distribution_box`"
+    summary: "Port `cdf_chart`: emit CDF samples + SVG component"
     needs: []
     status: pending
     notes: |
-      Rank table: per-query ranks (1..N) across platforms, optionally
-      with arrow indicators (↑↓) showing rank changes. Useful for
-      TPC-DS (99 queries) where the heatmap becomes unwieldy.
-
-      Distribution box: per-query box plot showing min/Q1/median/Q3/max
-      across all measurement runs (not just the median display value).
-      Reveals platforms with high variance even if median looks good.
-
-      Both consume data already in DetailResult.queries (raw per-sample
-      timings) — minimal pipeline changes needed; just add reduction
-      helpers to transformer.py and fixtures.
-
-      Add as alternate views in Compare.tsx and on a new page or section
-      "Per-query distribution" in ResultDetail.tsx.
+      Tier 1 — distribution-shape companion to percentile_ladder.
+      Placement: Compare.tsx tab + per-result detail page.
+      Same pre-compute discipline: CDF samples emitted by Python.
 
   - id: w3
-    summary: "Tier-3 (specialized): port `query_histogram`, `power_bar`, `stacked_phase`"
-    needs: [w1, w2]
+    summary: "Port `rank_table`: emit per-query rank matrix + table component"
+    needs: []
     status: pending
     notes: |
-      query_histogram: per-query timing histogram across all platforms
-        (the CLI auto-splits when query count > 33 — match that behavior).
+      Tier 2 — per-query ranks (1..N) across platforms with optional
+      ↑↓ rank-change arrows. Useful for TPC-DS (99 queries) where the
+      heatmap becomes unwieldy. Add as alternate view alongside the
+      heatmap; the heatmap stays the default.
 
-      power_bar: dedicated visualization for TPC Power@Size — bigger=better
-        (currently buried in Compare summary cards as a small dl row).
-        Make it a first-class chart on BenchmarkIndex when power_score
-        is the primary metric.
-
-      stacked_phase: phase breakdown (load/warmup/power/throughput) as
-        stacked bars per platform. Useful for TPC-H/TPC-DS where load
-        and throughput phases matter for comparison fairness.
-
-      All three are smaller individual ports — group them together.
+      Rank ties are a known divergence risk (Python and JS sort
+      algorithms differ silently) — fixture MUST cover ties.
 
   - id: w4
-    summary: "Tier-4 (cross-cutting analytics): port `time_series`, `cost_scatter`, `sparkline_table`"
-    needs: [w3]
+    summary: "Port `distribution_box`: emit min/Q1/median/Q3/max per query + box-plot component"
+    needs: []
     status: pending
     notes: |
-      time_series: trend chart of geomean_ms / power_score over run_date,
-        per platform. Surfaces regressions across releases. Lives on
-        PlatformIndex.tsx (per-platform history) and a new
-        BenchmarkIndex tab "Trends".
-
-      cost_scatter: cost_usd vs power_score (or geomean_ms) — central
-        for cloud DW comparisons (Snowflake/BigQuery/Athena/Databricks).
-        Lives on BenchmarkIndex when cost_usd is populated for >0 results.
-        Hide chart entirely when no cost data exists (don't render an
-        empty axis).
-
-      sparkline_table: compact metrics table with embedded micro-charts
-        (one mini per-query trend per row). Compact alternative to the
-        heatmap for the home page or platform overview.
+      Tier 2 — reveals platforms with high run-to-run variance even
+      when median looks good. Consumes raw per-sample timings already
+      in DetailResult.queries; reduction helper in transformer.py emits
+      the five-number summary.
+      Placement: alternate Compare view + ResultDetail
+      "Per-query distribution" section.
 
   - id: w5
-    summary: "Add an explorer chart-type registry mirroring `chart_types.py` and document the parity contract"
+    summary: "Port `query_histogram`: emit binned histogram + SVG component (auto-split when query_count > 33)"
     needs: [w1, w2, w3, w4]
+    status: pending
+    notes: |
+      Tier 3 — match the CLI auto-split behavior (when query count > 33
+      the CLI splits into multiple panels). Bin edges decided in Python
+      and shipped in the artifact so explorer cannot diverge.
+
+  - id: w6
+    summary: "Port `power_bar`: dedicated TPC Power@Size visualization (first-class on BenchmarkIndex)"
+    needs: [w1, w2, w3, w4]
+    status: pending
+    notes: |
+      Tier 3 — currently buried in Compare summary cards as a small dl
+      row. Promote to a first-class chart on BenchmarkIndex when
+      power_score is the primary metric for the benchmark family
+      (consult lib/ranking.ts from explorer-unify-visualization-foundations).
+
+  - id: w7
+    summary: "Port `stacked_phase`: phase breakdown (load/warmup/power/throughput) stacked bars"
+    needs: [w1, w2, w3, w4]
+    status: pending
+    notes: |
+      Tier 3 — useful for TPC-H/TPC-DS where load and throughput phases
+      matter for comparison fairness. Phase totals already in
+      BenchmarkSummary; new component renders them as stacked bars
+      per platform.
+
+  - id: w8
+    summary: "Port `time_series`: trend chart of geomean_ms / power_score over run_date, per platform"
+    needs: [w5, w6, w7]
+    status: pending
+    notes: |
+      Tier 4 — surfaces regressions across releases.
+      Placement: PlatformIndex.tsx (per-platform history) + new
+      BenchmarkIndex "Trends" tab.
+
+      4-color PALETTE may be insufficient for many overlapping lines —
+      extend chartTheme.ts with a dedicated TIME_SERIES_PALETTE if a
+      contrast check fails.
+
+  - id: w9
+    summary: "Port `cost_scatter`: cost_usd vs power_score (or geomean_ms) scatter"
+    needs: [w5, w6, w7]
+    status: pending
+    notes: |
+      Tier 4 — central for cloud DW comparisons
+      (Snowflake/BigQuery/Athena/Databricks).
+      Placement: BenchmarkIndex when cost_usd is populated for >0
+      results. Hide section entirely when no cost data exists
+      (an empty scatter looks broken).
+
+  - id: w10
+    summary: "Port `sparkline_table`: compact metrics table with embedded micro-charts"
+    needs: [w5, w6, w7]
+    status: pending
+    notes: |
+      Tier 4 — compact alternative to the heatmap for the home page or
+      platform overview. Each row carries a per-query trend mini-chart.
+
+  - id: w11
+    summary: "Add `chartRegistry.ts` mirroring chart_types.py + meta-test enforcing registry parity"
+    needs: [w8, w9, w10]
     status: pending
     notes: |
       Final integration step:
@@ -138,9 +174,8 @@ work:
           benchbox/core/visualization/chart_types.py.
         - Each registry entry: `{ id, title, description, requires:
           DataRequirements, component: ComponentRef, cli_equivalent: str }`.
-        - Add a meta-test that fails if the explorer registry diverges
-          from the CLI registry (e.g. a new chart type added on one
-          side without the other).
+        - Meta-test fails if the explorer registry diverges from the
+          CLI registry (new chart type added on one side without the other).
         - Update `docs/visualization-parity.md` (created by
           `explorer-establish-cli-explorer-parity-tests`) with the
           full chart-type matrix and the policy: "New chart types are

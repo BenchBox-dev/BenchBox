@@ -120,29 +120,37 @@ work:
       Pure function — no I/O. Caller writes the JSON.
 
   - id: w4
-    summary: "Wire pipeline to emit on-demand comparison artifacts via a new CLI subcommand `benchbox explorer build-comparison`"
+    summary: "Add `benchbox explorer build-comparison` CLI subcommand emitting one artifact per --ids set"
     needs: [w3]
     status: pending
     notes: |
-      Two emission strategies — pick (b) for v1 and document (a) as
-      future work in `deferred`:
+      Strategy decision: v1 emits on-demand. The alternative (pre-emit
+      every N-way combination) is documented in `deferred` as
+      combinatorially infeasible.
 
-        (a) Pre-emit one artifact per (sorted_result_ids hash) at pipeline
-            time. Pros: zero browser compute. Cons: combinatorial blowup
-            for arbitrary user-selected comparisons.
-
-        (b) On-demand: explorer hits an endpoint OR the artifact is
-            written by `benchbox explorer build-comparison
-            --ids id1,id2,id3 --out path/to/comparisons/<hash>.json`
-            with deterministic hashing of sorted result_ids. The static
-            site can pre-emit popular comparisons via the existing pipeline.
-
-      v1 = (b). Add the CLI subcommand. Wire pipeline to optionally
-      pre-emit comparisons for the top N most-recent result combinations
-      per benchmark (configurable, default 0 = off).
+      Subcommand contract:
+        benchbox explorer build-comparison \
+          --ids id1,id2,id3 \
+          --out data/compare/<hash>.json
 
       Output path: `data/compare/<sha256(sorted_result_ids)[:16]>.json`.
-      Schema validates against `ComparisonArtifact` Pydantic model.
+      Hash MUST be deterministic on sorted input ids (the explorer
+      computes the same hash to fetch). Schema validates against
+      `ComparisonArtifact` Pydantic model on emit.
+
+  - id: w8
+    summary: "Wire pipeline to optionally pre-emit comparison artifacts for top-N popular combinations per benchmark"
+    needs: [w4]
+    status: pending
+    notes: |
+      Pipeline-level pre-emission for the static site:
+        - Config flag in `pipeline.py` (default 0 = off) for the
+          number of pre-emitted comparisons per benchmark
+        - "Popular" defined for v1 as: the N most-recent result
+          combinations per benchmark from the manifest. Telemetry-driven
+          popularity is deferred.
+        - Wired so a single pipeline run produces the artifacts under
+          `data/compare/` alongside the manifest.
 
   - id: w5
     summary: "Refactor `Compare.tsx` to fetch `ComparisonArtifact` instead of N `DetailResult` files"
@@ -187,7 +195,11 @@ work:
     needs: [w5, w6]
     status: pending
     notes: |
-      Fixture flow (depends on the parity infrastructure being in place):
+      Requires the parity infrastructure to exist — declared as a hard
+      cross-item dep on `explorer-establish-cli-explorer-parity-tests`
+      at the item level.
+
+      Fixture flow:
         - Python emits `tests/parity/fixtures/comparison_artifact_*.json`
           covering at least: 2-result baseline, 3-result baseline,
           missing-query, all-failed-query, same-platform-different-version
@@ -235,7 +247,9 @@ approach: |
   explorer team can stub the consumer in parallel. Build the disambiguator
   (w2) before the artifact builder (w3) because the builder calls it.
   Wire the CLI subcommand (w4) before refactoring Compare (w5) so the
-  artifact actually exists to fetch.
+  artifact actually exists to fetch. Pipeline pre-emission for popular
+  combinations (w8) layers on top of the subcommand and is independent
+  of the explorer refactor.
 
   Speedup definition: use `slowest / this` per query (matches the current
   Compare.tsx breakdown table at line 392) for the `speedup_vs_slowest_per_row`
@@ -303,7 +317,9 @@ verification:
     expected_output: "all tests pass"
 
 deps:
-  needs: []
+  needs:
+    - explorer-establish-cli-explorer-parity-tests
+    - explorer-unify-visualization-foundations
 
 success_metrics:
   - "Compare.tsx contains zero arithmetic on `display_ms` values for the artifact path (only renders pre-computed numbers)"
