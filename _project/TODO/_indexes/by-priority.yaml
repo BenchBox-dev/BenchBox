@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T16:10:58.938679'
-total_items: 34
+generated_at: '2026-04-16T16:33:44.424304'
+total_items: 35
 priorities:
   Critical:
     count: 2
@@ -124,7 +124,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 11
+    count: 12
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -160,6 +160,11 @@ priorities:
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
+      status: Not Started
+    - id: reconcile-docs-review-code-followups
+      file: TODO/main/planning/reconcile-docs-review-code-followups.yaml
+      title: Reconcile three code-level inconsistencies surfaced by docs review
+      category: Architecture & Refactoring
       status: Not Started
     - id: evaluate-results-data-repo-extraction-checkpoint
       file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml

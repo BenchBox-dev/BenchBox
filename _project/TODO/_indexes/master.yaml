@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T16:10:58.938626'
-total_items: 34
+generated_at: '2026-04-16T16:33:44.424224'
+total_items: 35
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -264,6 +264,24 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
+- id: reconcile-docs-review-code-followups
+  file: TODO/main/planning/reconcile-docs-review-code-followups.yaml
+  title: Reconcile three code-level inconsistencies surfaced by docs review
+  worktree: main
+  category: Architecture & Refactoring
+  priority: Low
+  status: Not Started
+  tags:
+  - refactoring
+  - datavault
+  - metadata-primitives
+  - tpch
+  - tpcds
+  - consistency
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 3
 - id: evaluate-results-data-repo-extraction-checkpoint
   file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
   title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo

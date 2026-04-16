@@ -1,13 +1,18 @@
-generated_at: '2026-04-16T16:10:58.938661'
+generated_at: '2026-04-16T16:33:44.424288'
 total_categories: 11
 categories:
   Architecture & Refactoring:
-    count: 1
+    count: 2
     items:
     - id: generalize-database-table-reuse-detection
       file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
       title: Generalize benchmark table reuse detection for managed databases
       priority: Normal
+      status: Not Started
+    - id: reconcile-docs-review-code-followups
+      file: TODO/main/planning/reconcile-docs-review-code-followups.yaml
+      title: Reconcile three code-level inconsistencies surfaced by docs review
+      priority: Low
       status: Not Started
   Benchmark Development:
     count: 4
