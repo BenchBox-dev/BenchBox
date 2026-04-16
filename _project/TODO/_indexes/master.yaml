@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T23:48:21.957342'
+generated_at: '2026-04-16T00:04:06.510593'
 total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -628,8 +628,8 @@ items:
   - cleanup
   estimated_effort: Small-Medium (4-8 hours including research gate)
   work_total: 7
-  work_done: 3
-  work_ready: 2
+  work_done: 4
+  work_ready: 1
   deferred_count: 2
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml

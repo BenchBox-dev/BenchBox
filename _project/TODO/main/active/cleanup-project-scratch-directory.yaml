@@ -126,7 +126,7 @@ work:
 
   - id: w4
     summary: "Move 3 canonical analysis docs to proper docs/ locations"
-    status: pending
+    status: done
     notes: |
       These 3 files are actively linked from outside _project/ and belong in docs/.
       Confirmed external references exist to all three.

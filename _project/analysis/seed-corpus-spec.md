@@ -2,7 +2,7 @@
 
 **Created:** 2026-04-02
 **Originating TODO:** `generate-seed-corpus-for-results-explorer`
-**Related:** `benchbox-results-platform-strategy.md`
+**Related:** `docs/development/benchbox-results-platform-strategy.md`
 
 ## Purpose and Motivation
 
