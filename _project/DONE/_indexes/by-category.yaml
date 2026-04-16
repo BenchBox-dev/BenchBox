@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:49:24.301349'
+generated_at: '2026-04-15T23:37:14.526393'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -3443,7 +3443,7 @@ categories:
       file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
       title: Accessibility hardening and snapshot test coverage for matrix leaderboard
       priority: Medium
-      status: In Progress
+      status: Completed
     - id: pyspark-sql-tests
       file: DONE/dataframe-expansion/planning/pyspark-sql-tests.yaml
       title: Add comprehensive tests for PySpark SQL adapter

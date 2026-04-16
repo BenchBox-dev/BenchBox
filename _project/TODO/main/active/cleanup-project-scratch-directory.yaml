@@ -2,7 +2,7 @@ id: cleanup-project-scratch-directory
 title: "Relocate canonical assets out of _project/ scratch area to proper homes"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Code Quality and Technical Debt
 
 description: |
@@ -46,49 +46,35 @@ description: |
 work:
   - id: w1
     summary: "Research gate: read and classify the 5 ambiguous asset groups"
-    status: pending
+    status: done
     notes: |
-      Read enough of each group to answer the question. Write a one-paragraph
-      verdict (≤100 words) per question in this work unit's notes before w5
-      can proceed. Concrete commands to run:
+      VERDICT Q1 — _project/specs/ → OPTION C: ARCHIVE. docs/benchmarks/ and
+      docs/platforms/ are comprehensive (25+ and 50+ files respectively) and cover
+      all the same benchmarks and platforms. specs/ has zero external references
+      outside _project/. Decision: git mv _project/specs/ _project/_archive/specs/
 
-      QUESTION 1 — _project/specs/ (authoritative or internal-only?):
-        Read: _project/specs/tpch.md, _project/specs/tpcds.md,
-              _project/specs/platforms/ (pick 2), _project/specs/base.md
-        Cross-check: ls docs/benchmarks/ && ls docs/platforms/
-        Answer needed: (a) superseded by public docs — archive;
-                       (b) unique internal design notes — add README, leave in place;
-                       (c) authoritative content not yet in docs — merge.
+      VERDICT Q2 — DESIGN-integrated-task-management.md → OPTION B: MOVE.
+      Zero external references found (grep confirmed no hits outside the TODO file).
+      Standalone architecture doc describing task system design. Move to
+      docs/development/task-management-design.md.
 
-      QUESTION 2 — _project/DESIGN-integrated-task-management.md:
-        Read first 80 lines. Check if AGENTS.md or any script references it by path.
-        Command: grep -r "DESIGN-integrated-task-management" . --include="*.md" --include="*.py"
-        Answer needed: (a) agents rely on it as a navigational reference → stay in _project/;
-                       (b) standalone architecture doc with no agent reliance → move to docs/development/.
+      VERDICT Q3 — Roadmap/quality docs → OPTION C: ARCHIVE. PLATFORM_INTEGRATION_ROADMAP.md
+      last commit Nov 2024. PRE_RELEASE_CHECKLIST.md and RELEASE_PRIORITIZATION_v1.md only
+      referenced in completed DONE items (PROJECT_DONE.yaml, _project/DONE/). All describe
+      completed pre-release planning. Archive to _project/_archive/.
 
-      QUESTION 3 — Roadmap/quality docs at _project/ root:
-        Read introduction of: PLATFORM_INTEGRATION_ROADMAP.md, RELEASE_PRIORITIZATION_v1.md,
-        PRE_RELEASE_CHECKLIST.md. Check: grep -r "PLATFORM_INTEGRATION_ROADMAP\|PRE_RELEASE_CHECKLIST\|RELEASE_PRIORITIZATION" . --include="*.md" --include="*.yaml"
-        Answer needed: (a) agent-facing action checklists → no move;
-                       (b) human-facing publishable docs → merge into docs/development/roadmap.md;
-                       (c) completed milestones → archive.
+      VERDICT Q4 — DATAFRAME_SUPPORT_MASTER.md + related → OPTION A: ARCHIVE. No open
+      TODO depends on these files. Only self-referential _project/ links. No active
+      implementation work references them. Archive to _project/_archive/.
 
-      QUESTION 4 — _project/DATAFRAME_SUPPORT_MASTER.md + related:
-        Check git log for last-modified dates on:
-          DATAFRAME_SUPPORT_MASTER.md, FORMAT_CONVERTER_*.md, query_plan_*.md
-        Command: git log --oneline --follow -5 -- _project/DATAFRAME_SUPPORT_MASTER.md
-        Answer needed: (a) last touched >90 days ago, no open TODO depends on it → archive;
-                       (b) actively referenced during ongoing work → leave or condense to docs/.
-
-      QUESTION 5 — _project/handoffs/ (active or historical?):
-        Check dates in handoff filenames. Read the most recent one's summary.
-        Command: ls -lt _project/handoffs/*.md | head -5
-        Answer needed: (a) all handoffs describe completed work → archive to _project/_archive/handoffs/;
-                       (b) most recent covers in-flight results-publishing work → leave active, archive older ones.
+      VERDICT Q5 — _project/handoffs/ → OPTION B: PARTIAL ARCHIVE. Most recent file
+      (results-publishing-handoff-2026-04-04.md) was updated 2026-04-12 describing active
+      Phase 2 results-publishing work (PR #53). Keep it active. Archive the other 3 older
+      handoffs to _project/_archive/handoffs/.
 
   - id: w2
     summary: "Archive superseded monolithic YAMLs and delete generated artifacts"
-    status: pending
+    status: done
     notes: |
       No research gate required — these are unambiguously clutter.
 

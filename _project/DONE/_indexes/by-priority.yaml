@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:49:24.301554'
+generated_at: '2026-04-15T23:37:14.526560'
 total_items: 715
 priorities:
   Critical:
@@ -2091,7 +2091,7 @@ priorities:
       file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
       title: Accessibility hardening and snapshot test coverage for matrix leaderboard
       category: Testing and Quality Assurance
-      status: In Progress
+      status: Completed
     - id: interactive-wizard-capture-plans
       file: DONE/ux-improvements/planning/interactive-wizard-capture-plans.yaml
       title: Add --capture-plans option to interactive wizard
