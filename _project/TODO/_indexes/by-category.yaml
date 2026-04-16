@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T09:12:27.407564'
+generated_at: '2026-04-16T09:28:54.079575'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -36,10 +36,10 @@ categories:
     count: 2
     items:
     - id: migrate-psycopg2-to-psycopg3
-      file: TODO/main/planning/migrate-psycopg2-to-psycopg3.yaml
+      file: TODO/main/active/migrate-psycopg2-to-psycopg3.yaml
       title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
       priority: Medium
-      status: Not Started
+      status: In Progress
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds

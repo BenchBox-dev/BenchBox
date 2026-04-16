@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T09:12:27.407527'
+generated_at: '2026-04-16T09:28:54.079534'
 total_items: 34
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -420,12 +420,12 @@ items:
   needs:
   - launch-results-explorer-acceptance-and-seed
 - id: migrate-psycopg2-to-psycopg3
-  file: TODO/main/planning/migrate-psycopg2-to-psycopg3.yaml
+  file: TODO/main/active/migrate-psycopg2-to-psycopg3.yaml
   title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
   worktree: main
   category: Code Quality and Technical Debt
   priority: Medium
-  status: Not Started
+  status: In Progress
   tags:
   - maintenance
   - supply-chain
@@ -434,7 +434,7 @@ items:
   - postgresql
   estimated_effort: Medium (7-10 hours across 10 work units)
   work_total: 10
-  work_done: 0
+  work_done: 8
   work_ready: 1
   deferred_count: 4
 - id: operate-results-platform-security-observability-and-abuse-controls

@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T09:12:27.407580'
+generated_at: '2026-04-16T09:28:54.079596'
 total_items: 34
 priorities:
   Critical:
@@ -109,10 +109,10 @@ priorities:
       category: Core Functionality
       status: Completed
     - id: migrate-psycopg2-to-psycopg3
-      file: TODO/main/planning/migrate-psycopg2-to-psycopg3.yaml
+      file: TODO/main/active/migrate-psycopg2-to-psycopg3.yaml
       title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
       category: Code Quality and Technical Debt
-      status: Not Started
+      status: In Progress
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
