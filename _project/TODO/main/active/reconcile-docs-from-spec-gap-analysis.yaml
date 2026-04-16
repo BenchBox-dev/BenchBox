@@ -197,7 +197,7 @@ work:
 
 - id: w8
   summary: "Fix tpc-h.md: add official composite metrics (QphH@Size) and RF1/RF2 maintenance test"
-  status: pending
+  status: done
   notes: |
     RESEARCH GATE (run before editing):
       # Check if composite metric calculation is implemented
