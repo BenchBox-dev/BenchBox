@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T19:46:46.134951'
+generated_at: '2026-04-15T20:04:43.288995'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 55
+    count: 56
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -359,6 +359,11 @@ categories:
       file: DONE/unknown/planning/circular-import-issues-completed.yaml
       title: Circular Import Issues ✅ COMPLETED
       priority: Medium
+      status: Completed
+    - id: clean-up-unused-sphinx-dev-deps
+      file: DONE/main/active/clean-up-unused-sphinx-dev-deps.yaml
+      title: Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)
+      priority: Low
       status: Completed
     - id: quality-gate-dependency-bounds-in-release-automation
       file: DONE/main/quality/quality-gate-dependency-bounds-in-release-automation.yaml

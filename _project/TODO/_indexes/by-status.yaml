@@ -1,8 +1,16 @@
-generated_at: '2026-04-15T19:53:40.149367'
-total_items: 41
+generated_at: '2026-04-15T20:04:41.619181'
+total_items: 43
 statuses:
+  In Progress:
+    count: 1
+    items:
+    - id: explorer-establish-cli-explorer-parity-tests
+      file: TODO/main/active/explorer-establish-cli-explorer-parity-tests.yaml
+      title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
+      priority: Critical
+      category: Testing and Quality Assurance
   Not Started:
-    count: 33
+    count: 34
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -34,11 +42,6 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
-    - id: clean-up-unused-sphinx-dev-deps
-      file: TODO/main/planning/clean-up-unused-sphinx-dev-deps.yaml
-      title: Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)
-      priority: Low
-      category: Code Quality and Technical Debt
     - id: explorer-close-chart-type-coverage-gaps
       file: TODO/main/planning/explorer-close-chart-type-coverage-gaps.yaml
       title: 'Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others'
@@ -74,11 +77,11 @@ statuses:
       title: Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer
       priority: High
       category: Core Functionality
-    - id: explorer-establish-cli-explorer-parity-tests
-      file: TODO/main/planning/explorer-establish-cli-explorer-parity-tests.yaml
-      title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
-      priority: Critical
-      category: Testing and Quality Assurance
+    - id: extract-project-scripts-to-isolated-env
+      file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
+      title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -119,6 +122,16 @@ statuses:
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
       category: Core Functionality
+    - id: tighten-dependencies-phase-plan
+      file: TODO/main/planning/tighten-dependencies-phase-plan.yaml
+      title: 'Parent: phased plan to tighten BenchBox dependency surface'
+      priority: Medium
+      category: Code Quality and Technical Debt
+    - id: add-dependency-audit-ci-guard
+      file: TODO/main/planning/add-dependency-audit-ci-guard.yaml
+      title: Promote dependency audit AST scripts to a CI guard against re-introduction of unused deps
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds

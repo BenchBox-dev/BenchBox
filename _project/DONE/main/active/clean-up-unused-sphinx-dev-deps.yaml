@@ -2,7 +2,8 @@ id: clean-up-unused-sphinx-dev-deps
 title: "Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-04-15"
 category: Code Quality and Technical Debt
 description: |
   Two Sphinx-related deps are declared but inert:
@@ -28,21 +29,21 @@ description: |
 work:
   - id: w1
     summary: "Confirm sphinx-rtd-theme is not referenced in docs/, examples/, or any conf.py: `grep -rn 'sphinx_rtd_theme\\|rtd_theme' docs examples`."
-    status: pending
+    status: done
 
   - id: w2
     summary: "Confirm sphinx-copybutton is not in `docs/conf.py:extensions`: read the file and verify."
-    status: pending
+    status: done
 
   - id: w3
     summary: "Remove both lines from `[dependency-groups] dev` in pyproject.toml. Refresh uv.lock with `uv lock`."
     needs: [w1, w2]
-    status: pending
+    status: done
 
   - id: w4
     summary: "Build docs locally to confirm no regression: `make docs` (or the project's docs build target)."
     needs: [w3]
-    status: pending
+    status: done
 
 deferred:
   - summary: "Wire up sphinx-copybutton if copy buttons are desired"

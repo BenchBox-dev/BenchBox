@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T19:46:46.136398'
-total_items: 705
+generated_at: '2026-04-15T20:04:43.289314'
+total_items: 706
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 654
+    count: 655
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -969,6 +969,11 @@ statuses:
       title: Clean up deprecated command references and stale content across docs
       priority: Medium-High
       category: Documentation
+    - id: clean-up-unused-sphinx-dev-deps
+      file: DONE/main/active/clean-up-unused-sphinx-dev-deps.yaml
+      title: Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)
+      priority: Low
+      category: Code Quality and Technical Debt
     - id: clickhouse-cloud-deployment
       file: DONE/platform-expansion/active/clickhouse-cloud-deployment.yaml
       title: ClickHouse Cloud Deployment Mode

@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T19:53:40.149356'
-total_items: 41
+generated_at: '2026-04-15T20:04:41.619170'
+total_items: 43
 priorities:
   Critical:
     count: 3
@@ -10,10 +10,10 @@ priorities:
       category: Core Functionality
       status: Completed
     - id: explorer-establish-cli-explorer-parity-tests
-      file: TODO/main/planning/explorer-establish-cli-explorer-parity-tests.yaml
+      file: TODO/main/active/explorer-establish-cli-explorer-parity-tests.yaml
       title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
       category: Testing and Quality Assurance
-      status: Not Started
+      status: In Progress
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR
@@ -96,7 +96,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 8
+    count: 11
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -123,6 +123,11 @@ priorities:
       title: Drop chdb-core from [project] dependencies (transitive of optional chdb)
       category: Code Quality and Technical Debt
       status: Not Started
+    - id: extract-project-scripts-to-isolated-env
+      file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
+      title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
+      category: Code Quality and Technical Debt
+      status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow
@@ -133,13 +138,23 @@ priorities:
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
       status: Not Started
+    - id: tighten-dependencies-phase-plan
+      file: TODO/main/planning/tighten-dependencies-phase-plan.yaml
+      title: 'Parent: phased plan to tighten BenchBox dependency surface'
+      category: Code Quality and Technical Debt
+      status: Not Started
+    - id: add-dependency-audit-ci-guard
+      file: TODO/main/planning/add-dependency-audit-ci-guard.yaml
+      title: Promote dependency audit AST scripts to a CI guard against re-introduction of unused deps
+      category: Code Quality and Technical Debt
+      status: Not Started
     - id: write-results-platform-phase-2-operations-runbook
       file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
       title: Write the Phase 2 results-platform operations runbook
       category: Documentation
       status: Completed
   Low:
-    count: 15
+    count: 14
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -150,11 +165,6 @@ priorities:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: clean-up-unused-sphinx-dev-deps
-      file: TODO/main/planning/clean-up-unused-sphinx-dev-deps.yaml
-      title: Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)
-      category: Code Quality and Technical Debt
       status: Not Started
     - id: declare-undeclared-runtime-imports
       file: TODO/main/planning/declare-undeclared-runtime-imports.yaml

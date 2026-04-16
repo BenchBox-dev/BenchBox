@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T19:46:46.135139'
-total_items: 705
+generated_at: '2026-04-15T20:04:43.289164'
+total_items: 706
 priorities:
   Critical:
     count: 40
@@ -3421,7 +3421,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 25
+    count: 26
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3457,6 +3457,11 @@ priorities:
       file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml
       title: Build automated pg_duckdb vs native DuckDB comparison report
       category: Platform Expansion
+      status: Completed
+    - id: clean-up-unused-sphinx-dev-deps
+      file: DONE/main/active/clean-up-unused-sphinx-dev-deps.yaml
+      title: Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)
+      category: Code Quality and Technical Debt
       status: Completed
     - id: consolidate-tpc-delimiter-detection
       file: DONE/core-functionality/consolidate-tpc-delimiter-detection.yaml

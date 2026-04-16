@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T19:46:46.134549'
-total_items: 705
+generated_at: '2026-04-15T20:04:43.288727'
+total_items: 706
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4265,6 +4265,25 @@ items:
   work_total: 2
   work_done: 2
   work_ready: 0
+- id: clean-up-unused-sphinx-dev-deps
+  file: DONE/main/active/clean-up-unused-sphinx-dev-deps.yaml
+  title: Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Completed
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - docs
+  - audit-followup
+  estimated_effort: Small (< 1 hour)
+  completed_date: '2026-04-15'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  deferred_count: 1
 - id: consolidate-tpc-delimiter-detection
   file: DONE/core-functionality/consolidate-tpc-delimiter-detection.yaml
   title: Consolidate TPC delimiter detection to use get_delimiter_for_file()

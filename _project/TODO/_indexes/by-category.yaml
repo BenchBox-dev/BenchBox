@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T19:53:40.149337'
+generated_at: '2026-04-15T20:04:41.619152'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -33,13 +33,8 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 6
+    count: 8
     items:
-    - id: clean-up-unused-sphinx-dev-deps
-      file: TODO/main/planning/clean-up-unused-sphinx-dev-deps.yaml
-      title: Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton)
-      priority: Low
-      status: Not Started
     - id: declare-undeclared-runtime-imports
       file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
       title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
@@ -55,10 +50,25 @@ categories:
       title: Drop lxml dev dep (port single test to stdlib xml.etree)
       priority: Low
       status: Not Started
+    - id: extract-project-scripts-to-isolated-env
+      file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
+      title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
+      priority: Medium
+      status: Not Started
     - id: move-jsonschema-out-of-core-runtime-deps
       file: TODO/main/planning/move-jsonschema-out-of-core-runtime-deps.yaml
       title: Move jsonschema out of core deps (used only by _project/ tooling)
       priority: Low
+      status: Not Started
+    - id: tighten-dependencies-phase-plan
+      file: TODO/main/planning/tighten-dependencies-phase-plan.yaml
+      title: 'Parent: phased plan to tighten BenchBox dependency surface'
+      priority: Medium
+      status: Not Started
+    - id: add-dependency-audit-ci-guard
+      file: TODO/main/planning/add-dependency-audit-ci-guard.yaml
+      title: Promote dependency audit AST scripts to a CI guard against re-introduction of unused deps
+      priority: Medium
       status: Not Started
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
@@ -217,10 +227,10 @@ categories:
     count: 4
     items:
     - id: explorer-establish-cli-explorer-parity-tests
-      file: TODO/main/planning/explorer-establish-cli-explorer-parity-tests.yaml
+      file: TODO/main/active/explorer-establish-cli-explorer-parity-tests.yaml
       title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
       priority: Critical
-      status: Not Started
+      status: In Progress
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
