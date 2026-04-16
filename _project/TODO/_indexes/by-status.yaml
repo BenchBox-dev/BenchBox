@@ -1,16 +1,21 @@
-generated_at: '2026-04-15T20:12:12.944603'
+generated_at: '2026-04-15T20:13:40.463087'
 total_items: 41
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
+    - id: declare-undeclared-runtime-imports
+      file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
+      title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
+      priority: Low
+      category: Code Quality and Technical Debt
     - id: explorer-establish-cli-explorer-parity-tests
       file: TODO/main/active/explorer-establish-cli-explorer-parity-tests.yaml
       title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
       priority: Critical
       category: Testing and Quality Assurance
   Not Started:
-    count: 32
+    count: 31
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -47,11 +52,6 @@ statuses:
       title: 'Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others'
       priority: Medium-High
       category: Core Functionality
-    - id: declare-undeclared-runtime-imports
-      file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
-      title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
-      priority: Low
-      category: Code Quality and Technical Debt
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence

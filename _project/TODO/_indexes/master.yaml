@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:12:12.944499'
+generated_at: '2026-04-15T20:13:40.463017'
 total_items: 41
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -34,8 +34,8 @@ items:
   - contract-tests
   estimated_effort: Medium (2-3 days)
   work_total: 5
-  work_done: 2
-  work_ready: 1
+  work_done: 3
+  work_ready: 2
   deferred_count: 2
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -229,7 +229,7 @@ items:
   worktree: main
   category: Code Quality and Technical Debt
   priority: Low
-  status: Not Started
+  status: In Progress
   tags:
   - maintenance
   - supply-chain

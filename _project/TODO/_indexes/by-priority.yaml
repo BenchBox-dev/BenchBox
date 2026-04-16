@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:12:12.944590'
+generated_at: '2026-04-15T20:13:40.463075'
 total_items: 41
 priorities:
   Critical:
@@ -170,7 +170,7 @@ priorities:
       file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
       title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
       category: Code Quality and Technical Debt
-      status: Not Started
+      status: In Progress
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

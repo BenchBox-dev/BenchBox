@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:12:12.944560'
+generated_at: '2026-04-15T20:13:40.463058'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -39,7 +39,7 @@ categories:
       file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
       title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
       priority: Low
-      status: Not Started
+      status: In Progress
     - id: extract-project-scripts-to-isolated-env
       file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
       title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
