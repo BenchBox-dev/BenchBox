@@ -47,7 +47,7 @@ work:
   needs: [w1]
   status: pending
   notes: |
-    Template `_project/adr/TEMPLATE-results-data-extraction.md`:
+    Template `docs/development/adr/TEMPLATE-results-data-extraction.md`:
       - Context (repo size, PR volume at time of decision)
       - Options:
           A. Stay in monorepo (status quo)
@@ -87,7 +87,7 @@ work:
       Procedure when triggered:
         1. Open new TODO `evaluate-results-data-extraction-decision`
            (active, owner = current maintainer rotation).
-        2. Copy the ADR template to `_project/adr/{date}-results-data-extraction.md`.
+        2. Copy the ADR template to `docs/development/adr/{date}-results-data-extraction.md`.
         3. Fill in current measurements, score the matrix, write the
            recommendation.
         4. Get review from at least one other maintainer.
@@ -101,7 +101,7 @@ verification:
   command: "test -f _project/analysis/results-data-extraction-trigger.md && grep -c 'trigger' _project/analysis/results-data-extraction-trigger.md"
   expected_output: ">= 2"
 - description: "ADR template exists with decision matrix scaffold"
-  command: "test -f _project/adr/TEMPLATE-results-data-extraction.md"
+  command: "test -f docs/development/adr/TEMPLATE-results-data-extraction.md"
   expected_output: "file exists"
 
 must_preserve:
@@ -117,7 +117,7 @@ anti_patterns:
 scope_limit:
   only_modify:
   - _project/analysis/results-data-extraction-trigger.md
-  - _project/adr/TEMPLATE-results-data-extraction.md
+  - docs/development/adr/TEMPLATE-results-data-extraction.md
   - scripts/phase2_metrics.py  # one new section appended
   do_not_touch:
   - results-data/  # no actual extraction here

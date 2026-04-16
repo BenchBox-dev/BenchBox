@@ -100,7 +100,7 @@ work:
 
   - id: w3
     summary: "Move ADRs from _project/adr/ to docs/development/adr/"
-    status: pending
+    status: done
     notes: |
       Source files (confirmed no production code dependency on these paths):
         _project/adr/0001-unified-platform-registration.md
