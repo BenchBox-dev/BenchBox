@@ -117,7 +117,7 @@ work:
 
 - id: w5
   summary: "Fix metadata-primitives.md: reconcile ACL platform tiers and document tier definitions"
-  status: pending
+  status: done
   notes: |
     RESEARCH GATE (run before editing):
       # Find ACL support detection or tier assignments in code
