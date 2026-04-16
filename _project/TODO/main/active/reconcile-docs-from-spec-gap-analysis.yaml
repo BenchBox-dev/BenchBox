@@ -77,7 +77,7 @@ work:
 
 - id: w3
   summary: "Fix tpc-ds-obt.md: correct '99 queries' claim and document excluded query categories"
-  status: pending
+  status: done
   notes: |
     RESEARCH GATE (run before editing):
       # Count actual query files
