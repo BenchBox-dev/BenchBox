@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:44:05.955055'
+generated_at: '2026-04-15T20:49:24.300991'
 total_items: 715
 items:
 - id: interactive-wizard-dry-run-support
@@ -4761,7 +4761,7 @@ items:
   worktree: main
   category: Testing and Quality Assurance
   priority: Medium
-  status: Completed
+  status: In Progress
   tags:
   - results
   - explorer
@@ -4769,7 +4769,6 @@ items:
   - testing
   - a11y
   estimated_effort: Medium (1-2 days)
-  completed_date: '2026-04-15'
   work_total: 5
   work_done: 5
   work_ready: 0
@@ -7735,14 +7734,13 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Completed
+  status: Not Started
   tags:
   - results
   - explorer
   - urls
   - compare
   estimated_effort: Small (1 day)
-  completed_date: '2026-04-15'
   work_total: 5
   work_done: 5
   work_ready: 0

@@ -75,6 +75,3 @@ pygments:
 
 roman-numerals:
   reason: "Sphinx dependency for roman numeral support; pulled in via sphinx>=9 requirement. Not directly imported."
-
-pygments-cobalt2:
-  reason: "Custom Pygments theme in docs/_static/. Activated via conf.py STYLE_MAP registration — first-party local script, not a third-party import."

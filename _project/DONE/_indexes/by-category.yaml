@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:44:05.955364'
+generated_at: '2026-04-15T20:49:24.301349'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -1820,7 +1820,7 @@ categories:
       file: DONE/main/active/explorer-compare-url-short-ids.yaml
       title: Use short hash IDs in Compare URLs to avoid URL-length limits
       priority: Medium
-      status: Completed
+      status: Not Started
     - id: validate-isolated-runtime-importability
       file: DONE/core-functionality/active/validate-isolated-runtime-importability.yaml
       title: Validate isolated runtime importability before treating as cache hit
@@ -3443,7 +3443,7 @@ categories:
       file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
       title: Accessibility hardening and snapshot test coverage for matrix leaderboard
       priority: Medium
-      status: Completed
+      status: In Progress
     - id: pyspark-sql-tests
       file: DONE/dataframe-expansion/planning/pyspark-sql-tests.yaml
       title: Add comprehensive tests for PySpark SQL adapter

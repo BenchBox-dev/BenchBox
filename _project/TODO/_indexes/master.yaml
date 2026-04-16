@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:44:04.349706'
-total_items: 35
+generated_at: '2026-04-15T20:49:22.461241'
+total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -614,6 +614,23 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
+- id: cleanup-project-scratch-directory
+  file: TODO/main/planning/cleanup-project-scratch-directory.yaml
+  title: Relocate canonical assets out of _project/ scratch area to proper homes
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - repository-maintenance
+  - docs-structure
+  - technical-debt
+  - cleanup
+  estimated_effort: Small-Medium (4-8 hours including research gate)
+  work_total: 7
+  work_done: 0
+  work_ready: 4
+  deferred_count: 2
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

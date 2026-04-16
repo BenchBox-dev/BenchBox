@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:44:05.955536'
+generated_at: '2026-04-15T20:49:24.301554'
 total_items: 715
 priorities:
   Critical:
@@ -2091,7 +2091,7 @@ priorities:
       file: DONE/main/active/explorer-heatmap-accessibility-and-tests.yaml
       title: Accessibility hardening and snapshot test coverage for matrix leaderboard
       category: Testing and Quality Assurance
-      status: Completed
+      status: In Progress
     - id: interactive-wizard-capture-plans
       file: DONE/ux-improvements/planning/interactive-wizard-capture-plans.yaml
       title: Add --capture-plans option to interactive wizard
@@ -3249,7 +3249,7 @@ priorities:
       file: DONE/main/active/explorer-compare-url-short-ids.yaml
       title: Use short hash IDs in Compare URLs to avoid URL-length limits
       category: Core Functionality
-      status: Completed
+      status: Not Started
     - id: quality-cross-platform-validation-integration-matrix
       file: DONE/main/planning/quality-cross-platform-validation-integration-matrix.yaml
       title: Wire cross-platform validation comparator into a nightly integration matrix

@@ -1,68 +1,37 @@
 # Guarded optional import allowlist for the dependency audit.
 #
-# Packages listed here are expected to have zero UNCONDITIONAL import sites.
-# Their imports are wrapped in `try/except ImportError` so the package is
-# genuinely optional — users who want this functionality install the relevant
-# extras group explicitly.
+# Packages listed here are DECLARED in pyproject.toml but have zero import
+# sites in the scanned paths (benchbox/, scripts/, tests/, docs/).  The audit
+# would otherwise flag them as violations.  List a package here only when ALL
+# three conditions hold:
 #
-# The audit scans for ANY import site (including guarded), so these packages
-# WILL appear in the scan output even though they are correctly optional.
-# Listing them here prevents false-positive failures.
+#   1. The package IS declared in pyproject.toml (core, extras, or dep-group).
+#   2. The package has NO import statement in the scan paths — not even a
+#      guarded `try: import X` block — because the AST scanner finds those too.
+#   3. The package is legitimately optional (e.g. GPU-only, private distrib.).
+#
+# IMPORTANT: packages with guarded try/except imports are found by the AST
+# scanner and therefore have import sites.  They do NOT need to be listed here.
+# If a package passes the audit via import sites, an entry here is redundant.
 #
 # Each entry MUST include a `reason` and an `extras_group` reference so
 # future maintainers can verify the declaration is still current.
 
 # --------------------------------------------------------------------------
 # NVIDIA RAPIDS / CUDA stack — optional GPU acceleration.
-# See extras:cudf / benchbox/platforms/dataframe/cudf_df.py.
+# extras:cudf is currently a placeholder (empty group); these entries are
+# preemptive.  Once cudf/cupy are added to extras:cudf they will have guarded
+# import sites in benchbox/platforms/dataframe/cudf_df.py and may not need
+# this allowlist — but we keep the entries so the intent is documented.
 # --------------------------------------------------------------------------
 cudf:
-  reason: "GPU DataFrame backend; guarded import in cudf_df.py. Declared in extras:cudf."
+  reason: "GPU DataFrame backend; guarded import in cudf_df.py. extras:cudf currently empty placeholder."
   extras_group: "extras:cudf"
 
 cupy:
-  reason: "CUDA array library; guarded import in RAPIDS paths. Pulled via cudf."
+  reason: "CUDA array library; guarded import in cudf_df.py. Pulled via cudf."
   extras_group: "extras:cudf"
 
 cuml:
   reason: "CUDA ML library; guarded import in RAPIDS paths. Pulled via cudf."
   extras_group: "extras:cudf"
-
-# --------------------------------------------------------------------------
-# AI-primitives ML/NLP stack — optional AI benchmark backends.
-# See extras:ai-primitives / benchbox/core/ai_primitives/dataframe_operations.py.
-# --------------------------------------------------------------------------
-sentence-transformers:
-  reason: "Sentence embedding library; guarded import in ai_primitives. Declared in extras:ai-primitives."
-  extras_group: "extras:ai-primitives"
-
-torch:
-  reason: "PyTorch; guarded import in ai_primitives (required by sentence-transformers). Declared in extras:ai-primitives."
-  extras_group: "extras:ai-primitives"
-
-textblob:
-  reason: "NLP library; guarded import in ai_primitives. Declared in extras:ai-primitives."
-  extras_group: "extras:ai-primitives"
-
-spacy:
-  reason: "NLP library; guarded import in ai_primitives. Declared in extras:ai-primitives."
-  extras_group: "extras:ai-primitives"
-
-# --------------------------------------------------------------------------
-# Optional SQL/data backends — present in platform-specific extras.
-# --------------------------------------------------------------------------
-dask-sql:
-  reason: "Dask SQL backend; guarded import in dask platform. Pulled transitively when dask[sql] is installed."
-  extras_group: "extras:dask"
-
-pysail:
-  reason: "LakeSail Spark distribution; guarded import in lakesail.py. No public PyPI extra — KEEP-with-note."
-  extras_group: "none (private distribution)"
-
-flightsql:
-  reason: "Arrow Flight SQL client; guarded fallback in InfluxDB / Doris platform paths."
-  extras_group: "extras:influxdb / extras:doris"
-
-influxdb3:
-  reason: "Alternate InfluxDB client import name; guarded fallback in influxdb platform."
-  extras_group: "extras:influxdb"

@@ -25,8 +25,9 @@ import argparse
 import pathlib
 import re
 import sys
-import tomllib
 from collections import defaultdict
+
+import tomllib
 
 try:
     import yaml
@@ -93,7 +94,6 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
     "singlestoredb": {"singlestoredb"},
     "databend-driver": {"databend_driver"},
     "vortex-data": {"vortex"},
-    "chdb-core": {"chdb_core"},
     "textcharts": {"textcharts"},
     "tomli": {"tomli"},
     "ty": {"ty"},

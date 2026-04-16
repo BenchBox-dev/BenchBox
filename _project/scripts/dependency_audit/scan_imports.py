@@ -17,9 +17,9 @@ import json
 import pathlib
 import re
 import sys
-import tomllib
 from collections import defaultdict
 
+import tomllib
 
 # Package-name → top-level import-name(s) mapping. Most packages match their
 # install name, but several do not. Update this map whenever you discover a new
@@ -54,10 +54,8 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
     "pyarrow": {"pyarrow"},
     "ablog": {"ablog"},
     "myst-parser": {"myst_parser"},
-    "sphinx-rtd-theme": {"sphinx_rtd_theme"},
     "sphinx-tags": {"sphinx_tags"},
     "sphinx-design": {"sphinx_design"},
-    "sphinx-copybutton": {"sphinx_copybutton"},
     "sphinxcontrib-mermaid": {"sphinxcontrib.mermaid"},
     "roman-numerals": {"roman_numerals"},
     "ruamel-yaml": {"ruamel.yaml"},
@@ -69,7 +67,6 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
     "singlestoredb": {"singlestoredb"},
     "databend-driver": {"databend_driver"},
     "vortex-data": {"vortex"},
-    "chdb-core": {"chdb_core"},
     "textcharts": {"textcharts"},
     "tomli": {"tomli"},
     "ty": {"ty"},
@@ -77,7 +74,6 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
     "tox": {"tox"},
     "mutmut": {"mutmut"},
     "codespell": {"codespell_lib"},
-    "lxml": {"lxml"},
     "mcp": {"mcp"},
     "boto3": {"boto3", "botocore"},
     "cloudpathlib": {"cloudpathlib"},
@@ -237,12 +233,11 @@ def main() -> int:
         if tooling_sites and not py_only_sites and not doc_sites:
             pkg_tooling_only[pkg] = tooling_sites
 
-    out_path = root / "_project/scratch/import_sites.json"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path = pathlib.Path(__file__).resolve().parent / "import_sites.json"
     out_path.write_text(
         json.dumps(
             {
-                "py_sites": {k: v for k, v in pkg_sites.items()},
+                "py_sites": dict(pkg_sites.items()),
                 "doc_only": pkg_doc_only,
                 "tooling_only": pkg_tooling_only,
                 "all_top_modules": sorted({import_to_top(k) for k in all_imports}),
