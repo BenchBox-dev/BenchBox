@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:22:10.688197'
-total_items: 711
+generated_at: '2026-04-15T20:23:33.952490'
+total_items: 712
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6318,6 +6318,27 @@ items:
   work_total: 3
   work_done: 3
   work_ready: 0
+- id: extract-project-scripts-to-isolated-env
+  file: DONE/main/active/extract-project-scripts-to-isolated-env.yaml
+  title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - tooling
+  - audit-followup
+  estimated_effort: 'Medium (4-8 hours: AST inventory + new pyproject + invocation refactor + docs update)'
+  completed_date: '2026-04-15'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  deferred_count: 2
+  needs:
+  - move-jsonschema-out-of-core-runtime-deps
 - id: complexity-cli-orchestration-w14
   file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml
   title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)

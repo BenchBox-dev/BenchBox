@@ -1,0 +1,26 @@
+# Isolated Python environment for _project/scripts/ internal tooling.
+#
+# These scripts are NOT shipped in the BenchBox wheel. They live here so their
+# dependency surface cannot leak into the public install.
+#
+# Usage:
+#   uv run --project _project/scripts -- python _project/scripts/todo_cli.py <args>
+#   uv run --project _project/scripts -- python _project/scripts/validate_todo.py <path>
+#
+# See CLAUDE.md and AGENTS.md for the canonical pre-approved command forms.
+
+[project]
+name = "benchbox-project-scripts"
+version = "0.1.0"
+description = "Internal BenchBox TODO and release tooling — not shipped in the wheel"
+requires-python = ">=3.10"
+dependencies = [
+    "jsonschema>=4.25.1",  # validate_todo.py: Draft7Validator
+    "pyyaml>=6.0.0",       # todo_cli.py + validate_todo.py: yaml.safe_load
+    "ruamel-yaml>=0.19.1", # todo_cli.py: YAML() for structure-preserving edits (done command)
+]
+
+[tool.uv]
+# Prevent uv from resolving workspace members from the repo root when
+# invoked as `uv run --project _project/scripts`.
+managed = true

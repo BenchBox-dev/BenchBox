@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:22:08.993201'
-total_items: 39
+generated_at: '2026-04-15T20:23:32.217996'
+total_items: 38
 priorities:
   Critical:
     count: 2
@@ -91,7 +91,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 11
+    count: 10
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -113,11 +113,6 @@ priorities:
       title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Not Started
-    - id: extract-project-scripts-to-isolated-env
-      file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
-      title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow

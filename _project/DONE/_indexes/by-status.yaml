@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:22:10.688814'
-total_items: 711
+generated_at: '2026-04-15T20:23:33.953216'
+total_items: 712
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 660
+    count: 661
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1593,6 +1593,11 @@ statuses:
       title: Extract _normalize_table_name_in_sql to shared SQL utility module
       priority: Medium
       category: Core Functionality
+    - id: extract-project-scripts-to-isolated-env
+      file: DONE/main/active/extract-project-scripts-to-isolated-env.yaml
+      title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: complexity-cli-orchestration-w14
       file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml
       title: Extract phases from monolithic CLI orchestration functions (complexity batch 4)

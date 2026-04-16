@@ -1,14 +1,6 @@
-generated_at: '2026-04-15T20:22:08.993212'
-total_items: 39
+generated_at: '2026-04-15T20:23:32.218008'
+total_items: 38
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: extract-project-scripts-to-isolated-env
-      file: TODO/main/planning/extract-project-scripts-to-isolated-env.yaml
-      title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
-      priority: Medium
-      category: Code Quality and Technical Debt
   Not Started:
     count: 30
     items:

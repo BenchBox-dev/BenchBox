@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:22:10.688648'
-total_items: 711
+generated_at: '2026-04-15T20:23:33.953028'
+total_items: 712
 priorities:
   Critical:
     count: 41
@@ -1985,7 +1985,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 288
+    count: 289
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2658,6 +2658,11 @@ priorities:
       file: DONE/core-functionality/active/dedup-sql-utilities.yaml
       title: Extract _normalize_table_name_in_sql to shared SQL utility module
       category: Core Functionality
+      status: Completed
+    - id: extract-project-scripts-to-isolated-env
+      file: DONE/main/active/extract-project-scripts-to-isolated-env.yaml
+      title: Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest
+      category: Code Quality and Technical Debt
       status: Completed
     - id: complexity-cli-orchestration-w14
       file: DONE/core-functionality/active/complexity-cli-orchestration-w14.yaml

@@ -2,7 +2,8 @@ id: extract-project-scripts-to-isolated-env
 title: "Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-15"
 category: Code Quality and Technical Debt
 description: |
   Internal TODO/release tooling under `_project/scripts/` is the structural
@@ -27,7 +28,7 @@ description: |
 work:
   - id: w1
     summary: "Inventory every third-party import under `_project/scripts/` via AST scan. Capture the full set, not just jsonschema/ruamel-yaml."
-    status: pending
+    status: done
     notes: |
       Reuse `_project/scratch/scan_imports.py --root _project/scripts` or an
       equivalent ad-hoc AST walker.
@@ -35,12 +36,12 @@ work:
   - id: w2
     summary: "Create `_project/scripts/pyproject.toml` declaring the inventoried deps. Pin to versions consistent with current uv.lock for reproducibility."
     needs: [w1]
-    status: pending
+    status: done
 
   - id: w3
     summary: "Decide invocation pattern (uv --project flag vs wrapper script) and document it in `_project/scripts/README.md`."
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Option A: `uv run --project _project/scripts <script>`.
       Option B: thin wrapper at repo root that activates the isolated env.
@@ -48,17 +49,17 @@ work:
   - id: w4
     summary: "Update CLAUDE.md / AGENTS.md pre-approved command patterns for `_project/scripts/todo_cli.py *` and `_project/scripts/validate_todo.py *` to match the new invocation pattern."
     needs: [w3]
-    status: pending
+    status: done
 
   - id: w5
     summary: "Remove `jsonschema` and `ruamel-yaml` from the main `pyproject.toml` (they were already moved to dev in Phase 0; this step removes them entirely). Refresh `uv.lock` with `uv lock`."
     needs: [w2, w3]
-    status: pending
+    status: done
 
   - id: w6
     summary: "Run fast suite + execute `_project/scripts/todo_cli.py list` and `_project/scripts/validate_todo.py` against a known-good TODO to confirm tooling still works under the isolated env."
     needs: [w5]
-    status: pending
+    status: done
 
 deferred:
   - summary: "Move `_project/scratch/` audit scripts under the same isolated env"
