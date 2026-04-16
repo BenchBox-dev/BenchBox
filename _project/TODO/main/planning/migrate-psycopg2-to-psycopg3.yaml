@@ -79,11 +79,20 @@ work:
         Confirm pre-built wheels exist for darwin-arm64, darwin-x86_64, linux-x86_64,
         windows-amd64 in psycopg[binary] on PyPI (psycopg 3.1+ has all four).
 
+      Step 5 — Check explorer pipeline consumption of psycopg2_version key:
+        grep -rn "psycopg2_version\|psycopg_version" benchbox/core/explorer_pipeline/
+        Expected: no hits (key is platform metadata, not pipeline schema).
+        If found in models.py or transformer.py: expand scope_limit.only_modify to include
+        those files and coordinate the rename there, OR defer the key rename and leave
+        psycopg2_version unchanged post-migration. Do NOT proceed into w4 Change 4 without
+        resolving this.
+
       GATE PASS criteria:
         - No selection rationale found that still applies
         - All 5 platforms confirmed wire-compatible with psycopg3
         - psycopg[binary] wheels confirmed for CI platforms
         - psycopg2.extras confirmed vestigial (zero usage sites)
+        - psycopg2_version key confirmed absent from explorer pipeline schema (or scope expanded)
 
       If any platform-specific blocker is found, stop and add it to deferred[] rather
       than proceeding.
@@ -130,8 +139,12 @@ work:
 
       Class rename: `Psycopg2ConnectionMixin` → `PsycopgConnectionMixin` leaks the old version
       in the public class name. Rename it here and update all six subclass declarations
-      (postgresql.py, timescaledb.py, questdb.py, pg_mooncake.py, pg_duckdb.py). A __all__
-      backward-compat alias can bridge the transition within this commit if needed.
+      (postgresql.py, timescaledb.py, questdb.py, pg_mooncake.py, pg_duckdb.py). All six
+      subclass files are in scope_limit.only_modify and are updated in this same migration —
+      no backward-compat alias is needed.
+
+      File rename: psycopg2_mixin.py is NOT being renamed — only the class inside it.
+      The filename stays benchbox/platforms/base/psycopg2_mixin.py to minimize diff scope.
 
       Verify:
         uv run -- python -c "from benchbox.platforms.base.psycopg2_mixin import Psycopg2ConnectionMixin; print('OK')"
@@ -186,8 +199,7 @@ work:
       Change 4 — Version references (lines 694-695 and 807-808):
         psycopg2.__version__ → psycopg.__version__
         Key "psycopg2_version" in platform_info dict → "psycopg_version"
-        (Check benchbox/core/explorer_pipeline/ for pipeline consumption of this key
-        before renaming — if it's in the schema, coordinate with the pipeline.)
+        (Pipeline consumption was confirmed absent in w1 Step 5; proceed with rename.)
 
       Change 5 — All `if psycopg2:` guards → `if psycopg:`
 
@@ -320,8 +332,9 @@ work:
         Rename mock_psycopg2 → mock_psycopg throughout this file.
 
       tests/unit/platforms/test_psycopg2_mixin.py:
-        Update import path if class was renamed in w3 (Psycopg2ConnectionMixin →
-        PsycopgConnectionMixin). Update any string literals used in patch targets.
+        File is NOT being renamed (psycopg2_mixin.py source file was not renamed in w3).
+        Update the import: Psycopg2ConnectionMixin → PsycopgConnectionMixin.
+        Update any string literals used as patch targets to match the new class name.
 
       tests/unit/core/test_platform_registry.py (lines 110-113):
         lib_spec dict: "name": "psycopg2" → "name": "psycopg"

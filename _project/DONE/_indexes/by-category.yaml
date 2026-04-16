@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:13:42.288678'
+generated_at: '2026-04-15T20:17:52.413865'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 59
+    count: 60
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -417,6 +417,11 @@ categories:
       file: DONE/core-functionality/active/dedup-wave2-generator-schema-utils.yaml
       title: Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators
       priority: Medium
+      status: Completed
+    - id: declare-undeclared-runtime-imports
+      file: DONE/main/active/declare-undeclared-runtime-imports.yaml
+      title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
+      priority: Low
       status: Completed
     - id: quality-define-dataframe-protocol-and-remove-any
       file: DONE/main/quality/quality-define-dataframe-protocol-and-remove-any.yaml

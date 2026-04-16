@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:13:42.289038'
-total_items: 709
+generated_at: '2026-04-15T20:17:52.414250'
+total_items: 710
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 658
+    count: 659
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1282,6 +1282,11 @@ statuses:
       title: Databricks Example Modernization ✅ COMPLETED
       priority: Medium
       category: Platform Support and Deployment
+    - id: declare-undeclared-runtime-imports
+      file: DONE/main/active/declare-undeclared-runtime-imports.yaml
+      title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
+      priority: Low
+      category: Code Quality and Technical Debt
     - id: complexity-mcp-analytics-w14
       file: DONE/core-functionality/active/complexity-mcp-analytics-w14.yaml
       title: Decompose MCP tool implementations and analytics functions (complexity batch 6)

@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:13:40.463075'
-total_items: 41
+generated_at: '2026-04-15T20:17:50.675455'
+total_items: 40
 priorities:
   Critical:
     count: 3
@@ -154,7 +154,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 12
+    count: 11
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -166,11 +166,6 @@ priorities:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: declare-undeclared-runtime-imports
-      file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
-      title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

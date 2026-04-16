@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:13:40.463017'
-total_items: 41
+generated_at: '2026-04-15T20:17:50.675398'
+total_items: 40
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -34,8 +34,8 @@ items:
   - contract-tests
   estimated_effort: Medium (2-3 days)
   work_total: 5
-  work_done: 3
-  work_ready: 2
+  work_done: 4
+  work_ready: 1
   deferred_count: 2
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -223,23 +223,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: declare-undeclared-runtime-imports
-  file: TODO/main/planning/declare-undeclared-runtime-imports.yaml
-  title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Low
-  status: In Progress
-  tags:
-  - maintenance
-  - supply-chain
-  - deps
-  - audit-followup
-  estimated_effort: 'Small-Medium (2-4 hours: inventory + extras additions + doc update)'
-  work_total: 5
-  work_done: 0
-  work_ready: 3
-  deferred_count: 1
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

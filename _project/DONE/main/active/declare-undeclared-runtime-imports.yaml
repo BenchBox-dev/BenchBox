@@ -1,0 +1,121 @@
+id: declare-undeclared-runtime-imports
+title: "Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)"
+worktree: main
+priority: Low
+status: Completed
+completed_date: "2026-04-15"
+category: Code Quality and Technical Debt
+description: |
+  The dependency audit (`docs/development/dependency-inventory.md`,
+  used-but-undeclared section) found three categories of imports that
+  appear in shipped or tested source but have no `pyproject.toml`
+  declaration:
+
+  1. `PIL` (Pillow) — image processing in visualization image tests.
+  2. `ansi2html` — terminal output → HTML conversion (likely tooling-only).
+  3. AI-primitives ML stack — `sentence_transformers`, `spacy`, `textblob`,
+     `torch`, used by `benchbox/core/ai_primitives/`. All are guarded
+     behind `try/except ImportError`, but should still be declared in an
+     explicit extras group so users who want AI-primitives can install
+     a known-good set.
+
+  Goal: each undeclared third-party import either gets an explicit
+  declaration in the appropriate extras group, or is removed if the code
+  path is dead. No silent transitive-reach behavior.
+
+work:
+  - id: w1
+    summary: "Locate PIL import sites; declare `pillow` in `extras:viz` or dev group, or remove the dependent code."
+    status: done
+    notes: |
+      Use: grep -rn '^from PIL\|^import PIL' benchbox tests
+      Decide: extras:viz vs dep-group:dev vs delete based on whether
+      shipped source vs test-only.
+
+  - id: w2
+    summary: "Locate every ansi2html import site. If only used by tooling, add to `[dependency-groups] dev`. If used by shipped source, add to an appropriate runtime extras group."
+    status: done
+
+  - id: w3
+    summary: "Inventory AI-primitives imports: sentence_transformers, spacy, textblob, torch. Confirm guarded import pattern. Add an `ai-primitives` extras group declaring the supported optional set."
+    status: done
+
+  - id: w4
+    summary: "Update `docs/development/dependency-inventory.md` Used-But-Undeclared section to reflect the new declarations (or document any that were intentionally left undeclared, with reason)."
+    needs: [w1, w2, w3]
+    status: done
+
+  - id: w5
+    summary: "Run fast suite to confirm no install regressions."
+    needs: [w1, w2, w3]
+    status: done
+
+deferred:
+  - summary: "Decide which AI-primitive backend is the canonical default"
+    reason: "Product-level choice; out of scope for this declaration cleanup."
+
+files_affected:
+  modified:
+    - "pyproject.toml"
+    - "uv.lock"
+    - "docs/development/dependency-inventory.md"
+
+must_preserve:
+  - "Existing guarded-import patterns in `benchbox/core/ai_primitives/` continue to work without the optional deps installed"
+  - "Visualization image tests continue to work where PIL is currently relied on"
+  - "Fast suite green"
+  - "No new unconditional `import PIL`/`import torch`/etc — declarations only, not new imports"
+
+approach: |
+  Inventory-first. For each undeclared import, check the actual code path
+  before deciding:
+    - Is it shipped source or test-only?
+    - Is it guarded behind try/except?
+    - Is there a sensible extras group for it (existing `viz`, `dev`,
+      or new `ai-primitives`)?
+  Add the minimum declaration needed. Update the inventory doc to close
+  the loop.
+
+anti_patterns:
+  - "DO NOT add deps to core just to make undeclared imports satisfied — because that bloats the minimal install — use extras groups"
+  - "DO NOT remove the guarded-import pattern in AI-primitives — because the whole point is they remain optional — declarations only"
+
+verification:
+  - description: "Used-but-undeclared section in inventory updated to reflect new state"
+    command: "uv run -- python -c \"import pathlib; t = pathlib.Path('docs/development/dependency-inventory.md').read_text(); assert 'used-but-undeclared' in t.lower(); print('OK: section still present')\""
+    expected_output: "OK: section still present"
+  - description: "Fast suite passes"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "no failures"
+
+scope_limit:
+  only_modify:
+    - "pyproject.toml"
+    - "uv.lock"
+    - "docs/development/dependency-inventory.md"
+  do_not_modify:
+    - "benchbox/"
+    - "tests/"
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["maintenance", "supply-chain", "deps", "audit-followup"]
+  estimated_effort: "Small-Medium (2-4 hours: inventory + extras additions + doc update)"
+  created_date: "2026-04-15"
+
+impact:
+  business_value: |
+    Removes silent dependency-on-transitive-reach. Users who want AI
+    primitives get a known-good install path instead of guessing.
+  user_impact: |
+    `pip install benchbox[ai-primitives]` (or similar) becomes a real,
+    documented option. PIL / ansi2html stop being undeclared surprises.
+  technical_debt: |
+    Closes the used-but-undeclared findings from the dependency-inventory
+    audit.
+
+success_metrics:
+  - "All three undeclared categories (PIL, ansi2html, AI-primitives) either have an explicit `pyproject.toml` declaration or a documented reason in `dependency-inventory.md` for staying undeclared"
+  - "Fast suite still green"

@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:13:42.288374'
-total_items: 709
+generated_at: '2026-04-15T20:17:52.413469'
+total_items: 710
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4325,6 +4325,24 @@ items:
   category: ux-improvements
   priority: Low
   status: Completed
+- id: declare-undeclared-runtime-imports
+  file: DONE/main/active/declare-undeclared-runtime-imports.yaml
+  title: Declare currently-undeclared runtime imports (pillow, ansi2html, AI-primitives stack)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Completed
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - audit-followup
+  estimated_effort: 'Small-Medium (2-4 hours: inventory + extras additions + doc update)'
+  completed_date: '2026-04-15'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  deferred_count: 1
 - id: pg-mooncake-type-compat-matrix
   file: DONE/platform-expansion/active/pg-mooncake-type-compat-matrix.yaml
   title: Document pg_mooncake data type compatibility matrix with automated probing
