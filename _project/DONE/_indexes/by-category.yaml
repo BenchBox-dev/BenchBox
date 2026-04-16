@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:23:33.952828'
+generated_at: '2026-04-15T20:28:14.815800'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 61
+    count: 63
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -503,6 +503,11 @@ categories:
       title: Optimize Benchmark Results JSON Output Format
       priority: Medium
       status: Completed
+    - id: tighten-dependencies-phase-plan
+      file: DONE/main/active/tighten-dependencies-phase-plan.yaml
+      title: 'Parent: phased plan to tighten BenchBox dependency surface'
+      priority: Medium
+      status: Completed
     - id: timing-full-repo-audit-and-allowlist-enforcement
       file: DONE/main/active/timing-full-repo-audit-and-allowlist-enforcement.yaml
       title: Perform full-repo timing audit/migration with wall-clock allowlist enforcement
@@ -516,6 +521,11 @@ categories:
     - id: platform-adapter-and-core-module-code-consolidation
       file: DONE/unknown/planning/platform-adapter-and-core-module-code-consolidation.yaml
       title: Platform Adapter and Core Module Code Consolidation
+      priority: Medium
+      status: Completed
+    - id: add-dependency-audit-ci-guard
+      file: DONE/main/active/add-dependency-audit-ci-guard.yaml
+      title: Promote dependency audit AST scripts to a CI guard against re-introduction of unused deps
       priority: Medium
       status: Completed
     - id: reduce-cc12-complexity-ceiling

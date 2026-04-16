@@ -1,8 +1,16 @@
-generated_at: '2026-04-15T20:23:32.218008'
-total_items: 38
+generated_at: '2026-04-15T20:28:13.155357'
+total_items: 36
 statuses:
+  In Progress:
+    count: 1
+    items:
+    - id: explorer-unify-visualization-foundations
+      file: TODO/main/active/explorer-unify-visualization-foundations.yaml
+      title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
+      priority: High
+      category: Core Functionality
   Not Started:
-    count: 30
+    count: 27
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -94,16 +102,6 @@ statuses:
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
       category: Core Functionality
-    - id: tighten-dependencies-phase-plan
-      file: TODO/main/planning/tighten-dependencies-phase-plan.yaml
-      title: 'Parent: phased plan to tighten BenchBox dependency surface'
-      priority: Medium
-      category: Code Quality and Technical Debt
-    - id: add-dependency-audit-ci-guard
-      file: TODO/main/planning/add-dependency-audit-ci-guard.yaml
-      title: Promote dependency audit AST scripts to a CI guard against re-introduction of unused deps
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
@@ -139,11 +137,6 @@ statuses:
       title: TigerData Cloud Enhancements
       priority: Low
       category: Platform Expansion
-    - id: explorer-unify-visualization-foundations
-      file: TODO/main/planning/explorer-unify-visualization-foundations.yaml
-      title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
-      priority: High
-      category: Core Functionality
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR

@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:23:33.952490'
-total_items: 712
+generated_at: '2026-04-15T20:28:14.815504'
+total_items: 714
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7012,6 +7012,25 @@ items:
   work_total: 3
   work_done: 3
   work_ready: 0
+- id: tighten-dependencies-phase-plan
+  file: DONE/main/active/tighten-dependencies-phase-plan.yaml
+  title: 'Parent: phased plan to tighten BenchBox dependency surface'
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - audit-followup
+  - parent-todo
+  estimated_effort: Parent (phased; sum of children)
+  completed_date: '2026-04-15'
+  work_total: 5
+  work_done: 4
+  work_ready: 1
+  deferred_count: 3
 - id: performance-regression-detection-system
   file: DONE/enterprise-ops-regression/planning/performance-regression-detection-system.yaml
   title: Performance Regression Detection System
@@ -7122,6 +7141,28 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
+- id: add-dependency-audit-ci-guard
+  file: DONE/main/active/add-dependency-audit-ci-guard.yaml
+  title: Promote dependency audit AST scripts to a CI guard against re-introduction of unused deps
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - ci
+  - audit-followup
+  - regression-guard
+  estimated_effort: 'Medium (4-6 hours: script promotion + allowlist + Makefile + CI hook + reconcile)'
+  completed_date: '2026-04-15'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  deferred_count: 2
+  needs:
+  - tighten-dependencies-phase-plan
 - id: pyspark-dataframe-adapter
   file: DONE/dataframe-expansion/planning/pyspark-dataframe-adapter.yaml
   title: PySpark DataFrame Adapter Implementation

@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:23:33.953028'
-total_items: 712
+generated_at: '2026-04-15T20:28:14.815968'
+total_items: 714
 priorities:
   Critical:
     count: 41
@@ -1985,7 +1985,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 289
+    count: 291
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2925,6 +2925,11 @@ priorities:
       title: Parameterize _insert_{store,catalog,web}_returns in TPC-DS maintenance operations
       category: Core Functionality
       status: Completed
+    - id: tighten-dependencies-phase-plan
+      file: DONE/main/active/tighten-dependencies-phase-plan.yaml
+      title: 'Parent: phased plan to tighten BenchBox dependency surface'
+      category: Code Quality and Technical Debt
+      status: Completed
     - id: performance-regression-detection-system
       file: DONE/enterprise-ops-regression/planning/performance-regression-detection-system.yaml
       title: Performance Regression Detection System
@@ -2984,6 +2989,11 @@ priorities:
       file: DONE/ci-infrastructure/active/parallel-test-run-lock.yaml
       title: Prevent concurrent parallel test runs via fcntl.flock mutex
       category: CI Infrastructure
+      status: Completed
+    - id: add-dependency-audit-ci-guard
+      file: DONE/main/active/add-dependency-audit-ci-guard.yaml
+      title: Promote dependency audit AST scripts to a CI guard against re-introduction of unused deps
+      category: Code Quality and Technical Debt
       status: Completed
     - id: pyspark-dataframe-adapter
       file: DONE/dataframe-expansion/planning/pyspark-dataframe-adapter.yaml

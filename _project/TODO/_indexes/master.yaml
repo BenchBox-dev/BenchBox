@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:23:32.217933'
-total_items: 38
+generated_at: '2026-04-15T20:28:13.155287'
+total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -132,12 +132,12 @@ items:
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
 - id: explorer-unify-visualization-foundations
-  file: TODO/main/planning/explorer-unify-visualization-foundations.yaml
+  file: TODO/main/active/explorer-unify-visualization-foundations.yaml
   title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
   worktree: main
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - explorer
   - visualization
@@ -498,45 +498,6 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
-- id: tighten-dependencies-phase-plan
-  file: TODO/main/planning/tighten-dependencies-phase-plan.yaml
-  title: 'Parent: phased plan to tighten BenchBox dependency surface'
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: Not Started
-  tags:
-  - maintenance
-  - supply-chain
-  - deps
-  - audit-followup
-  - parent-todo
-  estimated_effort: Parent (phased; sum of children)
-  work_total: 5
-  work_done: 0
-  work_ready: 2
-  deferred_count: 3
-- id: add-dependency-audit-ci-guard
-  file: TODO/main/planning/add-dependency-audit-ci-guard.yaml
-  title: Promote dependency audit AST scripts to a CI guard against re-introduction of unused deps
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: Not Started
-  tags:
-  - maintenance
-  - supply-chain
-  - deps
-  - ci
-  - audit-followup
-  - regression-guard
-  estimated_effort: 'Medium (4-6 hours: script promotion + allowlist + Makefile + CI hook + reconcile)'
-  work_total: 7
-  work_done: 0
-  work_ready: 1
-  deferred_count: 2
-  needs:
-  - tighten-dependencies-phase-plan
 - id: write-results-platform-phase-2-operations-runbook
   file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
   title: Write the Phase 2 results-platform operations runbook

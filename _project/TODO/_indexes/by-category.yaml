@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:23:32.217975'
+generated_at: '2026-04-15T20:28:13.155325'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -33,21 +33,11 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 4
+    count: 2
     items:
     - id: migrate-psycopg2-to-psycopg3
       file: TODO/main/planning/migrate-psycopg2-to-psycopg3.yaml
       title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
-      priority: Medium
-      status: Not Started
-    - id: tighten-dependencies-phase-plan
-      file: TODO/main/planning/tighten-dependencies-phase-plan.yaml
-      title: 'Parent: phased plan to tighten BenchBox dependency surface'
-      priority: Medium
-      status: Not Started
-    - id: add-dependency-audit-ci-guard
-      file: TODO/main/planning/add-dependency-audit-ci-guard.yaml
-      title: Promote dependency audit AST scripts to a CI guard against re-introduction of unused deps
       priority: Medium
       status: Not Started
     - id: review-dependency-upper-bounds-quarterly
@@ -124,10 +114,10 @@ categories:
       priority: Low
       status: Not Started
     - id: explorer-unify-visualization-foundations
-      file: TODO/main/planning/explorer-unify-visualization-foundations.yaml
+      file: TODO/main/active/explorer-unify-visualization-foundations.yaml
       title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
       priority: High
-      status: Not Started
+      status: In Progress
   Documentation:
     count: 2
     items:

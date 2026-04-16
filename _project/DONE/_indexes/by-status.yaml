@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:23:33.953216'
-total_items: 712
+generated_at: '2026-04-15T20:28:14.816137'
+total_items: 714
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 661
+    count: 663
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2349,6 +2349,11 @@ statuses:
       title: Parameterize _insert_{store,catalog,web}_returns in TPC-DS maintenance operations
       priority: Medium
       category: Core Functionality
+    - id: tighten-dependencies-phase-plan
+      file: DONE/main/active/tighten-dependencies-phase-plan.yaml
+      title: 'Parent: phased plan to tighten BenchBox dependency surface'
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: patch-tpcds-source-stdout
       file: DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml
       title: Patch TPC-DS source to fix stdout data generation
@@ -2519,6 +2524,11 @@ statuses:
       title: Promote PostgreSQL to first-class platform status
       priority: High
       category: Platform Expansion
+    - id: add-dependency-audit-ci-guard
+      file: DONE/main/active/add-dependency-audit-ci-guard.yaml
+      title: Promote dependency audit AST scripts to a CI guard against re-introduction of unused deps
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: quality-make-timing-policy-ci-gate
       file: DONE/main/quality/quality-make-timing-policy-ci-gate.yaml
       title: Promote timing policy audit to CI gate and audit 154 wall-clock sites

@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:23:32.217996'
-total_items: 38
+generated_at: '2026-04-15T20:28:13.155346'
+total_items: 36
 priorities:
   Critical:
     count: 2
@@ -43,10 +43,10 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
     - id: explorer-unify-visualization-foundations
-      file: TODO/main/planning/explorer-unify-visualization-foundations.yaml
+      file: TODO/main/active/explorer-unify-visualization-foundations.yaml
       title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: verify-trust-badge-rendering-in-explorer
       file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
       title: Visually verify TrustBadge rendering across all 4 explorer pages
@@ -91,7 +91,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 10
+    count: 8
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -127,16 +127,6 @@ priorities:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
-      status: Not Started
-    - id: tighten-dependencies-phase-plan
-      file: TODO/main/planning/tighten-dependencies-phase-plan.yaml
-      title: 'Parent: phased plan to tighten BenchBox dependency surface'
-      category: Code Quality and Technical Debt
-      status: Not Started
-    - id: add-dependency-audit-ci-guard
-      file: TODO/main/planning/add-dependency-audit-ci-guard.yaml
-      title: Promote dependency audit AST scripts to a CI guard against re-introduction of unused deps
-      category: Code Quality and Technical Debt
       status: Not Started
     - id: write-results-platform-phase-2-operations-runbook
       file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml

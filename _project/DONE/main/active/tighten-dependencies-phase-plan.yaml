@@ -2,7 +2,8 @@ id: tighten-dependencies-phase-plan
 title: "Parent: phased plan to tighten BenchBox dependency surface"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-15"
 category: Code Quality and Technical Debt
 description: |
   Umbrella TODO that sequences the dependency-tightening work emerging from
@@ -32,7 +33,7 @@ description: |
 work:
   - id: w1
     summary: "Phase 0 — execute the 5 ready follow-ups in order: sphinx-dev-deps → lxml → jsonschema → chdb-core → declare-undeclared. One PR each."
-    status: pending
+    status: done
     notes: |
       Order: clean-up-unused-sphinx-dev-deps → drop-lxml-dev-dep-or-port-test-to-stdlib →
       move-jsonschema-out-of-core-runtime-deps → drop-chdb-core-from-core-dependencies →
@@ -40,17 +41,17 @@ work:
 
   - id: w2
     summary: "Phase 1 — fold into Phase 0's `declare-undeclared-runtime-imports` TODO (covers `pillow`, `ansi2html`, AI-primitives extras). No separate child TODO needed."
-    status: pending
+    status: done
     needs: [w1]
 
   - id: w3
     summary: "Phase 2 — execute child TODO `extract-project-scripts-to-isolated-env` to give internal TODO/release tooling its own pyproject.toml so jsonschema/ruamel-yaml leave the main manifest entirely."
-    status: pending
+    status: done
     needs: [w1]
 
   - id: w4
     summary: "Phase 4 — execute child TODO `add-dependency-audit-ci-guard` to promote the audit's AST scripts into a `make audit-deps` check wired into CI."
-    status: pending
+    status: done
     needs: [w1, w3]
 
   - id: w5
