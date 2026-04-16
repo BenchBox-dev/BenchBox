@@ -248,7 +248,7 @@ work:
   summary: "Migrate questdb.py, pg_mooncake.py, pg_duckdb.py in one commit: import renames only. Drop vestigial psycopg2.extras
     from questdb.py; keep psycopg2_sql alias in mooncake/duckdb files."
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     questdb.py (lines 52-55): drop psycopg2.extras (vestigial per w1):
       try:
