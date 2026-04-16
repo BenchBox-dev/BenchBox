@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T08:04:19.806378'
-total_items: 717
+generated_at: '2026-04-16T09:12:29.339481'
+total_items: 718
 priorities:
   Critical:
     count: 41
@@ -1456,7 +1456,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 108
+    count: 109
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1648,6 +1648,11 @@ priorities:
       file: DONE/main/planning/docs-fix-deprecated-references.yaml
       title: Clean up deprecated command references and stale content across docs
       category: Documentation
+      status: Completed
+    - id: explorer-close-chart-type-coverage-gaps
+      file: DONE/main/active/explorer-close-chart-type-coverage-gaps.yaml
+      title: 'Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others'
+      category: Core Functionality
       status: Completed
     - id: open-table-format-gap-analysis
       file: DONE/main/active/open-table-format-gap-analysis.yaml

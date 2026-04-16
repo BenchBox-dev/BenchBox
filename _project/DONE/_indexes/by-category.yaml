@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T08:04:19.806203'
+generated_at: '2026-04-16T09:12:29.338871'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -652,7 +652,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 238
+    count: 239
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -908,6 +908,11 @@ categories:
       file: DONE/main/active/centralize-output-control-and-eliminate-print-leaks.yaml
       title: Centralize user output control and eliminate print leaks across CLI/core/MCP paths
       priority: High
+      status: Completed
+    - id: explorer-close-chart-type-coverage-gaps
+      file: DONE/main/active/explorer-close-chart-type-coverage-gaps.yaml
+      title: 'Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others'
+      priority: Medium-High
       status: Completed
     - id: cloud-spark-adapter-consolidation
       file: DONE/platform-expansion/active/cloud-spark-adapter-consolidation.yaml

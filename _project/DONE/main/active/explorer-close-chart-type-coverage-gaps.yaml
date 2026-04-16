@@ -2,7 +2,8 @@ id: explorer-close-chart-type-coverage-gaps
 title: "Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-04-16"
 category: Core Functionality
 
 description: |
@@ -58,7 +59,7 @@ work:
   - id: w1
     summary: "Port `percentile_ladder`: emit p50/p90/p95/p99 arrays + ladder SVG component"
     needs: []
-    status: pending
+    status: done
     notes: |
       Tier 1 — highest-impact missing chart for tail-latency credibility.
       Placement: ResultDetail.tsx side panel + Compare.tsx tab alongside
@@ -71,7 +72,7 @@ work:
   - id: w2
     summary: "Port `cdf_chart`: emit CDF samples + SVG component"
     needs: []
-    status: pending
+    status: done
     notes: |
       Tier 1 — distribution-shape companion to percentile_ladder.
       Placement: Compare.tsx tab + per-result detail page.
@@ -80,7 +81,7 @@ work:
   - id: w3
     summary: "Port `rank_table`: emit per-query rank matrix + table component"
     needs: []
-    status: pending
+    status: done
     notes: |
       Tier 2 — per-query ranks (1..N) across platforms with optional
       ↑↓ rank-change arrows. Useful for TPC-DS (99 queries) where the
@@ -93,7 +94,7 @@ work:
   - id: w4
     summary: "Port `distribution_box`: emit min/Q1/median/Q3/max per query + box-plot component"
     needs: []
-    status: pending
+    status: done
     notes: |
       Tier 2 — reveals platforms with high run-to-run variance even
       when median looks good. Consumes raw per-sample timings already
@@ -105,7 +106,7 @@ work:
   - id: w5
     summary: "Port `query_histogram`: emit binned histogram + SVG component (auto-split when query_count > 33)"
     needs: [w1, w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Tier 3 — match the CLI auto-split behavior (when query count > 33
       the CLI splits into multiple panels). Bin edges decided in Python
@@ -114,7 +115,7 @@ work:
   - id: w6
     summary: "Port `power_bar`: dedicated TPC Power@Size visualization (first-class on BenchmarkIndex)"
     needs: [w1, w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Tier 3 — currently buried in Compare summary cards as a small dl
       row. Promote to a first-class chart on BenchmarkIndex when
@@ -124,7 +125,7 @@ work:
   - id: w7
     summary: "Port `stacked_phase`: phase breakdown (load/warmup/power/throughput) stacked bars"
     needs: [w1, w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Tier 3 — useful for TPC-H/TPC-DS where load and throughput phases
       matter for comparison fairness. Phase totals already in
@@ -134,7 +135,7 @@ work:
   - id: w8
     summary: "Port `time_series`: trend chart of geomean_ms / power_score over run_date, per platform"
     needs: [w5, w6, w7]
-    status: pending
+    status: done
     notes: |
       Tier 4 — surfaces regressions across releases.
       Placement: PlatformIndex.tsx (per-platform history) + new
@@ -147,7 +148,7 @@ work:
   - id: w9
     summary: "Port `cost_scatter`: cost_usd vs power_score (or geomean_ms) scatter"
     needs: [w5, w6, w7]
-    status: pending
+    status: done
     notes: |
       Tier 4 — central for cloud DW comparisons
       (Snowflake/BigQuery/Athena/Databricks).
@@ -158,7 +159,7 @@ work:
   - id: w10
     summary: "Port `sparkline_table`: compact metrics table with embedded micro-charts"
     needs: [w5, w6, w7]
-    status: pending
+    status: done
     notes: |
       Tier 4 — compact alternative to the heatmap for the home page or
       platform overview. Each row carries a per-query trend mini-chart.
@@ -166,7 +167,7 @@ work:
   - id: w11
     summary: "Add `chartRegistry.ts` mirroring chart_types.py + meta-test enforcing registry parity"
     needs: [w8, w9, w10]
-    status: pending
+    status: done
     notes: |
       Final integration step:
         - Create `results-explorer/src/lib/chartRegistry.ts` mirroring

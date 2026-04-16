@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T08:04:19.806543'
-total_items: 717
+generated_at: '2026-04-16T09:12:29.339726'
+total_items: 718
 statuses:
   In Progress:
     count: 2
@@ -271,7 +271,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 665
+    count: 666
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -989,6 +989,11 @@ statuses:
       title: Close SQL injection gaps in platform adapter identifier validation
       priority: High
       category: Platform Expansion
+    - id: explorer-close-chart-type-coverage-gaps
+      file: DONE/main/active/explorer-close-chart-type-coverage-gaps.yaml
+      title: 'Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others'
+      priority: Medium-High
+      category: Core Functionality
     - id: open-table-format-gap-analysis
       file: DONE/main/active/open-table-format-gap-analysis.yaml
       title: Close open table format support gaps across all BenchBox platforms
