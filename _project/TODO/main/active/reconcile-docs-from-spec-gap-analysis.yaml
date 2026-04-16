@@ -138,7 +138,7 @@ work:
 
 - id: w6
   summary: "Fix nyctaxi.md: document the spatial query layer (benchbox/core/nyctaxi/spatial.py)"
-  status: pending
+  status: done
   notes: |
     RESEARCH GATE (run before editing):
       # Confirm spatial.py API surface
