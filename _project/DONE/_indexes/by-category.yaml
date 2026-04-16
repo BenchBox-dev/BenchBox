@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:28:14.815800'
+generated_at: '2026-04-15T20:44:05.955364'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -647,7 +647,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 236
+    count: 237
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1809,6 +1809,11 @@ categories:
     - id: timing-query-contract-unification
       file: DONE/main/active/timing-query-contract-unification.yaml
       title: Unify runtime query timing contract to execution_time_seconds
+      priority: High
+      status: Completed
+    - id: explorer-unify-visualization-foundations
+      file: DONE/main/active/explorer-unify-visualization-foundations.yaml
+      title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
       priority: High
       status: Completed
     - id: explorer-compare-url-short-ids

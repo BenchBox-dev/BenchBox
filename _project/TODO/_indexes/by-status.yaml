@@ -1,14 +1,6 @@
-generated_at: '2026-04-15T20:28:13.155357'
-total_items: 36
+generated_at: '2026-04-15T20:44:04.349760'
+total_items: 35
 statuses:
-  In Progress:
-    count: 1
-    items:
-    - id: explorer-unify-visualization-foundations
-      file: TODO/main/active/explorer-unify-visualization-foundations.yaml
-      title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
-      priority: High
-      category: Core Functionality
   Not Started:
     count: 27
     items:

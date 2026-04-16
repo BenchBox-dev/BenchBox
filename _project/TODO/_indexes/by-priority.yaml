@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:28:13.155346'
-total_items: 36
+generated_at: '2026-04-15T20:44:04.349751'
+total_items: 35
 priorities:
   Critical:
     count: 2
@@ -15,7 +15,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 7
+    count: 6
     items:
     - id: explorer-emit-comparison-artifact-from-pipeline
       file: TODO/main/planning/explorer-emit-comparison-artifact-from-pipeline.yaml
@@ -42,11 +42,6 @@ priorities:
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
       status: Not Started
-    - id: explorer-unify-visualization-foundations
-      file: TODO/main/active/explorer-unify-visualization-foundations.yaml
-      title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
-      category: Core Functionality
-      status: In Progress
     - id: verify-trust-badge-rendering-in-explorer
       file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
       title: Visually verify TrustBadge rendering across all 4 explorer pages

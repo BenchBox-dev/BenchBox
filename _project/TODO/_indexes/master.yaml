@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:28:13.155287'
-total_items: 36
+generated_at: '2026-04-15T20:44:04.349706'
+total_items: 35
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -131,26 +131,6 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
-- id: explorer-unify-visualization-foundations
-  file: TODO/main/active/explorer-unify-visualization-foundations.yaml
-  title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - explorer
-  - visualization
-  - ux
-  - refactor
-  - consistency
-  estimated_effort: Medium-Large (3-5 days)
-  work_total: 9
-  work_done: 0
-  work_ready: 2
-  deferred_count: 3
-  needs:
-  - explorer-establish-cli-explorer-parity-tests
 - id: verify-trust-badge-rendering-in-explorer
   file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
   title: Visually verify TrustBadge rendering across all 4 explorer pages

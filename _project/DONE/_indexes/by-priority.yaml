@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:28:14.815968'
-total_items: 714
+generated_at: '2026-04-15T20:44:05.955536'
+total_items: 715
 priorities:
   Critical:
     count: 41
@@ -210,7 +210,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 246
+    count: 247
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -1253,6 +1253,11 @@ priorities:
     - id: timing-query-contract-unification
       file: DONE/main/active/timing-query-contract-unification.yaml
       title: Unify runtime query timing contract to execution_time_seconds
+      category: Core Functionality
+      status: Completed
+    - id: explorer-unify-visualization-foundations
+      file: DONE/main/active/explorer-unify-visualization-foundations.yaml
+      title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
       category: Core Functionality
       status: Completed
     - id: validate-isolated-runtime-importability

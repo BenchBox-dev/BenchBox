@@ -1,0 +1,366 @@
+id: explorer-unify-visualization-foundations
+title: "Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG"
+worktree: main
+priority: High
+status: Completed
+category: Core Functionality
+
+description: |
+  The 2026-04-15 review identified a cluster of foundational issues in
+  the results explorer that share the same root cause: visualization
+  primitives are defined inline per component instead of shared. These
+  bugs produce inconsistent UX today and block clean follow-on work
+  (chart-coverage expansion, parity tests, comparison artifacts).
+
+  Five distinct problems, fixable as one coordinated change:
+
+  **Issue 1 — Dual definition of "speedup" on the Compare page.**
+  Summary cards (Compare.tsx:225) compute `slowest_primary / primary`
+  (a "vs slowest" spread). Per-query breakdown table (Compare.tsx:392)
+  computes `slowest / fastest` (within-query spread). Speedup chart
+  (NormalizedSpeedupChart.tsx:57) computes `baseline / this`
+  (per-baseline ratio). All three render with the same "x" label.
+  Users see contradictory numbers on the same page.
+
+  **Issue 2 — Color/style constants duplicated across 4 files.**
+  `COMPARE_COLORS` / `CHART_COLORS` (`["#3b82f6","#10b981","#f59e0b","#ef4444"]`)
+  defined in Compare.tsx:17, NormalizedSpeedupChart.tsx:22,
+  DivergingBarChart.tsx:11, QueryTimingChart.tsx:18. Plus magic numbers
+  `LOG2_MIN/MAX`, `MAX_DELTA_PCT=300`, `GRID_STOPS=[0.25,0.5,1,2,4]`
+  scattered without a single source.
+
+  **Issue 3 — "Failed to Decode Data" error is opaque and misleading.**
+  When a benchmark artifact is missing, Vite serves the SPA HTML
+  fallback (HTTP 200), `DecompressionStream` then throws
+  "Failed to Decode Data" (manifest.ts:81-87). Users see this on the
+  TPC-H Results page (the user's screenshot of 2026-04-15) when the
+  page loads before the manifest filter has resolved the phase.
+  Three sub-problems: (a) BenchmarkIndex.tsx:84 useEffect fires before
+  `phases` resolves; (b) error message gives no clue what happened;
+  (c) Vite SPA fallback is detected as "decode error" rather than 404.
+
+  **Issue 4 — SVG charts have hardcoded viewBox dimensions.**
+  NormalizedSpeedupChart.tsx:69 (`viewBox="0 0 600 …"`),
+  DivergingBarChart.tsx:91 (`viewBox="0 0 600 …"`),
+  QueryTimingChart.tsx:58 (`viewBox="0 0 800 …"`),
+  GroupedQueryChart (`viewBox="0 0 900 …"`). All use
+  `preserveAspectRatio="none"` so on wide screens text squishes and
+  bar widths look wrong. This is a primary visual contributor to the
+  user's "sub-par visualizations" complaint.
+
+  **Issue 5 — Compare uses `geomean_ms` ignoring per-benchmark primary metric.**
+  Compare.tsx:151-156 hardcodes `getPrimary(r) = r.geomean_ms`. For
+  benchmarks where `power_score` is the primary metric (defined in
+  RANKING_METRIC_BY_FAMILY), the speedup math runs on the wrong axis.
+  Already exposed via BenchmarkSummary.ranking.primary_metric for the
+  heatmap (QueryHeatmap.tsx:102-107) — Compare needs to consume the
+  same registry.
+
+work:
+- id: w1
+  summary: "Create `results-explorer/src/lib/chartTheme.ts` consolidating colors, scales, and chart constants"
+  status: done
+  notes: |
+    Single export point for:
+      export const PALETTE = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
+      export const HEAT_MIN_RATIO = 1;
+      export const HEAT_MAX_RATIO = 10;
+      export const SPEEDUP_LOG2_MIN = Math.log2(0.2);
+      export const SPEEDUP_LOG2_MAX = Math.log2(5);
+      export const SPEEDUP_GRID_STOPS = [0.25, 0.5, 1, 2, 4];
+      export const DIVERGING_MAX_PCT = 300;
+      export const FASTER_FILL = "#22c55e";
+      export const SLOWER_FILL = "#ef4444";
+      export function paletteColor(index: number): string { ... }
+
+    Replace duplicates in Compare.tsx:17, NormalizedSpeedupChart.tsx:22,
+    DivergingBarChart.tsx:11, QueryTimingChart.tsx:18 with imports.
+
+- id: w2
+  summary: "Unify the speedup definition: pick `slowest / this` for cross-result, `baseline / this` for per-baseline; rename
+    so the contract is visible in the API"
+  needs: [w1]
+  status: done
+  notes: |
+    Soft cross-item dep: helpers live in `chartMath.ts`, created by
+    `explorer-establish-cli-explorer-parity-tests` w1 (declared as a
+    hard dep on this item). If for any reason this lands first,
+    create `chartMath.ts` here and let parity adopt it.
+
+
+    Two distinct concepts deserve two distinct names — but only TWO,
+    not THREE:
+
+      - **`vsSlowestRatio(thisMs, slowestMs)`** — used by summary cards
+        and breakdown table. Always `>= 1`. Labelled "vs slowest" in UI.
+        Replaces both the dual definitions in Compare.tsx:225 and :392.
+
+      - **`vsBaselineRatio(thisMs, baselineMs)`** — used by
+        NormalizedSpeedupChart only. Can be < 1 or > 1. Labelled
+        "vs <baseline name>" in UI.
+
+    UI labels MUST always include the comparison target so users
+    cannot read "1.5x" without knowing what it is relative to.
+
+    Both functions live in `chartMath.ts` (created by
+    `explorer-establish-cli-explorer-parity-tests` w1) when it lands
+    first; if this item lands first, create them here and let the
+    parity item adopt them.
+
+- id: w3
+  summary: "Build `lib/useElementSize.ts` ResizeObserver hook and convert NormalizedSpeedupChart as the proof of concept"
+  needs: [w1]
+  status: done
+  notes: |
+    Pattern: switch from `viewBox="0 0 600 H"` + `preserveAspectRatio="none"`
+    to a measured layout:
+      - `useElementSize` returns `{ width, height }` from a ref;
+        internal ResizeObserver, debounced via rAF if needed
+      - Caller sets `viewBox="0 0 ${width} ${H}"`
+      - Drop `preserveAspectRatio="none"` so text and bar widths scale
+        consistently
+      - Honor min-width with horizontal scroll fallback for mobile
+
+    Convert NormalizedSpeedupChart.tsx as the reference implementation.
+    Add a Vitest test that mounts the chart at three widths
+    (400, 800, 1600) and asserts the SVG `viewBox` width attribute
+    matches the container width (snapshot SVG attrs, not pixels).
+
+- id: w8
+  summary: "Apply the responsive viewBox pattern to DivergingBarChart, QueryTimingChart, GroupedQueryChart"
+  needs: [w3]
+  status: done
+  notes: |
+    Reuse `useElementSize` from w3. QueryHeatmap is HTML table-based
+    and not affected. Each chart gets its own multi-width Vitest test
+    following the w3 pattern.
+
+- id: w4
+  summary: "Improve missing-artifact UX in `manifest.ts` and `BenchmarkIndex.tsx`"
+  status: done
+  notes: |
+    Three changes:
+
+    (a) `manifest.ts` `getBenchmarkSummary`: detect HTML fallback
+        before attempting to decompress:
+          const ct = res.headers.get("content-type") || "";
+          if (ct.includes("text/html")) {
+            throw new Error(
+              `No benchmark data available for ${benchmark} SF ${sf} phase ${phase}. ` +
+              `Try a different phase or scale factor.`
+            );
+          }
+
+    (b) `BenchmarkIndex.tsx:84` useEffect — guard the request:
+          if (!manifest || phases.length === 0) return;
+          // also guard against effectivePhase being a stale value
+          // when phases just resolved
+
+    (c) `BenchmarkIndex.tsx:294-296` — when summaryError matches the
+        "No benchmark data available" pattern, surface as an
+        informational empty state ("No data for this combination —
+        try another phase") instead of an amber error banner. Other
+        errors (network, gzip-of-truncated-artifact) keep the amber
+        banner with the underlying error text.
+
+- id: w5
+  summary: "Add `lib/ranking.ts` mirroring RANKING_METRIC_BY_FAMILY with `primaryMetricFor(benchmark)`"
+  needs: [w2]
+  status: done
+  notes: |
+    Single function: `primaryMetricFor(benchmark: string): "power_score" | "geomean_ms"`.
+    Source of truth remains Python (`benchbox/core/ranking.py` —
+    RANKING_METRIC_BY_FAMILY). Comment in `ranking.ts` MUST cite the
+    canonical Python file path so the mirror cannot drift silently.
+
+    Add a parity fixture (or unit test) that pins the registry
+    contents on both sides — divergence fails CI.
+
+- id: w9
+  summary: "Wire Compare.tsx to call `primaryMetricFor` and render dynamic summary card labels"
+  needs: [w5]
+  status: done
+  notes: |
+    Compare.tsx:151-156 currently hardcodes `geomean_ms`. Replace:
+      function getPrimary(r): number | null {
+        const metric = primaryMetricFor(r.benchmark);
+        return metric === "power_score" ? r.power_score : r.display_geomean_ms;
+      }
+
+    Update summary card label dynamically: "Power Score" or "Geomean
+    query time" depending on the primary metric. Keep the secondary
+    metric visible as a deemphasized row.
+
+    If the comparison-artifact item has landed and the artifact carries
+    `ranking_primary_metric`, prefer reading it from the artifact and
+    fall back to `primaryMetricFor` only on the legacy code path.
+
+- id: w6
+  summary: "Centralize chart memoization helpers — `useMemo` for `colMins` in QueryHeatmap and similar hot paths"
+  needs: [w8]
+  status: done
+  notes: |
+    Touch-up pass after the foundational changes:
+      - QueryHeatmap.tsx:93-99 — wrap `colMins` in `useMemo` keyed on
+        `summary` (the `for` loop runs every render today; it spreads
+        across `query_ids.length × platforms.length`)
+      - DivergingBarChart.tsx:73-79 (`sorted`, `medianDelta`) — also
+        `useMemo` if the chart re-renders on baseline change
+
+    Each memoization must be measured with a quick perf check (browser
+    profiler on a 100-platform × 99-query case) and only kept if it
+    changes render time meaningfully — do not pile on memoization for
+    its own sake.
+
+- id: w7
+  summary: "Add Vitest coverage for the foundational changes"
+  needs: [w2, w8, w4, w9]
+  status: done
+  notes: |
+    New tests:
+      - `chartTheme.test.ts` — palette has 4 distinct colors,
+        paletteColor(i) wraps correctly, no exports collide
+      - `Compare.test.tsx` — summary card and breakdown table
+        numbers agree (regression test for the dual-speedup bug)
+      - `Compare.test.tsx` — for a benchmark where primary_metric is
+        "power_score", the speedup math uses power_score not geomean
+      - `BenchmarkIndex.test.tsx` — when manifest has a benchmark with
+        test_type only "standard", page loads "standard" phase artifact
+        successfully (regression for the user-reported "Failed to
+        Decode Data" symptom)
+      - `BenchmarkIndex.test.tsx` — when getBenchmarkSummary throws the
+        "No benchmark data available" message, the page shows the
+        informational empty state (not amber error banner)
+      - Visual smoke: each refactored chart renders at 3 viewport
+        widths without throwing
+
+deferred:
+- summary: "Replace SVG with Canvas/WebGL for very large heatmaps (>500 platforms)"
+  reason: "Premature — current SVG handles realistic corpus sizes fine; revisit if pages get sluggish at scale"
+- summary: "Server-side rendering of charts for SEO"
+  reason: "Tracked separately in vite.config.ts NOTE about pre-rendering — out of scope for this foundational pass"
+- summary: "Off-scale indicator for diverging-bar values clamped at 300%"
+  reason: "Nice-to-have polish; ship after the foundational architecture is unified — chart coverage gaps are higher priority"
+
+files_affected:
+  added:
+  - "results-explorer/src/lib/chartTheme.ts"
+  - "results-explorer/src/lib/useElementSize.ts"
+  - "results-explorer/src/lib/ranking.ts"
+  - "results-explorer/src/__tests__/chartTheme.test.ts"
+  - "results-explorer/src/__tests__/ranking.test.ts"
+  - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+  modified:
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+  - "results-explorer/src/components/DivergingBarChart.tsx"
+  - "results-explorer/src/components/QueryTimingChart.tsx"
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/manifest.ts"
+  - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+
+must_preserve:
+- "QueryHeatmap visual output — colorForCell/lightnessForCell return values must not change"
+- "Compare URL format `?ids=id1,id2,...` — short-id resolution behavior unchanged"
+- "ComparabilityBanner UI and `buildComparabilityWarnings` API — only consumers change, not the warning generation"
+- "Existing 36 Vitest tests + Python fast suite — all must still pass"
+- "QueryHeatmap row selection / Compare URL building — touched only to read from chartTheme, not behavior change"
+
+approach: |
+  Foundation-first, then refactor, then test:
+    1. chartTheme.ts (w1) — pure constants, zero risk
+    2. Speedup unification (w2) — single API replaces three call sites;
+       parity item adopts these helpers when it consumes chartMath.ts
+    3. Responsive SVG (w3→w8) — useElementSize hook + reference chart,
+       then propagate to the remaining three SVG charts
+    4. Error UX (w4) — independent of the chart work
+    5. Primary metric (w5→w9) — registry mirror first, then Compare
+       wiring; depends on speedup unification because both touch getPrimary
+    6. Memoization (w6) — final polish, only after refactors settle
+    7. Tests (w7) — cover all of the above with regression cases
+
+  Coordinate with `explorer-establish-cli-explorer-parity-tests` and
+  `explorer-emit-comparison-artifact-from-pipeline`: this item creates
+  the central `chartTheme.ts` + speedup helpers. The parity item will
+  add fixture coverage for those helpers; the comparison-artifact item
+  will deliver pre-computed values that flow through the same helpers.
+
+anti_patterns:
+- "DO NOT keep the `slowestPrimary / primary` definition in summary cards while changing the breakdown table — because that
+  recreates the dual-definition bug elsewhere — fix all three call sites in one commit"
+- "DO NOT leave inline color constants in any chart component — because that defeats the centralization purpose — every color
+  comes from chartTheme.ts, no exceptions"
+- "DO NOT solve responsive SVG by adding CSS `width: 100%` only — because preserveAspectRatio=none stretches the geometry
+  — must use measured width with a real ResizeObserver"
+- "DO NOT fall back to `phaseFilter` (=power) in BenchmarkIndex.tsx:81 when phases is empty — because that re-introduces the
+  original bug — guard the useEffect so no request fires until phases resolves"
+- "DO NOT couple primary-metric awareness to a hardcoded benchmark whitelist — because RANKING_METRIC_BY_FAMILY already exists
+  in Python — surface it through the artifact contract OR mirror it once in lib/ranking.ts with a comment pointing to the
+  canonical Python source"
+- "DO NOT add `useMemo` everywhere as a stylistic preference — because excessive memoization adds its own overhead — only
+  memo where profiler shows the work is hot"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/lib/chartTheme.ts"
+  - "results-explorer/src/lib/useElementSize.ts"
+  - "results-explorer/src/lib/ranking.ts"
+  - "results-explorer/src/lib/chartMath.ts"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+  - "results-explorer/src/components/DivergingBarChart.tsx"
+  - "results-explorer/src/components/QueryTimingChart.tsx"
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/manifest.ts"
+  - "results-explorer/src/__tests__/**"
+  - "results-explorer/src/pages/__tests__/**"
+  - "results-explorer/src/components/__tests__/**"
+  do_not_modify:
+  - "benchbox/**"
+  - "results-explorer/src/types.ts"
+
+verification:
+- description: "chartTheme.ts is the single source of palette/scale constants"
+  command: "grep -rn '\\[\"#3b82f6\"' results-explorer/src/ --include='*.tsx' --include='*.ts' | grep -v chartTheme.ts"
+  expected_output: "zero matches outside chartTheme.ts"
+- description: "No three-way speedup divergence on Compare page"
+  command: "grep -nE 'slowestPrimary / primary|slowest / fastest|baselineMs / t' results-explorer/src/pages/Compare.tsx"
+  expected_output: "all three replaced with vsSlowestRatio / vsBaselineRatio helper calls"
+- description: "manifest.ts detects HTML fallback"
+  command: "grep -n 'text/html' results-explorer/src/manifest.ts"
+  expected_output: "explicit content-type guard added"
+- description: "BenchmarkIndex guards useEffect against empty phases"
+  command: "grep -n 'phases.length === 0' results-explorer/src/pages/BenchmarkIndex.tsx"
+  expected_output: "guard added inside the summary-loading useEffect"
+- description: "All SVG charts use measured width"
+  command: "grep -nE 'viewBox=\"0 0 (600|800|900)' results-explorer/src/components/"
+  expected_output: "zero matches — all replaced with template-literal viewBox"
+- description: "Compare honors per-benchmark primary metric"
+  command: "grep -nE 'r\\.geomean_ms[^_]' results-explorer/src/pages/Compare.tsx"
+  expected_output: "no remaining hardcoded geomean_ms in getPrimary; uses primaryMetricFor"
+- description: "All Vitest tests pass"
+  command: "cd results-explorer && npm test"
+  expected_output: "all tests pass; new tests cover speedup-unification, primary-metric-awareness, responsive viewBox, and
+    error UX"
+- description: "TypeScript still compiles"
+  command: "cd results-explorer && npm run typecheck"
+  expected_output: "0 errors"
+
+deps:
+  needs:
+  - explorer-establish-cli-explorer-parity-tests
+
+success_metrics:
+- "Visiting `/results/tpch/` on a fresh dev server (no stale cache) loads the heatmap without error"
+- "When a benchmark/SF/phase combination has no artifact, the user sees an actionable empty-state, not 'Failed to Decode Data'"
+- "Resizing the browser window from 400px to 1600px keeps chart text legible and bars proportional"
+- "Summary card 'vs slowest' value matches the breakdown table 'Δ fastest' for the same row"
+- "For a clickbench-family benchmark (where power_score is primary), Compare shows speedups based on power_score not geomean_ms"
+
+metadata:
+  tags: ["explorer", "visualization", "ux", "refactor", "consistency"]
+  estimated_effort: "Medium-Large (3-5 days)"
+  created_date: "2026-04-15"
+  completed_date: "2026-04-15"

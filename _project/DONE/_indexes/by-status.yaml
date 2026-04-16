@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:28:14.816137'
-total_items: 714
+generated_at: '2026-04-15T20:44:05.955691'
+total_items: 715
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 663
+    count: 664
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3158,6 +3158,11 @@ statuses:
     - id: timing-query-contract-unification
       file: DONE/main/active/timing-query-contract-unification.yaml
       title: Unify runtime query timing contract to execution_time_seconds
+      priority: High
+      category: Core Functionality
+    - id: explorer-unify-visualization-foundations
+      file: DONE/main/active/explorer-unify-visualization-foundations.yaml
+      title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
       priority: High
       category: Core Functionality
     - id: explorer-compare-url-short-ids

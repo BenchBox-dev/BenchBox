@@ -1,5 +1,5 @@
-generated_at: '2026-04-15T20:28:14.815504'
-total_items: 714
+generated_at: '2026-04-15T20:44:05.955055'
+total_items: 715
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3881,6 +3881,26 @@ items:
   work_ready: 0
   needs:
   - timing-clock-foundation-and-correctness
+- id: explorer-unify-visualization-foundations
+  file: DONE/main/active/explorer-unify-visualization-foundations.yaml
+  title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - visualization
+  - ux
+  - refactor
+  - consistency
+  estimated_effort: Medium-Large (3-5 days)
+  work_total: 9
+  work_done: 9
+  work_ready: 0
+  deferred_count: 3
+  needs:
+  - explorer-establish-cli-explorer-parity-tests
 - id: validate-isolated-runtime-importability
   file: DONE/core-functionality/active/validate-isolated-runtime-importability.yaml
   title: Validate isolated runtime importability before treating as cache hit

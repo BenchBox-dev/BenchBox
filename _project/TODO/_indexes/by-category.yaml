@@ -1,4 +1,4 @@
-generated_at: '2026-04-15T20:28:13.155325'
+generated_at: '2026-04-15T20:44:04.349738'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 14
+    count: 13
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -113,11 +113,6 @@ categories:
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
       status: Not Started
-    - id: explorer-unify-visualization-foundations
-      file: TODO/main/active/explorer-unify-visualization-foundations.yaml
-      title: 'Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG'
-      priority: High
-      status: In Progress
   Documentation:
     count: 2
     items:
