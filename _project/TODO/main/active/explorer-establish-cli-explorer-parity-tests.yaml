@@ -86,7 +86,7 @@ work:
   - id: w3
     summary: "Add Vitest parity suite at `results-explorer/src/__tests__/parity/chartMath.parity.test.ts` that loads each fixture and asserts equivalence"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Pattern: read each `tests/parity/fixtures/*.json` (relative path
       computed in vitest config), iterate `cases`, call the corresponding
