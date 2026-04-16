@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T08:04:18.138436'
+generated_at: '2026-04-16T09:12:27.407580'
 total_items: 34
 priorities:
   Critical:
@@ -60,11 +60,6 @@ priorities:
       title: Automate corpus-inventory.json generation from results-data/bundles/
       category: Core Functionality
       status: Completed
-    - id: explorer-close-chart-type-coverage-gaps
-      file: TODO/main/planning/explorer-close-chart-type-coverage-gaps.yaml
-      title: 'Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others'
-      category: Core Functionality
-      status: Not Started
     - id: define-hosted-results-contract-and-governance-model
       file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
@@ -75,6 +70,11 @@ priorities:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Completed
+    - id: reconcile-docs-from-spec-gap-analysis
+      file: TODO/main/planning/reconcile-docs-from-spec-gap-analysis.yaml
+      title: Reconcile documentation gaps found in archived spec review
+      category: Documentation
+      status: Not Started
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission

@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T08:04:18.138423'
+generated_at: '2026-04-16T09:12:27.407564'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 12
+    count: 11
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -58,11 +58,6 @@ categories:
       title: Automate corpus-inventory.json generation from results-data/bundles/
       priority: Medium-High
       status: Completed
-    - id: explorer-close-chart-type-coverage-gaps
-      file: TODO/main/planning/explorer-close-chart-type-coverage-gaps.yaml
-      title: 'Close chart-type coverage gaps: percentile_ladder, cdf, rank_table, distribution_box, and 6 others'
-      priority: Medium-High
-      status: Not Started
     - id: define-results-platform-product-and-launch-strategy
       file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
       title: Define BenchBox results platform product boundary and launch strategy
@@ -109,8 +104,13 @@ categories:
       priority: Low
       status: Not Started
   Documentation:
-    count: 2
+    count: 3
     items:
+    - id: reconcile-docs-from-spec-gap-analysis
+      file: TODO/main/planning/reconcile-docs-from-spec-gap-analysis.yaml
+      title: Reconcile documentation gaps found in archived spec review
+      priority: Medium-High
+      status: Not Started
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
