@@ -1,7 +1,7 @@
 id: questdb-benchmark-compatibility-remediation
 title: "QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage"
 worktree: main
-priority: Medium-High
+priority: High
 status: Not Started
 category: Platform Support
 
@@ -16,7 +16,7 @@ description: |
 
   **BROKEN — SQL dialect (5 benchmarks)** — All queries fail due to comma-JOIN syntax:
     tpch (22/22 fail), tpcds (99/99 fail), ssb (13/13 fail),
-    tpchavoc (220/220 fail), tpch_skew (22/22 fail)
+    tpchavoc (220/220 fail — 10 iterations × 22 queries), tpch_skew (22/22 fail)
     Root cause: QuestDB 9.3.4 does NOT support implicit comma-JOIN syntax
     (FROM a, b WHERE a.x = b.y) despite docs claiming it works. Additionally
     INTERVAL arithmetic (CAST(x AS DATE) + INTERVAL '…') fails; use dateadd().
@@ -230,7 +230,7 @@ work:
 
   - id: w7
     summary: "Design QuestDB SQL dialect rewriter architecture"
-    needs: [w1, w2, w3]
+    needs: [w1]
     status: pending
     notes: |
       Before implementing, design the rewriter so it is:
@@ -278,39 +278,65 @@ work:
       for comma-JOIN expansion.
 
   - id: w8
-    summary: "Implement comma-JOIN → explicit JOIN rewriter using SQLGlot AST"
+    summary: "Implement comma-JOIN AST walker and 2-table rewrite (SQLGlot foundation)"
     needs: [w7]
     status: pending
     notes: |
-      This is the highest-impact rewrite — without it, 5 benchmarks are 100% broken.
+      Foundation slice — get the AST walking framework working on the simplest case.
+      Split from original w8 to keep the work unit within the 1-4 hour target.
 
-      Implementation approach (based on w7 design):
+      Implementation:
         1. Parse query with `sqlglot.parse_one(query, dialect='postgres')`
         2. Walk all FROM clauses looking for comma-separated table references
            (SQLGlot AST node: `From` with multiple `Table` children)
-        3. Extract the implicit join conditions from the WHERE clause
-           (equality predicates referencing cross-table column pairs)
-        4. Reconstruct as explicit JOIN … ON nodes
-        5. Re-emit with `sqlglot.generate(ast, dialect='postgres')`
+        3. For the 2-table case: extract the single equality predicate from WHERE
+           that references both tables, split remaining predicates as true filters,
+           reconstruct as a single JOIN … ON node
+        4. Re-emit with `sqlglot.generate(ast, dialect='postgres')`
+        5. Verify passthrough: queries without comma JOINs emit unchanged
 
-      Hard cases to handle:
+      Test fixtures (create in `tests/unit/platforms/test_questdb_rewriter.py`):
+        - Single 2-table comma JOIN (TPC-H Q20 simplified form)
+        - Unaliased tables: `FROM lineitem, part WHERE l_partkey = p_partkey`
+        - No comma JOIN (verify passthrough, no AST rewrite)
+        - Filter + join predicate in same WHERE (verify split)
+
+      Deferred to w9: multi-way joins, aliased tables, mixed explicit+implicit,
+      subqueries in FROM.
+
+  - id: w9
+    summary: "Extend comma-JOIN rewriter to multi-way joins, aliases, and subqueries"
+    needs: [w8]
+    status: pending
+    notes: |
+      Builds on the w8 foundation to handle the harder cases TPC-H and TPC-DS
+      actually produce.
+
+      Cases to handle (add one at a time, test after each):
         - Multi-way joins: FROM a, b, c with three equality predicates
+          (TPC-H Q9 has 6-table comma JOIN)
         - Aliased tables: FROM lineitem l, part p WHERE l.l_partkey = p.p_partkey
         - Mixed explicit+implicit: FROM a JOIN b ON … , c WHERE c.x = b.y
         - Subqueries in FROM with aliases
-        - WHERE clause has both join conditions AND filter predicates (must split)
+        - Nested: WHERE clause of an outer query contains a subquery that itself
+          has comma JOINs — recurse into subqueries during AST walk
 
-      Test fixtures needed (create in `tests/unit/platforms/test_questdb_rewriter.py`):
-        - Single comma JOIN (TPC-H Q20 simplified)
+      Join-order heuristic: when multiple join predicates exist, the rewriter
+      must pick an ordering that keeps each JOIN connected to already-joined
+      tables. Use a simple greedy walk (start with first table, join each
+      subsequent table via whichever predicate connects it to the current set).
+
+      Additional test fixtures:
         - 3-table comma JOIN (TPC-H Q9)
-        - Aliased tables
+        - 6-table comma JOIN (TPC-H Q9 full)
+        - Aliased tables in TPC-DS form
         - Mixed explicit + implicit JOIN
-        - No comma JOIN (verify passthrough)
         - Subquery containing comma JOIN
+        - Nested comma JOINs (outer + subquery)
 
       Verify against live QuestDB after each fixture passes the unit test.
 
-  - id: w9
+  - id: w10
     summary: "Implement INTERVAL arithmetic and SUBSTRING FROM/FOR rewrites"
     needs: [w7]
     status: pending
@@ -340,9 +366,9 @@ work:
         - Each pattern with boundary variants (leading space, newlines, trailing comma)
         - Passthrough test for queries with none of these patterns
 
-  - id: w10
+  - id: w11
     summary: "Wire dialect rewriter into QuestDB adapter and run full TPC-H validation"
-    needs: [w8, w9]
+    needs: [w9, w10]
     status: pending
     notes: |
       Wire the rewriter into `QuestDBAdapter.execute_query()` as a pre-execution step.
@@ -359,9 +385,9 @@ work:
         `uv run benchbox run --platform questdb --benchmark ssb \
           --scale 0.1 --platform-option http_port=19000`
 
-  - id: w11
+  - id: w12
     summary: "Run full TPC-DS validation after dialect rewriter"
-    needs: [w10]
+    needs: [w11]
     status: pending
     notes: |
       TPC-DS uses comma JOINs throughout but also has additional syntax issues
@@ -383,9 +409,9 @@ work:
         B) Unsupported QuestDB feature (hard block)
         C) BenchBox translation gap
 
-  - id: w12
+  - id: w13
     summary: "Update local_stress_test.sh with Phase 1 + Phase 2 gating information"
-    needs: [w2, w10]
+    needs: [w2, w11]
     status: pending
     notes: |
       Update `scripts/local_stress_test.sh` with a comment block documenting the
@@ -464,21 +490,18 @@ approach: |
   that schema-failing benchmarks can load and the adapter bugs don't confuse
   future debugging.
 
-  Phase 2 (w7–w12): expand SQL coverage via a dedicated dialect rewriter in
+  Phase 2 (w7–w13): expand SQL coverage via a dedicated dialect rewriter in
   questdb_rewriter.py. Use SQLGlot AST (already a project dependency) for the
-  comma-JOIN rewrite (the hardest part), and regex for the simpler pattern
-  rewrites (INTERVAL, SUBSTRING, CTE column list). Wire the rewriter into
-  QuestDBAdapter.execute_query() as the last pre-execution step.
+  comma-JOIN rewrite — split across w8 (foundation, 2-table case) and w9
+  (multi-way/aliased/nested cases) — and regex for the simpler rewrites in w10
+  (INTERVAL, SUBSTRING, CTE column list). Wire the rewriter into
+  QuestDBAdapter.execute_query() in w11 as the last pre-execution step.
 
   The research gate (w1) is non-negotiable before writing any gating code (w2)
   so the mechanism fits the existing CLI architecture rather than introducing a
   new pattern that diverges from how supports_dataframe is enforced.
 
 verification:
-  - description: "Research gate conclusion documented (w1 output)"
-    command: "grep -A5 'Research gate conclusion' _project/TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml"
-    expected_output: "w2 notes updated with the chosen mechanism and file/line insertion point"
-
   - description: "Phase 1: always-failing benchmarks gate cleanly"
     command: "uv run benchbox run --platform questdb --benchmark tpch --scale 0.01 --platform-option http_port=19000 2>&1 | grep -E 'incompatible|unsupported|gated'"
     expected_output: "Clear error message stating tpch is incompatible with QuestDB pending Phase 2 dialect rewriter"

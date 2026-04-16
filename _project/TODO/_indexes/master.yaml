@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T15:49:47.330569'
+generated_at: '2026-04-16T15:59:24.721119'
 total_items: 35
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -74,6 +74,24 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
+- id: questdb-benchmark-compatibility-remediation
+  file: TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml
+  title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
+  worktree: main
+  category: Platform Support
+  priority: High
+  status: Not Started
+  tags:
+  - questdb
+  - compatibility
+  - platform-support
+  - sql-dialect
+  - adapter
+  estimated_effort: Large (1-2 weeks across phases)
+  work_total: 13
+  work_done: 0
+  work_ready: 4
+  deferred_count: 3
 - id: fix-git-author-history-rewrite
   file: TODO/main/planning/fix-git-author-history-rewrite.yaml
   title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
@@ -571,34 +589,16 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
-- id: questdb-benchmark-compatibility-remediation
-  file: TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml
-  title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
-  worktree: main
-  category: Platform Support
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - questdb
-  - compatibility
-  - platform-support
-  - sql-dialect
-  - adapter
-  estimated_effort: Large (1-2 weeks across phases)
-  work_total: 12
-  work_done: 0
-  work_ready: 4
-  deferred_count: 3
 - id: reconcile-docs-from-spec-gap-analysis
-  file: TODO/main/planning/reconcile-docs-from-spec-gap-analysis.yaml
+  file: TODO/main/active/reconcile-docs-from-spec-gap-analysis.yaml
   title: Reconcile documentation gaps found in archived spec review
   worktree: main
   category: Documentation
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   work_total: 14
-  work_done: 0
-  work_ready: 10
+  work_done: 5
+  work_ready: 7
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

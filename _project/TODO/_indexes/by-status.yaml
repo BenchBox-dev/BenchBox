@@ -1,16 +1,21 @@
-generated_at: '2026-04-16T15:49:47.330632'
+generated_at: '2026-04-16T15:59:24.721184'
 total_items: 35
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: migrate-psycopg2-to-psycopg3
       file: TODO/main/active/migrate-psycopg2-to-psycopg3.yaml
       title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
       priority: Medium
       category: Code Quality and Technical Debt
+    - id: reconcile-docs-from-spec-gap-analysis
+      file: TODO/main/active/reconcile-docs-from-spec-gap-analysis.yaml
+      title: Reconcile documentation gaps found in archived spec review
+      priority: Medium-High
+      category: Documentation
   Not Started:
-    count: 26
+    count: 25
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -95,18 +100,13 @@ statuses:
     - id: questdb-benchmark-compatibility-remediation
       file: TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml
       title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
-      priority: Medium-High
+      priority: High
       category: Platform Support
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       priority: Low
       category: Platform Expansion
-    - id: reconcile-docs-from-spec-gap-analysis
-      file: TODO/main/planning/reconcile-docs-from-spec-gap-analysis.yaml
-      title: Reconcile documentation gaps found in archived spec review
-      priority: Medium-High
-      category: Documentation
     - id: fix-git-author-history-rewrite
       file: TODO/main/planning/fix-git-author-history-rewrite.yaml
       title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)

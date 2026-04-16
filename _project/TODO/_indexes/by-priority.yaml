@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T15:49:47.330621'
+generated_at: '2026-04-16T15:59:24.721173'
 total_items: 35
 priorities:
   Critical:
@@ -15,7 +15,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 5
+    count: 6
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -26,6 +26,11 @@ priorities:
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
+      status: Not Started
+    - id: questdb-benchmark-compatibility-remediation
+      file: TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml
+      title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
+      category: Platform Support
       status: Not Started
     - id: fix-git-author-history-rewrite
       file: TODO/main/planning/fix-git-author-history-rewrite.yaml
@@ -43,7 +48,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 8
+    count: 7
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -70,16 +75,11 @@ priorities:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Completed
-    - id: questdb-benchmark-compatibility-remediation
-      file: TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml
-      title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
-      category: Platform Support
-      status: Not Started
     - id: reconcile-docs-from-spec-gap-analysis
-      file: TODO/main/planning/reconcile-docs-from-spec-gap-analysis.yaml
+      file: TODO/main/active/reconcile-docs-from-spec-gap-analysis.yaml
       title: Reconcile documentation gaps found in archived spec review
       category: Documentation
-      status: Not Started
+      status: In Progress
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
