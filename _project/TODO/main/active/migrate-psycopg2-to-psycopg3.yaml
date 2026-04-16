@@ -120,7 +120,7 @@ work:
   summary: "Migrate psycopg2_mixin.py: rename import psycopg2 → psycopg, update sql alias, consider renaming Psycopg2ConnectionMixin
     to PsycopgConnectionMixin."
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Import block (lines 38-47):
       Before:
