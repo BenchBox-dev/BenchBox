@@ -273,7 +273,7 @@ work:
   summary: "Migrate redshift.py fallback branch: rename psycopg2 → psycopg in the nested ImportError fallback only. Primary
     redshift-connector path is unchanged."
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Nested import (lines 39-48):
       Before:
