@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T15:44:05.160638'
-total_categories: 10
+generated_at: '2026-04-16T15:49:47.330606'
+total_categories: 11
 categories:
   Architecture & Refactoring:
     count: 1
@@ -158,6 +158,14 @@ categories:
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
       priority: Low
+      status: Not Started
+  Platform Support:
+    count: 1
+    items:
+    - id: questdb-benchmark-compatibility-remediation
+      file: TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml
+      title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
+      priority: Medium-High
       status: Not Started
   Repository Maintenance:
     count: 1

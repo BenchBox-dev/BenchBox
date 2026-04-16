@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T15:44:05.160655'
-total_items: 34
+generated_at: '2026-04-16T15:49:47.330621'
+total_items: 35
 priorities:
   Critical:
     count: 2
@@ -43,7 +43,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 7
+    count: 8
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -70,6 +70,11 @@ priorities:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Completed
+    - id: questdb-benchmark-compatibility-remediation
+      file: TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml
+      title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
+      category: Platform Support
+      status: Not Started
     - id: reconcile-docs-from-spec-gap-analysis
       file: TODO/main/planning/reconcile-docs-from-spec-gap-analysis.yaml
       title: Reconcile documentation gaps found in archived spec review

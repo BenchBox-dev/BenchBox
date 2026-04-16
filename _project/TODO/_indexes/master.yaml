@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T15:44:05.160606'
-total_items: 34
+generated_at: '2026-04-16T15:49:47.330569'
+total_items: 35
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -571,6 +571,24 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
+- id: questdb-benchmark-compatibility-remediation
+  file: TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml
+  title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
+  worktree: main
+  category: Platform Support
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - questdb
+  - compatibility
+  - platform-support
+  - sql-dialect
+  - adapter
+  estimated_effort: Large (1-2 weeks across phases)
+  work_total: 12
+  work_done: 0
+  work_ready: 4
+  deferred_count: 3
 - id: reconcile-docs-from-spec-gap-analysis
   file: TODO/main/planning/reconcile-docs-from-spec-gap-analysis.yaml
   title: Reconcile documentation gaps found in archived spec review
