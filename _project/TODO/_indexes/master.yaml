@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:50:52.569981'
-total_items: 39
+generated_at: '2026-04-16T20:55:09.626609'
+total_items: 40
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -216,6 +216,22 @@ items:
   work_done: 0
   work_ready: 0
   deferred_count: 1
+- id: explorer-meta-leaderboard-review-followups
+  file: TODO/main/planning/explorer-meta-leaderboard-review-followups.yaml
+  title: Address follow-up findings from cross-benchmark meta-leaderboard code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - explorer
+  - meta-leaderboard
+  - pipeline
+  - review-followup
+  estimated_effort: Tiny (< 1 hour)
+  work_total: 5
+  work_done: 0
+  work_ready: 0
 - id: explorer-matrix-leaderboard-review-followups
   file: TODO/main/planning/explorer-matrix-leaderboard-review-followups.yaml
   title: Address follow-up findings from matrix-leaderboard code review
