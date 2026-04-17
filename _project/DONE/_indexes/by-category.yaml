@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:42:50.075637'
-total_categories: 77
+generated_at: '2026-04-16T20:44:14.795442'
+total_categories: 78
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -125,6 +125,14 @@ categories:
       file: DONE/main/active/isolate-experimental-core-subsystems.yaml
       title: Move 5 experimental subsystems out of benchbox/core/ into an explicit experimental namespace
       priority: High
+      status: Completed
+  Architecture & Refactoring:
+    count: 1
+    items:
+    - id: reconcile-docs-review-code-followups
+      file: DONE/main/active/reconcile-docs-review-code-followups.yaml
+      title: Reconcile three code-level inconsistencies surfaced by docs review
+      priority: Medium-High
       status: Completed
   Benchmark Correctness and Validation:
     count: 1

@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:42:50.075842'
-total_items: 720
+generated_at: '2026-04-16T20:44:14.795652'
+total_items: 721
 priorities:
   Critical:
     count: 41
@@ -1456,7 +1456,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 110
+    count: 111
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1943,6 +1943,11 @@ priorities:
       file: DONE/main/planning/reconcile-docs-from-spec-gap-analysis.yaml
       title: Reconcile documentation gaps found in archived spec review
       category: Documentation
+      status: Completed
+    - id: reconcile-docs-review-code-followups
+      file: DONE/main/active/reconcile-docs-review-code-followups.yaml
+      title: Reconcile three code-level inconsistencies surfaced by docs review
+      category: Architecture & Refactoring
       status: Completed
     - id: quality-reduce-complexity-hotspots-to-mccabe-20
       file: DONE/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml

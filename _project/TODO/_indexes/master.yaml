@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:42:43.224782'
-total_items: 38
+generated_at: '2026-04-16T20:44:13.031955'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -621,24 +621,6 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
-- id: reconcile-docs-review-code-followups
-  file: TODO/main/active/reconcile-docs-review-code-followups.yaml
-  title: Reconcile three code-level inconsistencies surfaced by docs review
-  worktree: main
-  category: Architecture & Refactoring
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - refactoring
-  - datavault
-  - metadata-primitives
-  - tpch
-  - tpcds
-  - consistency
-  estimated_effort: Small
-  work_total: 3
-  work_done: 2
-  work_ready: 1
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

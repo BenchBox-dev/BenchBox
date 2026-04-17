@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:42:50.075215'
-total_items: 720
+generated_at: '2026-04-16T20:44:14.794979'
+total_items: 721
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -9730,6 +9730,25 @@ items:
   work_total: 14
   work_done: 14
   work_ready: 0
+- id: reconcile-docs-review-code-followups
+  file: DONE/main/active/reconcile-docs-review-code-followups.yaml
+  title: Reconcile three code-level inconsistencies surfaced by docs review
+  worktree: main
+  category: Architecture & Refactoring
+  priority: Medium-High
+  status: Completed
+  tags:
+  - refactoring
+  - datavault
+  - metadata-primitives
+  - tpch
+  - tpcds
+  - consistency
+  estimated_effort: Small
+  completed_date: '2026-04-16'
+  work_total: 3
+  work_done: 2
+  work_ready: 1
 - id: quality-reduce-complexity-hotspots-to-mccabe-20
   file: DONE/main/planning/quality-reduce-complexity-hotspots-to-mccabe-20.yaml
   title: Reduce McCabe complexity hotspots under 18 and gate C901 permanently

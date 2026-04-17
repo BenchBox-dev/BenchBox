@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:42:50.076051'
-total_items: 720
+generated_at: '2026-04-16T20:44:14.795849'
+total_items: 721
 statuses:
   In Progress:
     count: 2
@@ -271,7 +271,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 668
+    count: 669
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2709,6 +2709,11 @@ statuses:
       title: Reconcile documentation gaps found in archived spec review
       priority: Medium-High
       category: Documentation
+    - id: reconcile-docs-review-code-followups
+      file: DONE/main/active/reconcile-docs-review-code-followups.yaml
+      title: Reconcile three code-level inconsistencies surfaced by docs review
+      priority: Medium-High
+      category: Architecture & Refactoring
     - id: reduce-cc14-complexity-cluster
       file: DONE/main/active/reduce-cc14-complexity-cluster.yaml
       title: Reduce CC 14 complexity cluster — exclude 8 inherent, refactor 8 to ≤10
