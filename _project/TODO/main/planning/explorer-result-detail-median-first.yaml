@@ -89,6 +89,17 @@ scope_limit:
     - "results-explorer/src/pages/ResultDetail.tsx"
     - "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
 
+impact:
+  user_impact: |
+    Result detail pages match the rest of the explorer: one median
+    row per query by default, per-sample noise hidden behind an
+    expander. Users comparing a single result to a leaderboard no
+    longer see different numbers than the leaderboard shows.
+  technical_debt: |
+    Removes the last surface that reads raw queries[] as the default
+    view. Completes the "median at high level, samples on drilldown"
+    contract across the whole app.
+
 metadata:
   tags: ["explorer", "result-detail", "median", "ultraplan-phase-a"]
   estimated_effort: "Small (2-4 hours)"

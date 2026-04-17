@@ -151,6 +151,18 @@ scope_limit:
     - "results-explorer/src/pages/__tests__/Query.test.tsx"
     - "results-explorer/src/lib/queryFilters.ts"
 
+impact:
+  user_impact: |
+    Users can slice the full result corpus by platform, benchmark,
+    SF, date, trust tier, etc. with counted facets, export filtered
+    CSVs, and run arbitrary SELECT queries against results.duckdb
+    without downloading anything — parity with what a local
+    `benchbox results --sql` session offers.
+  business_value: |
+    The query workbench is the CloudSpecs-style analysis surface
+    that lets prospects explore their own questions against the
+    corpus, not just the questions we pre-baked into charts.
+
 metadata:
   tags: ["explorer", "query-workbench", "duckdb-wasm", "cloudspecs", "ultraplan-phase-c"]
   estimated_effort: "Medium (2-3 days)"

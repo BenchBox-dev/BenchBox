@@ -107,6 +107,17 @@ scope_limit:
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/pages/PlatformIndex.tsx"
 
+impact:
+  user_impact: |
+    Filter state is shareable: a colleague can paste a URL and land
+    on the same SF/phase/tuning view. Back/forward buttons restore
+    filter state instead of losing it.
+  technical_debt: |
+    One small hook replaces ad-hoc useState filter patterns across
+    BenchmarkIndex and PlatformIndex. Unblocks Home (master
+    leaderboard) and Query workbench from each inventing their own
+    URL-state plumbing.
+
 metadata:
   tags: ["explorer", "url-state", "hook", "ultraplan-phase-e"]
   estimated_effort: "Small (2-4 hours)"

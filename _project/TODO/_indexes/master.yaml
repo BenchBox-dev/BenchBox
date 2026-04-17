@@ -1,4 +1,4 @@
-generated_at: '2026-04-17T08:36:24.092505'
+generated_at: '2026-04-17T08:50:11.174857'
 total_items: 56
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -52,7 +52,7 @@ items:
   - clickbench
   - ultraplan-phase-b
   estimated_effort: Medium (1-2 days)
-  work_total: 6
+  work_total: 8
   work_done: 0
   work_ready: 2
   needs:
@@ -124,7 +124,7 @@ items:
   - cli-parity
   - ultraplan-phase-d
   estimated_effort: Medium (1-2 days)
-  work_total: 5
+  work_total: 8
   work_done: 0
   work_ready: 1
   needs:

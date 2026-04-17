@@ -76,21 +76,23 @@ work:
     needs: [w2, w3]
     status: pending
     notes: |
-      Extend tests in tests/unit/core/explorer_pipeline/:
-        - test_meta_leaderboard.py (or equivalent): assert each cell
-          has metric_value, speedup_vs_best, primary_metric,
-          primary_order; check speedup math for a latency cohort
-          (best = min) and a throughput cohort (best = max)
-        - test_duckdb_builder.py: assert results_schema.json exists
-          next to results.duckdb and lists the expected columns
+      - tests/unit/core/explorer_pipeline/test_meta_leaderboard.py (new):
+        assert each cell has metric_value, speedup_vs_best,
+        primary_metric, primary_order; check speedup math for a
+        latency cohort (best = min) and a throughput cohort
+        (best = max)
+      - tests/unit/core/explorer_pipeline/test_duckdb_builder.py
+        (extended): assert results_schema.json exists next to
+        results.duckdb and lists the expected columns
 
 files_affected:
   modified:
     - "benchbox/core/explorer_pipeline/pipeline.py"
     - "benchbox/core/explorer_pipeline/models.py"
     - "benchbox/core/explorer_pipeline/duckdb_builder.py"
-    - "tests/unit/core/explorer_pipeline/" # specific test files TBD
+    - "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
   added:
+    - "tests/unit/core/explorer_pipeline/test_meta_leaderboard.py"
     - "results_schema.json (emitted artifact, not checked in)"
 
 must_preserve:
@@ -131,7 +133,20 @@ scope_limit:
     - "benchbox/core/explorer_pipeline/pipeline.py"
     - "benchbox/core/explorer_pipeline/models.py"
     - "benchbox/core/explorer_pipeline/duckdb_builder.py"
-    - "tests/unit/core/explorer_pipeline/"
+    - "tests/unit/core/explorer_pipeline/test_meta_leaderboard.py"
+    - "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
+
+impact:
+  user_impact: |
+    Enables two downstream UIs that users will actually see: the
+    master leaderboard (absolute-value cells + speedup mode) and the
+    query workbench column picker. Users get cross-benchmark
+    numbers, not just cross-benchmark ranks.
+  technical_debt: |
+    Removes a planned frontend hardcoding of _COLUMNS by making the
+    pipeline the single source of truth for the results snapshot
+    schema. Meta-leaderboard cells stop dropping information that's
+    already computed one pass earlier.
 
 metadata:
   tags: ["explorer", "pipeline", "meta-leaderboard", "duckdb", "ultraplan-phase-f"]

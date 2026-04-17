@@ -61,17 +61,34 @@ work:
       visible platform rows.
 
   - id: w4
-    summary: "Rewrite Home.tsx around the new matrix"
+    summary: "Scaffold Home.tsx around the extended MetaLeaderboard as primary content"
     needs: [w3]
     status: pending
     notes: |
-      results-explorer/src/pages/Home.tsx — matrix becomes the
-      primary content. Cohort headers link to
-      /results/{benchmark}/?sf=X&phase=Y (preserve filter state).
-      Row click → /results/p/{platform_id}/. Keep Recent Results
-      list but demote below the matrix.
+      results-explorer/src/pages/Home.tsx — make the matrix the
+      primary content surface. Do not wire cohort/row navigation yet
+      (w6 handles that). Do not change the Recent Results position
+      yet (w5 handles that). Scope: layout only.
 
   - id: w5
+    summary: "Demote Recent Results list below the matrix"
+    needs: [w4]
+    status: pending
+    notes: |
+      Keep the Recent Results component and data surface; move its
+      render position below the matrix on Home.tsx. No behavioral
+      change to the list itself.
+
+  - id: w6
+    summary: "Wire cohort header links and row-click navigation with preserved filter state"
+    needs: [w4]
+    status: pending
+    notes: |
+      Cohort headers → /results/{benchmark}/?sf=X&phase=Y (preserve
+      the relevant slice of filter state via useUrlState's serde).
+      Row click → /results/p/{platform_id}/.
+
+  - id: w7
     summary: "Accessibility: reuse QueryHeatmap's role=grid + roving tabindex pattern"
     needs: [w4]
     status: pending
@@ -80,11 +97,11 @@ work:
       reuse the same a11y scaffolding (role=grid, aria-rowindex/col,
       roving tabindex). Existing tests like
       QueryHeatmap.a11y should continue to pass; author a sibling
-      MasterLeaderboard.a11y test covering the equivalent contract.
+      MetaLeaderboard.a11y test covering the equivalent contract.
 
-  - id: w6
+  - id: w8
     summary: "Vitest coverage for render-mode toggle, filter→matrix wiring, cohort-link state preservation"
-    needs: [w4, w5]
+    needs: [w5, w6, w7]
     status: pending
 
 files_affected:
@@ -93,7 +110,8 @@ files_affected:
     - "results-explorer/src/components/MetaLeaderboard.tsx"
     - "results-explorer/src/types.ts"
   added:
-    - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx (or sibling)"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
 
 must_preserve:
   - "Recent Results data surface remains accessible on Home (just demoted below the matrix)"
@@ -132,8 +150,20 @@ scope_limit:
   only_modify:
     - "results-explorer/src/pages/Home.tsx"
     - "results-explorer/src/components/MetaLeaderboard.tsx"
-    - "results-explorer/src/components/__tests__/"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
     - "results-explorer/src/types.ts"
+
+impact:
+  user_impact: |
+    Landing page answers "how fast is engine X on cohort Y" at a
+    glance with absolute numbers (not just cohort ranks). Users can
+    toggle to speedup-vs-best for normalized comparisons, and every
+    filter choice is in the URL so views are shareable.
+  business_value: |
+    Closes the ClickBench-model gap called out in the ultraplan —
+    the primary cross-benchmark entry point for prospects evaluating
+    BenchBox against alternatives.
 
 metadata:
   tags: ["explorer", "home", "master-leaderboard", "clickbench", "ultraplan-phase-b"]
