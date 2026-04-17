@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T07:47:11.083733'
-total_items: 49
+generated_at: '2026-04-17T07:53:24.975177'
+total_items: 50
 priorities:
   Critical:
     count: 2
@@ -134,7 +134,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 24
+    count: 25
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -194,6 +194,11 @@ priorities:
     - id: explorer-trust-tiers-review-followups
       file: TODO/main/planning/explorer-trust-tiers-review-followups.yaml
       title: Address follow-up findings from trust-tiers-as-badges code review
+      category: Core Functionality
+      status: Not Started
+    - id: explorer-unify-visualization-review-followups
+      file: TODO/main/planning/explorer-unify-visualization-review-followups.yaml
+      title: Address follow-up findings from unify-visualization-foundations code review
       category: Core Functionality
       status: Not Started
     - id: questdb-strip-pk-quoted-constraint-name

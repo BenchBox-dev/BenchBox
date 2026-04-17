@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T07:47:11.083685'
-total_items: 49
+generated_at: '2026-04-17T07:53:24.975126'
+total_items: 50
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -345,6 +345,22 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 3
+- id: explorer-unify-visualization-review-followups
+  file: TODO/main/planning/explorer-unify-visualization-review-followups.yaml
+  title: Address follow-up findings from unify-visualization-foundations code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - explorer
+  - visualization
+  - testing
+  - review-followup
+  estimated_effort: Small (2-3 hours)
+  work_total: 6
+  work_done: 0
+  work_ready: 6
 - id: questdb-strip-pk-quoted-constraint-name
   file: TODO/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
   title: Extend _strip_pk_constraints to handle quoted constraint names
