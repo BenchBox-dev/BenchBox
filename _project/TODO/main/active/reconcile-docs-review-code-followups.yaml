@@ -2,7 +2,7 @@ id: reconcile-docs-review-code-followups
 title: "Reconcile three code-level inconsistencies surfaced by docs review"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 description: |
   The reconcile-docs-from-spec-gap-analysis TODO was scoped to docs-only
   edits; verification of those doc edits against benchbox/ surfaced three
@@ -45,26 +45,28 @@ description: |
 category: Architecture & Refactoring
 
 work:
-  - id: w1
-    summary: "C1 — narrow HashAlgorithm Literal in datavault/etl/hash_functions.py:16 to ('md5',) to match benchmark.py SUPPORTED_HASH_ALGORITHMS"
-    status: pending
+- id: w1
+  summary: "C1 — narrow HashAlgorithm Literal in datavault/etl/hash_functions.py:16 to ('md5',) to match benchmark.py SUPPORTED_HASH_ALGORITHMS"
+  status: done
 
-  - id: w2
-    summary: "C2 — add 'duckdb' to no_acl set in metadata_primitives/ddl.py:583 so supports_acl('duckdb') returns False, matching the Tier 4 assignment in queries.yaml:1435-1438 and the other supports_* predicates"
-    status: pending
+- id: w2
+  summary: "C2 — add 'duckdb' to no_acl set in metadata_primitives/ddl.py:583 so supports_acl('duckdb') returns False, matching
+    the Tier 4 assignment in queries.yaml:1435-1438 and the other supports_* predicates"
+  status: pending
 
-  - id: w3
-    summary: "N1 — replace connection.cursor() with _make_stream_cursor(connection) at platforms/base/execution.py lines 547, 673, 765, 854, 1534 for consistency with line 369"
-    status: pending
+- id: w3
+  summary: "N1 — replace connection.cursor() with _make_stream_cursor(connection) at platforms/base/execution.py lines 547,
+    673, 765, 854, 1534 for consistency with line 369"
+  status: pending
 
 metadata:
   tags:
-    - refactoring
-    - datavault
-    - metadata-primitives
-    - tpch
-    - tpcds
-    - consistency
+  - refactoring
+  - datavault
+  - metadata-primitives
+  - tpch
+  - tpcds
+  - consistency
   estimated_effort: "Small"
   created_date: "2026-04-16"
   source_review: "Verification review of reconcile-docs-from-spec-gap-analysis (commits 92e108470..9327bd9e0)"
@@ -80,9 +82,10 @@ impact:
     harder. After this, each concept has one authoritative source.
 
 must_preserve:
-  - "DataVaultBenchmark hash validation continues to reject sha1/sha256 with the existing error message at benchmark.py:89-92"
-  - "All five throughput paths in execution.py continue to produce an object with a .execute() method (the _NoCloseProxy fallback preserves this for non-cursor-capable connections)"
-  - "supports_acl_introspection/role_hierarchy/column_grants predicates unchanged — only the no_acl set in supports_acl changes"
+- "DataVaultBenchmark hash validation continues to reject sha1/sha256 with the existing error message at benchmark.py:89-92"
+- "All five throughput paths in execution.py continue to produce an object with a .execute() method (the _NoCloseProxy fallback
+  preserves this for non-cursor-capable connections)"
+- "supports_acl_introspection/role_hierarchy/column_grants predicates unchanged — only the no_acl set in supports_acl changes"
 
 approach: |
   Three independent work units, no shared state. Each is a single-file
@@ -98,34 +101,37 @@ approach: |
     those (scope is throughput paths only).
 
 anti_patterns:
-  - "DO NOT widen SUPPORTED_HASH_ALGORITHMS to ('md5','sha1','sha256') for w1 — because the schema uses fixed-width BINARY(16) columns sized for MD5 and the error message explicitly cites 'schema constraints' — narrow the Literal instead"
-  - "DO NOT change supports_acl_introspection/role_hierarchy/column_grants for DuckDB in w2 — because those already correctly return False — only the no_acl set needs 'duckdb' added"
-  - "DO NOT refactor _make_stream_cursor's fallback behaviour in w3 — because the proxy is load-bearing for adapters without .cursor() — just adopt the helper at the five call sites"
+- "DO NOT widen SUPPORTED_HASH_ALGORITHMS to ('md5','sha1','sha256') for w1 — because the schema uses fixed-width BINARY(16)
+  columns sized for MD5 and the error message explicitly cites 'schema constraints' — narrow the Literal instead"
+- "DO NOT change supports_acl_introspection/role_hierarchy/column_grants for DuckDB in w2 — because those already correctly
+  return False — only the no_acl set needs 'duckdb' added"
+- "DO NOT refactor _make_stream_cursor's fallback behaviour in w3 — because the proxy is load-bearing for adapters without
+  .cursor() — just adopt the helper at the five call sites"
 
 verification:
-  - description: "datavault tests pass after Literal narrowing (w1)"
-    command: "uv run -- python -m pytest tests/ -k datavault -m fast -q"
-    expected_output: "all tests pass"
-  - description: "metadata_primitives tests pass after no_acl update (w2)"
-    command: "uv run -- python -m pytest tests/ -k metadata_primitives -m fast -q"
-    expected_output: "all tests pass"
-  - description: "throughput test suite passes after cursor helper adoption (w3)"
-    command: "uv run -- python -m pytest tests/ -k 'throughput or tpch or tpcds' -m fast -q"
-    expected_output: "all tests pass"
-  - description: "type check clean after Literal change (w1)"
-    command: "uv run ty check benchbox/core/datavault/"
-    expected_output: "no new errors introduced"
+- description: "datavault tests pass after Literal narrowing (w1)"
+  command: "uv run -- python -m pytest tests/ -k datavault -m fast -q"
+  expected_output: "all tests pass"
+- description: "metadata_primitives tests pass after no_acl update (w2)"
+  command: "uv run -- python -m pytest tests/ -k metadata_primitives -m fast -q"
+  expected_output: "all tests pass"
+- description: "throughput test suite passes after cursor helper adoption (w3)"
+  command: "uv run -- python -m pytest tests/ -k 'throughput or tpch or tpcds' -m fast -q"
+  expected_output: "all tests pass"
+- description: "type check clean after Literal change (w1)"
+  command: "uv run ty check benchbox/core/datavault/"
+  expected_output: "no new errors introduced"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/datavault/etl/hash_functions.py"
-    - "benchbox/core/metadata_primitives/ddl.py"
-    - "benchbox/platforms/base/execution.py"
+  - "benchbox/core/datavault/etl/hash_functions.py"
+  - "benchbox/core/metadata_primitives/ddl.py"
+  - "benchbox/platforms/base/execution.py"
   do_not_modify:
-    - "docs/"
-    - "benchbox/core/datavault/benchmark.py"
-    - "benchbox/core/metadata_primitives/catalog/queries.yaml"
+  - "docs/"
+  - "benchbox/core/datavault/benchmark.py"
+  - "benchbox/core/metadata_primitives/catalog/queries.yaml"
 
 commits:
-  - "de8b66244"  # docs(tpc-di) follow-up that surfaced these
-  - "9327bd9e0"  # completion of parent docs TODO
+- "de8b66244"    # docs(tpc-di) follow-up that surfaced these
+- "9327bd9e0"    # completion of parent docs TODO
