@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T20:59:45.412280'
+generated_at: '2026-04-16T21:02:21.375976'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -242,8 +242,13 @@ categories:
       priority: Low
       status: Not Started
   Testing and Quality Assurance:
-    count: 3
+    count: 4
     items:
+    - id: explorer-parity-tests-review-followups
+      file: TODO/main/planning/explorer-parity-tests-review-followups.yaml
+      title: Address follow-up findings from parity-tests code review
+      priority: Low
+      status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

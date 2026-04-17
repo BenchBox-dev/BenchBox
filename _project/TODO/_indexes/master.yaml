@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:59:45.412240'
-total_items: 45
+generated_at: '2026-04-16T21:02:21.375940'
+total_items: 46
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -248,6 +248,22 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 0
+- id: explorer-parity-tests-review-followups
+  file: TODO/main/planning/explorer-parity-tests-review-followups.yaml
+  title: Address follow-up findings from parity-tests code review
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Low
+  status: Not Started
+  tags:
+  - explorer
+  - parity
+  - testing
+  - review-followup
+  estimated_effort: Tiny (< 1 hour)
+  work_total: 4
+  work_done: 0
+  work_ready: 4
 - id: explorer-ranking-review-followups
   file: TODO/main/planning/explorer-ranking-review-followups.yaml
   title: Address follow-up findings from ranking-metric code review

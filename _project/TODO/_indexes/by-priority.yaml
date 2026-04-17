@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:59:45.412300'
-total_items: 45
+generated_at: '2026-04-16T21:02:21.375991'
+total_items: 46
 priorities:
   Critical:
     count: 2
@@ -134,7 +134,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 20
+    count: 21
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -165,6 +165,11 @@ priorities:
       file: TODO/main/planning/explorer-matrix-leaderboard-review-followups.yaml
       title: Address follow-up findings from matrix-leaderboard code review
       category: Core Functionality
+      status: Not Started
+    - id: explorer-parity-tests-review-followups
+      file: TODO/main/planning/explorer-parity-tests-review-followups.yaml
+      title: Address follow-up findings from parity-tests code review
+      category: Testing and Quality Assurance
       status: Not Started
     - id: explorer-ranking-review-followups
       file: TODO/main/planning/explorer-ranking-review-followups.yaml
