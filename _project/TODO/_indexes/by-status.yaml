@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:55:09.626757'
-total_items: 40
+generated_at: '2026-04-16T20:58:29.802576'
+total_items: 44
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 31
+    count: 35
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -67,6 +67,11 @@ statuses:
       title: Address follow-up findings from ranking-metric code review
       priority: Low
       category: Core Functionality
+    - id: timing-policy-split-review-followups
+      file: TODO/main/planning/timing-policy-split-review-followups.yaml
+      title: Address follow-up findings from timing-policy pre-commit split review
+      priority: Low
+      category: Testing & Quality
     - id: explorer-trust-tiers-review-followups
       file: TODO/main/planning/explorer-trust-tiers-review-followups.yaml
       title: Address follow-up findings from trust-tiers-as-badges code review
@@ -82,6 +87,11 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
+    - id: questdb-strip-pk-quoted-constraint-name
+      file: TODO/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
+      title: Extend _strip_pk_constraints to handle quoted constraint names
+      priority: Low
+      category: Platform Support
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -107,6 +117,11 @@ statuses:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: High
       category: Core Functionality
+    - id: questdb-parquet-chunk-size-tunable
+      file: TODO/main/planning/questdb-parquet-chunk-size-tunable.yaml
+      title: Make QuestDB parquet chunk row count tunable via platform config
+      priority: Low
+      category: Platform Support
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
@@ -157,6 +172,11 @@ statuses:
       title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
       priority: Medium-High
       category: Architecture & Refactoring
+    - id: questdb-imp-headerless-column-mapping-verify
+      file: TODO/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
+      title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
+      priority: Medium-High
+      category: Platform Support
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR

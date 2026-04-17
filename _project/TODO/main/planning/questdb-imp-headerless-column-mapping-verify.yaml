@@ -1,0 +1,109 @@
+id: questdb-imp-headerless-column-mapping-verify
+title: "Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Platform Support
+
+description: |
+  `_load_parquet_via_chunked_csv` sends chunk 1 with `header=True` and all
+  subsequent chunks with `header=False`.  Each chunk is an independent HTTP POST
+  to the QuestDB `/imp` REST endpoint with `overwrite=false` (append mode).
+
+  The implicit assumption is: when the target table already exists and
+  `overwrite=false` is set, QuestDB maps headerless CSV data by column position
+  against the existing table schema.
+
+  This assumption is unverified.  If QuestDB instead assigns synthetic column
+  names (`col0`, `col1`, …) to headerless uploads and requires an explicit header
+  to identify columns, every chunk after the first would land in the wrong columns
+  silently — the `/imp` response would still report N rows imported, masking the
+  corruption.
+
+  The tpcds_obt benchmark is the only current user of this code path, but any
+  future large-parquet load will hit the same path.
+
+  Flagged during Phase 1 remediation review (2026-04-16).
+
+work:
+- id: w1
+  summary: "Read QuestDB /imp documentation for overwrite=false + no-header behaviour"
+  needs: []
+  status: pending
+  notes: |
+    Check QuestDB REST API docs (/imp endpoint) for the interaction between:
+      - `overwrite=false` (append to existing table)
+      - missing header row in the uploaded CSV body
+
+    Specific question: does QuestDB map by header name (requires header on every
+    chunk) or by column position (safe without header)?
+
+    Sources: QuestDB 9.3.4 REST API reference, release notes, GitHub issues.
+    Also check: `curl` test against a running QuestDB instance with a known
+    schema — send two chunks, first with header, second without, verify the
+    second chunk's data lands in the correct columns by querying the table.
+
+- id: w2
+  summary: "Write a live integration test verifying two-chunk headerless import"
+  needs: [w1]
+  status: pending
+  notes: |
+    Add a test in `tests/integration/platforms/test_questdb_parquet_load.py`
+    (NOT fast-marked — requires a live QuestDB instance).
+
+    Test structure:
+      1. Create a table with 3 columns: id INT, name VARCHAR, val DOUBLE
+      2. Upload chunk 1 (header=True, 3 rows) via /imp with overwrite=false
+      3. Upload chunk 2 (header=False, 3 rows) via /imp with overwrite=false
+      4. SELECT * FROM table ORDER BY id
+      5. Assert all 6 rows have correct column values (not shifted)
+
+    If chunk 2 data arrives in wrong columns, the test will catch it here
+    rather than in a full tpcds_obt benchmark run.
+
+- id: w3
+  summary: "Update code and docstring based on findings"
+  needs: [w2]
+  status: pending
+  notes: |
+    Two outcomes:
+
+    CASE A — column mapping is positional (assumption holds):
+      Add a one-line comment in `_load_parquet_via_chunked_csv` (questdb.py:~880):
+        # QuestDB /imp maps headerless chunks by position against existing schema
+        # (verified against QuestDB 9.3.4 — see integration test).
+      No behaviour change needed.
+
+    CASE B — column mapping requires header on every chunk:
+      Change loop to always send `header=True`, but strip the header row from
+      subsequent chunks before POSTing (or use `skiprows=1` in pandas `to_csv`
+      equivalent).  The simplest safe fix: always include the header.
+      QuestDB /imp with `overwrite=false` + repeated header rows should be
+      idempotent if it ignores the header row for schema inference on append.
+      Verify this assumption too.
+
+must_preserve:
+- "_load_parquet_via_chunked_csv: overwrite=false on every chunk (must not be changed to true)"
+- "_load_parquet_via_chunked_csv: create_schema always runs before load_data — table exists and is empty at load time"
+- "All 4 TestLoadParquetViaChunkedCsv unit tests continue to pass after any code change"
+
+verification:
+- description: "Integration test: two-chunk headerless import produces correct column values"
+  command: "uv run -- python -m pytest tests/integration/platforms/test_questdb_parquet_load.py -v"
+  expected_output: "All assertions pass — chunk 2 data in correct columns"
+
+- description: "Unit tests: overwrite and header semantics unchanged"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_questdb_coverage.py::TestLoadParquetViaChunkedCsv -v"
+  expected_output: "4 tests pass"
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["questdb", "parquet", "platform-support", "correctness"]
+  estimated_effort: "Small (investigation + test + optional 1-line fix)"
+  created_date: "2026-04-16"
+  source_review: "Phase 1 QuestDB remediation review (Finding 4)"
+  related_files:
+  - "benchbox/platforms/questdb.py"
+  - "tests/unit/platforms/test_questdb_coverage.py"

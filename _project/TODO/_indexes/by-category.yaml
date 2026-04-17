@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T20:55:09.626697'
+generated_at: '2026-04-16T20:58:29.802544'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -185,13 +185,28 @@ categories:
       priority: Low
       status: Not Started
   Platform Support:
-    count: 1
+    count: 4
     items:
+    - id: questdb-strip-pk-quoted-constraint-name
+      file: TODO/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
+      title: Extend _strip_pk_constraints to handle quoted constraint names
+      priority: Low
+      status: Not Started
+    - id: questdb-parquet-chunk-size-tunable
+      file: TODO/main/planning/questdb-parquet-chunk-size-tunable.yaml
+      title: Make QuestDB parquet chunk row count tunable via platform config
+      priority: Low
+      status: Not Started
     - id: questdb-benchmark-compatibility-remediation
       file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
       title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
       priority: High
       status: In Progress
+    - id: questdb-imp-headerless-column-mapping-verify
+      file: TODO/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
+      title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
+      priority: Medium-High
+      status: Not Started
   Repository Maintenance:
     count: 1
     items:
@@ -209,12 +224,17 @@ categories:
       priority: Low
       status: Not Started
   Testing & Quality:
-    count: 1
+    count: 2
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       priority: Medium-High
+      status: Not Started
+    - id: timing-policy-split-review-followups
+      file: TODO/main/planning/timing-policy-split-review-followups.yaml
+      title: Address follow-up findings from timing-policy pre-commit split review
+      priority: Low
       status: Not Started
   Testing and Quality Assurance:
     count: 3

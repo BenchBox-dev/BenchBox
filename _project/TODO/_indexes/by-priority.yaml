@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:55:09.626732'
-total_items: 40
+generated_at: '2026-04-16T20:58:29.802563'
+total_items: 44
 priorities:
   Critical:
     count: 2
@@ -48,7 +48,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 7
+    count: 8
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -84,6 +84,11 @@ priorities:
       file: TODO/main/planning/unify-platform-label-disambiguator.yaml
       title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
       category: Architecture & Refactoring
+      status: Not Started
+    - id: questdb-imp-headerless-column-mapping-verify
+      file: TODO/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
+      title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
+      category: Platform Support
       status: Not Started
   Medium:
     count: 7
@@ -124,7 +129,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 17
+    count: 20
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -161,10 +166,20 @@ priorities:
       title: Address follow-up findings from ranking-metric code review
       category: Core Functionality
       status: Not Started
+    - id: timing-policy-split-review-followups
+      file: TODO/main/planning/timing-policy-split-review-followups.yaml
+      title: Address follow-up findings from timing-policy pre-commit split review
+      category: Testing & Quality
+      status: Not Started
     - id: explorer-trust-tiers-review-followups
       file: TODO/main/planning/explorer-trust-tiers-review-followups.yaml
       title: Address follow-up findings from trust-tiers-as-badges code review
       category: Core Functionality
+      status: Not Started
+    - id: questdb-strip-pk-quoted-constraint-name
+      file: TODO/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
+      title: Extend _strip_pk_constraints to handle quoted constraint names
+      category: Platform Support
       status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
@@ -180,6 +195,11 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
+      status: Not Started
+    - id: questdb-parquet-chunk-size-tunable
+      file: TODO/main/planning/questdb-parquet-chunk-size-tunable.yaml
+      title: Make QuestDB parquet chunk row count tunable via platform config
+      category: Platform Support
       status: Not Started
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:55:09.626609'
-total_items: 40
+generated_at: '2026-04-16T20:58:29.802505'
+total_items: 44
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -264,6 +264,22 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 0
+- id: timing-policy-split-review-followups
+  file: TODO/main/planning/timing-policy-split-review-followups.yaml
+  title: Address follow-up findings from timing-policy pre-commit split review
+  worktree: main
+  category: Testing & Quality
+  priority: Low
+  status: Not Started
+  tags:
+  - pre-commit
+  - timing-policy
+  - review-followup
+  - tooling
+  estimated_effort: Tiny (< 1 hr total)
+  work_total: 3
+  work_done: 0
+  work_ready: 3
 - id: explorer-trust-tiers-review-followups
   file: TODO/main/planning/explorer-trust-tiers-review-followups.yaml
   title: Address follow-up findings from trust-tiers-as-badges code review
@@ -280,6 +296,22 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 0
+- id: questdb-strip-pk-quoted-constraint-name
+  file: TODO/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
+  title: Extend _strip_pk_constraints to handle quoted constraint names
+  worktree: main
+  category: Platform Support
+  priority: Low
+  status: Not Started
+  tags:
+  - questdb
+  - ddl
+  - regex
+  - robustness
+  estimated_effort: Trivial (< 30 minutes)
+  work_total: 1
+  work_done: 0
+  work_ready: 1
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -336,6 +368,22 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
+- id: questdb-parquet-chunk-size-tunable
+  file: TODO/main/planning/questdb-parquet-chunk-size-tunable.yaml
+  title: Make QuestDB parquet chunk row count tunable via platform config
+  worktree: main
+  category: Platform Support
+  priority: Low
+  status: Not Started
+  tags:
+  - questdb
+  - parquet
+  - performance
+  - configurability
+  estimated_effort: Trivial (< 1 hour)
+  work_total: 2
+  work_done: 0
+  work_ready: 1
 - id: review-dependency-upper-bounds-quarterly
   file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
   title: Quarterly review of dependency upper bounds
@@ -703,6 +751,22 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 3
+- id: questdb-imp-headerless-column-mapping-verify
+  file: TODO/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
+  title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
+  worktree: main
+  category: Platform Support
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - questdb
+  - parquet
+  - platform-support
+  - correctness
+  estimated_effort: Small (investigation + test + optional 1-line fix)
+  work_total: 3
+  work_done: 0
+  work_ready: 1
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases
