@@ -17,15 +17,17 @@ description: |
     2. SUPPORTED_HASH_ALGORITHMS = ("md5",) (benchmark.py:56) immediately rejects
        sha256 at construction time with ValueError.
     3. HashAlgorithm = Literal["md5"] (hash_functions.py:16) narrows the type to
-       match the runtime, but the function body still has sha1/sha256 branches.
-    4. The sha256 branch truncates to [:32] (hash_functions.py:49) — destroying
-       half the entropy and providing zero collision advantage over MD5.
+       match the runtime — the unreachable sha1/sha256 branches were cleaned up in
+       fc6509c35 along with the [:32] truncation; sha256 must now be added back cleanly.
+    4. (Resolved by fc6509c35) The sha256 branch truncated to [:32], destroying
+       half the entropy. That branch is gone; the function now raises ValueError for
+       non-md5 inputs. Remaining work is to add sha256 properly post-schema migration.
     5. DataVaultETLTransformer hard-codes `if hash_algorithm != "md5"` (transformer.py:136)
        independently of SUPPORTED_HASH_ALGORITHMS.
 
   The fix has two sequential phases: (a) immediately stop the CLI from advertising
-  sha256 while the schema cannot support it, and (b) migrate the schema to VARCHAR(64),
-  remove the truncation, and wire sha256 through all layers cleanly.
+  sha256 while the schema cannot support it, and (b) migrate the schema to VARCHAR(64)
+  and wire sha256 through all remaining layers cleanly.
 
   After this work, `benchbox run --platform duckdb --benchmark datavault
   --benchmark-option hash_algorithm=sha256` must execute successfully end-to-end.
@@ -103,11 +105,13 @@ work:
          HashAlgorithm = Literal["md5", "sha256"]
        SHA-1 stays excluded: it's neither collision-safe nor schema-compatible (40 chars).
 
-    2. hash_functions.py:49 — remove the truncation:
-         return hashlib.sha256(key_string.encode("utf-8")).hexdigest()[:32]
-       becomes:
-         return hashlib.sha256(key_string.encode("utf-8")).hexdigest()
-       The 64-char output now fits VARCHAR(64).
+    2. hash_functions.py:43-45 — add sha256 branch before the raise:
+         (The old truncated [:32] sha256 branch was removed in fc6509c35;
+          the function body is now just md5 + raise ValueError.)
+         Add:
+           elif algorithm == "sha256":
+               return hashlib.sha256(key_string.encode("utf-8")).hexdigest()
+         The 64-char output fits VARCHAR(64).
 
     3. benchmark.py:56 — widen the allowlist:
          SUPPORTED_HASH_ALGORITHMS = ("md5", "sha256")
@@ -160,8 +164,9 @@ work:
       - benchmark.py:51, 78: docstring mentions "only 'md5' currently supported"
         — update to list both md5 and sha256.
       - transformer.py:126: docstring "(only 'md5' supported)" — update.
-      - hash_functions.py:32: Returns docstring "40 for SHA1, 64 for SHA256"
-        is now accurate post-w4; verify it's up to date.
+      - hash_functions.py:28-29: generate_hash_key docstring says "32-character
+        hex string" — update to describe md5 (32 chars) and sha256 (64 chars).
+      - hash_functions.py: verify Returns docstring is accurate post-w4.
 
     Grep for "only.*md5" and "VARCHAR(32)" across the datavault package to catch
     any remaining stale references.

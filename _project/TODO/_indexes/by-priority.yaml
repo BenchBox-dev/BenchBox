@@ -1,4 +1,4 @@
-generated_at: '2026-04-17T08:02:31.985984'
+generated_at: '2026-04-17T08:10:50.604358'
 total_items: 51
 priorities:
   Critical:
@@ -208,7 +208,7 @@ priorities:
       status: Not Started
     - id: explorer-visualization-review-followup-nits
       file: TODO/main/active/explorer-visualization-review-followup-nits.yaml
-      title: Fix three nit-level findings from explorer-unify-visualization-foundations code review
+      title: Fix nit-level findings from explorer visualization code reviews (unify + a11y)
       category: Code Quality
       status: Not Started
     - id: future-ideas-backlog
