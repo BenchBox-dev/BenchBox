@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:48:19.716637'
-total_items: 38
+generated_at: '2026-04-16T20:50:52.570111'
+total_items: 39
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 29
+    count: 30
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -50,6 +50,11 @@ statuses:
     - id: explorer-chart-coverage-review-followups
       file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
       title: Address follow-up findings from chart-coverage code review
+      priority: Low
+      category: Core Functionality
+    - id: explorer-matrix-leaderboard-review-followups
+      file: TODO/main/planning/explorer-matrix-leaderboard-review-followups.yaml
+      title: Address follow-up findings from matrix-leaderboard code review
       priority: Low
       category: Core Functionality
     - id: explorer-ranking-review-followups

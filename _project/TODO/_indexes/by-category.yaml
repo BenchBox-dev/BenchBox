@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T20:48:19.716610'
+generated_at: '2026-04-16T20:50:52.570055'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 15
+    count: 16
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -61,6 +61,11 @@ categories:
     - id: explorer-chart-coverage-review-followups
       file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
       title: Address follow-up findings from chart-coverage code review
+      priority: Low
+      status: Not Started
+    - id: explorer-matrix-leaderboard-review-followups
+      file: TODO/main/planning/explorer-matrix-leaderboard-review-followups.yaml
+      title: Address follow-up findings from matrix-leaderboard code review
       priority: Low
       status: Not Started
     - id: explorer-ranking-review-followups
