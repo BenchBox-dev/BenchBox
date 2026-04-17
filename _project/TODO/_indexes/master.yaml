@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T21:30:15.482656'
-total_items: 48
+generated_at: '2026-04-17T07:47:11.083685'
+total_items: 49
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -294,6 +294,22 @@ items:
   - accessibility
   - review-followup
   estimated_effort: Tiny (< 1 hour)
+  work_total: 3
+  work_done: 0
+  work_ready: 3
+- id: explorer-read-model-review-followups
+  file: TODO/main/planning/explorer-read-model-review-followups.yaml
+  title: Address follow-up findings from read-model-contract code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - explorer
+  - pipeline
+  - read-model
+  - review-followup
+  estimated_effort: Tiny (< 30 min)
   work_total: 3
   work_done: 0
   work_ready: 3

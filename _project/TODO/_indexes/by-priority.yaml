@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T21:30:15.482705'
-total_items: 48
+generated_at: '2026-04-17T07:47:11.083733'
+total_items: 49
 priorities:
   Critical:
     count: 2
@@ -134,7 +134,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 23
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -179,6 +179,11 @@ priorities:
     - id: explorer-ranking-review-followups
       file: TODO/main/planning/explorer-ranking-review-followups.yaml
       title: Address follow-up findings from ranking-metric code review
+      category: Core Functionality
+      status: Not Started
+    - id: explorer-read-model-review-followups
+      file: TODO/main/planning/explorer-read-model-review-followups.yaml
+      title: Address follow-up findings from read-model-contract code review
       category: Core Functionality
       status: Not Started
     - id: timing-policy-split-review-followups
