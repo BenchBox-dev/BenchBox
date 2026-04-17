@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T08:19:31.690108'
-total_items: 50
+generated_at: '2026-04-17T08:36:24.092505'
+total_items: 56
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -38,6 +38,97 @@ items:
   work_ready: 1
   needs:
   - implement-pr-based-result-submission-workflow
+- id: explorer-master-leaderboard-home
+  file: TODO/main/planning/explorer-master-leaderboard-home.yaml
+  title: 'Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - explorer
+  - home
+  - master-leaderboard
+  - clickbench
+  - ultraplan-phase-b
+  estimated_effort: Medium (1-2 days)
+  work_total: 6
+  work_done: 0
+  work_ready: 2
+  needs:
+  - explorer-pipeline-meta-leaderboard-widening
+  - explorer-url-synced-filter-state
+- id: explorer-result-detail-median-first
+  file: TODO/main/planning/explorer-result-detail-median-first.yaml
+  title: 'Explorer ResultDetail: default to median-of-passing, move raw samples to drill-down'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - explorer
+  - result-detail
+  - median
+  - ultraplan-phase-a
+  estimated_effort: Small (2-4 hours)
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+- id: explorer-pipeline-meta-leaderboard-widening
+  file: TODO/main/planning/explorer-pipeline-meta-leaderboard-widening.yaml
+  title: 'Explorer pipeline: widen MetaRank cells and emit results_schema.json'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - explorer
+  - pipeline
+  - meta-leaderboard
+  - duckdb
+  - ultraplan-phase-f
+  estimated_effort: Small (2-4 hours)
+  work_total: 4
+  work_done: 0
+  work_ready: 2
+- id: explorer-query-workbench
+  file: TODO/main/planning/explorer-query-workbench.yaml
+  title: 'Explorer: CloudSpecs-style /results/query workbench over results.duckdb'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - explorer
+  - query-workbench
+  - duckdb-wasm
+  - cloudspecs
+  - ultraplan-phase-c
+  estimated_effort: Medium (2-3 days)
+  work_total: 7
+  work_done: 0
+  work_ready: 2
+  needs:
+  - explorer-pipeline-meta-leaderboard-widening
+- id: explorer-unified-chart-panel
+  file: TODO/main/planning/explorer-unified-chart-panel.yaml
+  title: 'Explorer: unified <ChartPanel> driven by CHART_REGISTRY across all pages'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - explorer
+  - charts
+  - registry
+  - cli-parity
+  - ultraplan-phase-d
+  estimated_effort: Medium (1-2 days)
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - explorer-result-detail-median-first
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -812,6 +903,22 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
+- id: explorer-url-synced-filter-state
+  file: TODO/main/planning/explorer-url-synced-filter-state.yaml
+  title: 'Explorer: URL-synced filter state via useUrlState hook'
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - explorer
+  - url-state
+  - hook
+  - ultraplan-phase-e
+  estimated_effort: Small (2-4 hours)
+  work_total: 4
+  work_done: 0
+  work_ready: 1
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

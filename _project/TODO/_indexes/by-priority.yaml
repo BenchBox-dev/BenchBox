@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T08:19:31.690169'
-total_items: 50
+generated_at: '2026-04-17T08:36:24.092669'
+total_items: 56
 priorities:
   Critical:
     count: 2
@@ -15,8 +15,33 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 6
+    count: 11
     items:
+    - id: explorer-master-leaderboard-home
+      file: TODO/main/planning/explorer-master-leaderboard-home.yaml
+      title: 'Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)'
+      category: Core Functionality
+      status: Not Started
+    - id: explorer-result-detail-median-first
+      file: TODO/main/planning/explorer-result-detail-median-first.yaml
+      title: 'Explorer ResultDetail: default to median-of-passing, move raw samples to drill-down'
+      category: Core Functionality
+      status: Not Started
+    - id: explorer-pipeline-meta-leaderboard-widening
+      file: TODO/main/planning/explorer-pipeline-meta-leaderboard-widening.yaml
+      title: 'Explorer pipeline: widen MetaRank cells and emit results_schema.json'
+      category: Core Functionality
+      status: Not Started
+    - id: explorer-query-workbench
+      file: TODO/main/planning/explorer-query-workbench.yaml
+      title: 'Explorer: CloudSpecs-style /results/query workbench over results.duckdb'
+      category: Core Functionality
+      status: Not Started
+    - id: explorer-unified-chart-panel
+      file: TODO/main/planning/explorer-unified-chart-panel.yaml
+      title: 'Explorer: unified <ChartPanel> driven by CHART_REGISTRY across all pages'
+      category: Core Functionality
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -48,7 +73,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 8
+    count: 9
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -75,6 +100,11 @@ priorities:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Completed
+    - id: explorer-url-synced-filter-state
+      file: TODO/main/planning/explorer-url-synced-filter-state.yaml
+      title: 'Explorer: URL-synced filter state via useUrlState hook'
+      category: Core Functionality
+      status: Not Started
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission

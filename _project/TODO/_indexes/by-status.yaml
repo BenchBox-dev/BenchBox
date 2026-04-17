@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T08:19:31.690184'
-total_items: 50
+generated_at: '2026-04-17T08:36:24.092706'
+total_items: 56
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 41
+    count: 47
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -106,6 +106,36 @@ statuses:
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
+      category: Core Functionality
+    - id: explorer-master-leaderboard-home
+      file: TODO/main/planning/explorer-master-leaderboard-home.yaml
+      title: 'Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)'
+      priority: High
+      category: Core Functionality
+    - id: explorer-result-detail-median-first
+      file: TODO/main/planning/explorer-result-detail-median-first.yaml
+      title: 'Explorer ResultDetail: default to median-of-passing, move raw samples to drill-down'
+      priority: High
+      category: Core Functionality
+    - id: explorer-pipeline-meta-leaderboard-widening
+      file: TODO/main/planning/explorer-pipeline-meta-leaderboard-widening.yaml
+      title: 'Explorer pipeline: widen MetaRank cells and emit results_schema.json'
+      priority: High
+      category: Core Functionality
+    - id: explorer-query-workbench
+      file: TODO/main/planning/explorer-query-workbench.yaml
+      title: 'Explorer: CloudSpecs-style /results/query workbench over results.duckdb'
+      priority: High
+      category: Core Functionality
+    - id: explorer-url-synced-filter-state
+      file: TODO/main/planning/explorer-url-synced-filter-state.yaml
+      title: 'Explorer: URL-synced filter state via useUrlState hook'
+      priority: Medium-High
+      category: Core Functionality
+    - id: explorer-unified-chart-panel
+      file: TODO/main/planning/explorer-unified-chart-panel.yaml
+      title: 'Explorer: unified <ChartPanel> driven by CHART_REGISTRY across all pages'
+      priority: High
       category: Core Functionality
     - id: questdb-strip-pk-quoted-constraint-name
       file: TODO/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
