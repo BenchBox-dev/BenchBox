@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T17:00:40.971468'
-total_items: 36
+generated_at: '2026-04-16T20:24:27.087441'
+total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -182,6 +182,40 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: explorer-chart-coverage-review-followups
+  file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
+  title: Address follow-up findings from chart-coverage code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - explorer
+  - visualization
+  - charts
+  - polish
+  - review-followup
+  estimated_effort: Small (half day)
+  work_total: 4
+  work_done: 0
+  work_ready: 0
+  deferred_count: 1
+- id: explorer-ranking-review-followups
+  file: TODO/main/planning/explorer-ranking-review-followups.yaml
+  title: Address follow-up findings from ranking-metric code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - explorer
+  - ranking
+  - accessibility
+  - review-followup
+  estimated_effort: Tiny (< 1 hour)
+  work_total: 3
+  work_done: 0
+  work_ready: 0
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

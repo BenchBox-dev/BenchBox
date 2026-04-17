@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T17:00:40.971513'
-total_items: 36
+generated_at: '2026-04-16T20:24:27.087498'
+total_items: 38
 priorities:
   Critical:
     count: 2
@@ -124,7 +124,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 13
+    count: 15
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -135,6 +135,16 @@ priorities:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: explorer-chart-coverage-review-followups
+      file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
+      title: Address follow-up findings from chart-coverage code review
+      category: Core Functionality
+      status: Not Started
+    - id: explorer-ranking-review-followups
+      file: TODO/main/planning/explorer-ranking-review-followups.yaml
+      title: Address follow-up findings from ranking-metric code review
+      category: Core Functionality
       status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
