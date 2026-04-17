@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:44:13.032021'
-total_items: 37
+generated_at: '2026-04-16T20:48:19.716637'
+total_items: 38
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 28
+    count: 29
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -55,6 +55,11 @@ statuses:
     - id: explorer-ranking-review-followups
       file: TODO/main/planning/explorer-ranking-review-followups.yaml
       title: Address follow-up findings from ranking-metric code review
+      priority: Low
+      category: Core Functionality
+    - id: explorer-trust-tiers-review-followups
+      file: TODO/main/planning/explorer-trust-tiers-review-followups.yaml
+      title: Address follow-up findings from trust-tiers-as-badges code review
       priority: Low
       category: Core Functionality
     - id: define-phase-3-promotion-metrics

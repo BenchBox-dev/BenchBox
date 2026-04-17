@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:44:13.031955'
-total_items: 37
+generated_at: '2026-04-16T20:48:19.716576'
+total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -226,6 +226,22 @@ items:
   tags:
   - explorer
   - ranking
+  - accessibility
+  - review-followup
+  estimated_effort: Tiny (< 1 hour)
+  work_total: 3
+  work_done: 0
+  work_ready: 0
+- id: explorer-trust-tiers-review-followups
+  file: TODO/main/planning/explorer-trust-tiers-review-followups.yaml
+  title: Address follow-up findings from trust-tiers-as-badges code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - explorer
+  - trust
   - accessibility
   - review-followup
   estimated_effort: Tiny (< 1 hour)

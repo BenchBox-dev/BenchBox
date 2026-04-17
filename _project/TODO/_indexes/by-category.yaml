@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T20:44:13.031987'
+generated_at: '2026-04-16T20:48:19.716610'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 14
+    count: 15
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -66,6 +66,11 @@ categories:
     - id: explorer-ranking-review-followups
       file: TODO/main/planning/explorer-ranking-review-followups.yaml
       title: Address follow-up findings from ranking-metric code review
+      priority: Low
+      status: Not Started
+    - id: explorer-trust-tiers-review-followups
+      file: TODO/main/planning/explorer-trust-tiers-review-followups.yaml
+      title: Address follow-up findings from trust-tiers-as-badges code review
       priority: Low
       status: Not Started
     - id: automate-corpus-inventory-generation
