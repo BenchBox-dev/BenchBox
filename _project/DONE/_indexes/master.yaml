@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T08:19:33.452919'
-total_items: 722
+generated_at: '2026-04-17T12:25:17.066326'
+total_items: 728
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1666,6 +1666,102 @@ items:
   owners:
   - joe
   estimated_effort: Medium
+- id: explorer-master-leaderboard-home
+  file: DONE/main/planning/explorer-master-leaderboard-home.yaml
+  title: 'Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - home
+  - master-leaderboard
+  - clickbench
+  - ultraplan-phase-b
+  estimated_effort: Medium (1-2 days)
+  completed_date: '2026-04-17'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  needs:
+  - explorer-pipeline-meta-leaderboard-widening
+  - explorer-url-synced-filter-state
+- id: explorer-result-detail-median-first
+  file: DONE/main/planning/explorer-result-detail-median-first.yaml
+  title: 'Explorer ResultDetail: default to median-of-passing, move raw samples to drill-down'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - result-detail
+  - median
+  - ultraplan-phase-a
+  estimated_effort: Small (2-4 hours)
+  completed_date: '2026-04-17'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+- id: explorer-pipeline-meta-leaderboard-widening
+  file: DONE/main/planning/explorer-pipeline-meta-leaderboard-widening.yaml
+  title: 'Explorer pipeline: widen MetaRank cells and emit results_schema.json'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - pipeline
+  - meta-leaderboard
+  - duckdb
+  - ultraplan-phase-f
+  estimated_effort: Small (2-4 hours)
+  completed_date: '2026-04-17'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+- id: explorer-query-workbench
+  file: DONE/main/planning/explorer-query-workbench.yaml
+  title: 'Explorer: CloudSpecs-style /results/query workbench over results.duckdb'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - query-workbench
+  - duckdb-wasm
+  - cloudspecs
+  - ultraplan-phase-c
+  estimated_effort: Medium (2-3 days)
+  completed_date: '2026-04-17'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  needs:
+  - explorer-pipeline-meta-leaderboard-widening
+- id: explorer-unified-chart-panel
+  file: DONE/main/planning/explorer-unified-chart-panel.yaml
+  title: 'Explorer: unified <ChartPanel> driven by CHART_REGISTRY across all pages'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - charts
+  - registry
+  - cli-parity
+  - ultraplan-phase-d
+  estimated_effort: Medium (1-2 days)
+  completed_date: '2026-04-17'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  needs:
+  - explorer-result-detail-median-first
 - id: interactive-table-mode-ux-and-equivalent-command
   file: DONE/main/active/interactive-table-mode-ux-and-equivalent-command.yaml
   title: Expose interactive table mode selection and include it in equivalent CLI command
@@ -9032,6 +9128,23 @@ items:
   - terminal
   estimated_effort: 3-5 days
   completed_date: '2026-02-06'
+- id: explorer-url-synced-filter-state
+  file: DONE/main/planning/explorer-url-synced-filter-state.yaml
+  title: 'Explorer: URL-synced filter state via useUrlState hook'
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - explorer
+  - url-state
+  - hook
+  - ultraplan-phase-e
+  estimated_effort: Small (2-4 hours)
+  completed_date: '2026-04-17'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: quality-extend-error-capture-to-cloud-adapters
   file: DONE/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
   title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters

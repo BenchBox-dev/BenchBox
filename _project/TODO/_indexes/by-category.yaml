@@ -1,4 +1,4 @@
-generated_at: '2026-04-17T08:50:11.174906'
+generated_at: '2026-04-17T12:25:15.377462'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -59,7 +59,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 25
+    count: 19
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -136,36 +136,6 @@ categories:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       priority: Medium-High
       status: Completed
-    - id: explorer-master-leaderboard-home
-      file: TODO/main/planning/explorer-master-leaderboard-home.yaml
-      title: 'Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)'
-      priority: High
-      status: Not Started
-    - id: explorer-result-detail-median-first
-      file: TODO/main/planning/explorer-result-detail-median-first.yaml
-      title: 'Explorer ResultDetail: default to median-of-passing, move raw samples to drill-down'
-      priority: High
-      status: Not Started
-    - id: explorer-pipeline-meta-leaderboard-widening
-      file: TODO/main/planning/explorer-pipeline-meta-leaderboard-widening.yaml
-      title: 'Explorer pipeline: widen MetaRank cells and emit results_schema.json'
-      priority: High
-      status: Not Started
-    - id: explorer-query-workbench
-      file: TODO/main/planning/explorer-query-workbench.yaml
-      title: 'Explorer: CloudSpecs-style /results/query workbench over results.duckdb'
-      priority: High
-      status: Not Started
-    - id: explorer-url-synced-filter-state
-      file: TODO/main/planning/explorer-url-synced-filter-state.yaml
-      title: 'Explorer: URL-synced filter state via useUrlState hook'
-      priority: Medium-High
-      status: Not Started
-    - id: explorer-unified-chart-panel
-      file: TODO/main/planning/explorer-unified-chart-panel.yaml
-      title: 'Explorer: unified <ChartPanel> driven by CHART_REGISTRY across all pages'
-      priority: High
-      status: Not Started
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow

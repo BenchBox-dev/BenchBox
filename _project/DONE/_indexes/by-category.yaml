@@ -1,4 +1,4 @@
-generated_at: '2026-04-17T08:19:33.453220'
+generated_at: '2026-04-17T12:25:17.066635'
 total_categories: 78
 categories:
   '"Bug Fixes & Reliability"':
@@ -665,7 +665,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 240
+    count: 246
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1093,6 +1093,36 @@ categories:
       title: Expand query plan fingerprint coverage and verification
       priority: High
       status: Not Started
+    - id: explorer-master-leaderboard-home
+      file: DONE/main/planning/explorer-master-leaderboard-home.yaml
+      title: 'Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)'
+      priority: High
+      status: Completed
+    - id: explorer-result-detail-median-first
+      file: DONE/main/planning/explorer-result-detail-median-first.yaml
+      title: 'Explorer ResultDetail: default to median-of-passing, move raw samples to drill-down'
+      priority: High
+      status: Completed
+    - id: explorer-pipeline-meta-leaderboard-widening
+      file: DONE/main/planning/explorer-pipeline-meta-leaderboard-widening.yaml
+      title: 'Explorer pipeline: widen MetaRank cells and emit results_schema.json'
+      priority: High
+      status: Completed
+    - id: explorer-query-workbench
+      file: DONE/main/planning/explorer-query-workbench.yaml
+      title: 'Explorer: CloudSpecs-style /results/query workbench over results.duckdb'
+      priority: High
+      status: Completed
+    - id: explorer-url-synced-filter-state
+      file: DONE/main/planning/explorer-url-synced-filter-state.yaml
+      title: 'Explorer: URL-synced filter state via useUrlState hook'
+      priority: Medium-High
+      status: Completed
+    - id: explorer-unified-chart-panel
+      file: DONE/main/planning/explorer-unified-chart-panel.yaml
+      title: 'Explorer: unified <ChartPanel> driven by CHART_REGISTRY across all pages'
+      priority: High
+      status: Completed
     - id: quality-extend-error-capture-to-cloud-adapters
       file: DONE/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
       title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters

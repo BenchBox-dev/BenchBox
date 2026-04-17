@@ -2,7 +2,8 @@ id: explorer-master-leaderboard-home
 title: "Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-17"
 category: Core Functionality
 
 description: |
@@ -28,7 +29,7 @@ description: |
 work:
   - id: w1
     summary: "Extend MetaLeaderboard component with render-mode toggle (Times/Ranks/Speedup)"
-    status: pending
+    status: done
     notes: |
       results-explorer/src/components/MetaLeaderboard.tsx — extend in
       place (per plan: data shape already carries what each mode needs
@@ -42,7 +43,7 @@ work:
 
   - id: w2
     summary: "Widen MetaRank frontend type in types.ts"
-    status: pending
+    status: done
     notes: |
       results-explorer/src/types.ts — add metric_value,
       speedup_vs_best, primary_metric, primary_order to MetaRank.
@@ -51,7 +52,7 @@ work:
   - id: w3
     summary: "Sticky filter chip row backed by useUrlState"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       Filters: Benchmark family (multi), SF (multi), Phase
       (power/standard/throughput), Tuning mode, Trust tier, Date
@@ -63,7 +64,7 @@ work:
   - id: w4
     summary: "Scaffold Home.tsx around the extended MetaLeaderboard as primary content"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       results-explorer/src/pages/Home.tsx — make the matrix the
       primary content surface. Do not wire cohort/row navigation yet
@@ -73,7 +74,7 @@ work:
   - id: w5
     summary: "Demote Recent Results list below the matrix"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Keep the Recent Results component and data surface; move its
       render position below the matrix on Home.tsx. No behavioral
@@ -82,7 +83,7 @@ work:
   - id: w6
     summary: "Wire cohort header links and row-click navigation with preserved filter state"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Cohort headers → /results/{benchmark}/?sf=X&phase=Y (preserve
       the relevant slice of filter state via useUrlState's serde).
@@ -91,7 +92,7 @@ work:
   - id: w7
     summary: "Accessibility: reuse QueryHeatmap's role=grid + roving tabindex pattern"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       The new master matrix is structurally similar to QueryHeatmap —
       reuse the same a11y scaffolding (role=grid, aria-rowindex/col,
@@ -102,7 +103,7 @@ work:
   - id: w8
     summary: "Vitest coverage for render-mode toggle, filter→matrix wiring, cohort-link state preservation"
     needs: [w5, w6, w7]
-    status: pending
+    status: done
 
 files_affected:
   modified:

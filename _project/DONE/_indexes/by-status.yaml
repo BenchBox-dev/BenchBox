@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T08:19:33.453548'
-total_items: 722
+generated_at: '2026-04-17T12:25:17.066980'
+total_items: 728
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 671
+    count: 677
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1561,6 +1561,36 @@ statuses:
     - id: tpcds-obt-query-expansion
       file: DONE/benchmark-expansion/implementation/tpcds-obt-query-expansion.yaml
       title: Expand TPC-DS OBT Query Coverage to 93 Queries
+      priority: High
+      category: Core Functionality
+    - id: explorer-master-leaderboard-home
+      file: DONE/main/planning/explorer-master-leaderboard-home.yaml
+      title: 'Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)'
+      priority: High
+      category: Core Functionality
+    - id: explorer-result-detail-median-first
+      file: DONE/main/planning/explorer-result-detail-median-first.yaml
+      title: 'Explorer ResultDetail: default to median-of-passing, move raw samples to drill-down'
+      priority: High
+      category: Core Functionality
+    - id: explorer-pipeline-meta-leaderboard-widening
+      file: DONE/main/planning/explorer-pipeline-meta-leaderboard-widening.yaml
+      title: 'Explorer pipeline: widen MetaRank cells and emit results_schema.json'
+      priority: High
+      category: Core Functionality
+    - id: explorer-query-workbench
+      file: DONE/main/planning/explorer-query-workbench.yaml
+      title: 'Explorer: CloudSpecs-style /results/query workbench over results.duckdb'
+      priority: High
+      category: Core Functionality
+    - id: explorer-url-synced-filter-state
+      file: DONE/main/planning/explorer-url-synced-filter-state.yaml
+      title: 'Explorer: URL-synced filter state via useUrlState hook'
+      priority: Medium-High
+      category: Core Functionality
+    - id: explorer-unified-chart-panel
+      file: DONE/main/planning/explorer-unified-chart-panel.yaml
+      title: 'Explorer: unified <ChartPanel> driven by CHART_REGISTRY across all pages'
       priority: High
       category: Core Functionality
     - id: interactive-table-mode-ux-and-equivalent-command

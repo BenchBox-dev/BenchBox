@@ -2,7 +2,8 @@ id: explorer-query-workbench
 title: "Explorer: CloudSpecs-style /results/query workbench over results.duckdb"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-17"
 category: Core Functionality
 
 description: |
@@ -25,7 +26,7 @@ description: |
 work:
   - id: w1
     summary: "Add /results/query route in App.tsx"
-    status: pending
+    status: done
     notes: |
       results-explorer/src/App.tsx — register
       `<Query path="/results/query" />` BEFORE the benchmark-wildcard
@@ -33,7 +34,7 @@ work:
 
   - id: w2
     summary: "Build queryFilters.ts: filter state → parameterised DuckDB SQL"
-    status: pending
+    status: done
     notes: |
       New file: results-explorer/src/lib/queryFilters.ts. Given a
       FilterState object, produce a safe SQL string (or prepared
@@ -45,7 +46,7 @@ work:
   - id: w3
     summary: "Facet panel with counts (single GROUP BY probe on load)"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       Left sticky panel. Facets: benchmark, platform, SF, tuning
       mode, trust tier, date range, has_cost, validation_status.
@@ -57,7 +58,7 @@ work:
   - id: w4
     summary: "Flat sortable results table + column picker (reads results_schema.json)"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Center column. One row per bundle from bench.results. Column
       picker reads results_schema.json (emitted by the pipeline —
@@ -70,7 +71,7 @@ work:
   - id: w5
     summary: "CSV export via DuckDBDataProtocol.BROWSER_FILEREADER → Blob"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Button: "Download CSV". Exports the currently-filtered set
       (not the full table). Uses the DuckDB-WASM Blob path already
@@ -79,7 +80,7 @@ work:
   - id: w6
     summary: "Advanced mode: plain <textarea> SQL editor, read-only enforced by ATTACH READ_ONLY"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Collapsed <details> under the table. Plain textarea (no
       CodeMirror — parity with `benchbox results --sql`, no new
@@ -90,7 +91,7 @@ work:
   - id: w7
     summary: "Vitest coverage: facet counts, sort order, CSV round-trip, SQL textarea"
     needs: [w5, w6]
-    status: pending
+    status: done
     notes: |
       src/pages/__tests__/Query.test.tsx. Smoke tests:
         - facet GROUP BY probe produces expected counts for a fixture

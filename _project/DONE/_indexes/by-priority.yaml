@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T08:19:33.453390'
-total_items: 722
+generated_at: '2026-04-17T12:25:17.066818'
+total_items: 728
 priorities:
   Critical:
     count: 41
@@ -210,7 +210,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 248
+    count: 253
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -554,6 +554,31 @@ priorities:
       title: Expand query plan fingerprint coverage and verification
       category: Core Functionality
       status: Not Started
+    - id: explorer-master-leaderboard-home
+      file: DONE/main/planning/explorer-master-leaderboard-home.yaml
+      title: 'Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)'
+      category: Core Functionality
+      status: Completed
+    - id: explorer-result-detail-median-first
+      file: DONE/main/planning/explorer-result-detail-median-first.yaml
+      title: 'Explorer ResultDetail: default to median-of-passing, move raw samples to drill-down'
+      category: Core Functionality
+      status: Completed
+    - id: explorer-pipeline-meta-leaderboard-widening
+      file: DONE/main/planning/explorer-pipeline-meta-leaderboard-widening.yaml
+      title: 'Explorer pipeline: widen MetaRank cells and emit results_schema.json'
+      category: Core Functionality
+      status: Completed
+    - id: explorer-query-workbench
+      file: DONE/main/planning/explorer-query-workbench.yaml
+      title: 'Explorer: CloudSpecs-style /results/query workbench over results.duckdb'
+      category: Core Functionality
+      status: Completed
+    - id: explorer-unified-chart-panel
+      file: DONE/main/planning/explorer-unified-chart-panel.yaml
+      title: 'Explorer: unified <ChartPanel> driven by CHART_REGISTRY across all pages'
+      category: Core Functionality
+      status: Completed
     - id: interactive-table-mode-ux-and-equivalent-command
       file: DONE/main/active/interactive-table-mode-ux-and-equivalent-command.yaml
       title: Expose interactive table mode selection and include it in equivalent CLI command
@@ -1456,7 +1481,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 112
+    count: 113
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1737,6 +1762,11 @@ priorities:
     - id: enhance-ascii-charting
       file: DONE/core-functionality/planning/enhance-ascii-charting.yaml
       title: Enhance and extend ASCII charting with new chart types and comparison visualizations
+      category: Core Functionality
+      status: Completed
+    - id: explorer-url-synced-filter-state
+      file: DONE/main/planning/explorer-url-synced-filter-state.yaml
+      title: 'Explorer: URL-synced filter state via useUrlState hook'
       category: Core Functionality
       status: Completed
     - id: quality-extend-error-capture-to-cloud-adapters
