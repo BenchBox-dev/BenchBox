@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T20:29:26.207426'
+generated_at: '2026-04-16T20:42:43.224834'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -10,10 +10,10 @@ categories:
       priority: Normal
       status: Not Started
     - id: reconcile-docs-review-code-followups
-      file: TODO/main/planning/reconcile-docs-review-code-followups.yaml
+      file: TODO/main/active/reconcile-docs-review-code-followups.yaml
       title: Reconcile three code-level inconsistencies surfaced by docs review
       priority: Medium-High
-      status: Not Started
+      status: In Progress
     - id: unify-platform-label-disambiguator
       file: TODO/main/planning/unify-platform-label-disambiguator.yaml
       title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
@@ -51,12 +51,17 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 13
+    count: 14
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
+      status: Not Started
+    - id: explorer-benchmark-summary-review-followups
+      file: TODO/main/planning/explorer-benchmark-summary-review-followups.yaml
+      title: Address follow-up findings from benchmark-summary artifact code review
+      priority: Low
       status: Not Started
     - id: explorer-chart-coverage-review-followups
       file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml

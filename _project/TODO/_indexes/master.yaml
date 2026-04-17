@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:29:26.207388'
-total_items: 37
+generated_at: '2026-04-16T20:42:43.224782'
+total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -182,6 +182,22 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
+- id: explorer-benchmark-summary-review-followups
+  file: TODO/main/planning/explorer-benchmark-summary-review-followups.yaml
+  title: Address follow-up findings from benchmark-summary artifact code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - explorer
+  - pipeline
+  - artifact
+  - review-followup
+  estimated_effort: Tiny (< 1 hour)
+  work_total: 5
+  work_done: 0
+  work_ready: 0
 - id: explorer-chart-coverage-review-followups
   file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
   title: Address follow-up findings from chart-coverage code review
@@ -606,12 +622,12 @@ items:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
 - id: reconcile-docs-review-code-followups
-  file: TODO/main/planning/reconcile-docs-review-code-followups.yaml
+  file: TODO/main/active/reconcile-docs-review-code-followups.yaml
   title: Reconcile three code-level inconsistencies surfaced by docs review
   worktree: main
   category: Architecture & Refactoring
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   tags:
   - refactoring
   - datavault
@@ -621,8 +637,8 @@ items:
   - consistency
   estimated_effort: Small
   work_total: 3
-  work_done: 0
-  work_ready: 3
+  work_done: 2
+  work_ready: 1
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

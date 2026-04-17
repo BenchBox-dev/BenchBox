@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:29:26.207449'
-total_items: 37
+generated_at: '2026-04-16T20:42:43.224858'
+total_items: 38
 priorities:
   Critical:
     count: 2
@@ -76,10 +76,10 @@ priorities:
       category: Core Functionality
       status: Completed
     - id: reconcile-docs-review-code-followups
-      file: TODO/main/planning/reconcile-docs-review-code-followups.yaml
+      file: TODO/main/active/reconcile-docs-review-code-followups.yaml
       title: Reconcile three code-level inconsistencies surfaced by docs review
       category: Architecture & Refactoring
-      status: Not Started
+      status: In Progress
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
@@ -129,7 +129,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 13
+    count: 14
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -140,6 +140,11 @@ priorities:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
+      status: Not Started
+    - id: explorer-benchmark-summary-review-followups
+      file: TODO/main/planning/explorer-benchmark-summary-review-followups.yaml
+      title: Address follow-up findings from benchmark-summary artifact code review
+      category: Core Functionality
       status: Not Started
     - id: explorer-chart-coverage-review-followups
       file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
