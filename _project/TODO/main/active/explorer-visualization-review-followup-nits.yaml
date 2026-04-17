@@ -1,49 +1,18 @@
 id: explorer-visualization-review-followup-nits
-title: "Fix nit-level findings from explorer visualization code reviews (unify + a11y)"
+title: "Fix nit-level findings from explorer visualization code reviews"
 worktree: main
 priority: Low
 status: Not Started
 category: Code Quality
 
 description: |
-  Code review of `explorer-unify-visualization-foundations` found three nit-level
-  issues that don't block the feature but should be cleaned up:
+  Nit-level findings from code reviews of seven completed explorer-* TODOs
+  (2026-04-17). None block functionality; all are cleanup items.
 
-  **Nit 1 — `perQuerySpeedup` docstring has an incomplete sentence.**
-  `chartMath.ts:163`: "Represents how much the slowest result for a given query
-  is than the fastest." — missing "faster" before "than".
-
-  **Nit 2 — `StackedPhase.tsx` `PHASE_COLORS` uses inline hex that overlaps PALETTE.**
-  `StackedPhase.tsx:24-31` defines `PHASE_COLORS` with `#3b82f6`, `#10b981`,
-  `#f59e0b`, `#ef4444` — the exact same values as `chartTheme.PALETTE` but
-  defined independently.  The `explorer-unify-visualization-foundations` anti-pattern
-  says "every color comes from chartTheme.ts, no exceptions."  StackedPhase was
-  out of scope for that TODO, so this pre-existing violation was not fixed.
-  The phase colors have different semantics from the platform palette (phases, not
-  platforms), so the fix is to export `PHASE_COLORS` from `chartTheme.ts` rather
-  than eliminating the distinction.
-
-  **Nit 3 — `BenchmarkIndex.tsx:373` has an unnecessary `?? ""` defensive fallback.**
-  `primaryMetricFor(s.benchmark ?? "")` — `BenchmarkSummary.benchmark` is required
-  (always set by the pipeline), so `?? ""` is defensive noise.  The TypeScript
-  type already guarantees it is not null.
-
-  From explorer-heatmap-accessibility-and-tests review (2026-04-17):
-
-  **Nit 4 — Keyboard navigation in `QueryHeatmap` is untested.**
-  Roving tabindex and arrow-key navigation are implemented and correct
-  (`QueryHeatmap.tsx:122-148`) but there is no unit test exercising `ArrowRight`/
-  `ArrowDown` behavior.  Axe provides structural coverage but doesn't confirm
-  that focus actually moves to the correct cell.
-
-  **Nit 5 — `ranks` view doesn't distinguish "no data" errors from other errors.**
-  `BenchmarkIndex.tsx:350` shows the amber banner for all errors in ranks view,
-  including `NO_DATA_ERROR_PREFIX` errors.  The `matrix` view now shows an
-  informational empty state for the same condition.  These should be consistent.
-
-  **Nit 6 — `axe-helper.ts:38` uses an `as`-cast type escape.**
-  `{ violations: critical } as typeof results` to satisfy `toHaveNoViolations`
-  typing.  Low-risk in a test helper but worth a comment or a safer cast.
+  Sources: explorer-unify-visualization-foundations, explorer-heatmap-accessibility-and-tests,
+  explorer-emit-comparison-artifact-from-pipeline, explorer-close-chart-type-coverage-gaps,
+  explorer-establish-cli-explorer-parity-tests, explorer-cross-benchmark-meta-leaderboard,
+  and explorer-compare-url-short-ids.
 
 work:
 - id: w1
@@ -54,8 +23,6 @@ work:
       "Represents how much the slowest result for a given query is than the fastest."
     To:
       "Represents how much faster the slowest result for a given query is than the fastest."
-    Or a cleaner rewrite:
-      "Represents how many times the slowest result is relative to the fastest within a query."
 
 - id: w2
   summary: "Move PHASE_COLORS from StackedPhase.tsx to chartTheme.ts"
@@ -65,7 +32,6 @@ work:
       export const PHASE_LABELS: Record<string, string> = { ... }
       export const PHASE_COLORS: Record<string, string> = { ... }
       export const PHASE_ORDER: string[] = [ ... ]
-    (Move all three since they're conceptually a unit.)
     Update StackedPhase.tsx to import from chartTheme.ts instead.
     No behavior change.
 
@@ -77,159 +43,212 @@ work:
       primaryMetricFor(s.benchmark ?? "")
     To:
       primaryMetricFor(s.benchmark)
-    BenchmarkSummary.benchmark is always set by the pipeline; the TypeScript
-    type confirms it is string (not string | null | undefined).
+    BenchmarkSummary.benchmark is always set by the pipeline.
 
 - id: w4
   summary: "Add keyboard navigation unit test for QueryHeatmap roving tabindex"
   status: pending
   notes: |
-    Add to QueryHeatmap.test.tsx (or a new keyboard.test.tsx):
+    Add to QueryHeatmap.test.tsx:
       - fireEvent.keyDown(firstCell, { key: "ArrowRight" }) → next cell gets focus
       - fireEvent.keyDown(firstCell, { key: "ArrowDown" }) → cell below gets focus
       - ArrowLeft/ArrowUp at boundary → no change (no crash, no out-of-bounds)
-    Use userEvent or fireEvent with vitest-dom matchers.
-    Reference: WAI-ARIA grid pattern tests.
 
 - id: w5
   summary: "Apply NO_DATA_ERROR_PREFIX informational empty state to ranks view in BenchmarkIndex.tsx"
   status: pending
   notes: |
-    BenchmarkIndex.tsx:350 — ranks view error block:
+    BenchmarkIndex.tsx:350 — ranks view error block should mirror matrix view:
       summaryError.startsWith(NO_DATA_ERROR_PREFIX) ? (informational empty state)
         : (amber banner)
-    Mirrors the matrix view at line 325.  Add a test case covering the ranks
-    view error path.
+    Add a test case covering the ranks view error path.
 
 - id: w6
   summary: "Add clarifying comment to axe-helper.ts:38 type cast"
   status: pending
   notes: |
-    The cast `{ violations: critical } as typeof results` is intentional —
-    toHaveNoViolations only reads the violations field.
+    The cast `{ violations: critical } as typeof results` is intentional.
     Add a one-line comment:
       // toHaveNoViolations only reads .violations; the cast is safe.
-    (Or use `satisfies Partial<typeof results>` if the jest-axe types support it.)
 
 - id: w7
   summary: "Optimize O(n×m) query lookup in build_comparison_artifact (transformer.py:757)"
   status: pending
   notes: |
-    transformer.py:754-760 — for each query_id, scans d.display_timings linearly
-    to find the matching entry.  For TPC-DS (99 queries × 20 platforms) this is
-    ~1,980 scans through a list of up to 99 items.
+    transformer.py:754-760 — inner loop scans d.display_timings linearly per query.
     Fix: build a per-detail lookup dict before the outer loop:
       timing_maps = [{dt.query_id: dt for dt in d.display_timings} for d in details]
-    Then in the inner loop:
-      timing = timing_maps[i].get(qid)
-    No behavior change; reduces O(n×m×q) → O(n×m + n×q).
+    Then: timing = timing_maps[i].get(qid)
+    No behavior change.
 
 - id: w8
   summary: "Add progressive disambiguation cascade test (same driver_version + different execution_mode)"
   status: pending
   notes: |
-    test_comparison_artifact.py tests each disambiguation level independently but
-    has no test for the progressive case: two results with the same driver_version
-    and DIFFERENT execution_mode — confirming the cascade stops at driver_version
-    (the first differentiating field) and does NOT also append the execution_mode suffix.
+    test_comparison_artifact.py has no test for the progressive case: same driver_version
+    but different execution_mode — confirming cascade continues to execution_mode.
     Add:
       def test_driver_version_stops_cascade_before_execution_mode():
           d1 = _make_detail("r1", ..., driver_version="1.2.0", execution_mode="sql")
           d2 = _make_detail("r2", ..., driver_version="1.2.0", execution_mode="dataframe")
           labels = _disambiguate_platform_labels([d1, d2])
           assert labels == ["DuckDB v1.2.0 (sql)", "DuckDB v1.2.0 (df)"]
-    (driver_version alone doesn't disambiguate → cascade continues to execution_mode)
 
 - id: w9
   summary: "Add CLI-level test for explorer_build_comparison file output path"
   status: pending
   notes: |
     benchbox/cli/commands/explorer.py has no test verifying the CLI subcommand
-    writes the artifact to compare/<hash16>.json with the correct path computation.
-    Add an integration or unit test (with tmp_path) that:
-      - Calls _explorer_build_comparison_for_ids([r1, r2], output_dir=tmp_path)
-        (or the CLI via click CliRunner)
-      - Asserts file exists at tmp_path / "compare" / f"{hash16}.json"
-      - Asserts JSON parses and schema_version == 2
-    Mirrors the hash verification already present in test_comparison_artifact.py
-    but at the CLI integration boundary.
+    writes the artifact to compare/<hash16>.json.
+    Add a unit test (with tmp_path) that asserts:
+      - File exists at tmp_path / "compare" / f"{hash16}.json"
+      - JSON parses and schema_version == 2
 
 - id: w10
   summary: "Replace hardcoded #6366f1 legend color in PercentileLadder.tsx with theme-derived neutral"
   status: pending
   notes: |
-    PercentileLadder.tsx:86 — legend swatches use hardcoded `fill="#6366f1"` (Tailwind
-    indigo-500).  The chart body uses paletteColor(ri) per platform, so the legend
-    color doesn't match any platform.  The legend is showing opacity levels (P99→P50),
-    not platform identity — use a neutral gray or paletteColor(0) so the legend is
-    visually coherent with the chart.
-    Change:
-      fill="#6366f1"
-    To:
-      fill="#6b7280"  (Tailwind gray-500, neutral enough for an opacity-only legend)
-    Or export a LEGEND_COLOR constant from chartTheme.ts if other legends need it.
+    PercentileLadder.tsx:86 — legend swatches use hardcoded fill="#6366f1" (Tailwind indigo-500).
+    The legend shows opacity levels (P99→P50), not platform identity.
+    Change to fill="#6b7280" (Tailwind gray-500) or export a LEGEND_COLOR from chartTheme.ts.
 
 - id: w11
   summary: "Harden chartRegistry meta-test to catch forward drift (new Python chart types)"
   status: pending
   notes: |
-    results-explorer/src/__tests__/chartRegistry.meta.test.ts hardcodes CANONICAL_IDS.
-    If chart_types.py grows a 17th entry, the meta-test passes until a human also
-    updates CANONICAL_IDS.  The test only catches TS→Python divergence, not Python→TS.
-    Fix: generate a CANONICAL_IDS fixture at test time by reading chart_types.py via
-    a vite plugin or a pre-test script that writes `tests/parity/fixtures/chart_ids.json`
-    during `make parity-fixtures`.  The meta-test then loads that file instead of
-    hard-coding the list.
-    Alternatively, add a Python smoke test that asserts len(ALL_CHART_TYPES) == 16
-    so a new entry forces both files to be updated.
+    chartRegistry.meta.test.ts hardcodes CANONICAL_IDS — adding chart type #17 to
+    chart_types.py won't fail the test until CANONICAL_IDS is also manually updated.
+    Fix: emit chart_ids.json during make parity-fixtures; meta-test loads that file.
+    Alternatively, add a Python smoke test asserting len(ALL_CHART_TYPES) == 16.
 
 - id: w12
-  summary: "Rename NewCharts.test.tsx to charts.smoke.test.tsx (or per-component files)"
+  summary: "Rename NewCharts.test.tsx to charts.smoke.test.tsx"
   status: pending
   notes: |
-    results-explorer/src/components/__tests__/NewCharts.test.tsx — "New" is relative
-    to when the file was created; once these are established components the name is
-    misleading.  Rename to charts.smoke.test.tsx or split into per-chart files
-    alongside the component (e.g. PercentileLadder.test.tsx).
-    No test content changes — rename only.
+    results-explorer/src/components/__tests__/NewCharts.test.tsx — "New" is misleading
+    once these are established components. Rename to charts.smoke.test.tsx.
+    No test content changes.
 
 - id: w13
-  summary: "Add parity fixtures for 6 pure-render chart types (query_histogram, power_bar, stacked_phase, time_series, cost_scatter, sparkline_table)"
+  summary: "Add parity fixtures for 6 pure-render chart types"
   status: pending
   notes: |
-    The explorer-close-chart-type-coverage-gaps TODO spec required parity fixtures for
-    all 10 new chart types.  Only 4 were generated (percentile_ladder, cdf_ecdf, rank_table,
-    box_stats).  The 6 pure-render charts have no TS math to verify but they do map
-    pipeline-emitted fields to SVG — a fixture confirming field→visual mapping is useful
-    for regression detection.
-    For each missing chart, add a minimal fixture to tests/parity/fixtures/ and a
-    corresponding test case in chartMath.parity.test.ts (or a new rendering.parity.test.ts)
-    that checks field values appear in the rendered output.
-    Low urgency — smoke tests in NewCharts.test.tsx already cover rendering crashes.
+    Only 4 of 10 required parity fixtures were generated (percentile_ladder, cdf_ecdf,
+    rank_table, box_stats). Missing: query_histogram, power_bar, stacked_phase, time_series,
+    cost_scatter, sparkline_table.
+    These charts render pipeline-emitted fields directly (no TS math), so the fixtures
+    would verify field→rendering mapping rather than numeric equivalence.
+    Low urgency — smoke tests already cover rendering crashes.
+
+- id: w14
+  summary: "Update docs/visualization-parity.md fixture table with 4 new fixtures"
+  status: pending
+  notes: |
+    docs/visualization-parity.md fixture table lists only the original 7 fixtures.
+    Add 4 new rows:
+      - box_stats.json        → computeBoxStats   → transformer.py _compute_box_stats
+      - cdf_ecdf.json         → computeECDFPoints → transformer.py _compute_ecdf
+      - rank_table.json       → computeRankTable  → transformer.py _compute_ranks
+      - percentile_ladder.json → computePercentile → transformer.py _compute_percentile
+    No code change — docs-only.
+
+- id: w15
+  summary: "Add explanatory comment for comparison_artifact.json exclusion in Makefile parity-check"
+  status: pending
+  notes: |
+    Makefile:597 — `--exclude='comparison_artifact.json'` has no comment.
+    Add:
+      # comparison_artifact.json is excluded — it requires real result bundles
+      # to generate and is verified by the comparisonArtifact.parity.test.tsx suite instead
+
+- id: w16
+  summary: "Add tie-handling to _build_meta_leaderboard (pipeline.py:207-209)"
+  status: pending
+  notes: |
+    _build_meta_leaderboard assigns ordinal ranks (enumerate → i+1) without tie detection.
+    Two platforms with equal metric values get consecutive ranks (1, 2) instead of equal (1, 1).
+    Fix: after sorting, scan for equal metric values and assign equal ranks.
+    computeRankTable() in chartMath.ts already handles ties — Python should match.
+
+- id: w17
+  summary: "Add unit tests for _build_meta_leaderboard (pipeline.py:165-256)"
+  status: pending
+  notes: |
+    _build_meta_leaderboard has no unit tests.
+    Add to tests/unit/core/explorer_pipeline/:
+      - Single cohort with 3 platforms → correct 1/2/3 ranks
+      - Cohort with 1 platform → excluded from output
+      - Platform with N/A in cohort → avg_rank from participated cohorts only
+      - Empty summaries → empty artifact
+      - Tie-handling (once w16 is fixed)
+
+- id: w18
+  summary: "Add Vitest test for MetaLeaderboard.tsx component"
+  status: pending
+  notes: |
+    MetaLeaderboard.tsx has no Vitest test. The empty-data guard (line 25) and rank
+    cell rendering are untested.
+    Add to results-explorer/src/components/__tests__/:
+      - Empty platforms → renders null
+      - One cohort, two platforms → correct rank cells ("1/2", "2/2")
+      - Platform with N/A → shows "—" cell
+      - avg_rank with 1 decimal place
+
+- id: w19
+  summary: "Add scale_factor and phase query params to cohort hrefs in meta-leaderboard (pipeline.py:232)"
+  status: pending
+  notes: |
+    pipeline.py:232 — cohort href is `/results/{benchmark}/` — navigates to the
+    benchmark index without specifying (SF, phase). If BenchmarkIndex defaults to a
+    different SF, users see a different cohort than intended.
+    Change to: f"/results/{benchmark}/?sf={sf}&phase={phase}"
+    Requires confirming what query params BenchmarkIndex.tsx reads for initial selection.
+
+- id: w20
+  summary: "Add Vitest tests for resolveShortId and toShortIds in manifest.ts"
+  status: pending
+  notes: |
+    Neither resolveShortId nor toShortIds have Vitest tests.
+    Add tests (mocking the short_ids.json fetch):
+      - resolveShortId("abc12345") → full ID from map
+      - resolveShortId("unknownX") → returns "unknownX" (passthrough)
+      - resolveShortId("tpch-duckdb-xyz") → unchanged (contains hyphen, not short ID)
+      - toShortIds(["fullId1", "fullId2"]) → short IDs from inverse map
+
+- id: w21
+  summary: "Fix stale status field in explorer-compare-url-short-ids.yaml DONE entry"
+  status: done
+  notes: |
+    Fixed: status updated to Completed, completed_date added.
 
 files_affected:
   modified:
   - "results-explorer/src/lib/chartMath.ts"
   - "results-explorer/src/lib/chartTheme.ts"
   - "results-explorer/src/components/StackedPhase.tsx"
-  - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
   - "results-explorer/src/components/PercentileLadder.tsx"
+  - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
   - "results-explorer/src/pages/BenchmarkIndex.tsx"
   - "results-explorer/src/testing/axe-helper.ts"
   - "results-explorer/src/__tests__/chartRegistry.meta.test.ts"
   - "benchbox/core/explorer_pipeline/transformer.py"
-  - "tests/unit/core/explorer_pipeline/test_comparison_artifact.py"
+  - "benchbox/core/explorer_pipeline/pipeline.py"
   - "benchbox/cli/commands/explorer.py"
+  - "tests/unit/core/explorer_pipeline/test_comparison_artifact.py"
+  - "docs/visualization-parity.md"
+  - "Makefile"
   renamed:
   - "results-explorer/src/components/__tests__/NewCharts.test.tsx → charts.smoke.test.tsx"
   added:
   - "tests/parity/fixtures/{query_histogram,power_bar,stacked_phase,time_series,cost_scatter,sparkline_table}.json"
+  - "tests/unit/core/explorer_pipeline/test_meta_leaderboard.py"
+  - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
 
 must_preserve:
 - "StackedPhase.tsx visual output — phase colors must remain identical hex values"
-- "All existing Vitest tests pass (no behavior change)"
+- "All existing Vitest tests pass"
 - "build_comparison_artifact output unchanged — only internal data structure optimization"
-- "PercentileLadder visual output unchanged — only legend swatch color changes"
+- "PercentileLadder visual output — only legend swatch color changes"
 
 verification:
 - description: "No inline PHASE_COLORS in StackedPhase.tsx"
@@ -244,114 +263,12 @@ verification:
 - description: "No hardcoded indigo in PercentileLadder legend"
   command: "grep -n '6366f1' results-explorer/src/components/PercentileLadder.tsx"
   expected_output: "zero matches"
-- description: "All tests pass"
+- description: "All Vitest tests pass"
   command: "cd results-explorer && npm test"
   expected_output: "all tests pass"
 - description: "Python tests pass"
-  command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline/test_comparison_artifact.py -q"
+  command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -q"
   expected_output: "all tests pass"
-
-- id: w14
-  summary: "Update docs/visualization-parity.md fixture table with 4 new fixtures"
-  status: pending
-  notes: |
-    docs/visualization-parity.md fixture contract table lists only the original 7
-    fixtures.  4 new fixtures added by explorer-close-chart-type-coverage-gaps
-    are missing:
-      - box_stats.json        → computeBoxStats
-      - cdf_ecdf.json         → computeECDFPoints
-      - rank_table.json       → computeRankTable
-      - percentile_ladder.json → computePercentile
-    Add these 4 rows to the table with their Python reference locations.
-    No code change — docs-only.
-
-- id: w15
-  summary: "Add explanatory comment for comparison_artifact.json exclusion in Makefile parity-check target"
-  status: pending
-  notes: |
-    Makefile:597 — `--exclude='comparison_artifact.json'` in parity-check diff.
-    No comment explains why this fixture is excluded.  A future contributor
-    might re-add it without understanding the reason (it requires real result
-    data and can't be regenerated from synthetic inputs).
-    Add a comment above or on the line:
-      # comparison_artifact.json is excluded — it requires real result bundles
-      # to generate and is verified by the comparisonArtifact.parity.test.tsx suite instead
-
-- id: w16
-  summary: "Add tie-handling to _build_meta_leaderboard (pipeline.py:207-209)"
-  status: pending
-  notes: |
-    _build_meta_leaderboard assigns ordinal ranks (enumerate → i+1) without
-    detecting ties.  Two platforms with equal metric values get consecutive ranks
-    (1, 2) instead of equal ranks (1, 1).  The computeRankTable() in chartMath.ts
-    already implements dense rank with ties — the Python function should match.
-    Fix: after sorting, scan for equal metric values and assign equal ranks.
-    Only matters when two platforms genuinely tie on a summary metric (rare but
-    possible for e.g. integer power_scores in small cohorts).
-    Reference: computeRankTable in results-explorer/src/lib/chartMath.ts
-
-- id: w17
-  summary: "Add unit tests for _build_meta_leaderboard (pipeline.py:165-256)"
-  status: pending
-  notes: |
-    _build_meta_leaderboard has no unit tests.  It contains ranking logic,
-    conditional averaging (N/A exclusion), cohort filtering (≥2 platforms),
-    and platform aggregation.
-    Add tests to tests/unit/core/explorer_pipeline/:
-      - Single cohort with 3 platforms → correct 1/2/3 rank assignment
-      - Cohort with 1 platform → excluded from output
-      - Platform with N/A in a cohort → avg_rank computed from participated only
-      - Empty summaries list → empty artifact
-      - Tie-handling (once w16 is fixed)
-
-- id: w18
-  summary: "Add Vitest test for MetaLeaderboard.tsx component"
-  status: pending
-  notes: |
-    MetaLeaderboard.tsx has no Vitest test.  The empty-data guard (line 25)
-    and rank cell rendering (rank.rank/rank.total) are untested.
-    Add to results-explorer/src/components/__tests__/:
-      - Empty platforms list → renders null (no table)
-      - One cohort, two platforms → correct rank cells ("1/2", "2/2")
-      - Platform with N/A in cohort → shows "—" cell
-      - avg_rank displayed with 1 decimal place
-
-- id: w19
-  summary: "Add scale_factor and phase query params to cohort hrefs in meta-leaderboard (pipeline.py:232)"
-  status: pending
-  notes: |
-    pipeline.py:232 — cohort href is `f"/results/{benchmark}/"` — navigates to
-    the benchmark index but doesn't specify which (SF, phase) cohort to show.
-    If BenchmarkIndex defaults to a different SF than the cohort being ranked,
-    users see a different view than the one they clicked on.
-    Change to:
-      f"/results/{benchmark}/?sf={sf}&phase={phase}"
-    (or the equivalent URL format expected by BenchmarkIndex.tsx routing)
-    Requires confirming what query params BenchmarkIndex.tsx reads for initial
-    SF and phase selection.
-
-- id: w20
-  summary: "Add Vitest tests for resolveShortId and toShortIds in manifest.ts"
-  status: pending
-  notes: |
-    manifest.ts exports resolveShortId and toShortIds but neither has a Vitest test.
-    The resolution logic (short ID → full ID lookup, fallback to original when not
-    found) and the inverse (full → short, fallback to full) are worth testing.
-    Add tests mocking the short_ids.json fetch:
-      - resolveShortId("abc12345") → looks up in map, returns full ID
-      - resolveShortId("unknownX") → returns "unknownX" (not found → passthrough)
-      - resolveShortId("tpch-duckdb-xyz") → returns unchanged (contains hyphen, not a short ID)
-      - toShortIds(["fullId1", "fullId2"]) → returns short IDs from inverse map
-    Use vi.mock("@/manifest") to inject a fake short_ids.json response.
-
-- id: w21
-  summary: "Fix stale status field in explorer-compare-url-short-ids.yaml DONE entry"
-  status: pending
-  notes: |
-    _project/DONE/main/active/explorer-compare-url-short-ids.yaml has status: Not Started
-    even though all work items (w1-w5) are done and the file is in the DONE directory.
-    Update status to Completed and add completed_date: "2026-04-16".
-    No code change — YAML housekeeping only.
 
 deps:
   needs:
@@ -361,4 +278,4 @@ metadata:
   tags: ["explorer", "visualization", "cleanup", "nit", "docs", "testing"]
   estimated_effort: "Large (4-6 hours)"
   created_date: "2026-04-17"
-  source: "Code reviews of explorer-unify-visualization-foundations, explorer-heatmap-accessibility-and-tests, explorer-emit-comparison-artifact-from-pipeline, explorer-close-chart-type-coverage-gaps, explorer-establish-cli-explorer-parity-tests, explorer-cross-benchmark-meta-leaderboard, and explorer-compare-url-short-ids, 2026-04-17"
+  source: "Code reviews of all seven explorer-* TODOs completed 2026-04-15 to 2026-04-16, reviewed 2026-04-17"

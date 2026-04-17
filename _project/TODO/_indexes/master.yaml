@@ -1,4 +1,4 @@
-generated_at: '2026-04-17T08:18:56.615283'
+generated_at: '2026-04-17T08:19:31.690108'
 total_items: 50
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -379,7 +379,7 @@ items:
   work_ready: 1
 - id: explorer-visualization-review-followup-nits
   file: TODO/main/active/explorer-visualization-review-followup-nits.yaml
-  title: Fix nit-level findings from explorer visualization code reviews (unify + a11y)
+  title: Fix nit-level findings from explorer visualization code reviews
   worktree: main
   category: Code Quality
   priority: Low
@@ -392,9 +392,9 @@ items:
   - docs
   - testing
   estimated_effort: Large (4-6 hours)
-  work_total: 13
-  work_done: 0
-  work_ready: 13
+  work_total: 21
+  work_done: 1
+  work_ready: 20
   needs:
   - explorer-unify-visualization-foundations
 - id: future-ideas-backlog

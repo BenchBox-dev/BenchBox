@@ -1,4 +1,4 @@
-generated_at: '2026-04-17T08:18:56.615340'
+generated_at: '2026-04-17T08:19:31.690150'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -42,7 +42,7 @@ categories:
     items:
     - id: explorer-visualization-review-followup-nits
       file: TODO/main/active/explorer-visualization-review-followup-nits.yaml
-      title: Fix nit-level findings from explorer visualization code reviews (unify + a11y)
+      title: Fix nit-level findings from explorer visualization code reviews
       priority: Low
       status: Not Started
     - id: normalize-pg-family-driver-package-fallback
