@@ -14,7 +14,7 @@ work:
   - id: w1
     summary: "Add comment explaining ?? 0 fallback in Compare.tsx grouped chart"
     needs: []
-    status: not started
+    status: pending
     notes: |
       Compare.tsx:196-198 — grouped bar chart uses `?? 0` for null display_ms
       values (queries where all runs failed).  Zero-height bars correctly
@@ -28,7 +28,7 @@ work:
   - id: w2
     summary: "Document zero-timing filter intent in QueryHeatmap.tsx"
     needs: []
-    status: not started
+    status: pending
     notes: |
       QueryHeatmap.tsx:74 — filter `v > 0` silently excludes timing=0ms
       (physically impossible but could occur with rounding artifacts).
@@ -39,7 +39,7 @@ work:
   - id: w3
     summary: "Improve getBenchmarkSummary to also check !res.ok before content-type"
     needs: []
-    status: not started
+    status: pending
     notes: |
       manifest.ts:79-80 — HTML detection uses `contentType.includes("text/html")`.
       If a real 5xx error page uses `application/json` content-type, the gzip
@@ -53,7 +53,7 @@ work:
   - id: w4
     summary: "Suppress lightnessForCell call when suppressHeat is true"
     needs: []
-    status: not started
+    status: pending
     notes: |
       QueryHeatmap.tsx:272 — lightnessForCell is called unconditionally even
       when suppressHeat=true (single-platform view).  The result is immediately

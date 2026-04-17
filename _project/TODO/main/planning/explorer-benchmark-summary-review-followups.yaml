@@ -15,7 +15,7 @@ work:
   - id: w1
     summary: "Consult RankingConfig.primary_order in _platform_row_sort_key"
     needs: []
-    status: not started
+    status: pending
     notes: |
       pipeline.py:78-87 — _platform_row_sort_key hardcodes sort direction: negate
       power_score (higher-is-better), use geomean_ms as-is (lower-is-better).
@@ -40,7 +40,7 @@ work:
   - id: w2
     summary: "Filter empty strings from _natural_sort_key output"
     needs: []
-    status: not started
+    status: pending
     notes: |
       pipeline.py:54-56 — re.split(r"(\d+)", s) produces empty strings between
       number groups (e.g., "Q10" → ["", "Q", "10", ""]). Python's sort handles
@@ -52,7 +52,7 @@ work:
   - id: w3
     summary: "Document why percentile filter uses display_ms > 0 not >= 0"
     needs: []
-    status: not started
+    status: pending
     notes: |
       transformer.py:272 — filter `dt.display_ms is not None and dt.display_ms > 0`
       excludes zero-millisecond measurements. For extremely fast queries (sub-ms
@@ -66,7 +66,7 @@ work:
   - id: w4
     summary: "Use Path.is_relative_to() for path-traversal guard"
     needs: []
-    status: not started
+    status: pending
     notes: |
       pipeline.py:381,395 — Path traversal check uses string prefix:
         if not str(detail_path).startswith(str(details_dir.resolve()) + "/"):
@@ -80,7 +80,7 @@ work:
   - id: w5
     summary: "Refactor _build_meta_leaderboard into smaller helpers"
     needs: []
-    status: not started
+    status: pending
     notes: |
       pipeline.py:165-256 — _build_meta_leaderboard is ~90 lines with nested
       functions and multiple accumulation passes. Consider extracting:

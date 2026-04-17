@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T21:02:21.375940'
-total_items: 46
+generated_at: '2026-04-16T21:30:15.482656'
+total_items: 48
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -197,7 +197,7 @@ items:
   estimated_effort: Tiny (< 1 hour)
   work_total: 5
   work_done: 0
-  work_ready: 0
+  work_ready: 5
 - id: explorer-chart-coverage-review-followups
   file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
   title: Address follow-up findings from chart-coverage code review
@@ -214,7 +214,7 @@ items:
   estimated_effort: Small (half day)
   work_total: 4
   work_done: 0
-  work_ready: 0
+  work_ready: 4
   deferred_count: 1
 - id: explorer-meta-leaderboard-review-followups
   file: TODO/main/planning/explorer-meta-leaderboard-review-followups.yaml
@@ -231,7 +231,24 @@ items:
   estimated_effort: Tiny (< 1 hour)
   work_total: 5
   work_done: 0
-  work_ready: 0
+  work_ready: 5
+- id: explorer-heatmap-accessibility-review-followups
+  file: TODO/main/planning/explorer-heatmap-accessibility-review-followups.yaml
+  title: Address follow-up findings from heatmap-accessibility code review
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Low
+  status: Not Started
+  tags:
+  - explorer
+  - accessibility
+  - a11y
+  - testing
+  - review-followup
+  estimated_effort: Tiny (< 1 hour)
+  work_total: 4
+  work_done: 0
+  work_ready: 4
 - id: explorer-matrix-leaderboard-review-followups
   file: TODO/main/planning/explorer-matrix-leaderboard-review-followups.yaml
   title: Address follow-up findings from matrix-leaderboard code review
@@ -247,7 +264,7 @@ items:
   estimated_effort: Tiny (< 30 min)
   work_total: 4
   work_done: 0
-  work_ready: 0
+  work_ready: 4
 - id: explorer-parity-tests-review-followups
   file: TODO/main/planning/explorer-parity-tests-review-followups.yaml
   title: Address follow-up findings from parity-tests code review
@@ -279,7 +296,7 @@ items:
   estimated_effort: Tiny (< 1 hour)
   work_total: 3
   work_done: 0
-  work_ready: 0
+  work_ready: 3
 - id: timing-policy-split-review-followups
   file: TODO/main/planning/timing-policy-split-review-followups.yaml
   title: Address follow-up findings from timing-policy pre-commit split review
@@ -311,7 +328,7 @@ items:
   estimated_effort: Tiny (< 1 hour)
   work_total: 3
   work_done: 0
-  work_ready: 0
+  work_ready: 3
 - id: questdb-strip-pk-quoted-constraint-name
   file: TODO/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
   title: Extend _strip_pk_constraints to handle quoted constraint names
@@ -400,6 +417,16 @@ items:
   work_total: 2
   work_done: 0
   work_ready: 1
+- id: normalize-pg-family-driver-package-fallback
+  file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
+  title: Normalize driver_package fallback string across pg-family config builders
+  worktree: main
+  category: Code Quality
+  priority: Low
+  status: Not Started
+  work_total: 2
+  work_done: 0
+  work_ready: 2
 - id: review-dependency-upper-bounds-quarterly
   file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
   title: Quarterly review of dependency upper bounds

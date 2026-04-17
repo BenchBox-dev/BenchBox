@@ -15,7 +15,7 @@ work:
   - id: w1
     summary: "Make trust chip label abbreviation explicit rather than split('-')[0]"
     needs: []
-    status: not started
+    status: pending
     notes: |
       BenchmarkIndex.tsx:270 — chip label uses `.split("-")[0]` which extracts
       only the first hyphen-delimited word.  Works for current labels
@@ -35,7 +35,7 @@ work:
   - id: w2
     summary: "Improve tooltip text for unrecognised trust labels in TrustBadge"
     needs: []
-    status: not started
+    status: pending
     notes: |
       TrustBadge.tsx:57 — unknown labels fall back to DEFAULT_CONFIG whose title
       is "Trust level not recorded".  But unknown labels ARE recorded — the issue
@@ -48,7 +48,7 @@ work:
   - id: w3
     summary: "Add light input guard for empty/null trustLabel in TrustBadge"
     needs: []
-    status: not started
+    status: pending
     notes: |
       TrustBadge.tsx:51 — no input guard; arbitrary strings render as-is.
       If manifest.json is malformed or a future field is null, the component

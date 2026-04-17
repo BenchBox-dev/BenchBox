@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T21:02:21.376003'
-total_items: 46
+generated_at: '2026-04-16T21:30:15.482719'
+total_items: 48
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 37
+    count: 39
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -57,6 +57,11 @@ statuses:
       title: Address follow-up findings from cross-benchmark meta-leaderboard code review
       priority: Low
       category: Core Functionality
+    - id: explorer-heatmap-accessibility-review-followups
+      file: TODO/main/planning/explorer-heatmap-accessibility-review-followups.yaml
+      title: Address follow-up findings from heatmap-accessibility code review
+      priority: Low
+      category: Testing and Quality Assurance
     - id: explorer-matrix-leaderboard-review-followups
       file: TODO/main/planning/explorer-matrix-leaderboard-review-followups.yaml
       title: Address follow-up findings from matrix-leaderboard code review
@@ -137,6 +142,11 @@ statuses:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       priority: High
       category: Platform Expansion
+    - id: normalize-pg-family-driver-package-fallback
+      file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
+      title: Normalize driver_package fallback string across pg-family config builders
+      priority: Low
+      category: Code Quality
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

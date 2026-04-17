@@ -14,7 +14,7 @@ work:
   - id: w1
     summary: "Fix aria-sort on primary metric column in QueryHeatmap"
     needs: []
-    status: not started
+    status: pending
     notes: |
       QueryHeatmap.tsx:197 — `aria-sort="none"` is used on the primary metric
       column header, but the table IS sorted by that column (lines 94–103 sort
@@ -30,7 +30,7 @@ work:
   - id: w2
     summary: "Use ranking?.secondary_metric to gate the secondary geomean column"
     needs: []
-    status: not started
+    status: pending
     notes: |
       QueryHeatmap.tsx:164 —
         const showGeomeanCol = primaryMetric === "power_score";
@@ -47,7 +47,7 @@ work:
   - id: w3
     summary: "Add comment to ranking.test.ts clarifying triple-write limitation"
     needs: []
-    status: not started
+    status: pending
     notes: |
       ranking.test.ts pins all 9 known benchmark→metric mappings explicitly.
       Like chartRegistry.meta.test.ts, it protects against TS-side drift but

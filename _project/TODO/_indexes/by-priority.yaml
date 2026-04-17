@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T21:02:21.375991'
-total_items: 46
+generated_at: '2026-04-16T21:30:15.482705'
+total_items: 48
 priorities:
   Critical:
     count: 2
@@ -134,7 +134,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 21
+    count: 23
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -160,6 +160,11 @@ priorities:
       file: TODO/main/planning/explorer-meta-leaderboard-review-followups.yaml
       title: Address follow-up findings from cross-benchmark meta-leaderboard code review
       category: Core Functionality
+      status: Not Started
+    - id: explorer-heatmap-accessibility-review-followups
+      file: TODO/main/planning/explorer-heatmap-accessibility-review-followups.yaml
+      title: Address follow-up findings from heatmap-accessibility code review
+      category: Testing and Quality Assurance
       status: Not Started
     - id: explorer-matrix-leaderboard-review-followups
       file: TODO/main/planning/explorer-matrix-leaderboard-review-followups.yaml
@@ -210,6 +215,11 @@ priorities:
       file: TODO/main/planning/questdb-parquet-chunk-size-tunable.yaml
       title: Make QuestDB parquet chunk row count tunable via platform config
       category: Platform Support
+      status: Not Started
+    - id: normalize-pg-family-driver-package-fallback
+      file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
+      title: Normalize driver_package fallback string across pg-family config builders
+      category: Code Quality
       status: Not Started
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml

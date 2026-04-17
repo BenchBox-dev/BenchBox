@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T21:02:21.375976'
-total_categories: 11
+generated_at: '2026-04-16T21:30:15.482688'
+total_categories: 12
 categories:
   Architecture & Refactoring:
     count: 2
@@ -35,6 +35,14 @@ categories:
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+      priority: Low
+      status: Not Started
+  Code Quality:
+    count: 1
+    items:
+    - id: normalize-pg-family-driver-package-fallback
+      file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
+      title: Normalize driver_package fallback string across pg-family config builders
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
@@ -242,8 +250,13 @@ categories:
       priority: Low
       status: Not Started
   Testing and Quality Assurance:
-    count: 4
+    count: 5
     items:
+    - id: explorer-heatmap-accessibility-review-followups
+      file: TODO/main/planning/explorer-heatmap-accessibility-review-followups.yaml
+      title: Address follow-up findings from heatmap-accessibility code review
+      priority: Low
+      status: Not Started
     - id: explorer-parity-tests-review-followups
       file: TODO/main/planning/explorer-parity-tests-review-followups.yaml
       title: Address follow-up findings from parity-tests code review

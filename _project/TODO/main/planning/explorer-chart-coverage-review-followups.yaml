@@ -15,7 +15,7 @@ work:
   - id: w1
     summary: "Fix ordinal() in RankTable to handle n >= 21 correctly"
     needs: []
-    status: not started
+    status: pending
     notes: |
       RankTable.tsx:21-25 — ordinal() only special-cases 1/2/3; everything
       else falls through to `${n}th`.  Renders "21th", "22nd"→"22th" for
@@ -30,7 +30,7 @@ work:
   - id: w2
     summary: "Render CDFChart as ECDF steps, not smooth lines"
     needs: []
-    status: not started
+    status: pending
     notes: |
       CDFChart.tsx:103-115 uses `L` (lineto) to connect CDF points, producing
       smooth diagonal lines.  A true ECDF is a step function: horizontal
@@ -45,7 +45,7 @@ work:
   - id: w3
     summary: "Data-gate Histogram / Box Plot / CDF tabs in BenchmarkIndex"
     needs: []
-    status: not started
+    status: pending
     notes: |
       BenchmarkIndex.tsx:383-386 — The Histogram, Box Plot, and CDF tabs are
       unconditionally shown (hardcoded true).  When all platform timings are
@@ -62,7 +62,7 @@ work:
   - id: w4
     summary: "Replace hardcoded CANONICAL_IDS in meta-test with dynamic chart_types.py parse"
     needs: []
-    status: not started
+    status: pending
     notes: |
       chartRegistry.meta.test.ts:19-36 — CANONICAL_IDS is a third hardcoded
       copy of the chart type list (alongside chart_types.py and chartRegistry.ts).

@@ -18,7 +18,7 @@ work:
   - id: w1
     summary: "Simplify Home.tsx meta-leaderboard guard to trust MetaLeaderboard.tsx internal guard"
     needs: []
-    status: not started
+    status: pending
     notes: |
       Home.tsx:80-82 — guard checks `metaLeaderboard && metaLeaderboard.cohorts.length > 0`
       before rendering MetaLeaderboard.  But MetaLeaderboard.tsx:23-25 already handles
@@ -33,7 +33,7 @@ work:
   - id: w2
     summary: "Align avg_rank decimal display in MetaLeaderboard.tsx with pipeline precision"
     needs: []
-    status: not started
+    status: pending
     notes: |
       MetaLeaderboard.tsx:102 — avg_rank displayed with `.toFixed(1)` (1 decimal).
       Pipeline emits 2 decimal places (pipeline.py:244).
@@ -45,7 +45,7 @@ work:
   - id: w3
     summary: "Add defensive destructuring defaults in MetaLeaderboard.tsx"
     needs: []
-    status: not started
+    status: pending
     notes: |
       MetaLeaderboard.tsx:23 — `const { cohorts, platforms } = data;`
       If a corrupted or partial meta-leaderboard.json.gz is served, `platforms`
@@ -57,7 +57,7 @@ work:
   - id: w4
     summary: "Extract _cohort_metadata helper in pipeline.py"
     needs: []
-    status: not started
+    status: pending
     notes: |
       pipeline.py:185-188 — cohort_key, label, and href derivation is repeated
       inline inside the loop.  Could be a small helper:
@@ -70,7 +70,7 @@ work:
   - id: w5
     summary: "Add avg_rank rounding comment explaining tie-breaking"
     needs: []
-    status: not started
+    status: pending
     notes: |
       pipeline.py:244 — avg_rank is rounded to 2 decimal places.  Two platforms
       with identical averages (e.g., both 1.25) are ordered by platform_id
