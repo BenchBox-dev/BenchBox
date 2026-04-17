@@ -6,25 +6,34 @@ status: Not Started
 category: Code Quality
 description: |
   Inconsistency surfaced during review of commit 495efcaa8 (psycopg3 migration
-  completion). The pg-family `_build_*_config` builders disagree on the fallback
-  value used for `driver_package` when `info` is None:
+  completion) and follow-up commit 1786150ec. The pg-family `_build_*_config`
+  builders disagree three ways on the fallback value used for `driver_package`
+  when `info` is None:
 
-    - postgresql.py, timescaledb.py, cedardb.py, pg_duckdb.py, pg_mooncake.py
-      all fall back to `"psycopg"` (bare distribution name).
-    - questdb.py:1415 falls back to `"psycopg[binary]"` (with extras marker).
+    - postgresql.py, timescaledb.py, pg_duckdb.py, pg_mooncake.py
+      fall back to `"psycopg"` (bare distribution/import name).
+    - cedardb.py:194 falls back to `"psycopg2-binary"` (psycopg2 pip extras
+      variant — leftover from pre-psycopg3 migration; the registry metadata
+      at platform_registry.py:616 already advertises `"psycopg"`, so this
+      fallback string is stale).
+    - questdb.py:1415 falls back to `"psycopg[binary]"` (psycopg3 with pip
+      extras marker — the bracketed form is a pip-install requirement, not
+      an import name).
 
   In practice the fallback is rarely hit because PlatformRegistry.get_platform_info()
-  returns a populated `info` for every registered platform, so `info.driver_package`
-  wins. But the divergence is a latent footgun: if anything ever consumes
-  driver_package as a pip-style requirement string vs. an import-name string,
-  the two forms behave differently. The bare name `"psycopg"` is correct for
-  `importlib.import_module()`; the bracketed form is only valid for pip/uv
-  install commands.
+  returns a populated `info` for every registered platform (all pg-family
+  entries in platform_registry.py advertise `driver_package: "psycopg"`), so
+  `info.driver_package` wins. But the divergence is a latent footgun: if
+  anything ever consumes driver_package as a pip-style requirement string vs.
+  an import-name string, the three forms behave differently. The bare name
+  `"psycopg"` is correct for `importlib.import_module()`; the bracketed form
+  is only valid for pip/uv install commands; and `"psycopg2-binary"` points
+  at an entirely different (legacy) distribution.
 
   Action: pick one form (recommend bare `"psycopg"` since `driver_package` is
-  used elsewhere as an import target) and normalize questdb.py to match. Audit
-  any consumer of `DatabaseConfig.driver_package` to confirm import-name vs
-  requirement-string usage before changing.
+  used elsewhere as an import target) and normalize cedardb.py and questdb.py
+  to match. Audit any consumer of `DatabaseConfig.driver_package` to confirm
+  import-name vs requirement-string usage before changing.
 
 work:
 - id: w1
@@ -33,8 +42,10 @@ work:
   notes: |
     grep for `driver_package` references across benchbox/. Determine whether
     consumers expect a pip requirement (`psycopg[binary]>=3.1`) or an import
-    name (`psycopg`). The DatabaseConfig field is Optional[str] with no
-    docstring distinguishing the two.
+    name (`psycopg`). Known consumer: `ensure_driver_version` in
+    benchbox/cli/database.py passes `package_name=driver_package` through to
+    driver resolution; _sync_driver_options also reads it. The DatabaseConfig
+    field is Optional[str] with no docstring distinguishing the two.
 
 - id: w2
   summary: "Normalize questdb.py fallback to match pg-family convention"
@@ -45,6 +56,18 @@ work:
     to
       driver_package = info.driver_package if info else "psycopg"
     (assuming w1 confirms import-name semantics).
+
+- id: w3
+  summary: "Normalize cedardb.py fallback to match pg-family convention"
+  status: pending
+  notes: |
+    benchbox/platforms/cedardb.py:194 — change
+      driver_package = info.driver_package if info else "psycopg2-binary"
+    to
+      driver_package = info.driver_package if info else "psycopg"
+    The registry already advertises "psycopg" for cedardb
+    (platform_registry.py:616), so this is a stale psycopg2 leftover from
+    before the 495efcaa8 migration rather than a deliberate choice.
 
 success_criteria:
 - All pg-family builders use identical fallback string for driver_package
