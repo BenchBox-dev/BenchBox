@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T16:48:32.529417'
+generated_at: '2026-04-16T17:00:40.971468'
 total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -75,12 +75,12 @@ items:
   work_done: 0
   work_ready: 1
 - id: questdb-benchmark-compatibility-remediation
-  file: TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml
+  file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
   title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
   worktree: main
   category: Platform Support
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - questdb
   - compatibility
@@ -89,8 +89,8 @@ items:
   - adapter
   estimated_effort: Large (1-2 weeks across phases)
   work_total: 13
-  work_done: 0
-  work_ready: 4
+  work_done: 5
+  work_ready: 2
   deferred_count: 3
 - id: fix-git-author-history-rewrite
   file: TODO/main/planning/fix-git-author-history-rewrite.yaml

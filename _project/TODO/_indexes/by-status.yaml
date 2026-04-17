@@ -1,16 +1,21 @@
-generated_at: '2026-04-16T16:48:32.529496'
+generated_at: '2026-04-16T17:00:40.971524'
 total_items: 36
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: migrate-psycopg2-to-psycopg3
       file: TODO/main/active/migrate-psycopg2-to-psycopg3.yaml
       title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
       priority: Medium
       category: Code Quality and Technical Debt
+    - id: questdb-benchmark-compatibility-remediation
+      file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
+      title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
+      priority: High
+      category: Platform Support
   Not Started:
-    count: 27
+    count: 26
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -92,11 +97,6 @@ statuses:
       title: Quarterly review of dependency upper bounds
       priority: Low
       category: Code Quality and Technical Debt
-    - id: questdb-benchmark-compatibility-remediation
-      file: TODO/main/planning/questdb-benchmark-compatibility-remediation.yaml
-      title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
-      priority: High
-      category: Platform Support
     - id: reenable-fireducks-after-upstream-fixes
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
