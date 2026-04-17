@@ -1,0 +1,249 @@
+id: datavault-sha256-hash-migration
+title: "Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+description: |
+  The DataVault benchmark's hash key columns are defined as VARCHAR(32), sized for
+  MD5's 32-char hex output. MD5 has known collision vulnerabilities that make it
+  unsuitable for Data Vault 2.0 in any production-representative benchmark — the
+  whole point of DV2.0 hash keys is collision-free surrogate identity.
+
+  A root-cause analysis revealed a five-layer inconsistency across the codebase:
+
+    1. BenchmarkOptionSpec (benchmark.py:485) declares choices=("md5", "sha256") —
+       the CLI accepts sha256 and the docs advertise it.
+    2. SUPPORTED_HASH_ALGORITHMS = ("md5",) (benchmark.py:56) immediately rejects
+       sha256 at construction time with ValueError.
+    3. HashAlgorithm = Literal["md5"] (hash_functions.py:16) narrows the type to
+       match the runtime, but the function body still has sha1/sha256 branches.
+    4. The sha256 branch truncates to [:32] (hash_functions.py:49) — destroying
+       half the entropy and providing zero collision advantage over MD5.
+    5. DataVaultETLTransformer hard-codes `if hash_algorithm != "md5"` (transformer.py:136)
+       independently of SUPPORTED_HASH_ALGORITHMS.
+
+  The fix has two sequential phases: (a) immediately stop the CLI from advertising
+  sha256 while the schema cannot support it, and (b) migrate the schema to VARCHAR(64),
+  remove the truncation, and wire sha256 through all layers cleanly.
+
+  After this work, `benchbox run --platform duckdb --benchmark datavault
+  --benchmark-option hash_algorithm=sha256` must execute successfully end-to-end.
+
+work:
+- id: w1
+  summary: "Fix the immediate CLI false promise: remove sha256 from BenchmarkOptionSpec choices"
+  status: pending
+  notes: |
+    In benchbox/core/datavault/benchmark.py:485, change:
+      choices=("md5", "sha256")
+    to:
+      choices=("md5",)
+
+    Also update docs/reference/cli/run.md — the hash_algorithm row currently says
+    "md5, sha256"; change it to "md5" with a note that sha256 support is planned.
+
+    This eliminates the user-visible false promise without any behavioral change.
+    The validator at line 89 already rejects sha256 — this makes the CLI agree.
+
+    Verification: `benchbox run --benchmark datavault --benchmark-option hash_algorithm=sha256`
+    must now fail at CLI validation (choices check) rather than silently passing
+    the CLI and failing inside the constructor.
+
+- id: w2
+  summary: "Audit every source of truth for the algorithm allowlist — document the single-source design"
+  needs: [w1]
+  status: pending
+  notes: |
+    Read and map every place the algorithm set is defined or enforced:
+      - HashAlgorithm Literal in hash_functions.py:16
+      - SUPPORTED_HASH_ALGORITHMS in benchmark.py:56
+      - BenchmarkOptionSpec.choices in benchmark.py:485 (fixed in w1)
+      - Validator in benchmark.py:89
+      - Hard-coded check in transformer.py:136
+      - Schema column HASHKEY = "VARCHAR(32)" in schema.py:34
+
+    Decide: SUPPORTED_HASH_ALGORITHMS in benchmark.py should be the single
+    authoritative source. HashAlgorithm Literal derives from it (or is kept
+    in sync). BenchmarkOptionSpec.choices must exactly match it. Transformer
+    must import and reference it rather than hard-coding.
+
+    Output: inline comment in benchmark.py above SUPPORTED_HASH_ALGORITHMS
+    documenting it as the canonical source, and what must be updated in sync
+    when it changes.
+
+- id: w3
+  summary: "Schema migration: widen HASHKEY column from VARCHAR(32) to VARCHAR(64)"
+  needs: [w2]
+  status: pending
+  notes: |
+    In benchbox/core/datavault/schema.py, change:
+      HASHKEY = "VARCHAR(32)"  # MD5 hash keys are always 32 hex characters
+    to:
+      HASHKEY = "VARCHAR(64)"  # Hash key columns — 32 chars for MD5, 40 for SHA-1, 64 for SHA-256
+
+    Verify that HASHKEY is the single definition driving all hub/link/satellite DDL.
+    Grep for any other hard-coded VARCHAR(32) references tied to hash columns and
+    update those too. Do not change non-hash columns.
+
+    The wider column is backward-compatible for existing MD5 data — VARCHAR(64)
+    stores 32-char strings without truncation or padding.
+
+    Run datavault schema generation smoke test to confirm DDL output reflects the
+    new width before proceeding.
+
+- id: w4
+  summary: "Wire sha256 through all five layers: type, constant, validator, transformer, function"
+  needs: [w3]
+  status: pending
+  notes: |
+    Exact changes in order:
+
+    1. hash_functions.py:16 — widen type:
+         HashAlgorithm = Literal["md5", "sha256"]
+       SHA-1 stays excluded: it's neither collision-safe nor schema-compatible (40 chars).
+
+    2. hash_functions.py:49 — remove the truncation:
+         return hashlib.sha256(key_string.encode("utf-8")).hexdigest()[:32]
+       becomes:
+         return hashlib.sha256(key_string.encode("utf-8")).hexdigest()
+       The 64-char output now fits VARCHAR(64).
+
+    3. benchmark.py:56 — widen the allowlist:
+         SUPPORTED_HASH_ALGORITHMS = ("md5", "sha256")
+
+    4. benchmark.py:485 — restore sha256 in CLI choices:
+         choices=("md5", "sha256")
+
+    5. transformer.py:136-137 — replace the hard-coded check with a reference:
+         from benchbox.core.datavault.benchmark import DataVaultBenchmark
+         if hash_algorithm not in DataVaultBenchmark.SUPPORTED_HASH_ALGORITHMS:
+             raise ValueError(...)
+       Or import SUPPORTED_HASH_ALGORITHMS directly to avoid circular import.
+
+    SHA-1 is deliberately not added: 40-char output doesn't map cleanly to
+    either VARCHAR(32) or VARCHAR(64), and SHA-1 is cryptographically weaker
+    than SHA-256.
+
+- id: w5
+  summary: "Update tests: flip sha256 rejection tests, add sha256 acceptance and schema width tests"
+  needs: [w4]
+  status: pending
+  notes: |
+    In tests/unit/core/datavault/test_datavault_benchmark.py:
+      - test_sha256_algorithm_rejected → test_sha256_algorithm_accepted: construct
+        DataVaultBenchmark(hash_algorithm="sha256") and assert no exception.
+      - test_sha1_algorithm_rejected: keep — SHA-1 must still be rejected.
+      - Add test_sha256_produces_64char_key: call generate_hash_key(1, algorithm="sha256")
+        and assert len(result) == 64.
+
+    In tests/unit/core/datavault/test_hash_functions.py:
+      - test_sha256_algorithm: update assertion from len==32 to len==64.
+      - Keep test_sha1_algorithm as-is (40-char output is correct for SHA-1 itself).
+
+    In tests/unit/core/datavault/ (or schema tests):
+      - Add test_hashkey_column_width: generate DDL for a hub table and assert
+        that hash key columns are VARCHAR(64), not VARCHAR(32).
+
+    Run full datavault fast test suite before marking w5 done.
+
+- id: w6
+  summary: "Update all docs and comments that say sha256 is unsupported or MD5-only"
+  needs: [w4, w5]
+  status: pending
+  notes: |
+    Locations to update:
+      - docs/reference/cli/run.md: hash_algorithm row — restore "md5, sha256"
+        (already changed to "md5" in w1; re-add sha256 now that it works).
+      - benchmark.py:55 comment: "currently only MD5 due to VARCHAR(32) schema
+        constraints" — update to reflect VARCHAR(64) and sha256 support.
+      - benchmark.py:51, 78: docstring mentions "only 'md5' currently supported"
+        — update to list both md5 and sha256.
+      - transformer.py:126: docstring "(only 'md5' supported)" — update.
+      - hash_functions.py:32: Returns docstring "40 for SHA1, 64 for SHA256"
+        is now accurate post-w4; verify it's up to date.
+
+    Grep for "only.*md5" and "VARCHAR(32)" across the datavault package to catch
+    any remaining stale references.
+
+metadata:
+  tags:
+  - datavault
+  - schema-migration
+  - hash
+  - data-integrity
+  - tpcdi
+  estimated_effort: "Medium"
+  created_date: "2026-04-16"
+
+impact:
+  business_value: |
+    MD5 is cryptographically broken for collision resistance. A benchmark that
+    models Data Vault 2.0 hash key generation using MD5 produces results that
+    don't reflect production DV2.0 deployments, which use SHA-256. Enabling
+    sha256 makes DataVault benchmark results representative of real workloads.
+  user_impact: |
+    Users running `--benchmark-option hash_algorithm=sha256` currently get a
+    confusing ValueError after the CLI accepted the argument. After this work,
+    sha256 runs end-to-end and produces correct 64-char hash keys.
+  technical_debt: |
+    Eliminates five independent sources of truth for the algorithm allowlist.
+    After this work, SUPPORTED_HASH_ALGORITHMS in benchmark.py is the single
+    authoritative source; all other layers are derived or validated against it.
+
+must_preserve:
+- "MD5 remains the default — hash_algorithm defaults to 'md5' in all constructors and CLI options"
+- "SHA-1 stays unsupported — 40-char output doesn't align with either VARCHAR(32) or VARCHAR(64), and SHA-1 is cryptographically weaker than SHA-256"
+- "generate_hash_key_sql() remains MD5-only — DuckDB's md5() SQL function is the only hash SQL available without custom extensions; that restriction stands"
+- "Existing VARCHAR(32) test fixtures remain valid — stored MD5 hashes are still 32 chars and fit in VARCHAR(64) without truncation"
+
+approach: |
+  Execute as two gate-checked phases: w1 (stop the false promise) before any
+  schema changes, then w3→w4 (schema + implementation) before w5 (tests). Each
+  work unit must pass the fast test suite before the next begins.
+
+  The schema change (w3) is backward-compatible: VARCHAR(64) stores existing
+  32-char MD5 hashes without modification. No data migration is required for
+  test fixtures; only DDL generation changes.
+
+  SUPPORTED_HASH_ALGORITHMS in benchmark.py is the single source of truth after
+  this work. Any future algorithm addition touches that constant and nothing else.
+
+anti_patterns:
+- "DO NOT add SHA-1 to the allowlist -- because 40-char output doesn't map to either VARCHAR(32) or VARCHAR(64) cleanly, and SHA-1 offers no security advantage over SHA-256 -- extend to SHA-256 only"
+- "DO NOT keep the [:32] truncation as a compatibility shim -- because it destroys entropy and makes SHA-256 no better than MD5 -- remove it entirely once VARCHAR(64) lands"
+- "DO NOT add a second HASHKEY_WIDE column type alongside HASHKEY -- because that creates two parallel schema paths that diverge -- change HASHKEY in place since VARCHAR(64) is backward-compatible"
+- "DO NOT replicate the algorithm check in each layer independently -- because that is the root cause of this entire bug -- derive all enforcement from SUPPORTED_HASH_ALGORITHMS"
+
+verification:
+- description: "SHA-256 DataVault run completes without error"
+  command: "uv run -- python -m benchbox run --platform duckdb --benchmark datavault --scale 0.01 --benchmark-option hash_algorithm=sha256 --phases generate,load,power"
+  expected_output: "Benchmark completed successfully"
+- description: "SHA-256 hash key is 64 chars (not truncated)"
+  command: "uv run -- python -c \"from benchbox.core.datavault.etl.hash_functions import generate_hash_key; r = generate_hash_key(1, algorithm='sha256'); assert len(r) == 64, f'got {len(r)}'; print('OK')\""
+  expected_output: "OK"
+- description: "SHA-1 is still rejected"
+  command: "uv run -- python -c \"from benchbox.core.datavault.benchmark import DataVaultBenchmark; DataVaultBenchmark(scale_factor=0.01, hash_algorithm='sha1')\" 2>&1 | grep -c ValueError"
+  expected_output: "1"
+- description: "Hub DDL uses VARCHAR(64) for hash key column"
+  command: "uv run -- python -c \"from benchbox.core.datavault.schema import HASHKEY; assert HASHKEY == 'VARCHAR(64)', f'got {HASHKEY}'; print('OK')\""
+  expected_output: "OK"
+- description: "Datavault fast tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/datavault/ -q"
+  expected_output: "All tests pass"
+
+files_affected:
+  modified:
+  - "benchbox/core/datavault/schema.py"
+  - "benchbox/core/datavault/benchmark.py"
+  - "benchbox/core/datavault/etl/hash_functions.py"
+  - "benchbox/core/datavault/etl/transformer.py"
+  - "tests/unit/core/datavault/test_datavault_benchmark.py"
+  - "tests/unit/core/datavault/test_hash_functions.py"
+  - "docs/reference/cli/run.md"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/datavault/"
+  - "tests/unit/core/datavault/"
+  - "docs/reference/cli/run.md"

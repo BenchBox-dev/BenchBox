@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:58:29.802505'
-total_items: 44
+generated_at: '2026-04-16T20:59:45.412240'
+total_items: 45
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -717,6 +717,23 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
+- id: datavault-sha256-hash-migration
+  file: TODO/main/planning/datavault-sha256-hash-migration.yaml
+  title: Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - datavault
+  - schema-migration
+  - hash
+  - data-integrity
+  - tpcdi
+  estimated_effort: Medium
+  work_total: 6
+  work_done: 0
+  work_ready: 1
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

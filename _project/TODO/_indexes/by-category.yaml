@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T20:58:29.802544'
+generated_at: '2026-04-16T20:59:45.412280'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 17
+    count: 18
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -122,6 +122,11 @@ categories:
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: High
+      status: Not Started
+    - id: datavault-sha256-hash-migration
+      file: TODO/main/planning/datavault-sha256-hash-migration.yaml
+      title: Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256
+      priority: Medium-High
       status: Not Started
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml

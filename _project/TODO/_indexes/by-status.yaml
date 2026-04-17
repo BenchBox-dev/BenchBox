@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:58:29.802576'
-total_items: 44
+generated_at: '2026-04-16T20:59:45.412314'
+total_items: 45
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 35
+    count: 36
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -122,6 +122,11 @@ statuses:
       title: Make QuestDB parquet chunk row count tunable via platform config
       priority: Low
       category: Platform Support
+    - id: datavault-sha256-hash-migration
+      file: TODO/main/planning/datavault-sha256-hash-migration.yaml
+      title: Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256
+      priority: Medium-High
+      category: Core Functionality
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control

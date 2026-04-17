@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:58:29.802563'
-total_items: 44
+generated_at: '2026-04-16T20:59:45.412300'
+total_items: 45
 priorities:
   Critical:
     count: 2
@@ -48,7 +48,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 8
+    count: 9
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -75,6 +75,11 @@ priorities:
       title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Completed
+    - id: datavault-sha256-hash-migration
+      file: TODO/main/planning/datavault-sha256-hash-migration.yaml
+      title: Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256
+      category: Core Functionality
+      status: Not Started
     - id: surface-contributor-onboarding-for-results
       file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
       title: Surface contributor onboarding for results submission
