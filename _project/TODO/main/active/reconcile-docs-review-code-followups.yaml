@@ -57,7 +57,7 @@ work:
 - id: w3
   summary: "N1 — replace connection.cursor() with _make_stream_cursor(connection) at platforms/base/execution.py lines 547,
     673, 765, 854, 1534 for consistency with line 369"
-  status: pending
+  status: done
 
 metadata:
   tags:
