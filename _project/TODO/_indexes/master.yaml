@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T07:53:24.975126'
-total_items: 50
+generated_at: '2026-04-17T08:02:31.985909'
+total_items: 51
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -377,6 +377,24 @@ items:
   work_total: 1
   work_done: 0
   work_ready: 1
+- id: explorer-visualization-review-followup-nits
+  file: TODO/main/active/explorer-visualization-review-followup-nits.yaml
+  title: Fix three nit-level findings from explorer-unify-visualization-foundations code review
+  worktree: main
+  category: Code Quality
+  priority: Low
+  status: Not Started
+  tags:
+  - explorer
+  - visualization
+  - cleanup
+  - nit
+  estimated_effort: Small (1-2 hours)
+  work_total: 3
+  work_done: 0
+  work_ready: 3
+  needs:
+  - explorer-unify-visualization-foundations
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -456,9 +474,9 @@ items:
   category: Code Quality
   priority: Low
   status: Not Started
-  work_total: 2
+  work_total: 3
   work_done: 0
-  work_ready: 2
+  work_ready: 3
 - id: review-dependency-upper-bounds-quarterly
   file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
   title: Quarterly review of dependency upper bounds

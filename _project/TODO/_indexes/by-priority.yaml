@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T07:53:24.975177'
-total_items: 50
+generated_at: '2026-04-17T08:02:31.985984'
+total_items: 51
 priorities:
   Critical:
     count: 2
@@ -134,7 +134,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 25
+    count: 26
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -205,6 +205,11 @@ priorities:
       file: TODO/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
       title: Extend _strip_pk_constraints to handle quoted constraint names
       category: Platform Support
+      status: Not Started
+    - id: explorer-visualization-review-followup-nits
+      file: TODO/main/active/explorer-visualization-review-followup-nits.yaml
+      title: Fix three nit-level findings from explorer-unify-visualization-foundations code review
+      category: Code Quality
       status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml

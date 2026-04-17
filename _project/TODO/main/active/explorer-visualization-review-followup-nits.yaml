@@ -1,0 +1,99 @@
+id: explorer-visualization-review-followup-nits
+title: "Fix three nit-level findings from explorer-unify-visualization-foundations code review"
+worktree: main
+priority: Low
+status: Not Started
+category: Code Quality
+
+description: |
+  Code review of `explorer-unify-visualization-foundations` found three nit-level
+  issues that don't block the feature but should be cleaned up:
+
+  **Nit 1 — `perQuerySpeedup` docstring has an incomplete sentence.**
+  `chartMath.ts:163`: "Represents how much the slowest result for a given query
+  is than the fastest." — missing "faster" before "than".
+
+  **Nit 2 — `StackedPhase.tsx` `PHASE_COLORS` uses inline hex that overlaps PALETTE.**
+  `StackedPhase.tsx:24-31` defines `PHASE_COLORS` with `#3b82f6`, `#10b981`,
+  `#f59e0b`, `#ef4444` — the exact same values as `chartTheme.PALETTE` but
+  defined independently.  The `explorer-unify-visualization-foundations` anti-pattern
+  says "every color comes from chartTheme.ts, no exceptions."  StackedPhase was
+  out of scope for that TODO, so this pre-existing violation was not fixed.
+  The phase colors have different semantics from the platform palette (phases, not
+  platforms), so the fix is to export `PHASE_COLORS` from `chartTheme.ts` rather
+  than eliminating the distinction.
+
+  **Nit 3 — `BenchmarkIndex.tsx:373` has an unnecessary `?? ""` defensive fallback.**
+  `primaryMetricFor(s.benchmark ?? "")` — `BenchmarkSummary.benchmark` is required
+  (always set by the pipeline), so `?? ""` is defensive noise.  The TypeScript
+  type already guarantees it is not null.
+
+work:
+- id: w1
+  summary: "Fix incomplete sentence in perQuerySpeedup docstring (chartMath.ts:163)"
+  status: pending
+  notes: |
+    Change:
+      "Represents how much the slowest result for a given query is than the fastest."
+    To:
+      "Represents how much faster the slowest result for a given query is than the fastest."
+    Or a cleaner rewrite:
+      "Represents how many times the slowest result is relative to the fastest within a query."
+
+- id: w2
+  summary: "Move PHASE_COLORS from StackedPhase.tsx to chartTheme.ts"
+  status: pending
+  notes: |
+    Add to chartTheme.ts:
+      export const PHASE_LABELS: Record<string, string> = { ... }
+      export const PHASE_COLORS: Record<string, string> = { ... }
+      export const PHASE_ORDER: string[] = [ ... ]
+    (Move all three since they're conceptually a unit.)
+    Update StackedPhase.tsx to import from chartTheme.ts instead.
+    No behavior change.
+
+- id: w3
+  summary: "Remove unnecessary ?? '' fallback in BenchmarkIndex.tsx:373"
+  status: pending
+  notes: |
+    Change:
+      primaryMetricFor(s.benchmark ?? "")
+    To:
+      primaryMetricFor(s.benchmark)
+    BenchmarkSummary.benchmark is always set by the pipeline; the TypeScript
+    type confirms it is string (not string | null | undefined).
+
+files_affected:
+  modified:
+  - "results-explorer/src/lib/chartMath.ts"
+  - "results-explorer/src/lib/chartTheme.ts"
+  - "results-explorer/src/components/StackedPhase.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+
+must_preserve:
+- "StackedPhase.tsx visual output — phase colors must remain identical hex values"
+- "All existing Vitest tests pass (no behavior change)"
+
+verification:
+- description: "No inline PHASE_COLORS in StackedPhase.tsx"
+  command: "grep -n 'PHASE_COLORS\\s*=' results-explorer/src/components/StackedPhase.tsx"
+  expected_output: "zero matches — PHASE_COLORS imported from chartTheme"
+- description: "chartTheme exports PHASE_COLORS"
+  command: "grep -n 'export.*PHASE_COLORS' results-explorer/src/lib/chartTheme.ts"
+  expected_output: "one match"
+- description: "No ?? '' fallback on benchmark"
+  command: "grep -n 'benchmark ?? \"\"' results-explorer/src/pages/BenchmarkIndex.tsx"
+  expected_output: "zero matches"
+- description: "All tests pass"
+  command: "cd results-explorer && npm test"
+  expected_output: "all tests pass"
+
+deps:
+  needs:
+  - explorer-unify-visualization-foundations
+
+metadata:
+  tags: ["explorer", "visualization", "cleanup", "nit"]
+  estimated_effort: "Small (1-2 hours)"
+  created_date: "2026-04-17"
+  source: "Code review of explorer-unify-visualization-foundations, 2026-04-17"

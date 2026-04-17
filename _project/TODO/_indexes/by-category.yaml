@@ -1,4 +1,4 @@
-generated_at: '2026-04-17T07:53:24.975160'
+generated_at: '2026-04-17T08:02:31.985963'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -38,8 +38,13 @@ categories:
       priority: Low
       status: Not Started
   Code Quality:
-    count: 1
+    count: 2
     items:
+    - id: explorer-visualization-review-followup-nits
+      file: TODO/main/active/explorer-visualization-review-followup-nits.yaml
+      title: Fix three nit-level findings from explorer-unify-visualization-foundations code review
+      priority: Low
+      status: Not Started
     - id: normalize-pg-family-driver-package-fallback
       file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
       title: Normalize driver_package fallback string across pg-family config builders
