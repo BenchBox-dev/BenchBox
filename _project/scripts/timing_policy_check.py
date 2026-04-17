@@ -153,50 +153,66 @@ def main() -> int:
         help="Fast-lane guardrail JSON file path",
     )
     parser.add_argument("--strict", action="store_true", help="Fail on any non-allowlisted wall-clock violations")
+    lane_group = parser.add_mutually_exclusive_group()
+    lane_group.add_argument(
+        "--skip-fast-lane",
+        action="store_true",
+        help="Skip the pytest-collection fast-lane policy checks (runs only the allowlist scan).",
+    )
+    lane_group.add_argument(
+        "--only-fast-lane",
+        action="store_true",
+        help="Run only the pytest-collection fast-lane policy checks (skips the allowlist scan).",
+    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[2]
-    allowlist_path = repo_root / args.allowlist
-    fast_lane_policy_path = repo_root / args.fast_lane_policy
-    entries = _load_allowlist(allowlist_path)
-    fast_lane_policy = _load_fast_lane_policy(fast_lane_policy_path)
 
-    findings = collect_findings(repo_root, args.roots)
-    candidate_violations = [
-        f
-        for f in findings
-        if f.symbol in {"time.time", "datetime.now"}
-        and f.classification == "elapsed_or_timeout_wall_clock"
-    ]
+    violations: list[Any] = []
+    fast_lane_violations: list[str] = []
 
-    unknown_wall_clock = [
-        f
-        for f in findings
-        if f.symbol in {"time.time", "datetime.now"}
-        and f.classification == "wall_clock_unknown"
-    ]
+    if not args.only_fast_lane:
+        allowlist_path = repo_root / args.allowlist
+        entries = _load_allowlist(allowlist_path)
 
-    violations = []
-    allowed = 0
-    for finding in candidate_violations:
-        if any(_is_allowed(finding.path, finding.text, finding.symbol, entry) for entry in entries):
-            allowed += 1
-            continue
-        violations.append(finding)
+        findings = collect_findings(repo_root, args.roots)
+        candidate_violations = [
+            f
+            for f in findings
+            if f.symbol in {"time.time", "datetime.now"}
+            and f.classification == "elapsed_or_timeout_wall_clock"
+        ]
 
-    print(f"Timing policy candidates: {len(candidate_violations)}")
-    print(f"Allowlisted: {allowed}")
-    print(f"Violations: {len(violations)}")
-    print(f"Unknown (informational): {len(unknown_wall_clock)}")
-    for finding in violations[:200]:
-        print(f"{finding.path}:{finding.line} [{finding.symbol}] {finding.text}")
-    if len(violations) > 200:
-        print(f"... truncated {len(violations) - 200} additional violations")
+        unknown_wall_clock = [
+            f
+            for f in findings
+            if f.symbol in {"time.time", "datetime.now"}
+            and f.classification == "wall_clock_unknown"
+        ]
 
-    fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy)
-    print(f"Fast lane policy violations: {len(fast_lane_violations)}")
-    for violation in fast_lane_violations:
-        print(f"FAST_LANE_VIOLATION: {violation}")
+        allowed = 0
+        for finding in candidate_violations:
+            if any(_is_allowed(finding.path, finding.text, finding.symbol, entry) for entry in entries):
+                allowed += 1
+                continue
+            violations.append(finding)
+
+        print(f"Timing policy candidates: {len(candidate_violations)}")
+        print(f"Allowlisted: {allowed}")
+        print(f"Violations: {len(violations)}")
+        print(f"Unknown (informational): {len(unknown_wall_clock)}")
+        for finding in violations[:200]:
+            print(f"{finding.path}:{finding.line} [{finding.symbol}] {finding.text}")
+        if len(violations) > 200:
+            print(f"... truncated {len(violations) - 200} additional violations")
+
+    if not args.skip_fast_lane:
+        fast_lane_policy_path = repo_root / args.fast_lane_policy
+        fast_lane_policy = _load_fast_lane_policy(fast_lane_policy_path)
+        fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy)
+        print(f"Fast lane policy violations: {len(fast_lane_violations)}")
+        for violation in fast_lane_violations:
+            print(f"FAST_LANE_VIOLATION: {violation}")
 
     if args.strict and (violations or fast_lane_violations):
         return 1
