@@ -49,25 +49,24 @@ work:
 
 - id: w2
   summary: "Normalize questdb.py fallback to match pg-family convention"
-  status: pending
+  status: done
   notes: |
-    benchbox/platforms/questdb.py:1415 — change
+    Fixed in commit following 96ad49356. Changed
       driver_package = info.driver_package if info else "psycopg[binary]"
     to
       driver_package = info.driver_package if info else "psycopg"
-    (assuming w1 confirms import-name semantics).
 
 - id: w3
   summary: "Normalize cedardb.py fallback to match pg-family convention"
-  status: pending
+  status: done
   notes: |
-    benchbox/platforms/cedardb.py:194 — change
+    Fixed in commit following 96ad49356. Changed
       driver_package = info.driver_package if info else "psycopg2-binary"
     to
       driver_package = info.driver_package if info else "psycopg"
-    The registry already advertises "psycopg" for cedardb
-    (platform_registry.py:616), so this is a stale psycopg2 leftover from
-    before the 495efcaa8 migration rather than a deliberate choice.
+    Also tightened builder signature from `info: Any` / `-> Any` to
+    `info: PlatformInfo | None` / `-> DatabaseConfig` (via TYPE_CHECKING
+    imports) and dropped `merged_options or {}` dead code.
 
 success_criteria:
 - All pg-family builders use identical fallback string for driver_package
