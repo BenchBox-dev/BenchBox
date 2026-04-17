@@ -1,7 +1,7 @@
 id: reconcile-docs-review-code-followups
 title: "Reconcile three code-level inconsistencies surfaced by docs review"
 worktree: main
-priority: Low
+priority: Medium-High
 status: Not Started
 description: |
   The reconcile-docs-from-spec-gap-analysis TODO was scoped to docs-only

@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T20:24:27.087441'
+generated_at: '2026-04-16T20:26:55.356351'
 total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -298,24 +298,6 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
-- id: reconcile-docs-review-code-followups
-  file: TODO/main/planning/reconcile-docs-review-code-followups.yaml
-  title: Reconcile three code-level inconsistencies surfaced by docs review
-  worktree: main
-  category: Architecture & Refactoring
-  priority: Low
-  status: Not Started
-  tags:
-  - refactoring
-  - datavault
-  - metadata-primitives
-  - tpch
-  - tpcds
-  - consistency
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 3
 - id: evaluate-results-data-repo-extraction-checkpoint
   file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
   title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
@@ -372,22 +354,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
-- id: unify-platform-label-disambiguator
-  file: TODO/main/planning/unify-platform-label-disambiguator.yaml
-  title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
-  worktree: main
-  category: Architecture & Refactoring
-  priority: Low
-  status: Not Started
-  tags:
-  - explorer
-  - visualization
-  - refactoring
-  - consistency
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 3
 - id: wikipedia-pageviews-benchmark
   file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
   title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
@@ -657,6 +623,24 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
+- id: reconcile-docs-review-code-followups
+  file: TODO/main/planning/reconcile-docs-review-code-followups.yaml
+  title: Reconcile three code-level inconsistencies surfaced by docs review
+  worktree: main
+  category: Architecture & Refactoring
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - refactoring
+  - datavault
+  - metadata-primitives
+  - tpch
+  - tpcds
+  - consistency
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 3
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission
@@ -675,6 +659,22 @@ items:
   work_ready: 0
   needs:
   - implement-pr-based-result-submission-workflow
+- id: unify-platform-label-disambiguator
+  file: TODO/main/planning/unify-platform-label-disambiguator.yaml
+  title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
+  worktree: main
+  category: Architecture & Refactoring
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - explorer
+  - visualization
+  - refactoring
+  - consistency
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 3
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T20:24:27.087482'
+generated_at: '2026-04-16T20:26:55.356416'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -12,12 +12,12 @@ categories:
     - id: reconcile-docs-review-code-followups
       file: TODO/main/planning/reconcile-docs-review-code-followups.yaml
       title: Reconcile three code-level inconsistencies surfaced by docs review
-      priority: Low
+      priority: Medium-High
       status: Not Started
     - id: unify-platform-label-disambiguator
       file: TODO/main/planning/unify-platform-label-disambiguator.yaml
       title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
-      priority: Low
+      priority: Medium-High
       status: Not Started
   Benchmark Development:
     count: 4
