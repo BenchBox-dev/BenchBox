@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:26:55.356434'
-total_items: 38
+generated_at: '2026-04-16T20:29:26.207449'
+total_items: 37
 priorities:
   Critical:
     count: 2
@@ -91,7 +91,7 @@ priorities:
       category: Architecture & Refactoring
       status: Not Started
   Medium:
-    count: 8
+    count: 7
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -118,11 +118,6 @@ priorities:
       title: Implement PR-based community result submission workflow
       category: Core Functionality
       status: Completed
-    - id: migrate-psycopg2-to-psycopg3
-      file: TODO/main/active/migrate-psycopg2-to-psycopg3.yaml
-      title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
-      category: Code Quality and Technical Debt
-      status: In Progress
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

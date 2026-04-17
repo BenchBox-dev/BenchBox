@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:26:57.062604'
-total_items: 719
+generated_at: '2026-04-16T20:29:27.965374'
+total_items: 720
 priorities:
   Critical:
     count: 41
@@ -2010,7 +2010,7 @@ priorities:
       category: Core Functionality
       status: Completed
   Medium:
-    count: 291
+    count: 292
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2865,6 +2865,11 @@ priorities:
       title: Metadata Primitives Benchmark - INFORMATION_SCHEMA, SHOW, DESCRIBE
       category: Benchmark Development
       status: Not Started
+    - id: migrate-psycopg2-to-psycopg3
+      file: DONE/main/active/migrate-psycopg2-to-psycopg3.yaml
+      title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
+      category: Code Quality and Technical Debt
+      status: Completed
     - id: minimize-emoji-usage-completed
       file: DONE/unknown/planning/minimize-emoji-usage-completed.yaml
       title: Minimize Emoji Usage ✅ COMPLETED

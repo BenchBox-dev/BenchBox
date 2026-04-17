@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:26:55.356351'
-total_items: 38
+generated_at: '2026-04-16T20:29:26.207388'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -471,24 +471,6 @@ items:
   work_ready: 0
   needs:
   - launch-results-explorer-acceptance-and-seed
-- id: migrate-psycopg2-to-psycopg3
-  file: TODO/main/active/migrate-psycopg2-to-psycopg3.yaml
-  title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: In Progress
-  tags:
-  - maintenance
-  - supply-chain
-  - deps
-  - driver-modernization
-  - postgresql
-  estimated_effort: Medium (7-10 hours across 10 work units)
-  work_total: 10
-  work_done: 8
-  work_ready: 1
-  deferred_count: 4
 - id: operate-results-platform-security-observability-and-abuse-controls
   file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
   title: Operate results platform security, observability, and abuse controls

@@ -1,4 +1,4 @@
-generated_at: '2026-04-16T20:26:57.062437'
+generated_at: '2026-04-16T20:29:27.965200'
 total_categories: 77
 categories:
   '"Bug Fixes & Reliability"':
@@ -303,7 +303,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 64
+    count: 65
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -481,6 +481,11 @@ categories:
     - id: quality-map-adapter-base-refactor-scope
       file: DONE/main/quality/quality-map-adapter-base-refactor-scope.yaml
       title: Map adapter.py public surface and extraction plan before the base refactor
+      priority: Medium
+      status: Completed
+    - id: migrate-psycopg2-to-psycopg3
+      file: DONE/main/active/migrate-psycopg2-to-psycopg3.yaml
+      title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
       priority: Medium
       status: Completed
     - id: timing-runtime-wide-monotonic-migration

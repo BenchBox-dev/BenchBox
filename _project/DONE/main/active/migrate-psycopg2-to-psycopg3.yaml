@@ -2,7 +2,8 @@ id: migrate-psycopg2-to-psycopg3
 title: "Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-04-16"
 category: Code Quality and Technical Debt
 description: |
   psycopg2-binary has been in maintenance-only mode since 2022. psycopg3 (PyPI package:
@@ -325,7 +326,7 @@ work:
   summary: "Update test mocks: retarget monkeypatch.setattr from psycopg2 → psycopg module name in 4 test files. Update version
     string from 2.9.9 → 3.1.0."
   needs: [w4, w5, w6, w7]
-  status: pending
+  status: done
   notes: |
     tests/unit/platforms/test_postgresql_adapter.py (lines 26-32):
       Before:
@@ -362,7 +363,7 @@ work:
   summary: "Full validation pass: grep for zero psycopg2 references, confirm copy_expert gone, verify dep declarations, run
     fast+unit test suites."
   needs: [w8, w9]
-  status: pending
+  status: done
   notes: |
     1. No psycopg2 imports remain in shipped source:
        grep -rn "import psycopg2\|from psycopg2" benchbox/ scripts/ && echo "FAIL: psycopg2 imports remain" || echo "OK: no psycopg2 imports"

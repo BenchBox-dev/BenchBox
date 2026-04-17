@@ -1,14 +1,9 @@
-generated_at: '2026-04-16T20:26:55.356445'
-total_items: 38
+generated_at: '2026-04-16T20:29:26.207461'
+total_items: 37
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: migrate-psycopg2-to-psycopg3
-      file: TODO/main/active/migrate-psycopg2-to-psycopg3.yaml
-      title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
-      priority: Medium
-      category: Code Quality and Technical Debt
     - id: questdb-benchmark-compatibility-remediation
       file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
       title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'

@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:26:57.062090'
-total_items: 719
+generated_at: '2026-04-16T20:29:27.964885'
+total_items: 720
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6836,6 +6836,25 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks
+- id: migrate-psycopg2-to-psycopg3
+  file: DONE/main/active/migrate-psycopg2-to-psycopg3.yaml
+  title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Completed
+  tags:
+  - maintenance
+  - supply-chain
+  - deps
+  - driver-modernization
+  - postgresql
+  estimated_effort: Medium (7-10 hours across 10 work units)
+  completed_date: '2026-04-16'
+  work_total: 10
+  work_done: 10
+  work_ready: 0
+  deferred_count: 4
 - id: minimize-emoji-usage-completed
   file: DONE/unknown/planning/minimize-emoji-usage-completed.yaml
   title: Minimize Emoji Usage ✅ COMPLETED
