@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T08:10:50.604291'
-total_items: 51
+generated_at: '2026-04-17T08:18:56.615283'
+total_items: 50
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -389,10 +389,12 @@ items:
   - visualization
   - cleanup
   - nit
-  estimated_effort: Medium (2-3 hours)
-  work_total: 9
+  - docs
+  - testing
+  estimated_effort: Large (4-6 hours)
+  work_total: 13
   work_done: 0
-  work_ready: 9
+  work_ready: 13
   needs:
   - explorer-unify-visualization-foundations
 - id: future-ideas-backlog
@@ -475,8 +477,8 @@ items:
   priority: Low
   status: Not Started
   work_total: 3
-  work_done: 0
-  work_ready: 3
+  work_done: 2
+  work_ready: 1
 - id: review-dependency-upper-bounds-quarterly
   file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
   title: Quarterly review of dependency upper bounds
@@ -810,23 +812,6 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
-- id: datavault-sha256-hash-migration
-  file: TODO/main/planning/datavault-sha256-hash-migration.yaml
-  title: Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - datavault
-  - schema-migration
-  - hash
-  - data-integrity
-  - tpcdi
-  estimated_effort: Medium
-  work_total: 6
-  work_done: 0
-  work_ready: 1
 - id: surface-contributor-onboarding-for-results
   file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
   title: Surface contributor onboarding for results submission

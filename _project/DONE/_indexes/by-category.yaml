@@ -1,4 +1,4 @@
-generated_at: '2026-04-17T08:02:33.745723'
+generated_at: '2026-04-17T08:18:58.389860'
 total_categories: 78
 categories:
   '"Bug Fixes & Reliability"':
@@ -665,7 +665,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 239
+    count: 240
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1514,6 +1514,11 @@ categories:
       title: Migrate ClickHouse/Firebolt to Deployment Registry
       priority: Medium-High
       status: Completed
+    - id: datavault-sha256-hash-migration
+      file: DONE/main/active/datavault-sha256-hash-migration.yaml
+      title: Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256
+      priority: Medium-High
+      status: Completed
     - id: migrate-remaining-print-leaks-to-emit
       file: DONE/main/active/migrate-remaining-print-leaks-to-emit.yaml
       title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
@@ -1848,7 +1853,7 @@ categories:
       file: DONE/main/active/explorer-compare-url-short-ids.yaml
       title: Use short hash IDs in Compare URLs to avoid URL-length limits
       priority: Medium
-      status: Not Started
+      status: Completed
     - id: validate-isolated-runtime-importability
       file: DONE/core-functionality/active/validate-isolated-runtime-importability.yaml
       title: Validate isolated runtime importability before treating as cache hit

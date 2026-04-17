@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T08:02:33.745894'
-total_items: 721
+generated_at: '2026-04-17T08:18:58.390033'
+total_items: 722
 priorities:
   Critical:
     count: 41
@@ -1456,7 +1456,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 111
+    count: 112
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1877,6 +1877,11 @@ priorities:
     - id: migrate-clickhouse-firebolt-deployment
       file: DONE/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
       title: Migrate ClickHouse/Firebolt to Deployment Registry
+      category: Core Functionality
+      status: Completed
+    - id: datavault-sha256-hash-migration
+      file: DONE/main/active/datavault-sha256-hash-migration.yaml
+      title: Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256
       category: Core Functionality
       status: Completed
     - id: migrate-remaining-print-leaks-to-emit
@@ -3279,7 +3284,7 @@ priorities:
       file: DONE/main/active/explorer-compare-url-short-ids.yaml
       title: Use short hash IDs in Compare URLs to avoid URL-length limits
       category: Core Functionality
-      status: Not Started
+      status: Completed
     - id: quality-cross-platform-validation-integration-matrix
       file: DONE/main/planning/quality-cross-platform-validation-integration-matrix.yaml
       title: Wire cross-platform validation comparator into a nightly integration matrix

@@ -2,7 +2,8 @@ id: explorer-compare-url-short-ids
 title: "Use short hash IDs in Compare URLs to avoid URL-length limits"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-16"
 category: Core Functionality
 
 description: |

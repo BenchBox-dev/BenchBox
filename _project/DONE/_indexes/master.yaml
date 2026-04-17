@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T08:02:33.745397'
-total_items: 721
+generated_at: '2026-04-17T08:18:58.389537'
+total_items: 722
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7775,13 +7775,14 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Not Started
+  status: Completed
   tags:
   - results
   - explorer
   - urls
   - compare
   estimated_effort: Small (1 day)
+  completed_date: '2026-04-16'
   work_total: 5
   work_done: 5
   work_ready: 0
@@ -9518,6 +9519,24 @@ items:
   - firebolt
   - deployment-modes
   estimated_effort: 2-3 days
+- id: datavault-sha256-hash-migration
+  file: DONE/main/active/datavault-sha256-hash-migration.yaml
+  title: Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - datavault
+  - schema-migration
+  - hash
+  - data-integrity
+  - tpcdi
+  estimated_effort: Medium
+  completed_date: '2026-04-17'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: migrate-remaining-print-leaks-to-emit
   file: DONE/main/active/migrate-remaining-print-leaks-to-emit.yaml
   title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
