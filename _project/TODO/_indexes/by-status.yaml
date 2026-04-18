@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T12:25:15.377493'
-total_items: 50
+generated_at: '2026-04-18T09:31:25.105793'
+total_items: 52
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 41
+    count: 43
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -117,6 +117,11 @@ statuses:
       title: Fix nit-level findings from explorer visualization code reviews
       priority: Low
       category: Code Quality
+    - id: explorer-phase-a-f-review-followups
+      file: TODO/main/planning/explorer-phase-a-f-review-followups.yaml
+      title: Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)
+      priority: Low
+      category: Code Quality
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
@@ -140,6 +145,11 @@ statuses:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
+      priority: High
+      category: Core Functionality
+    - id: explorer-canonical-browser-duckdb-read-model
+      file: TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
+      title: Make DuckDB-WASM the canonical browser read model for explorer graphs and query workbench
       priority: High
       category: Core Functionality
     - id: questdb-parquet-chunk-size-tunable

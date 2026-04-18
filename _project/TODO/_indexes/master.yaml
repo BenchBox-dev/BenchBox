@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T12:25:15.377423'
-total_items: 50
+generated_at: '2026-04-18T09:31:25.105717'
+total_items: 52
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -59,6 +59,24 @@ items:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: explorer-canonical-browser-duckdb-read-model
+  file: TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
+  title: Make DuckDB-WASM the canonical browser read model for explorer graphs and query workbench
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - explorer
+  - duckdb-wasm
+  - read-model
+  - cloudspecs
+  - results
+  estimated_effort: Large (4-6 days)
+  work_total: 7
+  work_done: 0
+  work_ready: 1
+  deferred_count: 3
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
@@ -397,6 +415,30 @@ items:
   work_ready: 20
   needs:
   - explorer-unify-visualization-foundations
+- id: explorer-phase-a-f-review-followups
+  file: TODO/main/planning/explorer-phase-a-f-review-followups.yaml
+  title: Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)
+  worktree: main
+  category: Code Quality
+  priority: Low
+  status: Not Started
+  tags:
+  - explorer
+  - cleanup
+  - nit
+  - ultraplan
+  - follow-up
+  estimated_effort: Medium (4-6 hours)
+  work_total: 16
+  work_done: 0
+  work_ready: 16
+  needs:
+  - explorer-master-leaderboard-home
+  - explorer-pipeline-meta-leaderboard-widening
+  - explorer-query-workbench
+  - explorer-result-detail-median-first
+  - explorer-unified-chart-panel
+  - explorer-url-synced-filter-state
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

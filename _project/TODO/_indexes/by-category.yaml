@@ -1,4 +1,4 @@
-generated_at: '2026-04-17T12:25:15.377462'
+generated_at: '2026-04-18T09:31:25.105760'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -38,11 +38,16 @@ categories:
       priority: Low
       status: Not Started
   Code Quality:
-    count: 2
+    count: 3
     items:
     - id: explorer-visualization-review-followup-nits
       file: TODO/main/active/explorer-visualization-review-followup-nits.yaml
       title: Fix nit-level findings from explorer visualization code reviews
+      priority: Low
+      status: Not Started
+    - id: explorer-phase-a-f-review-followups
+      file: TODO/main/planning/explorer-phase-a-f-review-followups.yaml
+      title: Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)
       priority: Low
       status: Not Started
     - id: normalize-pg-family-driver-package-fallback
@@ -59,7 +64,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 19
+    count: 20
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -144,6 +149,11 @@ categories:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
+      priority: High
+      status: Not Started
+    - id: explorer-canonical-browser-duckdb-read-model
+      file: TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
+      title: Make DuckDB-WASM the canonical browser read model for explorer graphs and query workbench
       priority: High
       status: Not Started
     - id: operate-results-platform-security-observability-and-abuse-controls

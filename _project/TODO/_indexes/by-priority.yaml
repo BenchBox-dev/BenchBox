@@ -1,5 +1,5 @@
-generated_at: '2026-04-17T12:25:15.377479'
-total_items: 50
+generated_at: '2026-04-18T09:31:25.105778'
+total_items: 52
 priorities:
   Critical:
     count: 2
@@ -15,11 +15,16 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 6
+    count: 7
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
+      category: Core Functionality
+      status: Not Started
+    - id: explorer-canonical-browser-duckdb-read-model
+      file: TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
+      title: Make DuckDB-WASM the canonical browser read model for explorer graphs and query workbench
       category: Core Functionality
       status: Not Started
     - id: motherduck-cloud-features
@@ -129,7 +134,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 26
+    count: 27
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -204,6 +209,11 @@ priorities:
     - id: explorer-visualization-review-followup-nits
       file: TODO/main/active/explorer-visualization-review-followup-nits.yaml
       title: Fix nit-level findings from explorer visualization code reviews
+      category: Code Quality
+      status: Not Started
+    - id: explorer-phase-a-f-review-followups
+      file: TODO/main/planning/explorer-phase-a-f-review-followups.yaml
+      title: Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)
       category: Code Quality
       status: Not Started
     - id: future-ideas-backlog
