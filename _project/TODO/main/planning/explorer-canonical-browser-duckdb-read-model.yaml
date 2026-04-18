@@ -127,18 +127,26 @@ work:
           cells, rankings, meta-leaderboard rows, cohort metadata), bulk
           insert in one transaction, copy raw bundles to
           `public/data/bundles/` for the raw-bundle download affordance ONLY.
-        - Delete emitters for `manifest.json`, `details/*.json`,
-          `compare/*.json`, `benchmarks/*.json.gz`, `meta_leaderboard.json`,
-          `short_ids.json`, and `results_schema.json`. The pipeline's first
-          step removes these paths so stale artifacts cannot leak.
+        - Delete emitters for metric-bearing JSON artifacts:
+          `details/*.json`, `compare/*.json`, `benchmarks/*.json.gz`,
+          `meta_leaderboard.json`, `short_ids.json`, and
+          `results_schema.json`. If `manifest.json` survives, it is strictly
+          non-metric route/navigation bootstrap derived from DuckDB-owned
+          identities only.
+        - Deletion sequencing follows page cutover, not pipeline preference:
+          do not remove the artifact still backing a live page until that page
+          migrates to DuckDB in the same implementation slice. Temporary
+          bridge artifacts may exist during branch-local work, but they are
+          scaffolding only, never a second accepted metric contract.
         - No TypeScript-side recomputation of display reductions, geomean, or
           rank is permitted downstream. Every user-visible metric must be
           persisted by this work item.
 
-      Exit: ingestion round-trip test passes (every metric in a committed
-      "visible metrics" YAML equals the JSON source value), schema contract
-      test passes, short-id uniqueness test passes, no-computed-metric-view
-      contract test passes.
+      Exit: source-fidelity tests pass for raw fields copied directly from the
+      committed JSON bundles; derived-metric parity tests pass for final
+      user-visible values against canonical DuckDB queries/reference fixtures;
+      schema contract test passes; short-id uniqueness test passes;
+      no-computed-metric-view contract test passes.
 
   - id: w3
     summary: "Replace metric JSON loaders with a single frontend DuckDB access layer; keep only bootstrap JSON if it is still justified"
@@ -172,8 +180,9 @@ work:
           `{ loading, error, data }`.
 
       Exit: Vitest coverage on the data-layer helpers; in-browser cold-start
-      measurement confirms RG-1 budgets; no page imports `manifest.ts` yet
-      (pages are migrated in w4).
+      measurement confirms RG-1 budgets; `Query.tsx` no longer depends on
+      `results_schema.json`; and the shared DuckDB data layer is ready for
+      page-by-page migration in w4.
 
   - id: w4
     summary: "Migrate Home, platform, benchmark, compare, and result-detail surfaces to DuckDB-backed metric reads while preserving matrix-first UX"
@@ -187,19 +196,23 @@ work:
 
       Suggested migration order (one page per slice, commit per page):
       Home -> PlatformIndex -> BenchmarkIndex -> ResultDetail -> Compare ->
-      Query. Delete `results-explorer/src/manifest.ts` on the last slice.
-      Prune dead interfaces from `results-explorer/src/types.ts` (`Manifest`,
-      `DetailResult`, `BenchmarkSummary`, `ComparisonArtifact`,
-      `MetaLeaderboard`, `PlatformRow`, `ComparisonQueryCell`,
-      `ComparabilityWarning`).
+      Query. Delete `results-explorer/src/manifest.ts` only after the last
+      consumer is gone. When a page migrates, delete that page's metric JSON
+      artifact/loader in the same slice so no migrated surface can regress to
+      JSON-backed metrics.
+      Prune transport-only JSON artifact interfaces from
+      `results-explorer/src/types.ts` once their last caller disappears. Do
+      not delete render-layer domain types solely because the transport
+      changed; keep, move, or rename them only when DuckDB row models make the
+      old shape redundant.
 
       Per-page rule: never recompute a user-visible metric in TypeScript
       (display_ms, geomean_ms, rank, speedup). Read materialized columns
       from the canonical tables.
 
       Exit: chart-parity and accessibility tests green on every migrated
-      page; no page imports `manifest.ts`; `git grep` shows no remaining
-      references to the deleted type names.
+      page; no page imports `manifest.ts`; and any removed TS types are
+      confirmed unused rather than deleted by naming policy alone.
 
   - id: w5
     summary: "Expand the query workbench into the canonical analyst surface with starter queries, cohort-aware templates, and downloads against the same DuckDB contract"
@@ -233,7 +246,11 @@ work:
           `tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py`
           asserts all ten canonical tables exist with expected columns.
         - G-2 Ingestion round-trip: every metric in a committed
-          "visible-metrics" YAML equals the JSON source value.
+          "visible-metrics" YAML must either (a) match the copied raw source
+          field for non-derived values or (b) match the canonical final value
+          produced by the DuckDB pipeline/reference computation for derived
+          values. Final rendered value parity is the contract, not verbatim
+          equality to pre-derived JSON.
         - G-3 Cross-surface parity:
           `results-explorer/src/__tests__/duckdbMetricParity.test.ts` asserts
           Home stats == `meta_leaderboard`, benchmark matrix cell ==
@@ -250,9 +267,11 @@ work:
           navigates, asserts a DuckDB-sourced row renders, opens the
           workbench, runs `SELECT COUNT(*) FROM results`.
         - G-8 Legacy-artifact guard: post-build assertion fails if any of
-          `manifest.json`, `details/`, `compare/`, `meta_leaderboard.json`,
-          `short_ids.json`, `results_schema.json`, or `benchmarks/*.gz`
-          appear under `public/data/`.
+          `details/`, `compare/`, `meta_leaderboard.json`, `short_ids.json`,
+          `results_schema.json`, or `benchmarks/*.gz` appear under
+          `public/data/`. If `manifest.json` survives, a dedicated contract
+          test proves it is navigation-only and carries no user-visible
+          metrics.
         - G-9 Read-only fuzz: Vitest runs ~50 adversarial SQL strings
           (CREATE TABLE, ATTACH, COPY TO, INSTALL, LOAD, HTTPFS) against the
           READ_ONLY-attached DB; all fail harmlessly.
@@ -330,6 +349,7 @@ must_preserve:
   - "DuckDB is always attached read-only in the browser; no implementation step may weaken `ATTACH ... (READ_ONLY)` or permit persistent mutation from the SQL workbench"
   - "Every user-visible metric, rank, aggregate, and detail timing shown in the explorer originates from DuckDB rather than JSON sidecars or TypeScript-only recomputation"
   - "Committed JSON result objects remain immutable source inputs; the browser does not fetch them directly for metric rendering"
+  - "Any temporary compatibility scaffolding used during page-by-page migration is derived from the DuckDB contract and cannot define, override, or outlive user-visible metrics"
   - "Shareable compare flows remain available after cutover, but route convenience is subordinate to the DuckDB-only metric contract"
   - "The explorer remains static-hosted and browser-executed; no server API, auth dependency, or hosted query runtime is introduced by this TODO"
 
@@ -354,6 +374,7 @@ anti_patterns:
   - "DO NOT keep separate canonical logic in JSON loaders and DuckDB helpers -- because that recreates the current drift risk -- move all interactive metric reads behind one DuckDB contract"
   - "DO NOT allow Home, PlatformIndex, BenchmarkIndex, Compare, or ResultDetail to keep metric reads outside DuckDB -- because that violates the core architecture goal -- migrate every metric-bearing surface"
   - "DO NOT recompute display reductions or ranking rules in TypeScript -- because the pipeline already owns those semantics -- persist canonical values in DuckDB and read them directly"
+  - "DO NOT require derived user-visible metrics to equal verbatim JSON source fields -- because many visible values are canonical reductions or rollups computed by the pipeline -- prove final-value parity against DuckDB outputs and reference computations instead"
   - "DO NOT let bootstrap convenience justify metric-bearing `manifest.json` or `results_schema.json` sidecars -- because that silently recreates split-brain storage -- keep any surviving JSON bootstrap-only"
   - "DO NOT widen scope into CLI, hosted API, or submission-path changes -- because this TODO is about the static explorer read model only -- leave write-path contracts untouched"
 
@@ -377,7 +398,7 @@ verification:
     command: "if rg -n \"/results/data/(benchmarks/|details/|compare/|meta_leaderboard\\.json|results_schema\\.json|short_ids\\.json)\" results-explorer/src; then exit 1; else echo CLEAN; fi"
     expected_output: "CLEAN"
   - description: "Pipeline output contains no legacy metric-bearing artifacts"
-    command: "bash -c 'for f in manifest.json meta_leaderboard.json short_ids.json results_schema.json; do if [ -e \"results-explorer/public/data/$f\" ]; then echo FAIL_$f; exit 1; fi; done; for d in details compare benchmarks; do if [ -d \"results-explorer/public/data/$d\" ]; then echo FAIL_$d; exit 1; fi; done; echo CLEAN'"
+    command: "bash -c 'for f in meta_leaderboard.json short_ids.json results_schema.json; do if [ -e \"results-explorer/public/data/$f\" ]; then echo FAIL_$f; exit 1; fi; done; for d in details compare benchmarks; do if [ -d \"results-explorer/public/data/$d\" ]; then echo FAIL_$d; exit 1; fi; done; echo CLEAN'"
     expected_output: "CLEAN"
   - description: "Cross-surface parity holds for canonical display values"
     command: "cd results-explorer && npm test -- duckdbMetricParity"
@@ -416,11 +437,10 @@ success_metrics:
   - "Benchmark landing pages remain matrix-first and read-only SQL safety remains intact"
 
 open_questions:
-  - "What is the minimal bootstrap JSON that remains after cutover, if any, and how is the no-metrics-in-JSON rule enforced in code and tests? (Plan recommendation: NONE beyond bundles/*.json for raw-bundle downloads)"
+  - "What is the minimal bootstrap JSON that remains after cutover, if any, and how is the no-metrics-in-JSON rule enforced in code and tests? (Plan recommendation: if `manifest.json` survives, it is route/navigation-only and never a metric carrier; everything else metric-bearing dies)"
   - "Which DuckDB tables or views are documented as stable browser contracts for Home, PlatformIndex, BenchmarkIndex, Compare, ResultDetail, and Query? (Plan recommendation: the ten canonical tables listed in w2)"
   - "Should Query schema discovery come from DuckDB introspection or a DuckDB-resident metadata table? (Plan recommendation: introspection first; upgrade to metadata table only if RG-1 measures it as hot-path)"
-  - "What is the acceptable startup/loading budget for DuckDB-backed pages, and do we need a tiny non-metric route bootstrap for first paint? (Plan proposal: p50 <1500ms, p95 <3500ms per RG-1; no route bootstrap needed)"
-  - "Should short-id resolution remain a tiny bootstrap map, or move fully behind DuckDB-backed helpers once routing queries are in place? (Plan recommendation: DuckDB `short_ids` table, no JSON bootstrap)"
+  - "What is the acceptable startup/loading budget for DuckDB-backed pages, and do we need a tiny non-metric route bootstrap for first paint? (Plan proposal: p50 <1500ms, p95 <3500ms per RG-1; if a route bootstrap exists it stays non-metric and subordinate to DuckDB)"
   - "Is `result_detail_metrics` a single EAV-style table (metric_group, metric_name, value_numeric/value_text/value_json) or a set of narrow tables (phases, validations, platform_info, environment, tuning, cost_breakdown) joined by a view of the same name? (Plan recommendation: narrow tables + join view, so dashboards read the view and analysts drill into the narrow tables)"
   - "Should the DuckDB-WASM build used by the workbench have `HTTPFS`, `INSTALL`, and `LOAD` extensions compiled out so user SQL cannot reach arbitrary network endpoints even under READ_ONLY attach?"
 
