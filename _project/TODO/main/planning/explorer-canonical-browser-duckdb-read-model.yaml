@@ -1,0 +1,269 @@
+id: explorer-canonical-browser-duckdb-read-model
+title: "Make DuckDB-WASM the canonical browser read model for explorer graphs and query workbench"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Revisit the results explorer strategy so the product stays matrix-first
+  on benchmark landing pages while the CloudSpecs-style query surface
+  remains a secondary analyst workbench. The current implementation is
+  split-brain: the frontend already embeds DuckDB-WASM and `/results/query`
+  executes SQL against `bench.results`, but most graph and compare surfaces
+  still read from JSON artifacts while the pipeline snapshot only contains a
+  thin `results` table.
+
+  The target architecture is a static-first explorer where `results.duckdb`
+  becomes the canonical interactive browser-side store for matrix views,
+  compare flows, and ad hoc analysis, with `manifest.json` reduced to
+  bootstrap/navigation and compatibility duties. This work must not proceed
+  directly to code changes: the unresolved contract questions below must be
+  closed by an explicit research gate before any implementation work starts.
+
+  Verified current-state anchors:
+    - `results-explorer/src/db.ts` attaches `/results/data/results.duckdb`
+      with `ATTACH ... AS bench (READ_ONLY)`.
+    - `results-explorer/src/pages/Query.tsx` already queries `bench.results`
+      through DuckDB-WASM.
+    - `benchbox/core/explorer_pipeline/duckdb_builder.py` currently emits
+      only a `results` table plus `results_schema.json`, so most explorer
+      graph pages still depend on JSON sidecars.
+
+work:
+  - id: w1
+    summary: "Research gate: inventory current JSON vs DuckDB consumers, verify the CloudSpecs interaction/storage model, and close all open contract questions before implementation"
+    status: pending
+    notes: |
+      Deliverables:
+        1. A concrete call-site inventory for every explorer surface showing
+           which pages/components currently read manifest JSON, benchmark
+           summary JSON, detail JSON, or DuckDB.
+        2. A schema decision record for the canonical browser DuckDB surface:
+           required tables, required views, bootstrap JSON that remains, and
+           which artifacts stay transitional.
+        3. Resolution of every question in open_questions below, recorded in
+           the TODO notes or a linked design note before any code edit begins.
+        4. A migration order proving there is no period where matrix/compare
+           and `/results/query` disagree on canonical timings.
+
+  - id: w2
+    summary: "Extend the explorer pipeline so results.duckdb contains the canonical browser tables and views needed by matrix, compare, and query surfaces"
+    needs: [w1]
+    status: pending
+    notes: |
+      Minimum expected artifacts:
+        - `results`
+        - `query_display_timings`
+        - `query_executions`
+        - `cohort_metadata`
+        - `meta_leaderboard`
+        - `short_ids`
+      Plus stable browser-facing views for matrix and compare use cases.
+
+  - id: w3
+    summary: "Build a single frontend DuckDB access layer and schema contract tests so all interactive explorer reads go through one browser query path"
+    needs: [w2]
+    status: pending
+    notes: |
+      Consolidate TS-side data access around `results-explorer/src/db.ts`
+      and small typed query helpers. No page should re-implement reduction or
+      join logic ad hoc once this lands.
+
+  - id: w4
+    summary: "Migrate benchmark landing and compare surfaces to DuckDB-backed reads while preserving matrix-first UX and existing shareable URLs"
+    needs: [w3]
+    status: pending
+    notes: |
+      Benchmark pages remain the primary graph surface. `/results/query`
+      remains secondary in product positioning, but all interactive values
+      shown on both surfaces must come from the same DuckDB source of truth.
+
+  - id: w5
+    summary: "Expand the query workbench from result-row filtering into the canonical analyst surface with starter queries, cohort-aware templates, and download affordances"
+    needs: [w4]
+    status: pending
+    notes: |
+      Starter queries must cover common analyst questions across results,
+      per-query timings, cohort comparisons, and trust/tuning breakdowns.
+      Keep the SQL surface read-only.
+
+  - id: w6
+    summary: "Add parity, browser, and schema-contract exit gates proving matrix, compare, and SQL surfaces all agree on canonical values"
+    needs: [w4, w5]
+    status: pending
+    notes: |
+      Required parity assertions:
+        - benchmark matrix query cell == compare query cell == SQL query result
+        - ranking metric selection remains benchmark-family aware
+        - read-only DuckDB enforcement still blocks DDL/DML from the workbench
+
+  - id: w7
+    summary: "Cut over documentation and transitional artifacts only after DuckDB-backed parity is proven and validated"
+    needs: [w6]
+    status: pending
+    notes: |
+      Narrow JSON artifacts only after additive migration succeeds. Update
+      stale comments and contracts so the repo no longer describes DuckDB as
+      scaffold-only when it is the canonical browser read model.
+
+deferred:
+  - summary: "Introduce any hosted API, authenticated query service, or server-side execution path"
+    reason: "This TODO is static-first only; the proposed plan explicitly keeps the read path browser-side and read-only."
+  - summary: "Make `/results/query` the default landing page for the explorer"
+    reason: "The adopted product strategy keeps benchmark landing pages matrix-first and the query workbench secondary."
+  - summary: "Remove all JSON artifacts in the first implementation slice"
+    reason: "JSON outputs remain transitional until DuckDB-backed parity is demonstrated across existing surfaces."
+
+metadata:
+  tags:
+    - "explorer"
+    - "duckdb-wasm"
+    - "read-model"
+    - "cloudspecs"
+    - "results"
+  estimated_effort: "Large (4-6 days)"
+  created_date: "2026-04-18"
+  source: "Proposed plan: Results Explorer Revision — matrix-first UX, DuckDB-WASM as canonical browser store"
+
+impact:
+  business_value: |
+    Gives BenchBox a clearer and more credible public results product:
+    benchmark pages answer the obvious comparison question immediately,
+    while analyst users can ask their own questions against the same
+    embedded corpus without leaving the browser.
+  user_impact: |
+    Users get one consistent source of truth for matrix views, compare,
+    and ad hoc SQL analysis instead of a split between precomputed JSON
+    views and a thinner DuckDB workbench.
+  technical_debt: |
+    Retires the split-brain read model where JSON and DuckDB can drift,
+    and turns browser-side DuckDB from an optional workbench feature into
+    the canonical interactive data contract.
+
+files_affected:
+  modified:
+    - "benchbox/core/explorer_pipeline/duckdb_builder.py"
+    - "benchbox/core/explorer_pipeline/pipeline.py"
+    - "benchbox/core/explorer_pipeline/models.py"
+    - "results-explorer/src/db.ts"
+    - "results-explorer/src/lib/manifest.ts"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/types.ts"
+    - "docs/development/benchbox-results-platform-strategy.md"
+  added:
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/lib/duckdbSchema.ts"
+    - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+    - "results-explorer/src/__tests__/duckdbReadModel.parity.test.ts"
+
+must_preserve:
+  - "Benchmark landing pages remain matrix-first default routes; `/results/query` stays a secondary analysis surface rather than the primary explorer entrypoint"
+  - "DuckDB is always attached read-only in the browser; no implementation step may weaken `ATTACH ... (READ_ONLY)` or permit persistent mutation from the SQL workbench"
+  - "Matrix, compare, and query surfaces continue to show the same reduced per-query timings; no TypeScript path may silently recompute a divergent reduction policy"
+  - "Existing compare URLs and short-id resolution remain backward-compatible throughout the migration"
+  - "The explorer remains static-hosted and browser-executed; no server API, auth dependency, or hosted query runtime is introduced by this TODO"
+
+approach: |
+  Follow a research-first, additive migration.
+
+  First, inventory every current explorer read path and confirm exactly where
+  JSON remains authoritative today. Use that to close the schema and cutover
+  questions before editing code. After the research gate, extend the pipeline
+  so the DuckDB snapshot contains the canonical browser tables/views while
+  preserving existing JSON outputs.
+
+  Migrate one surface at a time behind parity checks:
+    1. pipeline/schema contract
+    2. frontend typed DuckDB access layer
+    3. benchmark matrix
+    4. compare
+    5. query workbench expansion
+    6. transitional JSON narrowing
+
+  Reuse the existing reduction policy and ranking registry from the explorer
+  pipeline. Compute canonical values once in Python, persist them into DuckDB,
+  and consume them directly in TypeScript. Do not move reduction or ranking
+  decisions into browser code.
+
+anti_patterns:
+  - "DO NOT start implementation before the research gate closes the schema and migration-cut questions — because this is a contract refactor across pipeline and UI — resolve the unknowns first and record the decisions"
+  - "DO NOT make `/results/query` the primary explorer landing flow — because the adopted product strategy is matrix-first on benchmark pages — keep query as the secondary analyst surface"
+  - "DO NOT keep separate canonical logic in JSON loaders and DuckDB helpers — because that recreates the current drift risk — move interactive reads behind one DuckDB contract"
+  - "DO NOT recompute display reductions or ranking rules in TypeScript — because the pipeline already owns those semantics — persist canonical values in DuckDB and read them directly"
+  - "DO NOT drop benchmark/detail JSON artifacts in the same slice that introduces new DuckDB tables — because rollback and parity validation become impossible — cut over additively first"
+  - "DO NOT widen scope into CLI, hosted API, or submission-path changes — because this TODO is about the static explorer read model only — leave write-path contracts untouched"
+
+verification:
+  - description: "Research gate complete before code work begins"
+    command: "rg -n \"Research gate|schema decision record|open_questions\" _project/TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml docs/development || true"
+    expected_output: "Implementation does not begin until the research outputs and open-question resolutions are recorded"
+  - description: "TODO metadata and graph validate cleanly"
+    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+    expected_output: "TODO file validates; dependency graph check passes"
+  - description: "Explorer pipeline tests remain green after DuckDB schema expansion"
+    command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -q"
+    expected_output: "all tests pass"
+  - description: "Explorer frontend typecheck, tests, and production build remain green"
+    command: "cd results-explorer && npm run typecheck && npm test && npm run build"
+    expected_output: "all green"
+  - description: "Canonical DuckDB contract exists with the expected browser tables/views"
+    command: "uv run -- python -c \"import duckdb; con=duckdb.connect('results-explorer/public/data/results.duckdb', read_only=True); names={r[0] for r in con.execute('PRAGMA show_tables').fetchall()}; required={'results','query_display_timings','query_executions','cohort_metadata','meta_leaderboard','short_ids'}; missing=required-names; assert not missing, missing\""
+    expected_output: "no assertion failure"
+  - description: "Cross-surface parity holds for canonical display values"
+    command: "cd results-explorer && npm test -- duckdbReadModel"
+    expected_output: "matrix, compare, and query parity tests pass"
+  - description: "Read-only SQL enforcement still holds"
+    command: "cd results-explorer && npm test -- Query"
+    expected_output: "DDL/DML attempts fail; read-only SELECT flows still pass"
+  - description: "Fast Python suite stays green after the migration"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/explorer_pipeline/"
+    - "results-explorer/src/db.ts"
+    - "results-explorer/src/lib/"
+    - "results-explorer/src/pages/"
+    - "results-explorer/src/components/"
+    - "results-explorer/src/types.ts"
+    - "results-explorer/src/__tests__/"
+    - "results-explorer/public/data/"
+    - "tests/unit/core/explorer_pipeline/"
+    - "docs/development/benchbox-results-platform-strategy.md"
+  do_not_modify:
+    - "benchbox/cli/"
+    - "benchbox/core/results/"
+    - ".github/workflows/"
+    - "docs/reference/hosted-results-contract.md"
+
+success_metrics:
+  - "A research gate closes all schema and migration-cut questions before the first code edit"
+  - "Matrix, compare, and query surfaces read canonical interactive values from DuckDB rather than parallel JSON-specific logic"
+  - "results.duckdb exposes the browser-side tables/views needed for cohort analysis, per-query graphing, and ad hoc SQL"
+  - "Benchmark landing pages remain matrix-first while `/results/query` becomes a stronger secondary analyst surface"
+  - "No regression in static hosting, shareable compare URLs, or read-only SQL safety"
+
+open_questions:
+  - "Should the first cut keep result-detail pages on per-result JSON, or migrate them onto the canonical DuckDB contract in the same implementation slice?"
+  - "Which JSON artifacts remain bootstrap-only after the cutover: `manifest.json` only, or `benchmarks/*.json.gz` as a temporary compatibility layer as well?"
+  - "Should `query_executions` ship in the first schema expansion, or is `query_display_timings` sufficient until detail-page/drill-down parity is ready?"
+  - "Which DuckDB views should be documented as stable public browser contracts versus internal implementation details?"
+  - "What is the acceptable startup/loading budget for DuckDB-backed benchmark pages, and do any pages still need a non-DuckDB bootstrap path for first paint?"
+
+research_value:
+  hypothesis: |
+    A DuckDB-first browser read model will reduce cross-surface drift and make
+    the explorer more credible and more powerful without changing the adopted
+    matrix-first product shape.
+  validation_approach: |
+    Compare current explorer consumers, verify the CloudSpecs reference model,
+    define the canonical DuckDB schema, then prove parity across matrix,
+    compare, and SQL surfaces with automated tests before narrowing JSON usage.
+  success_criteria: |
+    All open questions are resolved before implementation; the final schema is
+    explicit and testable; and automated parity tests show the same canonical
+    values across the three interactive explorer surfaces.
