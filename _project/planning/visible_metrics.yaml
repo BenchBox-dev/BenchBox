@@ -330,7 +330,12 @@ metrics:
     display_surfaces: [benchmark_index]
 
   # ---------------------------------------------------------------------------
-  # cohort_metadata table — meta-leaderboard cohort + per-platform ranks
+  # cohort_metadata table — meta-leaderboard cohort + per-variant ranks
+  #
+  # PRIMARY KEY is (cohort_key, result_id): one row PER PUBLISHABLE VARIANT,
+  # not per platform. Same platform may appear more than once per cohort when
+  # run with different tuning_mode or trust_label. The pipeline preserves all
+  # variants; the UI is responsible for any display-time collapsing.
   # ---------------------------------------------------------------------------
 
   - table: cohort_metadata
@@ -339,7 +344,7 @@ metrics:
     canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
     tolerance: 0
     display_surfaces: [home]
-    notes: "1-based rank within cohort by primary_metric; null when metric_value is null"
+    notes: "1-based rank within cohort by primary_metric; per result_id (variant), not per platform_id; null when metric_value is null"
 
   - table: cohort_metadata
     column: metric_value
@@ -347,7 +352,7 @@ metrics:
     canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
     tolerance: 1.0e-9
     display_surfaces: [home]
-    notes: "power_score for power_score cohorts; display_geomean_ms otherwise"
+    notes: "power_score for power_score cohorts; display_geomean_ms otherwise; per result_id (variant)"
 
   - table: cohort_metadata
     column: speedup_vs_best
@@ -358,7 +363,31 @@ metrics:
     notes: >
       For lower-is-better: best_val / this_val (>= 1 for non-best, == 1 for best).
       For higher-is-better: this_val / best_val (<= 1 for non-best, == 1 for best).
-      Null when metric_value is null.
+      Per result_id (variant); null when metric_value is null.
+
+  - table: cohort_metadata
+    column: short_id
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_short_ids"
+    tolerance: 0
+    display_surfaces: [home]
+    notes: "sha256(result_id) prefix for compact URLs; threaded through to cohort rows so Home can link variants without joining short_ids"
+
+  - table: cohort_metadata
+    column: tuning_mode
+    kind: raw_copy
+    source_field: "config.tuning_mode from the committed bundle (via ManifestEntry.tuning_mode)"
+    tolerance: 0
+    display_surfaces: [home]
+    notes: "Enables Home to label/group variants (e.g. 'tuned' vs 'notuning') without joining benchmark_rankings"
+
+  - table: cohort_metadata
+    column: trust_label
+    kind: raw_copy
+    source_field: "ManifestEntry.trust_label (derived at pipeline ingest, not from the raw bundle)"
+    tolerance: 0
+    display_surfaces: [home]
+    notes: "Enables Home to surface cross-trust-level comparisons on the cohort panel without a secondary query"
 
   # ---------------------------------------------------------------------------
   # meta_leaderboard table — pre-computed cross-cohort platform summary
