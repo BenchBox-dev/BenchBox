@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T15:00:26.882900'
+generated_at: '2026-04-18T15:46:59.042018'
 total_items: 52
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -60,12 +60,12 @@ items:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
 - id: explorer-canonical-browser-duckdb-read-model
-  file: TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
+  file: TODO/main/active/explorer-canonical-browser-duckdb-read-model.yaml
   title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
   worktree: main
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - explorer
   - duckdb-wasm
@@ -74,7 +74,7 @@ items:
   - canonical-store
   estimated_effort: Large (5-7 days)
   work_total: 7
-  work_done: 0
+  work_done: 1
   work_ready: 1
   deferred_count: 2
 - id: motherduck-cloud-features

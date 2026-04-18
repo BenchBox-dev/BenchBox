@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T15:00:26.883085'
+generated_at: '2026-04-18T15:46:59.042051'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -152,10 +152,10 @@ categories:
       priority: High
       status: Not Started
     - id: explorer-canonical-browser-duckdb-read-model
-      file: TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
+      file: TODO/main/active/explorer-canonical-browser-duckdb-read-model.yaml
       title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
       priority: High
-      status: Not Started
+      status: In Progress
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

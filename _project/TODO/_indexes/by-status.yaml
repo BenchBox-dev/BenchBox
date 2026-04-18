@@ -1,16 +1,21 @@
-generated_at: '2026-04-18T15:00:26.883119'
+generated_at: '2026-04-18T15:46:59.042081'
 total_items: 52
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
+    - id: explorer-canonical-browser-duckdb-read-model
+      file: TODO/main/active/explorer-canonical-browser-duckdb-read-model.yaml
+      title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
+      priority: High
+      category: Core Functionality
     - id: questdb-benchmark-compatibility-remediation
       file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
       title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
       priority: High
       category: Platform Support
   Not Started:
-    count: 43
+    count: 42
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -145,11 +150,6 @@ statuses:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
-      priority: High
-      category: Core Functionality
-    - id: explorer-canonical-browser-duckdb-read-model
-      file: TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
-      title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
       priority: High
       category: Core Functionality
     - id: questdb-parquet-chunk-size-tunable
