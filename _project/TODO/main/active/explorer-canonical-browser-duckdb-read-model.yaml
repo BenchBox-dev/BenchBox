@@ -378,7 +378,7 @@ work:
   summary: "Migrate remaining pages to DuckDB, delete each bridge artifact in the same slice, and land `db.ts` hardening with
     the last manifest consumer"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Every user-visible number on these surfaces must originate from DuckDB
     queries or DuckDB-backed helpers. Benchmark landing pages remain the
