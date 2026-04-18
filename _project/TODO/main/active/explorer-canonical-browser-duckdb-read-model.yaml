@@ -216,9 +216,112 @@ work:
           artifacts; `public/data/` still contains the current shape.
           Removal is deliberately deferred to W4/W7.
 
+  - id: w8
+    summary: "Preserve all publishable result variants in `cohort_metadata` and fix the `_build_meta_leaderboard` `platform_agg` last-write-wins bug before the frontend migration"
+    needs: [w2]
+    status: pending
+    notes: |
+      Surfaced during W2 contract tests: the same platform can legitimately
+      appear in a cohort more than once (different `tuning_mode`, different
+      `trust_label`, different run). The originating schema pinned
+      `cohort_metadata` PRIMARY KEY to `(cohort_key, platform_id)` and the
+      W2 builder silently deduplicated by keeping only the best-ranked row,
+      dropping the other publishable variant from the DuckDB store.
+
+      That violates the project principle: ALL results we trust enough to
+      publish must be available in the DuckDB published-results dataset so
+      users can compare across tuning levels AND trust levels from the same
+      store. The table is the per-cohort published-result set; the UI
+      decides any display-time grouping.
+
+      Empirical evidence recorded with this TODO (`/tmp/reproduce_cohort_duplicates.py`-style
+      two-bundle reproducer, same platform `duckdb`, tuning_mode
+      `tuned` vs `notuning`, both in `tpch-sf0.1-power`):
+        - `meta_leaderboard.json` `cohorts[0].platforms` kept BOTH variants
+          (tuned rank 1, notuning rank 2) — JSON artifact is correct.
+        - DuckDB `cohort_metadata` after W2 dedup kept only the tuned row —
+          silently discards the notuning variant.
+        - `platform_agg` at `pipeline.py:240` overwrites the better rank
+          (rank 1) with the worse rank (rank 2) via last-write-wins, so the
+          JSON artifact `platforms[]` entry AND the DuckDB `meta_leaderboard`
+          row BOTH report `avg_rank = 2.0` when the correct answer is 1.0.
+          This is a pre-existing correctness bug in the meta-leaderboard
+          that already affects today's Home surface, independent of the PK
+          decision.
+
+      Implementation (Option B + bug fix):
+
+      Schema (`docs/development/browser-duckdb-schema.sql`):
+        - `cohort_metadata` PRIMARY KEY changes from
+          `(cohort_key, platform_id)` to `(cohort_key, result_id)`.
+        - Add columns: `tuning_mode VARCHAR`, `trust_label VARCHAR NOT NULL`,
+          `short_id VARCHAR NOT NULL`. These give Home the data it needs to
+          label, group, or collapse variants without a secondary join.
+        - Keep `idx_cohort_metadata_key (cohort_key)`; add
+          `idx_cohort_metadata_platform (cohort_key, platform_id)` so
+          platform-grouped queries stay cheap.
+
+      Python (`benchbox/core/explorer_pipeline/duckdb_builder.py`):
+        - `_create_schema` mirrors the new DDL (PK + 3 columns + index).
+        - `_populate_cohort_metadata` deletes the `best` dedup dict and
+          `_RANK_IDX` logic; inserts every row from
+          `meta["cohorts"][*]["platforms"]`. Widens the insert tuple to
+          include `tuning_mode`, `trust_label`, `short_id`.
+
+      Python (`benchbox/core/explorer_pipeline/pipeline.py`):
+        - `_build_meta_leaderboard` emits `tuning_mode`, `trust_label`,
+          `short_id` on each entry in `cohort_platforms` so the builder has
+          what it needs without re-joining. Thread `full_to_short` into
+          the function, or resolve in the builder by looking up
+          `short_id_map`.
+        - Fix `platform_agg` last-write-wins at `pipeline.py:240`: when the
+          same `platform_id` ranks in the same `cohort_key` more than once,
+          KEEP THE BEST RANK (lowest integer). Correct for the Home
+          meta-leaderboard semantics (one row per platform across cohorts
+          — best variant represents the platform). Equivalent minimal
+          edit: replace the blind dict assignment with a guarded update,
+          or rely on `setdefault` since `sorted_rows` is already best-first.
+
+      Registry (`_project/planning/visible_metrics.yaml`):
+        - Update `cohort_metadata` `rank` / `metric_value` / `speedup_vs_best`
+          notes to clarify they are PER RESULT_ID, not per platform_id.
+        - Add new rows: `cohort_metadata.tuning_mode`,
+          `cohort_metadata.trust_label`, `cohort_metadata.short_id` with
+          `kind: raw_copy` and appropriate `canonical_ref` pointers.
+
+      Tests:
+        - Extend `test_distinct_tuning_modes_produce_distinct_rows` in
+          `tests/unit/core/explorer_pipeline/test_benchmark_summary.py` with
+          a DuckDB assertion: after the pipeline run, the cohort contains
+          BOTH `result_id`s in `cohort_metadata` with distinct ranks.
+        - Add a regression test in
+          `tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py`
+          (or a peer file) against the two-bundle same-platform-same-cohort
+          fixture: assert `meta_leaderboard.avg_rank` equals the BEST rank
+          (1.0, not 2.0), and `n_cohorts` equals the number of distinct
+          cohort_keys (not the number of cohort-variants).
+        - Add a `visible_metrics` drift test asserting the
+          `cohort_metadata` PRIMARY KEY columns declared in the schema
+          YAML match the frozen `browser-duckdb-schema.sql`.
+
+      Exit:
+        - `cohort_metadata` PK is `(cohort_key, result_id)` in schema,
+          builder, and visible_metrics.
+        - Running the pipeline on a two-variant corpus lands BOTH rows in
+          `cohort_metadata`; no silent deduplication anywhere in the
+          pipeline.
+        - `_build_meta_leaderboard` keeps the BEST rank per
+          `(platform_id, cohort_key)`; regression test pinning
+          `avg_rank == 1.0` on the two-variant reproducer is green.
+        - All 217 pre-existing explorer pipeline tests remain green; the
+          two new tests are green.
+        - W3 does not start until this item is done, because the
+          `duckdbQueries.getCohort` helper it builds must match the final
+          key shape.
+
   - id: w3
     summary: "Build the shared frontend DuckDB access layer and cut `Query.tsx` off from `results_schema.json`; defer `db.ts` attach-failure hardening until W4"
-    needs: [w2]
+    needs: [w8]
     status: pending
     notes: |
       Consolidate TS-side data access around `results-explorer/src/db.ts`
@@ -484,6 +587,7 @@ files_affected:
     - "results-explorer/src/pages/Query.tsx"
     - "results-explorer/src/types.ts"
     - "docs/development/benchbox-results-platform-strategy.md"
+    - "docs/development/browser-duckdb-schema.sql"
   added:
     - "results-explorer/src/lib/duckdbQueries.ts"
     - "results-explorer/src/lib/duckdbSchema.ts"
@@ -509,6 +613,7 @@ files_affected:
     deletion; the file name itself does not survive.
 
 must_preserve:
+  - "Every result trusted enough to publish appears in the DuckDB published-results dataset with its identity preserved (`result_id`, `tuning_mode`, `trust_label`); the pipeline never silently collapses, dedupes, or hides publishable variants — users must be able to compare across tuning levels AND trust levels from the same store"
   - "Benchmark landing pages remain matrix-first default routes; `/results/query` stays a secondary analysis surface rather than the primary explorer entrypoint"
   - "DuckDB is always attached read-only in the browser; no implementation step may weaken `ATTACH ... (READ_ONLY)` or permit persistent mutation from the SQL workbench"
   - "Every user-visible metric, rank, aggregate, and detail timing shown in the explorer originates from DuckDB rather than JSON sidecars or TypeScript-only recomputation"
@@ -546,6 +651,8 @@ anti_patterns:
   - "DO NOT let `public/data/bundles/*.json` drift into a rendered metric path -- because bundles are committed JSON source inputs and a download-only affordance, not a runtime read source -- enforce via the G-8 second assertion that no `src/pages/` or `src/components/` file fetches `/results/data/bundles/`"
   - "DO NOT delete metric-JSON emitters in W2 -- because Home/PlatformIndex/BenchmarkIndex/Compare/ResultDetail still read from them until W4 -- W2 is additive, W4 deletes each emitter in the same slice as its last consumer, W7 does the final sweep"
   - "DO NOT tighten `db.ts` to reject on attach failure until the last manifest.ts consumer migrates -- because pages still on the JSON path rely on the soft failure path -- W3 keeps the fallback in place; W4 lands the hardening in the same slice that deletes `manifest.ts`"
+  - "DO NOT dedupe `cohort_metadata` rows by `(cohort_key, platform_id)` or hide publishable variants of the same platform in any canonical table -- because users must be able to compare across tuning levels and trust levels from the DuckDB store, and the pipeline is the wrong layer to decide which variant 'represents' a platform -- key `cohort_metadata` on `(cohort_key, result_id)`, carry `tuning_mode`/`trust_label`/`short_id` alongside, and let the UI decide any display-time collapsing"
+  - "DO NOT rely on dict last-write-wins inside `_build_meta_leaderboard` `platform_agg` when the same `platform_id` ranks more than once in the same cohort -- because the second write clobbers the better rank with a worse one and poisons `avg_rank` for the Home meta-leaderboard -- compare ranks on write and keep the best (or rely on best-first iteration order with `setdefault`)"
   - "DO NOT widen scope into CLI, hosted API, or submission-path changes -- because this TODO is about the static explorer read model only -- leave write-path contracts untouched"
   - "DO NOT add new reduction code under `benchbox/core/results/` -- because this TODO's scope_limit keeps that tree read-only -- add new reductions under `benchbox/core/explorer_pipeline/` and import existing utilities read-only from `benchbox/core/results/` as needed"
 
@@ -606,6 +713,7 @@ scope_limit:
     - "tests/unit/core/explorer_pipeline/"
     - "_project/planning/visible_metrics.yaml"
     - "docs/development/benchbox-results-platform-strategy.md"
+    - "docs/development/browser-duckdb-schema.sql"
   do_not_modify:
     - "benchbox/cli/"
     - ".github/workflows/"
@@ -622,6 +730,7 @@ scope_limit:
 
 success_metrics:
   - "The research gate resolves the DuckDB-only explorer contract before the first code edit"
+  - "Every publishable result variant (distinct `result_id`, including per-tuning-mode and per-trust-label variants) is present in the DuckDB published-results dataset; no canonical table dedupes or hides variants at ingest"
   - "Committed JSON result objects flow directly into DuckDB and no user-visible metric is served from JSON at runtime"
   - "Home, platform, benchmark, compare, detail, and query surfaces read canonical metrics from DuckDB"
   - "Any surviving bootstrap JSON is explicitly non-metric and covered by tests or static checks"
@@ -634,6 +743,7 @@ open_questions:
   - "What is the acceptable startup/loading budget for DuckDB-backed pages, and do we need a tiny non-metric route bootstrap for first paint? (Plan proposal: p50 <1500ms, p95 <3500ms per RG-1; if a route bootstrap exists it stays non-metric and subordinate to DuckDB)"
   - "Is `result_detail_metrics` a single EAV-style table (metric_group, metric_name, value_numeric/value_text/value_json) or a set of narrow tables (phases, validations, platform_info, environment, tuning, cost_breakdown) joined by a view of the same name? (Plan recommendation: narrow tables + a G-11-compliant projection-only view of the same name, so dashboards read the view and analysts drill into the narrow tables)"
   - "Which derived metrics currently live in `results-explorer/src/lib/{queryReduction,chartMath,ranking,compliance}.ts` have no canonical Python reference computation under `benchbox/core/explorer_pipeline/` or `benchbox/core/results/` today, and must therefore be ported into `benchbox/core/explorer_pipeline/` during W2 before their DuckDB column can be persisted? (Answered by the W1 compute-ownership note, deliverable 7.)"
+  - "Should `cohort_metadata` be keyed one-row-per-platform-per-cohort or one-row-per-result-per-cohort? (Resolved during W2 contract-test work: W2b pins `PRIMARY KEY (cohort_key, result_id)` so publishable tuning/trust variants are not silently dropped; the Home UI does any variant collapsing. See W2b notes for evidence and the concurrent fix to the `_build_meta_leaderboard` `platform_agg` last-write-wins bug.)"
 
 research_value:
   hypothesis: |

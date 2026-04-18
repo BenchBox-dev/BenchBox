@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T15:46:59.042018'
+generated_at: '2026-04-18T17:01:07.276969'
 total_items: 52
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -73,7 +73,7 @@ items:
   - results
   - canonical-store
   estimated_effort: Large (5-7 days)
-  work_total: 7
+  work_total: 8
   work_done: 1
   work_ready: 1
   deferred_count: 2
