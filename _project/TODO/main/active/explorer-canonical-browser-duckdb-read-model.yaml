@@ -222,7 +222,7 @@ work:
   summary: "Preserve all publishable result variants in `cohort_metadata` and fix the `_build_meta_leaderboard` `platform_agg`
     last-write-wins bug before the frontend migration"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Surfaced during W2 contract tests: the same platform can legitimately
     appear in a cohort more than once (different `tuning_mode`, different
