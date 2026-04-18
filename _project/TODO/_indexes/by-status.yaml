@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T13:57:52.994267'
+generated_at: '2026-04-18T14:07:16.698638'
 total_items: 52
 statuses:
   In Progress:
@@ -149,7 +149,7 @@ statuses:
       category: Core Functionality
     - id: explorer-canonical-browser-duckdb-read-model
       file: TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
-      title: Make DuckDB-WASM the canonical browser read model for explorer graphs and query workbench
+      title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
       priority: High
       category: Core Functionality
     - id: questdb-parquet-chunk-size-tunable

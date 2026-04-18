@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T13:57:52.994195'
+generated_at: '2026-04-18T14:07:16.698565'
 total_items: 52
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -61,7 +61,7 @@ items:
   - design-results-ingest-storage-and-derived-read-model
 - id: explorer-canonical-browser-duckdb-read-model
   file: TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
-  title: Make DuckDB-WASM the canonical browser read model for explorer graphs and query workbench
+  title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
   worktree: main
   category: Core Functionality
   priority: High
@@ -70,13 +70,13 @@ items:
   - explorer
   - duckdb-wasm
   - read-model
-  - cloudspecs
   - results
-  estimated_effort: Large (4-6 days)
+  - canonical-store
+  estimated_effort: Large (5-7 days)
   work_total: 7
   work_done: 0
   work_ready: 1
-  deferred_count: 3
+  deferred_count: 2
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control

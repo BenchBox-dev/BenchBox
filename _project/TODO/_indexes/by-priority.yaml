@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T13:57:52.994254'
+generated_at: '2026-04-18T14:07:16.698623'
 total_items: 52
 priorities:
   Critical:
@@ -24,7 +24,7 @@ priorities:
       status: Not Started
     - id: explorer-canonical-browser-duckdb-read-model
       file: TODO/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
-      title: Make DuckDB-WASM the canonical browser read model for explorer graphs and query workbench
+      title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
       category: Core Functionality
       status: Not Started
     - id: motherduck-cloud-features
