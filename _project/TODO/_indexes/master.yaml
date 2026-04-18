@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T17:39:37.915128'
+generated_at: '2026-04-18T17:48:07.070011'
 total_items: 52
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -74,7 +74,7 @@ items:
   - canonical-store
   estimated_effort: Large (5-7 days)
   work_total: 8
-  work_done: 3
+  work_done: 4
   work_ready: 1
   deferred_count: 2
 - id: motherduck-cloud-features

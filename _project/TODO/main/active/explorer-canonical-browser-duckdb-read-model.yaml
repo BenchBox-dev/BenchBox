@@ -326,7 +326,7 @@ work:
   summary: "Build the shared frontend DuckDB access layer and cut `Query.tsx` off from `results_schema.json`; defer `db.ts`
     attach-failure hardening until W4"
   needs: [w8]
-  status: pending
+  status: done
   notes: |
     Consolidate TS-side data access around `results-explorer/src/db.ts`
     plus typed query helpers. Retire `results-explorer/src/manifest.ts` as
