@@ -1,5 +1,5 @@
-generated_at: '2026-04-18T18:44:10.069054'
-total_items: 728
+generated_at: '2026-04-18T19:32:53.920847'
+total_items: 729
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 677
+    count: 678
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2224,6 +2224,11 @@ statuses:
       title: MCP Server Comprehensive Improvements
       priority: High
       category: AI Integration
+    - id: explorer-canonical-browser-duckdb-read-model
+      file: DONE/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
+      title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
+      priority: High
+      category: Core Functionality
     - id: make-parquet-default-for-tpcds-obt
       file: DONE/main/make-parquet-default-for-tpcds-obt.yaml
       title: Make Parquet the default output format for TPC-DS OBT

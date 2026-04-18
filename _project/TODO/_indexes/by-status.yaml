@@ -1,14 +1,9 @@
-generated_at: '2026-04-18T18:44:08.307842'
-total_items: 52
+generated_at: '2026-04-18T19:32:52.096048'
+total_items: 51
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: explorer-canonical-browser-duckdb-read-model
-      file: TODO/main/active/explorer-canonical-browser-duckdb-read-model.yaml
-      title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
-      priority: High
-      category: Core Functionality
     - id: questdb-benchmark-compatibility-remediation
       file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
       title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'

@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T18:44:08.307809'
+generated_at: '2026-04-18T19:32:52.096013'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -64,7 +64,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 20
+    count: 19
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -151,11 +151,6 @@ categories:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: High
       status: Not Started
-    - id: explorer-canonical-browser-duckdb-read-model
-      file: TODO/main/active/explorer-canonical-browser-duckdb-read-model.yaml
-      title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
-      priority: High
-      status: In Progress
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

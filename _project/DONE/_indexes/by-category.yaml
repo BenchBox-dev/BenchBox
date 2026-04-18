@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T18:44:10.068707'
+generated_at: '2026-04-18T19:32:53.920431'
 total_categories: 78
 categories:
   '"Bug Fixes & Reliability"':
@@ -665,7 +665,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 246
+    count: 247
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1519,6 +1519,11 @@ categories:
       title: Make DuckDB text plan parsing reliable or fail fast
       priority: Medium
       status: Not Started
+    - id: explorer-canonical-browser-duckdb-read-model
+      file: DONE/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
+      title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
+      priority: High
+      status: Completed
     - id: provable-cli-command-generation
       file: DONE/core-functionality/planning/provable-cli-command-generation.yaml
       title: Make generate_cli_command provably complete — all behavior-affecting CLI params round-trip

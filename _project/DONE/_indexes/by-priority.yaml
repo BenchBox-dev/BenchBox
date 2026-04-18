@@ -1,5 +1,5 @@
-generated_at: '2026-04-18T18:44:10.068884'
-total_items: 728
+generated_at: '2026-04-18T19:32:53.920634'
+total_items: 729
 priorities:
   Critical:
     count: 41
@@ -210,7 +210,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 253
+    count: 254
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -863,6 +863,11 @@ priorities:
       file: DONE/mcp-integration/active/mcp-server-comprehensive-improvements.yaml
       title: MCP Server Comprehensive Improvements
       category: AI Integration
+      status: Completed
+    - id: explorer-canonical-browser-duckdb-read-model
+      file: DONE/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
+      title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
+      category: Core Functionality
       status: Completed
     - id: make-parquet-default-for-tpcds-obt
       file: DONE/main/make-parquet-default-for-tpcds-obt.yaml

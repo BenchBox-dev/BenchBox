@@ -1,5 +1,5 @@
-generated_at: '2026-04-18T18:44:08.307827'
-total_items: 52
+generated_at: '2026-04-18T19:32:52.096034'
+total_items: 51
 priorities:
   Critical:
     count: 2
@@ -15,18 +15,13 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 7
+    count: 6
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
       category: Core Functionality
       status: Not Started
-    - id: explorer-canonical-browser-duckdb-read-model
-      file: TODO/main/active/explorer-canonical-browser-duckdb-read-model.yaml
-      title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
-      category: Core Functionality
-      status: In Progress
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control

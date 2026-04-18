@@ -2,7 +2,8 @@ id: explorer-canonical-browser-duckdb-read-model
 title: "Make DuckDB-WASM the sole browser store for all user-visible explorer metrics"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-18"
 category: Core Functionality
 
 description: |
@@ -435,7 +436,7 @@ work:
   summary: "Expand the query workbench into the canonical analyst surface with starter queries, cohort-aware templates, and
     downloads against the same DuckDB contract"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Starter queries must cover common analyst questions across results,
     per-query timings, cohort comparisons, trust/tuning breakdowns, and
@@ -444,7 +445,7 @@ work:
 - id: w6
   summary: "Add exit gates proving no metric-bearing JSON runtime reads remain and all explorer surfaces agree on DuckDB values"
   needs: [w4, w5]
-  status: pending
+  status: done
   notes: |
     Required assertions:
       - home stats and leaderboard rows == DuckDB query results
@@ -539,7 +540,7 @@ work:
 - id: w7
   summary: "Delete metric-bearing JSON artifacts and stale compatibility framing once DuckDB-backed parity is proven"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Remove benchmark/detail/compare/meta-leaderboard JSON outputs once the
     DuckDB-backed contract passes parity tests. If `manifest.json` or any
