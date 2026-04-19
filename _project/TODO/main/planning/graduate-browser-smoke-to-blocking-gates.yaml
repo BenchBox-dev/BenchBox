@@ -32,17 +32,29 @@ work:
     summary: "Flip webkit-smoke to a blocking gate after 10 consecutive CI green runs"
     status: pending
     notes: |
-      Monitor the `webkit-smoke` job in CI. Once 10 consecutive runs pass
-      without `continue-on-error` masking a failure, remove that flag from
-      the `webkit-smoke` job block in
-      `.github/workflows/results-explorer-browser.yml`.
+      Check the last 10 WebKit job conclusions:
+        gh run list --workflow=results-explorer-browser.yml --repo joeharris76/benchbox-private \
+          --limit=15 --json databaseId \
+          | jq -r '.[].databaseId' \
+          | xargs -I{} gh api repos/joeharris76/benchbox-private/actions/runs/{}/jobs \
+              --jq '.jobs[] | select(.name=="WebKit (@smoke, non-blocking)") | .conclusion' \
+          | head -10
+      Once all 10 lines are "success", remove `continue-on-error: true` from
+      the `webkit-smoke` job block in `.github/workflows/results-explorer-browser.yml`.
 
   - id: w2
     summary: "Flip firefox-smoke to a blocking gate after 10 consecutive CI green runs"
     status: pending
     notes: |
-      Monitor the `firefox-smoke` job in CI. Apply the same flip
-      independently of w1 — Firefox may reach the 10-green threshold first.
+      Check the last 10 Firefox job conclusions:
+        gh run list --workflow=results-explorer-browser.yml --repo joeharris76/benchbox-private \
+          --limit=15 --json databaseId \
+          | jq -r '.[].databaseId' \
+          | xargs -I{} gh api repos/joeharris76/benchbox-private/actions/runs/{}/jobs \
+              --jq '.jobs[] | select(.name=="Firefox (@smoke, non-blocking)") | .conclusion' \
+          | head -10
+      Once all 10 lines are "success", remove `continue-on-error: true` from
+      the `firefox-smoke` job block. Apply independently of w1.
 
 must_preserve:
   - "The Chromium blocking gate is unaffected by either change."
@@ -53,12 +65,12 @@ anti_patterns:
   - "DO NOT flip both browsers in a single commit if their thresholds are reached at different times — because batching obscures which browser caused any subsequent regression — flip each in its own commit."
 
 verification:
-  - description: "WebKit smoke passes in CI (check recent workflow runs)"
-    command: "gh run list --workflow=results-explorer-browser.yml --limit=20 --json conclusion,name | jq '[.[] | select(.name==\"WebKit (@smoke, non-blocking)\") | .conclusion]'"
-    expected_output: "Last 10 entries are all \"success\""
-  - description: "Firefox smoke passes in CI (check recent workflow runs)"
-    command: "gh run list --workflow=results-explorer-browser.yml --limit=20 --json conclusion,name | jq '[.[] | select(.name==\"Firefox (@smoke, non-blocking)\") | .conclusion]'"
-    expected_output: "Last 10 entries are all \"success\""
+  - description: "Last 10 WebKit job conclusions are all success"
+    command: "gh run list --workflow=results-explorer-browser.yml --repo joeharris76/benchbox-private --limit=15 --json databaseId | jq -r '.[].databaseId' | xargs -I{} gh api repos/joeharris76/benchbox-private/actions/runs/{}/jobs --jq '.jobs[] | select(.name==\"WebKit (@smoke, non-blocking)\") | .conclusion' | head -10"
+    expected_output: "10 lines of \"success\""
+  - description: "Last 10 Firefox job conclusions are all success"
+    command: "gh run list --workflow=results-explorer-browser.yml --repo joeharris76/benchbox-private --limit=15 --json databaseId | jq -r '.[].databaseId' | xargs -I{} gh api repos/joeharris76/benchbox-private/actions/runs/{}/jobs --jq '.jobs[] | select(.name==\"Firefox (@smoke, non-blocking)\") | .conclusion' | head -10"
+    expected_output: "10 lines of \"success\""
 
 scope_limit:
   only_modify:
