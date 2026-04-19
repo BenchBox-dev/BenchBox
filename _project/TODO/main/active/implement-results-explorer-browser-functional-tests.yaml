@@ -88,7 +88,7 @@ work:
   - id: w3
     summary: "Implement deterministic fixture-corpus generation for browser tests"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Browser tests must not depend on whichever derived artifacts happen to be
       present in the working tree. Generate fixture data per run from canonical
