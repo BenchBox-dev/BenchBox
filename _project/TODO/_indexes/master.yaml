@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:06:46.841938'
-total_items: 41
+generated_at: '2026-04-19T10:15:30.131511'
+total_items: 40
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -712,22 +712,6 @@ items:
   work_ready: 0
   needs:
   - implement-results-explorer-browser-functional-tests
-- id: questdb-imp-headerless-column-mapping-verify
-  file: TODO/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
-  title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
-  worktree: main
-  category: Platform Support
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - questdb
-  - parquet
-  - platform-support
-  - correctness
-  estimated_effort: Small (investigation + test + optional 1-line fix)
-  work_total: 3
-  work_done: 0
-  work_ready: 1
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

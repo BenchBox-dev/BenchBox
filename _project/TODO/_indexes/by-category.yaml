@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T10:06:46.841980'
+generated_at: '2026-04-19T10:15:30.131544'
 total_categories: 14
 categories:
   Architecture & Refactoring:
@@ -179,18 +179,13 @@ categories:
       priority: Low
       status: Not Started
   Platform Support:
-    count: 2
+    count: 1
     items:
     - id: questdb-benchmark-compatibility-remediation
       file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
       title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
       priority: High
       status: In Progress
-    - id: questdb-imp-headerless-column-mapping-verify
-      file: TODO/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
-      title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
-      priority: Medium-High
-      status: Not Started
   Repository Maintenance:
     count: 1
     items:

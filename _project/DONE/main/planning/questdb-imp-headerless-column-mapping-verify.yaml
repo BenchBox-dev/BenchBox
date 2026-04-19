@@ -2,7 +2,7 @@ id: questdb-imp-headerless-column-mapping-verify
 title: "Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Platform Support
 
 description: |
@@ -29,7 +29,7 @@ work:
 - id: w1
   summary: "Read QuestDB /imp documentation for overwrite=false + no-header behaviour"
   needs: []
-  status: pending
+  status: done
   notes: |
     Check QuestDB REST API docs (/imp endpoint) for the interaction between:
       - `overwrite=false` (append to existing table)
@@ -46,7 +46,7 @@ work:
 - id: w2
   summary: "Write a live integration test verifying two-chunk headerless import"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add a test in `tests/integration/platforms/test_questdb_parquet_load.py`
     (NOT fast-marked — requires a live QuestDB instance).
@@ -64,7 +64,7 @@ work:
 - id: w3
   summary: "Update code and docstring based on findings"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Two outcomes:
 
@@ -85,7 +85,7 @@ work:
 must_preserve:
 - "_load_parquet_via_chunked_csv: overwrite=false on every chunk (must not be changed to true)"
 - "_load_parquet_via_chunked_csv: create_schema always runs before load_data — table exists and is empty at load time"
-- "All 4 TestLoadParquetViaChunkedCsv unit tests continue to pass after any code change"
+- "All 6 TestLoadParquetViaChunkedCsv unit tests continue to pass after any code change"
 
 verification:
 - description: "Integration test: two-chunk headerless import produces correct column values"
@@ -103,7 +103,9 @@ metadata:
   tags: ["questdb", "parquet", "platform-support", "correctness"]
   estimated_effort: "Small (investigation + test + optional 1-line fix)"
   created_date: "2026-04-16"
+  completed_date: "2026-04-19"
   source_review: "Phase 1 QuestDB remediation review (Finding 4)"
   related_files:
   - "benchbox/platforms/questdb.py"
   - "tests/unit/platforms/test_questdb_coverage.py"
+  - "tests/integration/platforms/test_questdb_parquet_load.py"

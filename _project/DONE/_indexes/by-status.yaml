@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:06:48.716532'
-total_items: 744
+generated_at: '2026-04-19T10:15:31.859232'
+total_items: 745
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 693
+    count: 694
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3325,6 +3325,11 @@ statuses:
       title: Vector Search Benchmark Support
       priority: High
       category: AI/ML Capabilities
+    - id: questdb-imp-headerless-column-mapping-verify
+      file: DONE/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
+      title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
+      priority: Medium-High
+      category: Platform Support
     - id: visualization-framework-chart-generation-results-display
       file: DONE/content-enablement-viz/planning/visualization-framework-chart-generation-results-display.yaml
       title: Visualization Framework - Chart Generation & Results Display

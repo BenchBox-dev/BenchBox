@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:06:46.842011'
-total_items: 41
+generated_at: '2026-04-19T10:15:30.131571'
+total_items: 40
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 28
+    count: 27
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -137,11 +137,6 @@ statuses:
       title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
       priority: Medium-High
       category: Architecture & Refactoring
-    - id: questdb-imp-headerless-column-mapping-verify
-      file: TODO/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
-      title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
-      priority: Medium-High
-      category: Platform Support
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR

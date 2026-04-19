@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:06:48.716347'
-total_items: 744
+generated_at: '2026-04-19T10:15:31.859068'
+total_items: 745
 priorities:
   Critical:
     count: 41
@@ -1491,7 +1491,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 113
+    count: 114
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -2058,6 +2058,11 @@ priorities:
       file: DONE/core-functionality/planning/unified-adapter-interface.yaml
       title: Unify SQL and DataFrame Adapter Execution Interfaces
       category: Core Functionality
+      status: Completed
+    - id: questdb-imp-headerless-column-mapping-verify
+      file: DONE/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
+      title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
+      category: Platform Support
       status: Completed
   Medium:
     count: 292

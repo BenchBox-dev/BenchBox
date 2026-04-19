@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:06:46.841999'
-total_items: 41
+generated_at: '2026-04-19T10:15:30.131560'
+total_items: 40
 priorities:
   Critical:
     count: 2
@@ -48,7 +48,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 9
+    count: 8
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -90,11 +90,6 @@ priorities:
       title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
       category: Infrastructure
       status: Completed
-    - id: questdb-imp-headerless-column-mapping-verify
-      file: TODO/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
-      title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
-      category: Platform Support
-      status: Not Started
   Medium:
     count: 10
     items:

@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:06:48.715770'
-total_items: 744
+generated_at: '2026-04-19T10:15:31.858598'
+total_items: 745
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -10401,3 +10401,19 @@ items:
   owners:
   - joe
   estimated_effort: Medium (2-3 days)
+- id: questdb-imp-headerless-column-mapping-verify
+  file: DONE/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
+  title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
+  worktree: main
+  category: Platform Support
+  priority: Medium-High
+  status: Completed
+  tags:
+  - questdb
+  - parquet
+  - platform-support
+  - correctness
+  estimated_effort: Small (investigation + test + optional 1-line fix)
+  work_total: 3
+  work_done: 3
+  work_ready: 0
