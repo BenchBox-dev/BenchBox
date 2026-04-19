@@ -1,5 +1,5 @@
-generated_at: '2026-04-18T19:32:52.096048'
-total_items: 51
+generated_at: '2026-04-18T20:01:15.229685'
+total_items: 52
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 42
+    count: 43
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -142,6 +142,11 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
+    - id: implement-results-explorer-browser-functional-tests
+      file: TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml
+      title: Implement browser-based functional testing for the results explorer
+      priority: High
+      category: Testing and Quality Assurance
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

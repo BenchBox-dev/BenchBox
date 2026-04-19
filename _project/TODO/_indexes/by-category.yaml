@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T19:32:52.096013'
+generated_at: '2026-04-18T20:01:15.229652'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -265,7 +265,7 @@ categories:
       priority: Low
       status: Not Started
   Testing and Quality Assurance:
-    count: 5
+    count: 6
     items:
     - id: explorer-heatmap-accessibility-review-followups
       file: TODO/main/planning/explorer-heatmap-accessibility-review-followups.yaml
@@ -276,6 +276,11 @@ categories:
       file: TODO/main/planning/explorer-parity-tests-review-followups.yaml
       title: Address follow-up findings from parity-tests code review
       priority: Low
+      status: Not Started
+    - id: implement-results-explorer-browser-functional-tests
+      file: TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml
+      title: Implement browser-based functional testing for the results explorer
+      priority: High
       status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml

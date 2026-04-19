@@ -1,5 +1,5 @@
-generated_at: '2026-04-18T19:32:52.096034'
-total_items: 51
+generated_at: '2026-04-18T20:01:15.229671'
+total_items: 52
 priorities:
   Critical:
     count: 2
@@ -15,8 +15,13 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 6
+    count: 7
     items:
+    - id: implement-results-explorer-browser-functional-tests
+      file: TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml
+      title: Implement browser-based functional testing for the results explorer
+      category: Testing and Quality Assurance
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

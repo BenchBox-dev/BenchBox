@@ -1,5 +1,5 @@
-generated_at: '2026-04-18T19:32:52.095975'
-total_items: 51
+generated_at: '2026-04-18T20:01:15.229609'
+total_items: 52
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -38,6 +38,27 @@ items:
   work_ready: 1
   needs:
   - implement-pr-based-result-submission-workflow
+- id: implement-results-explorer-browser-functional-tests
+  file: TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml
+  title: Implement browser-based functional testing for the results explorer
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - testing
+  - browser
+  - e2e
+  - playwright
+  - quality-gate
+  estimated_effort: Large
+  work_total: 7
+  work_done: 0
+  work_ready: 1
+  needs:
+  - launch-results-explorer-acceptance-and-seed
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
