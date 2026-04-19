@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:21:03.697006'
-total_items: 38
+generated_at: '2026-04-19T12:25:58.264085'
+total_items: 37
 priorities:
   Critical:
     count: 2
@@ -38,7 +38,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 7
+    count: 6
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -70,11 +70,6 @@ priorities:
       title: Surface contributor onboarding for results submission
       category: Documentation
       status: Completed
-    - id: unify-platform-label-disambiguator
-      file: TODO/main/planning/unify-platform-label-disambiguator.yaml
-      title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
-      category: Architecture & Refactoring
-      status: Not Started
   Medium:
     count: 10
     items:

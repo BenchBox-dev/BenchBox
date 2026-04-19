@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:21:05.490250'
-total_items: 747
+generated_at: '2026-04-19T12:25:59.991773'
+total_items: 748
 priorities:
   Critical:
     count: 41
@@ -1496,7 +1496,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 115
+    count: 116
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -2059,6 +2059,11 @@ priorities:
       title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
       category: Core Functionality
       status: Not Started
+    - id: unify-platform-label-disambiguator
+      file: DONE/main/planning/unify-platform-label-disambiguator.yaml
+      title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
+      category: Architecture & Refactoring
+      status: Completed
     - id: unified-adapter-interface
       file: DONE/core-functionality/planning/unified-adapter-interface.yaml
       title: Unify SQL and DataFrame Adapter Execution Interfaces

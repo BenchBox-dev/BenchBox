@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T12:21:05.490078'
+generated_at: '2026-04-19T12:25:59.991586'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -127,11 +127,16 @@ categories:
       priority: High
       status: Completed
   Architecture & Refactoring:
-    count: 1
+    count: 2
     items:
     - id: reconcile-docs-review-code-followups
       file: DONE/main/active/reconcile-docs-review-code-followups.yaml
       title: Reconcile three code-level inconsistencies surfaced by docs review
+      priority: Medium-High
+      status: Completed
+    - id: unify-platform-label-disambiguator
+      file: DONE/main/planning/unify-platform-label-disambiguator.yaml
+      title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
       priority: Medium-High
       status: Completed
   Benchmark Correctness and Validation:

@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:21:05.489764'
-total_items: 747
+generated_at: '2026-04-19T12:25:59.991231'
+total_items: 748
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -10402,6 +10402,23 @@ items:
   work_ready: 2
   needs:
   - explorer-extend-manifest-and-pipeline
+- id: unify-platform-label-disambiguator
+  file: DONE/main/planning/unify-platform-label-disambiguator.yaml
+  title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
+  worktree: main
+  category: Architecture & Refactoring
+  priority: Medium-High
+  status: Completed
+  tags:
+  - explorer
+  - visualization
+  - refactoring
+  - consistency
+  estimated_effort: Small
+  completed_date: '2026-04-19'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: unified-adapter-interface
   file: DONE/core-functionality/planning/unified-adapter-interface.yaml
   title: Unify SQL and DataFrame Adapter Execution Interfaces

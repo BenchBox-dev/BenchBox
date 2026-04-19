@@ -1,18 +1,13 @@
-generated_at: '2026-04-19T12:21:03.696987'
+generated_at: '2026-04-19T12:25:58.264069'
 total_categories: 12
 categories:
   Architecture & Refactoring:
-    count: 2
+    count: 1
     items:
     - id: generalize-database-table-reuse-detection
       file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
       title: Generalize benchmark table reuse detection for managed databases
       priority: Normal
-      status: Not Started
-    - id: unify-platform-label-disambiguator
-      file: TODO/main/planning/unify-platform-label-disambiguator.yaml
-      title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
-      priority: Medium-High
       status: Not Started
   Benchmark Development:
     count: 4

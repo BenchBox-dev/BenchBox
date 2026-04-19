@@ -2,7 +2,8 @@ id: unify-platform-label-disambiguator
 title: "Unify CLI vs pipeline platform-label disambiguator into a single implementation"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-19"
 category: Architecture & Refactoring
 
 description: |

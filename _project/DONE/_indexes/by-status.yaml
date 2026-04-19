@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:21:05.490421'
-total_items: 747
+generated_at: '2026-04-19T12:25:59.991952'
+total_items: 748
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 696
+    count: 697
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3280,6 +3280,11 @@ statuses:
       title: Unified Tuning Configuration System ✅ COMPLETED
       priority: Medium
       category: '"Technical Debt & Refactoring"'
+    - id: unify-platform-label-disambiguator
+      file: DONE/main/planning/unify-platform-label-disambiguator.yaml
+      title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
+      priority: Medium-High
+      category: Architecture & Refactoring
     - id: unify-dataframe-sql-default-storage-location
       file: DONE/core-functionality/active/unify-dataframe-sql-default-storage-location.yaml
       title: Unify DataFrame and SQL default storage locations to project-local benchmark_runs/

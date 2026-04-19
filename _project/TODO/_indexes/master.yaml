@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:21:03.696952'
-total_items: 38
+generated_at: '2026-04-19T12:25:58.264029'
+total_items: 37
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -657,22 +657,6 @@ items:
   work_ready: 0
   needs:
   - implement-pr-based-result-submission-workflow
-- id: unify-platform-label-disambiguator
-  file: TODO/main/planning/unify-platform-label-disambiguator.yaml
-  title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
-  worktree: main
-  category: Architecture & Refactoring
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - explorer
-  - visualization
-  - refactoring
-  - consistency
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 3
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases
