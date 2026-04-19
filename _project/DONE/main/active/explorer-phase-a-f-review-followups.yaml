@@ -2,7 +2,8 @@ id: explorer-phase-a-f-review-followups
 title: "Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)"
 worktree: main
 priority: Low
-status: In Progress
+status: Completed
+completed_date: "2026-04-19"
 category: Code Quality
 
 description: |
@@ -108,7 +109,7 @@ work:
 
 - id: w10
   summary: "Keyboard-enable sortable table headers in ResultDetail.tsx"
-  status: pending
+  status: done
   notes: |
     ResultDetail.tsx uses <th onClick={toggleSort(...)}> without
     role="button", tabIndex, or onKeyDown. Add keyboard affordances
@@ -117,14 +118,14 @@ work:
 
 - id: w11
   summary: "Memoize sorted arrays in ResultDetail.tsx"
-  status: pending
+  status: done
   notes: |
     `sortedMedians` / `sortedRawQueries` (lines 68-86) sort on every
     render. Low impact but easy useMemo win.
 
 - id: w12
   summary: "Memoize ChartPanel context objects at call sites"
-  status: pending
+  status: done
   notes: |
     ResultDetail.tsx:282 and BenchmarkIndex/Compare/PlatformIndex
     pass `context={{ kind: "...", ... }}` as inline literals. Each
@@ -136,7 +137,7 @@ work:
 
 - id: w13
   summary: "Emit chart spec IDs as a JSON fixture for the parity test"
-  status: pending
+  status: done
   notes: |
     chartRegistry.parity.test.ts regex-matches _CHART_SPECS in
     chart_types.py. Any Python syntax change (formatting, comments
@@ -148,7 +149,7 @@ work:
 
 - id: w14
   summary: "Broaden SummaryBoxPanel primary-metric fallback"
-  status: pending
+  status: done
   notes: |
     ChartPanel.tsx:419 hardcodes `benchmark === "tpch" || benchmark === "tpcds"`
     as the Power@Size carve-out when summary.ranking is missing. The
@@ -158,7 +159,7 @@ work:
 
 - id: w15
   summary: "Stabilize useUrlState's initial/value references at call sites"
-  status: pending
+  status: done
   notes: |
     Call sites like Home.tsx:23-24 pass fresh `[]` as `initial`. The
     popstate useEffect at useUrlState.ts:116 depends on `initial`,
@@ -169,7 +170,7 @@ work:
 
 - id: w16
   summary: "Memoize useUrlState's setValue via useCallback"
-  status: pending
+  status: done
   notes: |
     useUrlState.ts:126 returns a new setValue function each render.
     Downstream memoized subtrees re-render when it is passed as a

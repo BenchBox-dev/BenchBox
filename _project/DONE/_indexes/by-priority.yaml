@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:36:55.831777'
-total_items: 741
+generated_at: '2026-04-19T10:02:13.481542'
+total_items: 742
 priorities:
   Critical:
     count: 41
@@ -3526,7 +3526,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 40
+    count: 41
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3686,6 +3686,11 @@ priorities:
     - id: explorer-visualization-review-followup-nits
       file: DONE/main/active/explorer-visualization-review-followup-nits.yaml
       title: Fix nit-level findings from explorer visualization code reviews
+      category: Code Quality
+      status: Completed
+    - id: explorer-phase-a-f-review-followups
+      file: DONE/main/active/explorer-phase-a-f-review-followups.yaml
+      title: Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)
       category: Code Quality
       status: Completed
     - id: move-jsonschema-out-of-core-runtime-deps

@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T09:36:55.831603'
+generated_at: '2026-04-19T10:02:13.481351'
 total_categories: 78
 categories:
   '"Bug Fixes & Reliability"':
@@ -252,7 +252,7 @@ categories:
       priority: High
       status: Completed
   Code Quality:
-    count: 6
+    count: 7
     items:
     - id: consolidate-tpc-delimiter-detection
       file: DONE/core-functionality/consolidate-tpc-delimiter-detection.yaml
@@ -272,6 +272,11 @@ categories:
     - id: explorer-visualization-review-followup-nits
       file: DONE/main/active/explorer-visualization-review-followup-nits.yaml
       title: Fix nit-level findings from explorer visualization code reviews
+      priority: Low
+      status: Completed
+    - id: explorer-phase-a-f-review-followups
+      file: DONE/main/active/explorer-phase-a-f-review-followups.yaml
+      title: Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)
       priority: Low
       status: Completed
     - id: reduce-cc14-complexity-cluster

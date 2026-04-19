@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:36:55.831289'
-total_items: 741
+generated_at: '2026-04-19T10:02:13.481001'
+total_items: 742
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4863,6 +4863,31 @@ items:
   work_ready: 0
   needs:
   - explorer-unify-visualization-foundations
+- id: explorer-phase-a-f-review-followups
+  file: DONE/main/active/explorer-phase-a-f-review-followups.yaml
+  title: Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)
+  worktree: main
+  category: Code Quality
+  priority: Low
+  status: Completed
+  tags:
+  - explorer
+  - cleanup
+  - nit
+  - ultraplan
+  - follow-up
+  estimated_effort: Medium (4-6 hours)
+  completed_date: '2026-04-19'
+  work_total: 16
+  work_done: 16
+  work_ready: 0
+  needs:
+  - explorer-master-leaderboard-home
+  - explorer-pipeline-meta-leaderboard-widening
+  - explorer-query-workbench
+  - explorer-result-detail-median-first
+  - explorer-unified-chart-panel
+  - explorer-url-synced-filter-state
 - id: move-jsonschema-out-of-core-runtime-deps
   file: DONE/main/active/move-jsonschema-out-of-core-runtime-deps.yaml
   title: Move jsonschema out of core deps (used only by _project/ tooling)
