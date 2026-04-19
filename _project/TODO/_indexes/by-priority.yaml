@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:25:58.264085'
-total_items: 37
+generated_at: '2026-04-19T16:48:21.844984'
+total_items: 36
 priorities:
   Critical:
     count: 2
@@ -124,7 +124,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 14
+    count: 13
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -155,11 +155,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: normalize-pg-family-driver-package-fallback
-      file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
-      title: Normalize driver_package fallback string across pg-family config builders
-      category: Code Quality
       status: Not Started
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:25:58.264069'
-total_categories: 12
+generated_at: '2026-04-19T16:48:21.844966'
+total_categories: 11
 categories:
   Architecture & Refactoring:
     count: 1
@@ -30,14 +30,6 @@ categories:
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
-      priority: Low
-      status: Not Started
-  Code Quality:
-    count: 1
-    items:
-    - id: normalize-pg-family-driver-package-fallback
-      file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
-      title: Normalize driver_package fallback string across pg-family config builders
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:

@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:25:59.991231'
-total_items: 748
+generated_at: '2026-04-19T16:48:23.843730'
+total_items: 749
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4958,6 +4958,17 @@ items:
   work_done: 4
   work_ready: 0
   deferred_count: 1
+- id: normalize-pg-family-driver-package-fallback
+  file: DONE/main/active/normalize-pg-family-driver-package-fallback.yaml
+  title: Normalize driver_package fallback string across pg-family config builders
+  worktree: main
+  category: Code Quality
+  priority: Low
+  status: Completed
+  completed_date: '2026-04-19'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
 - id: phase-9-advanced-features
   file: DONE/query-plan-remediation/phase-9-advanced-features.yaml
   title: 'Query Plan Remediation - Phase 9: Advanced Features'

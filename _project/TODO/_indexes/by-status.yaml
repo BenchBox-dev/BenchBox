@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:25:58.264096'
-total_items: 37
+generated_at: '2026-04-19T16:48:21.844996'
+total_items: 36
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Low
       category: Testing & Quality
   Not Started:
-    count: 25
+    count: 24
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -82,11 +82,6 @@ statuses:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       priority: High
       category: Platform Expansion
-    - id: normalize-pg-family-driver-package-fallback
-      file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
-      title: Normalize driver_package fallback string across pg-family config builders
-      priority: Low
-      category: Code Quality
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

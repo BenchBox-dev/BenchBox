@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:25:59.991952'
-total_items: 748
+generated_at: '2026-04-19T16:48:23.844521'
+total_items: 749
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 697
+    count: 698
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2434,6 +2434,11 @@ statuses:
       title: Natural Language to SQL Testing Framework
       priority: Medium
       category: AI/ML Capabilities
+    - id: normalize-pg-family-driver-package-fallback
+      file: DONE/main/active/normalize-pg-family-driver-package-fallback.yaml
+      title: Normalize driver_package fallback string across pg-family config builders
+      priority: Low
+      category: Code Quality
     - id: notimplementederror-completions-completed
       file: DONE/unknown/planning/notimplementederror-completions-completed.yaml
       title: NotImplementedError Completions ✅ COMPLETED

@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T12:25:59.991586'
+generated_at: '2026-04-19T16:48:23.844114'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -257,7 +257,7 @@ categories:
       priority: High
       status: Completed
   Code Quality:
-    count: 7
+    count: 8
     items:
     - id: consolidate-tpc-delimiter-detection
       file: DONE/core-functionality/consolidate-tpc-delimiter-detection.yaml
@@ -282,6 +282,11 @@ categories:
     - id: explorer-phase-a-f-review-followups
       file: DONE/main/active/explorer-phase-a-f-review-followups.yaml
       title: Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)
+      priority: Low
+      status: Completed
+    - id: normalize-pg-family-driver-package-fallback
+      file: DONE/main/active/normalize-pg-family-driver-package-fallback.yaml
+      title: Normalize driver_package fallback string across pg-family config builders
       priority: Low
       status: Completed
     - id: reduce-cc14-complexity-cluster

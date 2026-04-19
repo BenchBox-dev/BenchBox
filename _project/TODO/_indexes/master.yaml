@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:25:58.264029'
-total_items: 37
+generated_at: '2026-04-19T16:48:21.844917'
+total_items: 36
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -221,16 +221,6 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
-- id: normalize-pg-family-driver-package-fallback
-  file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
-  title: Normalize driver_package fallback string across pg-family config builders
-  worktree: main
-  category: Code Quality
-  priority: Low
-  status: Not Started
-  work_total: 3
-  work_done: 2
-  work_ready: 1
 - id: review-dependency-upper-bounds-quarterly
   file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
   title: Quarterly review of dependency upper bounds
