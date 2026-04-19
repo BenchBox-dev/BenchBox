@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:05:20.987176'
+generated_at: '2026-04-16T20:55:11.503688'
 total_categories: 78
 categories:
   '"Bug Fixes & Reliability"':
@@ -665,7 +665,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 247
+    count: 239
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1093,36 +1093,6 @@ categories:
       title: Expand query plan fingerprint coverage and verification
       priority: High
       status: Not Started
-    - id: explorer-master-leaderboard-home
-      file: DONE/main/planning/explorer-master-leaderboard-home.yaml
-      title: 'Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)'
-      priority: High
-      status: Completed
-    - id: explorer-result-detail-median-first
-      file: DONE/main/planning/explorer-result-detail-median-first.yaml
-      title: 'Explorer ResultDetail: default to median-of-passing, move raw samples to drill-down'
-      priority: High
-      status: Completed
-    - id: explorer-pipeline-meta-leaderboard-widening
-      file: DONE/main/planning/explorer-pipeline-meta-leaderboard-widening.yaml
-      title: 'Explorer pipeline: widen MetaRank cells and emit results_schema.json'
-      priority: High
-      status: Completed
-    - id: explorer-query-workbench
-      file: DONE/main/planning/explorer-query-workbench.yaml
-      title: 'Explorer: CloudSpecs-style /results/query workbench over results.duckdb'
-      priority: High
-      status: Completed
-    - id: explorer-url-synced-filter-state
-      file: DONE/main/planning/explorer-url-synced-filter-state.yaml
-      title: 'Explorer: URL-synced filter state via useUrlState hook'
-      priority: Medium-High
-      status: Completed
-    - id: explorer-unified-chart-panel
-      file: DONE/main/planning/explorer-unified-chart-panel.yaml
-      title: 'Explorer: unified <ChartPanel> driven by CHART_REGISTRY across all pages'
-      priority: High
-      status: Completed
     - id: quality-extend-error-capture-to-cloud-adapters
       file: DONE/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
       title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
@@ -1519,11 +1489,6 @@ categories:
       title: Make DuckDB text plan parsing reliable or fail fast
       priority: Medium
       status: Not Started
-    - id: explorer-canonical-browser-duckdb-read-model
-      file: DONE/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
-      title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
-      priority: High
-      status: Completed
     - id: provable-cli-command-generation
       file: DONE/core-functionality/planning/provable-cli-command-generation.yaml
       title: Make generate_cli_command provably complete — all behavior-affecting CLI params round-trip
@@ -1547,11 +1512,6 @@ categories:
     - id: migrate-clickhouse-firebolt-deployment
       file: DONE/platform-expansion/active/migrate-clickhouse-firebolt-deployment.yaml
       title: Migrate ClickHouse/Firebolt to Deployment Registry
-      priority: Medium-High
-      status: Completed
-    - id: datavault-sha256-hash-migration
-      file: DONE/main/active/datavault-sha256-hash-migration.yaml
-      title: Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256
       priority: Medium-High
       status: Completed
     - id: migrate-remaining-print-leaks-to-emit
@@ -1888,7 +1848,7 @@ categories:
       file: DONE/main/active/explorer-compare-url-short-ids.yaml
       title: Use short hash IDs in Compare URLs to avoid URL-length limits
       priority: Medium
-      status: Completed
+      status: Not Started
     - id: validate-isolated-runtime-importability
       file: DONE/core-functionality/active/validate-isolated-runtime-importability.yaml
       title: Validate isolated runtime importability before treating as cache hit
@@ -3500,7 +3460,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 40
+    count: 39
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3606,11 +3566,6 @@ categories:
     - id: implement-dataframe-result-validation-framework
       file: DONE/dataframe-validation/completed/implement-dataframe-result-validation-framework.yaml
       title: Implement DataFrame Result Validation Framework
-      priority: High
-      status: Completed
-    - id: implement-results-explorer-browser-functional-tests
-      file: DONE/main/active/implement-results-explorer-browser-functional-tests.yaml
-      title: Implement browser-based functional testing for the results explorer
       priority: High
       status: Completed
     - id: coverage-cli-modules
