@@ -9,36 +9,23 @@ description: |
   The browser-functional suite added by
   `implement-results-explorer-browser-functional-tests` has Chromium as a
   blocking gate and Firefox + WebKit `@smoke` as non-blocking
-  cross-browser coverage. During validation (w9 of the parent TODO) the
-  WebKit smoke run flaked when Playwright ran multiple workers in
-  parallel: one of the seven `@smoke` tests (varies — observed on
-  `Query workbench @smoke` during the validation run) failed while the
-  same test passed both when run in isolation and when the project is
-  run with `--workers=1`.
+  cross-browser coverage.
 
-  Pattern observed locally on macOS:
+  Root cause (confirmed w1): under default Playwright parallelism (5 workers),
+  all 8 `@smoke` tests navigate to different routes simultaneously. Each page
+  independently instantiates a DuckDB-WASM worker; WebKit serializes WASM
+  compilation differently from Chromium/Firefox and stalls past the 10 s
+  `expect` timeout when multiple pages compete for init. Moving DuckDB-WASM
+  to same-origin bundled assets did NOT retire the flake — the race is WASM
+  init contention, not CDN latency.
 
-  - `npm run test:e2e:webkit` → 1/7 failed
-  - `npm run test:e2e:webkit -- --workers=1` → 7/7 passed
-  - `npm run test:e2e:webkit -- --grep "Query workbench.*@smoke"` → 1/1 passed
+  Fix applied (w2): `--workers=1` added to the `test:e2e:webkit` npm script
+  and to the `test:e2e:full` inline webkit invocation, serializing init so
+  each test page gets an uncontested WASM worker. Chromium and Firefox are
+  unaffected. 8/8 pass on 3 consecutive local runs.
 
-  The flake does not reproduce in Firefox or Chromium. The original
-  validation run happened before DuckDB-WASM moved to same-origin bundled
-  assets, so the first step now is to reproduce against the current
-  harness. If it still fails, the most likely cause is a WebKit-specific
-  race during worker startup / DuckDB-WASM init when multiple pages are
-  mounting simultaneously.
-
-  Candidate remediations, in order of preference:
-
-  1. Confirm whether the move to same-origin bundled DuckDB-WASM assets
-     has already retired the flake; if not, capture a fresh trace under
-     the current harness before changing anything else.
-  2. Reduce WebKit parallelism via Playwright project-level config
-     (currently not directly supported — may require a `globalSetup`
-     hook or splitting the config into per-project runs).
-  3. Pre-warm DuckDB in a shared `BeforeAll` fixture so the first-page
-     init cost is paid once.
+  Remaining work (w3): accumulate 10 consecutive CI green runs, then promote
+  WebKit from `continue-on-error: true` to a blocking gate.
 
 deps:
   needs:
