@@ -181,7 +181,7 @@ work:
   - id: w8
     summary: "Integrate the suite into CI and define the release-check browser matrix"
     needs: [w4, w5, w6, w7]
-    status: pending
+    status: done
     notes: |
       Wire the new suite into CI with a stable gating policy:
       - Chromium full suite required
