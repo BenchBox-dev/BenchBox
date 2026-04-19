@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:51:21.686376'
-total_items: 53
+generated_at: '2026-04-19T08:54:32.476726'
+total_items: 52
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -182,22 +182,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: explorer-meta-leaderboard-review-followups
-  file: TODO/main/planning/explorer-meta-leaderboard-review-followups.yaml
-  title: Address follow-up findings from cross-benchmark meta-leaderboard code review
-  worktree: main
-  category: Core Functionality
-  priority: Low
-  status: Not Started
-  tags:
-  - explorer
-  - meta-leaderboard
-  - pipeline
-  - review-followup
-  estimated_effort: Tiny (< 1 hour)
-  work_total: 5
-  work_done: 0
-  work_ready: 5
 - id: explorer-heatmap-accessibility-review-followups
   file: TODO/main/planning/explorer-heatmap-accessibility-review-followups.yaml
   title: Address follow-up findings from heatmap-accessibility code review
