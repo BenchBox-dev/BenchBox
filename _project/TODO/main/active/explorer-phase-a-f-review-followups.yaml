@@ -71,7 +71,7 @@ work:
 
 - id: w6
   summary: "Populate Query workbench date-window facet counts"
-  status: pending
+  status: done
   notes: |
     Query.tsx:285-295 hardcodes `{count: 0}` for each date-window
     option. Add a dedicated facet query that buckets rows by
@@ -79,7 +79,7 @@ work:
 
 - id: w7
   summary: "Defensively sanitize or parameterize exportName in CSV COPY TO"
-  status: pending
+  status: done
   notes: |
     Query.tsx:192 uses
       COPY (...) TO '${exportName}' (FORMAT CSV, ...)
@@ -91,7 +91,7 @@ work:
 
 - id: w8
   summary: "Stabilize Advanced SQL result column derivation"
-  status: pending
+  status: done
   notes: |
     Query.tsx:399 uses `Object.keys(sqlRows[0]!)` to derive headers.
     Heterogeneous rows (UNION ALL over schema-drifted views) would
@@ -100,7 +100,7 @@ work:
 
 - id: w9
   summary: "Render code-marker backticks as inline <code> in Query.tsx copy"
-  status: pending
+  status: done
   notes: |
     Query.tsx line 232 uses literal backticks in prose — they render
     as visible characters rather than code styling. Replace with
