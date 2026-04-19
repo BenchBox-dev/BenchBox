@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:57:22.829522'
-total_items: 51
+generated_at: '2026-04-19T09:00:31.611954'
+total_items: 50
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -182,22 +182,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: explorer-matrix-leaderboard-review-followups
-  file: TODO/main/planning/explorer-matrix-leaderboard-review-followups.yaml
-  title: Address follow-up findings from matrix-leaderboard code review
-  worktree: main
-  category: Core Functionality
-  priority: Low
-  status: Not Started
-  tags:
-  - explorer
-  - heatmap
-  - compare
-  - review-followup
-  estimated_effort: Tiny (< 30 min)
-  work_total: 4
-  work_done: 0
-  work_ready: 4
 - id: explorer-parity-tests-review-followups
   file: TODO/main/planning/explorer-parity-tests-review-followups.yaml
   title: Address follow-up findings from parity-tests code review
