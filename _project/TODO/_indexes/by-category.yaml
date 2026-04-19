@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:40:04.806627'
+generated_at: '2026-04-19T08:47:50.248782'
 total_categories: 14
 categories:
   Architecture & Refactoring:
@@ -64,17 +64,12 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 19
+    count: 18
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
-      status: Not Started
-    - id: explorer-benchmark-summary-review-followups
-      file: TODO/main/planning/explorer-benchmark-summary-review-followups.yaml
-      title: Address follow-up findings from benchmark-summary artifact code review
-      priority: Low
       status: Not Started
     - id: explorer-chart-coverage-review-followups
       file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
@@ -181,7 +176,7 @@ categories:
       file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
       title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
       priority: Medium-High
-      status: Identified
+      status: Completed
   Performance:
     count: 1
     items:
@@ -297,7 +292,7 @@ categories:
       file: TODO/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml
       title: Guard the browser fixture generator against silent `benchbox explorer build` CLI drift
       priority: Medium
-      status: Identified
+      status: Completed
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

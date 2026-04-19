@@ -412,7 +412,7 @@ work:
 - id: w13
   summary: "Update local_stress_test.sh with Phase 1 + Phase 2 gating information"
   needs: [w2, w11]
-  status: pending
+  status: done
   notes: |
     Update `scripts/local_stress_test.sh` with a comment block documenting the
     QuestDB benchmark compatibility status so operators know which benchmarks to

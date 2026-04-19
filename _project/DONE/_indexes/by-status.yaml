@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:40:06.657925'
-total_items: 730
+generated_at: '2026-04-19T08:47:52.164481'
+total_items: 731
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 679
+    count: 680
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -763,6 +763,11 @@ statuses:
       file: DONE/mcp-integration/mcp-visualization-tools.yaml
       title: Add visualization tools to MCP server
       priority: Medium-High
+      category: Core Functionality
+    - id: explorer-benchmark-summary-review-followups
+      file: DONE/main/explorer-benchmark-summary-review-followups.yaml
+      title: Address follow-up findings from benchmark-summary artifact code review
+      priority: Low
       category: Core Functionality
     - id: preexisting-complexity-review-findings
       file: DONE/core-functionality/active/preexisting-complexity-review-findings.yaml

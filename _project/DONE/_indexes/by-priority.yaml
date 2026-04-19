@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:40:06.657699'
-total_items: 730
+generated_at: '2026-04-19T08:47:52.164294'
+total_items: 731
 priorities:
   Critical:
     count: 41
@@ -3526,7 +3526,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 29
+    count: 30
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3557,6 +3557,11 @@ priorities:
       file: DONE/main/planning/quality-add-tests-for-extracted-dedup-helpers.yaml
       title: Add unit tests for 5 helpers extracted by the dedup consolidation
       category: Code Quality and Technical Debt
+      status: Completed
+    - id: explorer-benchmark-summary-review-followups
+      file: DONE/main/explorer-benchmark-summary-review-followups.yaml
+      title: Address follow-up findings from benchmark-summary artifact code review
+      category: Core Functionality
       status: Completed
     - id: pg-duckdb-native-comparison
       file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml

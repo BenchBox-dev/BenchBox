@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:40:06.657052'
-total_items: 730
+generated_at: '2026-04-19T08:47:52.163724'
+total_items: 731
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4445,6 +4445,23 @@ items:
   work_ready: 0
   needs:
   - quality-consolidate-duplicate-code-clusters
+- id: explorer-benchmark-summary-review-followups
+  file: DONE/main/explorer-benchmark-summary-review-followups.yaml
+  title: Address follow-up findings from benchmark-summary artifact code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Completed
+  tags:
+  - explorer
+  - pipeline
+  - artifact
+  - review-followup
+  estimated_effort: Tiny (< 1 hour)
+  completed_date: '2026-04-19'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
 - id: pg-duckdb-native-comparison
   file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml
   title: Build automated pg_duckdb vs native DuckDB comparison report

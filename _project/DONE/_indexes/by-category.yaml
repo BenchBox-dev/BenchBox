@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:40:06.657488'
+generated_at: '2026-04-19T08:47:52.164095'
 total_categories: 78
 categories:
   '"Bug Fixes & Reliability"':
@@ -665,7 +665,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 247
+    count: 248
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -851,6 +851,11 @@ categories:
       file: DONE/mcp-integration/mcp-visualization-tools.yaml
       title: Add visualization tools to MCP server
       priority: Medium-High
+      status: Completed
+    - id: explorer-benchmark-summary-review-followups
+      file: DONE/main/explorer-benchmark-summary-review-followups.yaml
+      title: Address follow-up findings from benchmark-summary artifact code review
+      priority: Low
       status: Completed
     - id: preexisting-complexity-review-findings
       file: DONE/core-functionality/active/preexisting-complexity-review-findings.yaml

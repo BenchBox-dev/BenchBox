@@ -2,47 +2,22 @@ id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
 title: "Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production"
 worktree: main
 priority: Medium-High
-status: Identified
+status: Completed
+completed_date: "2026-04-19"
 category: Infrastructure
 
 description: |
-  Both the production explorer (`results-explorer/src/db.ts` lines 56–64)
-  and the browser-functional test harness pull the DuckDB-WASM runtime
-  from jsDelivr via `duckdb.getJsDelivrBundles()` → `selectBundle(...)`.
-  A jsDelivr outage, a rate-limit burst, or a version deprecation
-  therefore has two independent failure modes:
+  The explorer no longer bootstraps DuckDB-WASM from jsDelivr. Instead,
+  `results-explorer/src/lib/duckdbBundles.ts` imports the worker and WASM
+  assets directly from the installed npm package via Vite `?url` imports,
+  and `results-explorer/src/db.ts` now resolves the runtime bundle from
+  that same-origin descriptor.
 
-  1. Every pull request in the repo blocks because the Chromium blocking
-     gate cannot initialise DuckDB-WASM during page load.
-  2. Production explorer users cannot load the app at all until jsDelivr
-     recovers — the app has no local fallback.
-
-  The WebKit-flake follow-up
-  (`stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml`)
-  lists vendoring as its preferred remediation, but its scope is narrow:
-  it targets the WebKit test path only, and its `scope_limit` explicitly
-  excludes `results-explorer/src/` — so even if vendoring lands there it
-  will not cover the production runtime. That is why this TODO exists
-  separately: vendoring is a cross-cutting supply-chain fix, not a
-  WebKit-specific flake fix.
-
-  Deliverables:
-
-  1. Host the DuckDB-WASM bundle files (wasm + worker + pthread worker)
-     alongside the app in `results-explorer/public/vendor/duckdb-wasm/`,
-     pinned to the `@duckdb/duckdb-wasm` version already declared in
-     `results-explorer/package.json`.
-  2. Swap `duckdb.getJsDelivrBundles()` in `results-explorer/src/db.ts`
-     for a locally-pointing bundle descriptor, with jsDelivr retained
-     only as a runtime fallback (or dropped entirely if the vendored
-     path is reliable).
-  3. Teach `results-explorer/scripts/serve-browser-tests.mjs` to serve
-     the same vendored bundle under `/results/vendor/duckdb-wasm/` so
-     the test harness matches production and is immune to jsDelivr
-     outages.
-  4. Add a build-time check (npm script or Vite plugin) that the
-     vendored files exist and match the installed npm package — so a
-     `npm install` bump cannot silently desync the bundle.
+  This removed the external CDN dependency for both production explorer
+  loads and the browser-functional harness without introducing a separate
+  committed vendor directory. Because the browser now imports assets from
+  the installed package at build time, there is no duplicated byte copy to
+  desync from `package-lock.json`.
 
 deps:
   needs:
@@ -50,38 +25,30 @@ deps:
 
 work:
   - id: w1
-    summary: "Vendor the duckdb-wasm bundle under results-explorer/public/vendor/duckdb-wasm/ and load it from src/db.ts"
-    status: pending
+    summary: "Load the duckdb-wasm bundle from same-origin Vite asset URLs"
+    status: done
     notes: |
-      Replace the jsDelivr bundle object with a locally-pointing one.
-      Confirm the `Cross-Origin-Embedder-Policy`/
-      `Cross-Origin-Opener-Policy` headers the production server serves
-      are compatible with loading the worker from the same origin
-      (they should be — the worker is fetched same-origin and the test
-      server already sets COEP/COOP; see
-      `results-explorer/scripts/serve-browser-tests.mjs` lines 100–102).
+      Added `results-explorer/src/lib/duckdbBundles.ts` with MVP/EH/COI
+      asset descriptors and switched `results-explorer/src/db.ts` to use
+      `selectBundle(LOCAL_DUCKDB_BUNDLES)`.
 
   - id: w2
-    summary: "Route `/results/vendor/duckdb-wasm/` in the test server so e2e no longer hits jsDelivr"
+    summary: "Assert in smoke coverage that e2e no longer hits jsDelivr"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Mirror the production serving path. The goal is zero network
-      egress to jsDelivr during an `npm run test:e2e:*` run — confirm
-      this with a Playwright network-log assertion (one spec, tagged
-      `@smoke`) that no request to `cdn.jsdelivr.net` is observed.
+      Added a smoke assertion in
+      `results-explorer/e2e/smoke/harness.spec.ts` that fails on any
+      request to `cdn.jsdelivr.net`.
 
   - id: w3
-    summary: "Add a desync guard so `npm install` bumps cannot silently stale-ship the vendored bundle"
+    summary: "Keep bundle bytes in lockstep with the installed npm package"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Simplest form: a `prebuild` npm script that reads
-      `node_modules/@duckdb/duckdb-wasm/package.json` `version` and
-      compares it to a stamped version file under
-      `results-explorer/public/vendor/duckdb-wasm/VERSION`. Fail the
-      build if they diverge, with a one-line instruction on how to
-      regenerate the vendored directory.
+      Vite now emits the worker/WASM assets directly from
+      `node_modules/@duckdb/duckdb-wasm`, so there is no separate
+      vendored directory to drift from the lockfile.
 
 must_preserve:
   - "`registerFileURL('results.duckdb', ...)` and `ATTACH ... AS bench (READ_ONLY)` continue to work unchanged — this TODO only moves bundle loading, not file registration."

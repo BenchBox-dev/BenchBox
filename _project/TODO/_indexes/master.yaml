@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:40:04.806587'
-total_items: 55
+generated_at: '2026-04-19T08:47:50.248734'
+total_items: 54
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -89,7 +89,7 @@ items:
   - adapter
   estimated_effort: Large (1-2 weeks across phases)
   work_total: 13
-  work_done: 7
+  work_done: 11
   work_ready: 2
   deferred_count: 3
 - id: fix-git-author-history-rewrite
@@ -182,22 +182,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: explorer-benchmark-summary-review-followups
-  file: TODO/main/planning/explorer-benchmark-summary-review-followups.yaml
-  title: Address follow-up findings from benchmark-summary artifact code review
-  worktree: main
-  category: Core Functionality
-  priority: Low
-  status: Not Started
-  tags:
-  - explorer
-  - pipeline
-  - artifact
-  - review-followup
-  estimated_effort: Tiny (< 1 hour)
-  work_total: 5
-  work_done: 0
-  work_ready: 5
 - id: explorer-chart-coverage-review-followups
   file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
   title: Address follow-up findings from chart-coverage code review
@@ -707,7 +691,7 @@ items:
   worktree: main
   category: Testing and Quality Assurance
   priority: Medium
-  status: Identified
+  status: Completed
   tags:
   - results
   - explorer
@@ -716,9 +700,10 @@ items:
   - contract
   - infrastructure
   estimated_effort: Small
+  completed_date: '2026-04-19'
   work_total: 3
-  work_done: 0
-  work_ready: 1
+  work_done: 3
+  work_ready: 0
   needs:
   - implement-results-explorer-browser-functional-tests
 - id: implement-pr-based-result-submission-workflow
@@ -935,7 +920,7 @@ items:
   worktree: main
   category: Infrastructure
   priority: Medium-High
-  status: Identified
+  status: Completed
   tags:
   - results
   - explorer
@@ -944,9 +929,10 @@ items:
   - infrastructure
   - ci
   estimated_effort: Small
+  completed_date: '2026-04-19'
   work_total: 3
-  work_done: 0
-  work_ready: 1
+  work_done: 3
+  work_ready: 0
   needs:
   - implement-results-explorer-browser-functional-tests
 - id: questdb-imp-headerless-column-mapping-verify
