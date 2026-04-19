@@ -212,7 +212,7 @@ work:
 - id: w6
   summary: "Investigate and fix transaction_primitives data loading for QuestDB"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Observed: txn_orders, txn_lineitem, txn_customer tables exist (schema created)
     but have 0 rows. Validation halts with "Empty tables detected".
@@ -231,7 +231,7 @@ work:
 - id: w7
   summary: "Design QuestDB SQL dialect rewriter architecture"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Before implementing, design the rewriter so it is:
       - Focused: only rewrites patterns actually needed for QuestDB compatibility
