@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:47:50.248805'
+generated_at: '2026-04-19T08:48:18.883385'
 total_items: 54
 priorities:
   Critical:
@@ -162,10 +162,10 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: explorer-chart-coverage-review-followups
-      file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
+      file: TODO/main/active/explorer-chart-coverage-review-followups.yaml
       title: Address follow-up findings from chart-coverage code review
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: explorer-meta-leaderboard-review-followups
       file: TODO/main/planning/explorer-meta-leaderboard-review-followups.yaml
       title: Address follow-up findings from cross-benchmark meta-leaderboard code review

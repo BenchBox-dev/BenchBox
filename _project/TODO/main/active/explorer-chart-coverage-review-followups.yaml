@@ -2,7 +2,7 @@ id: explorer-chart-coverage-review-followups
 title: "Address follow-up findings from chart-coverage code review"
 worktree: main
 priority: Low
-status: Not Started
+status: In Progress
 category: Core Functionality
 
 description: |

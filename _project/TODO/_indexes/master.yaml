@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:47:50.248734'
+generated_at: '2026-04-19T08:48:18.883314'
 total_items: 54
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -89,8 +89,8 @@ items:
   - adapter
   estimated_effort: Large (1-2 weeks across phases)
   work_total: 13
-  work_done: 11
-  work_ready: 2
+  work_done: 12
+  work_ready: 1
   deferred_count: 3
 - id: fix-git-author-history-rewrite
   file: TODO/main/planning/fix-git-author-history-rewrite.yaml
@@ -183,12 +183,12 @@ items:
   work_done: 0
   work_ready: 17
 - id: explorer-chart-coverage-review-followups
-  file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
+  file: TODO/main/active/explorer-chart-coverage-review-followups.yaml
   title: Address follow-up findings from chart-coverage code review
   worktree: main
   category: Core Functionality
   priority: Low
-  status: Not Started
+  status: In Progress
   tags:
   - explorer
   - visualization

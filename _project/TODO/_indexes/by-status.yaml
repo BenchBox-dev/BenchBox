@@ -1,16 +1,21 @@
-generated_at: '2026-04-19T08:47:50.248821'
+generated_at: '2026-04-19T08:48:18.883400'
 total_items: 54
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
+    - id: explorer-chart-coverage-review-followups
+      file: TODO/main/active/explorer-chart-coverage-review-followups.yaml
+      title: Address follow-up findings from chart-coverage code review
+      priority: Low
+      category: Core Functionality
     - id: questdb-benchmark-compatibility-remediation
       file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
       title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
       priority: High
       category: Platform Support
   Not Started:
-    count: 41
+    count: 40
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -41,11 +46,6 @@ statuses:
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
-      category: Core Functionality
-    - id: explorer-chart-coverage-review-followups
-      file: TODO/main/planning/explorer-chart-coverage-review-followups.yaml
-      title: Address follow-up findings from chart-coverage code review
-      priority: Low
       category: Core Functionality
     - id: explorer-meta-leaderboard-review-followups
       file: TODO/main/planning/explorer-meta-leaderboard-review-followups.yaml
