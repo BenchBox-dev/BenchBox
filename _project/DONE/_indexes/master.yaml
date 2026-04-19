@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:09:45.360780'
-total_items: 738
+generated_at: '2026-04-19T09:11:48.637599'
+total_items: 739
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4580,6 +4580,22 @@ items:
   - read-model
   - review-followup
   estimated_effort: Tiny (< 30 min)
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+- id: explorer-trust-tiers-review-followups
+  file: DONE/main/planning/explorer-trust-tiers-review-followups.yaml
+  title: Address follow-up findings from trust-tiers-as-badges code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Completed
+  tags:
+  - explorer
+  - trust
+  - accessibility
+  - review-followup
+  estimated_effort: Tiny (< 1 hour)
   work_total: 3
   work_done: 3
   work_ready: 0

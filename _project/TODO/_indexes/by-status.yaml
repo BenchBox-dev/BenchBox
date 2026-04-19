@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:09:43.660968'
-total_items: 47
+generated_at: '2026-04-19T09:11:46.922521'
+total_items: 46
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 34
+    count: 33
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -47,11 +47,6 @@ statuses:
       title: Address follow-up findings from timing-policy pre-commit split review
       priority: Low
       category: Testing & Quality
-    - id: explorer-trust-tiers-review-followups
-      file: TODO/main/planning/explorer-trust-tiers-review-followups.yaml
-      title: Address follow-up findings from trust-tiers-as-badges code review
-      priority: Low
-      category: Core Functionality
     - id: explorer-unify-visualization-review-followups
       file: TODO/main/planning/explorer-unify-visualization-review-followups.yaml
       title: Address follow-up findings from unify-visualization-foundations code review

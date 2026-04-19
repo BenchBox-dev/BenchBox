@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T09:09:45.361062'
+generated_at: '2026-04-19T09:11:48.637897'
 total_categories: 78
 categories:
   '"Bug Fixes & Reliability"':
@@ -665,7 +665,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 253
+    count: 254
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -880,6 +880,11 @@ categories:
     - id: explorer-read-model-review-followups
       file: DONE/main/active/explorer-read-model-review-followups.yaml
       title: Address follow-up findings from read-model-contract code review
+      priority: Low
+      status: Completed
+    - id: explorer-trust-tiers-review-followups
+      file: DONE/main/planning/explorer-trust-tiers-review-followups.yaml
+      title: Address follow-up findings from trust-tiers-as-badges code review
       priority: Low
       status: Completed
     - id: preexisting-complexity-review-findings

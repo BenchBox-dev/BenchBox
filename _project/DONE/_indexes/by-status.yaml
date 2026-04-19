@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:09:45.361397'
-total_items: 738
+generated_at: '2026-04-19T09:11:48.638245'
+total_items: 739
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 687
+    count: 688
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -802,6 +802,11 @@ statuses:
     - id: explorer-read-model-review-followups
       file: DONE/main/active/explorer-read-model-review-followups.yaml
       title: Address follow-up findings from read-model-contract code review
+      priority: Low
+      category: Core Functionality
+    - id: explorer-trust-tiers-review-followups
+      file: DONE/main/planning/explorer-trust-tiers-review-followups.yaml
+      title: Address follow-up findings from trust-tiers-as-badges code review
       priority: Low
       category: Core Functionality
     - id: preexisting-complexity-review-findings

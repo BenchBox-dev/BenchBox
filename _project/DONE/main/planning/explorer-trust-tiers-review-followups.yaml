@@ -1,0 +1,82 @@
+id: explorer-trust-tiers-review-followups
+title: "Address follow-up findings from trust-tiers-as-badges code review"
+worktree: main
+priority: Low
+status: Completed
+category: Core Functionality
+
+description: |
+  Non-required nits and improvements surfaced by the code review of
+  explorer-surface-trust-tiers-as-badges.  The Required issue (ListTable
+  missing trustFilter propagation) was fixed immediately post-review.
+  This item tracks the three remaining nit/consider findings.
+
+work:
+- id: w1
+  summary: "Make trust chip label abbreviation explicit rather than split('-')[0]"
+  needs: []
+  status: done
+  notes: |
+    BenchmarkIndex.tsx:270 — chip label uses `.split("-")[0]` which extracts
+    only the first hyphen-delimited word.  Works for current labels
+    ("maintainer-run" → "maintainer", "community-submission" → "community")
+    but would silently misbehave for a multi-word label like
+    "internal-team-verified" → "internal" instead of a meaningful abbreviation.
+
+    Fix: create an explicit TRUST_LABEL_ABBREV map:
+      const TRUST_LABEL_ABBREV: Record<string, string> = {
+        "maintainer-run": "Maintainer",
+        "community-submission": "Community",
+        "ci-verified": "CI",
+        "local": "Local",
+      };
+    Fall back to the full label or first word for unknown tiers.
+
+- id: w2
+  summary: "Improve tooltip text for unrecognised trust labels in TrustBadge"
+  needs: []
+  status: done
+  notes: |
+    TrustBadge.tsx:57 — unknown labels fall back to DEFAULT_CONFIG whose title
+    is "Trust level not recorded".  But unknown labels ARE recorded — the issue
+    is they aren't in the registry yet.  The tooltip is misleading.
+
+    Fix: generate a dynamic tooltip for the fallback path:
+      title: `Trust tier: ${trustLabel} (unrecognised — contact maintainers)`
+    This tells users the value was present, just unrecognised by the frontend.
+
+- id: w3
+  summary: "Add light input guard for empty/null trustLabel in TrustBadge"
+  needs: []
+  status: done
+  notes: |
+    TrustBadge.tsx:51 — no input guard; arbitrary strings render as-is.
+    If manifest.json is malformed or a future field is null, the component
+    would either crash (null/undefined) or render garbage.
+
+    Fix: add a short-circuit at the top of TrustBadge:
+      if (!trustLabel) return null;
+    This prevents crashes from null/undefined trust_label in manifest rows.
+
+files_affected:
+  modified:
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/components/TrustBadge.tsx"
+
+must_preserve:
+- "Trust chip behavior for all current labels — maintainer, community, ci-verified, local"
+- "TrustBadge rendering for all labels in TrustBadge.test.tsx — all 13 tests must pass"
+
+verification:
+- description: "TrustBadge and BenchmarkIndex tests pass"
+  command: "cd results-explorer && npm test -- TrustBadge BenchmarkIndex"
+  expected_output: "all tests pass"
+- description: "Full test suite green"
+  command: "cd results-explorer && npm run typecheck && npm test"
+  expected_output: "all green"
+
+metadata:
+  tags: ["explorer", "trust", "accessibility", "review-followup"]
+  estimated_effort: "Tiny (< 1 hour)"
+  created_date: "2026-04-16"
+  source: "Code review of explorer-surface-trust-tiers-as-badges (2026-04-16)"
