@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T20:11:32.326658'
+generated_at: '2026-04-18T20:14:45.939266'
 total_items: 52
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -54,7 +54,7 @@ items:
   - playwright
   - quality-gate
   estimated_effort: Large
-  work_total: 7
+  work_total: 9
   work_done: 0
   work_ready: 1
   needs:

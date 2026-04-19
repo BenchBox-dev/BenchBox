@@ -93,7 +93,7 @@ work:
       and from the committed curated corpus.
 
   - id: w4
-    summary: "Cover all top-level route happy paths and shareable URL-state workflows"
+    summary: "Cover Home plus benchmark/platform index happy paths under the real `/results/` base path"
     needs: [w2, w3]
     status: pending
     notes: |
@@ -101,37 +101,68 @@ work:
       - Home
       - BenchmarkIndex
       - PlatformIndex
-      - ResultDetail
-      - Compare
-      - Query workbench
 
       Cover real interactions rather than only page load:
       - filter toggles and URL sync
-      - compare selection flows
       - route deep-link loads
-      - query-table sorting and column toggles
       - result and cohort navigation
 
+      Keep this slice limited to the landing and browse surfaces so it can land
+      as a single vertical increment without being blocked on compare, query,
+      download, or failure-path work.
+
   - id: w5
-    summary: "Cover browser-only behaviors and failure/recovery paths"
-    needs: [w2, w3]
+    summary: "Cover ResultDetail and Compare happy paths, deep links, and shareable URL-state workflows"
+    needs: [w2, w3, w4]
+    status: pending
+    notes: |
+      Add browser tests for:
+      - ResultDetail
+      - Compare
+
+      Cover real interactions rather than only page load:
+      - compare selection flows
+      - route deep-link loads
+      - result and cohort navigation
+      - compare share-URL and clipboard flows
+
+      Keep compare/history/clipboard behavior in its own slice because it is
+      one of the main reasons to add real browser coverage and it can be landed
+      independently from query-workbench and injected-failure work.
+
+  - id: w6
+    summary: "Cover Query workbench browser workflows, read-only SQL, and table/download interactions"
+    needs: [w2, w3, w4]
+    status: pending
+    notes: |
+      Add browser tests for the Query page that prove the browser-only parts of
+      the workbench against a real built app:
+      - query-table sorting and column toggles
+      - starter-query loading
+      - read-only SQL enforcement in the workbench
+      - CSV and JSON download flows
+
+      Keep this separate from the route-browse and compare slices because Query
+      already has several distinct behaviors in Vitest and is large enough to
+      justify its own work unit.
+
+  - id: w7
+    summary: "Cover failure and recovery paths with user-visible assertions"
+    needs: [w2, w3, w5, w6]
     status: pending
     notes: |
       Add explicit tests for the behaviors jsdom does not prove today:
       - DuckDB snapshot missing/corrupt or unreachable
       - compare benchmark mismatch and scale mismatch hard blocks
       - tuning-config sidecar fetch failure
-      - clipboard/share URL flow
-      - bundle/CSV/JSON download flows
-      - read-only SQL enforcement in the query workbench
       - online/offline or retry-state behavior where supported by the app
 
       Failure assertions must validate user-visible error states, not only
       thrown exceptions or console output.
 
-  - id: w6
+  - id: w8
     summary: "Integrate the suite into CI and define the release-check browser matrix"
-    needs: [w4, w5]
+    needs: [w4, w5, w6, w7]
     status: pending
     notes: |
       Wire the new suite into CI with a stable gating policy:
@@ -144,9 +175,9 @@ work:
       changes: one short pass across Chrome, Firefox, and Safari for layout and
       browser-specific rendering issues that automation may not catch early.
 
-  - id: w7
+  - id: w9
     summary: "Close with full validation, flake triage, and follow-up capture"
-    needs: [w6]
+    needs: [w8]
     status: pending
     notes: |
       Do not mark this item complete on a single green run. Verify repeatability,
@@ -185,13 +216,21 @@ success_metrics:
 
 files_affected:
   modified:
+    - "_project/TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml"
     - "results-explorer/package.json"
     - "results-explorer/package-lock.json"
-    - "results-explorer/src/pages/"
-    - "results-explorer/src/components/"
-    - "results-explorer/src/lib/"
-    - ".github/workflows/"
-    - "docs/"
+    - "results-explorer/src/App.tsx"
+    - "results-explorer/src/db.ts"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/lib/manifest.ts"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/components/ErrorMessage.tsx"
+    - ".github/workflows/docs.yml"
+    - "tests/unit/core/explorer_pipeline/"
+    - "docs/development/browser-test-architecture.md"
+    - "docs/development/results-explorer-browser-testing.md"
   added:
     - "results-explorer/playwright.config.ts"
     - "results-explorer/e2e/"
@@ -222,9 +261,11 @@ approach: |
   Implement in thin slices:
   1. lock architecture in the research gate
   2. establish harness and fixture generation
-  3. land happy-path coverage per route
-  4. add failure-path coverage
-  5. wire CI and residual manual release checks
+  3. land browse-surface happy paths
+  4. land compare/detail happy paths
+  5. land query-workbench happy paths
+  6. add injected failure-path coverage
+  7. wire CI and residual manual release checks
 
 anti_patterns:
   - "DO NOT begin implementation before the research gate closes the open questions — because the built-app target, fixture location, and browser matrix materially change the shape of the solution — lock those decisions first."
@@ -240,6 +281,9 @@ verification:
   - description: "TODO graph remains valid after the new item is added"
     command: "uv run _project/scripts/todo_cli.py check-graph"
     expected_output: "No cycles, dangling refs, or duplicate IDs"
+  - description: "The TODO explicitly names the research-gate decision record location"
+    command: "rg -n 'browser-test-architecture\\.md' _project/TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml"
+    expected_output: "The TODO points w1 at `docs/development/browser-test-architecture.md` as the architecture-note deliverable"
   - description: "Existing explorer fast tests remain green after harness integration"
     command: "cd results-explorer && npm test"
     expected_output: "All Vitest suites pass"
@@ -266,17 +310,26 @@ verification:
 
 scope_limit:
   only_modify:
+    - "_project/TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml"
     - "results-explorer/package.json"
     - "results-explorer/package-lock.json"
     - "results-explorer/playwright.config.ts"
     - "results-explorer/e2e/"
-    - "results-explorer/src/pages/"
-    - "results-explorer/src/components/"
-    - "results-explorer/src/lib/"
+    - "results-explorer/src/App.tsx"
+    - "results-explorer/src/db.ts"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/lib/manifest.ts"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/components/ErrorMessage.tsx"
     - "results-explorer/test-fixtures/"
     - "results-explorer/test-results/.gitignore"
-    - ".github/workflows/"
-    - "docs/"
+    - ".github/workflows/docs.yml"
+    - ".github/workflows/results-explorer-browser.yml"
+    - "tests/unit/core/explorer_pipeline/"
+    - "docs/development/browser-test-architecture.md"
+    - "docs/development/results-explorer-browser-testing.md"
   do_not_modify:
     - "results-data/bundles/"
     - "docs/reference/hosted-results-contract.md"
