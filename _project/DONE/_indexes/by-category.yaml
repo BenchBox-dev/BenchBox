@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T16:48:23.844114'
+generated_at: '2026-04-19T17:05:03.471952'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -685,7 +685,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 255
+    count: 260
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -937,6 +937,11 @@ categories:
       title: Auto-Compile TPC Binary Tools ✅ COMPLETED
       priority: Medium
       status: Completed
+    - id: automate-corpus-inventory-generation
+      file: DONE/main/planning/automate-corpus-inventory-generation.yaml
+      title: Automate corpus-inventory.json generation from results-data/bundles/
+      priority: Medium-High
+      status: Completed
     - id: bidirectional-repo-sync-v2
       file: DONE/release-sync/active/bidirectional-repo-sync-v2.yaml
       title: Bidirectional Repository Sync (Redesigned)
@@ -1062,9 +1067,19 @@ categories:
       title: Deferred Storage Location and Cache Unification Enhancements
       priority: Medium
       status: Completed
+    - id: define-results-platform-product-and-launch-strategy
+      file: DONE/main/planning/define-results-platform-product-and-launch-strategy.yaml
+      title: Define BenchBox results platform product boundary and launch strategy
+      priority: Critical
+      status: Completed
     - id: dataframe-write-primitives-model
       file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
       title: Define DataFrame Execution Model for Write Primitives
+      priority: Medium-High
+      status: Completed
+    - id: define-hosted-results-contract-and-governance-model
+      file: DONE/main/planning/define-hosted-results-contract-and-governance-model.yaml
+      title: Define hosted results contract, trust labels, and governance model
       priority: Medium-High
       status: Completed
     - id: dataframe-tpcdi-architecture
@@ -1153,6 +1168,11 @@ categories:
       title: Expand query plan fingerprint coverage and verification
       priority: High
       status: Not Started
+    - id: expand-seed-corpus-to-sf-0-1
+      file: DONE/main/planning/expand-seed-corpus-to-sf-0-1.yaml
+      title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
+      priority: Medium-High
+      status: Completed
     - id: explorer-master-leaderboard-home
       file: DONE/main/planning/explorer-master-leaderboard-home.yaml
       title: 'Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)'
@@ -1437,6 +1457,11 @@ categories:
       file: DONE/dataframe-expression-family/completed/implement-expression-family-base-adapter-and-dialects.yaml
       title: Implement Expression Family Base Adapter and Dialects
       priority: Critical
+      status: Completed
+    - id: implement-pr-based-result-submission-workflow
+      file: DONE/main/planning/implement-pr-based-result-submission-workflow.yaml
+      title: Implement PR-based community result submission workflow
+      priority: Medium
       status: Completed
     - id: implement-pandas-family-base-adapter
       file: DONE/dataframe-pandas-family/planning/implement-pandas-family-base-adapter.yaml
@@ -2079,7 +2104,7 @@ categories:
       priority: Medium-High
       status: Completed
   Documentation:
-    count: 21
+    count: 23
     items:
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
@@ -2181,9 +2206,19 @@ categories:
       title: Standardize benchmark and platform naming across documentation
       priority: Medium-High
       status: Completed
+    - id: surface-contributor-onboarding-for-results
+      file: DONE/main/planning/surface-contributor-onboarding-for-results.yaml
+      title: Surface contributor onboarding for results submission
+      priority: Medium-High
+      status: Completed
     - id: surface-driver-version-options-in-cli-help
       file: DONE/main/active/surface-driver-version-options-in-cli-help.yaml
       title: Surface driver_version and driver_auto_install more prominently in CLI help
+      priority: Medium
+      status: Completed
+    - id: write-results-platform-phase-2-operations-runbook
+      file: DONE/main/planning/write-results-platform-phase-2-operations-runbook.yaml
+      title: Write the Phase 2 results-platform operations runbook
       priority: Medium
       status: Completed
   Documentation and Developer Experience:
@@ -3591,7 +3626,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 42
+    count: 44
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3704,6 +3739,11 @@ categories:
       title: Fix type checking errors ignored in ty config
       priority: Medium-High
       status: Completed
+    - id: guard-browser-fixture-generator-against-benchbox-cli-drift
+      file: DONE/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml
+      title: Guard the browser fixture generator against silent `benchbox explorer build` CLI drift
+      priority: Medium
+      status: Completed
     - id: implement-dataframe-result-validation-framework
       file: DONE/dataframe-validation/completed/implement-dataframe-result-validation-framework.yaml
       title: Implement DataFrame Result Validation Framework
@@ -3788,6 +3828,11 @@ categories:
       file: DONE/unknown/planning/test-suite-reliability-completed.yaml
       title: Test Suite Reliability ✅ COMPLETED
       priority: Medium
+      status: Completed
+    - id: verify-trust-badge-rendering-in-explorer
+      file: DONE/main/planning/verify-trust-badge-rendering-in-explorer.yaml
+      title: Visually verify TrustBadge rendering across all 4 explorer pages
+      priority: High
       status: Completed
     - id: quality-cross-platform-validation-integration-matrix
       file: DONE/main/planning/quality-cross-platform-validation-integration-matrix.yaml

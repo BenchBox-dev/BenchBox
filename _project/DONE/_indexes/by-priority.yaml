@@ -1,8 +1,8 @@
-generated_at: '2026-04-19T16:48:23.844325'
-total_items: 749
+generated_at: '2026-04-19T17:05:03.472123'
+total_items: 758
 priorities:
   Critical:
-    count: 41
+    count: 42
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -63,6 +63,11 @@ priorities:
       file: DONE/platform-expansion/active/databricks-dataframe-mode.yaml
       title: Databricks DataFrame Mode - CRITICAL PRIORITY
       category: Platform Expansion
+      status: Completed
+    - id: define-results-platform-product-and-launch-strategy
+      file: DONE/main/planning/define-results-platform-product-and-launch-strategy.yaml
+      title: Define BenchBox results platform product boundary and launch strategy
+      category: Core Functionality
       status: Completed
     - id: design-and-implement-core-dataframe-abstractions
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
@@ -210,7 +215,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 256
+    count: 257
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -1315,6 +1320,11 @@ priorities:
       title: Vector Search Benchmark Support
       category: AI/ML Capabilities
       status: Completed
+    - id: verify-trust-badge-rendering-in-explorer
+      file: DONE/main/planning/verify-trust-badge-rendering-in-explorer.yaml
+      title: Visually verify TrustBadge rendering across all 4 explorer pages
+      category: Testing and Quality Assurance
+      status: Completed
     - id: adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage
       file: DONE/unknown/completed/adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage.yaml
       title: ✅ Adversarial Review - Cost Framework Enhancement (Warnings, Metadata, Timing, Storage)
@@ -1496,7 +1506,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 116
+    count: 120
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1654,6 +1664,11 @@ priorities:
       title: 'Athena: Convert text tables to Parquet using CTAS for query performance'
       category: Platform Expansion
       status: Completed
+    - id: automate-corpus-inventory-generation
+      file: DONE/main/planning/automate-corpus-inventory-generation.yaml
+      title: Automate corpus-inventory.json generation from results-data/bundles/
+      category: Core Functionality
+      status: Completed
     - id: bidirectional-sync-and-true-up-releases
       file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
       title: Bidirectional Sync and True-Up Releases for Public/Private Repos
@@ -1764,6 +1779,11 @@ priorities:
       title: Define DataFrame Execution Model for Write Primitives
       category: Core Functionality
       status: Completed
+    - id: define-hosted-results-contract-and-governance-model
+      file: DONE/main/planning/define-hosted-results-contract-and-governance-model.yaml
+      title: Define hosted results contract, trust labels, and governance model
+      category: Core Functionality
+      status: Completed
     - id: embed-tuning-config-in-results
       file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
       title: Embed Full Tuning Config in Result Output
@@ -1777,6 +1797,11 @@ priorities:
     - id: enhance-ascii-charting
       file: DONE/core-functionality/planning/enhance-ascii-charting.yaml
       title: Enhance and extend ASCII charting with new chart types and comparison visualizations
+      category: Core Functionality
+      status: Completed
+    - id: expand-seed-corpus-to-sf-0-1
+      file: DONE/main/planning/expand-seed-corpus-to-sf-0-1.yaml
+      title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       category: Core Functionality
       status: Completed
     - id: explorer-url-synced-filter-state
@@ -2049,6 +2074,11 @@ priorities:
       title: Surface active driver version in CLI progress output
       category: Core Functionality
       status: Completed
+    - id: surface-contributor-onboarding-for-results
+      file: DONE/main/planning/surface-contributor-onboarding-for-results.yaml
+      title: Surface contributor onboarding for results submission
+      category: Documentation
+      status: Completed
     - id: explorer-surface-trust-tiers-as-badges
       file: DONE/main/planning/explorer-surface-trust-tiers-as-badges.yaml
       title: Surface trust tiers as visible badges, not a default hide filter
@@ -2080,7 +2110,7 @@ priorities:
       category: Platform Support
       status: Completed
   Medium:
-    count: 292
+    count: 295
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2864,6 +2894,11 @@ priorities:
       title: GPU Acceleration Benchmarking & RAPIDS cuDF Integration
       category: AI/ML Capabilities
       status: Not Started
+    - id: guard-browser-fixture-generator-against-benchbox-cli-drift
+      file: DONE/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml
+      title: Guard the browser fixture generator against silent `benchbox explorer build` CLI drift
+      category: Testing and Quality Assurance
+      status: Completed
     - id: harmonize-platform-display-names
       file: DONE/main/active/harmonize-platform-display-names.yaml
       title: Harmonize platform display names and CLI keys for consistency
@@ -2887,6 +2922,11 @@ priorities:
     - id: dataframe-transaction-primitives
       file: DONE/dataframe-benchmarks/active/dataframe-transaction-primitives.yaml
       title: Implement DataFrame Version of Transaction Primitives Benchmark
+      category: Core Functionality
+      status: Completed
+    - id: implement-pr-based-result-submission-workflow
+      file: DONE/main/planning/implement-pr-based-result-submission-workflow.yaml
+      title: Implement PR-based community result submission workflow
       category: Core Functionality
       status: Completed
     - id: ctas-sort-cloud-platforms
@@ -3349,6 +3389,11 @@ priorities:
       file: DONE/main/planning/quality-cross-platform-validation-integration-matrix.yaml
       title: Wire cross-platform validation comparator into a nightly integration matrix
       category: Testing and Quality Assurance
+      status: Completed
+    - id: write-results-platform-phase-2-operations-runbook
+      file: DONE/main/planning/write-results-platform-phase-2-operations-runbook.yaml
+      title: Write the Phase 2 results-platform operations runbook
+      category: Documentation
       status: Completed
     - id: duckdb-architecture-verification
       file: DONE/blog-content/active/duckdb-architecture-verification.yaml

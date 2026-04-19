@@ -3,6 +3,7 @@ title: "Implement PR-based community result submission workflow"
 worktree: main
 priority: Medium
 status: Completed
+completed_date: "2026-04-04"
 category: Core Functionality
 deps:
   needs:

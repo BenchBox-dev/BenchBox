@@ -3,6 +3,7 @@ title: "Automate corpus-inventory.json generation from results-data/bundles/"
 worktree: main
 priority: Medium-High
 status: Completed
+completed_date: "2026-04-12"
 completed_note: "Implemented `scripts/generate_corpus_inventory.py` with sidecar-aware trust labels, test coverage, CI/pre-commit wiring, and contributor-doc guidance. Inventory regenerated and verified on 2026-04-12."
 category: Core Functionality
 

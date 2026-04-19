@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T16:48:21.844966'
-total_categories: 11
+generated_at: '2026-04-19T17:05:01.778284'
+total_categories: 10
 categories:
   Architecture & Refactoring:
     count: 1
@@ -41,48 +41,23 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 11
+    count: 6
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       status: Not Started
-    - id: automate-corpus-inventory-generation
-      file: TODO/main/planning/automate-corpus-inventory-generation.yaml
-      title: Automate corpus-inventory.json generation from results-data/bundles/
-      priority: Medium-High
-      status: Completed
-    - id: define-results-platform-product-and-launch-strategy
-      file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
-      title: Define BenchBox results platform product boundary and launch strategy
-      priority: Critical
-      status: Completed
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence
       priority: Medium
       status: Not Started
-    - id: define-hosted-results-contract-and-governance-model
-      file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
-      title: Define hosted results contract, trust labels, and governance model
-      priority: Medium-High
-      status: Completed
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
-      priority: Medium
-      status: Not Started
-    - id: expand-seed-corpus-to-sf-0-1
-      file: TODO/main/planning/expand-seed-corpus-to-sf-0-1.yaml
-      title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
       priority: Medium-High
-      status: Completed
-    - id: implement-pr-based-result-submission-workflow
-      file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
-      title: Implement PR-based community result submission workflow
-      priority: Medium
-      status: Completed
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -98,19 +73,6 @@ categories:
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
       status: Not Started
-  Documentation:
-    count: 2
-    items:
-    - id: surface-contributor-onboarding-for-results
-      file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
-      title: Surface contributor onboarding for results submission
-      priority: Medium-High
-      status: Completed
-    - id: write-results-platform-phase-2-operations-runbook
-      file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
-      title: Write the Phase 2 results-platform operations runbook
-      priority: Medium
-      status: Completed
   Performance:
     count: 1
     items:
@@ -184,16 +146,11 @@ categories:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
-      priority: Low
+      priority: Medium
       status: In Progress
   Testing and Quality Assurance:
-    count: 5
+    count: 3
     items:
-    - id: guard-browser-fixture-generator-against-benchbox-cli-drift
-      file: TODO/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml
-      title: Guard the browser fixture generator against silent `benchbox explorer build` CLI drift
-      priority: Medium
-      status: Completed
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
@@ -202,15 +159,10 @@ categories:
     - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
       file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
       title: Stabilize the results-explorer WebKit @smoke run under parallel workers
-      priority: Medium
+      priority: Medium-High
       status: Identified
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR
       priority: Critical
       status: Not Started
-    - id: verify-trust-badge-rendering-in-explorer
-      file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
-      title: Visually verify TrustBadge rendering across all 4 explorer pages
-      priority: High
-      status: Completed

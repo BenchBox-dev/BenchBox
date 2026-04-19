@@ -1,21 +1,16 @@
-generated_at: '2026-04-19T16:48:21.844984'
-total_items: 36
+generated_at: '2026-04-19T17:05:01.778300'
+total_items: 27
 priorities:
   Critical:
-    count: 2
+    count: 1
     items:
-    - id: define-results-platform-product-and-launch-strategy
-      file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
-      title: Define BenchBox results platform product boundary and launch strategy
-      category: Core Functionality
-      status: Completed
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 4
+    count: 3
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -32,13 +27,8 @@ priorities:
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
       status: Not Started
-    - id: verify-trust-badge-rendering-in-explorer
-      file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
-      title: Visually verify TrustBadge rendering across all 4 explorer pages
-      category: Testing and Quality Assurance
-      status: Completed
   Medium-High:
-    count: 6
+    count: 4
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -50,28 +40,18 @@ priorities:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       category: Core Functionality
       status: Not Started
-    - id: automate-corpus-inventory-generation
-      file: TODO/main/planning/automate-corpus-inventory-generation.yaml
-      title: Automate corpus-inventory.json generation from results-data/bundles/
+    - id: design-results-ingest-storage-and-derived-read-model
+      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+      title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
-      status: Completed
-    - id: define-hosted-results-contract-and-governance-model
-      file: TODO/main/planning/define-hosted-results-contract-and-governance-model.yaml
-      title: Define hosted results contract, trust labels, and governance model
-      category: Core Functionality
-      status: Completed
-    - id: expand-seed-corpus-to-sf-0-1
-      file: TODO/main/planning/expand-seed-corpus-to-sf-0-1.yaml
-      title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
-      category: Core Functionality
-      status: Completed
-    - id: surface-contributor-onboarding-for-results
-      file: TODO/main/planning/surface-contributor-onboarding-for-results.yaml
-      title: Surface contributor onboarding for results submission
-      category: Documentation
-      status: Completed
+      status: Not Started
+    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
+      file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
+      category: Testing and Quality Assurance
+      status: Identified
   Medium:
-    count: 10
+    count: 6
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -83,14 +63,14 @@ priorities:
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
       status: Not Started
+    - id: timing-policy-split-review-followups
+      file: TODO/main/active/timing-policy-split-review-followups.yaml
+      title: Address follow-up findings from timing-policy pre-commit split review
+      category: Testing & Quality
+      status: In Progress
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence
-      category: Core Functionality
-      status: Not Started
-    - id: design-results-ingest-storage-and-derived-read-model
-      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
-      title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Not Started
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
@@ -98,33 +78,13 @@ priorities:
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       category: Performance
       status: Identified
-    - id: guard-browser-fixture-generator-against-benchbox-cli-drift
-      file: TODO/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml
-      title: Guard the browser fixture generator against silent `benchbox explorer build` CLI drift
-      category: Testing and Quality Assurance
-      status: Completed
-    - id: implement-pr-based-result-submission-workflow
-      file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
-      title: Implement PR-based community result submission workflow
-      category: Core Functionality
-      status: Completed
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
       status: Not Started
-    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
-      file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
-      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
-      category: Testing and Quality Assurance
-      status: Identified
-    - id: write-results-platform-phase-2-operations-runbook
-      file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
-      title: Write the Phase 2 results-platform operations runbook
-      category: Documentation
-      status: Completed
   Low:
-    count: 13
+    count: 12
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -136,11 +96,6 @@ priorities:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
       status: Not Started
-    - id: timing-policy-split-review-followups
-      file: TODO/main/active/timing-policy-split-review-followups.yaml
-      title: Address follow-up findings from timing-policy pre-commit split review
-      category: Testing & Quality
-      status: In Progress
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

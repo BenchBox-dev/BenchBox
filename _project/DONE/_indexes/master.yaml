@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T16:48:23.843730'
-total_items: 749
+generated_at: '2026-04-19T17:05:03.471635'
+total_items: 758
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -174,6 +174,24 @@ items:
   - critical-priority
   estimated_effort: 1 week
   completed_date: '2025-12-24'
+- id: define-results-platform-product-and-launch-strategy
+  file: DONE/main/planning/define-results-platform-product-and-launch-strategy.yaml
+  title: Define BenchBox results platform product boundary and launch strategy
+  worktree: main
+  category: Core Functionality
+  priority: Critical
+  status: Completed
+  tags:
+  - results
+  - website
+  - submission
+  - product-strategy
+  - architecture
+  estimated_effort: Medium
+  completed_date: '2026-03-29'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
 - id: design-and-implement-core-dataframe-abstractions
   file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
   title: Design and Implement Core DataFrame Abstractions
@@ -4113,6 +4131,26 @@ items:
   work_total: 19
   work_done: 19
   work_ready: 0
+- id: verify-trust-badge-rendering-in-explorer
+  file: DONE/main/planning/verify-trust-badge-rendering-in-explorer.yaml
+  title: Visually verify TrustBadge rendering across all 4 explorer pages
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - frontend
+  - trust-labels
+  - visual-qa
+  estimated_effort: Small
+  completed_date: '2026-04-12'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - implement-pr-based-result-submission-workflow
 - id: adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage
   file: DONE/unknown/completed/adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage.yaml
   title: ✅ Adversarial Review - Cost Framework Enhancement (Warnings, Metadata, Timing, Storage)
@@ -7040,6 +7078,27 @@ items:
   priority: Medium
   status: Not Started
   estimated_effort: 3 weeks (0.75 FTE ML engineer)
+- id: guard-browser-fixture-generator-against-benchbox-cli-drift
+  file: DONE/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml
+  title: Guard the browser fixture generator against silent `benchbox explorer build` CLI drift
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - testing
+  - cli
+  - contract
+  - infrastructure
+  estimated_effort: Small
+  completed_date: '2026-04-19'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+  needs:
+  - implement-results-explorer-browser-functional-tests
 - id: harmonize-platform-display-names
   file: DONE/main/active/harmonize-platform-display-names.yaml
   title: Harmonize platform display names and CLI keys for consistency
@@ -7121,6 +7180,27 @@ items:
   - pyspark
   estimated_effort: Large
   completed_date: '2026-01-31'
+- id: implement-pr-based-result-submission-workflow
+  file: DONE/main/planning/implement-pr-based-result-submission-workflow.yaml
+  title: Implement PR-based community result submission workflow
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - phase-2
+  - community
+  - submission
+  - pr-workflow
+  estimated_effort: Large
+  completed_date: '2026-04-04'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - launch-results-explorer-acceptance-and-seed
 - id: ctas-sort-cloud-platforms
   file: DONE/physical-tuning/active/ctas-sort-cloud-platforms.yaml
   title: Implement _build_ctas_sort_sql for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Athena,
@@ -8224,6 +8304,26 @@ items:
   work_ready: 0
   needs:
   - quality-add-cross-platform-result-validation
+- id: write-results-platform-phase-2-operations-runbook
+  file: DONE/main/planning/write-results-platform-phase-2-operations-runbook.yaml
+  title: Write the Phase 2 results-platform operations runbook
+  worktree: main
+  category: Documentation
+  priority: Medium
+  status: Completed
+  tags:
+  - documentation
+  - operations
+  - runbook
+  - phase-2
+  - results
+  estimated_effort: Small
+  completed_date: '2026-04-12'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - implement-pr-based-result-submission-workflow
 - id: duckdb-architecture-verification
   file: DONE/blog-content/active/duckdb-architecture-verification.yaml
   title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
@@ -9038,6 +9138,26 @@ items:
   - optimization
   estimated_effort: Medium
   completed_date: '2025-12-21'
+- id: automate-corpus-inventory-generation
+  file: DONE/main/planning/automate-corpus-inventory-generation.yaml
+  title: Automate corpus-inventory.json generation from results-data/bundles/
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - results
+  - corpus
+  - automation
+  - ci
+  - phase-2
+  estimated_effort: Medium
+  completed_date: '2026-04-12'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  needs:
+  - implement-pr-based-result-submission-workflow
 - id: bidirectional-sync-and-true-up-releases
   file: DONE/release-sync/bidirectional-sync-and-true-up-releases.yaml
   title: Bidirectional Sync and True-Up Releases for Public/Private Repos
@@ -9397,6 +9517,26 @@ items:
   - joe
   estimated_effort: Medium
   completed_date: '2026-02-07'
+- id: define-hosted-results-contract-and-governance-model
+  file: DONE/main/planning/define-hosted-results-contract-and-governance-model.yaml
+  title: Define hosted results contract, trust labels, and governance model
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - results
+  - governance
+  - ranking
+  - trust
+  - privacy
+  estimated_effort: Large
+  completed_date: '2026-03-29'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - define-results-platform-product-and-launch-strategy
 - id: embed-tuning-config-in-results
   file: DONE/result-object-migration/planning/embed-tuning-config-in-results.yaml
   title: Embed Full Tuning Config in Result Output
@@ -9448,6 +9588,27 @@ items:
   - terminal
   estimated_effort: 3-5 days
   completed_date: '2026-02-06'
+- id: expand-seed-corpus-to-sf-0-1
+  file: DONE/main/planning/expand-seed-corpus-to-sf-0-1.yaml
+  title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - results
+  - corpus
+  - tpch
+  - ssb
+  - sf-0.1
+  estimated_effort: Medium
+  completed_date: '2026-04-12'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - automate-corpus-inventory-generation
+  - verify-ci-validation-workflow-end-to-end
 - id: explorer-url-synced-filter-state
   file: DONE/main/planning/explorer-url-synced-filter-state.yaml
   title: 'Explorer: URL-synced filter state via useUrlState hook'
@@ -10373,6 +10534,25 @@ items:
   work_total: 4
   work_done: 4
   work_ready: 0
+- id: surface-contributor-onboarding-for-results
+  file: DONE/main/planning/surface-contributor-onboarding-for-results.yaml
+  title: Surface contributor onboarding for results submission
+  worktree: main
+  category: Documentation
+  priority: Medium-High
+  status: Completed
+  tags:
+  - documentation
+  - results
+  - contributor-experience
+  - phase-2
+  estimated_effort: Small
+  completed_date: '2026-04-12'
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - implement-pr-based-result-submission-workflow
 - id: explorer-surface-trust-tiers-as-badges
   file: DONE/main/planning/explorer-surface-trust-tiers-as-badges.yaml
   title: Surface trust tiers as visible badges, not a default hide filter

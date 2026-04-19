@@ -3,6 +3,7 @@ title: "Write the Phase 2 results-platform operations runbook"
 worktree: main
 priority: Medium
 status: Completed
+completed_date: "2026-04-12"
 completed_note: "Created docs/operations/results-phase-2-runbook.md and linked it from contributor docs plus the results-publishing handoff on 2026-04-12."
 category: Documentation
 

@@ -1,7 +1,7 @@
 id: timing-policy-split-review-followups
 title: "Address follow-up findings from timing-policy pre-commit split review"
 worktree: main
-priority: Low
+priority: Medium
 status: In Progress
 category: Testing & Quality
 

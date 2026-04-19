@@ -1,7 +1,7 @@
 id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
 title: "Stabilize the results-explorer WebKit @smoke run under parallel workers"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Identified
 category: Testing and Quality Assurance
 

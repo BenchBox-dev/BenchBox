@@ -3,6 +3,7 @@ title: "Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB"
 worktree: main
 priority: Medium-High
 status: Completed
+completed_date: "2026-04-12"
 completed_note: "Current corpus contains 12 bundles total: TPC-H and SSB/`star_schema` each have SF 0.01 and 0.1 cohorts with 3 platforms per cohort. Explorer data was regenerated from the 12-bundle corpus on 2026-04-12."
 category: Core Functionality
 

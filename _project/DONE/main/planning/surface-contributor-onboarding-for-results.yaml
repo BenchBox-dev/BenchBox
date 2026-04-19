@@ -3,6 +3,7 @@ title: "Surface contributor onboarding for results submission"
 worktree: main
 priority: Medium-High
 status: Completed
+completed_date: "2026-04-12"
 completed_note: "Contributor path is now linked from the explorer header, explorer home CTA, docs navigation, and README. Completed 2026-04-12."
 category: Documentation
 

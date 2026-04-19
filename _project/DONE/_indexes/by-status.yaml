@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T16:48:23.844521'
-total_items: 749
+generated_at: '2026-04-19T17:05:03.472281'
+total_items: 758
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 698
+    count: 707
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -884,6 +884,11 @@ statuses:
       title: Auto-Compile TPC Binary Tools ✅ COMPLETED
       priority: Medium
       category: Core Functionality
+    - id: automate-corpus-inventory-generation
+      file: DONE/main/planning/automate-corpus-inventory-generation.yaml
+      title: Automate corpus-inventory.json generation from results-data/bundles/
+      priority: Medium-High
+      category: Core Functionality
     - id: automated-data-publishing-pipeline
       file: DONE/infrastructure-publishing/planning/automated-data-publishing-pipeline.yaml
       title: Automated Data Publishing Pipeline
@@ -1367,6 +1372,11 @@ statuses:
       title: Deferred Storage Location and Cache Unification Enhancements
       priority: Medium
       category: Core Functionality
+    - id: define-results-platform-product-and-launch-strategy
+      file: DONE/main/planning/define-results-platform-product-and-launch-strategy.yaml
+      title: Define BenchBox results platform product boundary and launch strategy
+      priority: Critical
+      category: Core Functionality
     - id: dataframe-write-primitives-model
       file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
       title: Define DataFrame Execution Model for Write Primitives
@@ -1377,6 +1387,11 @@ statuses:
       title: Define DataFrameProtocol and remove Any annotations from unified frame layer
       priority: Medium
       category: Code Quality and Technical Debt
+    - id: define-hosted-results-contract-and-governance-model
+      file: DONE/main/planning/define-hosted-results-contract-and-governance-model.yaml
+      title: Define hosted results contract, trust labels, and governance model
+      priority: Medium-High
+      category: Core Functionality
     - id: dataframe-tpcdi-architecture
       file: DONE/dataframe-benchmarks/active/dataframe-tpcdi-architecture.yaml
       title: Design DataFrame Architecture for TPC-DI ETL Workload
@@ -1612,6 +1627,11 @@ statuses:
       file: DONE/benchmark-expansion/implementation/tpcds-obt-query-expansion.yaml
       title: Expand TPC-DS OBT Query Coverage to 93 Queries
       priority: High
+      category: Core Functionality
+    - id: expand-seed-corpus-to-sf-0-1
+      file: DONE/main/planning/expand-seed-corpus-to-sf-0-1.yaml
+      title: Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB
+      priority: Medium-High
       category: Core Functionality
     - id: explorer-master-leaderboard-home
       file: DONE/main/planning/explorer-master-leaderboard-home.yaml
@@ -2018,6 +2038,11 @@ statuses:
       title: Guard TPC-DS Fractional Scale Defaults
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: guard-browser-fixture-generator-against-benchbox-cli-drift
+      file: DONE/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml
+      title: Guard the browser fixture generator against silent `benchbox explorer build` CLI drift
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: windows-ci-hardening
       file: DONE/main/planning/windows-ci-hardening.yaml
       title: Harden CI and static analysis to catch Windows-specific failures before merge
@@ -2092,6 +2117,11 @@ statuses:
       file: DONE/dataframe-expression-family/completed/implement-expression-family-base-adapter-and-dialects.yaml
       title: Implement Expression Family Base Adapter and Dialects
       priority: Critical
+      category: Core Functionality
+    - id: implement-pr-based-result-submission-workflow
+      file: DONE/main/planning/implement-pr-based-result-submission-workflow.yaml
+      title: Implement PR-based community result submission workflow
+      priority: Medium
       category: Core Functionality
     - id: implement-pandas-family-base-adapter
       file: DONE/dataframe-pandas-family/planning/implement-pandas-family-base-adapter.yaml
@@ -3174,6 +3204,11 @@ statuses:
       title: Surface active driver version in CLI progress output
       priority: Medium-High
       category: Core Functionality
+    - id: surface-contributor-onboarding-for-results
+      file: DONE/main/planning/surface-contributor-onboarding-for-results.yaml
+      title: Surface contributor onboarding for results submission
+      priority: Medium-High
+      category: Documentation
     - id: surface-driver-version-options-in-cli-help
       file: DONE/main/active/surface-driver-version-options-in-cli-help.yaml
       title: Surface driver_version and driver_auto_install more prominently in CLI help
@@ -3355,11 +3390,21 @@ statuses:
       title: Visualization Framework - Chart Generation & Results Display
       priority: Critical
       category: Marketing Content Enablement
+    - id: verify-trust-badge-rendering-in-explorer
+      file: DONE/main/planning/verify-trust-badge-rendering-in-explorer.yaml
+      title: Visually verify TrustBadge rendering across all 4 explorer pages
+      priority: High
+      category: Testing and Quality Assurance
     - id: quality-cross-platform-validation-integration-matrix
       file: DONE/main/planning/quality-cross-platform-validation-integration-matrix.yaml
       title: Wire cross-platform validation comparator into a nightly integration matrix
       priority: Medium
       category: Testing and Quality Assurance
+    - id: write-results-platform-phase-2-operations-runbook
+      file: DONE/main/planning/write-results-platform-phase-2-operations-runbook.yaml
+      title: Write the Phase 2 results-platform operations runbook
+      priority: Medium
+      category: Documentation
     - id: duckdb-architecture-verification
       file: DONE/blog-content/active/duckdb-architecture-verification.yaml
       title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
