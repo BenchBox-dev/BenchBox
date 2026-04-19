@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:05:19.382233'
-total_items: 53
+generated_at: '2026-04-19T08:37:18.187136'
+total_items: 55
 priorities:
   Critical:
     count: 2
@@ -91,7 +91,7 @@ priorities:
       category: Platform Support
       status: Not Started
   Medium:
-    count: 9
+    count: 11
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -118,6 +118,11 @@ priorities:
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       category: Performance
       status: Identified
+    - id: guard-browser-fixture-generator-against-benchbox-cli-drift
+      file: TODO/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml
+      title: Guard the browser fixture generator against silent `benchbox explorer build` CLI drift
+      category: Testing and Quality Assurance
+      status: Identified
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow
@@ -132,6 +137,11 @@ priorities:
       file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
       title: Stabilize the results-explorer WebKit @smoke run under parallel workers
       category: Testing and Quality Assurance
+      status: Identified
+    - id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
+      file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
+      title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
+      category: Infrastructure
       status: Identified
     - id: write-results-platform-phase-2-operations-runbook
       file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml

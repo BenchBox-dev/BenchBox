@@ -1,0 +1,141 @@
+id: guard-browser-fixture-generator-against-benchbox-cli-drift
+title: "Guard the browser fixture generator against silent `benchbox explorer build` CLI drift"
+worktree: main
+priority: Medium
+status: Identified
+category: Testing and Quality Assurance
+
+description: |
+  The deterministic fixture corpus is produced by
+  `results-explorer/scripts/generate-browser-fixtures.mjs`, which shells
+  out to `benchbox explorer build --data-dir ... --output ...`. The JS
+  side and the Python CLI side are coupled only by string flags — there
+  is no contract that a rename on the Python side surfaces as a clear
+  failure on the JS side.
+
+  If a future refactor renames `--data-dir`, changes the positional
+  argument order, or moves the command under a different Typer group,
+  the fixture generator silently fails with a subprocess error, which
+  Playwright then reports as "failed to start test server" or "fixture
+  dir not found" (see `scripts/serve-browser-tests.mjs:46-51`). New
+  contributors reasonably read that as an infra/flake issue, not as a
+  dependency-drift bug — and may spend hours chasing it.
+
+  The mitigation is a versioned contract:
+
+  1. The Python CLI exposes a stable `benchbox explorer build --help` /
+     `--version` / `--contract` surface that the JS generator can
+     interrogate *before* running the build.
+  2. The JS generator asserts the expected contract version (or the
+     expected flag names) up front and fails fast with a message that
+     names the Python file to update.
+  3. A pytest-level test loads the same contract constant and asserts
+     the Python side still exposes the declared flags, so a refactor
+     that breaks the contract fails in the Python test suite *before*
+     the browser suite ever runs.
+
+  Acceptable shapes (pick one, in order of preference):
+
+  - Single `explorer_pipeline.contract.CONTRACT_VERSION` string constant
+    declared in Python and duplicated in the JS generator. A mismatch
+    raises with a pointer to both files.
+  - A `benchbox explorer build --contract` subcommand that prints a
+    JSON blob of supported flags; the JS generator parses it and
+    validates required flags exist.
+
+deps:
+  needs:
+    - implement-results-explorer-browser-functional-tests
+
+work:
+  - id: w1
+    summary: "Declare a stable contract surface on the Python side"
+    status: pending
+    notes: |
+      Add a `CONTRACT_VERSION` (or equivalent) constant in the explorer
+      pipeline module and a lightweight way to surface it — either via
+      `benchbox explorer build --contract` or by re-exporting in
+      `benchbox/cli/commands/explorer.py`. Keep the change minimal: the
+      goal is a single brittle integration point, not a framework.
+
+  - id: w2
+    summary: "Teach `generate-browser-fixtures.mjs` to assert the contract before invoking `benchbox explorer build`"
+    needs: [w1]
+    status: pending
+    notes: |
+      The assertion runs once at the top of the generator. On
+      mismatch, exit non-zero with a message like:
+      "benchbox explorer build contract version X expected, got Y —
+      update results-explorer/scripts/generate-browser-fixtures.mjs or
+      benchbox/cli/commands/explorer.py to re-align." No fallback
+      behaviour: fail fast.
+
+  - id: w3
+    summary: "Add a pytest that pins the Python-side flag surface"
+    needs: [w1]
+    status: pending
+    notes: |
+      One small unit test under `tests/unit/cli/` that imports the
+      Typer command and asserts the expected flag names (`--data-dir`,
+      `--output`, etc.) still exist. Fails loudly on refactor, long
+      before the browser suite would notice.
+
+must_preserve:
+  - "`benchbox explorer build` continues to work for all current callers (the fixture generator and any doc snippets)."
+  - "The fixture generator remains a single-entry `node scripts/generate-browser-fixtures.mjs` command — no new required env vars."
+  - "The browser suite remains the source of truth for user-visible coverage; this TODO only adds an early warning, not replacement coverage."
+
+approach: |
+  Keep the contract small and ugly on purpose. A shared constant plus
+  a one-line assertion beats a generated TypeScript binding or an
+  OpenAPI-style schema for a surface this narrow. If the coupling grows
+  (more commands, richer output), revisit.
+
+anti_patterns:
+  - "DO NOT replace the subprocess call with an in-process Python→JS bridge — because subprocess-based coupling is the only thing keeping the fixture generator deployable without a Node↔Python runtime — keep the shell-out and add the version check alongside it."
+  - "DO NOT swallow the mismatch as a warning — because the whole point is to fail fast so the real root cause surfaces in CI — exit non-zero on mismatch."
+
+verification:
+  - description: "The TODO item itself validates cleanly"
+    command: "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml"
+    expected_output: "Validation passes with no schema or DAG errors"
+  - description: "The Python contract test pins the flags the generator depends on"
+    command: "uv run -- python -m pytest tests/unit/cli/test_explorer_build_contract.py -q"
+    expected_output: "Contract test passes; flag surface unchanged"
+  - description: "The JS generator fails fast on a simulated contract bump"
+    command: "cd results-explorer && CONTRACT_OVERRIDE=bad node scripts/generate-browser-fixtures.mjs"
+    expected_output: "Non-zero exit with a message naming both the Python file and the JS generator"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/scripts/generate-browser-fixtures.mjs"
+    - "benchbox/cli/commands/explorer.py"
+    - "benchbox/core/explorer_pipeline/"
+    - "tests/unit/cli/"
+  do_not_modify:
+    - "results-explorer/src/"
+    - "results-explorer/public/data/"
+    - "results-data/bundles/"
+    - "results-explorer/e2e/"
+
+metadata:
+  tags:
+    - "results"
+    - "explorer"
+    - "testing"
+    - "cli"
+    - "contract"
+    - "infrastructure"
+  estimated_effort: "Small"
+  created_date: "2026-04-19"
+
+impact:
+  business_value: |
+    Prevents a class of cross-language drift bug that wastes
+    contributor time and makes the browser suite look flaky when the
+    real fault is on the Python side.
+  user_impact: |
+    None directly — this is infrastructure-side resilience.
+  technical_debt: |
+    Makes the implicit contract between `benchbox explorer build` and
+    the fixture generator explicit and testable.

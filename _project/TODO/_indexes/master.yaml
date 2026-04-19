@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:05:19.382181'
-total_items: 53
+generated_at: '2026-04-19T08:37:18.187064'
+total_items: 55
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -89,8 +89,8 @@ items:
   - adapter
   estimated_effort: Large (1-2 weeks across phases)
   work_total: 13
-  work_done: 5
-  work_ready: 2
+  work_done: 6
+  work_ready: 1
   deferred_count: 3
 - id: fix-git-author-history-rewrite
   file: TODO/main/planning/fix-git-author-history-rewrite.yaml
@@ -701,6 +701,26 @@ items:
   work_ready: 1
   needs:
   - implement-results-explorer-browser-functional-tests
+- id: guard-browser-fixture-generator-against-benchbox-cli-drift
+  file: TODO/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml
+  title: Guard the browser fixture generator against silent `benchbox explorer build` CLI drift
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Identified
+  tags:
+  - results
+  - explorer
+  - testing
+  - cli
+  - contract
+  - infrastructure
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  needs:
+  - implement-results-explorer-browser-functional-tests
 - id: implement-pr-based-result-submission-workflow
   file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
   title: Implement PR-based community result submission workflow
@@ -755,6 +775,26 @@ items:
   - browser
   - flake
   - webkit
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  needs:
+  - implement-results-explorer-browser-functional-tests
+- id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
+  file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
+  title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
+  worktree: main
+  category: Infrastructure
+  priority: Medium
+  status: Identified
+  tags:
+  - results
+  - explorer
+  - duckdb-wasm
+  - supply-chain
+  - infrastructure
+  - ci
   estimated_effort: Small
   work_total: 3
   work_done: 0

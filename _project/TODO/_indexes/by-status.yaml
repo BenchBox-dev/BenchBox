@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:05:19.382247'
-total_items: 53
+generated_at: '2026-04-19T08:37:18.187153'
+total_items: 55
 statuses:
   In Progress:
     count: 1
@@ -223,18 +223,28 @@ statuses:
       priority: Low
       category: Benchmark Development
   Identified:
-    count: 2
+    count: 4
     items:
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       priority: Medium
       category: Performance
+    - id: guard-browser-fixture-generator-against-benchbox-cli-drift
+      file: TODO/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml
+      title: Guard the browser fixture generator against silent `benchbox explorer build` CLI drift
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
       file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
       title: Stabilize the results-explorer WebKit @smoke run under parallel workers
       priority: Medium
       category: Testing and Quality Assurance
+    - id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
+      file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
+      title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
+      priority: Medium
+      category: Infrastructure
   Completed:
     count: 8
     items:

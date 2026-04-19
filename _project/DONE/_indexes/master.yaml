@@ -1,5 +1,5 @@
-generated_at: '2026-04-16T20:55:11.503203'
-total_items: 721
+generated_at: '2026-04-19T08:37:19.905604'
+total_items: 730
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1666,6 +1666,102 @@ items:
   owners:
   - joe
   estimated_effort: Medium
+- id: explorer-master-leaderboard-home
+  file: DONE/main/planning/explorer-master-leaderboard-home.yaml
+  title: 'Explorer Home: ClickBench-style master leaderboard (Times/Ranks/Speedup, chip filters, URL state)'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - home
+  - master-leaderboard
+  - clickbench
+  - ultraplan-phase-b
+  estimated_effort: Medium (1-2 days)
+  completed_date: '2026-04-17'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  needs:
+  - explorer-pipeline-meta-leaderboard-widening
+  - explorer-url-synced-filter-state
+- id: explorer-result-detail-median-first
+  file: DONE/main/planning/explorer-result-detail-median-first.yaml
+  title: 'Explorer ResultDetail: default to median-of-passing, move raw samples to drill-down'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - result-detail
+  - median
+  - ultraplan-phase-a
+  estimated_effort: Small (2-4 hours)
+  completed_date: '2026-04-17'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+- id: explorer-pipeline-meta-leaderboard-widening
+  file: DONE/main/planning/explorer-pipeline-meta-leaderboard-widening.yaml
+  title: 'Explorer pipeline: widen MetaRank cells and emit results_schema.json'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - pipeline
+  - meta-leaderboard
+  - duckdb
+  - ultraplan-phase-f
+  estimated_effort: Small (2-4 hours)
+  completed_date: '2026-04-17'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+- id: explorer-query-workbench
+  file: DONE/main/planning/explorer-query-workbench.yaml
+  title: 'Explorer: CloudSpecs-style /results/query workbench over results.duckdb'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - query-workbench
+  - duckdb-wasm
+  - cloudspecs
+  - ultraplan-phase-c
+  estimated_effort: Medium (2-3 days)
+  completed_date: '2026-04-17'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  needs:
+  - explorer-pipeline-meta-leaderboard-widening
+- id: explorer-unified-chart-panel
+  file: DONE/main/planning/explorer-unified-chart-panel.yaml
+  title: 'Explorer: unified <ChartPanel> driven by CHART_REGISTRY across all pages'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - charts
+  - registry
+  - cli-parity
+  - ultraplan-phase-d
+  estimated_effort: Medium (1-2 days)
+  completed_date: '2026-04-17'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  needs:
+  - explorer-result-detail-median-first
 - id: interactive-table-mode-ux-and-equivalent-command
   file: DONE/main/active/interactive-table-mode-ux-and-equivalent-command.yaml
   title: Expose interactive table mode selection and include it in equivalent CLI command
@@ -2359,6 +2455,28 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 4 weeks
+- id: implement-results-explorer-browser-functional-tests
+  file: DONE/main/active/implement-results-explorer-browser-functional-tests.yaml
+  title: Implement browser-based functional testing for the results explorer
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - testing
+  - browser
+  - e2e
+  - playwright
+  - quality-gate
+  estimated_effort: Large
+  completed_date: '2026-04-19'
+  work_total: 9
+  work_done: 9
+  work_ready: 0
+  needs:
+  - launch-results-explorer-acceptance-and-seed
 - id: on-demand-tpc-answer-download
   file: DONE/core-functionality/planning/on-demand-tpc-answer-download.yaml
   title: Implement on-demand download of TPC answer files for validation
@@ -2591,6 +2709,25 @@ items:
   - observability
   estimated_effort: 2-3 weeks (phased implementation)
   completed_date: '2026-01-16'
+- id: explorer-canonical-browser-duckdb-read-model
+  file: DONE/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
+  title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - explorer
+  - duckdb-wasm
+  - read-model
+  - results
+  - canonical-store
+  estimated_effort: Large (5-7 days)
+  completed_date: '2026-04-18'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  deferred_count: 2
 - id: make-parquet-default-for-tpcds-obt
   file: DONE/main/make-parquet-default-for-tpcds-obt.yaml
   title: Make Parquet the default output format for TPC-DS OBT
@@ -7775,13 +7912,14 @@ items:
   worktree: main
   category: Core Functionality
   priority: Medium
-  status: Not Started
+  status: Completed
   tags:
   - results
   - explorer
   - urls
   - compare
   estimated_effort: Small (1 day)
+  completed_date: '2026-04-16'
   work_total: 5
   work_done: 5
   work_ready: 0
@@ -9031,6 +9169,23 @@ items:
   - terminal
   estimated_effort: 3-5 days
   completed_date: '2026-02-06'
+- id: explorer-url-synced-filter-state
+  file: DONE/main/planning/explorer-url-synced-filter-state.yaml
+  title: 'Explorer: URL-synced filter state via useUrlState hook'
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - explorer
+  - url-state
+  - hook
+  - ultraplan-phase-e
+  estimated_effort: Small (2-4 hours)
+  completed_date: '2026-04-17'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
 - id: quality-extend-error-capture-to-cloud-adapters
   file: DONE/platform-expansion/planning/quality-extend-error-capture-to-cloud-adapters.yaml
   title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
@@ -9518,6 +9673,24 @@ items:
   - firebolt
   - deployment-modes
   estimated_effort: 2-3 days
+- id: datavault-sha256-hash-migration
+  file: DONE/main/active/datavault-sha256-hash-migration.yaml
+  title: Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - datavault
+  - schema-migration
+  - hash
+  - data-integrity
+  - tpcdi
+  estimated_effort: Medium
+  completed_date: '2026-04-17'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
 - id: migrate-remaining-print-leaks-to-emit
   file: DONE/main/active/migrate-remaining-print-leaks-to-emit.yaml
   title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION

@@ -90,6 +90,7 @@ approach: |
 anti_patterns:
   - "DO NOT paper over the flake with retries — because this hides the underlying WebKit-specific issue and ships silent instability to maintainers — identify and fix the root cause."
   - "DO NOT drop WebKit from the matrix — because Safari/WebKit rendering is a real user surface — graduate it once stable, don't remove it."
+  - "DO NOT flip `continue-on-error: true` off on a calendar / release schedule — because promoting WebKit before the flake is actually fixed will regress main — gate the flip on the 10-consecutive-green criterion in w3 and nothing else."
 
 verification:
   - description: "The TODO item itself validates cleanly"
