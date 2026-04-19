@@ -2,7 +2,8 @@ id: explorer-visualization-review-followup-nits
 title: "Fix nit-level findings from explorer visualization code reviews"
 worktree: main
 priority: Low
-status: Not Started
+status: "Completed"
+completed_date: "2026-04-19"
 category: Code Quality
 
 description: |
@@ -17,7 +18,7 @@ description: |
 work:
 - id: w1
   summary: "Fix incomplete sentence in perQuerySpeedup docstring (chartMath.ts:163)"
-  status: pending
+  status: done
   notes: |
     Change:
       "Represents how much the slowest result for a given query is than the fastest."
@@ -26,7 +27,7 @@ work:
 
 - id: w2
   summary: "Move PHASE_COLORS from StackedPhase.tsx to chartTheme.ts"
-  status: pending
+  status: done
   notes: |
     Add to chartTheme.ts:
       export const PHASE_LABELS: Record<string, string> = { ... }
@@ -37,7 +38,7 @@ work:
 
 - id: w3
   summary: "Remove unnecessary ?? '' fallback in BenchmarkIndex.tsx:373"
-  status: pending
+  status: done
   notes: |
     Change:
       primaryMetricFor(s.benchmark ?? "")
@@ -47,7 +48,7 @@ work:
 
 - id: w4
   summary: "Add keyboard navigation unit test for QueryHeatmap roving tabindex"
-  status: pending
+  status: done
   notes: |
     Add to QueryHeatmap.test.tsx:
       - fireEvent.keyDown(firstCell, { key: "ArrowRight" }) → next cell gets focus
@@ -56,7 +57,7 @@ work:
 
 - id: w5
   summary: "Apply NO_DATA_ERROR_PREFIX informational empty state to ranks view in BenchmarkIndex.tsx"
-  status: pending
+  status: done
   notes: |
     BenchmarkIndex.tsx:350 — ranks view error block should mirror matrix view:
       summaryError.startsWith(NO_DATA_ERROR_PREFIX) ? (informational empty state)
@@ -65,7 +66,7 @@ work:
 
 - id: w6
   summary: "Add clarifying comment to axe-helper.ts:38 type cast"
-  status: pending
+  status: done
   notes: |
     The cast `{ violations: critical } as typeof results` is intentional.
     Add a one-line comment:
@@ -73,7 +74,7 @@ work:
 
 - id: w7
   summary: "Optimize O(n×m) query lookup in build_comparison_artifact (transformer.py:757)"
-  status: pending
+  status: done
   notes: |
     transformer.py:754-760 — inner loop scans d.display_timings linearly per query.
     Fix: build a per-detail lookup dict before the outer loop:
@@ -83,7 +84,7 @@ work:
 
 - id: w8
   summary: "Add progressive disambiguation cascade test (same driver_version + different execution_mode)"
-  status: pending
+  status: done
   notes: |
     test_comparison_artifact.py has no test for the progressive case: same driver_version
     but different execution_mode — confirming cascade continues to execution_mode.
@@ -96,7 +97,7 @@ work:
 
 - id: w9
   summary: "Add CLI-level test for explorer_build_comparison file output path"
-  status: pending
+  status: done
   notes: |
     benchbox/cli/commands/explorer.py has no test verifying the CLI subcommand
     writes the artifact to compare/<hash16>.json.
@@ -106,7 +107,7 @@ work:
 
 - id: w10
   summary: "Replace hardcoded #6366f1 legend color in PercentileLadder.tsx with theme-derived neutral"
-  status: pending
+  status: done
   notes: |
     PercentileLadder.tsx:86 — legend swatches use hardcoded fill="#6366f1" (Tailwind indigo-500).
     The legend shows opacity levels (P99→P50), not platform identity.
@@ -114,7 +115,7 @@ work:
 
 - id: w11
   summary: "Harden chartRegistry meta-test to catch forward drift (new Python chart types)"
-  status: pending
+  status: done
   notes: |
     chartRegistry.meta.test.ts hardcodes CANONICAL_IDS — adding chart type #17 to
     chart_types.py won't fail the test until CANONICAL_IDS is also manually updated.
@@ -123,7 +124,7 @@ work:
 
 - id: w12
   summary: "Rename NewCharts.test.tsx to charts.smoke.test.tsx"
-  status: pending
+  status: done
   notes: |
     results-explorer/src/components/__tests__/NewCharts.test.tsx — "New" is misleading
     once these are established components. Rename to charts.smoke.test.tsx.
@@ -131,7 +132,7 @@ work:
 
 - id: w13
   summary: "Add parity fixtures for 6 pure-render chart types"
-  status: pending
+  status: done
   notes: |
     Only 4 of 10 required parity fixtures were generated (percentile_ladder, cdf_ecdf,
     rank_table, box_stats). Missing: query_histogram, power_bar, stacked_phase, time_series,
@@ -142,7 +143,7 @@ work:
 
 - id: w14
   summary: "Update docs/visualization-parity.md fixture table with 4 new fixtures"
-  status: pending
+  status: done
   notes: |
     docs/visualization-parity.md fixture table lists only the original 7 fixtures.
     Add 4 new rows:
@@ -154,7 +155,7 @@ work:
 
 - id: w15
   summary: "Add explanatory comment for comparison_artifact.json exclusion in Makefile parity-check"
-  status: pending
+  status: done
   notes: |
     Makefile:597 — `--exclude='comparison_artifact.json'` has no comment.
     Add:
@@ -163,7 +164,7 @@ work:
 
 - id: w16
   summary: "Add tie-handling to _build_meta_leaderboard (pipeline.py:207-209)"
-  status: pending
+  status: done
   notes: |
     _build_meta_leaderboard assigns ordinal ranks (enumerate → i+1) without tie detection.
     Two platforms with equal metric values get consecutive ranks (1, 2) instead of equal (1, 1).
@@ -172,7 +173,7 @@ work:
 
 - id: w17
   summary: "Add unit tests for _build_meta_leaderboard (pipeline.py:165-256)"
-  status: pending
+  status: done
   notes: |
     _build_meta_leaderboard has no unit tests.
     Add to tests/unit/core/explorer_pipeline/:
@@ -184,7 +185,7 @@ work:
 
 - id: w18
   summary: "Add Vitest test for MetaLeaderboard.tsx component"
-  status: pending
+  status: done
   notes: |
     MetaLeaderboard.tsx has no Vitest test. The empty-data guard (line 25) and rank
     cell rendering are untested.
@@ -196,7 +197,7 @@ work:
 
 - id: w19
   summary: "Add scale_factor and phase query params to cohort hrefs in meta-leaderboard (pipeline.py:232)"
-  status: pending
+  status: done
   notes: |
     pipeline.py:232 — cohort href is `/results/{benchmark}/` — navigates to the
     benchmark index without specifying (SF, phase). If BenchmarkIndex defaults to a
@@ -206,7 +207,7 @@ work:
 
 - id: w20
   summary: "Add Vitest tests for resolveShortId and toShortIds in manifest.ts"
-  status: pending
+  status: done
   notes: |
     Neither resolveShortId nor toShortIds have Vitest tests.
     Add tests (mocking the short_ids.json fetch):

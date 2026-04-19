@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:22:05.686743'
-total_items: 740
+generated_at: '2026-04-19T09:36:55.831941'
+total_items: 741
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 689
+    count: 690
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1943,6 +1943,11 @@ statuses:
       title: Fix manifest validation for directory-based table formats (Delta, Iceberg, DuckLake)
       priority: High
       category: Core Functionality
+    - id: explorer-visualization-review-followup-nits
+      file: DONE/main/active/explorer-visualization-review-followup-nits.yaml
+      title: Fix nit-level findings from explorer visualization code reviews
+      priority: Low
+      category: Code Quality
     - id: fix-sharded-dataframe-parquet-bypass
       file: DONE/main/active/fix-sharded-dataframe-parquet-bypass.yaml
       title: Fix sharded DataFrame Parquet bypass causing Polars date-string failures

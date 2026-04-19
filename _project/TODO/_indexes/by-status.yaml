@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:22:03.991721'
-total_items: 45
+generated_at: '2026-04-19T09:36:54.149731'
+total_items: 44
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 32
+    count: 31
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -62,11 +62,6 @@ statuses:
       title: Extend _strip_pk_constraints to handle quoted constraint names
       priority: Low
       category: Platform Support
-    - id: explorer-visualization-review-followup-nits
-      file: TODO/main/active/explorer-visualization-review-followup-nits.yaml
-      title: Fix nit-level findings from explorer visualization code reviews
-      priority: Low
-      category: Code Quality
     - id: explorer-phase-a-f-review-followups
       file: TODO/main/planning/explorer-phase-a-f-review-followups.yaml
       title: Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)

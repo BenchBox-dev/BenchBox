@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T09:22:03.991694'
+generated_at: '2026-04-19T09:36:54.149705'
 total_categories: 14
 categories:
   Architecture & Refactoring:
@@ -38,13 +38,8 @@ categories:
       priority: Low
       status: Not Started
   Code Quality:
-    count: 3
+    count: 2
     items:
-    - id: explorer-visualization-review-followup-nits
-      file: TODO/main/active/explorer-visualization-review-followup-nits.yaml
-      title: Fix nit-level findings from explorer visualization code reviews
-      priority: Low
-      status: Not Started
     - id: explorer-phase-a-f-review-followups
       file: TODO/main/planning/explorer-phase-a-f-review-followups.yaml
       title: Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)

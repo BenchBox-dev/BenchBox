@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:22:03.991664'
-total_items: 45
+generated_at: '2026-04-19T09:36:54.149672'
+total_items: 44
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -214,26 +214,6 @@ items:
   work_total: 1
   work_done: 0
   work_ready: 1
-- id: explorer-visualization-review-followup-nits
-  file: TODO/main/active/explorer-visualization-review-followup-nits.yaml
-  title: Fix nit-level findings from explorer visualization code reviews
-  worktree: main
-  category: Code Quality
-  priority: Low
-  status: Not Started
-  tags:
-  - explorer
-  - visualization
-  - cleanup
-  - nit
-  - docs
-  - testing
-  estimated_effort: Large (4-6 hours)
-  work_total: 21
-  work_done: 1
-  work_ready: 20
-  needs:
-  - explorer-unify-visualization-foundations
 - id: explorer-phase-a-f-review-followups
   file: TODO/main/planning/explorer-phase-a-f-review-followups.yaml
   title: Fix nit-level findings from six explorer phase A–F code reviews (2026-04-17 TODOs)

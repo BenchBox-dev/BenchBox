@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:22:05.686117'
-total_items: 740
+generated_at: '2026-04-19T09:36:55.831289'
+total_items: 741
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4842,6 +4842,27 @@ items:
   - dependencies
   owners:
   - '"@benchbox-maintainers"'
+- id: explorer-visualization-review-followup-nits
+  file: DONE/main/active/explorer-visualization-review-followup-nits.yaml
+  title: Fix nit-level findings from explorer visualization code reviews
+  worktree: main
+  category: Code Quality
+  priority: Low
+  status: Completed
+  tags:
+  - explorer
+  - visualization
+  - cleanup
+  - nit
+  - docs
+  - testing
+  estimated_effort: Large (4-6 hours)
+  completed_date: '2026-04-19'
+  work_total: 21
+  work_done: 21
+  work_ready: 0
+  needs:
+  - explorer-unify-visualization-foundations
 - id: move-jsonschema-out-of-core-runtime-deps
   file: DONE/main/active/move-jsonschema-out-of-core-runtime-deps.yaml
   title: Move jsonschema out of core deps (used only by _project/ tooling)
