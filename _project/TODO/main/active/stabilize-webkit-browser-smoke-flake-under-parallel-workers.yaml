@@ -94,7 +94,7 @@ anti_patterns:
 
 verification:
   - description: "The TODO item itself validates cleanly"
-    command: "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml"
+    command: "uv run _project/scripts/validate_todo.py _project/TODO/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml"
     expected_output: "Validation passes with no schema or DAG errors"
   - description: "WebKit smoke passes 10 consecutive times under default parallelism"
     command: "for i in 1 2 3 4 5 6 7 8 9 10; do cd results-explorer && npm run test:e2e:webkit || exit 1; done"
