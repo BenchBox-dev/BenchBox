@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T20:14:45.939266'
+generated_at: '2026-04-18T20:15:59.795547'
 total_items: 52
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -39,12 +39,12 @@ items:
   needs:
   - implement-pr-based-result-submission-workflow
 - id: implement-results-explorer-browser-functional-tests
-  file: TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml
+  file: TODO/main/active/implement-results-explorer-browser-functional-tests.yaml
   title: Implement browser-based functional testing for the results explorer
   worktree: main
   category: Testing and Quality Assurance
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - results
   - explorer
@@ -55,8 +55,8 @@ items:
   - quality-gate
   estimated_effort: Large
   work_total: 9
-  work_done: 0
-  work_ready: 1
+  work_done: 1
+  work_ready: 2
   needs:
   - launch-results-explorer-acceptance-and-seed
 - id: integrate-benchbox-cli-submit-and-service-auth

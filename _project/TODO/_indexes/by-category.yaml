@@ -1,4 +1,4 @@
-generated_at: '2026-04-18T20:14:45.939314'
+generated_at: '2026-04-18T20:15:59.795592'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -278,10 +278,10 @@ categories:
       priority: Low
       status: Not Started
     - id: implement-results-explorer-browser-functional-tests
-      file: TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml
+      file: TODO/main/active/implement-results-explorer-browser-functional-tests.yaml
       title: Implement browser-based functional testing for the results explorer
       priority: High
-      status: Not Started
+      status: In Progress
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

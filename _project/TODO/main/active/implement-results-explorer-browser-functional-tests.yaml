@@ -2,7 +2,7 @@ id: implement-results-explorer-browser-functional-tests
 title: "Implement browser-based functional testing for the results explorer"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
@@ -40,7 +40,7 @@ deps:
 work:
   - id: w1
     summary: "Run a research gate and lock the browser-test architecture before editing"
-    status: pending
+    status: done
     notes: |
       Read the current explorer routes, DuckDB-WASM loading path, existing
       jsdom/unit coverage, manual browser-verification TODOs, and deploy/base-path
@@ -58,6 +58,17 @@ work:
       defaults and rejected alternatives for each open question, plus a link
       to it from this TODO's notes before w2 starts. No implementation starts
       until these decisions are locked.
+
+      Architecture note (accepted 2026-04-18):
+      `docs/development/browser-test-architecture.md`. Locked decisions:
+      (1) test target is the built `dist/` served via Playwright `webServer`,
+      (2) fixture corpus is generated per-run into gitignored
+      `results-explorer/test-fixtures/.generated/` with the curated public
+      corpus untouched, (3) Chromium full suite is the required blocking
+      gate while Firefox and WebKit run `@smoke` only and graduate on flake
+      data, (4) no production-code seam is added for failure injection —
+      all error paths are exercised through Playwright `page.route()`,
+      `setOffline`, permissions grants, and download events.
 
   - id: w2
     summary: "Add the browser-test harness, scripts, and built-app serving model"
@@ -156,6 +167,13 @@ work:
       - compare benchmark mismatch and scale mismatch hard blocks
       - tuning-config sidecar fetch failure
       - online/offline or retry-state behavior where supported by the app
+      - RG-2 HTTP range-reads: assert that a cold single-row lookup against
+        `results.duckdb` served by the test harness issues `Range: bytes=...`
+        requests, receives `206 Partial Content` with `Accept-Ranges: bytes`,
+        and that the sum of `Content-Length` transferred is ≤10% of the
+        on-disk DB size. This closes the
+        `explorer-canonical-browser-duckdb-read-model` RG-2 gate that the
+        completed TODO deferred to browser-level coverage.
 
       Failure assertions must validate user-visible error states, not only
       thrown exceptions or console output.
