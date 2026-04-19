@@ -2,7 +2,8 @@ id: implement-results-explorer-browser-functional-tests
 title: "Implement browser-based functional testing for the results explorer"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-19"
 category: Testing and Quality Assurance
 
 description: |
@@ -196,7 +197,7 @@ work:
   - id: w9
     summary: "Close with full validation, flake triage, and follow-up capture"
     needs: [w8]
-    status: pending
+    status: done
     notes: |
       Do not mark this item complete on a single green run. Verify repeatability,
       capture any flaky selectors or browser-specific issues, and create focused

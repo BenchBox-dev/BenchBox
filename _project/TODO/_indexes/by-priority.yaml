@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:00:09.721761'
+generated_at: '2026-04-19T08:05:19.382233'
 total_items: 53
 priorities:
   Critical:
@@ -15,13 +15,8 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 7
+    count: 6
     items:
-    - id: implement-results-explorer-browser-functional-tests
-      file: TODO/main/active/implement-results-explorer-browser-functional-tests.yaml
-      title: Implement browser-based functional testing for the results explorer
-      category: Testing and Quality Assurance
-      status: In Progress
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -96,7 +91,7 @@ priorities:
       category: Platform Support
       status: Not Started
   Medium:
-    count: 8
+    count: 9
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -133,6 +128,11 @@ priorities:
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
       status: Not Started
+    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
+      file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
+      category: Testing and Quality Assurance
+      status: Identified
     - id: write-results-platform-phase-2-operations-runbook
       file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
       title: Write the Phase 2 results-platform operations runbook

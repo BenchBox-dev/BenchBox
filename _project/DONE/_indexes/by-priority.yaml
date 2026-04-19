@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:00:11.446166'
-total_items: 729
+generated_at: '2026-04-19T08:05:20.987363'
+total_items: 730
 priorities:
   Critical:
     count: 41
@@ -210,7 +210,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 254
+    count: 255
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -789,6 +789,11 @@ priorities:
       title: Implement TPC-DS Queries for Both Families
       category: Core Functionality
       status: Not Started
+    - id: implement-results-explorer-browser-functional-tests
+      file: DONE/main/active/implement-results-explorer-browser-functional-tests.yaml
+      title: Implement browser-based functional testing for the results explorer
+      category: Testing and Quality Assurance
+      status: Completed
     - id: on-demand-tpc-answer-download
       file: DONE/core-functionality/planning/on-demand-tpc-answer-download.yaml
       title: Implement on-demand download of TPC answer files for validation

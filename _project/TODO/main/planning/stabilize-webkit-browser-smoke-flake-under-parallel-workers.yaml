@@ -1,0 +1,135 @@
+id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
+title: "Stabilize the results-explorer WebKit @smoke run under parallel workers"
+worktree: main
+priority: Medium
+status: Identified
+category: Testing and Quality Assurance
+
+description: |
+  The browser-functional suite added by
+  `implement-results-explorer-browser-functional-tests` has Chromium as a
+  blocking gate and Firefox + WebKit `@smoke` as non-blocking
+  cross-browser coverage. During validation (w9 of the parent TODO) the
+  WebKit smoke run flaked when Playwright ran multiple workers in
+  parallel: one of the seven `@smoke` tests (varies — observed on
+  `Query workbench @smoke` during the validation run) failed while the
+  same test passed both when run in isolation and when the project is
+  run with `--workers=1`.
+
+  Pattern observed locally on macOS:
+
+  - `npm run test:e2e -- --project=webkit --grep @smoke` → 1/7 failed
+  - `npm run test:e2e -- --project=webkit --grep @smoke --workers=1` → 7/7 passed
+  - `npm run test:e2e -- --project=webkit --grep "Query workbench.*@smoke"` → 1/1 passed
+
+  The flake does not reproduce in Firefox or Chromium. The most likely
+  cause is a WebKit-specific race during DuckDB-WASM CDN init when
+  multiple pages are mounting simultaneously — each page downloads the
+  ~6 MB WASM bundle from jsDelivr, and WebKit's fetch/cache layer
+  appears to serialise them unevenly.
+
+  Candidate remediations, in order of preference:
+
+  1. Vendor the DuckDB-WASM bundle locally for the test harness so init
+     does not depend on jsDelivr under test. This also speeds up the
+     suite.
+  2. Reduce WebKit parallelism via Playwright project-level config
+     (currently not directly supported — may require a `globalSetup`
+     hook or splitting the config into per-project runs).
+  3. Pre-warm DuckDB in a shared `BeforeAll` fixture so the first-page
+     init cost is paid once.
+
+deps:
+  needs:
+    - implement-results-explorer-browser-functional-tests
+
+work:
+  - id: w1
+    summary: "Reproduce and capture the flake with trace + network log"
+    status: pending
+    notes: |
+      Re-run `npm run test:e2e -- --project=webkit --grep @smoke`
+      locally until the flake reproduces, and keep the
+      `playwright-report/` + `test-results/trace.zip` artifact. Confirm
+      from the trace whether the stall is a jsDelivr request, a WASM
+      instantiate step, or a first-ATTACH range-read.
+
+  - id: w2
+    summary: "Pick a remediation and prototype it against the WebKit smoke run"
+    needs: [w1]
+    status: pending
+    notes: |
+      Prefer vendoring the DuckDB-WASM bundle locally (option 1). If
+      bundle size is an issue for the committed fixture dir, serve the
+      bundle from the same static server rather than pointing at
+      jsDelivr. Keep the change invisible to Chromium/Firefox runs —
+      they pass cleanly today and should continue to.
+
+  - id: w3
+    summary: "Graduate WebKit smoke to a blocking gate"
+    needs: [w2]
+    status: pending
+    notes: |
+      Once the flake is gone for 10+ consecutive runs in CI, flip the
+      `webkit-smoke` job in `.github/workflows/results-explorer-browser.yml`
+      to remove `continue-on-error: true`. Apply the same change to
+      Firefox smoke once its own flake characteristics support it.
+
+must_preserve:
+  - "The Chromium blocking gate continues to run the full suite without regression."
+  - "Firefox @smoke continues to pass cleanly."
+  - "No production-code seam is introduced for failure injection — the
+    original architecture decision stands."
+
+approach: |
+  Start from the trace, not from guesswork. The suite already captures
+  traces on failure — the first step is to confirm whether the failing
+  step is a WASM download, an `ATTACH`, or a navigation. Pick the
+  remediation that addresses that specific step.
+
+anti_patterns:
+  - "DO NOT paper over the flake with retries — because this hides the underlying WebKit-specific issue and ships silent instability to maintainers — identify and fix the root cause."
+  - "DO NOT drop WebKit from the matrix — because Safari/WebKit rendering is a real user surface — graduate it once stable, don't remove it."
+
+verification:
+  - description: "The TODO item itself validates cleanly"
+    command: "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml"
+    expected_output: "Validation passes with no schema or DAG errors"
+  - description: "WebKit smoke passes 10 consecutive times under default parallelism"
+    command: "for i in 1 2 3 4 5 6 7 8 9 10; do cd results-explorer && npm run test:e2e -- --project=webkit --grep @smoke || exit 1; done"
+    expected_output: "All 10 WebKit smoke runs pass"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/playwright.config.ts"
+    - "results-explorer/scripts/serve-browser-tests.mjs"
+    - "results-explorer/e2e/support/"
+    - "results-explorer/package.json"
+    - "results-explorer/package-lock.json"
+    - ".github/workflows/results-explorer-browser.yml"
+  do_not_modify:
+    - "results-explorer/src/"
+    - "results-data/bundles/"
+
+metadata:
+  tags:
+    - "results"
+    - "explorer"
+    - "testing"
+    - "browser"
+    - "flake"
+    - "webkit"
+  estimated_effort: "Small"
+  created_date: "2026-04-19"
+
+impact:
+  business_value: |
+    Lets us promote WebKit from a non-blocking smoke gate to a blocking
+    gate, closing the cross-browser coverage story and removing a class
+    of Safari-specific regressions from the manual release check.
+  user_impact: |
+    Safari users of the results explorer get automated protection from
+    regressions in DuckDB-WASM init and routing behaviour.
+  technical_debt: |
+    Removes a non-blocking job from the CI matrix and a known flaky-run
+    workaround from the browser-testing release-check doc.

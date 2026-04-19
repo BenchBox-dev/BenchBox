@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:00:09.721743'
+generated_at: '2026-04-19T08:05:19.382216'
 total_categories: 13
 categories:
   Architecture & Refactoring:
@@ -285,16 +285,16 @@ categories:
       title: Address follow-up findings from parity-tests code review
       priority: Low
       status: Not Started
-    - id: implement-results-explorer-browser-functional-tests
-      file: TODO/main/active/implement-results-explorer-browser-functional-tests.yaml
-      title: Implement browser-based functional testing for the results explorer
-      priority: High
-      status: In Progress
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
       priority: High
       status: Not Started
+    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
+      file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
+      priority: Medium
+      status: Identified
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR

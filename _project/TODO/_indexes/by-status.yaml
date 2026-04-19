@@ -1,14 +1,9 @@
-generated_at: '2026-04-19T08:00:09.721774'
+generated_at: '2026-04-19T08:05:19.382247'
 total_items: 53
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: implement-results-explorer-browser-functional-tests
-      file: TODO/main/active/implement-results-explorer-browser-functional-tests.yaml
-      title: Implement browser-based functional testing for the results explorer
-      priority: High
-      category: Testing and Quality Assurance
     - id: questdb-benchmark-compatibility-remediation
       file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
       title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
@@ -228,13 +223,18 @@ statuses:
       priority: Low
       category: Benchmark Development
   Identified:
-    count: 1
+    count: 2
     items:
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       priority: Medium
       category: Performance
+    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
+      file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
+      priority: Medium
+      category: Testing and Quality Assurance
   Completed:
     count: 8
     items:

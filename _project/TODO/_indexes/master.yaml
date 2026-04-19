@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:00:09.721711'
+generated_at: '2026-04-19T08:05:19.382181'
 total_items: 53
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -38,27 +38,6 @@ items:
   work_ready: 1
   needs:
   - implement-pr-based-result-submission-workflow
-- id: implement-results-explorer-browser-functional-tests
-  file: TODO/main/active/implement-results-explorer-browser-functional-tests.yaml
-  title: Implement browser-based functional testing for the results explorer
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: High
-  status: In Progress
-  tags:
-  - results
-  - explorer
-  - testing
-  - browser
-  - e2e
-  - playwright
-  - quality-gate
-  estimated_effort: Large
-  work_total: 9
-  work_done: 7
-  work_ready: 1
-  needs:
-  - launch-results-explorer-acceptance-and-seed
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -762,6 +741,26 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
+  file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+  title: Stabilize the results-explorer WebKit @smoke run under parallel workers
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Identified
+  tags:
+  - results
+  - explorer
+  - testing
+  - browser
+  - flake
+  - webkit
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  needs:
+  - implement-results-explorer-browser-functional-tests
 - id: write-results-platform-phase-2-operations-runbook
   file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
   title: Write the Phase 2 results-platform operations runbook

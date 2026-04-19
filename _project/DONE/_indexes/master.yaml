@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:00:11.445699'
-total_items: 729
+generated_at: '2026-04-19T08:05:20.986880'
+total_items: 730
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2455,6 +2455,28 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 4 weeks
+- id: implement-results-explorer-browser-functional-tests
+  file: DONE/main/active/implement-results-explorer-browser-functional-tests.yaml
+  title: Implement browser-based functional testing for the results explorer
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - testing
+  - browser
+  - e2e
+  - playwright
+  - quality-gate
+  estimated_effort: Large
+  completed_date: '2026-04-19'
+  work_total: 9
+  work_done: 9
+  work_ready: 0
+  needs:
+  - launch-results-explorer-acceptance-and-seed
 - id: on-demand-tpc-answer-download
   file: DONE/core-functionality/planning/on-demand-tpc-answer-download.yaml
   title: Implement on-demand download of TPC answer files for validation
