@@ -31,7 +31,7 @@ description: |
   The e2e harness already serves the snapshot with `Accept-Ranges: bytes`
   and honours `Range: bytes=...` with `206 Partial Content` (see
   `results-explorer/scripts/serve-browser-tests.mjs` and
-  `results-explorer/e2e/failures/range-read-budget.spec.ts`), so the
+  `results-explorer/e2e/capability/range-read-budget.spec.ts`), so the
   moment the browser runtime starts issuing range reads, the RG-2
   byte-budget assertion can be re-introduced without any server change.
 
@@ -45,7 +45,7 @@ description: |
      `registerFileURL`, or (c) file an upstream issue/PR and pin to a
      build that includes the fix.
   3. Re-enable the byte-budget assertion in
-     `results-explorer/e2e/failures/range-read-budget.spec.ts` using
+     `results-explorer/e2e/capability/range-read-budget.spec.ts` using
      the server-side `/__test/transfers` accounting already in place.
 
 deps:
@@ -89,7 +89,7 @@ work:
     status: pending
     notes: |
       Replace the capability-only assertions in
-      `results-explorer/e2e/failures/range-read-budget.spec.ts` with the
+      `results-explorer/e2e/capability/range-read-budget.spec.ts` with the
       original server-side transfer-log assertion: after a cold `goto`
       of `/results/` followed by `waitForDataLoaded`, the sum of
       `Content-Length` transfers under `/results/data/results.duckdb`
@@ -125,7 +125,7 @@ scope_limit:
     - "results-explorer/package.json"
     - "results-explorer/package-lock.json"
     - "results-explorer/src/db.ts"
-    - "results-explorer/e2e/failures/range-read-budget.spec.ts"
+    - "results-explorer/e2e/capability/range-read-budget.spec.ts"
   do_not_modify:
     - "results-explorer/scripts/serve-browser-tests.mjs"
     - "results-explorer/public/data/"
