@@ -1,5 +1,5 @@
-generated_at: '2026-04-18T20:15:59.795612'
-total_items: 52
+generated_at: '2026-04-19T08:00:09.721761'
+total_items: 53
 priorities:
   Critical:
     count: 2
@@ -96,7 +96,7 @@ priorities:
       category: Platform Support
       status: Not Started
   Medium:
-    count: 7
+    count: 8
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -118,6 +118,11 @@ priorities:
       title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Not Started
+    - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
+      file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
+      title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
+      category: Performance
+      status: Identified
     - id: implement-pr-based-result-submission-workflow
       file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
       title: Implement PR-based community result submission workflow

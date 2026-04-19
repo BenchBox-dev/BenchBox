@@ -1,5 +1,5 @@
-generated_at: '2026-04-18T20:15:59.795547'
-total_items: 52
+generated_at: '2026-04-19T08:00:09.721711'
+total_items: 53
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -55,8 +55,8 @@ items:
   - quality-gate
   estimated_effort: Large
   work_total: 9
-  work_done: 1
-  work_ready: 2
+  work_done: 7
+  work_ready: 1
   needs:
   - launch-results-explorer-acceptance-and-seed
 - id: integrate-benchbox-cli-submit-and-service-auth
@@ -703,6 +703,25 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
+- id: enable-duckdb-wasm-http-range-reads-for-registered-urls
+  file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
+  title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
+  worktree: main
+  category: Performance
+  priority: Medium
+  status: Identified
+  tags:
+  - results
+  - explorer
+  - duckdb-wasm
+  - performance
+  - http-range
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  needs:
+  - implement-results-explorer-browser-functional-tests
 - id: implement-pr-based-result-submission-workflow
   file: TODO/main/planning/implement-pr-based-result-submission-workflow.yaml
   title: Implement PR-based community result submission workflow

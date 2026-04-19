@@ -1,5 +1,5 @@
-generated_at: '2026-04-18T20:15:59.795628'
-total_items: 52
+generated_at: '2026-04-19T08:00:09.721774'
+total_items: 53
 statuses:
   In Progress:
     count: 2
@@ -227,6 +227,14 @@ statuses:
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
+  Identified:
+    count: 1
+    items:
+    - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
+      file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
+      title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
+      priority: Medium
+      category: Performance
   Completed:
     count: 8
     items:

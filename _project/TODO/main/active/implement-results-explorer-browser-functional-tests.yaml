@@ -160,7 +160,7 @@ work:
   - id: w7
     summary: "Cover failure and recovery paths with user-visible assertions"
     needs: [w2, w3, w5, w6]
-    status: pending
+    status: done
     notes: |
       Add explicit tests for the behaviors jsdom does not prove today:
       - DuckDB snapshot missing/corrupt or unreachable
