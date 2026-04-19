@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:04:37.673281'
-total_items: 42
+generated_at: '2026-04-19T10:06:46.841938'
+total_items: 41
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -254,22 +254,6 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
-- id: questdb-parquet-chunk-size-tunable
-  file: TODO/main/planning/questdb-parquet-chunk-size-tunable.yaml
-  title: Make QuestDB parquet chunk row count tunable via platform config
-  worktree: main
-  category: Platform Support
-  priority: Low
-  status: Not Started
-  tags:
-  - questdb
-  - parquet
-  - performance
-  - configurability
-  estimated_effort: Trivial (< 1 hour)
-  work_total: 2
-  work_done: 0
-  work_ready: 1
 - id: normalize-pg-family-driver-package-fallback
   file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
   title: Normalize driver_package fallback string across pg-family config builders

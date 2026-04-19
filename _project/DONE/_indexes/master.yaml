@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:04:40.743755'
-total_items: 743
+generated_at: '2026-04-19T10:06:48.715770'
+total_items: 744
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4905,6 +4905,23 @@ items:
   - explorer-result-detail-median-first
   - explorer-unified-chart-panel
   - explorer-url-synced-filter-state
+- id: questdb-parquet-chunk-size-tunable
+  file: DONE/main/planning/questdb-parquet-chunk-size-tunable.yaml
+  title: Make QuestDB parquet chunk row count tunable via platform config
+  worktree: main
+  category: Platform Support
+  priority: Low
+  status: Completed
+  tags:
+  - questdb
+  - parquet
+  - performance
+  - configurability
+  estimated_effort: Trivial (< 1 hour)
+  completed_date: '2026-04-19'
+  work_total: 2
+  work_done: 2
+  work_ready: 0
 - id: move-jsonschema-out-of-core-runtime-deps
   file: DONE/main/active/move-jsonschema-out-of-core-runtime-deps.yaml
   title: Move jsonschema out of core deps (used only by _project/ tooling)

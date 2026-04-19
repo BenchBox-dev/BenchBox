@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:04:37.673332'
-total_items: 42
+generated_at: '2026-04-19T10:06:46.841999'
+total_items: 41
 priorities:
   Critical:
     count: 2
@@ -149,7 +149,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 14
+    count: 13
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -180,11 +180,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: questdb-parquet-chunk-size-tunable
-      file: TODO/main/planning/questdb-parquet-chunk-size-tunable.yaml
-      title: Make QuestDB parquet chunk row count tunable via platform config
-      category: Platform Support
       status: Not Started
     - id: normalize-pg-family-driver-package-fallback
       file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml

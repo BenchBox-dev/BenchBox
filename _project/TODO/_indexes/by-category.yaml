@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T10:04:37.673315'
+generated_at: '2026-04-19T10:06:46.841980'
 total_categories: 14
 categories:
   Architecture & Refactoring:
@@ -179,13 +179,8 @@ categories:
       priority: Low
       status: Not Started
   Platform Support:
-    count: 3
+    count: 2
     items:
-    - id: questdb-parquet-chunk-size-tunable
-      file: TODO/main/planning/questdb-parquet-chunk-size-tunable.yaml
-      title: Make QuestDB parquet chunk row count tunable via platform config
-      priority: Low
-      status: Not Started
     - id: questdb-benchmark-compatibility-remediation
       file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
       title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'

@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T10:04:40.744666'
+generated_at: '2026-04-19T10:06:48.716151'
 total_categories: 79
 categories:
   '"Bug Fixes & Reliability"':
@@ -2969,11 +2969,16 @@ categories:
       priority: Medium
       status: Completed
   Platform Support:
-    count: 1
+    count: 2
     items:
     - id: questdb-strip-pk-quoted-constraint-name
       file: DONE/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
       title: Extend _strip_pk_constraints to handle quoted constraint names
+      priority: Low
+      status: Completed
+    - id: questdb-parquet-chunk-size-tunable
+      file: DONE/main/planning/questdb-parquet-chunk-size-tunable.yaml
+      title: Make QuestDB parquet chunk row count tunable via platform config
       priority: Low
       status: Completed
   Platform Support and Deployment:
