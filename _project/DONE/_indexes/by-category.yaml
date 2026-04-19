@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:02:13.481351'
-total_categories: 78
+generated_at: '2026-04-19T10:04:40.744666'
+total_categories: 79
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -2967,6 +2967,14 @@ categories:
       file: DONE/platform-expansion/planning/firebolt-mode-validation.yaml
       title: Firebolt Core/Cloud Mode Validation
       priority: Medium
+      status: Completed
+  Platform Support:
+    count: 1
+    items:
+    - id: questdb-strip-pk-quoted-constraint-name
+      file: DONE/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
+      title: Extend _strip_pk_constraints to handle quoted constraint names
+      priority: Low
       status: Completed
   Platform Support and Deployment:
     count: 5

@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:02:13.481719'
-total_items: 742
+generated_at: '2026-04-19T10:04:40.745529'
+total_items: 743
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 691
+    count: 692
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1653,6 +1653,11 @@ statuses:
       title: Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters
       priority: Medium-High
       category: Core Functionality
+    - id: questdb-strip-pk-quoted-constraint-name
+      file: DONE/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
+      title: Extend _strip_pk_constraints to handle quoted constraint names
+      priority: Low
+      category: Platform Support
     - id: explorer-extend-manifest-and-pipeline
       file: DONE/main/planning/explorer-extend-manifest-and-pipeline.yaml
       title: Extend explorer pipeline manifest and DuckDB schema with missing bundle fields

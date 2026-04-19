@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:02:13.481542'
-total_items: 742
+generated_at: '2026-04-19T10:04:40.745122'
+total_items: 743
 priorities:
   Critical:
     count: 41
@@ -3526,7 +3526,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 41
+    count: 42
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3657,6 +3657,11 @@ priorities:
       file: DONE/main/quality/quality-expand-agents-md-and-document-test-lock.yaml
       title: Expand AGENTS.md and document the test inter-process lock
       category: Project Lifecycle Management
+      status: Completed
+    - id: questdb-strip-pk-quoted-constraint-name
+      file: DONE/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
+      title: Extend _strip_pk_constraints to handle quoted constraint names
+      category: Platform Support
       status: Completed
     - id: dedup-tpcds-constants-empty-results
       file: DONE/core-functionality/active/dedup-tpcds-constants-empty-results.yaml

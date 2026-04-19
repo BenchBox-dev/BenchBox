@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:02:11.577780'
-total_items: 43
+generated_at: '2026-04-19T10:04:37.673345'
+total_items: 42
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 30
+    count: 29
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -57,11 +57,6 @@ statuses:
       title: Design results ingest, storage, and derived read-model architecture
       priority: Medium
       category: Core Functionality
-    - id: questdb-strip-pk-quoted-constraint-name
-      file: TODO/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
-      title: Extend _strip_pk_constraints to handle quoted constraint names
-      priority: Low
-      category: Platform Support
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

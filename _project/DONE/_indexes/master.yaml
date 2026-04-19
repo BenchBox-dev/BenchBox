@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:02:13.481001'
-total_items: 742
+generated_at: '2026-04-19T10:04:40.743755'
+total_items: 743
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4763,6 +4763,23 @@ items:
   completed_date: '2026-04-12'
   work_total: 3
   work_done: 3
+  work_ready: 0
+- id: questdb-strip-pk-quoted-constraint-name
+  file: DONE/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
+  title: Extend _strip_pk_constraints to handle quoted constraint names
+  worktree: main
+  category: Platform Support
+  priority: Low
+  status: Completed
+  tags:
+  - questdb
+  - ddl
+  - regex
+  - robustness
+  estimated_effort: Trivial (< 30 minutes)
+  completed_date: '2026-04-19'
+  work_total: 1
+  work_done: 1
   work_ready: 0
 - id: dedup-tpcds-constants-empty-results
   file: DONE/core-functionality/active/dedup-tpcds-constants-empty-results.yaml

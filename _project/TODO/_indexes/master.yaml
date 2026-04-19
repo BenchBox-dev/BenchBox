@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:02:11.577721'
-total_items: 43
+generated_at: '2026-04-19T10:04:37.673281'
+total_items: 42
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -198,22 +198,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 3
-- id: questdb-strip-pk-quoted-constraint-name
-  file: TODO/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
-  title: Extend _strip_pk_constraints to handle quoted constraint names
-  worktree: main
-  category: Platform Support
-  priority: Low
-  status: Not Started
-  tags:
-  - questdb
-  - ddl
-  - regex
-  - robustness
-  estimated_effort: Trivial (< 30 minutes)
-  work_total: 1
-  work_done: 0
-  work_ready: 1
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
