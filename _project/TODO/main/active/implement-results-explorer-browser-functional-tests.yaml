@@ -106,7 +106,7 @@ work:
   - id: w4
     summary: "Cover Home plus benchmark/platform index happy paths under the real `/results/` base path"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Add browser tests for:
       - Home
