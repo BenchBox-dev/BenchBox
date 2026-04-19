@@ -19,8 +19,11 @@ class AllowlistEntry(TypedDict, total=False):
     path_glob: str
     symbol: str
     line_regex: str
+    reason: str
 
 
+# Keys prefixed with "_" in the fast-lane policy JSON are human-facing annotations
+# (e.g. "_ceiling_note") and are intentionally not modeled here.
 class FastLanePolicy(TypedDict, total=False):
     enabled: bool
     max_fast_tests: int
