@@ -125,7 +125,7 @@ work:
   - id: w5
     summary: "Cover ResultDetail and Compare happy paths, deep links, and shareable URL-state workflows"
     needs: [w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Add browser tests for:
       - ResultDetail
