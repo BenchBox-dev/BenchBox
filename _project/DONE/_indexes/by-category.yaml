@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:54:35.146872'
+generated_at: '2026-04-19T08:57:24.805252'
 total_categories: 78
 categories:
   '"Bug Fixes & Reliability"':
@@ -3515,7 +3515,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 40
+    count: 41
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3562,6 +3562,11 @@ categories:
       file: DONE/tpch-stdout-fix/planning/test-stdout-datagen.yaml
       title: Add regression tests for TPC-H stdout data generation
       priority: High
+      status: Completed
+    - id: explorer-heatmap-accessibility-review-followups
+      file: DONE/main/explorer-heatmap-accessibility-review-followups.yaml
+      title: Address follow-up findings from heatmap-accessibility code review
+      priority: Low
       status: Completed
     - id: quality-audit-skip-xfail-markers-add-rationale
       file: DONE/main/quality/quality-audit-skip-xfail-markers-add-rationale.yaml

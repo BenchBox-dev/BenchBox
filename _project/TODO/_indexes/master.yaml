@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:54:32.476726'
-total_items: 52
+generated_at: '2026-04-19T08:57:22.829522'
+total_items: 51
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -182,23 +182,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: explorer-heatmap-accessibility-review-followups
-  file: TODO/main/planning/explorer-heatmap-accessibility-review-followups.yaml
-  title: Address follow-up findings from heatmap-accessibility code review
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: Low
-  status: Not Started
-  tags:
-  - explorer
-  - accessibility
-  - a11y
-  - testing
-  - review-followup
-  estimated_effort: Tiny (< 1 hour)
-  work_total: 4
-  work_done: 0
-  work_ready: 4
 - id: explorer-matrix-leaderboard-review-followups
   file: TODO/main/planning/explorer-matrix-leaderboard-review-followups.yaml
   title: Address follow-up findings from matrix-leaderboard code review

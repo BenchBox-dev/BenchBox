@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:54:32.476769'
+generated_at: '2026-04-19T08:57:22.829567'
 total_categories: 14
 categories:
   Architecture & Refactoring:
@@ -266,13 +266,8 @@ categories:
       priority: Low
       status: Not Started
   Testing and Quality Assurance:
-    count: 7
+    count: 6
     items:
-    - id: explorer-heatmap-accessibility-review-followups
-      file: TODO/main/planning/explorer-heatmap-accessibility-review-followups.yaml
-      title: Address follow-up findings from heatmap-accessibility code review
-      priority: Low
-      status: Not Started
     - id: explorer-parity-tests-review-followups
       file: TODO/main/planning/explorer-parity-tests-review-followups.yaml
       title: Address follow-up findings from parity-tests code review

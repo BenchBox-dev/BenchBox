@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:54:35.146445'
-total_items: 733
+generated_at: '2026-04-19T08:57:24.804848'
+total_items: 734
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4497,6 +4497,24 @@ items:
   completed_date: '2026-04-19'
   work_total: 5
   work_done: 5
+  work_ready: 0
+- id: explorer-heatmap-accessibility-review-followups
+  file: DONE/main/explorer-heatmap-accessibility-review-followups.yaml
+  title: Address follow-up findings from heatmap-accessibility code review
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Low
+  status: Completed
+  tags:
+  - explorer
+  - accessibility
+  - a11y
+  - testing
+  - review-followup
+  estimated_effort: Tiny (< 1 hour)
+  completed_date: '2026-04-19'
+  work_total: 4
+  work_done: 4
   work_ready: 0
 - id: pg-duckdb-native-comparison
   file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:54:32.476807'
-total_items: 52
+generated_at: '2026-04-19T08:57:22.829605'
+total_items: 51
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 39
+    count: 38
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -42,11 +42,6 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
-    - id: explorer-heatmap-accessibility-review-followups
-      file: TODO/main/planning/explorer-heatmap-accessibility-review-followups.yaml
-      title: Address follow-up findings from heatmap-accessibility code review
-      priority: Low
-      category: Testing and Quality Assurance
     - id: explorer-matrix-leaderboard-review-followups
       file: TODO/main/planning/explorer-matrix-leaderboard-review-followups.yaml
       title: Address follow-up findings from matrix-leaderboard code review

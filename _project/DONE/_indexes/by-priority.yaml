@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:54:35.147071'
-total_items: 733
+generated_at: '2026-04-19T08:57:24.805458'
+total_items: 734
 priorities:
   Critical:
     count: 41
@@ -3526,7 +3526,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 32
+    count: 33
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3572,6 +3572,11 @@ priorities:
       file: DONE/main/explorer-meta-leaderboard-review-followups.yaml
       title: Address follow-up findings from cross-benchmark meta-leaderboard code review
       category: Core Functionality
+      status: Completed
+    - id: explorer-heatmap-accessibility-review-followups
+      file: DONE/main/explorer-heatmap-accessibility-review-followups.yaml
+      title: Address follow-up findings from heatmap-accessibility code review
+      category: Testing and Quality Assurance
       status: Completed
     - id: pg-duckdb-native-comparison
       file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml
