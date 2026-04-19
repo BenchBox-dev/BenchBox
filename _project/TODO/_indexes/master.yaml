@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:15:30.131511'
-total_items: 40
+generated_at: '2026-04-19T10:38:23.674120'
+total_items: 39
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -74,24 +74,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
-- id: questdb-benchmark-compatibility-remediation
-  file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
-  title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
-  worktree: main
-  category: Platform Support
-  priority: High
-  status: In Progress
-  tags:
-  - questdb
-  - compatibility
-  - platform-support
-  - sql-dialect
-  - adapter
-  estimated_effort: Large (1-2 weeks across phases)
-  work_total: 13
-  work_done: 12
-  work_ready: 1
-  deferred_count: 3
 - id: fix-git-author-history-rewrite
   file: TODO/main/planning/fix-git-author-history-rewrite.yaml
   title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)

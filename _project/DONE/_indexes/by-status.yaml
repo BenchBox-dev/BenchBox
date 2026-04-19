@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:15:31.859232'
-total_items: 745
+generated_at: '2026-04-19T10:38:25.413233'
+total_items: 746
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 694
+    count: 695
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2754,6 +2754,11 @@ statuses:
       title: 'Query Plan Remediation - Phase 9: Advanced Features'
       priority: Low
       category: Enhancement
+    - id: questdb-benchmark-compatibility-remediation
+      file: DONE/main/active/questdb-benchmark-compatibility-remediation.yaml
+      title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
+      priority: High
+      category: Platform Support
     - id: quick-start-tutorials
       file: DONE/docs-experience/completed/quick-start-tutorials.yaml
       title: Quick-Start Tutorials

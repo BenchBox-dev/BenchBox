@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:15:31.858598'
-total_items: 745
+generated_at: '2026-04-19T10:38:25.412586'
+total_items: 746
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3265,6 +3265,24 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 1.5-2 weeks
+- id: questdb-benchmark-compatibility-remediation
+  file: DONE/main/active/questdb-benchmark-compatibility-remediation.yaml
+  title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
+  worktree: main
+  category: Platform Support
+  priority: High
+  status: Completed
+  tags:
+  - questdb
+  - compatibility
+  - platform-support
+  - sql-dialect
+  - adapter
+  estimated_effort: Large (1-2 weeks across phases)
+  work_total: 13
+  work_done: 13
+  work_ready: 0
+  deferred_count: 3
 - id: quick-start-tutorials
   file: DONE/docs-experience/completed/quick-start-tutorials.yaml
   title: Quick-Start Tutorials

@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:15:30.131544'
-total_categories: 14
+generated_at: '2026-04-19T10:38:23.674148'
+total_categories: 13
 categories:
   Architecture & Refactoring:
     count: 2
@@ -178,14 +178,6 @@ categories:
       title: TigerData Cloud Enhancements
       priority: Low
       status: Not Started
-  Platform Support:
-    count: 1
-    items:
-    - id: questdb-benchmark-compatibility-remediation
-      file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
-      title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
-      priority: High
-      status: In Progress
   Repository Maintenance:
     count: 1
     items:

@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T10:15:31.858893'
+generated_at: '2026-04-19T10:38:25.412895'
 total_categories: 79
 categories:
   '"Bug Fixes & Reliability"':
@@ -2969,7 +2969,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Support:
-    count: 3
+    count: 4
     items:
     - id: questdb-strip-pk-quoted-constraint-name
       file: DONE/main/planning/questdb-strip-pk-quoted-constraint-name.yaml
@@ -2980,6 +2980,11 @@ categories:
       file: DONE/main/planning/questdb-parquet-chunk-size-tunable.yaml
       title: Make QuestDB parquet chunk row count tunable via platform config
       priority: Low
+      status: Completed
+    - id: questdb-benchmark-compatibility-remediation
+      file: DONE/main/active/questdb-benchmark-compatibility-remediation.yaml
+      title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
+      priority: High
       status: Completed
     - id: questdb-imp-headerless-column-mapping-verify
       file: DONE/main/planning/questdb-imp-headerless-column-mapping-verify.yaml

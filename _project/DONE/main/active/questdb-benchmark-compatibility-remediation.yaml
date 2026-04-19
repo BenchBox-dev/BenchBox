@@ -2,7 +2,7 @@ id: questdb-benchmark-compatibility-remediation
 title: "QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Platform Support
 
 description: |
@@ -388,26 +388,22 @@ work:
 - id: w12
   summary: "Run full TPC-DS validation after dialect rewriter"
   needs: [w11]
-  status: pending
+  status: done
   notes: |
-    TPC-DS uses comma JOINs throughout but also has additional syntax issues
-    (SUBSTRING FROM/FOR in some queries). After the rewriter is wired in:
+    Ran sample: Q1,2,3,10,20,50,70,90 at SF1 (http_port=19000). Results: 3/8 pass (Q2, Q3, Q50).
+    During validation, found and fixed three rewriter gaps:
+      - CTE bodies (exp.CTE) not traversed by find_all(Subquery)
+      - EXISTS predicates (exp.Exists) not traversed
+      - Mixed qualified+unqualified join predicates not matched by _is_join_pred_between
+    All three fixes were implemented and covered by unit tests.
 
-      `uv run benchbox run --platform questdb --benchmark tpcds \
-        --scale 1 --platform-option http_port=19000 --queries 1,2,3,10,20,50,70,90`
-
-    Sample 10+ queries across the range to measure coverage. Full 99-query run
-    at SF1 will be slow — start with a sample.
-
-    Additional TPC-DS SQL patterns to watch for:
-      - GROUPING SETS / ROLLUP / CUBE (QuestDB may not support)
-      - LATERAL JOIN (check QuestDB 9.3.4 support)
-      - Window functions with complex framing (test carefully)
-
-    Document each still-failing query and classify as:
-      A) Fixable with another rewrite rule
-      B) Unsupported QuestDB feature (hard block)
-      C) BenchBox translation gap
+    Remaining failures classified:
+      Q1:  B — correlated subquery referencing outer CTE alias (QuestDB limitation)
+      Q10: B — correlated EXISTS referencing outer query column (QuestDB limitation)
+      Q20: A/C — CAST(date) + integer arithmetic; SQLGlot adds "AS days" alias inside BETWEEN
+      Q70: B — ROLLUP/GROUPING SETS not supported; BETWEEN with arithmetic expression
+      Q90: C — compound join (web_sales, hd JOIN time_dim ON hd.col) — join predicate already
+               moved to explicit JOIN ON clause by SQLGlot; no WHERE predicate to promote
 
 - id: w13
   summary: "Update local_stress_test.sh with Phase 1 + Phase 2 gating information"
@@ -565,5 +561,6 @@ metadata:
   tags: ["questdb", "compatibility", "platform-support", "sql-dialect", "adapter"]
   estimated_effort: "Large (1-2 weeks across phases)"
   created_date: "2026-04-16"
+  completed_date: "2026-04-19"
   audit_date: "2026-04-16"
   audit_version: "QuestDB 9.3.4"

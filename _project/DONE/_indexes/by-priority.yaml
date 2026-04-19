@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T10:15:31.859068'
-total_items: 745
+generated_at: '2026-04-19T10:38:25.413068'
+total_items: 746
 priorities:
   Critical:
     count: 41
@@ -210,7 +210,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 255
+    count: 256
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -1058,6 +1058,11 @@ priorities:
       file: DONE/query-plan-remediation/phase-5-testing-infrastructure.yaml
       title: 'Query Plan Remediation - Phase 5: Testing Infrastructure'
       category: Testing & Quality
+      status: Completed
+    - id: questdb-benchmark-compatibility-remediation
+      file: DONE/main/active/questdb-benchmark-compatibility-remediation.yaml
+      title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'
+      category: Platform Support
       status: Completed
     - id: quick-start-tutorials
       file: DONE/docs-experience/completed/quick-start-tutorials.yaml
