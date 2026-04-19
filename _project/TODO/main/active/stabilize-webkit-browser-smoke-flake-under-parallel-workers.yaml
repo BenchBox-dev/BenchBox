@@ -57,10 +57,8 @@ work:
     needs: [w2]
     status: pending
     notes: |
-      Once the flake is gone for 10+ consecutive runs in CI, flip the
-      `webkit-smoke` job in `.github/workflows/results-explorer-browser.yml`
-      to remove `continue-on-error: true`. Apply the same change to
-      Firefox smoke once its own flake characteristics support it.
+      Tracked in follow-up TODO: graduate-browser-smoke-to-blocking-gates.
+      Gate: 10 consecutive CI green runs for webkit-smoke.
 
 must_preserve:
   - "The Chromium blocking gate continues to run the full suite without regression."

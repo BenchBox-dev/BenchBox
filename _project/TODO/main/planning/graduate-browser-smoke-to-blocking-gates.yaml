@@ -1,0 +1,87 @@
+id: graduate-browser-smoke-to-blocking-gates
+title: "Graduate Firefox and WebKit @smoke CI jobs to blocking gates"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Both `firefox-smoke` and `webkit-smoke` jobs in
+  `.github/workflows/results-explorer-browser.yml` run with
+  `continue-on-error: true`, making them advisory-only. This item
+  flips each to a blocking gate once it demonstrates sufficient CI
+  stability.
+
+  WebKit: the DuckDB-WASM init race was fixed in
+  `stabilize-webkit-browser-smoke-flake-under-parallel-workers` (w2) by
+  serializing workers. Gate is 10 consecutive green CI runs post-fix.
+
+  Firefox: no known active flake. Gate is the same 10-consecutive-green
+  criterion applied independently — Firefox may be ready before WebKit
+  if it is already passing consistently.
+
+  Each browser is flipped independently; do not wait for both before
+  promoting one.
+
+deps:
+  needs:
+    - stabilize-webkit-browser-smoke-flake-under-parallel-workers
+
+work:
+  - id: w1
+    summary: "Flip webkit-smoke to a blocking gate after 10 consecutive CI green runs"
+    status: pending
+    notes: |
+      Monitor the `webkit-smoke` job in CI. Once 10 consecutive runs pass
+      without `continue-on-error` masking a failure, remove that flag from
+      the `webkit-smoke` job block in
+      `.github/workflows/results-explorer-browser.yml`.
+
+  - id: w2
+    summary: "Flip firefox-smoke to a blocking gate after 10 consecutive CI green runs"
+    status: pending
+    notes: |
+      Monitor the `firefox-smoke` job in CI. Apply the same flip
+      independently of w1 — Firefox may reach the 10-green threshold first.
+
+must_preserve:
+  - "The Chromium blocking gate is unaffected by either change."
+  - "Each browser is assessed independently — do not block one promotion on the other."
+
+anti_patterns:
+  - "DO NOT flip on a calendar or release schedule — because promoting before the run is stable will make the gate unreliable and erode trust in CI — gate strictly on the 10-consecutive-green criterion."
+  - "DO NOT flip both browsers in a single commit if their thresholds are reached at different times — because batching obscures which browser caused any subsequent regression — flip each in its own commit."
+
+verification:
+  - description: "WebKit smoke passes in CI (check recent workflow runs)"
+    command: "gh run list --workflow=results-explorer-browser.yml --limit=20 --json conclusion,name | jq '[.[] | select(.name==\"WebKit (@smoke, non-blocking)\") | .conclusion]'"
+    expected_output: "Last 10 entries are all \"success\""
+  - description: "Firefox smoke passes in CI (check recent workflow runs)"
+    command: "gh run list --workflow=results-explorer-browser.yml --limit=20 --json conclusion,name | jq '[.[] | select(.name==\"Firefox (@smoke, non-blocking)\") | .conclusion]'"
+    expected_output: "Last 10 entries are all \"success\""
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/results-explorer-browser.yml"
+  do_not_modify:
+    - "results-explorer/src/"
+    - "results-explorer/playwright.config.ts"
+
+metadata:
+  tags:
+    - "results"
+    - "explorer"
+    - "testing"
+    - "browser"
+    - "ci"
+    - "webkit"
+    - "firefox"
+  estimated_effort: "Trivial"
+  created_date: "2026-04-19"
+
+impact:
+  business_value: |
+    Closes the cross-browser coverage story — Safari and Firefox
+    regressions become release-blocking, not advisory.
+  technical_debt: |
+    Removes two `continue-on-error` workarounds from the CI matrix.
