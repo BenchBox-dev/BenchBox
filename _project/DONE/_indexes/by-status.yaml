@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T19:32:22.149383'
-total_items: 758
+generated_at: '2026-04-19T19:33:19.274836'
+total_items: 759
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 707
+    count: 708
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3159,6 +3159,11 @@ statuses:
       title: Stabilize Full Test Suite Failures
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
+      file: DONE/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
+      priority: Medium-High
+      category: Testing and Quality Assurance
     - id: standardize-benchmark-constraint-parameter-apis
       file: DONE/unknown/planning/standardize-benchmark-constraint-parameter-apis.yaml
       title: Standardize Benchmark Constraint Parameter APIs

@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T19:32:22.149045'
+generated_at: '2026-04-19T19:33:19.274458'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -3626,7 +3626,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 44
+    count: 45
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3818,6 +3818,11 @@ categories:
       file: DONE/ci-infrastructure/active/reenable-comprehensive-ci.yaml
       title: Re-enable comprehensive CI checks (linkcheck, security, coverage)
       priority: High
+      status: Completed
+    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
+      file: DONE/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
+      priority: Medium-High
       status: Completed
     - id: coverage-improvement
       file: DONE/observability-quality/active/coverage-improvement.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T19:32:22.148713'
-total_items: 758
+generated_at: '2026-04-19T19:33:19.274099'
+total_items: 759
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -10501,6 +10501,27 @@ items:
   - snowpark
   - pyspark-compatible
   estimated_effort: 1.5 weeks
+- id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
+  file: DONE/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+  title: Stabilize the results-explorer WebKit @smoke run under parallel workers
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium-High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - testing
+  - browser
+  - flake
+  - webkit
+  estimated_effort: Small
+  completed_date: '2026-04-19'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+  needs:
+  - implement-results-explorer-browser-functional-tests
 - id: docs-fix-naming-inconsistencies
   file: DONE/main/planning/docs-fix-naming-inconsistencies.yaml
   title: Standardize benchmark and platform naming across documentation

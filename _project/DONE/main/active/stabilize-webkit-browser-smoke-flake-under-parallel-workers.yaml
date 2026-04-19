@@ -2,7 +2,8 @@ id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
 title: "Stabilize the results-explorer WebKit @smoke run under parallel workers"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-04-19"
 category: Testing and Quality Assurance
 
 description: |
@@ -55,9 +56,9 @@ work:
   - id: w3
     summary: "Graduate WebKit smoke to a blocking gate"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      Tracked in follow-up TODO: graduate-browser-smoke-to-blocking-gates.
+      Extracted to follow-up TODO: graduate-browser-smoke-to-blocking-gates.
       Gate: 10 consecutive CI green runs for webkit-smoke.
 
 must_preserve:

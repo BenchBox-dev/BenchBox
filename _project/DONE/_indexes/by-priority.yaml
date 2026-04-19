@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T19:32:22.149223'
-total_items: 758
+generated_at: '2026-04-19T19:33:19.274653'
+total_items: 759
 priorities:
   Critical:
     count: 42
@@ -1506,7 +1506,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 120
+    count: 121
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -2063,6 +2063,11 @@ priorities:
       file: DONE/platform-expansion/planning/snowpark-connect-platform.yaml
       title: Snowpark Connect for Spark Platform
       category: Platform Expansion
+      status: Completed
+    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
+      file: DONE/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
+      category: Testing and Quality Assurance
       status: Completed
     - id: docs-fix-naming-inconsistencies
       file: DONE/main/planning/docs-fix-naming-inconsistencies.yaml
