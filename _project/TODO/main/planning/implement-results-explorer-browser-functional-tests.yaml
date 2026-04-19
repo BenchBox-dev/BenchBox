@@ -53,9 +53,11 @@ work:
       - blocking vs smoke browser matrix
       - minimum seam required for deterministic failure injection
 
-      Deliverable: a short implementation note or TODO update that records the
-      chosen defaults and rejected alternatives. No implementation starts until
-      these decisions are locked.
+      Deliverable: an implementation note at
+      `docs/development/browser-test-architecture.md` that records the chosen
+      defaults and rejected alternatives for each open question, plus a link
+      to it from this TODO's notes before w2 starts. No implementation starts
+      until these decisions are locked.
 
   - id: w2
     summary: "Add the browser-test harness, scripts, and built-app serving model"
@@ -259,7 +261,7 @@ verification:
   - description: "Any Python-side fixture-generation or explorer-pipeline glue stays green"
     command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline -q"
     expected_output: "All targeted Python explorer-pipeline tests pass"
-  - description: "Residual manual release check is executed after meaningful explorer changes"
+  - description: "Residual manual release check is executed after meaningful explorer changes (manual — no command by design)"
     expected_output: "One short Chrome/Firefox/Safari pass is documented for Home, BenchmarkIndex, ResultDetail, Compare, and Query pages"
 
 scope_limit:
