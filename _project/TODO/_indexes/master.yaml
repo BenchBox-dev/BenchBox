@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:13:39.898321'
-total_items: 39
+generated_at: '2026-04-19T12:15:54.861325'
+total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -673,27 +673,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 3
-- id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
-  file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
-  title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
-  worktree: main
-  category: Infrastructure
-  priority: Medium-High
-  status: Completed
-  tags:
-  - results
-  - explorer
-  - duckdb-wasm
-  - supply-chain
-  - infrastructure
-  - ci
-  estimated_effort: Small
-  completed_date: '2026-04-19'
-  work_total: 3
-  work_done: 3
-  work_ready: 0
-  needs:
-  - implement-results-explorer-browser-functional-tests
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

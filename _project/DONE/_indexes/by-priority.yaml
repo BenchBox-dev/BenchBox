@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:13:41.573616'
-total_items: 746
+generated_at: '2026-04-19T12:15:56.657951'
+total_items: 747
 priorities:
   Critical:
     count: 41
@@ -1496,7 +1496,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 114
+    count: 115
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -2063,6 +2063,11 @@ priorities:
       file: DONE/core-functionality/planning/unified-adapter-interface.yaml
       title: Unify SQL and DataFrame Adapter Execution Interfaces
       category: Core Functionality
+      status: Completed
+    - id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
+      file: DONE/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
+      title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
+      category: Infrastructure
       status: Completed
     - id: questdb-imp-headerless-column-mapping-verify
       file: DONE/main/planning/questdb-imp-headerless-column-mapping-verify.yaml

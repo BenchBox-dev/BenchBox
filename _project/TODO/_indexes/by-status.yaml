@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:13:39.898389'
-total_items: 39
+generated_at: '2026-04-19T12:15:54.861392'
+total_items: 38
 statuses:
   Not Started:
     count: 27
@@ -153,7 +153,7 @@ statuses:
       priority: Medium
       category: Testing and Quality Assurance
   Completed:
-    count: 10
+    count: 9
     items:
     - id: automate-corpus-inventory-generation
       file: TODO/main/planning/automate-corpus-inventory-generation.yaml
@@ -190,11 +190,6 @@ statuses:
       title: Surface contributor onboarding for results submission
       priority: Medium-High
       category: Documentation
-    - id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
-      file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
-      title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
-      priority: Medium-High
-      category: Infrastructure
     - id: verify-trust-badge-rendering-in-explorer
       file: TODO/main/planning/verify-trust-badge-rendering-in-explorer.yaml
       title: Visually verify TrustBadge rendering across all 4 explorer pages

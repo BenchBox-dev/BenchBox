@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:13:41.573798'
-total_items: 746
+generated_at: '2026-04-19T12:15:56.658148'
+total_items: 747
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 695
+    count: 696
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3330,6 +3330,11 @@ statuses:
       title: Vector Search Benchmark Support
       priority: High
       category: AI/ML Capabilities
+    - id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
+      file: DONE/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
+      title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
+      priority: Medium-High
+      category: Infrastructure
     - id: questdb-imp-headerless-column-mapping-verify
       file: DONE/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
       title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader

@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:13:39.898377'
-total_items: 39
+generated_at: '2026-04-19T12:15:54.861382'
+total_items: 38
 priorities:
   Critical:
     count: 2
@@ -38,7 +38,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 8
+    count: 7
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -75,11 +75,6 @@ priorities:
       title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
       category: Architecture & Refactoring
       status: Not Started
-    - id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
-      file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
-      title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
-      category: Infrastructure
-      status: Completed
   Medium:
     count: 10
     items:

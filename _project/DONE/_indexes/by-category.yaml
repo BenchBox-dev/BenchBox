@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:13:41.573433'
-total_categories: 79
+generated_at: '2026-04-19T12:15:56.657749'
+total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -2314,6 +2314,14 @@ categories:
       file: DONE/query-plan-remediation/phase-6-manifest-v2-integration.yaml
       title: 'Query Plan Remediation - Phase 6: Manifest v2 Integration'
       priority: Medium
+      status: Completed
+  Infrastructure:
+    count: 1
+    items:
+    - id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
+      file: DONE/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
+      title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
+      priority: Medium-High
       status: Completed
   Legal and Licensing:
     count: 1

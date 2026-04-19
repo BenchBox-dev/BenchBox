@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T12:13:39.898357'
-total_categories: 13
+generated_at: '2026-04-19T12:15:54.861362'
+total_categories: 12
 categories:
   Architecture & Refactoring:
     count: 2
@@ -123,14 +123,6 @@ categories:
       file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
       title: Write the Phase 2 results-platform operations runbook
       priority: Medium
-      status: Completed
-  Infrastructure:
-    count: 1
-    items:
-    - id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
-      file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
-      title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
-      priority: Medium-High
       status: Completed
   Performance:
     count: 1
