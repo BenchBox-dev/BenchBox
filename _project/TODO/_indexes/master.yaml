@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:03:39.961037'
-total_items: 49
+generated_at: '2026-04-19T09:05:29.362745'
+total_items: 48
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -182,22 +182,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: explorer-ranking-review-followups
-  file: TODO/main/planning/explorer-ranking-review-followups.yaml
-  title: Address follow-up findings from ranking-metric code review
-  worktree: main
-  category: Core Functionality
-  priority: Low
-  status: Not Started
-  tags:
-  - explorer
-  - ranking
-  - accessibility
-  - review-followup
-  estimated_effort: Tiny (< 1 hour)
-  work_total: 3
-  work_done: 0
-  work_ready: 3
 - id: explorer-read-model-review-followups
   file: TODO/main/planning/explorer-read-model-review-followups.yaml
   title: Address follow-up findings from read-model-contract code review

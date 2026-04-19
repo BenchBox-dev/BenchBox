@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T09:03:41.733143'
+generated_at: '2026-04-19T09:05:31.159369'
 total_categories: 78
 categories:
   '"Bug Fixes & Reliability"':
@@ -665,7 +665,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 251
+    count: 252
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -870,6 +870,11 @@ categories:
     - id: explorer-matrix-leaderboard-review-followups
       file: DONE/main/explorer-matrix-leaderboard-review-followups.yaml
       title: Address follow-up findings from matrix-leaderboard code review
+      priority: Low
+      status: Completed
+    - id: explorer-ranking-review-followups
+      file: DONE/main/explorer-ranking-review-followups.yaml
+      title: Address follow-up findings from ranking-metric code review
       priority: Low
       status: Completed
     - id: preexisting-complexity-review-findings

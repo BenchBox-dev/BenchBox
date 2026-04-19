@@ -1,0 +1,89 @@
+id: explorer-ranking-review-followups
+title: "Address follow-up findings from ranking-metric code review"
+worktree: main
+priority: Low
+status: Completed
+completed_date: "2026-04-19"
+category: Core Functionality
+
+description: |
+  Non-required nits and improvements surfaced by the code review of
+  explorer-align-ranking-metric-with-tpc-standards.  No Required issues
+  were found in that review; this item tracks the three nit/consider findings.
+
+work:
+- id: w1
+  summary: "Fix aria-sort on primary metric column in QueryHeatmap"
+  needs: []
+  status: done
+  notes: |
+    QueryHeatmap.tsx:197 — `aria-sort="none"` is used on the primary metric
+    column header, but the table IS sorted by that column (lines 94–103 sort
+    `sorted` by primary metric).  Screen readers announce "sort: none" which
+    is incorrect.
+
+    Fix: set `aria-sort` dynamically based on sort direction:
+      aria-sort={higherIsBetter ? "descending" : "ascending"}
+
+    The query-timing columns (Q1, Q2, …) correctly retain aria-sort="none"
+    since those columns are not sorted.
+
+- id: w2
+  summary: "Use ranking?.secondary_metric to gate the secondary geomean column"
+  needs: []
+  status: done
+  notes: |
+    QueryHeatmap.tsx:164 —
+      const showGeomeanCol = primaryMetric === "power_score";
+
+    This hardcodes the assumption that the secondary column is always
+    display_geomean_ms when primary is power_score.  The artifact already
+    carries `ranking?.secondary_metric`.  A more robust guard:
+      const showGeomeanCol = primaryMetric !== "display_geomean_ms";
+    or use `ranking?.secondary_metric === "display_geomean_ms"`.
+
+    Functionally equivalent for all current benchmark families, but less
+    fragile if a future family uses a different metric pair.
+
+- id: w3
+  summary: "Add comment to ranking.test.ts clarifying triple-write limitation"
+  needs: []
+  status: done
+  notes: |
+    ranking.test.ts pins all 9 known benchmark→metric mappings explicitly.
+    Like chartRegistry.meta.test.ts, it protects against TS-side drift but
+    not Python-side drift — if a 10th family is added to models.py without
+    updating the test, no CI failure occurs.
+
+    The existing comment already says "When you add a new benchmark to the
+    Python registry, add a case here too."  This work item is to add a note
+    explaining WHY (the test cannot parse Python source) so maintainers
+    understand the limitation rather than assuming the test is comprehensive.
+    If w4 from explorer-chart-coverage-review-followups adopts a dynamic
+    parse approach for chartRegistry, mirror that approach here.
+
+files_affected:
+  modified:
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/__tests__/ranking.test.ts"
+
+must_preserve:
+- "QueryHeatmap sort behavior — only the aria-sort attribute changes in w1"
+- "showGeomeanCol behavior for all current benchmarks — equivalent semantics, just a less fragile guard"
+
+verification:
+- description: "QueryHeatmap axe test passes with correct aria-sort"
+  command: "cd results-explorer && npm test -- BenchmarkIndex"
+  expected_output: "no axe violations, all tests pass"
+- description: "Full test suite green"
+  command: "cd results-explorer && npm run typecheck && npm test"
+  expected_output: "all green"
+
+anti_patterns:
+- "DO NOT change the sort logic in w1 — only the aria attribute changes"
+
+metadata:
+  tags: ["explorer", "ranking", "accessibility", "review-followup"]
+  estimated_effort: "Tiny (< 1 hour)"
+  created_date: "2026-04-16"
+  source: "Code review of explorer-align-ranking-metric-with-tpc-standards (2026-04-16)"

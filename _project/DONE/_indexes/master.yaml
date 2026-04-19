@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:03:41.732829'
-total_items: 736
+generated_at: '2026-04-19T09:05:31.159011'
+total_items: 737
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4549,6 +4549,23 @@ items:
   completed_date: '2026-04-19'
   work_total: 4
   work_done: 4
+  work_ready: 0
+- id: explorer-ranking-review-followups
+  file: DONE/main/explorer-ranking-review-followups.yaml
+  title: Address follow-up findings from ranking-metric code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Completed
+  tags:
+  - explorer
+  - ranking
+  - accessibility
+  - review-followup
+  estimated_effort: Tiny (< 1 hour)
+  completed_date: '2026-04-19'
+  work_total: 3
+  work_done: 3
   work_ready: 0
 - id: pg-duckdb-native-comparison
   file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml

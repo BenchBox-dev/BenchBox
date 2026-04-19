@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T09:03:39.961086'
+generated_at: '2026-04-19T09:05:29.362785'
 total_categories: 14
 categories:
   Architecture & Refactoring:
@@ -64,17 +64,12 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 15
+    count: 14
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
-      status: Not Started
-    - id: explorer-ranking-review-followups
-      file: TODO/main/planning/explorer-ranking-review-followups.yaml
-      title: Address follow-up findings from ranking-metric code review
-      priority: Low
       status: Not Started
     - id: explorer-read-model-review-followups
       file: TODO/main/planning/explorer-read-model-review-followups.yaml
