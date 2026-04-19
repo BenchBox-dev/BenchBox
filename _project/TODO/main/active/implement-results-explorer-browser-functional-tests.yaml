@@ -73,7 +73,7 @@ work:
   - id: w2
     summary: "Add the browser-test harness, scripts, and built-app serving model"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Add the test runner, package scripts, `playwright.config.ts`, and failure
       artifact handling. The suite must exercise the built explorer with the
