@@ -339,7 +339,7 @@ work:
 - id: w10
   summary: "Implement INTERVAL arithmetic and SUBSTRING FROM/FOR rewrites"
   needs: [w7]
-  status: pending
+  status: done
   notes: |
     These are regex-safe rewrites (syntactically fixed patterns).
 
