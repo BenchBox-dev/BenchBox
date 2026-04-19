@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T12:15:54.861382'
+generated_at: '2026-04-19T12:21:03.697006'
 total_items: 38
 priorities:
   Critical:
@@ -142,10 +142,10 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: timing-policy-split-review-followups
-      file: TODO/main/planning/timing-policy-split-review-followups.yaml
+      file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
       category: Testing & Quality
-      status: Not Started
+      status: In Progress
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

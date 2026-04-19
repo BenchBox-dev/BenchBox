@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T12:15:54.861362'
+generated_at: '2026-04-19T12:21:03.696987'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -195,10 +195,10 @@ categories:
       priority: Medium-High
       status: Not Started
     - id: timing-policy-split-review-followups
-      file: TODO/main/planning/timing-policy-split-review-followups.yaml
+      file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
       priority: Low
-      status: Not Started
+      status: In Progress
   Testing and Quality Assurance:
     count: 5
     items:

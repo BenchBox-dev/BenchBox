@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T12:15:54.861325'
+generated_at: '2026-04-19T12:21:03.696952'
 total_items: 38
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -150,12 +150,12 @@ items:
   work_done: 0
   work_ready: 17
 - id: timing-policy-split-review-followups
-  file: TODO/main/planning/timing-policy-split-review-followups.yaml
+  file: TODO/main/active/timing-policy-split-review-followups.yaml
   title: Address follow-up findings from timing-policy pre-commit split review
   worktree: main
   category: Testing & Quality
   priority: Low
-  status: Not Started
+  status: In Progress
   tags:
   - pre-commit
   - timing-policy
@@ -163,8 +163,8 @@ items:
   - tooling
   estimated_effort: Tiny (< 1 hr total)
   work_total: 3
-  work_done: 0
-  work_ready: 3
+  work_done: 1
+  work_ready: 2
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
   title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure

@@ -10,29 +10,42 @@ import subprocess
 import sys
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict, cast
 
 from timing_audit import collect_findings
 
 
-def _load_allowlist(path: Path) -> list[dict[str, Any]]:
+class AllowlistEntry(TypedDict, total=False):
+    path_glob: str
+    symbol: str
+    line_regex: str
+
+
+class FastLanePolicy(TypedDict, total=False):
+    enabled: bool
+    max_fast_tests: int
+    forbidden_marker_expressions: list[str]
+    forbidden_path_substrings: list[str]
+
+
+def _load_allowlist(path: Path) -> list[AllowlistEntry]:
     data = json.loads(path.read_text(encoding="utf-8"))
     entries = data.get("entries", [])
     if not isinstance(entries, list):
         raise ValueError("allowlist must contain an 'entries' list")
-    return entries
+    return cast(list[AllowlistEntry], entries)
 
 
-def _load_fast_lane_policy(path: Path) -> dict[str, Any]:
+def _load_fast_lane_policy(path: Path) -> FastLanePolicy:
     if not path.exists():
         return {}
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("fast lane policy must be a JSON object")
-    return data
+    return cast(FastLanePolicy, data)
 
 
-def _is_allowed(path: str, text: str, symbol: str, entry: dict[str, Any]) -> bool:
+def _is_allowed(path: str, text: str, symbol: str, entry: AllowlistEntry) -> bool:
     path_glob = entry.get("path_glob", "**")
     if not fnmatch(path, path_glob):
         return False
@@ -87,7 +100,7 @@ def _parse_collect_count(output: str) -> int | None:
     return None
 
 
-def _check_fast_lane_policy(repo_root: Path, policy: dict[str, Any]) -> list[str]:
+def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str]:
     if not policy or not policy.get("enabled", True):
         return []
 
