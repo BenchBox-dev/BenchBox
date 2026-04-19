@@ -280,7 +280,7 @@ work:
 - id: w8
   summary: "Implement comma-JOIN AST walker and 2-table rewrite (SQLGlot foundation)"
   needs: [w7]
-  status: pending
+  status: done
   notes: |
     Foundation slice — get the AST walking framework working on the simplest case.
     Split from original w8 to keep the work unit within the 1-4 hour target.
@@ -307,7 +307,7 @@ work:
 - id: w9
   summary: "Extend comma-JOIN rewriter to multi-way joins, aliases, and subqueries"
   needs: [w8]
-  status: pending
+  status: done
   notes: |
     Builds on the w8 foundation to handle the harder cases TPC-H and TPC-DS
     actually produce.

@@ -18,9 +18,9 @@ description: |
 
   Pattern observed locally on macOS:
 
-  - `npm run test:e2e -- --project=webkit --grep @smoke` → 1/7 failed
-  - `npm run test:e2e -- --project=webkit --grep @smoke --workers=1` → 7/7 passed
-  - `npm run test:e2e -- --project=webkit --grep "Query workbench.*@smoke"` → 1/1 passed
+  - `npm run test:e2e:webkit` → 1/7 failed
+  - `npm run test:e2e:webkit -- --workers=1` → 7/7 passed
+  - `npm run test:e2e:webkit -- --grep "Query workbench.*@smoke"` → 1/1 passed
 
   The flake does not reproduce in Firefox or Chromium. The most likely
   cause is a WebKit-specific race during DuckDB-WASM CDN init when
@@ -48,7 +48,7 @@ work:
     summary: "Reproduce and capture the flake with trace + network log"
     status: pending
     notes: |
-      Re-run `npm run test:e2e -- --project=webkit --grep @smoke`
+      Re-run `npm run test:e2e:webkit`
       locally until the flake reproduces, and keep the
       `playwright-report/` + `test-results/trace.zip` artifact. Confirm
       from the trace whether the stall is a jsDelivr request, a WASM
@@ -97,7 +97,7 @@ verification:
     command: "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml"
     expected_output: "Validation passes with no schema or DAG errors"
   - description: "WebKit smoke passes 10 consecutive times under default parallelism"
-    command: "for i in 1 2 3 4 5 6 7 8 9 10; do cd results-explorer && npm run test:e2e -- --project=webkit --grep @smoke || exit 1; done"
+    command: "for i in 1 2 3 4 5 6 7 8 9 10; do cd results-explorer && npm run test:e2e:webkit || exit 1; done"
     expected_output: "All 10 WebKit smoke runs pass"
 
 scope_limit:

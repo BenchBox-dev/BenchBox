@@ -117,7 +117,7 @@ verification:
     command: "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml"
     expected_output: "Validation passes with no schema or DAG errors"
   - description: "After the fix lands, a cold explorer load transfers ≤10% of the snapshot"
-    command: "cd results-explorer && npm run test:e2e -- --project=chromium --grep \"RG-2 range-read\""
+    command: "cd results-explorer && npm run test:e2e:chromium -- --grep \"RG-2 range-read\""
     expected_output: "The byte-budget assertion is re-enabled and passes"
 
 scope_limit:
