@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:37:18.187136'
+generated_at: '2026-04-19T08:40:04.806647'
 total_items: 55
 priorities:
   Critical:
@@ -48,7 +48,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Completed
   Medium-High:
-    count: 8
+    count: 9
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -85,13 +85,18 @@ priorities:
       title: Unify CLI vs pipeline platform-label disambiguator into a single implementation
       category: Architecture & Refactoring
       status: Not Started
+    - id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
+      file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
+      title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
+      category: Infrastructure
+      status: Identified
     - id: questdb-imp-headerless-column-mapping-verify
       file: TODO/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
       title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
       category: Platform Support
       status: Not Started
   Medium:
-    count: 11
+    count: 10
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -137,11 +142,6 @@ priorities:
       file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
       title: Stabilize the results-explorer WebKit @smoke run under parallel workers
       category: Testing and Quality Assurance
-      status: Identified
-    - id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
-      file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
-      title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
-      category: Infrastructure
       status: Identified
     - id: write-results-platform-phase-2-operations-runbook
       file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml

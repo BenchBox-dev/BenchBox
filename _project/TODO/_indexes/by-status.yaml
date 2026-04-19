@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:37:18.187153'
+generated_at: '2026-04-19T08:40:04.806662'
 total_items: 55
 statuses:
   In Progress:
@@ -243,7 +243,7 @@ statuses:
     - id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
       file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
       title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
-      priority: Medium
+      priority: Medium-High
       category: Infrastructure
   Completed:
     count: 8

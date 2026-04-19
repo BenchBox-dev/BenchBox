@@ -1,7 +1,7 @@
 id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
 title: "Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Identified
 category: Infrastructure
 

@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T08:37:18.187064'
+generated_at: '2026-04-19T08:40:04.806587'
 total_items: 55
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -89,8 +89,8 @@ items:
   - adapter
   estimated_effort: Large (1-2 weeks across phases)
   work_total: 13
-  work_done: 6
-  work_ready: 1
+  work_done: 7
+  work_ready: 2
   deferred_count: 3
 - id: fix-git-author-history-rewrite
   file: TODO/main/planning/fix-git-author-history-rewrite.yaml
@@ -781,26 +781,6 @@ items:
   work_ready: 1
   needs:
   - implement-results-explorer-browser-functional-tests
-- id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
-  file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
-  title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
-  worktree: main
-  category: Infrastructure
-  priority: Medium
-  status: Identified
-  tags:
-  - results
-  - explorer
-  - duckdb-wasm
-  - supply-chain
-  - infrastructure
-  - ci
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 1
-  needs:
-  - implement-results-explorer-browser-functional-tests
 - id: write-results-platform-phase-2-operations-runbook
   file: TODO/main/planning/write-results-platform-phase-2-operations-runbook.yaml
   title: Write the Phase 2 results-platform operations runbook
@@ -949,6 +929,26 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 3
+- id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
+  file: TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml
+  title: Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production
+  worktree: main
+  category: Infrastructure
+  priority: Medium-High
+  status: Identified
+  tags:
+  - results
+  - explorer
+  - duckdb-wasm
+  - supply-chain
+  - infrastructure
+  - ci
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  needs:
+  - implement-results-explorer-browser-functional-tests
 - id: questdb-imp-headerless-column-mapping-verify
   file: TODO/main/planning/questdb-imp-headerless-column-mapping-verify.yaml
   title: Verify QuestDB /imp column mapping for headerless CSV chunks in parquet loader
