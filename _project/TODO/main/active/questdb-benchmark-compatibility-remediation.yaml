@@ -369,7 +369,7 @@ work:
 - id: w11
   summary: "Wire dialect rewriter into QuestDB adapter and run full TPC-H validation"
   needs: [w9, w10]
-  status: pending
+  status: done
   notes: |
     Wire the rewriter into `QuestDBAdapter.execute_query()` as a pre-execution step.
     The rewriter must be idempotent (safe to call on already-rewritten SQL).
