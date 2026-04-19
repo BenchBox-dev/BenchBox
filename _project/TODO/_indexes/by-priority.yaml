@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T17:05:01.778300'
+generated_at: '2026-04-19T17:45:35.857049'
 total_items: 27
 priorities:
   Critical:
@@ -46,10 +46,10 @@ priorities:
       category: Core Functionality
       status: Not Started
     - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
-      file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+      file: TODO/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
       title: Stabilize the results-explorer WebKit @smoke run under parallel workers
       category: Testing and Quality Assurance
-      status: Identified
+      status: In Progress
   Medium:
     count: 6
     items:

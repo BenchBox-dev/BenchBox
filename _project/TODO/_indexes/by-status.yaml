@@ -1,14 +1,19 @@
-generated_at: '2026-04-19T17:05:01.778310'
+generated_at: '2026-04-19T17:45:35.857057'
 total_items: 27
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
       priority: Medium
       category: Testing & Quality
+    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
+      file: TODO/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
+      priority: Medium-High
+      category: Testing and Quality Assurance
   Not Started:
     count: 24
     items:
@@ -133,15 +138,10 @@ statuses:
       priority: Low
       category: Benchmark Development
   Identified:
-    count: 2
+    count: 1
     items:
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       priority: Medium
       category: Performance
-    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
-      file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
-      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
-      priority: Medium-High
-      category: Testing and Quality Assurance

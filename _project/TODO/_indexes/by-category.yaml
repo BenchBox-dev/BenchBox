@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T17:05:01.778284'
+generated_at: '2026-04-19T17:45:35.857036'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -157,10 +157,10 @@ categories:
       priority: High
       status: Not Started
     - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
-      file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+      file: TODO/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
       title: Stabilize the results-explorer WebKit @smoke run under parallel workers
       priority: Medium-High
-      status: Identified
+      status: In Progress
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR

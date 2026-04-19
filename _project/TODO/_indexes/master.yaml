@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T17:05:01.778252'
+generated_at: '2026-04-19T17:45:35.857008'
 total_items: 27
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -454,12 +454,12 @@ items:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
 - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
-  file: TODO/main/planning/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
+  file: TODO/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
   title: Stabilize the results-explorer WebKit @smoke run under parallel workers
   worktree: main
   category: Testing and Quality Assurance
   priority: Medium-High
-  status: Identified
+  status: In Progress
   tags:
   - results
   - explorer
@@ -469,7 +469,7 @@ items:
   - webkit
   estimated_effort: Small
   work_total: 3
-  work_done: 0
+  work_done: 2
   work_ready: 1
   needs:
   - implement-results-explorer-browser-functional-tests
