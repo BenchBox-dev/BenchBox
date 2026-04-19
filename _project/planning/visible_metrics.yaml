@@ -329,6 +329,22 @@ metrics:
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index]
 
+  - table: benchmark_rankings
+    column: speedup_vs_best
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.compare_math.speedup_vs_best"
+    tolerance: 1.0e-9
+    display_surfaces: [benchmark_index, compare]
+    notes: "∈ (0, 1] — best row in cohort = 1.0, worse rows < 1.0; direction-aware on primary_metric"
+
+  - table: benchmark_rankings
+    column: speedup_vs_slowest_in_cohort
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.compare_math.speedup_vs_slowest"
+    tolerance: 1.0e-9
+    display_surfaces: [benchmark_index, compare]
+    notes: "≥ 1.0 — slowest row in cohort = 1.0, better rows > 1.0; direction-aware on primary_metric"
+
   # ---------------------------------------------------------------------------
   # cohort_metadata table — meta-leaderboard cohort + per-variant ranks
   #
