@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:05:31.159011'
-total_items: 737
+generated_at: '2026-04-19T09:09:45.360780'
+total_items: 738
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4564,6 +4564,22 @@ items:
   - review-followup
   estimated_effort: Tiny (< 1 hour)
   completed_date: '2026-04-19'
+  work_total: 3
+  work_done: 3
+  work_ready: 0
+- id: explorer-read-model-review-followups
+  file: DONE/main/active/explorer-read-model-review-followups.yaml
+  title: Address follow-up findings from read-model-contract code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Completed
+  tags:
+  - explorer
+  - pipeline
+  - read-model
+  - review-followup
+  estimated_effort: Tiny (< 30 min)
   work_total: 3
   work_done: 3
   work_ready: 0

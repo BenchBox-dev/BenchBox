@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:05:31.159558'
-total_items: 737
+generated_at: '2026-04-19T09:09:45.361234'
+total_items: 738
 priorities:
   Critical:
     count: 41
@@ -3526,7 +3526,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 36
+    count: 37
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3591,6 +3591,11 @@ priorities:
     - id: explorer-ranking-review-followups
       file: DONE/main/explorer-ranking-review-followups.yaml
       title: Address follow-up findings from ranking-metric code review
+      category: Core Functionality
+      status: Completed
+    - id: explorer-read-model-review-followups
+      file: DONE/main/active/explorer-read-model-review-followups.yaml
+      title: Address follow-up findings from read-model-contract code review
       category: Core Functionality
       status: Completed
     - id: pg-duckdb-native-comparison

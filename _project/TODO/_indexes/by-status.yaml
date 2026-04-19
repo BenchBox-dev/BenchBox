@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:05:29.362820'
-total_items: 48
+generated_at: '2026-04-19T09:09:43.660968'
+total_items: 47
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 35
+    count: 34
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -41,11 +41,6 @@ statuses:
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
-      category: Core Functionality
-    - id: explorer-read-model-review-followups
-      file: TODO/main/planning/explorer-read-model-review-followups.yaml
-      title: Address follow-up findings from read-model-contract code review
-      priority: Low
       category: Core Functionality
     - id: timing-policy-split-review-followups
       file: TODO/main/planning/timing-policy-split-review-followups.yaml
