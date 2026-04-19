@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:49:12.359875'
-total_items: 731
+generated_at: '2026-04-19T08:51:24.772689'
+total_items: 732
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4462,6 +4462,25 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
+- id: explorer-chart-coverage-review-followups
+  file: DONE/main/explorer-chart-coverage-review-followups.yaml
+  title: Address follow-up findings from chart-coverage code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Completed
+  tags:
+  - explorer
+  - visualization
+  - charts
+  - polish
+  - review-followup
+  estimated_effort: Small (half day)
+  completed_date: '2026-04-19'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  deferred_count: 1
 - id: pg-duckdb-native-comparison
   file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml
   title: Build automated pg_duckdb vs native DuckDB comparison report

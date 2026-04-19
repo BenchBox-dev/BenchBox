@@ -1,14 +1,9 @@
-generated_at: '2026-04-19T08:49:09.574742'
-total_items: 54
+generated_at: '2026-04-19T08:51:21.686465'
+total_items: 53
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: explorer-chart-coverage-review-followups
-      file: TODO/main/active/explorer-chart-coverage-review-followups.yaml
-      title: Address follow-up findings from chart-coverage code review
-      priority: Low
-      category: Core Functionality
     - id: questdb-benchmark-compatibility-remediation
       file: TODO/main/active/questdb-benchmark-compatibility-remediation.yaml
       title: 'QuestDB benchmark compatibility remediation: disable always-failing benchmarks and patch adapter to expand coverage'

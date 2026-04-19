@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T08:49:09.574660'
-total_items: 54
+generated_at: '2026-04-19T08:51:21.686376'
+total_items: 53
 items:
 - id: define-results-platform-product-and-launch-strategy
   file: TODO/main/planning/define-results-platform-product-and-launch-strategy.yaml
@@ -182,24 +182,6 @@ items:
   work_total: 17
   work_done: 0
   work_ready: 17
-- id: explorer-chart-coverage-review-followups
-  file: TODO/main/active/explorer-chart-coverage-review-followups.yaml
-  title: Address follow-up findings from chart-coverage code review
-  worktree: main
-  category: Core Functionality
-  priority: Low
-  status: In Progress
-  tags:
-  - explorer
-  - visualization
-  - charts
-  - polish
-  - review-followup
-  estimated_effort: Small (half day)
-  work_total: 4
-  work_done: 0
-  work_ready: 4
-  deferred_count: 1
 - id: explorer-meta-leaderboard-review-followups
   file: TODO/main/planning/explorer-meta-leaderboard-review-followups.yaml
   title: Address follow-up findings from cross-benchmark meta-leaderboard code review
