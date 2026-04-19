@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T10:38:23.674148'
+generated_at: '2026-04-19T12:13:39.898357'
 total_categories: 13
 categories:
   Architecture & Refactoring:
@@ -184,7 +184,7 @@ categories:
     - id: fix-git-author-history-rewrite
       file: TODO/main/planning/fix-git-author-history-rewrite.yaml
       title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
-      priority: High
+      priority: Low
       status: Not Started
   Supporting Infrastructure:
     count: 1

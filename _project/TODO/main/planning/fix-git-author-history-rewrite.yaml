@@ -1,7 +1,7 @@
 id: fix-git-author-history-rewrite
 title: "Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)"
 worktree: main
-priority: High
+priority: Low
 status: Not Started
 description: |
   On 2026-01-28, a local git config entry `user.name=user.email` was written

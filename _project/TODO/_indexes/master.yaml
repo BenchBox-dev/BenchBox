@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T10:38:23.674120'
+generated_at: '2026-04-19T12:13:39.898321'
 total_items: 39
 items:
 - id: define-results-platform-product-and-launch-strategy
@@ -72,21 +72,6 @@ items:
   - deferred-followup
   estimated_effort: Medium — requires MotherDuck free-tier account
   work_total: 3
-  work_done: 0
-  work_ready: 1
-- id: fix-git-author-history-rewrite
-  file: TODO/main/planning/fix-git-author-history-rewrite.yaml
-  title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
-  worktree: main
-  category: Repository Maintenance
-  priority: High
-  status: Not Started
-  tags:
-  - git
-  - history-rewrite
-  - author
-  estimated_effort: Medium
-  work_total: 10
   work_done: 0
   work_ready: 1
 - id: external-contributor-submission-dry-run
@@ -270,6 +255,21 @@ items:
   priority: Low
   status: Not Started
   work_total: 4
+  work_done: 0
+  work_ready: 1
+- id: fix-git-author-history-rewrite
+  file: TODO/main/planning/fix-git-author-history-rewrite.yaml
+  title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+  worktree: main
+  category: Repository Maintenance
+  priority: Low
+  status: Not Started
+  tags:
+  - git
+  - history-rewrite
+  - author
+  estimated_effort: Medium
+  work_total: 10
   work_done: 0
   work_ready: 1
 - id: evaluate-results-data-repo-extraction-checkpoint

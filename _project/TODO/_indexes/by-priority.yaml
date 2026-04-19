@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T10:38:23.674162'
+generated_at: '2026-04-19T12:13:39.898377'
 total_items: 39
 priorities:
   Critical:
@@ -15,7 +15,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 5
+    count: 4
     items:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -26,11 +26,6 @@ priorities:
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
-      status: Not Started
-    - id: fix-git-author-history-rewrite
-      file: TODO/main/planning/fix-git-author-history-rewrite.yaml
-      title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
-      category: Repository Maintenance
       status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
@@ -139,7 +134,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 13
+    count: 14
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -185,6 +180,11 @@ priorities:
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
+      status: Not Started
+    - id: fix-git-author-history-rewrite
+      file: TODO/main/planning/fix-git-author-history-rewrite.yaml
+      title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+      category: Repository Maintenance
       status: Not Started
     - id: evaluate-results-data-repo-extraction-checkpoint
       file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
