@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:00:31.612091'
-total_items: 50
+generated_at: '2026-04-19T09:03:39.961112'
+total_items: 49
 priorities:
   Critical:
     count: 2
@@ -149,7 +149,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 22
+    count: 21
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -160,11 +160,6 @@ priorities:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
-      status: Not Started
-    - id: explorer-parity-tests-review-followups
-      file: TODO/main/planning/explorer-parity-tests-review-followups.yaml
-      title: Address follow-up findings from parity-tests code review
-      category: Testing and Quality Assurance
       status: Not Started
     - id: explorer-ranking-review-followups
       file: TODO/main/planning/explorer-ranking-review-followups.yaml

@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T09:00:31.612047'
+generated_at: '2026-04-19T09:03:39.961086'
 total_categories: 14
 categories:
   Architecture & Refactoring:
@@ -261,13 +261,8 @@ categories:
       priority: Low
       status: Not Started
   Testing and Quality Assurance:
-    count: 6
+    count: 5
     items:
-    - id: explorer-parity-tests-review-followups
-      file: TODO/main/planning/explorer-parity-tests-review-followups.yaml
-      title: Address follow-up findings from parity-tests code review
-      priority: Low
-      status: Not Started
     - id: guard-browser-fixture-generator-against-benchbox-cli-drift
       file: TODO/main/planning/guard-browser-fixture-generator-against-benchbox-cli-drift.yaml
       title: Guard the browser fixture generator against silent `benchbox explorer build` CLI drift

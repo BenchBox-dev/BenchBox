@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:00:35.848782'
-total_items: 735
+generated_at: '2026-04-19T09:03:41.733332'
+total_items: 736
 priorities:
   Critical:
     count: 41
@@ -3526,7 +3526,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 34
+    count: 35
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3582,6 +3582,11 @@ priorities:
       file: DONE/main/explorer-matrix-leaderboard-review-followups.yaml
       title: Address follow-up findings from matrix-leaderboard code review
       category: Core Functionality
+      status: Completed
+    - id: explorer-parity-tests-review-followups
+      file: DONE/main/explorer-parity-tests-review-followups.yaml
+      title: Address follow-up findings from parity-tests code review
+      category: Testing and Quality Assurance
       status: Completed
     - id: pg-duckdb-native-comparison
       file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml

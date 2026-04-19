@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:00:31.612121'
-total_items: 50
+generated_at: '2026-04-19T09:03:39.961126'
+total_items: 49
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 37
+    count: 36
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -42,11 +42,6 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
-    - id: explorer-parity-tests-review-followups
-      file: TODO/main/planning/explorer-parity-tests-review-followups.yaml
-      title: Address follow-up findings from parity-tests code review
-      priority: Low
-      category: Testing and Quality Assurance
     - id: explorer-ranking-review-followups
       file: TODO/main/planning/explorer-ranking-review-followups.yaml
       title: Address follow-up findings from ranking-metric code review

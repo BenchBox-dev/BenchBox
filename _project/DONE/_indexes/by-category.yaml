@@ -1,4 +1,4 @@
-generated_at: '2026-04-19T09:00:35.848358'
+generated_at: '2026-04-19T09:03:41.733143'
 total_categories: 78
 categories:
   '"Bug Fixes & Reliability"':
@@ -3520,7 +3520,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 41
+    count: 42
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3571,6 +3571,11 @@ categories:
     - id: explorer-heatmap-accessibility-review-followups
       file: DONE/main/explorer-heatmap-accessibility-review-followups.yaml
       title: Address follow-up findings from heatmap-accessibility code review
+      priority: Low
+      status: Completed
+    - id: explorer-parity-tests-review-followups
+      file: DONE/main/explorer-parity-tests-review-followups.yaml
+      title: Address follow-up findings from parity-tests code review
       priority: Low
       status: Completed
     - id: quality-audit-skip-xfail-markers-add-rationale

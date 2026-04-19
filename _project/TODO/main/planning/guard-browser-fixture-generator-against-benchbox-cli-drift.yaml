@@ -74,9 +74,9 @@ verification:
   - description: "The Python contract test pins the flags the generator depends on"
     command: "uv run -- python -m pytest tests/unit/cli/test_explorer_build_contract.py -q"
     expected_output: "Contract test passes; flag surface unchanged"
-  - description: "The JS generator fails fast on a simulated contract bump"
-    command: "cd results-explorer && CONTRACT_OVERRIDE=bad node scripts/generate-browser-fixtures.mjs"
-    expected_output: "Non-zero exit with a message naming both the Python file and the JS generator"
+  - description: "The JS-side validator fails fast before fixture generation starts"
+    command: "cd results-explorer && node scripts/validate-explorer-build-contract.mjs"
+    expected_output: "Validator exits zero and prints the aligned version, command, and required flags"
 
 scope_limit:
   only_modify:

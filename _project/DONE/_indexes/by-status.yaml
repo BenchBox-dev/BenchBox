@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:00:35.849001'
-total_items: 735
+generated_at: '2026-04-19T09:03:41.733503'
+total_items: 736
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 684
+    count: 685
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -789,6 +789,11 @@ statuses:
       title: Address follow-up findings from matrix-leaderboard code review
       priority: Low
       category: Core Functionality
+    - id: explorer-parity-tests-review-followups
+      file: DONE/main/explorer-parity-tests-review-followups.yaml
+      title: Address follow-up findings from parity-tests code review
+      priority: Low
+      category: Testing and Quality Assurance
     - id: preexisting-complexity-review-findings
       file: DONE/core-functionality/active/preexisting-complexity-review-findings.yaml
       title: Address pre-existing issues surfaced by complexity batch 8-10 review
