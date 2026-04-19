@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:11:46.922510'
-total_items: 46
+generated_at: '2026-04-19T09:22:03.991709'
+total_items: 45
 priorities:
   Critical:
     count: 2
@@ -149,7 +149,7 @@ priorities:
       category: Documentation
       status: Completed
   Low:
-    count: 18
+    count: 17
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -165,11 +165,6 @@ priorities:
       file: TODO/main/planning/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
       category: Testing & Quality
-      status: Not Started
-    - id: explorer-unify-visualization-review-followups
-      file: TODO/main/planning/explorer-unify-visualization-review-followups.yaml
-      title: Address follow-up findings from unify-visualization-foundations code review
-      category: Core Functionality
       status: Not Started
     - id: questdb-strip-pk-quoted-constraint-name
       file: TODO/main/planning/questdb-strip-pk-quoted-constraint-name.yaml

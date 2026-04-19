@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:11:48.637599'
-total_items: 739
+generated_at: '2026-04-19T09:22:05.686117'
+total_items: 740
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4598,6 +4598,22 @@ items:
   estimated_effort: Tiny (< 1 hour)
   work_total: 3
   work_done: 3
+  work_ready: 0
+- id: explorer-unify-visualization-review-followups
+  file: DONE/main/active/explorer-unify-visualization-review-followups.yaml
+  title: Address follow-up findings from unify-visualization-foundations code review
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Completed
+  tags:
+  - explorer
+  - visualization
+  - testing
+  - review-followup
+  estimated_effort: Small (2-3 hours)
+  work_total: 6
+  work_done: 6
   work_ready: 0
 - id: pg-duckdb-native-comparison
   file: DONE/platform-expansion/active/pg-duckdb-native-comparison.yaml

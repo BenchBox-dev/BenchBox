@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:11:48.638067'
-total_items: 739
+generated_at: '2026-04-19T09:22:05.686587'
+total_items: 740
 priorities:
   Critical:
     count: 41
@@ -3526,7 +3526,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 38
+    count: 39
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3601,6 +3601,11 @@ priorities:
     - id: explorer-trust-tiers-review-followups
       file: DONE/main/planning/explorer-trust-tiers-review-followups.yaml
       title: Address follow-up findings from trust-tiers-as-badges code review
+      category: Core Functionality
+      status: Completed
+    - id: explorer-unify-visualization-review-followups
+      file: DONE/main/active/explorer-unify-visualization-review-followups.yaml
+      title: Address follow-up findings from unify-visualization-foundations code review
       category: Core Functionality
       status: Completed
     - id: pg-duckdb-native-comparison

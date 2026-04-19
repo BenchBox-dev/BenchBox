@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T09:11:46.922521'
-total_items: 46
+generated_at: '2026-04-19T09:22:03.991721'
+total_items: 45
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: High
       category: Platform Support
   Not Started:
-    count: 33
+    count: 32
     items:
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
@@ -47,11 +47,6 @@ statuses:
       title: Address follow-up findings from timing-policy pre-commit split review
       priority: Low
       category: Testing & Quality
-    - id: explorer-unify-visualization-review-followups
-      file: TODO/main/planning/explorer-unify-visualization-review-followups.yaml
-      title: Address follow-up findings from unify-visualization-foundations code review
-      priority: Low
-      category: Core Functionality
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence
