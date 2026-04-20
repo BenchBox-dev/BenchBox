@@ -1,5 +1,5 @@
-generated_at: '2026-04-20T08:22:51.835533'
-total_items: 29
+generated_at: '2026-04-20T08:37:54.498158'
+total_items: 30
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -438,6 +438,24 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: validate-and-integrate-tpc-tuning-json
+  file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
+  title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - databricks
+  - tpch
+  - tpcds
+  - z-ordering
+  - cleanup
+  estimated_effort: Small
+  work_total: 4
+  work_done: 0
+  work_ready: 1
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml
   title: Add Hypothesis property-based tests for pure-function invariants

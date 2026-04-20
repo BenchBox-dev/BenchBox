@@ -1,5 +1,5 @@
-generated_at: '2026-04-20T08:22:51.835609'
-total_items: 29
+generated_at: '2026-04-20T08:37:54.498216'
+total_items: 30
 priorities:
   Critical:
     count: 1
@@ -46,7 +46,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   Medium:
-    count: 7
+    count: 8
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -82,6 +82,11 @@ priorities:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
+      status: Not Started
+    - id: validate-and-integrate-tpc-tuning-json
+      file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
+      title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
+      category: Testing and Quality Assurance
       status: Not Started
   Low:
     count: 14

@@ -1,4 +1,4 @@
-generated_at: '2026-04-20T08:22:51.835594'
+generated_at: '2026-04-20T08:37:54.498196'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -162,7 +162,7 @@ categories:
       priority: Medium
       status: In Progress
   Testing and Quality Assurance:
-    count: 3
+    count: 4
     items:
     - id: graduate-browser-smoke-to-blocking-gates
       file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
@@ -173,6 +173,11 @@ categories:
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
       priority: High
+      status: Not Started
+    - id: validate-and-integrate-tpc-tuning-json
+      file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
+      title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
+      priority: Medium
       status: Not Started
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml

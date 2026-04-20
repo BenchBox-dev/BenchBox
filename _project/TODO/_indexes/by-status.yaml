@@ -1,5 +1,5 @@
-generated_at: '2026-04-20T08:22:51.835619'
-total_items: 29
+generated_at: '2026-04-20T08:37:54.498227'
+total_items: 30
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Testing & Quality
   Not Started:
-    count: 27
+    count: 28
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -137,6 +137,11 @@ statuses:
       title: TigerData Cloud Enhancements
       priority: Low
       category: Platform Expansion
+    - id: validate-and-integrate-tpc-tuning-json
+      file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
+      title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR
