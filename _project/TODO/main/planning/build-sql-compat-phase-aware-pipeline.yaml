@@ -144,6 +144,15 @@ work:
   summary: "Slice B: Primary-key vertical — migrate write_primitives + transaction_primitives together, including both schema emitters and _supports_primary_keys body rewrite"
   needs: [w5]
   status: pending
+  size_note: |
+    LARGER-THAN-TYPICAL SLICE (touches 5 sites across 2 benchmarks + CLI
+    preflight). Do not split into separate slices — the dual-run divergence
+    gate applies to the PK capability as a vertical. Within the slice,
+    land as 5 sub-PRs in order (a → e), each sub-PR building and passing
+    the fast test suite in shadow mode. The slice's cutover (flag to on
+    for PK rules) happens only once all five sub-PRs have merged AND
+    divergence.log shows zero entries for PK-tagged rule_ids across a
+    full dual-run pass.
   notes: |
     Co-migrate: (a) remove hardcoded dialect tuple at
     core/write_primitives/benchmark.py:171 → capability lookup;
@@ -182,6 +191,15 @@ work:
   summary: "Slice D: Adapter/runtime transformers — ClickHouse, DataFusion, StarRocks DDL, SQL/DataFrame skip filters, session policies"
   needs: [w7]
   status: pending
+  size_note: |
+    LARGER-THAN-TYPICAL SLICE (5 adapter/runtime concerns: a–e below). Do
+    not split into separate slices — the pipeline-head rewrite in (d) plus
+    facade conversion in (e) must land atomically to keep the SQL-mode
+    and DataFrame-mode paths consistent. Within the slice, land as 5
+    sub-PRs in order (a → e), each sub-PR building and passing the fast
+    test suite in shadow mode. Per-sub-PR, the divergence.log must show
+    zero entries for the rule_ids introduced by that sub-PR before the
+    next sub-PR merges.
   notes: |
     (a) ClickHouse Q23/Q87 alias-injection: attempt AST-first rewrite; if
     sqlglot cannot express it safely, register as set_session_policy rule
@@ -231,10 +249,20 @@ work:
   needs: [w11]
   status: pending
   notes: |
-    Generate docs/compat/capability-matrix.md and docs/compat/skip-
-    reference.md from the registry at build time (not hand-written).
-    Update ADR status from Proposed to Accepted with link to the shipped
-    subsystem.
+    Two sub-steps, in order:
+    (a) Land the doc-generator script itself:
+        scripts/generate_compat_docs.py (reads the registry, writes
+        docs/compat/capability-matrix.md and docs/compat/skip-reference.md)
+        plus a CI hook (Makefile target + pre-commit or CI job) that runs
+        it and fails the build if the committed docs differ from the
+        regenerated output. This is the "build-time hook" — verify it
+        exists and is wired to CI before step (b).
+    (b) Run the generator, commit the generated docs, and update ADR
+        status from Proposed to Accepted with a link to the shipped
+        subsystem.
+    Rationale: sub-step (a) was an implicit prerequisite in earlier
+    revisions. Splitting it out prevents w12 from silently becoming a
+    two-week item because "oh, we also need to build the generator."
 
 metadata:
   tags:
@@ -321,6 +349,9 @@ verification:
   - description: "H2O Q9 class constants removed after slice w8"
     command: "grep -E '_CLICKHOUSE_Q9|_STARROCKS_Q9' benchbox/core/h2odb/benchmark.py | wc -l | tr -d ' '"
     expected_output: "0"
+  - description: "Doc generator script + CI drift check exist before docs are generated (w12 sub-step a)"
+    command: "test -f scripts/generate_compat_docs.py && grep -l generate_compat_docs Makefile .github/workflows/*.yml 2>/dev/null | head -1 | grep -q . && echo PRESENT"
+    expected_output: "PRESENT"
   - description: "Generated capability matrix present after slice w12"
     command: "test -f docs/compat/capability-matrix.md && test -f docs/compat/skip-reference.md && echo PRESENT"
     expected_output: "PRESENT"
@@ -342,6 +373,7 @@ files_affected:
     - "benchbox/sql_compat/baseline_tool.py"
     - "benchbox/sql_compat/rules/"
     - "scripts/compat_lint.py"
+    - "scripts/generate_compat_docs.py"
     - "docs/compat/capability-matrix.md"
     - "docs/compat/skip-reference.md"
   modified:
@@ -368,6 +400,14 @@ files_affected:
     - "benchbox/core/query_catalog_base.py"
 
 scope_limit:
+  only_modify_note: |
+    The listed directories are the allowed BLAST RADIUS for this
+    workstream, not a license to refactor. Within these trees, only modify
+    sites that appear in files_affected above OR sites surfaced by the w2
+    inventory as unregistered compatibility decisions. Unrelated cleanup,
+    reformatting, or drive-by refactors in benchbox/platforms/ and
+    benchbox/core/ are out of scope and must be carved out into their own
+    TODOs.
   only_modify:
     - "benchbox/sql_compat/"
     - "benchbox/platforms/"
@@ -385,3 +425,4 @@ scope_limit:
     - "sqlglot version upgrade or replacement"
     - "New platform or benchmark additions"
     - "Result schema or visualization changes"
+    - "Unrelated changes in benchbox/platforms/ or benchbox/core/ that are not surfaced by the w2 inventory as compatibility decisions"
