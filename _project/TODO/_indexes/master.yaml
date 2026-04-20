@@ -1,4 +1,4 @@
-generated_at: '2026-04-20T19:00:22.448747'
+generated_at: '2026-04-20T19:13:33.659623'
 total_items: 31
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -527,8 +527,8 @@ items:
   - refactor
   estimated_effort: X-Large
   work_total: 18
-  work_done: 1
-  work_ready: 1
+  work_done: 2
+  work_ready: 2
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases
