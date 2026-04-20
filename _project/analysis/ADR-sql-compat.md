@@ -155,20 +155,76 @@ class FailureMode(str, Enum):
     PERFORMANCE_REGRESSION = "PERFORMANCE_REGRESSION"
 ```
 
+### Typed Action Payloads
+
+`CompatibilityDecision.payload` is a typed union — not `dict[str, Any]` — so that `frozen=True`
+is valid (all payload types are frozen and hashable) and downstream code can pattern-match on
+payload type instead of string keys. Callables are referenced by `transformer_id` (a registry
+lookup key) rather than inline functions, which keeps payloads serializable.
+
+```python
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Union
+
+@dataclass(frozen=True)
+class BlockBenchmarkPayload:
+    reason: str
+
+@dataclass(frozen=True)
+class SkipQueryPayload:
+    reason: str
+    query_id: str
+
+@dataclass(frozen=True)
+class SelectVariantPayload:
+    variant_key: str   # key into the benchmark's variant dict (e.g. "clickhouse")
+    variant_sql: str   # the actual SQL text already in the target dialect
+
+@dataclass(frozen=True)
+class RewriteQueryPayload:
+    transformer_id: str   # registry key → Callable[[str], str] at runtime
+    description: str
+
+@dataclass(frozen=True)
+class RewriteDDLPayload:
+    transformer_id: str   # registry key → Callable[[str], str] at runtime
+    description: str
+
+@dataclass(frozen=True)
+class SetSessionPolicyPayload:
+    settings: tuple[tuple[str, str], ...]   # key-value pairs emitted before query
+    issue_url: str | None                   # link documenting why AST rewrite is not viable
+
+@dataclass(frozen=True)
+class PostTranslatePayload:
+    transformer_id: str   # registry key → Callable[[str], str] at runtime
+    description: str
+
+# NATIVE action carries no payload — use None
+CompatPayload = Union[
+    BlockBenchmarkPayload,
+    SkipQueryPayload,
+    SelectVariantPayload,
+    RewriteQueryPayload,
+    RewriteDDLPayload,
+    SetSessionPolicyPayload,
+    PostTranslatePayload,
+    None,  # NATIVE
+]
+```
+
 ### CompatibilityDecision
 
 ```python
-from dataclasses import dataclass, field
-from typing import Any
-
 @dataclass(frozen=True)
 class CompatibilityDecision:
-    rule_id: str                          # "{phase}.{platform}.{scope}.{slug}"
+    rule_id: str              # "{phase}.{platform}.{scope}.{slug}"
     action: CompatAction
     support_level: SupportLevel
     failure_mode: FailureMode
-    payload: dict[str, Any]              # action-specific; see action vocab above
-    reason: str                           # human-readable rationale
+    payload: CompatPayload    # typed per action; None for NATIVE
+    reason: str               # human-readable rationale
 ```
 
 ### Structured Capability Example — StarRocks PK
@@ -177,17 +233,20 @@ Capabilities are **not** bare booleans. The StarRocks PK rule is the canonical e
 StarRocks silently ignores PKs whose columns are not the first N columns of the table.
 
 ```python
-# Expressed as a CompatibilityDecision with structured payload:
+# Expressed as a CompatibilityDecision with a typed, hashable payload:
 CompatibilityDecision(
     rule_id="schema_emit.starrocks.pk.first_n_columns_only",
     action=CompatAction.REWRITE_DDL,
     support_level=SupportLevel.DEGRADED,
     failure_mode=FailureMode.SILENT_CORRUPTION,
-    payload={
-        "condition": "pk_cols_must_be_first_n_columns",
-        "enforcement": "accepts_ddl_silently_ignores",
-        "transformer": "_starrocks_pk_reorder_or_drop",
-    },
+    payload=RewriteDDLPayload(
+        transformer_id="starrocks.pk_reorder_or_drop",
+        description=(
+            "Reorders PK columns to be first N in the table or drops the PK "
+            "if reordering is not possible. StarRocks accepts PRIMARY KEY DDL "
+            "but silently ignores PKs that violate the first-N-columns rule."
+        ),
+    ),
     reason=(
         "StarRocks accepts PRIMARY KEY DDL but silently ignores PKs unless "
         "the PK columns are the first N columns of the table. A boolean "
@@ -215,9 +274,14 @@ Examples:
 - `schema_emit.starrocks.pk.first_n_columns_only`
 - `query_source.clickhouse.h2odb.q9_percentile_syntax`
 - `query_source.starrocks.h2odb.q9_percentile_syntax`
-- `benchmark_gate.starrocks.write_primitives.lock_bypass`
+- `schema_emit.starrocks.write_primitives.pk_lock_table_unsupported`
+- `schema_emit.datafusion.write_primitives.pk_lock_table_unsupported`
 - `query_adapter.clickhouse.tpch.subquery_alias_session_policy`
-- `execution_filter.datafusion.write_primitives.pk_lock_unsupported`
+
+Note: the write_primitives lock-bypass at `benchmark.py:171` is a DDL operation (creating a lock
+table with a PRIMARY KEY column) performed during setup — it is a `schema_emit` decision, not a
+`benchmark_gate` one. `benchmark_gate` is reserved for pre-run blocking of an entire
+platform×benchmark combination before any execution begins.
 
 ---
 
@@ -259,12 +323,28 @@ def compat_local(
 | Query skip or variant selection | Register in registry |
 | DDL correctness (drop FK, reorder PK cols) | Register in registry |
 
+### Granularity Rule
+
+`@compat_local` exempts **all** dialect branches within the decorated callable. This means:
+
+- **Apply at the narrowest scope possible.** Decorate a helper that only does type mapping, not a
+  top-level function that mixes type mapping with a PK-policy branch. If a function contains both a
+  legitimate local branch and an unregistered compatibility-policy branch, split it into two
+  callables before applying the decorator.
+- **Mixed-branch functions are a lint error even if decorated.** If a `@compat_local`-decorated
+  function contains a branch that matches a `kind` not covered by the decorator arguments (e.g., a
+  `schema_emit`-style branch inside a `kind="type_mapping"` function), the linter must flag it as
+  a misuse of the decorator. The decorator's `kind` is an assertion, not a blanket exemption.
+
 ### Linter Attribution Rule
 
-The lint rule (`scripts/compat_lint.py`) fires when: a dialect-branch (`if dialect`, `if "platform" in dialect`, etc.) appears inside `benchbox/core/` or `benchbox/benchmarks/` AND the containing callable is not `@compat_local`-decorated AND has no registered rule for the detected platform × phase combination.
+The lint rule (`scripts/compat_lint.py`) fires when: a dialect-branch (`if dialect`,
+`if "platform" in dialect`, etc.) appears inside `benchbox/core/` or `benchbox/benchmarks/` AND
+the containing callable is not `@compat_local`-decorated (with a matching `kind`) AND has no
+registered rule for the detected platform × phase combination.
 
-The linter ships **warn-only** (exit 0) in `w4` and is promoted to **error** (exit 1) at the end of
-`w15` (after schema-generation branches are classified).
+The linter ships **warn-only** (exit 0) in `w4` and is promoted to **error** (exit 1) at the end
+of `w15` (after schema-generation branches are classified).
 
 ---
 
@@ -321,10 +401,33 @@ diff to detect drift.
 
 ---
 
+## CLI Preflight (benchmark_gate phase)
+
+`benchmark_gate` decisions are resolved at CLI preflight inside
+`_check_benchmark_platform_compatibility()` (`cli/commands/run.py:804`), **before** the SQL or
+DataFrame pipeline runs. This is the only place where `block_benchmark` fires.
+
+```
+CLI run command
+    │
+    └── _check_benchmark_platform_compatibility()
+            │
+            └── Resolver(CompatibilityContext(phase=benchmark_gate, ...))
+                    │
+                    ├── BLOCK_BENCHMARK → print error, exit(1)
+                    └── NATIVE          → continue to execution
+```
+
+The `caps.unsupported_benchmarks` field on `PlatformCapability` becomes a view computed from
+registry `benchmark_gate` rules (implemented in `w16`). Until then, `w9` wires the CLI preflight
+to consult the registry for PK-requiring benchmarks.
+
 ## SQL Pipeline Head
 
 The SQL pipeline head sits at `platforms/base/execution.py` (query execution entry point). It
-receives a `CompatibilityContext` and consults the registry before running a query.
+receives a `CompatibilityContext` and consults the registry before running a query. It handles
+query-execution phases only (`query_source`, `query_compile`, `query_adapter`,
+`execution_filter`); `benchmark_gate` is handled at CLI preflight above.
 
 ```
 ┌──────────────┐    CompatibilityContext     ┌─────────────┐
@@ -332,11 +435,12 @@ receives a `CompatibilityContext` and consults the registry before running a que
 │ (SQL head)   │ ◀── CompatibilityDecision── │             │
 └──────────────┘                             └─────────────┘
         │
-        ├── SKIP_QUERY  → skip, log
-        ├── SELECT_VARIANT → use variant SQL, bypass sqlglot
-        ├── SET_SESSION_POLICY → emit settings, then run original
-        ├── REWRITE_QUERY → apply transformer, then run
-        └── NATIVE → run original SQL
+        ├── SKIP_QUERY       → skip, log
+        ├── SELECT_VARIANT   → use variant_sql from payload, bypass sqlglot
+        ├── SET_SESSION_POLICY → emit settings, then run query
+        ├── REWRITE_QUERY    → apply transformer (via transformer_id), then run
+        ├── POST_TRANSLATE   → apply transformer after sqlglot pass
+        └── NATIVE           → run original SQL unchanged
 ```
 
 Actions that apply at the SQL pipeline head: `skip_query`, `select_variant`, `set_session_policy`,
@@ -368,13 +472,70 @@ When multiple rules match the same `CompatibilityContext`, the most specific rul
 3. `platform` (most general)
 
 Within the same specificity tier:
-- Version-gated rules (rules with `platform_version` constraint) take precedence over rules without
-  a version constraint, when `context.platform_version` satisfies the gate.
+- Version-gated rules (rules with a `platform_version` constraint satisfying
+  `context.platform_version`) take precedence over rules without a version constraint.
+- If `context.platform_version is None`, no version-gated rule fires for that context; the
+  non-versioned rule at the same tier applies. This is the explicit fallback: unknown version →
+  non-versioned behavior, never version-gated.
 
-If two rules at the same specificity level produce conflicting actions, it is a registry error and
-the resolver raises `CompatibilityRegistryConflict`.
+If two rules at the same specificity level produce conflicting actions for the same context, it is
+a registry error and the resolver raises `CompatibilityRegistryConflict`.
+
+### Multi-Action Composition
+
+**A query may require multiple compatibility actions in a single execution pass — one per phase.**
+The pipeline calls the resolver independently at each phase, so actions compose sequentially:
+
+```
+query_source    → SELECT_VARIANT (pick H2O Q9 ClickHouse constant)
+query_compile   → NATIVE (variant is already in target dialect, skip sqlglot)
+query_adapter   → SET_SESSION_POLICY (joined_subquery_requires_alias=0)
+execution_filter → NATIVE
+```
+
+Within a single phase, **at most one action fires** per (platform, benchmark, query_id) tuple.
+If two rules at the same specificity level match the same phase context, it is a registry error
+(raised as `CompatibilityRegistryConflict`).
+
+The composition rule means there is never a need for a "combined" rule that does both a rewrite and
+a session policy in one action — split them across `query_compile` and `query_adapter` instead.
 
 ---
+
+## CompilationPlan
+
+The resolver pre-computes a `CompilationPlan` at run start for each (platform, benchmark) pair and
+caches it in the benchmark execution context. Warmup, power, and throughput phases reuse the same
+plan without re-querying the registry.
+
+```python
+from __future__ import annotations
+from dataclasses import dataclass, field
+
+@dataclass(frozen=True)
+class PhasedDecision:
+    """One resolved decision keyed by (query_id | None, Phase)."""
+    query_id: str | None
+    phase: Phase
+    decision: CompatibilityDecision
+
+@dataclass
+class CompilationPlan:
+    platform: str
+    benchmark: str
+    # Outer key: query_id (None = applies to all queries in this phase)
+    # Inner key: Phase
+    # Value: the winning CompatibilityDecision after specificity resolution
+    decisions: dict[tuple[str | None, Phase], CompatibilityDecision] = field(default_factory=dict)
+
+    def get(self, query_id: str | None, phase: Phase) -> CompatibilityDecision | None:
+        """Return the decision for (query_id, phase), falling back to (None, phase)."""
+        return self.decisions.get((query_id, phase)) or self.decisions.get((None, phase))
+```
+
+`CompilationPlan` is not frozen because it is populated incrementally by the resolver during plan
+construction. Once the resolver hands it to the benchmark runner it must not be mutated; the
+runner enforces this by not retaining a reference to the resolver.
 
 ## Dual-Run Harness
 
@@ -391,15 +552,19 @@ Feature flag: `BENCHBOX_COMPAT_REGISTRY={off|shadow|on}` (default: `off` until `
 
 ```json
 {
-  "rule_id": "execution_filter.starrocks.write_primitives.lock_bypass",
+  "rule_id": "schema_emit.starrocks.write_primitives.pk_lock_table_unsupported",
   "platform": "starrocks",
   "benchmark": "write_primitives",
   "query_id": null,
-  "phase": "benchmark_gate",
-  "legacy_outcome": "allowed",
-  "registry_outcome": "blocked"
+  "phase": "schema_emit",
+  "legacy_outcome": "NATIVE",
+  "registry_outcome": "REWRITE_DDL"
 }
 ```
+
+The `rule_id` prefix must always match the `phase` field — both reflect the
+`CompatibilityContext.phase` used when the resolver was called. A null `rule_id` is valid when the
+registry has no matching rule (registry outcome = "no_decision").
 
 Cut-over to `on` mode is gated on divergence reaching **zero** for each slice's rule_ids across a
 full shadow-mode pass before that slice is merged.
