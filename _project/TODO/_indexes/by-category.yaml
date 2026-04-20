@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T17:45:35.857036'
-total_categories: 10
+generated_at: '2026-04-20T08:22:51.835594'
+total_categories: 11
 categories:
   Architecture & Refactoring:
     count: 1
@@ -30,6 +30,14 @@ categories:
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+      priority: Low
+      status: Not Started
+  Code Quality:
+    count: 1
+    items:
+    - id: normalize-pg-family-driver-package-fallback
+      file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
+      title: Normalize driver_package fallback string across pg-family config builders
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
@@ -82,8 +90,13 @@ categories:
       priority: Medium
       status: Identified
   Platform Expansion:
-    count: 7
+    count: 8
     items:
+    - id: databend-3-mode-local-server-cloud
+      file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
+      title: Add 3-mode support to Databend platform (standalone / server / cloud)
+      priority: Low
+      status: Not Started
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
       title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -151,16 +164,16 @@ categories:
   Testing and Quality Assurance:
     count: 3
     items:
+    - id: graduate-browser-smoke-to-blocking-gates
+      file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
+      title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
+      priority: Medium
+      status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
       priority: High
       status: Not Started
-    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
-      file: TODO/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
-      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
-      priority: Medium-High
-      status: In Progress
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR

@@ -1,5 +1,5 @@
-generated_at: '2026-04-19T17:45:35.857008'
-total_items: 27
+generated_at: '2026-04-20T08:22:51.835533'
+total_items: 29
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -77,6 +77,16 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
+- id: databend-3-mode-local-server-cloud
+  file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
+  title: Add 3-mode support to Databend platform (standalone / server / cloud)
+  worktree: main
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  work_total: 8
+  work_done: 0
+  work_ready: 1
 - id: bodo-jit-and-mpi-support
   file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
   title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -168,6 +178,16 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
+- id: normalize-pg-family-driver-package-fallback
+  file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
+  title: Normalize driver_package fallback string across pg-family config builders
+  worktree: main
+  category: Code Quality
+  priority: Low
+  status: Not Started
+  work_total: 3
+  work_done: 2
+  work_ready: 1
 - id: review-dependency-upper-bounds-quarterly
   file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
   title: Quarterly review of dependency upper bounds
@@ -377,6 +397,27 @@ items:
   work_ready: 1
   needs:
   - implement-results-explorer-browser-functional-tests
+- id: graduate-browser-smoke-to-blocking-gates
+  file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
+  title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - testing
+  - browser
+  - ci
+  - webkit
+  - firefox
+  estimated_effort: Trivial
+  work_total: 2
+  work_done: 0
+  work_ready: 2
+  needs:
+  - stabilize-webkit-browser-smoke-flake-under-parallel-workers
 - id: operate-results-platform-security-observability-and-abuse-controls
   file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
   title: Operate results platform security, observability, and abuse controls
@@ -453,26 +494,6 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
-- id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
-  file: TODO/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
-  title: Stabilize the results-explorer WebKit @smoke run under parallel workers
-  worktree: main
-  category: Testing and Quality Assurance
-  priority: Medium-High
-  status: In Progress
-  tags:
-  - results
-  - explorer
-  - testing
-  - browser
-  - flake
-  - webkit
-  estimated_effort: Small
-  work_total: 3
-  work_done: 2
-  work_ready: 1
-  needs:
-  - implement-results-explorer-browser-functional-tests
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

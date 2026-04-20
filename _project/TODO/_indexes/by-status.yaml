@@ -1,22 +1,22 @@
-generated_at: '2026-04-19T17:45:35.857057'
-total_items: 27
+generated_at: '2026-04-20T08:22:51.835619'
+total_items: 29
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
       priority: Medium
       category: Testing & Quality
-    - id: stabilize-webkit-browser-smoke-flake-under-parallel-workers
-      file: TODO/main/active/stabilize-webkit-browser-smoke-flake-under-parallel-workers.yaml
-      title: Stabilize the results-explorer WebKit @smoke run under parallel workers
-      priority: Medium-High
-      category: Testing and Quality Assurance
   Not Started:
-    count: 24
+    count: 27
     items:
+    - id: databend-3-mode-local-server-cloud
+      file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
+      title: Add 3-mode support to Databend platform (standalone / server / cloud)
+      priority: Low
+      category: Platform Expansion
     - id: bodo-jit-and-mpi-support
       file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
       title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
@@ -77,6 +77,11 @@ statuses:
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       priority: Low
       category: Benchmark Development
+    - id: graduate-browser-smoke-to-blocking-gates
+      file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
+      title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
+      priority: Medium
+      category: Testing and Quality Assurance
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -87,6 +92,11 @@ statuses:
       title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
       priority: High
       category: Platform Expansion
+    - id: normalize-pg-family-driver-package-fallback
+      file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
+      title: Normalize driver_package fallback string across pg-family config builders
+      priority: Low
+      category: Code Quality
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
