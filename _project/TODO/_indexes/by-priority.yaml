@@ -1,5 +1,5 @@
-generated_at: '2026-04-20T08:37:54.498216'
-total_items: 30
+generated_at: '2026-04-20T18:24:26.789189'
+total_items: 31
 priorities:
   Critical:
     count: 1
@@ -28,7 +28,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 3
+    count: 4
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -38,6 +38,11 @@ priorities:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
+      category: Core Functionality
+      status: Not Started
+    - id: build-sql-compat-phase-aware-pipeline
+      file: TODO/main/planning/build-sql-compat-phase-aware-pipeline.yaml
+      title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       category: Core Functionality
       status: Not Started
     - id: design-results-ingest-storage-and-derived-read-model

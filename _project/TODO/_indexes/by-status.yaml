@@ -1,5 +1,5 @@
-generated_at: '2026-04-20T08:37:54.498227'
-total_items: 30
+generated_at: '2026-04-20T18:24:26.789198'
+total_items: 31
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Testing & Quality
   Not Started:
-    count: 28
+    count: 29
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -45,6 +45,11 @@ statuses:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
+      priority: Medium-High
+      category: Core Functionality
+    - id: build-sql-compat-phase-aware-pipeline
+      file: TODO/main/planning/build-sql-compat-phase-aware-pipeline.yaml
+      title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
       category: Core Functionality
     - id: define-phase-3-promotion-metrics

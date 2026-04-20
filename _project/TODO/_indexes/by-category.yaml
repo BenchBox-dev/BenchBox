@@ -1,4 +1,4 @@
-generated_at: '2026-04-20T08:37:54.498196'
+generated_at: '2026-04-20T18:24:26.789174'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -49,11 +49,16 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 6
+    count: 7
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
+      priority: Medium-High
+      status: Not Started
+    - id: build-sql-compat-phase-aware-pipeline
+      file: TODO/main/planning/build-sql-compat-phase-aware-pipeline.yaml
+      title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
       status: Not Started
     - id: define-phase-3-promotion-metrics

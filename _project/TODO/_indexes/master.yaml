@@ -1,5 +1,5 @@
-generated_at: '2026-04-20T08:37:54.498158'
-total_items: 30
+generated_at: '2026-04-20T18:24:26.789139'
+total_items: 31
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -492,6 +492,23 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
+- id: build-sql-compat-phase-aware-pipeline
+  file: TODO/main/planning/build-sql-compat-phase-aware-pipeline.yaml
+  title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - sql-compat
+  - architecture
+  - dialect-translation
+  - capabilities
+  - refactor
+  estimated_effort: X-Large
+  work_total: 12
+  work_done: 0
+  work_ready: 1
 - id: design-results-ingest-storage-and-derived-read-model
   file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
   title: Design results ingest, storage, and derived read-model architecture
