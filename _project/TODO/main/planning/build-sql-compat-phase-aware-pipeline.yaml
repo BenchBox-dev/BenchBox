@@ -27,25 +27,32 @@ description: |
   first N columns of the table.
 
   This TODO builds a phase-aware compatibility subsystem (benchbox/sql_compat/)
-  that centralizes decision ownership across every phase where compatibility
-  policy fires: benchmark_gate, query_source, query_compile, query_adapter,
-  schema_emit, ddl_optimize, execution_filter, dataframe_filter, and session
-  policy. Decisions are made by a typed rule engine returning typed
-  CompatibilityDecision objects with explicit support_level, failure_mode,
-  rule_id, and action payload. Existing query-storage shapes (catalog-backed,
-  dict-based managers, QUERY_VARIANTS) remain in place — the engine plugs in
-  behind each manager as a resolver. Storage-format unification is an explicit
-  non-goal of this workstream and is deferred to a future ADR.
+  that centralizes decision ownership across every compatibility decision point
+  surfaced by the inventory in w2. The final phase taxonomy is NOT frozen here:
+  w1 drafts the ADR with a provisional taxonomy, then w2 derives the final
+  taxonomy from the repo and the ADR is updated before engine work proceeds. Likely
+  candidates include benchmark_gate, query_source, query_compile,
+  query_adapter, schema_emit, ddl_optimize, execution_filter, and
+  dataframe_filter. Session policy is intentionally treated as an action, not a
+  phase, unless inventory proves a separate phase is required. Decisions are
+  made by a typed rule engine returning typed CompatibilityDecision objects
+  with explicit support_level, failure_mode, rule_id, and action payload.
+  Existing query-storage shapes (catalog-backed, dict-based managers,
+  QUERY_VARIANTS) remain in place — the engine plugs in behind each manager as
+  a resolver. Storage-format unification is an explicit non-goal of this
+  workstream and is deferred to a future ADR.
 
-  The migration lands in ten reversible slices behind a BENCHBOX_COMPAT_REGISTRY
-  feature flag with a dual-run harness (legacy + registry in parallel,
-  divergences logged), cut over only after divergence reaches zero. A
+  The migration lands in staged, reversible work units behind a
+  BENCHBOX_COMPAT_REGISTRY feature flag with a dual-run harness
+  (legacy + registry in parallel, divergences logged), cut over only after
+  divergence reaches zero. A
   @compat_local decorator provides an attribution mechanism so a linter can
   distinguish legitimate platform-specific rendering (type mapping, storage
   layout) from unregistered compatibility policy. The linter lands warn-only
-  with slice 1 and is promoted to error at slice 7.
+  in the early inventory slice and is promoted to error during the
+  schema-generation cleanup slice before cutover.
 
-  See ADR deliverable (slice 0) for the full design: phase taxonomy derivation
+  See the ADR deliverable in w1 for the full design: phase taxonomy derivation
   protocol, action enum, CompatibilityContext / CompatibilityDecision
   dataclasses, rule_id format, baseline schema v1, dual-run harness spec,
   DataFrame pipeline head design, and the storage-unification non-goal.
@@ -70,7 +77,7 @@ work:
     precedence for rule resolution.
 
 - id: w2
-  summary: "Build compatibility inventory tool + record baseline snapshot"
+  summary: "Build compatibility inventory tool and freeze the discovered decision-surface taxonomy"
   needs: [w1]
   status: pending
   notes: |
@@ -80,14 +87,27 @@ work:
     {skip | rewrite | ddl | type_mapping | session_setting | benchmark_gate},
     platforms referenced, suggested phase). Use this to FREEZE the phase
     taxonomy in the ADR (amend ADR if inventory surfaces phases that were
-    missed). Also deliver benchbox/sql_compat/baseline_tool.py which, for
-    each (platform, benchmark, query_id, phase, mode), emits
-    {source_sql_hash, decision, rule_id_or_null, final_sql_hash,
-    benchmark_gate_outcome}. Checked-in artifact:
-    _project/compat/baseline.v1.jsonl.
+    missed). Inventory acceptance is not "tool runs"; it must classify at
+    least the current benchmark_gate site in cli/commands/run.py and the
+    QUERY_VARIANTS / version-gated site in core/vector_search/queries.py so
+    the registry proves it can see coarse benchmark gating and non-sqlglot
+    query-source variants.
 
 - id: w3
-  summary: "Introduce @compat_local decorator + inventory linter (warn-only)"
+  summary: "Record baseline snapshot artifact and schema-version it"
+  needs: [w2]
+  status: pending
+  notes: |
+    Deliver benchbox/sql_compat/baseline_tool.py which, for each
+    (platform, benchmark, query_id, phase, mode), emits
+    {source_sql_hash, decision, rule_id_or_null, final_sql_hash,
+    benchmark_gate_outcome}. The artifact is checked in at
+    _project/compat/baseline.v1.jsonl and is treated as the parity baseline
+    for shadow-mode divergence review. This work unit owns the baseline
+    schema, refresh protocol, and schema-version bump rules.
+
+- id: w4
+  summary: "Introduce @compat_local decorator and land the inventory linter in warn-only mode"
   needs: [w2]
   status: pending
   notes: |
@@ -102,9 +122,9 @@ work:
     fails the lint. Ship as warn-only (exit 0, log warnings) for this
     slice.
 
-- id: w4
+- id: w5
   summary: "Scaffold benchbox/sql_compat/ package: context, decision, action enum, registry, resolver, cache"
-  needs: [w1, w2]
+  needs: [w1, w2, w3]
   status: pending
   notes: |
     Deliver benchbox/sql_compat/{__init__.py, context.py, decision.py,
@@ -115,9 +135,9 @@ work:
     not re-resolve. NATIVE/REPLACED/SKIPPED decisions short-circuit sqlglot.
     No rules registered yet — just the engine.
 
-- id: w5
+- id: w6
   summary: "Build dual-run harness: legacy + registry run in parallel, log divergences, gated by BENCHBOX_COMPAT_REGISTRY flag"
-  needs: [w4]
+  needs: [w5]
   status: pending
   notes: |
     Env var BENCHBOX_COMPAT_REGISTRY={off|shadow|on}. shadow = both paths
@@ -125,11 +145,11 @@ work:
     on = registry is authoritative, legacy disabled. Divergences write to
     _project/compat/divergence.log with {rule_id, platform, benchmark,
     query_id, phase, legacy_outcome, registry_outcome}. CI runs in shadow
-    mode after w5 lands.
+    mode after w6 lands.
 
-- id: w6
+- id: w7
   summary: "Slice A: Unify translation entrypoints with per-adapter diff review PRs"
-  needs: [w5]
+  needs: [w6]
   status: pending
   notes: |
     Make benchbox/platforms/base/dialect_translation.py:33 delegate to
@@ -140,66 +160,74 @@ work:
     diff showing before/after translate() output across the adapter's
     catalog queries. Merge only after snapshot sign-off.
 
-- id: w7
-  summary: "Slice B: Primary-key vertical — migrate write_primitives + transaction_primitives together, including both schema emitters and _supports_primary_keys body rewrite"
-  needs: [w5]
-  status: pending
-  size_note: |
-    LARGER-THAN-TYPICAL SLICE (touches 5 sites across 2 benchmarks + CLI
-    preflight). Do not split into separate slices — the dual-run divergence
-    gate applies to the PK capability as a vertical. Within the slice,
-    land as 5 sub-PRs in order (a → e), each sub-PR building and passing
-    the fast test suite in shadow mode. The slice's cutover (flag to on
-    for PK rules) happens only once all five sub-PRs have merged AND
-    divergence.log shows zero entries for PK-tagged rule_ids across a
-    full dual-run pass.
-  notes: |
-    Co-migrate: (a) remove hardcoded dialect tuple at
-    core/write_primitives/benchmark.py:171 → capability lookup;
-    (b) remove hardcoded dialect tuple at
-    core/transaction_primitives/benchmark.py:147 → capability lookup;
-    (c) rewrite body of core/write_primitives/schema.py:352
-    _supports_primary_keys() on top of the capability model (current body
-    returns True for ClickHouse/StarRocks, which is wrong); (d) gate
-    unconditional PK emission at core/transaction_primitives/schema.py:130
-    behind the same capability; (e) wire CLI preflight at
-    cli/commands/run.py:804 to consult benchmark_gate-phase rules for
-    PK-requiring benchmarks. Capability entries introduced:
-    pk.ddl_accepted, pk.uniqueness_enforced, pk.conditions (structured:
-    StarRocks gets ColumnsMustBeFirst()), pk.failure_mode
-    (StarRocks = silent_ignore). Dual-run divergence = 0 for all
-    PK-affected queries before cutting this slice on.
-
 - id: w8
-  summary: "Slice C: Benchmark-local query overrides — register behind existing managers without migrating storage format"
-  needs: [w7]
+  summary: "Slice B1: Primary-key capability model plus write_primitives lock-path migration"
+  needs: [w6]
+  status: pending
+  notes: |
+    Introduce the structured PK capability model in the registry and use it
+    to replace the hardcoded dialect tuple at
+    core/write_primitives/benchmark.py:171 → capability lookup;
+    rewrite body of core/write_primitives/schema.py:352
+    _supports_primary_keys() on top of the capability model; and land the
+    first parity tests for PK semantics under shadow mode. This unit owns
+    pk.ddl_accepted, pk.uniqueness_enforced, pk.conditions, and
+    pk.failure_mode as typed data, not booleans.
+
+- id: w9
+  summary: "Slice B2: Transaction-primitives PK/schema migration and CLI benchmark-gate integration"
+  needs: [w8]
+  status: pending
+  notes: |
+    Remove the hardcoded dialect tuple at
+    core/transaction_primitives/benchmark.py:147 → capability lookup;
+    unconditional PK emission at core/transaction_primitives/schema.py:130
+    behind the same capability; then wire CLI preflight at
+    cli/commands/run.py:804 to consult benchmark_gate-phase rules for
+    PK-requiring benchmarks. Dual-run divergence must be 0 for PK-tagged
+    rule_ids across a full shadow-mode pass before this slice can be cut on.
+
+- id: w10
+  summary: "Slice C1: Register H2O and CoffeeShop benchmark-local overrides behind existing managers"
+  needs: [w9]
   status: pending
   notes: |
     Register as select_variant rules behind each benchmark's existing
     query manager (no storage-format migration):
     (a) H2O Q9 _CLICKHOUSE_Q9 / _STARROCKS_Q9 constants at
     core/h2odb/benchmark.py:106-141 (delete constants, add rules);
-    (b) CoffeeShop platform-specific overrides in core/coffeeshop/;
-    (c) NYC Taxi platform overrides;
-    (d) TPC-DI post-translation overrides (VERIFY actual line before
-    starting — reviewer's cited tpcdi/benchmark.py:374 is a get_queries
-    accessor, not a post-translation hook; find the real site first).
-    Each PR is per-benchmark, dual-run divergence must be 0 before cutting
-    that benchmark's flag on.
+    (b) CoffeeShop platform-specific overrides in core/coffeeshop/.
+    Dual-run divergence must be 0 for these benchmark-local rule_ids before
+    the slice is considered done.
 
-- id: w9
-  summary: "Slice D: Adapter/runtime transformers — ClickHouse, DataFusion, StarRocks DDL, SQL/DataFrame skip filters, session policies"
-  needs: [w7]
+- id: w11
+  summary: "Slice C2: Register NYC Taxi and TPC-DI benchmark-local overrides behind existing managers"
+  needs: [w10]
   status: pending
-  size_note: |
-    LARGER-THAN-TYPICAL SLICE (5 adapter/runtime concerns: a–e below). Do
-    not split into separate slices — the pipeline-head rewrite in (d) plus
-    facade conversion in (e) must land atomically to keep the SQL-mode
-    and DataFrame-mode paths consistent. Within the slice, land as 5
-    sub-PRs in order (a → e), each sub-PR building and passing the fast
-    test suite in shadow mode. Per-sub-PR, the divergence.log must show
-    zero entries for the rule_ids introduced by that sub-PR before the
-    next sub-PR merges.
+  notes: |
+    Register NYC Taxi platform overrides and TPC-DI post-translation
+    overrides behind the existing managers. VERIFY actual line before
+    starting — reviewer's cited tpcdi/benchmark.py:374 is a get_queries
+    accessor, not a post-translation hook; find the real site first.
+    Dual-run divergence must be 0 for these benchmark-local rule_ids before
+    the slice is considered done.
+
+- id: w12
+  summary: "Slice C3: Onboard Vector Search QUERY_VARIANTS and version-gated compatibility rules"
+  needs: [w11]
+  status: pending
+  notes: |
+    Explicitly migrate the non-catalog, non-sqlglot QUERY_VARIANTS path in
+    core/vector_search/queries.py into the registry-backed query_source
+    pipeline while preserving the existing manager shape. This unit owns the
+    version-gated StarRocks rule called out in the query comments, so the
+    registry proves it can represent platform-version-sensitive variants and
+    skips instead of only static dialect decisions.
+
+- id: w13
+  summary: "Slice D1: Adapter/runtime rules for ClickHouse session policy and DataFusion query rewrites"
+  needs: [w9]
+  status: pending
   notes: |
     (a) ClickHouse Q23/Q87 alias-injection: attempt AST-first rewrite; if
     sqlglot cannot express it safely, register as set_session_policy rule
@@ -208,7 +236,14 @@ work:
     for corruption — do not revive it.
     (b) DataFusion query-id-dispatched rewrites in
     platforms/datafusion_query_transformer.py → rewrite_query rules keyed
-    on query_id.
+    on query_id. Dual-run divergence must be 0 for ClickHouse/DataFusion
+    rule_ids before the slice is considered done.
+
+- id: w14
+  summary: "Slice D2: StarRocks query/DDL rules plus SQL/DataFrame pipeline-head integration"
+  needs: [w13]
+  status: pending
+  notes: |
     (c) StarRocks _inject_missing_subquery_aliases (workload.py:374,
     token-aware) → rewrite_query rule; _optimize_table_definition
     (workload.py:68+) → rewrite_ddl rule under the ddl_optimize phase.
@@ -217,11 +252,12 @@ work:
     both consult the registry through their respective pipeline heads.
     (e) get_platform_skip_queries / get_df_platform_skip_queries become
     thin facades over the registry (kept for backwards compat until slice
-    w11).
+    w16). Dual-run divergence must be 0 for StarRocks/runtime rule_ids before
+    the slice is considered done.
 
-- id: w10
+- id: w15
   summary: "Slice E: Schema-generation compatibility — absorb DDL-policy branches, mark type-mapping branches @compat_local"
-  needs: [w9]
+  needs: [w14]
   status: pending
   notes: |
     Walk core/tsbs_devops/schema.py and core/nyctaxi/schema.py. Classify
@@ -230,9 +266,9 @@ work:
     inventory.jsonl classification from w2 as input. Promote the lint from
     warn to error at the end of this slice.
 
-- id: w11
+- id: w16
   summary: "Cutover: registry becomes authoritative, dual-run harness deleted, feature flag removed, legacy skip APIs become registry views"
-  needs: [w6, w8, w9, w10]
+  needs: [w7, w12, w14, w15]
   status: pending
   notes: |
     Flip BENCHBOX_COMPAT_REGISTRY default from shadow to on. unsupported_
@@ -244,25 +280,24 @@ work:
     Acceptance: zero unregistered-or-unexempted dialect decisions remain
     (linter error-mode, CI green).
 
-- id: w12
-  summary: "Docs: capability matrix and skip reference generated from registry; ADR marked accepted"
-  needs: [w11]
+- id: w17
+  summary: "Docs plumbing: generator script plus CI drift check land before generated docs"
+  needs: [w16]
   status: pending
   notes: |
-    Two sub-steps, in order:
-    (a) Land the doc-generator script itself:
-        scripts/generate_compat_docs.py (reads the registry, writes
-        docs/compat/capability-matrix.md and docs/compat/skip-reference.md)
-        plus a CI hook (Makefile target + pre-commit or CI job) that runs
-        it and fails the build if the committed docs differ from the
-        regenerated output. This is the "build-time hook" — verify it
-        exists and is wired to CI before step (b).
-    (b) Run the generator, commit the generated docs, and update ADR
-        status from Proposed to Accepted with a link to the shipped
-        subsystem.
-    Rationale: sub-step (a) was an implicit prerequisite in earlier
-    revisions. Splitting it out prevents w12 from silently becoming a
-    two-week item because "oh, we also need to build the generator."
+    Land scripts/generate_compat_docs.py and the CI/build hook that runs it
+    and fails when the committed docs drift from regenerated output. This is
+    intentionally separate from the generated docs commit so the generator
+    itself does not hide inside a doc-refresh work unit.
+
+- id: w18
+  summary: "Docs: capability matrix and skip reference generated from registry; ADR marked accepted"
+  needs: [w17]
+  status: pending
+  notes: |
+    Run the generator, commit docs/compat/capability-matrix.md and
+    docs/compat/skip-reference.md, and update ADR status from Proposed to
+    Accepted with a link to the shipped subsystem.
 
 metadata:
   tags:
@@ -300,6 +335,7 @@ must_preserve:
   - "ClickHouse Q23/Q87 continue to run successfully (do not revive the corrupting regex)"
   - "DataFrame-mode skip decisions remain distinct from SQL-mode skip decisions (two pipeline heads share the registry, not the actions)"
   - "SQL/DataFrame engines that do not go through sqlglot (Polars, Pandas) retain their existing code paths"
+  - "Vector Search QUERY_VARIANTS and version-gated behavior continue to work without forcing sqlglot into the path"
 
 approach: |
   Phase-first, not query-first. Rule engine plugs in BEHIND existing
@@ -322,7 +358,8 @@ anti_patterns:
   - "DO NOT model capabilities as bare booleans (e.g., pk.uniqueness_enforced=True) -- because StarRocks silently ignores PKs that violate the first-N-columns rule, which a boolean cannot express -- use structured enforcement + conditions + failure_mode"
   - "DO NOT treat unsupported_benchmarks as dead metadata -- because it is enforced in CLI preflight at cli/commands/run.py:804 -- the benchmark_gate phase must back it via registry view"
   - "DO NOT migrate without a reversible feature flag -- because four slices touching ~15 sites across the codebase have no safe single-revert path -- ship behind BENCHBOX_COMPAT_REGISTRY with dual-run telemetry"
-  - "DO NOT trust the reviewer's tpcdi/benchmark.py:374 citation without verifying -- because that line is a get_queries accessor, not a post-translation override -- find the real site in slice w8 before registering the rule"
+  - "DO NOT trust the reviewer's tpcdi/benchmark.py:374 citation without verifying -- because that line is a get_queries accessor, not a post-translation override -- find the real site in slice w11 before registering the rule"
+  - "DO NOT leave vector_search/queries.py in files_affected without an owning work unit -- because QUERY_VARIANTS plus platform-version gates are a distinct storage/decision shape -- onboard them explicitly in their own slice"
 
 verification:
   - description: "ADR committed before implementation slices begin"
@@ -331,6 +368,9 @@ verification:
   - description: "Compatibility inventory artifact present"
     command: "test -s _project/compat/inventory.jsonl && echo PRESENT"
     expected_output: "PRESENT"
+  - description: "Inventory captures both benchmark_gate and QUERY_VARIANTS decision sites before the ADR is frozen"
+    command: "grep -E 'cli/commands/run.py|core/vector_search/queries.py' _project/compat/inventory.jsonl | wc -l | tr -d ' '"
+    expected_output: "2"
   - description: "Baseline snapshot present and schema-versioned"
     command: "test -s _project/compat/baseline.v1.jsonl && echo PRESENT"
     expected_output: "PRESENT"
@@ -340,19 +380,31 @@ verification:
   - description: "Full fast test suite passes under registry-authoritative mode"
     command: "BENCHBOX_COMPAT_REGISTRY=on uv run -- python -m pytest -m fast -q"
     expected_output: "passed"
-  - description: "Compatibility lint passes in error mode after slice w10"
+  - description: "Shadow-mode parity smoke passes once the dual-run harness lands"
+    command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_shadow_parity.py -q"
+    expected_output: "passed"
+  - description: "Primary-key vertical parity tests pass before the PK cutover slice is enabled"
+    command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_primary_key_capabilities.py -q"
+    expected_output: "passed"
+  - description: "Benchmark-rule parity tests cover H2O, TPC-DI, and Vector Search onboarding"
+    command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_benchmark_rule_parity.py -q"
+    expected_output: "passed"
+  - description: "Adapter-rule fixtures cover ClickHouse, DataFusion, and StarRocks migrations"
+    command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_adapter_rule_fixtures.py -q"
+    expected_output: "passed"
+  - description: "Compatibility lint passes in error mode after slice w15"
     command: "uv run scripts/compat_lint.py --strict && echo PASS"
     expected_output: "PASS"
-  - description: "No hardcoded dialect tuples remain in primitives benchmarks after slice w7"
+  - description: "No hardcoded dialect tuples remain in primitives benchmarks after slice w9"
     command: "grep -E 'dialect\\s+in\\s+\\(' benchbox/core/write_primitives/benchmark.py benchbox/core/transaction_primitives/benchmark.py | wc -l | tr -d ' '"
     expected_output: "0"
-  - description: "H2O Q9 class constants removed after slice w8"
+  - description: "H2O Q9 class constants removed after slice w10"
     command: "grep -E '_CLICKHOUSE_Q9|_STARROCKS_Q9' benchbox/core/h2odb/benchmark.py | wc -l | tr -d ' '"
     expected_output: "0"
-  - description: "Doc generator script + CI drift check exist before docs are generated (w12 sub-step a)"
+  - description: "Doc generator script + CI drift check exist before docs are generated (w17)"
     command: "test -f scripts/generate_compat_docs.py && grep -l generate_compat_docs Makefile .github/workflows/*.yml 2>/dev/null | head -1 | grep -q . && echo PRESENT"
     expected_output: "PRESENT"
-  - description: "Generated capability matrix present after slice w12"
+  - description: "Generated capability matrix present after slice w18"
     command: "test -f docs/compat/capability-matrix.md && test -f docs/compat/skip-reference.md && echo PRESENT"
     expected_output: "PRESENT"
 
@@ -376,6 +428,7 @@ files_affected:
     - "scripts/generate_compat_docs.py"
     - "docs/compat/capability-matrix.md"
     - "docs/compat/skip-reference.md"
+    - "tests/unit/sql_compat/"
   modified:
     - "benchbox/platforms/base/dialect_translation.py"
     - "benchbox/utils/dialect_utils.py"
@@ -405,20 +458,37 @@ scope_limit:
     workstream, not a license to refactor. Within these trees, only modify
     sites that appear in files_affected above OR sites surfaced by the w2
     inventory as unregistered compatibility decisions. Unrelated cleanup,
-    reformatting, or drive-by refactors in benchbox/platforms/ and
-    benchbox/core/ are out of scope and must be carved out into their own
-    TODOs.
+    reformatting, or drive-by refactors are out of scope and must be carved
+    out into their own TODOs. If a file is not under one of the roots below
+    AND is not newly surfaced by the w2 inventory as a compatibility site, it
+    is out of bounds for this item.
   only_modify:
     - "benchbox/sql_compat/"
-    - "benchbox/platforms/"
-    - "benchbox/core/"
+    - "benchbox/platforms/base/dialect_translation.py"
+    - "benchbox/platforms/base/execution.py"
+    - "benchbox/platforms/clickhouse/"
+    - "benchbox/platforms/datafusion_query_transformer.py"
+    - "benchbox/platforms/starrocks/"
+    - "benchbox/core/write_primitives/"
+    - "benchbox/core/transaction_primitives/"
+    - "benchbox/core/h2odb/"
+    - "benchbox/core/coffeeshop/"
+    - "benchbox/core/nyctaxi/"
+    - "benchbox/core/tsbs_devops/"
+    - "benchbox/core/tpcdi/"
+    - "benchbox/core/vector_search/"
+    - "benchbox/core/platform_registry.py"
+    - "benchbox/core/query_catalog_base.py"
     - "benchbox/cli/commands/run.py"
     - "benchbox/utils/dialect_utils.py"
     - "scripts/compat_lint.py"
+    - "scripts/generate_compat_docs.py"
     - "docs/compat/"
     - "_project/analysis/ADR-sql-compat.md"
     - "_project/compat/"
-    - "tests/"
+    - "tests/unit/sql_compat/"
+    - "tests/unit/platforms/"
+    - "tests/unit/core/"
   out_of_scope:
     - "Query-storage format unification (H2O/CoffeeShop dict managers → catalog) — deferred to a separate future ADR"
     - "Polars/Pandas DataFrame API-shape compatibility beyond the DataFrame pipeline head's skip/variant actions"
