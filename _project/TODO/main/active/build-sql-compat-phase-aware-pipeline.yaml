@@ -2,7 +2,7 @@ id: build-sql-compat-phase-aware-pipeline
 title: "Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Core Functionality
 description: |
   BenchBox's SQL compatibility decisions are currently scattered across five
@@ -60,7 +60,7 @@ description: |
 work:
 - id: w1
   summary: "Write ADR: phase taxonomy, action enum, typed contract, exemption policy, baseline schema v1, dual-run harness spec"
-  status: pending
+  status: done
   notes: |
     Blocking step. Deliver _project/analysis/ADR-sql-compat.md covering:
     (a) phase list derivation protocol (phases are derived from the inventory

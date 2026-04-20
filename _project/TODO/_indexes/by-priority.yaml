@@ -1,4 +1,4 @@
-generated_at: '2026-04-20T18:57:48.033094'
+generated_at: '2026-04-20T19:00:22.448790'
 total_items: 31
 priorities:
   Critical:
@@ -46,10 +46,10 @@ priorities:
       category: Core Functionality
       status: Not Started
     - id: build-sql-compat-phase-aware-pipeline
-      file: TODO/main/planning/build-sql-compat-phase-aware-pipeline.yaml
+      file: TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       category: Core Functionality
-      status: Not Started
+      status: In Progress
   Medium:
     count: 8
     items:

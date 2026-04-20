@@ -1,4 +1,4 @@
-generated_at: '2026-04-20T18:57:48.033071'
+generated_at: '2026-04-20T19:00:22.448777'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -57,10 +57,10 @@ categories:
       priority: Medium-High
       status: Not Started
     - id: build-sql-compat-phase-aware-pipeline
-      file: TODO/main/planning/build-sql-compat-phase-aware-pipeline.yaml
+      file: TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
-      status: Not Started
+      status: In Progress
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence

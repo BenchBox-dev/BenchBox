@@ -1,16 +1,21 @@
-generated_at: '2026-04-20T18:57:48.033107'
+generated_at: '2026-04-20T19:00:22.448799'
 total_items: 31
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
       priority: Medium
       category: Testing & Quality
+    - id: build-sql-compat-phase-aware-pipeline
+      file: TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
+      title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
+      priority: Medium-High
+      category: Core Functionality
   Not Started:
-    count: 29
+    count: 28
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -45,11 +50,6 @@ statuses:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
-      priority: Medium-High
-      category: Core Functionality
-    - id: build-sql-compat-phase-aware-pipeline
-      file: TODO/main/planning/build-sql-compat-phase-aware-pipeline.yaml
-      title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
       category: Core Functionality
     - id: define-phase-3-promotion-metrics
