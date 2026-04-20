@@ -1,4 +1,4 @@
-generated_at: '2026-04-20T18:46:22.365142'
+generated_at: '2026-04-20T18:57:48.033107'
 total_items: 31
 statuses:
   In Progress:
@@ -60,7 +60,7 @@ statuses:
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
-      priority: Medium-High
+      priority: High
       category: Core Functionality
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml

@@ -1,4 +1,4 @@
-generated_at: '2026-04-20T18:46:22.365133'
+generated_at: '2026-04-20T18:57:48.033094'
 total_items: 31
 priorities:
   Critical:
@@ -10,8 +10,13 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 3
+    count: 4
     items:
+    - id: design-results-ingest-storage-and-derived-read-model
+      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+      title: Design results ingest, storage, and derived read-model architecture
+      category: Core Functionality
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -28,7 +33,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 4
+    count: 3
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -43,11 +48,6 @@ priorities:
     - id: build-sql-compat-phase-aware-pipeline
       file: TODO/main/planning/build-sql-compat-phase-aware-pipeline.yaml
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
-      category: Core Functionality
-      status: Not Started
-    - id: design-results-ingest-storage-and-derived-read-model
-      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
-      title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Not Started
   Medium:

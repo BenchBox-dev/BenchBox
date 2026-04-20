@@ -1,4 +1,4 @@
-generated_at: '2026-04-20T18:46:22.365119'
+generated_at: '2026-04-20T18:57:48.033071'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -69,7 +69,7 @@ categories:
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
-      priority: Medium-High
+      priority: High
       status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
