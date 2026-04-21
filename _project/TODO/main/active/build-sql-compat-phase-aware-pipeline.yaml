@@ -192,7 +192,7 @@ work:
 - id: w10
   summary: "Slice C1: Register H2O and CoffeeShop benchmark-local overrides behind existing managers"
   needs: [w9]
-  status: pending
+  status: done
   notes: |
     Register as select_variant rules behind each benchmark's existing
     query manager (no storage-format migration):
@@ -205,7 +205,7 @@ work:
 - id: w11
   summary: "Slice C2: Register NYC Taxi and TPC-DI benchmark-local overrides behind existing managers"
   needs: [w10]
-  status: pending
+  status: done
   notes: |
     Register NYC Taxi platform overrides and TPC-DI post-translation
     overrides behind the existing managers. VERIFY actual line before
@@ -217,7 +217,7 @@ work:
 - id: w12
   summary: "Slice C3: Onboard Vector Search QUERY_VARIANTS and version-gated compatibility rules"
   needs: [w11]
-  status: pending
+  status: done
   notes: |
     Explicitly migrate the non-catalog, non-sqlglot QUERY_VARIANTS path in
     core/vector_search/queries.py into the registry-backed query_source
@@ -229,7 +229,7 @@ work:
 - id: w13
   summary: "Slice D1: Adapter/runtime rules for ClickHouse session policy and DataFusion query rewrites"
   needs: [w9]
-  status: pending
+  status: done
   notes: |
     (a) ClickHouse Q23/Q87 alias-injection: attempt AST-first rewrite; if
     sqlglot cannot express it safely, register as set_session_policy rule
@@ -244,7 +244,7 @@ work:
 - id: w14
   summary: "Slice D2: StarRocks query/DDL rules plus SQL/DataFrame pipeline-head integration"
   needs: [w13]
-  status: pending
+  status: done
   notes: |
     (c) StarRocks _inject_missing_subquery_aliases (workload.py:374,
     token-aware) → rewrite_query rule; _optimize_table_definition
@@ -260,7 +260,7 @@ work:
 - id: w15
   summary: "Slice E: Schema-generation compatibility — absorb DDL-policy branches, mark type-mapping branches @compat_local"
   needs: [w14]
-  status: pending
+  status: done
   notes: |
     Walk core/tsbs_devops/schema.py and core/nyctaxi/schema.py. Classify
     each dialect branch: compatibility policy (→ rewrite_ddl rule) vs.
