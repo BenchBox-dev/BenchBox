@@ -126,7 +126,7 @@ work:
 - id: w5
   summary: "Scaffold benchbox/sql_compat/ package: context, decision, action enum, registry, resolver, cache"
   needs: [w1, w2, w3]
-  status: pending
+  status: done
   notes: |
     Deliver benchbox/sql_compat/{__init__.py, context.py, decision.py,
     actions.py, registry.py, resolver.py, plan.py}. Registry is import-time
