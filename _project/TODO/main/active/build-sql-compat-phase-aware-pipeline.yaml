@@ -140,7 +140,7 @@ work:
   summary: "Build dual-run harness: legacy + registry run in parallel, log divergences, gated by BENCHBOX_COMPAT_REGISTRY
     flag"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Env var BENCHBOX_COMPAT_REGISTRY={off|shadow|on}. shadow = both paths
     run, only legacy decision is acted on, registry decision logged.
