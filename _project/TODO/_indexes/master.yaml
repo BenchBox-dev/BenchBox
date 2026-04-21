@@ -1,5 +1,5 @@
-generated_at: '2026-04-20T19:13:33.659623'
-total_items: 31
+generated_at: '2026-04-21T08:25:38.979568'
+total_items: 30
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -198,16 +198,6 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
-- id: normalize-pg-family-driver-package-fallback
-  file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
-  title: Normalize driver_package fallback string across pg-family config builders
-  worktree: main
-  category: Code Quality
-  priority: Low
-  status: Not Started
-  work_total: 3
-  work_done: 2
-  work_ready: 1
 - id: review-dependency-upper-bounds-quarterly
   file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
   title: Quarterly review of dependency upper bounds
@@ -527,8 +517,8 @@ items:
   - refactor
   estimated_effort: X-Large
   work_total: 18
-  work_done: 2
-  work_ready: 2
+  work_done: 8
+  work_ready: 3
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

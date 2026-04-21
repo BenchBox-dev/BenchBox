@@ -1,5 +1,5 @@
-generated_at: '2026-04-20T19:13:33.659669'
-total_items: 31
+generated_at: '2026-04-21T08:25:38.979613'
+total_items: 30
 priorities:
   Critical:
     count: 1
@@ -94,7 +94,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Low:
-    count: 14
+    count: 13
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -125,11 +125,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: normalize-pg-family-driver-package-fallback
-      file: TODO/main/planning/normalize-pg-family-driver-package-fallback.yaml
-      title: Normalize driver_package fallback string across pg-family config builders
-      category: Code Quality
       status: Not Started
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
