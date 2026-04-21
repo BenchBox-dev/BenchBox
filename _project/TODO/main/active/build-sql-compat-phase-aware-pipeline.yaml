@@ -165,7 +165,7 @@ work:
 - id: w8
   summary: "Slice B1: Primary-key capability model plus write_primitives lock-path migration"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Introduce the structured PK capability model in the registry and use it
     to replace the hardcoded dialect tuple at
