@@ -59,7 +59,8 @@ description: |
 
 work:
 - id: w1
-  summary: "Write ADR: phase taxonomy, action enum, typed contract, exemption policy, baseline schema v1, dual-run harness spec"
+  summary: "Write ADR: phase taxonomy, action enum, typed contract, exemption policy, baseline schema v1, dual-run harness
+    spec"
   status: done
   notes: |
     Blocking step. Deliver _project/analysis/ADR-sql-compat.md covering:
@@ -96,7 +97,7 @@ work:
 - id: w3
   summary: "Record baseline snapshot artifact and schema-version it"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Deliver benchbox/sql_compat/baseline_tool.py which, for each
     (platform, benchmark, query_id, phase, mode), emits
@@ -136,7 +137,8 @@ work:
     No rules registered yet — just the engine.
 
 - id: w6
-  summary: "Build dual-run harness: legacy + registry run in parallel, log divergences, gated by BENCHBOX_COMPAT_REGISTRY flag"
+  summary: "Build dual-run harness: legacy + registry run in parallel, log divergences, gated by BENCHBOX_COMPAT_REGISTRY
+    flag"
   needs: [w5]
   status: pending
   notes: |
@@ -267,7 +269,8 @@ work:
     warn to error at the end of this slice.
 
 - id: w16
-  summary: "Cutover: registry becomes authoritative, dual-run harness deleted, feature flag removed, legacy skip APIs become registry views"
+  summary: "Cutover: registry becomes authoritative, dual-run harness deleted, feature flag removed, legacy skip APIs become
+    registry views"
   needs: [w7, w12, w14, w15]
   status: pending
   notes: |
@@ -301,11 +304,11 @@ work:
 
 metadata:
   tags:
-    - sql-compat
-    - architecture
-    - dialect-translation
-    - capabilities
-    - refactor
+  - sql-compat
+  - architecture
+  - dialect-translation
+  - capabilities
+  - refactor
   estimated_effort: "X-Large"
   created_date: "2026-04-20"
 
@@ -329,13 +332,14 @@ impact:
     prevents future drift.
 
 must_preserve:
-  - "CLI preflight in cli/commands/run.py:804 continues to fail-fast on unsupported (platform, benchmark) pairs"
-  - "StarRocks first-N-columns PK rule is expressed structurally and prevents silent data divergence"
-  - "H2O Q9 ClickHouse and StarRocks variants continue to produce identical results to the current class-constant SQL"
-  - "ClickHouse Q23/Q87 continue to run successfully (do not revive the corrupting regex)"
-  - "DataFrame-mode skip decisions remain distinct from SQL-mode skip decisions (two pipeline heads share the registry, not the actions)"
-  - "SQL/DataFrame engines that do not go through sqlglot (Polars, Pandas) retain their existing code paths"
-  - "Vector Search QUERY_VARIANTS and version-gated behavior continue to work without forcing sqlglot into the path"
+- "CLI preflight in cli/commands/run.py:804 continues to fail-fast on unsupported (platform, benchmark) pairs"
+- "StarRocks first-N-columns PK rule is expressed structurally and prevents silent data divergence"
+- "H2O Q9 ClickHouse and StarRocks variants continue to produce identical results to the current class-constant SQL"
+- "ClickHouse Q23/Q87 continue to run successfully (do not revive the corrupting regex)"
+- "DataFrame-mode skip decisions remain distinct from SQL-mode skip decisions (two pipeline heads share the registry, not
+  the actions)"
+- "SQL/DataFrame engines that do not go through sqlglot (Polars, Pandas) retain their existing code paths"
+- "Vector Search QUERY_VARIANTS and version-gated behavior continue to work without forcing sqlglot into the path"
 
 approach: |
   Phase-first, not query-first. Rule engine plugs in BEHIND existing
@@ -350,107 +354,126 @@ approach: |
   authoritative only after divergence reaches zero per slice.
 
 anti_patterns:
-  - "DO NOT unify query-storage formats in this workstream -- because it conflates decision centralization with data-model churn and the dict-based managers have no blocking semantics today -- the engine must sit BEHIND the existing managers"
-  - "DO NOT decree the phase list upfront -- because the reviewer proposed phases (dataframe_filter, session_policy as a phase, post_translate) mix phases with actions -- derive the phase list from w2 inventory and freeze it in the ADR"
-  - "DO NOT ship 'no inline dialect == remains' as the acceptance criterion -- because legitimate type-mapping branches in nyctaxi/schema.py:253 and tsbs_devops/schema.py:174 are not compatibility policy -- gate on 'no unregistered-or-unexempted compatibility decision remains' instead"
-  - "DO NOT claim slice w6 is 'zero behavior change' -- because dialect_utils.translate_sql_query applies identify-policy, SQLite fixups, and post-processors that the bare sqlglot.transpile in DialectTranslationMixin does not -- gate with per-adapter snapshot diff sign-off"
-  - "DO NOT revive the ClickHouse add_subquery_aliases regex rewrite -- because it corrupts Q23/Q87 parentheses and is disabled in production for that reason -- prefer AST; fall back to session policy if sqlglot cannot express the rewrite safely"
-  - "DO NOT model capabilities as bare booleans (e.g., pk.uniqueness_enforced=True) -- because StarRocks silently ignores PKs that violate the first-N-columns rule, which a boolean cannot express -- use structured enforcement + conditions + failure_mode"
-  - "DO NOT treat unsupported_benchmarks as dead metadata -- because it is enforced in CLI preflight at cli/commands/run.py:804 -- the benchmark_gate phase must back it via registry view"
-  - "DO NOT migrate without a reversible feature flag -- because four slices touching ~15 sites across the codebase have no safe single-revert path -- ship behind BENCHBOX_COMPAT_REGISTRY with dual-run telemetry"
-  - "DO NOT trust the reviewer's tpcdi/benchmark.py:374 citation without verifying -- because that line is a get_queries accessor, not a post-translation override -- find the real site in slice w11 before registering the rule"
-  - "DO NOT leave vector_search/queries.py in files_affected without an owning work unit -- because QUERY_VARIANTS plus platform-version gates are a distinct storage/decision shape -- onboard them explicitly in their own slice"
+- "DO NOT unify query-storage formats in this workstream -- because it conflates decision centralization with data-model churn
+  and the dict-based managers have no blocking semantics today -- the engine must sit BEHIND the existing managers"
+- "DO NOT decree the phase list upfront -- because the reviewer proposed phases (dataframe_filter, session_policy as a phase,
+  post_translate) mix phases with actions -- derive the phase list from w2 inventory and freeze it in the ADR"
+- "DO NOT ship 'no inline dialect == remains' as the acceptance criterion -- because legitimate type-mapping branches in nyctaxi/schema.py:253
+  and tsbs_devops/schema.py:174 are not compatibility policy -- gate on 'no unregistered-or-unexempted compatibility decision
+  remains' instead"
+- "DO NOT claim slice w6 is 'zero behavior change' -- because dialect_utils.translate_sql_query applies identify-policy, SQLite
+  fixups, and post-processors that the bare sqlglot.transpile in DialectTranslationMixin does not -- gate with per-adapter
+  snapshot diff sign-off"
+- "DO NOT revive the ClickHouse add_subquery_aliases regex rewrite -- because it corrupts Q23/Q87 parentheses and is disabled
+  in production for that reason -- prefer AST; fall back to session policy if sqlglot cannot express the rewrite safely"
+- "DO NOT model capabilities as bare booleans (e.g., pk.uniqueness_enforced=True) -- because StarRocks silently ignores PKs
+  that violate the first-N-columns rule, which a boolean cannot express -- use structured enforcement + conditions + failure_mode"
+- "DO NOT treat unsupported_benchmarks as dead metadata -- because it is enforced in CLI preflight at cli/commands/run.py:804
+  -- the benchmark_gate phase must back it via registry view"
+- "DO NOT migrate without a reversible feature flag -- because four slices touching ~15 sites across the codebase have no
+  safe single-revert path -- ship behind BENCHBOX_COMPAT_REGISTRY with dual-run telemetry"
+- "DO NOT trust the reviewer's tpcdi/benchmark.py:374 citation without verifying -- because that line is a get_queries accessor,
+  not a post-translation override -- find the real site in slice w11 before registering the rule"
+- "DO NOT leave vector_search/queries.py in files_affected without an owning work unit -- because QUERY_VARIANTS plus platform-version
+  gates are a distinct storage/decision shape -- onboard them explicitly in their own slice"
 
 verification:
-  - description: "ADR committed before implementation slices begin"
-    command: "test -f _project/analysis/ADR-sql-compat.md && echo PRESENT"
-    expected_output: "PRESENT"
-  - description: "Compatibility inventory artifact present"
-    command: "test -s _project/compat/inventory.jsonl && echo PRESENT"
-    expected_output: "PRESENT"
-  - description: "Inventory captures both benchmark_gate and QUERY_VARIANTS decision sites before the ADR is frozen"
-    command: "grep -E 'cli/commands/run.py|core/vector_search/queries.py' _project/compat/inventory.jsonl | wc -l | tr -d ' '"
-    expected_output: "2"
-  - description: "Baseline snapshot present and schema-versioned"
-    command: "test -s _project/compat/baseline.v1.jsonl && echo PRESENT"
-    expected_output: "PRESENT"
-  - description: "sql_compat package exists with required modules"
-    command: "for m in context.py decision.py actions.py registry.py resolver.py plan.py; do test -f benchbox/sql_compat/$m || exit 1; done && echo PRESENT"
-    expected_output: "PRESENT"
-  - description: "Full fast test suite passes under registry-authoritative mode"
-    command: "BENCHBOX_COMPAT_REGISTRY=on uv run -- python -m pytest -m fast -q"
-    expected_output: "passed"
-  - description: "Shadow-mode parity smoke passes once the dual-run harness lands"
-    command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_shadow_parity.py -q"
-    expected_output: "passed"
-  - description: "Primary-key vertical parity tests pass before the PK cutover slice is enabled"
-    command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_primary_key_capabilities.py -q"
-    expected_output: "passed"
-  - description: "Benchmark-rule parity tests cover H2O, TPC-DI, and Vector Search onboarding"
-    command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_benchmark_rule_parity.py -q"
-    expected_output: "passed"
-  - description: "Adapter-rule fixtures cover ClickHouse, DataFusion, and StarRocks migrations"
-    command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_adapter_rule_fixtures.py -q"
-    expected_output: "passed"
-  - description: "Compatibility lint passes in error mode after slice w15"
-    command: "uv run scripts/compat_lint.py --strict && echo PASS"
-    expected_output: "PASS"
-  - description: "No hardcoded dialect tuples remain in primitives benchmarks after slice w9"
-    command: "grep -E 'dialect\\s+in\\s+\\(' benchbox/core/write_primitives/benchmark.py benchbox/core/transaction_primitives/benchmark.py | wc -l | tr -d ' '"
-    expected_output: "0"
-  - description: "H2O Q9 class constants removed after slice w10"
-    command: "grep -E '_CLICKHOUSE_Q9|_STARROCKS_Q9' benchbox/core/h2odb/benchmark.py | wc -l | tr -d ' '"
-    expected_output: "0"
-  - description: "Doc generator script + CI drift check exist before docs are generated (w17)"
-    command: "test -f scripts/generate_compat_docs.py && grep -l generate_compat_docs Makefile .github/workflows/*.yml 2>/dev/null | head -1 | grep -q . && echo PRESENT"
-    expected_output: "PRESENT"
-  - description: "Generated capability matrix present after slice w18"
-    command: "test -f docs/compat/capability-matrix.md && test -f docs/compat/skip-reference.md && echo PRESENT"
-    expected_output: "PRESENT"
+- description: "ADR committed before implementation slices begin"
+  command: "test -f _project/analysis/ADR-sql-compat.md && echo PRESENT"
+  expected_output: "PRESENT"
+- description: "Compatibility inventory artifact present"
+  command: "test -s _project/compat/inventory.jsonl && echo PRESENT"
+  expected_output: "PRESENT"
+- description: "Inventory captures both benchmark_gate and QUERY_VARIANTS decision sites before the ADR is frozen"
+  command: "grep -E 'cli/commands/run.py|core/vector_search/queries.py' _project/compat/inventory.jsonl | wc -l | tr -d '
+    '"
+  expected_output: "2"
+- description: "Baseline snapshot present and schema-versioned"
+  command: "test -s _project/compat/baseline.v1.jsonl && echo PRESENT"
+  expected_output: "PRESENT"
+- description: "sql_compat package exists with required modules"
+  command: "for m in context.py decision.py actions.py registry.py resolver.py plan.py; do test -f benchbox/sql_compat/$m
+    || exit 1; done && echo PRESENT"
+  expected_output: "PRESENT"
+- description: "Full fast test suite passes under registry-authoritative mode"
+  command: "BENCHBOX_COMPAT_REGISTRY=on uv run -- python -m pytest -m fast -q"
+  expected_output: "passed"
+- description: "Shadow-mode parity smoke passes once the dual-run harness lands"
+  command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_shadow_parity.py -q"
+  expected_output: "passed"
+- description: "Primary-key vertical parity tests pass before the PK cutover slice is enabled"
+  command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_primary_key_capabilities.py
+    -q"
+  expected_output: "passed"
+- description: "Benchmark-rule parity tests cover H2O, TPC-DI, and Vector Search onboarding"
+  command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_benchmark_rule_parity.py
+    -q"
+  expected_output: "passed"
+- description: "Adapter-rule fixtures cover ClickHouse, DataFusion, and StarRocks migrations"
+  command: "BENCHBOX_COMPAT_REGISTRY=shadow uv run -- python -m pytest tests/unit/sql_compat/test_adapter_rule_fixtures.py
+    -q"
+  expected_output: "passed"
+- description: "Compatibility lint passes in error mode after slice w15"
+  command: "uv run scripts/compat_lint.py --strict && echo PASS"
+  expected_output: "PASS"
+- description: "No hardcoded dialect tuples remain in primitives benchmarks after slice w9"
+  command: "grep -E 'dialect\\s+in\\s+\\(' benchbox/core/write_primitives/benchmark.py benchbox/core/transaction_primitives/benchmark.py
+    | wc -l | tr -d ' '"
+  expected_output: "0"
+- description: "H2O Q9 class constants removed after slice w10"
+  command: "grep -E '_CLICKHOUSE_Q9|_STARROCKS_Q9' benchbox/core/h2odb/benchmark.py | wc -l | tr -d ' '"
+  expected_output: "0"
+- description: "Doc generator script + CI drift check exist before docs are generated (w17)"
+  command: "test -f scripts/generate_compat_docs.py && grep -l generate_compat_docs Makefile .github/workflows/*.yml 2>/dev/null
+    | head -1 | grep -q . && echo PRESENT"
+  expected_output: "PRESENT"
+- description: "Generated capability matrix present after slice w18"
+  command: "test -f docs/compat/capability-matrix.md && test -f docs/compat/skip-reference.md && echo PRESENT"
+  expected_output: "PRESENT"
 
 files_affected:
   added:
-    - "_project/analysis/ADR-sql-compat.md"
-    - "_project/compat/inventory.jsonl"
-    - "_project/compat/baseline.v1.jsonl"
-    - "benchbox/sql_compat/__init__.py"
-    - "benchbox/sql_compat/context.py"
-    - "benchbox/sql_compat/decision.py"
-    - "benchbox/sql_compat/actions.py"
-    - "benchbox/sql_compat/registry.py"
-    - "benchbox/sql_compat/resolver.py"
-    - "benchbox/sql_compat/plan.py"
-    - "benchbox/sql_compat/local_exemptions.py"
-    - "benchbox/sql_compat/inventory.py"
-    - "benchbox/sql_compat/baseline_tool.py"
-    - "benchbox/sql_compat/rules/"
-    - "scripts/compat_lint.py"
-    - "scripts/generate_compat_docs.py"
-    - "docs/compat/capability-matrix.md"
-    - "docs/compat/skip-reference.md"
-    - "tests/unit/sql_compat/"
+  - "_project/analysis/ADR-sql-compat.md"
+  - "_project/compat/inventory.jsonl"
+  - "_project/compat/baseline.v1.jsonl"
+  - "benchbox/sql_compat/__init__.py"
+  - "benchbox/sql_compat/context.py"
+  - "benchbox/sql_compat/decision.py"
+  - "benchbox/sql_compat/actions.py"
+  - "benchbox/sql_compat/registry.py"
+  - "benchbox/sql_compat/resolver.py"
+  - "benchbox/sql_compat/plan.py"
+  - "benchbox/sql_compat/local_exemptions.py"
+  - "benchbox/sql_compat/inventory.py"
+  - "benchbox/sql_compat/baseline_tool.py"
+  - "benchbox/sql_compat/rules/"
+  - "scripts/compat_lint.py"
+  - "scripts/generate_compat_docs.py"
+  - "docs/compat/capability-matrix.md"
+  - "docs/compat/skip-reference.md"
+  - "tests/unit/sql_compat/"
   modified:
-    - "benchbox/platforms/base/dialect_translation.py"
-    - "benchbox/utils/dialect_utils.py"
-    - "benchbox/core/write_primitives/benchmark.py"
-    - "benchbox/core/write_primitives/schema.py"
-    - "benchbox/core/transaction_primitives/benchmark.py"
-    - "benchbox/core/transaction_primitives/schema.py"
-    - "benchbox/core/h2odb/benchmark.py"
-    - "benchbox/core/coffeeshop/"
-    - "benchbox/core/nyctaxi/schema.py"
-    - "benchbox/core/tsbs_devops/schema.py"
-    - "benchbox/core/tpcdi/benchmark.py"
-    - "benchbox/core/vector_search/queries.py"
-    - "benchbox/platforms/clickhouse/query_transformer.py"
-    - "benchbox/platforms/clickhouse/adapter.py"
-    - "benchbox/platforms/datafusion_query_transformer.py"
-    - "benchbox/platforms/starrocks/workload.py"
-    - "benchbox/platforms/base/execution.py"
-    - "benchbox/platforms/dataframe/benchmark_mixin.py"
-    - "benchbox/core/platform_registry.py"
-    - "benchbox/cli/commands/run.py"
-    - "benchbox/core/query_catalog_base.py"
+  - "benchbox/platforms/base/dialect_translation.py"
+  - "benchbox/utils/dialect_utils.py"
+  - "benchbox/core/write_primitives/benchmark.py"
+  - "benchbox/core/write_primitives/schema.py"
+  - "benchbox/core/transaction_primitives/benchmark.py"
+  - "benchbox/core/transaction_primitives/schema.py"
+  - "benchbox/core/h2odb/benchmark.py"
+  - "benchbox/core/coffeeshop/"
+  - "benchbox/core/nyctaxi/schema.py"
+  - "benchbox/core/tsbs_devops/schema.py"
+  - "benchbox/core/tpcdi/benchmark.py"
+  - "benchbox/core/vector_search/queries.py"
+  - "benchbox/platforms/clickhouse/query_transformer.py"
+  - "benchbox/platforms/clickhouse/adapter.py"
+  - "benchbox/platforms/datafusion_query_transformer.py"
+  - "benchbox/platforms/starrocks/workload.py"
+  - "benchbox/platforms/base/execution.py"
+  - "benchbox/platforms/dataframe/benchmark_mixin.py"
+  - "benchbox/core/platform_registry.py"
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/core/query_catalog_base.py"
 
 scope_limit:
   only_modify_note: |
@@ -463,36 +486,37 @@ scope_limit:
     AND is not newly surfaced by the w2 inventory as a compatibility site, it
     is out of bounds for this item.
   only_modify:
-    - "benchbox/sql_compat/"
-    - "benchbox/platforms/base/dialect_translation.py"
-    - "benchbox/platforms/base/execution.py"
-    - "benchbox/platforms/clickhouse/"
-    - "benchbox/platforms/datafusion_query_transformer.py"
-    - "benchbox/platforms/starrocks/"
-    - "benchbox/core/write_primitives/"
-    - "benchbox/core/transaction_primitives/"
-    - "benchbox/core/h2odb/"
-    - "benchbox/core/coffeeshop/"
-    - "benchbox/core/nyctaxi/"
-    - "benchbox/core/tsbs_devops/"
-    - "benchbox/core/tpcdi/"
-    - "benchbox/core/vector_search/"
-    - "benchbox/core/platform_registry.py"
-    - "benchbox/core/query_catalog_base.py"
-    - "benchbox/cli/commands/run.py"
-    - "benchbox/utils/dialect_utils.py"
-    - "scripts/compat_lint.py"
-    - "scripts/generate_compat_docs.py"
-    - "docs/compat/"
-    - "_project/analysis/ADR-sql-compat.md"
-    - "_project/compat/"
-    - "tests/unit/sql_compat/"
-    - "tests/unit/platforms/"
-    - "tests/unit/core/"
+  - "benchbox/sql_compat/"
+  - "benchbox/platforms/base/dialect_translation.py"
+  - "benchbox/platforms/base/execution.py"
+  - "benchbox/platforms/clickhouse/"
+  - "benchbox/platforms/datafusion_query_transformer.py"
+  - "benchbox/platforms/starrocks/"
+  - "benchbox/core/write_primitives/"
+  - "benchbox/core/transaction_primitives/"
+  - "benchbox/core/h2odb/"
+  - "benchbox/core/coffeeshop/"
+  - "benchbox/core/nyctaxi/"
+  - "benchbox/core/tsbs_devops/"
+  - "benchbox/core/tpcdi/"
+  - "benchbox/core/vector_search/"
+  - "benchbox/core/platform_registry.py"
+  - "benchbox/core/query_catalog_base.py"
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/utils/dialect_utils.py"
+  - "scripts/compat_lint.py"
+  - "scripts/generate_compat_docs.py"
+  - "docs/compat/"
+  - "_project/analysis/ADR-sql-compat.md"
+  - "_project/compat/"
+  - "tests/unit/sql_compat/"
+  - "tests/unit/platforms/"
+  - "tests/unit/core/"
   out_of_scope:
-    - "Query-storage format unification (H2O/CoffeeShop dict managers → catalog) — deferred to a separate future ADR"
-    - "Polars/Pandas DataFrame API-shape compatibility beyond the DataFrame pipeline head's skip/variant actions"
-    - "sqlglot version upgrade or replacement"
-    - "New platform or benchmark additions"
-    - "Result schema or visualization changes"
-    - "Unrelated changes in benchbox/platforms/ or benchbox/core/ that are not surfaced by the w2 inventory as compatibility decisions"
+  - "Query-storage format unification (H2O/CoffeeShop dict managers → catalog) — deferred to a separate future ADR"
+  - "Polars/Pandas DataFrame API-shape compatibility beyond the DataFrame pipeline head's skip/variant actions"
+  - "sqlglot version upgrade or replacement"
+  - "New platform or benchmark additions"
+  - "Result schema or visualization changes"
+  - "Unrelated changes in benchbox/platforms/ or benchbox/core/ that are not surfaced by the w2 inventory as compatibility
+    decisions"
