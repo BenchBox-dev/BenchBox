@@ -110,7 +110,7 @@ work:
 - id: w4
   summary: "Introduce @compat_local decorator and land the inventory linter in warn-only mode"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Deliver benchbox/sql_compat/local_exemptions.py with the @compat_local
     decorator (kind: Literal["type_mapping","storage_layout","rendering"],
