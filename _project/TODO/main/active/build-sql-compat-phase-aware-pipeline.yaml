@@ -179,7 +179,7 @@ work:
 - id: w9
   summary: "Slice B2: Transaction-primitives PK/schema migration and CLI benchmark-gate integration"
   needs: [w8]
-  status: pending
+  status: done
   notes: |
     Remove the hardcoded dialect tuple at
     core/transaction_primitives/benchmark.py:147 → capability lookup;
