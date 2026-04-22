@@ -1,158 +1,240 @@
 id: centralize-ddl-translation-phase
-title: "Centralize DDL translation: introduce ddl_compile phase and schema IR"
+title: "Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)"
 worktree: main
 priority: High
 status: Identified
 category: "Core Functionality"
 description: |
-  Eliminate split DDL ownership across three layers (benchmarks, base helpers, adapters) by introducing
-  a first-class ddl_compile phase and structured schema IR. Currently, benchmarks emit target-dialect SQL,
-  base helpers "compile" by double-translating, and adapters patch final SQL via regex/string rewrites.
+  Follow-on / amendment plan for `build-sql-compat-phase-aware-pipeline`. The ADR,
+  phase enum, registry, resolver, `schema_emit` rules, and the first
+  `ddl_optimize` rule already exist. The remaining DDL gap is narrower and more
+  concrete than the earlier draft assumed: many adapters still own late
+  `CREATE TABLE` rewrites (`_optimize_table_definition()` or Databricks
+  `_convert_to_delta_table()`), and base schema execution still exposes the
+  `platform_transform_fn` callback.
 
-  This architectural gap allows benchmark-level platform patches to persist despite the phase-aware pipeline.
-  The solution is to make DDL generation a first-class concern in the compatibility phase model, not ad-hoc.
+  This item does NOT introduce a new `ddl_compile` phase, a new
+  `CompatibilityContext` shape, or a parallel `benchbox/sql_compat/transformers/`
+  tree. The frozen phase model is sufficient:
+  - `schema_emit` owns logical-to-dialect DDL policy
+  - `ddl_optimize` owns post-generation statement rewrites
+  - adapter `create_schema()` overrides keep only operational setup
 
-created_date: "2026-04-22"
-last_updated: "2026-04-22T00:00:01"
+  Goal: finish central DDL ownership inside the shipped sql_compat architecture,
+  retire late adapter monkey-patching, and remove residual benchmark-level DDL
+  compatibility branches so benchmarks no longer need platform-specific
+  compatibility policy at schema generation time. If
+  `build-sql-compat-phase-aware-pipeline` is still active when this work starts,
+  fold overlapping slices into that TODO rather than landing a competing design.
 
 work:
   - id: w1
-    summary: "Extend CompatibilityContext with DDL fields and normalize all benchmark schemas to BaseSchemaTable IR"
+    summary: "Amend the existing ADR and active sql_compat TODO with the correct DDL-centralization target"
     status: pending
     notes: |
-      Add object_name, statement_kind, source_dialect, target_dialect to CompatibilityContext.
-      Normalize vector_search, nyctaxi, tsbs_devops, write_primitives, read_primitives dict-based schemas.
-      This is the prerequisite for all downstream work.
+      Update docs/development/adr/adr-sql-compat-phase-aware-pipeline.md and, if
+      needed, the remaining notes in _project/TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
+      to record the real scope:
+      - no new `ddl_compile` phase
+      - no `CompatibilityContext` extension in this item
+      - no parallel `sql_compat/transformers/` tree
+      - remaining adapter-owned DDL hooks are the work to finish
+
+      Enumerate the exact migration inventory here: ClickHouse, Databricks,
+      Databend, Firebolt, Redshift, Azure Synapse, Snowflake, Presto, Trino,
+      Spark, Lakesail, Velox, and Fabric Warehouse. If a DDL rewrite needs
+      statement metadata beyond raw SQL (for example Fabric Warehouse's tuning-
+      aware path), amend the existing `RewriteDDLPayload` / pipeline plumbing in
+      the ADR first rather than overloading `CompatibilityContext`.
+
+      REQUIRED before closing w1: explicitly resolve and document the Fabric
+      Warehouse question from open_questions — "is raw SQL sufficient or does
+      RewriteDDLPayload need a richer execution contract?" Record the decision
+      and its rationale in the ADR amendment. This decision gates w14, which
+      in turn gates the entire w15–w18 tail; leaving it open past w1 will stall
+      the work.
 
   - id: w2
-    summary: "Add ddl_compile as first-class phase in compatibility registry"
+    summary: "Move ClickHouse CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
     needs: [w1]
     notes: |
-      Update CompatibilityResolver.build_plan() to sequence: schema_emit → ddl_compile → ddl_optimize → execute.
-      Ensure existing query_id planning path for query execution remains unchanged.
+      Add a ClickHouse rule module under benchbox/sql_compat/rules/ddl_optimize/
+      following the shipped StarRocks precedent, then update
+      benchbox/platforms/clickhouse/workload.py so registry-backed DDL rewrite
+      is authoritative for CREATE TABLE statements. Keep ClickHouse-specific
+      runtime setup in the adapter; centralize only the SQL rewrite logic.
 
   - id: w3
-    summary: "Create central type mapping system and move _EMBEDDING_TYPE_MAP from benchmarks"
+    summary: "Move Databricks Delta-table CREATE TABLE rewrite under Phase.DDL_OPTIMIZE"
     status: pending
     needs: [w1]
     notes: |
-      Create compatibility/transformers/ddl_compiler.py with structured type mapping (Vector, Timestamp, Decimal).
-      Move _EMBEDDING_TYPE_MAP from vector_search into central renderer.
-      Only type rendering in this unit; defer storage/physical rewrites to w8-w14.
+      Databricks is a separate shape from the `_optimize_table_definition()`
+      adapters. Register `_convert_to_delta_table()` as a DDL rewrite rule and
+      replace the `platform_transform_fn` usage in
+      benchbox/platforms/databricks/adapter.py with the registry-owned path.
+      Keep catalog/schema creation, permissions, and other runtime setup local.
 
   - id: w4
-    summary: "Refactor vector_search to emit logical Vector(dim, type) IR only"
+    summary: "Move Databend CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
-    needs: [w1, w3]
+    needs: [w1]
     notes: |
-      Remove dialect branches in benchbox/core/vector_search/schema.py (current branch at line 48).
-      Emit Vector(dim, type) semantics through schema IR; compiler handles platform rendering.
-      Verify duckdb + clickhouse-cloud produce byte-identical DDL to pre-refactor baseline.
+      Register the Databend DDL rewrite in benchbox/sql_compat/rules/ddl_optimize/
+      and make benchbox/platforms/databend/adapter.py consume the central rule.
+      Delete adapter-local rewrite logic once parity tests pass.
 
   - id: w5
-    summary: "Refactor nyctaxi to emit partition_intent IR (remove ClickHouse MergeTree)"
+    summary: "Move Firebolt CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
-    needs: [w1, w3]
+    needs: [w1]
     notes: |
-      Remove ClickHouse MergeTree clauses in benchbox/core/nyctaxi/schema.py (branch at line 250).
-      Emit partition_intent through schema IR; compiler renders per-platform partition clauses.
-      Verify duckdb + clickhouse-cloud produce byte-identical DDL to pre-refactor baseline.
+      Register the Firebolt DDL rewrite in benchbox/sql_compat/rules/ddl_optimize/
+      and make benchbox/platforms/firebolt.py consume the central rule. Preserve
+      non-DDL operational behavior in create_schema().
 
   - id: w6
-    summary: "Refactor tsbs_devops to emit time_series_intent IR (remove TimescaleDB hypertable)"
+    summary: "Move Redshift CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
-    needs: [w1, w3]
+    needs: [w1]
     notes: |
-      Remove TimescaleDB create_hypertable branches in benchbox/core/tsbs_devops/schema.py (line 171).
-      Emit time_series_intent through schema IR; compiler renders per-platform time-series syntax.
-      Verify duckdb + postgresql produce byte-identical DDL to pre-refactor baseline.
+      Centralize the Redshift DDL rewrite while leaving adapter runtime concerns
+      such as search_path/session setup and pre-drop behavior local to
+      benchbox/platforms/redshift.py. Do not mix operational setup into the rule.
 
   - id: w7
-    summary: "Refactor write_primitives + read_primitives PK branches to capability gating"
+    summary: "Move Azure Synapse CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
-    needs: [w1, w3]
+    needs: [w1]
     notes: |
-      Remove PK dialect branches in benchbox/core/write_primitives/schema.py (line 352) and
-      benchbox/core/read_primitives/schema.py. Emit PK intent; compiler gates by platform capability.
-      Verify duckdb + postgresql + clickhouse-cloud produce byte-identical DDL to baseline.
+      Register the Azure Synapse table-definition rewrite centrally and update
+      benchbox/platforms/azure_synapse.py to consume it. External object setup
+      and connection/session behavior remain adapter-local.
 
   - id: w8
-    summary: "Extract ClickHouse _optimize_table_definition() into clickhouse_ddl transformer"
+    summary: "Move Snowflake CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
-    needs: [w2, w3, w4, w5, w6, w7]
+    needs: [w1]
     notes: |
-      Move regex/rewrite logic from benchbox/platforms/clickhouse/workload.py into
-      benchbox/sql_compat/transformers/clickhouse_ddl.py. Move existing rewrites as-is.
-      Route through ddl_compile phase dispatch.
+      Centralize Snowflake's CREATE TABLE rewrite and preserve the adapter's
+      runtime-only responsibilities. Verify clustering/tuning-related SQL
+      remains correct after moving the rewrite authority into the rule registry.
 
   - id: w9
-    summary: "Extract StarRocks _optimize_table_definition() into starrocks_ddl transformer"
+    summary: "Move Presto CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
-    needs: [w2, w3, w4, w5, w6, w7]
+    needs: [w1]
     notes: |
-      Move regex/rewrite logic from benchbox/platforms/starrocks/workload.py into
-      benchbox/sql_compat/transformers/starrocks_ddl.py. Move existing rewrites as-is.
+      Register the Presto DDL rewrite in the existing rules layout and make
+      benchbox/platforms/presto.py consume it. Keep connector/catalog setup
+      outside the rule path.
 
   - id: w10
-    summary: "Extract Databricks _optimize_table_definition() into databricks_ddl transformer"
+    summary: "Move Trino CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
-    needs: [w2, w3, w4, w5, w6, w7]
+    needs: [w1]
     notes: |
-      Move regex/rewrite logic from benchbox/platforms/databricks/adapter.py into
-      benchbox/sql_compat/transformers/databricks_ddl.py. Move existing rewrites as-is.
+      Mirror the Presto migration for benchbox/platforms/trino.py, but keep the
+      Trino-specific create_schema() flow and connector/runtime setup local.
 
   - id: w11
-    summary: "Extract Firebolt _optimize_table_definition() into firebolt_ddl transformer"
+    summary: "Move Spark CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
-    needs: [w2, w3, w4, w5, w6, w7]
+    needs: [w1]
     notes: |
-      Move regex/rewrite logic from benchbox/platforms/firebolt.py into
-      benchbox/sql_compat/transformers/firebolt_ddl.py. Move existing rewrites as-is.
+      Centralize Spark's DDL rewrite logic and preserve adapter-local runtime
+      session/configuration behavior. Verify `USING`-clause handling continues to
+      produce exactly one storage clause after migration.
 
   - id: w12
-    summary: "Extract Databend _optimize_table_definition() into databend_ddl transformer"
+    summary: "Move Lakesail CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
-    needs: [w2, w3, w4, w5, w6, w7]
+    needs: [w1]
     notes: |
-      Move regex/rewrite logic from benchbox/platforms/databend/adapter.py into
-      benchbox/sql_compat/transformers/databend_ddl.py. Move existing rewrites as-is.
+      Register the Lakesail DDL rewrite centrally and update
+      benchbox/platforms/lakesail.py to consume it. Preserve runtime-only cloud
+      setup and connection behavior in the adapter.
 
   - id: w13
-    summary: "Extract Redshift _optimize_table_definition() into redshift_ddl transformer"
+    summary: "Move Velox CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
-    needs: [w2, w3, w4, w5, w6, w7]
+    needs: [w1]
     notes: |
-      Move regex/rewrite logic from benchbox/platforms/redshift.py into
-      benchbox/sql_compat/transformers/redshift_ddl.py. Move existing rewrites as-is.
-      Note: distribution-key handling depends on resolution of open_questions item 3.
+      Register the Velox DDL rewrite centrally and update
+      benchbox/platforms/velox.py to consume it. Keep non-DDL execution setup
+      local to the adapter.
 
   - id: w14
-    summary: "Extract PostgreSQL _optimize_table_definition() into postgresql_ddl transformer and remove hook"
+    summary: "Move Fabric Warehouse CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
     status: pending
-    needs: [w8, w9, w10, w11, w12, w13]
+    needs: [w1]
     notes: |
-      Move regex/rewrite logic from benchbox/platforms/postgresql.py into
-      benchbox/sql_compat/transformers/postgresql_ddl.py. Move existing rewrites as-is.
-      Final unit — removes platform_transform_fn hook from _execute_schema_statements()
-      once all adapters are migrated.
+      Fabric Warehouse currently has a tuning-aware `_optimize_table_definition`
+      signature. Migrate only after w1 resolves whether raw SQL is sufficient or
+      whether `RewriteDDLPayload` needs a richer execution contract. Do not solve
+      this by adding DDL fields to `CompatibilityContext`.
 
   - id: w15
-    summary: "Audit remaining dialect branches and document design in ADR"
+    summary: "Delete now-redundant inline DDL policy branches in nyctaxi and tsbs_devops"
     status: pending
-    needs: [w14]
+    needs: [w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14]
     notes: |
-      Run compat_lint.py to confirm zero benchmark-level patches.
-      Update sql_compat/inventory.py and scripts/compat_lint.py to handle map-based renderers.
-      Create docs/development/adr/ document explaining ddl_compile phase design.
+      Revisit benchbox/core/nyctaxi/schema.py and benchbox/core/tsbs_devops/schema.py.
+      W15 of the active sql_compat item already registered central `schema_emit`
+      rules for the compatibility-policy branches. This cleanup unit removes any
+      now-shadowed inline policy logic, leaving only true `@compat_local`
+      rendering/type-mapping behavior. If a branch cannot be removed, document
+      exactly why in the ADR amendment and inventory output.
+
+  - id: w16
+    summary: "Audit vector_search and primitive schema helpers for residual benchmark-level DDL compatibility policy"
+    status: pending
+    needs: [w15]
+    notes: |
+      Review benchbox/core/vector_search/schema.py,
+      benchbox/core/write_primitives/schema.py, and
+      benchbox/core/read_primitives/schema.py for benchmark-level DDL logic that
+      still encodes platform compatibility policy rather than pure rendering.
+      Move compatibility-policy branches into existing `schema_emit` rules.
+      Do NOT force a repo-wide schema-IR migration here; if true zero-local-
+      rendering requires richer schema primitives than the current codebase can
+      represent, capture that as a separate follow-on item with concrete
+      evidence instead of reopening the architecture in this TODO.
+
+  - id: w17
+    summary: "Remove platform_transform_fn from base schema execution after all callers migrate"
+    status: pending
+    needs: [w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15, w16]
+    notes: |
+      Delete the `platform_transform_fn` parameter and all call sites in
+      benchbox/platforms/base/data_loading.py once every remaining CREATE TABLE
+      rewrite flows through resolver-backed `ddl_optimize` rules. Preserve
+      logging, tuning lookup, statement execution, and error-reporting behavior.
+
+  - id: w18
+    summary: "Tighten lint, inventory, tests, and ADR wording to lock in centralized DDL ownership"
+    status: pending
+    needs: [w17]
+    notes: |
+      Update benchbox/sql_compat/inventory.py and scripts/compat_lint.py so the
+      tooling can catch residual benchmark-level DDL policy sites beyond simple
+      `if dialect ...` branches where feasible, including the map-based cases
+      audited in w16. Amend the existing ADR to document the final contract and
+      explicit disposition of any remaining `@compat_local` rendering-only sites.
+      Do not add a second ADR for DDL compilation.
 
 deferred:
-  - summary: "Optimize per-platform compiler rules (bidirectional translation)"
-    reason: "Out of scope; implement after core pipeline is working"
-  - summary: "Support dataframe mode DDL generation through same pipeline"
-    reason: "Can be added after SQL path is complete"
-  - summary: "Integration with results-explorer for DDL tracking"
-    reason: "Separate feature; deferred to results platform work"
+  - summary: "Expand schema primitives / IR only if the w16 audit proves current benchmark models cannot remove remaining local renderers"
+    reason: "BaseSchemaTable does not currently encode vector, partition, or time-series semantics well enough to justify a repo-wide migration in this item"
+  - summary: "Unify DataFrame-mode DDL generation behind the same registry-owned path"
+    reason: "Keep this item focused on SQL DDL ownership first"
+  - summary: "Factor shared helper libraries across Presto/Trino/Spark-family DDL optimizers after parity is established"
+    reason: "First move ownership centrally; de-duplication is a separate cleanup pass"
+
+deps:
+  needs:
+    - build-sql-compat-phase-aware-pipeline
 
 metadata:
   owners:
@@ -162,215 +244,220 @@ metadata:
     - sql-compat
     - ddl
     - phase-aware-pipeline
-  estimated_effort: "Large"
-  budget_allocated: "40-50 hours"
+  estimated_effort: "X-Large"
+  created_date: "2026-04-22"
+  last_updated: "2026-04-22T12:00:00"
+  budget_allocated: "45-65 hours"
 
 impact:
   business_value: |
-    Unblocks future SQL compatibility improvements by establishing a single source of truth for DDL generation.
-    Enables platform-specific features (vector types, time-series, partitioning) without benchmark-level patching.
+    Completes the DDL portion of the sql_compat migration using the
+    infrastructure already built, so DDL behavior becomes auditable and centrally
+    owned instead of hidden in adapter callbacks and benchmark branches.
   user_impact: |
-    Transparent to users; improves internal architecture and maintainability.
+    Transparent to end users. The benefit is lower regression risk when adding
+    or changing platforms because CREATE TABLE behavior is visible in the
+    registry and covered by shared tests.
   technical_debt: |
-    Eliminates architectural debt around split DDL ownership. Removes double-compilation inefficiency.
-    Makes dialect-specific rules visible to registry/planning systems instead of hidden in adapters.
+    Removes late callback-based DDL surgery from adapters, narrows benchmark
+    schema helpers to benchmark-intrinsic rendering only, and avoids a second
+    competing DDL architecture. It also turns the remaining DDL gaps into
+    explicit rule modules and documented ADR amendments instead of folklore.
 
 files_affected:
   modified:
-    - benchbox/sql_compat/context.py
-    - benchbox/sql_compat/resolver.py
+    - docs/development/adr/adr-sql-compat-phase-aware-pipeline.md
+    - _project/TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
     - benchbox/platforms/base/data_loading.py
-    - benchbox/core/vector_search/schema.py
+    - benchbox/platforms/clickhouse/workload.py
+    - benchbox/platforms/databricks/adapter.py
+    - benchbox/platforms/databend/adapter.py
+    - benchbox/platforms/firebolt.py
+    - benchbox/platforms/redshift.py
+    - benchbox/platforms/azure_synapse.py
+    - benchbox/platforms/snowflake.py
+    - benchbox/platforms/presto.py
+    - benchbox/platforms/trino.py
+    - benchbox/platforms/spark.py
+    - benchbox/platforms/lakesail.py
+    - benchbox/platforms/velox.py
+    - benchbox/platforms/fabric_warehouse.py
     - benchbox/core/nyctaxi/schema.py
     - benchbox/core/tsbs_devops/schema.py
+    - benchbox/core/vector_search/schema.py
     - benchbox/core/write_primitives/schema.py
     - benchbox/core/read_primitives/schema.py
-    - benchbox/platforms/clickhouse/workload.py
-    - benchbox/platforms/starrocks/workload.py
-    - benchbox/platforms/databricks/adapter.py
-    - benchbox/platforms/firebolt.py
-    - benchbox/platforms/databend/adapter.py
-    - benchbox/platforms/redshift.py
-    - benchbox/platforms/postgresql.py
-    - scripts/compat_lint.py
     - benchbox/sql_compat/inventory.py
+    - scripts/compat_lint.py
+    - tests/unit/core/sql_compat/
+    - tests/unit/platforms/
   added:
-    - benchbox/sql_compat/phases/ddl_compile.py
-    - benchbox/sql_compat/transformers/ddl_compiler.py
-    - benchbox/sql_compat/transformers/clickhouse_ddl.py
-    - benchbox/sql_compat/transformers/starrocks_ddl.py
-    - benchbox/sql_compat/transformers/databricks_ddl.py
-    - benchbox/sql_compat/transformers/firebolt_ddl.py
-    - benchbox/sql_compat/transformers/databend_ddl.py
-    - benchbox/sql_compat/transformers/redshift_ddl.py
-    - benchbox/sql_compat/transformers/postgresql_ddl.py
-    - tests/test_schema_ir.py
-    - tests/test_compat_phases.py
-    - tests/test_ddl_compiler.py
-    - tests/integration/test_ddl_end_to_end.py
-    - docs/development/adr/ddl-compile-phase.md
+    - benchbox/sql_compat/rules/ddl_optimize/clickhouse_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/databricks_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/databend_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/firebolt_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/redshift_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/azure_synapse_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/snowflake_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/presto_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/trino_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/spark_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/lakesail_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/velox_ddl_rewrites.py
+    - benchbox/sql_compat/rules/ddl_optimize/fabric_warehouse_ddl_rewrites.py
 
 must_preserve:
-  - "All existing benchmarks still generate valid DDL for duckdb via get_create_tables_sql('duckdb')"
-  - "Query execution path (query_id planning in CompatibilityResolver) runs unchanged"
-  - "Benchmark results bit-for-bit identical before/after refactoring (same row counts, same values)"
-  - "All 36 platforms continue to load data and execute queries without regression"
-  - "vector_search produces identical DDL before/after schema IR normalization"
-  - "All 7 adapter platform tests pass (ClickHouse, StarRocks, Databricks, Firebolt, Databend, Redshift, PostgreSQL)"
+  - "The Phase enum in benchbox/sql_compat/context.py remains the ADR-frozen set; do not add `ddl_compile`"
+  - "CompatibilityResolver.build_plan() and registry specificity remain query-centric in this item; no `CompatibilityContext` DDL-field expansion"
+  - "Existing schema_emit rules for nyctaxi and tsbs_devops remain the source of truth for benchmark-level DDL compatibility policy"
+  - "The shipped StarRocks ddl_optimize rule remains authoritative and unchanged except for any shared helper extraction that preserves behavior"
+  - "Adapter create_schema() methods keep operational responsibilities such as catalog/schema setup, search_path/session state, permissions, and pre-drop sequencing"
+  - "Base data-loading code keeps tuning lookup, dry-run support, logging, and table-level error reporting"
 
 approach: |
-  Follow CompatibilityResolver pattern from benchbox/sql_compat/resolver.py for phase sequencing.
-  Use BaseSchemaTable model from benchbox/core/schema_primitives.py as IR foundation.
-  Mirror the hook dispatch pattern in _execute_schema_statements() (benchbox/platforms/base/data_loading.py:2399)
-  for transformer routing.
+  Work inside the existing sql_compat architecture, not around it.
 
-  Sequence work vertically: w1 foundation, then w2+w3 in parallel (phase + compiler system),
-  then w4-w7 (per-benchmark refactor, parallelizable), then w8-w13 (per-adapter extraction,
-  parallelizable), then w14 (final adapter + hook removal), finally w15 (audit/docs).
-
-  For w4-w7 benchmark migration: read current dialect-aware implementations first (vector_search:48,
-  nyctaxi:250, tsbs_devops:171, write_primitives:352), extract intent semantics, emit as part of
-  schema IR instead of SQL strings.
-
-  Each work unit should be 1-4 hours and produce an independently committable change.
+  1. Amend the active ADR and TODO notes first so the contract is explicit:
+     DDL centralization is achieved with `schema_emit` plus `ddl_optimize`, not
+     a new phase or a new resolver model.
+  2. Use benchbox/sql_compat/rules/ddl_optimize/starrocks_ddl_rewrites.py as
+     the implementation template for every remaining adapter-owned CREATE TABLE
+     rewrite. Each adapter migration should produce a rule module plus adapter
+     consumer cleanup in the same slice.
+  3. Keep runtime-only behavior in adapters. Centralize only pure SQL rewrite
+     logic; do not move catalog creation, connection/session setup, permissions,
+     or other operational flow into the registry.
+  4. After adapter parity is achieved, remove the base
+     `platform_transform_fn` hook and then clean up residual benchmark-level
+     policy branches. Do not begin with a speculative schema-IR migration:
+     BaseSchemaTable is not rich enough today to justify that refactor here.
+  5. Finish by tightening the inventory/lint/docs so new benchmark-level DDL
+     monkey-patching becomes detectable and reviewable.
 
 anti_patterns:
-  - "DO NOT add dialect branches during migration — because that perpetuates the split ownership model we're eliminating — all platform-specific logic must route through the compiler"
-  - "DO NOT use query_id as proxy for table names — because that's an abstraction mismatch causing context confusion — add proper object_name/statement_kind fields"
-  - "DO NOT keep get_create_tables_sql(dialect=...) variant methods — because that's the architectural root cause of split ownership — have benchmarks emit logical schema only"
-  - "DO NOT add new dialect branches to benchmarks as a staging compromise — because staged compromises calcify and perpetuate the exact split ownership we're eliminating — commit dialect decisions to the compiler from the start"
-  - "DO NOT invent new transformations during w5 — move existing rewrites as-is, then optimize separately"
-  - "DO NOT refactor query execution path in parallel — stay focused on DDL pipeline only"
+  - "DO NOT add a `ddl_compile` phase — because `schema_emit` and `ddl_optimize` already cover DDL ownership and are frozen in the ADR — route logical-to-dialect generation through `schema_emit` and post-generation surgery through `ddl_optimize`"
+  - "DO NOT extend `CompatibilityContext` with object_name, statement_kind, source_dialect, or target_dialect in this item — because resolver specificity and plan caching are query-centric today — if statement metadata is required, amend the existing DDL payload contract first"
+  - "DO NOT create a parallel `benchbox/sql_compat/transformers/` tree — because the shipped convention is `benchbox/sql_compat/rules/{phase}/` — add rule modules under the existing phase directories"
+  - "DO NOT move adapter operational setup into the registry — because catalog selection, search_path/session state, permissions, and pre-drop behavior are runtime concerns — centralize only pure DDL statement rewrites"
+  - "DO NOT promise a repo-wide schema-IR migration in this item — because the current schema primitives cannot yet express all benchmark semantics cleanly — capture any proven IR gap as a separate follow-on TODO"
+  - "DO NOT leave benchmark-local DDL compatibility branches in place once equivalent rules exist — because shadowed inline logic defeats centralized ownership — delete them or reduce them to documented `@compat_local` rendering only"
 
 verification:
-  - description: "Unit 1: Schema IR tests pass"
-    command: "uv run -- python -m pytest tests/test_schema_ir.py -v"
+  - description: "sql_compat rule and harness tests still pass after DDL-optimize expansion"
+    command: "uv run -- python -m pytest tests/unit/core/sql_compat/test_harness.py tests/unit/core/sql_compat/test_schema_emit_rules.py tests/unit/core/sql_compat/test_starrocks_pipeline_rules.py -q"
     expected_output: "all tests pass, 0 failures"
 
-  - description: "Unit 1: All benchmarks generate valid duckdb DDL"
-    command: "uv run -- python -c \"from benchbox.core.vector_search.schema import get_create_tables_sql; get_create_tables_sql('duckdb')\""
-    expected_output: "returns valid SQL DDL string with no errors"
-
-  - description: "Unit 2: ddl_compile phase is registered"
-    command: "uv run -- python -m pytest tests/test_compat_phases.py::test_ddl_compile_phase -v"
+  - description: "Platform adapter tests covering migrated CREATE TABLE rewrites still pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py tests/unit/platforms/test_databricks_adapter.py tests/unit/platforms/test_databend_adapter.py tests/unit/platforms/test_firebolt_adapter.py tests/unit/platforms/test_redshift_adapter.py tests/unit/platforms/test_azure_synapse_adapter.py tests/unit/platforms/test_snowflake_adapter.py tests/unit/platforms/test_presto_adapter.py tests/unit/platforms/test_trino_adapter.py tests/unit/platforms/test_spark_adapter.py tests/unit/platforms/test_lakesail_adapter.py tests/unit/platforms/test_velox_adapter.py tests/unit/platforms/test_fabric_warehouse_coverage.py -q"
     expected_output: "all tests pass, 0 failures"
 
-  - description: "Unit 3: Type mapping system functional"
-    command: "uv run -- python -m pytest tests/test_ddl_compiler.py -v"
+  - description: "Base schema execution remains correct after hook removal"
+    command: "uv run -- python -m pytest tests/unit/platforms/base/test_data_loading_operations.py tests/unit/platforms/test_platform_adapter_init_and_loading.py -q"
     expected_output: "all tests pass, 0 failures"
 
-  - description: "Unit 3: _EMBEDDING_TYPE_MAP removed from benchmarks"
-    command: "grep -r '_EMBEDDING_TYPE_MAP' benchbox/core/"
-    expected_output: "no output (zero matches)"
+  - description: "Benchmarks with prior inline DDL policy branches still dry-run successfully"
+    command: "uv run -- benchbox run --platform duckdb --benchmark nyctaxi --scale 0.01 --phases load --dry-run ./benchmark_runs/_tmp_nyctaxi_ddl --non-interactive && uv run -- benchbox run --platform duckdb --benchmark tsbs_devops --scale 0.01 --phases load --dry-run ./benchmark_runs/_tmp_tsbs_ddl --non-interactive"
+    expected_output: "both dry-runs complete with valid CREATE TABLE output and no schema-generation exceptions"
 
-  - description: "w4-w7: Benchmark DDL refactoring produces valid DDL (per-benchmark dry runs)"
-    command: "benchbox run --platform duckdb --benchmark vector_search --scale 0.01 --dry-run && benchbox run --platform clickhouse-cloud --benchmark vector_search --scale 0.01 --dry-run && benchbox run --platform duckdb --benchmark nyctaxi --scale 0.01 --dry-run && benchbox run --platform duckdb --benchmark tsbs_devops --scale 0.01 --dry-run"
-    expected_output: "all four commands produce valid DDL with no errors"
-
-  - description: "w4-w7: Bit-identical DDL before/after refactor (baseline comparison)"
-    command: "uv run -- python scripts/ddl_baseline_diff.py --benchmarks vector_search,nyctaxi,tsbs_devops,write_primitives --platforms duckdb,clickhouse-cloud,postgresql"
-    expected_output: "zero diffs across all benchmark × platform combinations"
-
-  - description: "w4-w7: Bit-identical benchmark results at TPC-H SF 0.01 (duckdb)"
-    command: "benchbox run --platform duckdb --benchmark tpch --scale 0.01 && uv run -- python scripts/result_diff.py --baseline .baselines/tpch-sf0.01-duckdb.json --current results/latest.json"
-    expected_output: "zero value diffs, identical row counts"
-
-  - description: "w4-w7: All fast tests still pass"
-    command: "uv run -- python -m pytest -m fast -q"
-    expected_output: "all tests pass, 0 failures"
-
-  - description: "w8-w14: Adapter consolidation integration tests"
-    command: "uv run -- python -m pytest tests/integration/test_ddl_end_to_end.py -v"
-    expected_output: "all 7 adapter tests pass, 0 failures"
-
-  - description: "w14: platform_transform_fn hook removed"
-    command: "grep -n 'platform_transform_fn' benchbox/platforms/base/data_loading.py"
-    expected_output: "no output (zero matches)"
-
-  - description: "w15: Zero platform-specific patches in benchmarks"
-    command: "grep -r 'get_create_tables_sql.*dialect' benchbox/core/*/schema.py"
-    expected_output: "no output (zero matches)"
-
-  - description: "w15: Lint audit passes"
-    command: "uv run -- python scripts/compat_lint.py"
-    expected_output: "zero benchmark-level platform patches reported"
+  - description: "Compatibility lint enforces zero unregistered benchmark-level DDL policy branches"
+    command: "uv run -- python scripts/compat_lint.py --strict"
+    expected_output: "0 unregistered dialect branch(es) found in the scanned roots"
 
 scope_limit:
   only_modify:
-    - benchbox/sql_compat/
-    - benchbox/core/*/schema.py
-    - benchbox/core/benchmark.py
+    - docs/development/adr/adr-sql-compat-phase-aware-pipeline.md
+    - _project/TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
     - benchbox/platforms/base/data_loading.py
-    - benchbox/platforms/clickhouse/
-    - benchbox/platforms/starrocks/
-    - benchbox/platforms/databricks/
+    - benchbox/platforms/clickhouse/workload.py
+    - benchbox/platforms/databricks/adapter.py
+    - benchbox/platforms/databend/adapter.py
     - benchbox/platforms/firebolt.py
-    - benchbox/platforms/databend/
     - benchbox/platforms/redshift.py
-    - benchbox/platforms/postgresql.py
-    - tests/
+    - benchbox/platforms/azure_synapse.py
+    - benchbox/platforms/snowflake.py
+    - benchbox/platforms/presto.py
+    - benchbox/platforms/trino.py
+    - benchbox/platforms/spark.py
+    - benchbox/platforms/lakesail.py
+    - benchbox/platforms/velox.py
+    - benchbox/platforms/fabric_warehouse.py
+    - benchbox/core/nyctaxi/schema.py
+    - benchbox/core/tsbs_devops/schema.py
+    - benchbox/core/vector_search/schema.py
+    - benchbox/core/write_primitives/schema.py
+    - benchbox/core/read_primitives/schema.py
+    - benchbox/sql_compat/inventory.py
+    - benchbox/sql_compat/rules/schema_emit/
+    - benchbox/sql_compat/rules/ddl_optimize/
     - scripts/compat_lint.py
+    - tests/unit/core/sql_compat/
+    - tests/unit/platforms/
   do_not_modify:
+    - benchbox/sql_compat/context.py
+    - benchbox/sql_compat/resolver.py
+    - benchbox/core/schema_primitives.py
     - benchbox/cli/
     - benchbox/core/runner.py
-    - benchbox/core/query/
   notes: |
-    benchbox/core/benchmark.py is in only_modify solely for adding schema IR support
-    (BaseSchemaTable plumbing). Do NOT touch execution, runner wiring, or unrelated fields.
+    This item is intentionally bounded to finishing DDL ownership inside the
+    shipped sql_compat architecture. If implementation discovers a genuine need
+    for new phase taxonomy, new context keys, or richer schema primitives, stop
+    and write a follow-on TODO / ADR amendment instead of expanding scope here.
 
 success_metrics:
-  - "grep -r 'get_create_tables_sql.*dialect' benchbox/core/*/schema.py returns zero results"
-  - "compat_lint.py reports zero benchmark-level platform patches"
-  - "All 36 platforms pass 'benchbox run --dry-run' without platform_transform_fn callbacks"
-  - "New test suite in tests/integration/test_ddl_end_to_end.py validates all 7 migrated adapters with zero regressions"
-  - "Results are bit-identical before/after across full TPC-H at scale 0.1 for all platforms"
-  - "CompatibilityResolver.build_plan() includes ddl_compile phase in execution sequence"
-  - "All 15 work units (w1-w15) marked complete with verification commands passing"
+  - "No new `ddl_compile` phase, no `CompatibilityContext` DDL-field expansion, and no `sql_compat/transformers/` tree are introduced"
+  - "ClickHouse, Databricks, Databend, Firebolt, Redshift, Azure Synapse, Snowflake, Presto, Trino, Spark, Lakesail, Velox, and Fabric Warehouse CREATE TABLE rewrites are registry-owned `Phase.DDL_OPTIMIZE` rules"
+  - "`platform_transform_fn` no longer exists in benchbox/platforms/base/data_loading.py or any adapter create_schema() caller"
+  - "Residual benchmark-level DDL policy branches are removed or narrowed to documented `@compat_local` rendering-only sites with matching ADR language"
+  - "`uv run -- python scripts/compat_lint.py --strict` passes and the relevant unit tests remain green"
 
 context_sections:
-  "Root Cause Analysis": |
-    Benchmarks own dialect branches (vector_search:48, nyctaxi:250, tsbs_devops:171, write_primitives:352).
-    Base helper asks for target-dialect SQL then translates again from duckdb (double-compilation).
-    Adapters patch final SQL via _optimize_table_definition() regex/string rewrites (7 platforms).
-    CompatibilityContext only has query_id, forcing overloading for table names ("tags").
-    Actual dialect compilation lives ad-hoc in _create_schema_with_tuning(), not in registry.
-    Result: translation ownership split across layers, preventing true centralization.
+  "What Already Landed": |
+    The active `build-sql-compat-phase-aware-pipeline` item already shipped the
+    ADR, the frozen Phase enum, the registry/resolver, schema_emit rules for
+    nyctaxi and tsbs_devops, and the StarRocks DDL_OPTIMIZE precedent. This
+    TODO must build on that infrastructure instead of replacing it.
 
-  "Why This Matters": |
-    Phase-aware pipeline is incomplete for DDL. Query execution is properly phased (query selection → execution).
-    But DDL generation bypasses the registry: schema_emit exists but doesn't own dialect compilation.
-    ddl_optimize exists but can't optimize what it doesn't see (hidden in adapter methods).
-    The hook in _execute_schema_statements() (platform_transform_fn) is an architectural admission that
-    DDL is still patched late, not planned centrally.
+  "Why The Earlier Draft Was Wrong": |
+    The earlier version assumed a pre-registry codebase and proposed a new
+    `ddl_compile` phase, a new context model, a new transformers tree, and a
+    repo-wide schema-IR migration. Those ideas conflict with the shipped ADR and
+    were too large, too speculative, and insufficiently aligned with the
+    current resolver and rule layout.
+
+  "Actual Remaining Gap": |
+    DDL ownership is still split because adapter-local CREATE TABLE rewrite
+    methods remain outside the registry and base data loading still supports a
+    late callback transform. Separately, some benchmark schema helpers still
+    contain inline DDL policy or rendering logic that needs a final audit so
+    centralized rules are the only place where compatibility policy lives.
 
   "Target End State": |
-    Benchmarks emit only logical schema: columns, PK/FK intent, partition intent, clustering intent,
-    vector dimensions/types, time-series intent. Zero platform names, zero dialect branches.
-
-    ddl_compile phase owns all dialect translation: type mapping, rendering, platform capability gating.
-
-    Adapters are mostly environment setup and statement execution, not DDL surgery.
-
-    All DDL generation flows through single compiler pipeline in base code, visible to registry/planning.
+    `schema_emit` and `ddl_optimize` are the only compatibility phases that own
+    DDL decisions. Benchmarks no longer carry platform-specific compatibility
+    policy for DDL. Adapters keep runtime setup only. Base schema execution runs
+    already-planned statements with no platform callback hook.
 
 technical_requirements:
   constraints:
-    - "Cannot break any existing benchmark results (bit-for-bit identical)"
-    - "Cannot break any existing platform integrations"
-    - "Must maintain backward compatibility for all CLI commands"
-    - "Must not require changes to external platform APIs"
-
+    - "Do not change the frozen Phase taxonomy in benchbox/sql_compat/context.py"
+    - "Do not broaden CompatibilityResolver planning keys in this item"
+    - "Do not break create_schema() operational behavior on any migrated adapter"
+    - "Do not require end-user CLI changes or new external dependencies"
   dependencies:
-    - "Existing BaseSchemaTable model (benchbox/core/schema_primitives.py)"
-    - "Existing CompatibilityResolver (benchbox/sql_compat/resolver.py)"
-    - "Existing phase registry (benchbox/sql_compat/phases/)"
-
+    - "docs/development/adr/adr-sql-compat-phase-aware-pipeline.md"
+    - "_project/TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml"
+    - "benchbox/sql_compat/rules/schema_emit/nyctaxi_ddl.py"
+    - "benchbox/sql_compat/rules/schema_emit/tsbs_devops_ddl.py"
+    - "benchbox/sql_compat/rules/ddl_optimize/starrocks_ddl_rewrites.py"
+    - "benchbox/platforms/base/data_loading.py"
   compatibility: |
-    Work is purely internal refactoring. No CLI changes required.
-    No new external dependencies.
-    All existing TPC-H, TPC-DS, SSB, etc. benchmarks must continue to work.
+    This is an internal architecture follow-on. Existing user-facing CLI
+    commands, benchmark identifiers, and platform identifiers must remain
+    unchanged. The item is compatible with the current dual-run / cutover
+    strategy defined by the active sql_compat workstream.
 
 open_questions:
-  - "Should we support bidirectional translation (source dialect → intermediate → target) or keep unidirectional for now?"
-  - "Should type mapping be part of ddl_compile or separate transformer phase?"
-  - "How should we handle platform-specific DDL that requires semantic information at compile time (e.g., Redshift distribution keys)?"
+  - "For Fabric Warehouse and any other tuning-aware DDL rewrite, is raw SQL sufficient or should RewriteDDLPayload grow a richer execution contract?"
+  - "After the w16 audit, should vector_search type mapping remain a documented `@compat_local` renderer or trigger a separate schema-primitive expansion item?"
+  - "Should adapter-family de-duplication (Presto/Trino/Spark-family helpers) happen in this item after parity, or stay deferred to a cleanup pass?"

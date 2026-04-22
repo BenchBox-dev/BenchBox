@@ -1,4 +1,4 @@
-generated_at: '2026-04-22T07:51:43.154102'
+generated_at: '2026-04-22T08:51:45.542462'
 total_items: 31
 statuses:
   In Progress:
@@ -155,13 +155,13 @@ statuses:
   Identified:
     count: 2
     items:
-    - id: centralize-ddl-translation-phase
-      file: TODO/main/planning/centralize-ddl-translation-phase.yaml
-      title: 'Centralize DDL translation: introduce ddl_compile phase and schema IR'
-      priority: High
-      category: Core Functionality
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       priority: Medium
       category: Performance
+    - id: centralize-ddl-translation-phase
+      file: TODO/main/planning/centralize-ddl-translation-phase.yaml
+      title: Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)
+      priority: High
+      category: Core Functionality
