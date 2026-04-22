@@ -1,4 +1,4 @@
-generated_at: '2026-04-22T14:37:37.618448'
+generated_at: '2026-04-22T18:12:47.057207'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -33,13 +33,8 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 3
+    count: 2
     items:
-    - id: consolidate-platform-config-builders-to-shared-helper
-      file: TODO/main/active/consolidate-platform-config-builders-to-shared-helper.yaml
-      title: Consolidate platform config builders to use shared build_platform_config helper
-      priority: Medium-High
-      status: In Progress
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds

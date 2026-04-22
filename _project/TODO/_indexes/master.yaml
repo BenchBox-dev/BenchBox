@@ -1,5 +1,5 @@
-generated_at: '2026-04-22T14:37:37.618412'
-total_items: 32
+generated_at: '2026-04-22T18:12:47.057177'
+total_items: 31
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -311,7 +311,7 @@ items:
   estimated_effort: Medium (1-2 days once gates clear)
   work_total: 6
   work_done: 0
-  work_ready: 1
+  work_ready: 3
   deferred_count: 2
 - id: wikipedia-pageviews-benchmark
   file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
@@ -537,16 +537,6 @@ items:
   work_total: 18
   work_done: 16
   work_ready: 1
-- id: consolidate-platform-config-builders-to-shared-helper
-  file: TODO/main/active/consolidate-platform-config-builders-to-shared-helper.yaml
-  title: Consolidate platform config builders to use shared build_platform_config helper
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium-High
-  status: In Progress
-  work_total: 9
-  work_done: 1
-  work_ready: 6
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

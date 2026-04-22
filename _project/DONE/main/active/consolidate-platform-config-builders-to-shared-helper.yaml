@@ -2,7 +2,8 @@ id: consolidate-platform-config-builders-to-shared-helper
 title: "Consolidate platform config builders to use shared build_platform_config helper"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-04-22"
 category: Code Quality and Technical Debt
 description: |
   21 platform adapters each have a _build_<platform>_config function that performs
@@ -290,7 +291,7 @@ work:
   summary: "Investigate Group D env-var platforms (singlestore, doris, starrocks) — can env-var fallbacks move to registered
     defaults?"
   needs: []
-  status: pending
+  status: done
   notes: |
     These builders use os.environ.get() and int() coercions for field defaults:
       singlestore: SINGLESTORE_HOST, SINGLESTORE_PORT, SINGLESTORE_USER, SINGLESTORE_PASSWORD
@@ -318,12 +319,30 @@ work:
     - If int() coercions are needed because of string→int type conversion: note in w9 as a blocker
       (build_platform_config would return string where adapter expects int — a silent type bug)
 
-    For each platform, write a 2-line verdict: "Can consolidate: YES/NO. Reason: ..."
+    w7 FINDINGS:
+      - PlatformOptionSpec.default is a static value. PlatformHookRegistry.get_default_options() returns that raw value
+        unchanged; there is no callable/env-aware default hook today.
+      - Reading os.environ at registration time would only snapshot the environment once, but the existing tests patch env vars
+        around builder/direct-construction calls after import. That means moving env fallbacks into today's registry mechanism
+        would break current behavior and tests.
+      - Existing tests explicitly lock in env-var resolution:
+        singlestore -> tests/unit/platforms/test_singlestore_adapter.py
+        doris       -> tests/unit/platforms/test_doris_adapter.py
+        starrocks   -> tests/unit/platforms/test_starrocks_adapter.py
+      - int() coercions are load-bearing:
+        singlestore coerces port
+        doris coerces port/http_port/be_http_port
+        starrocks coerces port/http_port
+
+    Verdicts:
+      - singlestore: Can consolidate: NO. Reason: builder-level env fallback and port coercion are runtime behaviors, not static defaults.
+      - doris: Can consolidate: NO. Reason: env fallback plus multi-port int coercion are load-bearing and covered by tests.
+      - starrocks: Can consolidate: NO. Reason: env fallback plus int coercion for FE/HTTP ports are load-bearing and covered by tests.
 
 - id: w8
   summary: "Investigate Group D complex platforms (athena, bigquery, redshift) — can unique logic be pre-processed?"
   needs: []
-  status: pending
+  status: done
   notes: |
     ATHENA — dual-source region
       Current: "region": merged_options.get("region") or merged_options.get("aws_region")
@@ -359,23 +378,33 @@ work:
       as the inline code — verify they're truly equivalent.
       Read: benchbox/platforms/__init__.py for redshift option spec registration.
 
-    For each platform, write a verdict: "Consolidation path: (a)/(b)/(c). Risk: low/medium/high. Action: ..."
+    w8 FINDINGS:
+      - athena: AthenaAdapter.__init__ already treats region and aws_region as aliases (`config.get("region") or config.get("aws_region")`).
+        The builder's only unique logic is emitting top-level region from either source.
+      - bigquery: staging_root/default_output_location parsing is covered by targeted builder tests in both
+        tests/unit/platforms/test_bigquery_adapter.py and tests/unit/platforms/test_bigquery_adapter_coverage.py.
+        The logic can be preserved as a post-processing step over the merged options emitted by the shared helper.
+      - redshift: the builder is otherwise a plain field projection. The only special cases are
+        admin_database defaulting to "dev" and the existing "database only when explicitly overridden" rule.
+        build_platform_config already matches the conditional database behavior, so only admin_database needs additive seeding.
+
+    Verdicts:
+      - athena: Consolidation path: (a). Risk: low. Action: use build_platform_config for the plain fields, then set config.region from config.options["region"] or config.options["aws_region"].
+      - bigquery: Consolidation path: (a). Risk: medium. Action: keep the staging resolver logic, but run it after build_platform_config using config.options as the merged source of truth.
+      - redshift: Consolidation path: (a). Risk: low. Action: consolidate to build_platform_config with base_options={"admin_database": "dev"}.
 
 - id: w9
   summary: "Implement Group D consolidation for platforms that cleared investigation gates (w7 + w8)"
   needs: [w7, w8]
-  status: pending
+  status: done
   notes: |
-    This work unit is intentionally underspecified until w7 and w8 complete.
-    Update these notes with the specific implementation plan after those investigations.
-
-    Expected outcomes based on current analysis:
-      singlestore: likely stays inline if int() coercions are needed (type safety issue)
-      doris:       likely stays inline (same reason — DORIS_PORT cast to int)
-      starrocks:   likely stays inline (same reason — STARROCKS_PORT cast to int)
-      athena:      likely consolidates with 2-line pre-processing (region normalization)
-      bigquery:    likely stays inline — staging_root logic is genuinely complex
-      redshift:    likely consolidates if "dev" registered as admin_database default
+    Investigation-driven implementation plan:
+      singlestore: stay inline; add explanatory comment citing env-var fallback + int coercion
+      doris:       stay inline; add explanatory comment citing env-var fallback + multi-port int coercion
+      starrocks:   stay inline; add explanatory comment citing env-var fallback + int coercion
+      athena:      consolidate via build_platform_config, then normalize config.region from config.options["region"] or ["aws_region"]
+      bigquery:    consolidate via build_platform_config, then resolve staging_root/storage_bucket/storage_prefix from config.options
+      redshift:    consolidate via build_platform_config with base_options={"admin_database": "dev"}
 
     For every platform that stays inline after investigation, add this comment at the top
     of the function body (immediately after the docstring):

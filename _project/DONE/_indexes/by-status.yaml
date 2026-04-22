@@ -1,5 +1,5 @@
-generated_at: '2026-04-22T13:28:52.650367'
-total_items: 760
+generated_at: '2026-04-22T18:12:48.869235'
+total_items: 761
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 709
+    count: 710
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1226,6 +1226,11 @@ statuses:
       file: DONE/core-functionality/active/dedup-wave2-generator-schema-utils.yaml
       title: Consolidate generator manifest writing, schema SQL helpers, and TPC-DI source generators
       priority: Medium
+      category: Code Quality and Technical Debt
+    - id: consolidate-platform-config-builders-to-shared-helper
+      file: DONE/main/active/consolidate-platform-config-builders-to-shared-helper.yaml
+      title: Consolidate platform config builders to use shared build_platform_config helper
+      priority: Medium-High
       category: Code Quality and Technical Debt
     - id: run-official-command-consolidation
       file: DONE/ux-improvements/active/run-official-command-consolidation.yaml
