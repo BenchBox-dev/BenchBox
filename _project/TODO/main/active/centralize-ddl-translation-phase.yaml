@@ -56,7 +56,7 @@ work:
 
 - id: w2
   summary: "Move ClickHouse CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Add a ClickHouse rule module under benchbox/sql_compat/rules/ddl_optimize/
