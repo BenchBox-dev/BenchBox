@@ -1,8 +1,8 @@
-generated_at: '2026-04-22T09:37:58.647761'
-total_items: 31
+generated_at: '2026-04-22T13:28:49.702542'
+total_items: 30
 statuses:
   In Progress:
-    count: 3
+    count: 2
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
@@ -13,11 +13,6 @@ statuses:
       file: TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
-      category: Core Functionality
-    - id: centralize-ddl-translation-phase
-      file: TODO/main/active/centralize-ddl-translation-phase.yaml
-      title: Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)
-      priority: High
       category: Core Functionality
   Not Started:
     count: 27

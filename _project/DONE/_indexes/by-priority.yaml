@@ -1,5 +1,5 @@
-generated_at: '2026-04-22T09:38:01.043660'
-total_items: 759
+generated_at: '2026-04-22T13:28:52.650193'
+total_items: 760
 priorities:
   Critical:
     count: 42
@@ -215,7 +215,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 257
+    count: 258
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -604,6 +604,11 @@ priorities:
       title: Extract SparkSessionManager for shared PySpark session management
       category: Platform Expansion
       status: Not Started
+    - id: centralize-ddl-translation-phase
+      file: DONE/main/active/centralize-ddl-translation-phase.yaml
+      title: Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)
+      category: Core Functionality
+      status: Completed
     - id: firebolt-platform-documentation
       file: DONE/docs-experience/planning/firebolt-platform-documentation.yaml
       title: Firebolt Platform Documentation

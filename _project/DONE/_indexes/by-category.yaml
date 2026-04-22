@@ -1,4 +1,4 @@
-generated_at: '2026-04-22T09:38:01.043463'
+generated_at: '2026-04-22T13:28:52.650008'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -685,7 +685,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 260
+    count: 261
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1267,6 +1267,11 @@ categories:
       file: DONE/core-functionality/active/dedup-simple-benchmark-base-methods.yaml
       title: Extract shared run_benchmark and _load_data to SimpleBenchmarkMixin
       priority: Medium
+      status: Completed
+    - id: centralize-ddl-translation-phase
+      file: DONE/main/active/centralize-ddl-translation-phase.yaml
+      title: Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)
+      priority: High
       status: Completed
     - id: fix-ascii-visualization-regressions
       file: DONE/main/active/fix-ascii-visualization-regressions.yaml

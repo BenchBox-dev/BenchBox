@@ -2,7 +2,8 @@ id: centralize-ddl-translation-phase
 title: "Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-22"
 category: "Core Functionality"
 description: |
   Follow-on / amendment plan for `build-sql-compat-phase-aware-pipeline`. The ADR,
@@ -67,7 +68,7 @@ work:
 
 - id: w3
   summary: "Move Databricks Delta-table CREATE TABLE rewrite under Phase.DDL_OPTIMIZE"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Databricks is a separate shape from the `_optimize_table_definition()`
@@ -78,7 +79,7 @@ work:
 
 - id: w4
   summary: "Move Databend CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Register the Databend DDL rewrite in benchbox/sql_compat/rules/ddl_optimize/
@@ -87,7 +88,7 @@ work:
 
 - id: w5
   summary: "Move Firebolt CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Register the Firebolt DDL rewrite in benchbox/sql_compat/rules/ddl_optimize/
@@ -96,7 +97,7 @@ work:
 
 - id: w6
   summary: "Move Redshift CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Centralize the Redshift DDL rewrite while leaving adapter runtime concerns
@@ -105,7 +106,7 @@ work:
 
 - id: w7
   summary: "Move Azure Synapse CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Register the Azure Synapse table-definition rewrite centrally and update
@@ -114,7 +115,7 @@ work:
 
 - id: w8
   summary: "Move Snowflake CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Centralize Snowflake's CREATE TABLE rewrite and preserve the adapter's
@@ -123,7 +124,7 @@ work:
 
 - id: w9
   summary: "Move Presto CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Register the Presto DDL rewrite in the existing rules layout and make
@@ -132,7 +133,7 @@ work:
 
 - id: w10
   summary: "Move Trino CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Mirror the Presto migration for benchbox/platforms/trino.py, but keep the
@@ -140,7 +141,7 @@ work:
 
 - id: w11
   summary: "Move Spark CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Centralize Spark's DDL rewrite logic and preserve adapter-local runtime
@@ -149,7 +150,7 @@ work:
 
 - id: w12
   summary: "Move Lakesail CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Register the Lakesail DDL rewrite centrally and update
@@ -158,7 +159,7 @@ work:
 
 - id: w13
   summary: "Move Velox CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Register the Velox DDL rewrite centrally and update
@@ -167,7 +168,7 @@ work:
 
 - id: w14
   summary: "Move Fabric Warehouse CREATE TABLE rewriting under Phase.DDL_OPTIMIZE rule ownership"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Fabric Warehouse currently has a tuning-aware `_optimize_table_definition`
@@ -177,7 +178,7 @@ work:
 
 - id: w15
   summary: "Delete now-redundant inline DDL policy branches in nyctaxi and tsbs_devops"
-  status: pending
+  status: done
   needs: [w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14]
   notes: |
     Revisit benchbox/core/nyctaxi/schema.py and benchbox/core/tsbs_devops/schema.py.
@@ -189,7 +190,7 @@ work:
 
 - id: w16
   summary: "Audit vector_search and primitive schema helpers for residual benchmark-level DDL compatibility policy"
-  status: pending
+  status: done
   needs: [w15]
   notes: |
     Review benchbox/core/vector_search/schema.py,
@@ -204,7 +205,7 @@ work:
 
 - id: w17
   summary: "Remove platform_transform_fn from base schema execution after all callers migrate"
-  status: pending
+  status: done
   needs: [w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15, w16]
   notes: |
     Delete the `platform_transform_fn` parameter and all call sites in
@@ -214,7 +215,7 @@ work:
 
 - id: w18
   summary: "Tighten lint, inventory, tests, and ADR wording to lock in centralized DDL ownership"
-  status: pending
+  status: done
   needs: [w17]
   notes: |
     Update benchbox/sql_compat/inventory.py and scripts/compat_lint.py so the

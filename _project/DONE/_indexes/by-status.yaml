@@ -1,5 +1,5 @@
-generated_at: '2026-04-22T09:38:01.043837'
-total_items: 759
+generated_at: '2026-04-22T13:28:52.650367'
+total_items: 760
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 708
+    count: 709
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1758,6 +1758,11 @@ statuses:
       title: Finalize Monitoring Module Scope
       priority: Medium
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+    - id: centralize-ddl-translation-phase
+      file: DONE/main/active/centralize-ddl-translation-phase.yaml
+      title: Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)
+      priority: High
+      category: Core Functionality
     - id: cloud-sql-open-table-format-loading
       file: DONE/platform-expansion/active/cloud-sql-open-table-format-loading.yaml
       title: Finish Delta loading closure for Redshift and BigQuery adapters

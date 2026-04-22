@@ -1,5 +1,5 @@
-generated_at: '2026-04-22T09:37:58.647699'
-total_items: 31
+generated_at: '2026-04-22T13:28:49.702485'
+total_items: 30
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -40,27 +40,6 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
-- id: centralize-ddl-translation-phase
-  file: TODO/main/active/centralize-ddl-translation-phase.yaml
-  title: Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - architecture
-  - sql-compat
-  - ddl
-  - phase-aware-pipeline
-  owners:
-  - joeharris76
-  estimated_effort: X-Large
-  work_total: 18
-  work_done: 2
-  work_ready: 12
-  deferred_count: 3
-  needs:
-  - build-sql-compat-phase-aware-pipeline
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication

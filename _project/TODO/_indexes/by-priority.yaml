@@ -1,5 +1,5 @@
-generated_at: '2026-04-22T09:37:58.647751'
-total_items: 31
+generated_at: '2026-04-22T13:28:49.702532'
+total_items: 30
 priorities:
   Critical:
     count: 1
@@ -10,18 +10,13 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 5
+    count: 4
     items:
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Not Started
-    - id: centralize-ddl-translation-phase
-      file: TODO/main/active/centralize-ddl-translation-phase.yaml
-      title: Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)
-      category: Core Functionality
-      status: In Progress
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
