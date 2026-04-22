@@ -19,7 +19,7 @@ description: |
   - Classified the remaining 24 additional CC=12 functions as inherent
     platform/spec/runtime/conversion complexity
   - Added narrow function-level exclusions in `pyproject.toml` with matching
-    rows in `_project/analysis/complexity/classification-matrix.yaml`
+    rows in `quality/complexity/classification-matrix.yaml`
   - Lowered `warn_complexity` from 13 to 12
 
   Final state:
@@ -195,7 +195,7 @@ anti_patterns:
 scope_limit:
   only_modify:
     - "pyproject.toml"
-    - "_project/analysis/complexity/classification-matrix.yaml"
+    - "quality/complexity/classification-matrix.yaml"
     - "benchbox/core/tpcdi/etl/sql_backend.py"
     - "benchbox/core/tpcdi/etl/transformations.py"
     - "benchbox/core/visualization/ascii_runtime.py"

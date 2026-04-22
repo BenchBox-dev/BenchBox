@@ -44,8 +44,9 @@ work:
   status: done
   notes: |
     Persist current output from `scripts/check_complexity.py --no-fail --top 200` under
-    `_project/analysis/complexity/` and seed a machine-readable inventory with all
-    functions at score >= 15, including score, file, function, and module family.
+    `_project/quality/complexity/` and seed the canonical machine-readable inventory at
+    `quality/complexity/classification-matrix.yaml` with all functions at score >= 15,
+    including score, file, function, and module family.
 
 - id: w2
   summary: "Define triage rubric for intended vs accidental complexity"
@@ -162,7 +163,7 @@ work:
     Before (2026-02-20 baseline): 4906 scanned, 106 warnings, 70 failures.
     After remediation: 5048 scanned, 109 warnings, 0 failures.
     Net change: failures reduced by 70; complexity gate now passes.
-    Updated complexity artifact: `_project/analysis/complexity/latest-report.txt`.
+    Updated complexity artifact: `_project/quality/complexity/latest-report.txt`.
 
 deferred:
 - summary: "Deep redesign of benchmark lifecycle architecture beyond targeted extraction"
@@ -194,7 +195,8 @@ scope_limit:
   - "benchbox/**/*.py"
   - "pyproject.toml (complexity config section only)"
   - "scripts/check_complexity.py"
-  - "_project/analysis/complexity/"
+  - "_project/quality/complexity/"
+  - "quality/complexity/classification-matrix.yaml"
   do_not_modify:
   - "benchbox/**/public API signatures or CLI command interfaces"
   - "tests/fixtures/ or test fixture data"
@@ -237,8 +239,8 @@ files_affected:
   - "benchbox/cli/ (rendering, comparison, visualization — specific files determined during w3c/w4)"
   - "benchbox/core/dataframe/ (runner, mixin, unified frame — specific files determined during w3b/w4)"
   added:
-  - "_project/analysis/complexity/latest-report.txt"
-  - "_project/analysis/complexity/classification-matrix.yaml"
+  - "_project/quality/complexity/latest-report.txt"
+  - "quality/complexity/classification-matrix.yaml"
 
 metadata:
   tags:
