@@ -1,4 +1,4 @@
-generated_at: '2026-04-22T08:51:45.542398'
+generated_at: '2026-04-22T08:57:14.340811'
 total_items: 31
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -41,12 +41,12 @@ items:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
 - id: centralize-ddl-translation-phase
-  file: TODO/main/planning/centralize-ddl-translation-phase.yaml
+  file: TODO/main/active/centralize-ddl-translation-phase.yaml
   title: Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)
   worktree: main
   category: Core Functionality
   priority: High
-  status: Identified
+  status: In Progress
   tags:
   - architecture
   - sql-compat
@@ -538,7 +538,7 @@ items:
   - refactor
   estimated_effort: X-Large
   work_total: 18
-  work_done: 14
+  work_done: 15
   work_ready: 1
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml

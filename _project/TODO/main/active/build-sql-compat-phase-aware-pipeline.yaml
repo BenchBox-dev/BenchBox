@@ -63,7 +63,7 @@ work:
     spec"
   status: done
   notes: |
-    Blocking step. Deliver _project/analysis/ADR-sql-compat.md covering:
+    Blocking step. Deliver docs/development/adr/adr-sql-compat-phase-aware-pipeline.md covering:
     (a) phase list derivation protocol (phases are derived from the inventory
     in w2 then frozen in the ADR — not decreed upfront); (b) the eight-action
     vocabulary (block_benchmark, skip_query, select_variant, rewrite_query,
@@ -152,7 +152,7 @@ work:
 - id: w7
   summary: "Slice A: Unify translation entrypoints with per-adapter diff review PRs"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Make benchbox/platforms/base/dialect_translation.py:33 delegate to
     benchbox/utils/dialect_utils.py:108. Explicitly acknowledge this as a
@@ -379,7 +379,7 @@ anti_patterns:
 
 verification:
 - description: "ADR committed before implementation slices begin"
-  command: "test -f _project/analysis/ADR-sql-compat.md && echo PRESENT"
+  command: "test -f docs/development/adr/adr-sql-compat-phase-aware-pipeline.md && echo PRESENT"
   expected_output: "PRESENT"
 - description: "Compatibility inventory artifact present"
   command: "test -s _project/compat/inventory.jsonl && echo PRESENT"
@@ -433,7 +433,7 @@ verification:
 
 files_affected:
   added:
-  - "_project/analysis/ADR-sql-compat.md"
+  - "docs/development/adr/adr-sql-compat-phase-aware-pipeline.md"
   - "_project/compat/inventory.jsonl"
   - "_project/compat/baseline.v1.jsonl"
   - "benchbox/sql_compat/__init__.py"
@@ -507,7 +507,7 @@ scope_limit:
   - "scripts/compat_lint.py"
   - "scripts/generate_compat_docs.py"
   - "docs/compat/"
-  - "_project/analysis/ADR-sql-compat.md"
+  - "docs/development/adr/adr-sql-compat-phase-aware-pipeline.md"
   - "_project/compat/"
   - "tests/unit/sql_compat/"
   - "tests/unit/platforms/"

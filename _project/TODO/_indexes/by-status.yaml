@@ -1,8 +1,8 @@
-generated_at: '2026-04-22T08:51:45.542462'
+generated_at: '2026-04-22T08:57:14.340868'
 total_items: 31
 statuses:
   In Progress:
-    count: 2
+    count: 3
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
@@ -13,6 +13,11 @@ statuses:
       file: TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
+      category: Core Functionality
+    - id: centralize-ddl-translation-phase
+      file: TODO/main/active/centralize-ddl-translation-phase.yaml
+      title: Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)
+      priority: High
       category: Core Functionality
   Not Started:
     count: 27
@@ -153,15 +158,10 @@ statuses:
       priority: Low
       category: Benchmark Development
   Identified:
-    count: 2
+    count: 1
     items:
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       priority: Medium
       category: Performance
-    - id: centralize-ddl-translation-phase
-      file: TODO/main/planning/centralize-ddl-translation-phase.yaml
-      title: Finish DDL centralization in existing sql_compat phases (retire adapter DDL hooks)
-      priority: High
-      category: Core Functionality
