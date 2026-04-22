@@ -43,7 +43,7 @@ work:
 - id: w1
   summary: "Write a gap matrix comparing the prototype publishing module to the canonical results/export workflow"
   status: done
-  completed_note: "Gap matrix written at _project/analysis/publishing-gap-matrix.md — recommendation: PRUNE"
+  completed_note: "Gap matrix written at _project/_archive/publishing-gap-matrix.md — recommendation: PRUNE"
   notes: |
     Capture the original intent (`automated-data-publishing-pipeline`, commit `97138d3a5`) versus the
     current execution reality. The matrix should explicitly classify each prototype capability as:
@@ -54,7 +54,7 @@ work:
   summary: "Define the supported user workflows, CLI surface, and success criteria for publishing and sharing results"
   needs: [w1]
   status: done
-  completed_note: "CLI surface defined in _project/analysis/publishing-gap-matrix.md under 'CLI Surface for benchbox publish (Design Note)'"
+  completed_note: "CLI surface defined in _project/_archive/publishing-gap-matrix.md under 'CLI Surface for benchbox publish (Design Note)'"
   notes: |
     Decide the product shape before coding. At minimum, define whether BenchBox supports:
     1) publishing an existing exported result bundle,

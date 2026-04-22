@@ -5,7 +5,7 @@ priority: Medium-High
 status: Not Started
 category: Code Quality & Build
 description: |
-  The gap matrix (_project/analysis/publishing-gap-matrix.md) recommends PRUNE for the
+  The gap matrix (_project/_archive/publishing-gap-matrix.md) recommends PRUNE for the
   original prototype publishing module. The new BundlePublisher + PublicationStore is now
   the supported implementation (merged via PR #13/#50, 143 tests passing).
 
