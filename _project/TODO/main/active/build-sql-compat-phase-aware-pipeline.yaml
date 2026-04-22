@@ -57,6 +57,16 @@ description: |
   dataclasses, rule_id format, baseline schema v1, dual-run harness spec,
   DataFrame pipeline head design, and the storage-unification non-goal.
 
+  DDL FOLLOW-ON: Adapter-owned CREATE TABLE rewrites (ClickHouse, Databricks,
+  Databend, Firebolt, Redshift, Azure Synapse, Snowflake, Presto, Trino, Spark,
+  Lakesail, Velox) are tracked in `centralize-ddl-translation-phase`, which
+  runs in parallel with remaining items here. Those shadow harnesses register
+  REWRITE_DDL decisions while keeping the legacy _optimize_table_definition()
+  path authoritative until this item's w16 cutover. Fabric Warehouse is
+  excluded — its DDL hook is operational (schema-prefix injection via
+  self.schema), not a compat rewrite; see ADR section "DDL Centralization
+  Follow-On" for the full decision record.
+
 work:
 - id: w1
   summary: "Write ADR: phase taxonomy, action enum, typed contract, exemption policy, baseline schema v1, dual-run harness

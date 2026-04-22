@@ -1,4 +1,4 @@
-generated_at: '2026-04-22T08:57:14.340811'
+generated_at: '2026-04-22T08:59:35.040292'
 total_items: 31
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -56,8 +56,8 @@ items:
   - joeharris76
   estimated_effort: X-Large
   work_total: 18
-  work_done: 0
-  work_ready: 1
+  work_done: 1
+  work_ready: 13
   deferred_count: 3
   needs:
   - build-sql-compat-phase-aware-pipeline

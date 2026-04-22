@@ -137,7 +137,7 @@ verification:
   command: "grep -c 'Spoofing\\|Tampering\\|Repudiation\\|Information\\|Denial\\|Elevation' _project/analysis/threat-model.md"
   expected_output: "6"
 - description: "Incident runbook committed and covers all three required incident classes (run after w8)"
-  command: "grep -c 'integrity\\|breach\\|abuse' _project/analysis/incident-runbook.md"
+  command: "grep -c 'integrity\\|breach\\|abuse' docs/operations/results-phase-3-runbook.md"
   expected_output: "3"
 
 files_affected:

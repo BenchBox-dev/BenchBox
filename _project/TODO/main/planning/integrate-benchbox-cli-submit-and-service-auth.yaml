@@ -34,7 +34,7 @@ work:
     (--last, --bundle, --dry-run), config keys (service.url, service.token),
     and the explicit distinction from `benchbox publish`. Reconcile with
     existing service_url placeholder. Output: submit-cli-surface.md under
-    _project/analysis/.
+    _project/research/.
 
 - id: w2
   summary: "Map submit to existing result export surfaces — identify reuse points in exporter and results CLI"
