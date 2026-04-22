@@ -1,5 +1,5 @@
-generated_at: '2026-04-21T10:23:36.519265'
-total_items: 30
+generated_at: '2026-04-22T07:51:43.154092'
+total_items: 31
 priorities:
   Critical:
     count: 1
@@ -10,8 +10,13 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 4
+    count: 5
     items:
+    - id: centralize-ddl-translation-phase
+      file: TODO/main/planning/centralize-ddl-translation-phase.yaml
+      title: 'Centralize DDL translation: introduce ddl_compile phase and schema IR'
+      category: Core Functionality
+      status: Identified
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture

@@ -1,5 +1,5 @@
-generated_at: '2026-04-21T10:23:36.519214'
-total_items: 30
+generated_at: '2026-04-22T07:51:43.154045'
+total_items: 31
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -20,6 +20,25 @@ items:
   work_ready: 1
   needs:
   - implement-pr-based-result-submission-workflow
+- id: centralize-ddl-translation-phase
+  file: TODO/main/planning/centralize-ddl-translation-phase.yaml
+  title: 'Centralize DDL translation: introduce ddl_compile phase and schema IR'
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Identified
+  tags:
+  - architecture
+  - sql-compat
+  - ddl
+  - phase-aware-pipeline
+  owners:
+  - joeharris76
+  estimated_effort: Large
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+  deferred_count: 3
 - id: design-results-ingest-storage-and-derived-read-model
   file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
   title: Design results ingest, storage, and derived read-model architecture
