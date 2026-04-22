@@ -282,7 +282,7 @@ work:
   summary: "Cutover: registry becomes authoritative, dual-run harness deleted, feature flag removed, legacy skip APIs become
     registry views"
   needs: [w7, w12, w14, w15]
-  status: pending
+  status: done
   notes: |
     Flip BENCHBOX_COMPAT_REGISTRY default from shadow to on. unsupported_
     benchmarks field on PlatformCapability (platform_registry.py:77)
