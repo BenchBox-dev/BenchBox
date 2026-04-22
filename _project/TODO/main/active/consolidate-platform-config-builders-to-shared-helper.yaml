@@ -45,11 +45,14 @@ deps:
 guardrails:
   verification:
     command: "uv run -- python -m pytest -m fast -q"
-    expected: "Pass count does not decrease from current baseline (20996 passed as of 2026-04-22; 19 pre-existing unrelated failures also present)"
+    expected: "Pass count does not decrease from current baseline (20996 passed as of 2026-04-22; 19 pre-existing unrelated
+      failures also present)"
   must_preserve:
-  - "Merge priority order in build_platform_config: defaults < saved_creds < explicit_options < overrides — this is the invariant the credential bug fix established"
+  - "Merge priority order in build_platform_config: defaults < saved_creds < explicit_options < overrides — this is the invariant
+    the credential bug fix established"
   - "Identical DatabaseConfig output for identical inputs before and after each platform consolidation"
-  - "base_options parameter must be additive-only (default None) — existing callers velox.py, lakesail.py, azure_synapse.py must continue to work with no changes"
+  - "base_options parameter must be additive-only (default None) — existing callers velox.py, lakesail.py, azure_synapse.py
+    must continue to work with no changes"
   - "cedardb.py and postgresql.py: DO NOT touch — they intentionally use inline implementations and are already correct"
   approach: |
     Reference implementation: benchbox/platforms/base/config_utils.py build_platform_config()
@@ -66,10 +69,14 @@ guardrails:
     For Group D platforms left inline after investigation: add a comment at the top of the
     function body explaining why (prevents future "cleanup" that reintroduces the bug).
   anti_patterns:
-  - "DO NOT run the full consolidation as a single commit — because a subtle field difference in one platform would be hard to bisect if all 18 are bundled"
-  - "DO NOT add parameters to build_platform_config without a default value — because existing callers (velox, lakesail, azure_synapse) must continue to work with no code changes"
-  - "DO NOT skip the investigation work units for Group C and D before writing code — because the variations exist for a reason and consolidating blindly may silently change behavior"
-  - "DO NOT assume .get(field, default) in a builder is redundant without checking the registry and from_config() — the triple-layer default pattern (registry → builder → from_config) was intentional in some platforms"
+  - "DO NOT run the full consolidation as a single commit — because a subtle field difference in one platform would be hard
+    to bisect if all 18 are bundled"
+  - "DO NOT add parameters to build_platform_config without a default value — because existing callers (velox, lakesail, azure_synapse)
+    must continue to work with no code changes"
+  - "DO NOT skip the investigation work units for Group C and D before writing code — because the variations exist for a reason
+    and consolidating blindly may silently change behavior"
+  - "DO NOT assume .get(field, default) in a builder is redundant without checking the registry and from_config() — the triple-layer
+    default pattern (registry → builder → from_config) was intentional in some platforms"
   scope_limit:
   - "Only modify _build_<platform>_config functions and their corresponding unit tests"
   - "Only add parameters to build_platform_config with default values (no breaking signature changes)"
@@ -116,7 +123,7 @@ work:
 - id: w2
   summary: "Extend build_platform_config with base_options parameter"
   needs: []
-  status: pending
+  status: done
   notes: |
     File: benchbox/platforms/base/config_utils.py
 
@@ -133,7 +140,7 @@ work:
 - id: w3
   summary: "Consolidate Group A — databend, clickhouse_cloud, spark, snowflake, databricks"
   needs: []
-  status: pending
+  status: done
   notes: |
     Five platforms where every config_dict entry is a plain merged_options.get(field).
     NOTE: clickhouse_cloud, snowflake, databricks all have the credential merge order bug
@@ -168,7 +175,7 @@ work:
 - id: w4
   summary: "Consolidate Group B — trino, presto, starburst, firebolt (after w1 audit)"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     w1 FINDINGS:
       Q1 (schema): ALL SAFE. trino/presto/starburst from_config() all use
@@ -195,7 +202,7 @@ work:
 - id: w5
   summary: "Investigate Group C (pg_duckdb, pg_mooncake, timescaledb) — triple-layer defaults and base_options sufficiency"
   needs: []
-  status: pending
+  status: done
   notes: |
     These platforms pre-seed merged_options with {"schema": "public"} and use .get(field, default)
     throughout the builder. The investigation goal is confirming that build_platform_config with
@@ -222,14 +229,24 @@ work:
       benchbox/platforms/timescaledb.py: same
       benchbox/platforms/__init__.py: option spec registrations for pg-duckdb, pg-mooncake, timescaledb
 
+    w5 FINDINGS:
+      - schema is already registered with default="public" on all three platforms. base_options={"schema": "public"}
+        is still useful in w6 to preserve merged_options["schema"] when the builder is called directly with empty options,
+        but it is not the only load-bearing default.
+      - All three platforms have additional top-level builder defaults that are not yet registered:
+        admin_database, sslmode, work_mem, maintenance_work_mem, effective_cache_size,
+        max_parallel_workers_per_gather.
+      - pg_duckdb also has a load-bearing compare_native=False builder default; this should be registered so the helper
+        can keep emitting False instead of None.
+      - pg_mooncake storage_mode and timescaledb chunk/compression fields are already covered by registry defaults.
+
     Expected outcome: all three platforms consolidate cleanly with base_options={"schema": "public"}.
-    If any load-bearing defaults are found not in the registry, register them first as a separate
-    commit (registry-only change, no builder change yet), then proceed with w6.
+    Action: register the missing Group C defaults first as a registry-only change, then proceed with w6.
 
 - id: w6
   summary: "Consolidate Group C (pg_duckdb, pg_mooncake, timescaledb) using base_options"
   needs: [w2, w5]
-  status: pending
+  status: done
   notes: |
     After w5 confirms readiness and w2 adds base_options support.
 
@@ -246,6 +263,21 @@ work:
           info=info,
       )
 
+    w6 FINDINGS:
+      - base_options had to seed all direct-call builder defaults, not just schema. The shared helper receives
+        already-defaulted registry values in the normal CLI path, but unit tests also call the builders directly
+        with options={}, so host/port/username and each platform's non-None fallback fields must be pre-seeded.
+      - pg_duckdb base_options: host, port, username, schema, admin_database, sslmode, work_mem,
+        maintenance_work_mem, effective_cache_size, max_parallel_workers_per_gather, force_execution,
+        postgres_scan_threads, compare_native.
+      - pg_mooncake base_options: host, port, username, schema, admin_database, sslmode, work_mem,
+        maintenance_work_mem, effective_cache_size, max_parallel_workers_per_gather, storage_mode.
+      - timescaledb base_options: host, port, username, schema, admin_database, sslmode, work_mem,
+        maintenance_work_mem, effective_cache_size, max_parallel_workers_per_gather, chunk_interval,
+        compression_enabled, compression_after.
+      - Verification: `uv run ruff check ...` passed on the touched files; focused Group C adapter+hook tests passed;
+        `uv run -- python -m pytest -m fast -q -n 0` completed with 21020 passed, 1 skipped, 2105 deselected.
+
     platform_fields for pg_duckdb: host, port, username, password, database, admin_database,
       sslmode, work_mem, maintenance_work_mem, effective_cache_size, max_parallel_workers_per_gather,
       force_execution, postgres_scan_threads, compare_native, duckdb_db_path
@@ -255,7 +287,8 @@ work:
     tests/unit/platforms/test_pg_duckdb_adapter.py (or equivalent) must continue to pass.
 
 - id: w7
-  summary: "Investigate Group D env-var platforms (singlestore, doris, starrocks) — can env-var fallbacks move to registered defaults?"
+  summary: "Investigate Group D env-var platforms (singlestore, doris, starrocks) — can env-var fallbacks move to registered
+    defaults?"
   needs: []
   status: pending
   notes: |
