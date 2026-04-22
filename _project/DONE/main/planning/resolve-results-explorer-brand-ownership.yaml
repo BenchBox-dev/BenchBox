@@ -50,7 +50,7 @@ work:
   needs: [w1]
   status: done
   completed_note: |
-    Full tradeoff analysis documented in _project/analysis/brand-ownership-decision.md.
+    Full tradeoff analysis documented in docs/development/results-explorer-brand-ownership.md.
     BenchBox placement is strongly favored: single domain, integrated brand, no
     infrastructure overhead, and the explorer's reproducibility value proposition is
     inseparable from BenchBox. Oxbow Research placement is not viable — no domain,
@@ -69,7 +69,7 @@ work:
   needs: [w2]
   status: done
   completed_note: |
-    Decision documented in _project/analysis/brand-ownership-decision.md (new file).
+    Decision documented in docs/development/results-explorer-brand-ownership.md.
     Strategy memo updated with a resolved Brand Decision section replacing the
     Open Question section. Decision: BenchBox placement at benchbox.dev/results/
     confirmed. No changes needed to existing scaffolding or CI/CD.
