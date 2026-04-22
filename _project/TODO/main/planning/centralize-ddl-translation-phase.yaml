@@ -13,7 +13,7 @@ description: |
   The solution is to make DDL generation a first-class concern in the compatibility phase model, not ad-hoc.
 
 created_date: "2026-04-22"
-last_updated: "2026-04-22T00:00:00"
+last_updated: "2026-04-22T00:00:01"
 
 work:
   - id: w1
@@ -39,33 +39,108 @@ work:
     notes: |
       Create compatibility/transformers/ddl_compiler.py with structured type mapping (Vector, Timestamp, Decimal).
       Move _EMBEDDING_TYPE_MAP from vector_search into central renderer.
-      Only type rendering in this unit; defer storage/physical rewrites to w5.
+      Only type rendering in this unit; defer storage/physical rewrites to w8-w14.
 
   - id: w4
-    summary: "Refactor benchmarks to emit logical schema only (remove all dialect branches)"
+    summary: "Refactor vector_search to emit logical Vector(dim, type) IR only"
     status: pending
     needs: [w1, w3]
     notes: |
-      vector_search: remove dialect branches, emit Vector(dim, type) semantics only
-      nyctaxi: remove ClickHouse MergeTree clauses, emit partition_intent
-      tsbs_devops: remove TimescaleDB create_hypertable, emit time_series_intent
-      write_primitives: remove PK dialect branches, let compiler handle capability gating
-      Results must be bit-for-bit identical before/after.
+      Remove dialect branches in benchbox/core/vector_search/schema.py (current branch at line 48).
+      Emit Vector(dim, type) semantics through schema IR; compiler handles platform rendering.
+      Verify duckdb + clickhouse-cloud produce byte-identical DDL to pre-refactor baseline.
 
   - id: w5
-    summary: "Move adapter _optimize_table_definition() methods to central registry transformers"
+    summary: "Refactor nyctaxi to emit partition_intent IR (remove ClickHouse MergeTree)"
     status: pending
-    needs: [w2, w3, w4]
+    needs: [w1, w3]
     notes: |
-      ClickHouse, StarRocks, Databricks, Firebolt, Databend, Redshift, PostgreSQL.
-      Extract regex/rewrite logic into compatibility/transformers/{platform}_ddl.py modules.
-      Remove platform_transform_fn hook from _execute_schema_statements().
-      Move existing rewrites as-is; do NOT optimize during move.
+      Remove ClickHouse MergeTree clauses in benchbox/core/nyctaxi/schema.py (branch at line 250).
+      Emit partition_intent through schema IR; compiler renders per-platform partition clauses.
+      Verify duckdb + clickhouse-cloud produce byte-identical DDL to pre-refactor baseline.
 
   - id: w6
+    summary: "Refactor tsbs_devops to emit time_series_intent IR (remove TimescaleDB hypertable)"
+    status: pending
+    needs: [w1, w3]
+    notes: |
+      Remove TimescaleDB create_hypertable branches in benchbox/core/tsbs_devops/schema.py (line 171).
+      Emit time_series_intent through schema IR; compiler renders per-platform time-series syntax.
+      Verify duckdb + postgresql produce byte-identical DDL to pre-refactor baseline.
+
+  - id: w7
+    summary: "Refactor write_primitives + read_primitives PK branches to capability gating"
+    status: pending
+    needs: [w1, w3]
+    notes: |
+      Remove PK dialect branches in benchbox/core/write_primitives/schema.py (line 352) and
+      benchbox/core/read_primitives/schema.py. Emit PK intent; compiler gates by platform capability.
+      Verify duckdb + postgresql + clickhouse-cloud produce byte-identical DDL to baseline.
+
+  - id: w8
+    summary: "Extract ClickHouse _optimize_table_definition() into clickhouse_ddl transformer"
+    status: pending
+    needs: [w2, w3, w4, w5, w6, w7]
+    notes: |
+      Move regex/rewrite logic from benchbox/platforms/clickhouse/workload.py into
+      benchbox/sql_compat/transformers/clickhouse_ddl.py. Move existing rewrites as-is.
+      Route through ddl_compile phase dispatch.
+
+  - id: w9
+    summary: "Extract StarRocks _optimize_table_definition() into starrocks_ddl transformer"
+    status: pending
+    needs: [w2, w3, w4, w5, w6, w7]
+    notes: |
+      Move regex/rewrite logic from benchbox/platforms/starrocks/workload.py into
+      benchbox/sql_compat/transformers/starrocks_ddl.py. Move existing rewrites as-is.
+
+  - id: w10
+    summary: "Extract Databricks _optimize_table_definition() into databricks_ddl transformer"
+    status: pending
+    needs: [w2, w3, w4, w5, w6, w7]
+    notes: |
+      Move regex/rewrite logic from benchbox/platforms/databricks/adapter.py into
+      benchbox/sql_compat/transformers/databricks_ddl.py. Move existing rewrites as-is.
+
+  - id: w11
+    summary: "Extract Firebolt _optimize_table_definition() into firebolt_ddl transformer"
+    status: pending
+    needs: [w2, w3, w4, w5, w6, w7]
+    notes: |
+      Move regex/rewrite logic from benchbox/platforms/firebolt.py into
+      benchbox/sql_compat/transformers/firebolt_ddl.py. Move existing rewrites as-is.
+
+  - id: w12
+    summary: "Extract Databend _optimize_table_definition() into databend_ddl transformer"
+    status: pending
+    needs: [w2, w3, w4, w5, w6, w7]
+    notes: |
+      Move regex/rewrite logic from benchbox/platforms/databend/adapter.py into
+      benchbox/sql_compat/transformers/databend_ddl.py. Move existing rewrites as-is.
+
+  - id: w13
+    summary: "Extract Redshift _optimize_table_definition() into redshift_ddl transformer"
+    status: pending
+    needs: [w2, w3, w4, w5, w6, w7]
+    notes: |
+      Move regex/rewrite logic from benchbox/platforms/redshift.py into
+      benchbox/sql_compat/transformers/redshift_ddl.py. Move existing rewrites as-is.
+      Note: distribution-key handling depends on resolution of open_questions item 3.
+
+  - id: w14
+    summary: "Extract PostgreSQL _optimize_table_definition() into postgresql_ddl transformer and remove hook"
+    status: pending
+    needs: [w8, w9, w10, w11, w12, w13]
+    notes: |
+      Move regex/rewrite logic from benchbox/platforms/postgresql.py into
+      benchbox/sql_compat/transformers/postgresql_ddl.py. Move existing rewrites as-is.
+      Final unit — removes platform_transform_fn hook from _execute_schema_statements()
+      once all adapters are migrated.
+
+  - id: w15
     summary: "Audit remaining dialect branches and document design in ADR"
     status: pending
-    needs: [w5]
+    needs: [w14]
     notes: |
       Run compat_lint.py to confirm zero benchmark-level patches.
       Update sql_compat/inventory.py and scripts/compat_lint.py to handle map-based renderers.
@@ -149,18 +224,21 @@ approach: |
   Mirror the hook dispatch pattern in _execute_schema_statements() (benchbox/platforms/base/data_loading.py:2399)
   for transformer routing.
 
-  Sequence work vertically: implement w1 foundation, then w2+w3 in parallel (phase + compiler system),
-  then w4 (benchmark refactoring), then w5 (adapter consolidation), finally w6 (audit/docs).
+  Sequence work vertically: w1 foundation, then w2+w3 in parallel (phase + compiler system),
+  then w4-w7 (per-benchmark refactor, parallelizable), then w8-w13 (per-adapter extraction,
+  parallelizable), then w14 (final adapter + hook removal), finally w15 (audit/docs).
 
-  For w4 benchmark migration: read current dialect-aware implementations first (vector_search:48,
+  For w4-w7 benchmark migration: read current dialect-aware implementations first (vector_search:48,
   nyctaxi:250, tsbs_devops:171, write_primitives:352), extract intent semantics, emit as part of
   schema IR instead of SQL strings.
+
+  Each work unit should be 1-4 hours and produce an independently committable change.
 
 anti_patterns:
   - "DO NOT add dialect branches during migration — because that perpetuates the split ownership model we're eliminating — all platform-specific logic must route through the compiler"
   - "DO NOT use query_id as proxy for table names — because that's an abstraction mismatch causing context confusion — add proper object_name/statement_kind fields"
   - "DO NOT keep get_create_tables_sql(dialect=...) variant methods — because that's the architectural root cause of split ownership — have benchmarks emit logical schema only"
-  - "DO NOT add new dialect branches to benchmarks as a staging compromise — commit dialect decisions to the compiler instead"
+  - "DO NOT add new dialect branches to benchmarks as a staging compromise — because staged compromises calcify and perpetuate the exact split ownership we're eliminating — commit dialect decisions to the compiler from the start"
   - "DO NOT invent new transformations during w5 — move existing rewrites as-is, then optimize separately"
   - "DO NOT refactor query execution path in parallel — stay focused on DDL pipeline only"
 
@@ -185,23 +263,35 @@ verification:
     command: "grep -r '_EMBEDDING_TYPE_MAP' benchbox/core/"
     expected_output: "no output (zero matches)"
 
-  - description: "Unit 4: Benchmark DDL refactoring complete and verified"
-    command: "benchbox run --platform duckdb --benchmark vector_search --scale 0.01 --dry-run && benchbox run --platform clickhouse-cloud --benchmark vector_search --scale 0.01 --dry-run"
-    expected_output: "both commands produce valid DDL with no errors"
+  - description: "w4-w7: Benchmark DDL refactoring produces valid DDL (per-benchmark dry runs)"
+    command: "benchbox run --platform duckdb --benchmark vector_search --scale 0.01 --dry-run && benchbox run --platform clickhouse-cloud --benchmark vector_search --scale 0.01 --dry-run && benchbox run --platform duckdb --benchmark nyctaxi --scale 0.01 --dry-run && benchbox run --platform duckdb --benchmark tsbs_devops --scale 0.01 --dry-run"
+    expected_output: "all four commands produce valid DDL with no errors"
 
-  - description: "Unit 4: All tests still pass"
+  - description: "w4-w7: Bit-identical DDL before/after refactor (baseline comparison)"
+    command: "uv run -- python scripts/ddl_baseline_diff.py --benchmarks vector_search,nyctaxi,tsbs_devops,write_primitives --platforms duckdb,clickhouse-cloud,postgresql"
+    expected_output: "zero diffs across all benchmark × platform combinations"
+
+  - description: "w4-w7: Bit-identical benchmark results at TPC-H SF 0.01 (duckdb)"
+    command: "benchbox run --platform duckdb --benchmark tpch --scale 0.01 && uv run -- python scripts/result_diff.py --baseline .baselines/tpch-sf0.01-duckdb.json --current results/latest.json"
+    expected_output: "zero value diffs, identical row counts"
+
+  - description: "w4-w7: All fast tests still pass"
     command: "uv run -- python -m pytest -m fast -q"
     expected_output: "all tests pass, 0 failures"
 
-  - description: "Unit 5: Adapter consolidation integration tests"
+  - description: "w8-w14: Adapter consolidation integration tests"
     command: "uv run -- python -m pytest tests/integration/test_ddl_end_to_end.py -v"
     expected_output: "all 7 adapter tests pass, 0 failures"
 
-  - description: "Unit 6: Zero platform-specific patches in benchmarks"
+  - description: "w14: platform_transform_fn hook removed"
+    command: "grep -n 'platform_transform_fn' benchbox/platforms/base/data_loading.py"
+    expected_output: "no output (zero matches)"
+
+  - description: "w15: Zero platform-specific patches in benchmarks"
     command: "grep -r 'get_create_tables_sql.*dialect' benchbox/core/*/schema.py"
     expected_output: "no output (zero matches)"
 
-  - description: "Unit 6: Lint audit passes"
+  - description: "w15: Lint audit passes"
     command: "uv run -- python scripts/compat_lint.py"
     expected_output: "zero benchmark-level platform patches reported"
 
@@ -209,6 +299,7 @@ scope_limit:
   only_modify:
     - benchbox/sql_compat/
     - benchbox/core/*/schema.py
+    - benchbox/core/benchmark.py
     - benchbox/platforms/base/data_loading.py
     - benchbox/platforms/clickhouse/
     - benchbox/platforms/starrocks/
@@ -219,12 +310,13 @@ scope_limit:
     - benchbox/platforms/postgresql.py
     - tests/
     - scripts/compat_lint.py
-    - scripts/inventory.py
   do_not_modify:
     - benchbox/cli/
     - benchbox/core/runner.py
-    - benchbox/core/benchmark.py (unless adding schema IR support)
     - benchbox/core/query/
+  notes: |
+    benchbox/core/benchmark.py is in only_modify solely for adding schema IR support
+    (BaseSchemaTable plumbing). Do NOT touch execution, runner wiring, or unrelated fields.
 
 success_metrics:
   - "grep -r 'get_create_tables_sql.*dialect' benchbox/core/*/schema.py returns zero results"
@@ -233,7 +325,7 @@ success_metrics:
   - "New test suite in tests/integration/test_ddl_end_to_end.py validates all 7 migrated adapters with zero regressions"
   - "Results are bit-identical before/after across full TPC-H at scale 0.1 for all platforms"
   - "CompatibilityResolver.build_plan() includes ddl_compile phase in execution sequence"
-  - "All 6 work units marked complete with verification commands passing"
+  - "All 15 work units (w1-w15) marked complete with verification commands passing"
 
 context_sections:
   "Root Cause Analysis": |
