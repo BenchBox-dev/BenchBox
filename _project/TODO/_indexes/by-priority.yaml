@@ -1,5 +1,5 @@
-generated_at: '2026-04-22T13:28:49.702532'
-total_items: 30
+generated_at: '2026-04-22T14:26:44.964836'
+total_items: 31
 priorities:
   Critical:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 3
+    count: 4
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -50,6 +50,11 @@ priorities:
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       category: Core Functionality
       status: In Progress
+    - id: consolidate-platform-config-builders-to-shared-helper
+      file: TODO/main/planning/consolidate-platform-config-builders-to-shared-helper.yaml
+      title: Consolidate platform config builders to use shared build_platform_config helper
+      category: Code Quality and Technical Debt
+      status: Not Started
   Medium:
     count: 8
     items:

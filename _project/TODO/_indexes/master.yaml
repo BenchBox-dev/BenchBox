@@ -1,5 +1,5 @@
-generated_at: '2026-04-22T13:28:49.702485'
-total_items: 30
+generated_at: '2026-04-22T14:26:44.964781'
+total_items: 31
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -519,6 +519,16 @@ items:
   work_total: 18
   work_done: 16
   work_ready: 1
+- id: consolidate-platform-config-builders-to-shared-helper
+  file: TODO/main/planning/consolidate-platform-config-builders-to-shared-helper.yaml
+  title: Consolidate platform config builders to use shared build_platform_config helper
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: Not Started
+  work_total: 9
+  work_done: 0
+  work_ready: 6
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases
