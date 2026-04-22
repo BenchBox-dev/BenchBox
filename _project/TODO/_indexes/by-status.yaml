@@ -1,8 +1,8 @@
-generated_at: '2026-04-22T14:32:15.041037'
-total_items: 31
+generated_at: '2026-04-22T14:37:37.618475'
+total_items: 32
 statuses:
   In Progress:
-    count: 2
+    count: 3
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
@@ -14,6 +14,11 @@ statuses:
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
       category: Core Functionality
+    - id: consolidate-platform-config-builders-to-shared-helper
+      file: TODO/main/active/consolidate-platform-config-builders-to-shared-helper.yaml
+      title: Consolidate platform config builders to use shared build_platform_config helper
+      priority: Medium-High
+      category: Code Quality and Technical Debt
   Not Started:
     count: 28
     items:
@@ -52,11 +57,6 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
-    - id: consolidate-platform-config-builders-to-shared-helper
-      file: TODO/main/planning/consolidate-platform-config-builders-to-shared-helper.yaml
-      title: Consolidate platform config builders to use shared build_platform_config helper
-      priority: Medium-High
-      category: Code Quality and Technical Debt
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence
@@ -142,6 +142,11 @@ statuses:
       title: TigerData Cloud Enhancements
       priority: Low
       category: Platform Expansion
+    - id: upgrade-pandas-to-3x
+      file: TODO/main/planning/upgrade-pandas-to-3x.yaml
+      title: Upgrade pandas to 3.x after modin compat and Python 3.10 gates clear
+      priority: Low
+      category: Code Quality and Technical Debt
     - id: validate-and-integrate-tpc-tuning-json
       file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
       title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard

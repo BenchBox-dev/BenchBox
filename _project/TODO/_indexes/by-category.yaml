@@ -1,4 +1,4 @@
-generated_at: '2026-04-22T14:32:15.041013'
+generated_at: '2026-04-22T14:37:37.618448'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -33,16 +33,21 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 2
+    count: 3
     items:
     - id: consolidate-platform-config-builders-to-shared-helper
-      file: TODO/main/planning/consolidate-platform-config-builders-to-shared-helper.yaml
+      file: TODO/main/active/consolidate-platform-config-builders-to-shared-helper.yaml
       title: Consolidate platform config builders to use shared build_platform_config helper
       priority: Medium-High
-      status: Not Started
+      status: In Progress
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
+      priority: Low
+      status: Not Started
+    - id: upgrade-pandas-to-3x
+      file: TODO/main/planning/upgrade-pandas-to-3x.yaml
+      title: Upgrade pandas to 3.x after modin compat and Python 3.10 gates clear
       priority: Low
       status: Not Started
   Core Functionality:

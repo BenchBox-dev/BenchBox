@@ -1,5 +1,5 @@
-generated_at: '2026-04-22T14:32:15.041027'
-total_items: 31
+generated_at: '2026-04-22T14:37:37.618465'
+total_items: 32
 priorities:
   Critical:
     count: 1
@@ -51,10 +51,10 @@ priorities:
       category: Core Functionality
       status: In Progress
     - id: consolidate-platform-config-builders-to-shared-helper
-      file: TODO/main/planning/consolidate-platform-config-builders-to-shared-helper.yaml
+      file: TODO/main/active/consolidate-platform-config-builders-to-shared-helper.yaml
       title: Consolidate platform config builders to use shared build_platform_config helper
       category: Code Quality and Technical Debt
-      status: Not Started
+      status: In Progress
   Medium:
     count: 8
     items:
@@ -99,7 +99,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Low:
-    count: 13
+    count: 14
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -160,6 +160,11 @@ priorities:
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
       category: Platform Expansion
+      status: Not Started
+    - id: upgrade-pandas-to-3x
+      file: TODO/main/planning/upgrade-pandas-to-3x.yaml
+      title: Upgrade pandas to 3.x after modin compat and Python 3.10 gates clear
+      category: Code Quality and Technical Debt
       status: Not Started
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml

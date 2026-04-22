@@ -1,5 +1,5 @@
-generated_at: '2026-04-22T14:32:15.040984'
-total_items: 31
+generated_at: '2026-04-22T14:37:37.618412'
+total_items: 32
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -295,6 +295,24 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
+- id: upgrade-pandas-to-3x
+  file: TODO/main/planning/upgrade-pandas-to-3x.yaml
+  title: Upgrade pandas to 3.x after modin compat and Python 3.10 gates clear
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Not Started
+  tags:
+  - deps
+  - pandas
+  - modin
+  - python-version
+  - breaking-change
+  estimated_effort: Medium (1-2 days once gates clear)
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+  deferred_count: 2
 - id: wikipedia-pageviews-benchmark
   file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
   title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
@@ -520,14 +538,14 @@ items:
   work_done: 16
   work_ready: 1
 - id: consolidate-platform-config-builders-to-shared-helper
-  file: TODO/main/planning/consolidate-platform-config-builders-to-shared-helper.yaml
+  file: TODO/main/active/consolidate-platform-config-builders-to-shared-helper.yaml
   title: Consolidate platform config builders to use shared build_platform_config helper
   worktree: main
   category: Code Quality and Technical Debt
   priority: Medium-High
-  status: Not Started
+  status: In Progress
   work_total: 9
-  work_done: 0
+  work_done: 1
   work_ready: 6
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml

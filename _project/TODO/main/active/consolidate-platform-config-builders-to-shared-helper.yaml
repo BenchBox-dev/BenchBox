@@ -2,7 +2,7 @@ id: consolidate-platform-config-builders-to-shared-helper
 title: "Consolidate platform config builders to use shared build_platform_config helper"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Code Quality and Technical Debt
 description: |
   21 platform adapters each have a _build_<platform>_config function that performs
@@ -80,7 +80,7 @@ work:
 - id: w1
   summary: "Audit Group B adapters — confirm conditional-schema and missing benchmark fields are safe to normalize"
   needs: []
-  status: pending
+  status: done
   notes: |
     Three specific questions to answer before w4 can proceed:
 
@@ -131,13 +131,14 @@ work:
     saved_creds={"schema": "custom"} → confirm saved_creds win over base_options (priority invariant).
 
 - id: w3
-  summary: "Consolidate Group A — databend, clickhouse_cloud, spark, snowflake, databricks (if w1 clears)"
-  needs: []  # databend/clickhouse_cloud/spark/snowflake are fully independent; databricks requires w1 Q2 first — do those four first, hold databricks until w1 is done
+  summary: "Consolidate Group A — databend, clickhouse_cloud, spark, snowflake, databricks"
+  needs: []
   status: pending
   notes: |
-    Five platforms where every config_dict entry is a plain merged_options.get(field) with no
-    special logic. Databricks inclusion depends on w1 Q2 — if DatabaseConfig fields are Optional,
-    include databricks here; if not, defer to w4.
+    Five platforms where every config_dict entry is a plain merged_options.get(field).
+    NOTE: clickhouse_cloud, snowflake, databricks all have the credential merge order bug
+    (saved_creds updated before options). Consolidation to build_platform_config fixes this
+    as a side-effect — each commit message should note the merge-order fix.
 
     For each platform, the swap is:
     1. Remove: CredentialManager import, cred_manager, saved_creds, explicit_options, merged_options,
@@ -161,7 +162,6 @@ work:
       databricks:     credential_key="databricks",      driver="databricks-sql-connector", display="Databricks"
                       fields: server_hostname, http_path, access_token, catalog, schema,
                               uc_catalog, uc_schema, uc_volume, staging_root
-                      (benchmark/scale_factor/tuning_config: defer if w1 Q2 shows unsafe)
 
     Commit per platform (5 commits), or group if they're truly trivial after first one succeeds.
 
@@ -170,26 +170,27 @@ work:
   needs: [w1]
   status: pending
   notes: |
-    Apply w1 findings to determine exact handling per platform.
+    w1 FINDINGS:
+      Q1 (schema): ALL SAFE. trino/presto/starburst from_config() all use
+        `if "schema" in config and config["schema"]:` — handles None correctly.
+        Include "schema" in platform_fields for all three.
+      Q2 (databricks benchmark fields): DatabaseConfig uses extra="allow" — benchmark,
+        scale_factor, tuning_config are extra fields with no validators. Safe as None.
+        Databricks promoted to Group A (w3).
+      Q3 (firebolt deployment_mode): Equivalent. Include in platform_fields.
 
-    trino:     fields: host, port, catalog, username, password, http_scheme, verify_ssl, ssl_cert_path,
-                       session_properties, query_timeout, timezone, table_format, staging_root
-               schema: include if w1 Q1 confirms safe; otherwise handle via post-call patch (see below)
-    presto:    fields: host, port, catalog, username, password, http_scheme, verify_ssl, ssl_cert_path,
-                       session_properties, query_timeout, table_format, staging_root
-               schema: same as trino
-    starburst: fields: host, port, catalog, username, password, role, http_scheme, verify_ssl,
-                       ssl_cert_path, session_properties, query_timeout, timezone, table_format, staging_root
-               schema: same as trino
-    firebolt:  fields: url, client_id, client_secret, account_name, engine_name, api_endpoint,
+    trino:     credential_key="trino", default_display_name="Trino", default_driver_package="trino"
+               fields: host, port, catalog, username, password, http_scheme, verify_ssl, ssl_cert_path,
+                       session_properties, query_timeout, timezone, table_format, staging_root, schema
+    presto:    credential_key="presto", default_display_name="Presto", default_driver_package="presto-python-client"
+               fields: host, port, catalog, username, password, http_scheme, verify_ssl, ssl_cert_path,
+                       session_properties, query_timeout, table_format, staging_root, schema
+    starburst: credential_key="starburst", default_display_name="Starburst", default_driver_package="trino"
+               fields: host, port, catalog, username, password, role, http_scheme, verify_ssl,
+                       ssl_cert_path, session_properties, query_timeout, timezone, table_format, staging_root, schema
+    firebolt:  credential_key="firebolt", default_display_name="Firebolt", default_driver_package="firebolt-sdk"
+               fields: url, client_id, client_secret, account_name, engine_name, api_endpoint,
                        deployment_mode, s3_staging_url, s3_region
-               (deployment_mode confirmed equivalent in w1 Q3)
-
-    If schema=None is NOT safe for any adapter, use this post-call patch pattern:
-      config = build_platform_config(...)
-      if overrides.get("schema"):
-          object.__setattr__(config, "schema", overrides["schema"])  # or rebuild via model_copy
-    Prefer avoiding this if w1 confirms None is safe.
 
 - id: w5
   summary: "Investigate Group C (pg_duckdb, pg_mooncake, timescaledb) — triple-layer defaults and base_options sufficiency"
