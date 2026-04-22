@@ -45,7 +45,7 @@ deps:
 guardrails:
   verification:
     command: "uv run -- python -m pytest -m fast -q"
-    expected: "Pass count does not decrease from current baseline (20983 passed as of 2026-04-22)"
+    expected: "Pass count does not decrease from current baseline (20996 passed as of 2026-04-22; 19 pre-existing unrelated failures also present)"
   must_preserve:
   - "Merge priority order in build_platform_config: defaults < saved_creds < explicit_options < overrides — this is the invariant the credential bug fix established"
   - "Identical DatabaseConfig output for identical inputs before and after each platform consolidation"
@@ -79,6 +79,7 @@ guardrails:
 work:
 - id: w1
   summary: "Audit Group B adapters — confirm conditional-schema and missing benchmark fields are safe to normalize"
+  needs: []
   status: pending
   notes: |
     Three specific questions to answer before w4 can proceed:
@@ -131,7 +132,7 @@ work:
 
 - id: w3
   summary: "Consolidate Group A — databend, clickhouse_cloud, spark, snowflake, databricks (if w1 clears)"
-  needs: []
+  needs: []  # databend/clickhouse_cloud/spark/snowflake are fully independent; databricks requires w1 Q2 first — do those four first, hold databricks until w1 is done
   status: pending
   notes: |
     Five platforms where every config_dict entry is a plain merged_options.get(field) with no
