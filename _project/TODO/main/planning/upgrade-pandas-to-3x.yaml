@@ -7,7 +7,7 @@ category: Code Quality and Technical Debt
 description: |
   pandas 3.0.2 is available on PyPI but cannot be safely bumped yet.
   A compatibility evaluation (2026-04-22) found two hard blockers that must
-  clear before any work begins, plus three targeted code fixes needed before
+  clear before the actual lock bump begins, plus two targeted code fixes needed before
   the lock bump lands.
 
   ── HARD BLOCKERS (do not proceed until both are resolved) ──────────────────
@@ -36,14 +36,18 @@ description: |
      Fix: add an upper guard `pandas_version < (3, 0)` so the assignment is
      skipped on 3.x where CoW is always active.
 
-  4. tpcdi/benchmark.py and tpcdi/tools/file_parsers.py — datetime resolution.
+  4. TPC-DI ingest + ETL datetime resolution.
      pandas 3.0 defaults to microsecond resolution for datetime parsing
-     (vs. nanoseconds in 2.x). Any code in these files that reads date/time
-     columns via pd.read_csv / pd.read_fwf / pd.read_json and subsequently
-     converts to int64 or compares values numerically will produce 1000×
-     different results under 3.x. Audit and add explicit `dtype_backend` or
-     explicit `parse_dates=False` where the downstream code is resolution-
-     sensitive. (CoW in-place mutation audit was clean — no fixes needed there.)
+     (vs. nanoseconds in 2.x). Any code in `tpcdi/benchmark.py`,
+     `tpcdi/tools/file_parsers.py`, `tpcdi/etl/batch.py`,
+     `tpcdi/etl/transformations.py`, `tpcdi/etl/validation.py`, or
+     `tpcdi/tools/data_cleaners.py` that reads or normalizes date/time values
+     via pd.read_csv / pd.read_fwf / pd.read_json / pd.to_datetime and then
+     converts to int64 or compares values numerically can produce 1000×
+     different results under 3.x. Audit and add explicit `dtype_backend`,
+     `parse_dates=False`, or explicit resolution normalization where the
+     downstream code is resolution-sensitive. (CoW in-place mutation audit was
+     clean — no fixes needed there.)
 
   ── EVALUATION SUMMARY ───────────────────────────────────────────────────────
 
@@ -51,7 +55,8 @@ description: |
   BenchBox codebase:
   - DataFrame.swapaxes / append / Index.format() — not used, no impact.
   - groupby/resample keyword changes — not used in DataFrame platform layer.
-  - read_csv/read_parquet dtype backend changes — affects TPC-DI only (item 4).
+  - datetime-unit changes in read/normalize paths — affects the TPC-DI ingest
+    and ETL pipeline only (item 4).
   - CoW mandatory — in-place mutation audit clean; only item 3 needs a guard.
   Estimated effort once gates clear: 1–2 days.
 
@@ -66,18 +71,16 @@ work:
     status: pending
 
   - id: w3
-    summary: "Add `pandas_version < (3, 0)` upper guard to the `pd.options.mode.copy_on_write` block in benchbox/platforms/dataframe/pandas_df.py:~145"
-    needs: [w2]
+    summary: "Add `pandas_version < (3, 0)` upper guard to the `pd.options.mode.copy_on_write` block in benchbox/platforms/dataframe/pandas_df.py:~145 (defensive pre-work; can land before the lock bump)"
     status: pending
 
   - id: w4
-    summary: "Audit tpcdi/benchmark.py and tpcdi/tools/file_parsers.py for datetime resolution sensitivity (read_csv/read_fwf/read_json → int64 paths); fix explicit dtype_backend or resolution where needed"
-    needs: [w2]
+    summary: "Audit the full TPC-DI datetime ingest/ETL path for resolution sensitivity; fix explicit dtype_backend / parse_dates / normalization where needed"
     status: pending
 
   - id: w5
     summary: "Run `uv lock --upgrade-package pandas`, run `uv run -- python -m pytest -m fast -q` and confirm only pre-existing failures appear (no new pandas-related failures)"
-    needs: [w3, w4]
+    needs: [w2, w3, w4]
     status: pending
 
   - id: w6
@@ -90,6 +93,10 @@ files_affected:
     - "benchbox/platforms/dataframe/pandas_df.py"
     - "benchbox/core/tpcdi/benchmark.py"
     - "benchbox/core/tpcdi/tools/file_parsers.py"
+    - "benchbox/core/tpcdi/etl/batch.py"
+    - "benchbox/core/tpcdi/etl/transformations.py"
+    - "benchbox/core/tpcdi/etl/validation.py"
+    - "benchbox/core/tpcdi/tools/data_cleaners.py"
     - "pyproject.toml"
 
 must_preserve:
@@ -99,9 +106,11 @@ must_preserve:
   - "Fast test suite baseline: currently 19 pre-existing failures — bump must not add new failures"
 
 approach: |
-  Gate-first, not code-first. Do w1 and w2 before touching any source files.
-  Items 3 and 4 are purely defensive guards, not feature work — keep them
-  minimal. The lock bump (w5) is the verification step, not the starting point.
+  Gate-first for the actual pandas bump, not for every defensive code change.
+  Items 3 and 4 are pre-flight guards and may land before w1/w2 if helpful,
+  but do not attempt the lock bump (w5) until both gates are resolved. Keep
+  the pre-flight changes minimal. The lock bump (w5) is the verification step,
+  not the starting point.
 
   For the modin gate: watch modin's GitHub releases page and pyproject.toml
   `install_requires` for `pandas` upper bound removal. A `pandas<3` → `pandas>=3`
@@ -135,6 +144,10 @@ scope_limit:
     - "benchbox/platforms/dataframe/pandas_df.py"
     - "benchbox/core/tpcdi/benchmark.py"
     - "benchbox/core/tpcdi/tools/file_parsers.py"
+    - "benchbox/core/tpcdi/etl/batch.py"
+    - "benchbox/core/tpcdi/etl/transformations.py"
+    - "benchbox/core/tpcdi/etl/validation.py"
+    - "benchbox/core/tpcdi/tools/data_cleaners.py"
     - "pyproject.toml"
     - "tests/unit/platforms/dataframe/"
     - "tests/unit/core/tpcdi/"
